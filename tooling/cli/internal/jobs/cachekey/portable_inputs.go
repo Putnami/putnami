@@ -64,7 +64,8 @@ type PortablePlanInputs struct {
 // and never hashes anything. One call memoizes its collector results, so a
 // project tree is walked once for a pattern set however many jobs share it —
 // the same reason the key path memoizes through the CacheManager.
-func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, commandParams map[string]any) (PortablePlanInputs, error) {
+// expander is the one the keys pass for their input selectors.
+func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, commandParams map[string]any, expander store.InputExpander) (PortablePlanInputs, error) {
 	inputs := PortablePlanInputs{Tasks: make([]PortableTaskInputs, 0, len(planned))}
 	if ws == nil {
 		return inputs, nil
@@ -78,7 +79,7 @@ func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, c
 			return PortablePlanInputs{}, err
 		}
 		files, workspaceFiles := KeyFilePatterns(ws, job, commandParams)
-		declared, fallback, goEmbed, err := portableKeyFiles(memo, ws, job, files, workspaceFiles)
+		declared, fallback, goEmbed, err := portableKeyFiles(memo, ws, job, files, workspaceFiles, expander)
 		if err != nil {
 			return PortablePlanInputs{}, err
 		}
@@ -95,19 +96,20 @@ func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, c
 // worktree it describes is read at one instant, and a later call must see a
 // later tree. A NUL separator cannot appear in a path or in a manifest glob,
 // so two different pattern sets cannot share a key.
+// The key leaves the expander out: one call passes one expander.
 type keyFileMemo map[string]store.KeyFileSelection
 
-func (m keyFileMemo) collect(root string, patterns []string) ([]string, error) {
-	selection, err := m.collectSelection(root, patterns)
+func (m keyFileMemo) collect(root string, patterns []string, expander store.InputExpander) ([]string, error) {
+	selection, err := m.collectSelection(root, patterns, expander)
 	return selection.Files, err
 }
 
-func (m keyFileMemo) collectSelection(root string, patterns []string) (store.KeyFileSelection, error) {
+func (m keyFileMemo) collectSelection(root string, patterns []string, expander store.InputExpander) (store.KeyFileSelection, error) {
 	key := root + "\x00" + strings.Join(patterns, "\x00")
 	if cached, found := m[key]; found {
 		return cached, nil
 	}
-	files, err := store.CollectKeyFileSelection(root, patterns)
+	files, err := store.CollectKeyFileSelection(root, patterns, expander)
 	if err != nil {
 		return store.KeyFileSelection{}, err
 	}
@@ -124,14 +126,14 @@ func (m keyFileMemo) collectSelection(root string, patterns []string) (store.Key
 // The fallback is deliberately independent of the RUN's cache bypass: whether
 // --no-cache was typed does not change what a task reads, and the bound set
 // travels inside the request's identity, which must not move with a flag.
-func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *jobmodel.ScheduledJob, files, workspaceFiles []string) (declared, fallback, goEmbed []string, resultErr error) {
+func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *jobmodel.ScheduledJob, files, workspaceFiles []string, expander store.InputExpander) (declared, fallback, goEmbed []string, resultErr error) {
 	projectRoot := filepath.Join(ws.Root, job.Project.Path)
 	var absolute, fallbackAbsolute, semanticAbsolute []string
 	collect := func(root string, patterns []string, explicit bool) []string {
 		if resultErr != nil {
 			return nil
 		}
-		selection, err := memo.collectSelection(root, patterns)
+		selection, err := memo.collectSelection(root, patterns, expander)
 		resultErr = err
 		if explicit {
 			semanticAbsolute = append(semanticAbsolute, selection.GoEmbed...)

@@ -731,7 +731,7 @@ func validateDeclaredGoEmbedSelectors(ws *workspace.Workspace, job *jobmodel.Sch
 	for _, patterns := range [][]string{ParamStrings(params, "filePatterns"), ProjectFilePatterns(ws, job)} {
 		for _, pattern := range patterns {
 			if strings.HasPrefix(pattern, "go-embed:") {
-				return fmt.Errorf("%w: selector %q requires an extension task input, not filePatterns", store.ErrGoEmbedInput, pattern)
+				return fmt.Errorf("%w: selector %q requires an extension task input, not filePatterns", store.ErrInputSelector, pattern)
 			}
 		}
 	}
@@ -741,7 +741,8 @@ func validateDeclaredGoEmbedSelectors(ws *workspace.Workspace, job *jobmodel.Sch
 // ValidateUnkeyedGoEmbedInputs keeps required selector inputs fail-closed for
 // tasks without a cache identity. Keyed tasks validate these same declarations
 // through ComputeHashUsing; this path runs only when key computation is skipped.
-func ValidateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *jobmodel.ScheduledJob, params map[string]any) error {
+// expander is the one the job's key passes for its input selectors.
+func ValidateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *jobmodel.ScheduledJob, params map[string]any, expander store.InputExpander) error {
 	if err := validateDeclaredGoEmbedSelectors(ws, job, params); err != nil {
 		return err
 	}
@@ -759,8 +760,8 @@ func ValidateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *jobmodel.Schedul
 		if !hasSelector(patterns) {
 			return nil
 		}
-		_, err := cache.HashFiles(root, patterns, scope)
-		if errors.Is(err, store.ErrGoEmbedInput) {
+		_, err := cache.HashFiles(root, patterns, expander, scope)
+		if errors.Is(err, store.ErrInputSelector) {
 			return err
 		}
 		return nil
@@ -779,7 +780,7 @@ func ValidateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *jobmodel.Schedul
 		}
 	}
 	if job.InvocationProducer != nil {
-		if err := ValidateUnkeyedGoEmbedInputs(ws, job.InvocationProducer, params); err != nil {
+		if err := ValidateUnkeyedGoEmbedInputs(ws, job.InvocationProducer, params, expander); err != nil {
 			return fmt.Errorf("invocation producer for %s: %w", job.Key(), err)
 		}
 	}
@@ -865,6 +866,9 @@ func ComputeJobCacheHashWith(
 	// reads only the layers this job's extension owns (see ProjectConfigScope).
 	policy.ConfigScope = JobConfigScope(ws, job)
 
+	// The store expands the input selectors the key patterns name.
+	policy.InputExpander = store.GoEmbedExpander()
+
 	// Resolve cross-project generate assets as extra files for cache key
 	policy.ExtraFiles = append(policy.ExtraFiles, GenerateAssetFiles(ws, job)...)
 
@@ -929,7 +933,7 @@ func ComputeJobCacheHashWith(
 	// runtime walks the closure's infra/requirements.json — kept one key while
 	// the environment it provisions changed, and the consumer that folds its
 	// action digest served a stored verdict against a different world.
-	digest, err := closureInputsDigest(ws, job, cache)
+	digest, err := closureInputsDigest(ws, job, cache, policy.InputExpander)
 	if err != nil {
 		return "", err
 	}
@@ -1109,7 +1113,8 @@ func closureKeyPatterns(job *jobmodel.ScheduledJob) []string {
 // skipped, so ADDING a manifest to a dependency moves the key exactly as
 // editing one does. The per-member digests come from the CacheManager's memo, so
 // one closure walk costs one stat per (member, pattern set) per CLI invocation.
-func closureInputsDigest(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache *store.CacheManager) (string, error) {
+// expander expands the input selectors the closure patterns name.
+func closureInputsDigest(ws *workspace.Workspace, job *jobmodel.ScheduledJob, cache *store.CacheManager, expander store.InputExpander) (string, error) {
 	patterns := closureKeyPatterns(job)
 	if len(patterns) == 0 || ws == nil || cache == nil || job == nil || job.Project == nil {
 		return "", nil
@@ -1122,7 +1127,7 @@ func closureInputsDigest(ws *workspace.Workspace, job *jobmodel.ScheduledJob, ca
 	// anyway: the digest must not depend on the graph walk's ordering.
 	parts := make([]string, 0, len(members))
 	for _, member := range members {
-		digest, err := cache.HashFiles(filepath.Join(ws.Root, member.Path), patterns, JobConfigScope(ws, job))
+		digest, err := cache.HashFiles(filepath.Join(ws.Root, member.Path), patterns, expander, JobConfigScope(ws, job))
 		if err != nil {
 			return "", fmt.Errorf("closure inputs for %s: %w", member.ID, err)
 		}

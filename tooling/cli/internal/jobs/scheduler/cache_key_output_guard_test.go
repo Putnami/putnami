@@ -550,7 +550,7 @@ func collectWitnesses(t *testing.T, reader string, patterns, witnesses []string)
 		for _, rel := range bucket {
 			writeTestFile(t, filepath.Join(dir, filepath.FromSlash(rel)), "")
 		}
-		files, err := store.CollectKeyFiles(dir, patterns)
+		files, err := store.CollectKeyFiles(dir, patterns, store.GoEmbedExpander())
 		if err != nil {
 			t.Fatalf("%s: collect key files with %q: %v", reader, patterns, err)
 		}

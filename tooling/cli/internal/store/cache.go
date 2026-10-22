@@ -130,7 +130,10 @@ func NewCacheManager(store *LocalStore) *CacheManager {
 // key computed after a task ran reads that task's bytes. A digest computed
 // while an invalidation named a path in its region may hold bytes from before
 // that write, so it is returned but not memoized (inputHashMemo.memoize).
-func (cm *CacheManager) lookupFileHash(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
+//
+// The memo key leaves expander out: every caller of one manager passes
+// expanders that expand a selector alike (InputExpander).
+func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
 	// The scope selects which bytes of a project config the digest reads, so two
 	// scopes are two different values and must never share one memo entry.
 	key := dir + "|" + strings.Join(patterns, ",") + "|" + strings.Join(scope.ExtensionLayers, "\x00") +
@@ -144,7 +147,7 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, scope Proj
 		return cached, nil
 	}
 
-	hash, err := memoizedHashFiles(dir, patterns, scope)
+	hash, err := memoizedHashFiles(dir, patterns, expander, scope)
 	if err != nil {
 		return "", err
 	}
@@ -166,12 +169,13 @@ var memoizedHashFiles = hashFiles
 // make a clean status entry non-restorable. It must pass the SAME scope the key
 // used: a narrower detector misses keyed edits, and a wider one reports edits
 // the key ignores. A source rewriter's scope is Verbatim, so a layout-only
-// rewrite of a project config is a keyed mutation.
-func (cm *CacheManager) HashFiles(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
+// rewrite of a project config is a keyed mutation. It passes the key's
+// expander too, which expands the input selectors patterns name.
+func (cm *CacheManager) HashFiles(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
 	if cm == nil {
 		return "", fmt.Errorf("cache manager is nil")
 	}
-	return cm.lookupFileHash(dir, patterns, scope)
+	return cm.lookupFileHash(dir, patterns, expander, scope)
 }
 
 // InvalidateFileHashes drops every memoized input digest, project files and
@@ -422,6 +426,12 @@ type CacheKey struct {
 	// key built without it is the wider of the two and never the wrong one.
 	ConfigScope ProjectConfigScope
 
+	// InputExpander expands the input selectors FilePatterns and
+	// WorkspaceFilePatterns name. Without one, a pattern set that names a
+	// selector is an invalid input selection (ErrInputSelector). The hash reads
+	// the files it lists, never the expander itself.
+	InputExpander InputExpander
+
 	// ProjectRoot is the absolute path to the project directory.
 	ProjectRoot string
 
@@ -532,7 +542,7 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 
 	// File content hash
 	if k.ProjectRoot != "" {
-		fileHash, err := cm.lookupFileHash(k.ProjectRoot, k.FilePatterns, k.ConfigScope)
+		fileHash, err := cm.lookupFileHash(k.ProjectRoot, k.FilePatterns, k.InputExpander, k.ConfigScope)
 		if err != nil {
 			return "", fmt.Errorf("hash files: %w", err)
 		}
@@ -542,7 +552,7 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	if k.WorkspaceRoot != "" && len(k.WorkspaceFilePatterns) > 0 {
 		// Every project config under the workspace root belongs to some other
 		// project, so a workspace-scoped pattern reads it whole.
-		workspaceHash, err := cm.lookupFileHash(k.WorkspaceRoot, k.WorkspaceFilePatterns,
+		workspaceHash, err := cm.lookupFileHash(k.WorkspaceRoot, k.WorkspaceFilePatterns, k.InputExpander,
 			ProjectConfigScope{Verbatim: k.ConfigScope.Verbatim})
 		if err != nil {
 			return "", fmt.Errorf("hash workspace files: %w", err)
@@ -831,6 +841,7 @@ func BuildCacheKey(
 		EnvVars:                       cachePolicy.Env,
 		ExtraFiles:                    cachePolicy.ExtraFiles,
 		ConfigScope:                   cachePolicy.ConfigScope,
+		InputExpander:                 cachePolicy.InputExpander,
 		UpstreamHashes:                upstreamHashes,
 	}
 }
@@ -914,6 +925,8 @@ type CacheKeyPolicy struct {
 	// ConfigScope names the extension whose option layers a hashed project
 	// config contributes. Empty keeps the file whole.
 	ConfigScope ProjectConfigScope
+	// InputExpander expands the input selectors Files and WorkspaceFiles name.
+	InputExpander InputExpander
 }
 
 // CacheHitResult holds the outcome of a cache lookup for a job.

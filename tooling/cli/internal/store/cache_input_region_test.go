@@ -206,7 +206,7 @@ func TestInvalidateFileHashesUnderDropsTheDigestsAWriteCanMove(t *testing.T) {
 	cm := NewCacheManager(nil)
 	digest := func(patterns ...string) string {
 		t.Helper()
-		hash, err := cm.HashFiles(dir, patterns, ProjectConfigScope{})
+		hash, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -245,8 +245,8 @@ func TestDigestSpanningAnInvalidationIsNotMemoized(t *testing.T) {
 	cm := NewCacheManager(nil)
 	original := memoizedHashFiles
 	t.Cleanup(func() { memoizedHashFiles = original })
-	memoizedHashFiles = func(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
-		hash, err := original(dir, patterns, scope)
+	memoizedHashFiles = func(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
+		hash, err := original(dir, patterns, expander, scope)
 		// The writer lands its output and invalidates while this digest of the
 		// old bytes is still in flight.
 		writeRegionFile(t, layer, "new layer")
@@ -255,11 +255,11 @@ func TestDigestSpanningAnInvalidationIsNotMemoized(t *testing.T) {
 		return hash, err
 	}
 
-	stale, err := cm.HashFiles(dir, []string{".gen/**"}, ProjectConfigScope{})
+	stale, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := cm.HashFiles(dir, []string{".gen/**"}, ProjectConfigScope{})
+	fresh, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,8 +289,8 @@ func TestDigestSpanningUnrelatedInvalidationsIsMemoizedWhileTheyAreRemembered(t 
 			cm := NewCacheManager(nil)
 			original := memoizedHashFiles
 			t.Cleanup(func() { memoizedHashFiles = original })
-			memoizedHashFiles = func(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
-				hash, err := original(dir, patterns, scope)
+			memoizedHashFiles = func(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
+				hash, err := original(dir, patterns, expander, scope)
 				// Other tasks land outputs elsewhere while this digest is in flight.
 				for range tc.invalidations {
 					cm.InvalidateFileHashesUnder([]string{filepath.Join(dir, "elsewhere")})
@@ -299,13 +299,13 @@ func TestDigestSpanningUnrelatedInvalidationsIsMemoizedWhileTheyAreRemembered(t 
 				return hash, err
 			}
 
-			first, err := cm.HashFiles(dir, []string{".gen/**"}, ProjectConfigScope{})
+			first, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			// An edit no invalidation names: only a fresh computation sees it.
 			writeRegionFile(t, layer, "edited layer")
-			second, err := cm.HashFiles(dir, []string{".gen/**"}, ProjectConfigScope{})
+			second, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
 			if err != nil {
 				t.Fatal(err)
 			}

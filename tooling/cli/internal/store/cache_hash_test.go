@@ -99,7 +99,7 @@ func TestCollectFiles_EmptyPatterns(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a"), 0o644)
 	os.WriteFile(filepath.Join(dir, "b.go"), []byte("package b"), 0o644)
 
-	files, err := collectFiles(dir, nil)
+	files, err := collectFiles(dir, nil, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestCollectFiles_SkipsHidden(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
 	os.WriteFile(filepath.Join(dir, ".git", "HEAD"), []byte("ref"), 0o644)
 
-	files, err := collectFiles(dir, nil)
+	files, err := collectFiles(dir, nil, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestCollectFiles_ARootNamedLikeASkippedDirectoryIsWalked(t *testing.T) {
 		os.WriteFile(filepath.Join(dir, "pkg", "api.go"), []byte("package pkg"), 0o644)
 		os.WriteFile(filepath.Join(dir, "pkg", "dist", "built.go"), []byte("package dist"), 0o644)
 
-		files, err := collectFiles(dir, []string{"**/*.go"})
+		files, err := collectFiles(dir, []string{"**/*.go"}, GoEmbedExpander())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +155,7 @@ func TestCollectFiles_ARootNamedLikeASkippedDirectoryKeysWithNoPattern(t *testin
 		os.WriteFile(filepath.Join(dir, "pkg", "api.go"), []byte("package pkg"), 0o644)
 		os.WriteFile(filepath.Join(dir, "pkg", "out", "built.go"), []byte("package out"), 0o644)
 
-		files, err := collectFiles(dir, nil)
+		files, err := collectFiles(dir, nil, GoEmbedExpander())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestCollectFiles_SkipsNodeModules(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "node_modules", "pkg"), 0o755)
 	os.WriteFile(filepath.Join(dir, "node_modules", "pkg", "index.js"), []byte("skip"), 0o644)
 
-	files, err := collectFiles(dir, nil)
+	files, err := collectFiles(dir, nil, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestCollectFiles_WithPatterns(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "main.go"), []byte("go"), 0o644)
 	os.WriteFile(filepath.Join(dir, "main.ts"), []byte("ts"), 0o644)
 
-	files, err := collectFiles(dir, []string{"*.go"})
+	files, err := collectFiles(dir, []string{"*.go"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestCollectFiles_DoubleStarRecurses(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "a", "b", "deep.go"), []byte("go"), 0o644)
 	os.WriteFile(filepath.Join(dir, "a", "note.txt"), []byte("txt"), 0o644)
 
-	files, err := collectFiles(dir, []string{"**/*.go"})
+	files, err := collectFiles(dir, []string{"**/*.go"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +225,7 @@ func TestCollectFiles_ExcludePattern(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "pkg", "lib.go"), []byte("go"), 0o644)
 	os.WriteFile(filepath.Join(dir, "pkg", "lib_test.go"), []byte("go"), 0o644)
 
-	files, err := collectFiles(dir, []string{"**/*.go", "!**/*_test.go"})
+	files, err := collectFiles(dir, []string{"**/*.go", "!**/*_test.go"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestCollectFiles_DoubleStarMatchesPathSuffix(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "pkg", "generated", "types.go"), []byte("go"), 0o644)
 	os.WriteFile(filepath.Join(dir, "pkg", "manual", "types.go"), []byte("go"), 0o644)
 
-	files, err := collectFiles(dir, []string{"**/generated/*.go"})
+	files, err := collectFiles(dir, []string{"**/generated/*.go"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,14 +265,14 @@ func TestHashFiles_ExcludedTestFileDoesNotChangeHash(t *testing.T) {
 	os.WriteFile(testFile, []byte("package main // v1"), 0o644)
 
 	patterns := []string{"**/*.go", "!**/*_test.go"}
-	h1, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	h1, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Editing an excluded test file must not change the hash.
 	os.WriteFile(testFile, []byte("package main // v2 changed"), 0o644)
-	h2, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	h2, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +282,7 @@ func TestHashFiles_ExcludedTestFileDoesNotChangeHash(t *testing.T) {
 
 	// Editing a non-test source file must change the hash.
 	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main // changed"), 0o644)
-	h3, _ := hashFiles(dir, patterns, ProjectConfigScope{})
+	h3, _ := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if h1 == h3 {
 		t.Error("editing a non-test source file should change the hash")
 	}
@@ -293,7 +293,7 @@ func TestCollectFiles_Deduplicate(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "main.go"), []byte("go"), 0o644)
 
 	// Overlapping patterns matching same file
-	files, err := collectFiles(dir, []string{"*.go", "main.*"})
+	files, err := collectFiles(dir, []string{"*.go", "main.*"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestHasMatchingFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	matched, err := HasMatchingFiles(dir, []string{"**/*.ts", "**/*.json"})
+	matched, err := HasMatchingFiles(dir, []string{"**/*.ts", "**/*.json"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestHasMatchingFiles(t *testing.T) {
 		t.Fatal("TypeScript patterns unexpectedly matched Go-only project through hidden generated metadata")
 	}
 
-	matched, err = HasMatchingFiles(dir, []string{"**/*.go"})
+	matched, err = HasMatchingFiles(dir, []string{"**/*.go"}, GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,29 +369,29 @@ func TestGoEmbedBatchProbeDefersSemanticReadToKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	patterns := []string{"**/*.go", "go-embed:build"}
-	if matched, err := HasMatchingFiles(dir, patterns); err != nil || !matched {
+	if matched, err := HasMatchingFiles(dir, patterns, GoEmbedExpander()); err != nil || !matched {
 		t.Fatalf("ordinary Go input should admit a live batch candidate: matched=%v err=%v", matched, err)
 	}
-	if _, err := hashFiles(dir, patterns, ProjectConfigScope{}); !errors.Is(err, ErrGoEmbedInput) {
+	if _, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{}); !errors.Is(err, ErrInputSelector) {
 		t.Fatalf("actual key must reject missing embedded input: %v", err)
 	}
-	if matched, err := HasMatchingFiles(dir, []string{"go-embed:build"}); !errors.Is(err, ErrGoEmbedInput) || matched {
+	if matched, err := HasMatchingFiles(dir, []string{"go-embed:build"}, GoEmbedExpander()); !errors.Is(err, ErrInputSelector) || matched {
 		t.Fatalf("selector-only batch must resolve inputs: matched=%v err=%v", matched, err)
 	}
-	if matched, err := HasMatchingFiles(dir, []string{"**/*.go", "go-embed:unknown"}); !errors.Is(err, ErrGoEmbedInput) || matched {
+	if matched, err := HasMatchingFiles(dir, []string{"**/*.go", "go-embed:unknown"}, GoEmbedExpander()); !errors.Is(err, ErrInputSelector) || matched {
 		t.Fatalf("unsupported selector must fail before ordinary probe: matched=%v err=%v", matched, err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "missing.txt"), []byte("A"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	first, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	first, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "missing.txt"), []byte("B"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	second, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	second, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil || first == second {
 		t.Fatalf("embedded bytes must still change key: first=%q second=%q err=%v", first, second, err)
 	}
@@ -403,13 +403,13 @@ func TestMixedGitGoInputRequiresAvailableCandidateInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	patterns := []string{"git:**", "**/*.go", "go-embed:build"}
-	if _, err := hashFiles(dir, patterns, ProjectConfigScope{}); !errors.Is(err, ErrGoEmbedInput) || !strings.Contains(err.Error(), "go input selection unavailable") {
+	if _, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{}); !errors.Is(err, ErrInputSelector) || !strings.Contains(err.Error(), "go input selection unavailable") {
 		t.Fatalf("mixed selection with unknown Git candidates must fail closed: %v", err)
 	}
-	if matched, err := HasMatchingFiles(dir, patterns); !errors.Is(err, ErrGoEmbedInput) || matched {
+	if matched, err := HasMatchingFiles(dir, patterns, GoEmbedExpander()); !errors.Is(err, ErrInputSelector) || matched {
 		t.Fatalf("mixed batch selection with unknown Git candidates: matched=%v err=%v", matched, err)
 	}
-	if _, err := hashFiles(dir, []string{"git:**"}, ProjectConfigScope{}); err == nil || errors.Is(err, ErrGoEmbedInput) {
+	if _, err := hashFiles(dir, []string{"git:**"}, GoEmbedExpander(), ProjectConfigScope{}); err == nil || errors.Is(err, ErrInputSelector) {
 		t.Fatalf("Git-only error must keep its generic category: %v", err)
 	}
 }
@@ -424,14 +424,14 @@ func TestMixedGitGoInputWithAvailableCandidatesHashesPayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	patterns := []string{"git:**", "**/*.go", "go-embed:build"}
-	first, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	first, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(asset, []byte("B"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	second, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	second, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil || first == second {
 		t.Fatalf("available mixed selection lost payload identity: %q %q %v", first, second, err)
 	}
@@ -441,7 +441,7 @@ func TestGoEmbedBatchProbeObservesCreationDeletionAndExclusion(t *testing.T) {
 	dir := t.TempDir()
 	patterns := []string{"file.txt", "go-embed:build"}
 	for i := 0; i < 2; i++ {
-		if matched, err := HasMatchingFiles(dir, patterns); err != nil || matched {
+		if matched, err := HasMatchingFiles(dir, patterns, GoEmbedExpander()); err != nil || matched {
 			t.Fatalf("empty probe %d: matched=%v err=%v", i, matched, err)
 		}
 	}
@@ -450,17 +450,17 @@ func TestGoEmbedBatchProbeObservesCreationDeletionAndExclusion(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		if matched, err := HasMatchingFiles(dir, patterns); err != nil || !matched {
+		if matched, err := HasMatchingFiles(dir, patterns, GoEmbedExpander()); err != nil || !matched {
 			t.Fatalf("created probe %d: matched=%v err=%v", i, matched, err)
 		}
 	}
-	if matched, err := HasMatchingFiles(dir, []string{"file.txt", "!file.txt", "go-embed:build"}); err != nil || matched {
+	if matched, err := HasMatchingFiles(dir, []string{"file.txt", "!file.txt", "go-embed:build"}, GoEmbedExpander()); err != nil || matched {
 		t.Fatalf("excluded ordinary input: matched=%v err=%v", matched, err)
 	}
 	if err := os.Remove(file); err != nil {
 		t.Fatal(err)
 	}
-	if matched, err := HasMatchingFiles(dir, patterns); err != nil || matched {
+	if matched, err := HasMatchingFiles(dir, patterns, GoEmbedExpander()); err != nil || matched {
 		t.Fatalf("deleted probe: matched=%v err=%v", matched, err)
 	}
 }
@@ -470,11 +470,11 @@ func TestHashFiles_Deterministic(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a"), 0o644)
 	os.WriteFile(filepath.Join(dir, "b.go"), []byte("package b"), 0o644)
 
-	h1, err := hashFiles(dir, nil, ProjectConfigScope{})
+	h1, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	h2, err := hashFiles(dir, nil, ProjectConfigScope{})
+	h2, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,12 +497,12 @@ func TestHashFiles_ManyFilesDeterministic(t *testing.T) {
 		}
 	}
 
-	first, err := hashFiles(dir, nil, ProjectConfigScope{})
+	first, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 5; i++ {
-		got, err := hashFiles(dir, nil, ProjectConfigScope{})
+		got, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -514,7 +514,7 @@ func TestHashFiles_ManyFilesDeterministic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "f100.go"), []byte("package p // changed"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if changed, _ := hashFiles(dir, nil, ProjectConfigScope{}); changed == first {
+	if changed, _ := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{}); changed == first {
 		t.Error("changing one file among many should change the hash")
 	}
 }
@@ -524,10 +524,10 @@ func TestHashFiles_ChangesWithContent(t *testing.T) {
 	path := filepath.Join(dir, "main.go")
 	os.WriteFile(path, []byte("v1"), 0o644)
 
-	h1, _ := hashFiles(dir, nil, ProjectConfigScope{})
+	h1, _ := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 
 	os.WriteFile(path, []byte("v2"), 0o644)
-	h2, _ := hashFiles(dir, nil, ProjectConfigScope{})
+	h2, _ := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 
 	if h1 == h2 {
 		t.Error("hashFiles should change when file content changes")
@@ -587,7 +587,7 @@ func TestHashFiles_ReadableTreeEncodingIsPinned(t *testing.T) {
 		t.Fatalf("the structural expectation drifted from the golden: %s != %s", structural, golden)
 	}
 
-	got, err := hashFiles(dir, nil, ProjectConfigScope{})
+	got, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -616,7 +616,7 @@ func TestHashFiles_UnreadableFileIsNeitherAbsentNorPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	readable, err := hashFiles(dir, nil, ProjectConfigScope{})
+	readable, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -624,7 +624,7 @@ func TestHashFiles_UnreadableFileIsNeitherAbsentNorPresent(t *testing.T) {
 	if !makeUnreadable(t, unreadablePath) {
 		t.Skip("the running user can still read a 0o000 file (root?); the skip cannot be exercised")
 	}
-	unreadable, err := hashFiles(dir, nil, ProjectConfigScope{})
+	unreadable, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +638,7 @@ func TestHashFiles_UnreadableFileIsNeitherAbsentNorPresent(t *testing.T) {
 	if err := os.Remove(unreadablePath); err != nil {
 		t.Fatal(err)
 	}
-	absent, err := hashFiles(dir, nil, ProjectConfigScope{})
+	absent, err := hashFiles(dir, nil, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +668,7 @@ func TestHashFiles_UnreadableVersionStampIsNotAbsent(t *testing.T) {
 	}
 
 	patterns := []string{"**/*.json"}
-	readable, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	readable, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -676,7 +676,7 @@ func TestHashFiles_UnreadableVersionStampIsNotAbsent(t *testing.T) {
 	if !makeUnreadable(t, stamp) {
 		t.Skip("the running user can still read a 0o000 file (root?); the skip cannot be exercised")
 	}
-	unreadable, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	unreadable, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +690,7 @@ func TestHashFiles_UnreadableVersionStampIsNotAbsent(t *testing.T) {
 	if err := os.Remove(stamp); err != nil {
 		t.Fatal(err)
 	}
-	absent, err := hashFiles(dir, patterns, ProjectConfigScope{})
+	absent, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -709,7 +709,7 @@ func TestHashFiles_ProjectConfigIgnoresTaskTuning(t *testing.T) {
 				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				hash, err := hashFiles(dir, []string{filename}, ProjectConfigScope{})
+				hash, err := hashFiles(dir, []string{filename}, GoEmbedExpander(), ProjectConfigScope{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -994,7 +994,7 @@ func TestHashFiles_VersionStampKeysTheTreeNotTheCommit(t *testing.T) {
 		if err := os.WriteFile(stamp, content, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		got, err := hashFiles(dir, []string{"**/*.json"}, ProjectConfigScope{})
+		got, err := hashFiles(dir, []string{"**/*.json"}, GoEmbedExpander(), ProjectConfigScope{})
 		if err != nil {
 			t.Fatalf("hashFiles: %v", err)
 		}
@@ -1092,12 +1092,12 @@ func TestHashFiles_VersionStampNormalizationIsNarrow(t *testing.T) {
 
 	sibling := filepath.Join(dir, "src", "version.json")
 	os.WriteFile(sibling, []byte(`{"buildTime":"A"}`), 0o644)
-	before, err := hashFiles(dir, []string{"**/*.json"}, ProjectConfigScope{})
+	before, err := hashFiles(dir, []string{"**/*.json"}, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatalf("hashFiles: %v", err)
 	}
 	os.WriteFile(sibling, []byte(`{"buildTime":"B"}`), 0o644)
-	after, err := hashFiles(dir, []string{"**/*.json"}, ProjectConfigScope{})
+	after, err := hashFiles(dir, []string{"**/*.json"}, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatalf("hashFiles: %v", err)
 	}
@@ -1107,12 +1107,12 @@ func TestHashFiles_VersionStampNormalizationIsNarrow(t *testing.T) {
 
 	stamp := filepath.Join(dir, ".gen", "version.json")
 	os.WriteFile(stamp, []byte("not json"), 0o644)
-	malformed, err := hashFiles(dir, []string{"**/*.json"}, ProjectConfigScope{})
+	malformed, err := hashFiles(dir, []string{"**/*.json"}, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatalf("hashFiles: %v", err)
 	}
 	os.WriteFile(stamp, []byte("still not json"), 0o644)
-	malformedEdited, err := hashFiles(dir, []string{"**/*.json"}, ProjectConfigScope{})
+	malformedEdited, err := hashFiles(dir, []string{"**/*.json"}, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatalf("hashFiles: %v", err)
 	}
@@ -1207,18 +1207,18 @@ func TestCollectKeyFilesAndExtraKeyFilesAgreeWithHashing(t *testing.T) {
 		}
 		return strings.Join(out, ",")
 	}
-	whole, err := CollectKeyFiles(dir, nil)
+	whole, err := CollectKeyFiles(dir, nil, GoEmbedExpander())
 	if err != nil || rel(whole) != "a.go,b_test.go,conf/local.txt,sub/c.go" {
 		t.Fatalf("empty patterns = %s (%v); expected the whole non-hidden tree", rel(whole), err)
 	}
 	// A pattern walk skips node_modules but not hidden directories: that is
 	// the key's own rule, and the admission must see what the key sees.
-	patterned, err := CollectKeyFiles(dir, []string{"**/*.go", "!**/*_test.go", "conf/*.txt"})
+	patterned, err := CollectKeyFiles(dir, []string{"**/*.go", "!**/*_test.go", "conf/*.txt"}, GoEmbedExpander())
 	if err != nil || rel(patterned) != ".hidden/d.go,a.go,conf/local.txt,sub/c.go" {
 		t.Fatalf("patterns = %s (%v)", rel(patterned), err)
 	}
 	// Same selection, same file set: the collector the key hashes through.
-	files, err := collectFiles(dir, []string{"**/*.go", "!**/*_test.go", "conf/*.txt"})
+	files, err := collectFiles(dir, []string{"**/*.go", "!**/*_test.go", "conf/*.txt"}, GoEmbedExpander())
 	if err != nil || len(files) != len(patterned) {
 		t.Fatalf("CollectKeyFiles diverged from collectFiles: %d vs %d", len(patterned), len(files))
 	}

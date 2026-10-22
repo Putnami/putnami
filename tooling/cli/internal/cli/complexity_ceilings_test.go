@@ -642,8 +642,8 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "cache",
 		prefix: "internal/store/",
-		files:  34,
-		funcs:  311,
+		files:  35,
+		funcs:  316,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -867,7 +867,17 @@ var complexityCeilings = []complexityCeiling{
 			"links on a region root, a dangling one included, so a read through a link and a " +
 			"write to its target overlap; OverlapsAsSpelled tells the planner when two regions " +
 			"meet only through such a link, so it decides that write by region and not by " +
-			"pattern. Neither reads, writes, addresses or evicts an entry",
+			"pattern. Neither reads, writes, addresses or evicts an entry. " +
+			"RAISED, from 34/311 to 35/316. input_expander.go is the one interface the key's " +
+			"collection reaches an input selector through: InputExpander, and GoEmbedExpander, " +
+			"whose ExpandInput, selectedGoLinks and relativeExpansion list what a go-embed " +
+			"selector reads with the SDK goembed package. In cache_hash.go, splitInputSelectors, " +
+			"collectPatternFiles and appendSelectorFiles replace appendSelectedGoReferents and " +
+			"appendGoEmbedInputs: collectFiles asks the expander once per selector and hashes " +
+			"each file it lists as exact bytes, and the expander lists the selected Go links " +
+			"with the collection's own pattern walk. Every key hashes the same bytes " +
+			"(input_expander_test.go pins a build and a test key). None reads, writes, " +
+			"addresses or evicts an entry",
 	},
 	{
 		unit:   "output",

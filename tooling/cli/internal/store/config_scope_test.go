@@ -39,7 +39,7 @@ func TestProjectConfigScope_KeepsWhatTheTaskReads(t *testing.T) {
 				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				hash, err := hashFiles(dir, []string{filename}, scope)
+				hash, err := hashFiles(dir, []string{filename}, GoEmbedExpander(), scope)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -95,12 +95,13 @@ func TestProjectConfigScope_EmptyScopeKeepsTheWholeFile(t *testing.T) {
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		scopedHash, err := hashFiles(dir, []string{wsproto.ConfigFilename},
+		scopedHash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(),
 			ProjectConfigScope{ExtensionLayers: []string{"@putnami/go"}})
+
 		if err != nil {
 			t.Fatal(err)
 		}
-		unscopedHash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, ProjectConfigScope{})
+		unscopedHash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), ProjectConfigScope{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,8 +123,9 @@ func TestProjectConfigScope_EmptyScopeKeepsTheWholeFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"name":"proj"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	bare, err := hashFiles(dir, []string{wsproto.ConfigFilename},
+	bare, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(),
 		ProjectConfigScope{ExtensionLayers: []string{"@putnami/go"}})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +148,7 @@ func TestProjectConfigScope_MalformedConfigIsHashedRaw(t *testing.T) {
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		hash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, scope)
+		hash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,11 +179,11 @@ func TestProjectConfigScope_MemoSeparatesScopes(t *testing.T) {
 	cm := NewCacheManager(NewLocalStore(t.TempDir()))
 	patterns := []string{wsproto.ConfigFilename}
 
-	goHash, err := cm.HashFiles(dir, patterns, ProjectConfigScope{ExtensionLayers: []string{"@putnami/go"}})
+	goHash, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{ExtensionLayers: []string{"@putnami/go"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	tsHash, err := cm.HashFiles(dir, patterns, ProjectConfigScope{ExtensionLayers: []string{"@putnami/typescript"}})
+	tsHash, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{ExtensionLayers: []string{"@putnami/typescript"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +193,7 @@ func TestProjectConfigScope_MemoSeparatesScopes(t *testing.T) {
 
 	// The memo must still be a memo: the same scope, spelled in another order,
 	// is the same value.
-	repeat, err := cm.HashFiles(dir, patterns, ProjectConfigScope{ExtensionLayers: []string{"@putnami/go"}})
+	repeat, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{ExtensionLayers: []string{"@putnami/go"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +221,7 @@ func TestProjectConfigScope_DeclaredNamespaces(t *testing.T) {
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		hash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, scope)
+		hash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -241,14 +243,14 @@ func TestProjectConfigScope_DeclaredNamespaces(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	before, err := hashFiles(dir, []string{wsproto.ConfigFilename}, shared)
+	before, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), shared)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte(`{"name":"proj","options":{"sdd":{"specs":"report"}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	after, err := hashFiles(dir, []string{wsproto.ConfigFilename}, shared)
+	after, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), shared)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +278,7 @@ func TestHashFiles_AForeignProjectConfigIsHashedWhole(t *testing.T) {
 	patterns := []string{"putnami.json", "../other/putnami.json"}
 	digest := func() string {
 		t.Helper()
-		got, err := hashFiles(filepath.Join(root, "proj"), patterns, scope)
+		got, err := hashFiles(filepath.Join(root, "proj"), patterns, GoEmbedExpander(), scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -313,11 +315,11 @@ func TestProjectConfigScope_VerbatimReadsEveryByte(t *testing.T) {
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		verbatimHash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, verbatim)
+		verbatimHash, err := hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), verbatim)
 		if err != nil {
 			t.Fatal(err)
 		}
-		projectedHash, err = hashFiles(dir, []string{wsproto.ConfigFilename}, projected)
+		projectedHash, err = hashFiles(dir, []string{wsproto.ConfigFilename}, GoEmbedExpander(), projected)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -343,11 +345,11 @@ func TestProjectConfigScope_VerbatimReadsEveryByte(t *testing.T) {
 	// for the projected one or the reverse.
 	cm := NewCacheManager(NewLocalStore(t.TempDir()))
 	patterns := []string{wsproto.ConfigFilename}
-	memoVerbatim, err := cm.HashFiles(dir, patterns, verbatim)
+	memoVerbatim, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), verbatim)
 	if err != nil {
 		t.Fatal(err)
 	}
-	memoWhole, err := cm.HashFiles(dir, patterns, ProjectConfigScope{})
+	memoWhole, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +412,7 @@ func TestHashFiles_GlobPatternReadsProjectConfigBytes(t *testing.T) {
 	}
 	digest := func(patterns ...string) string {
 		t.Helper()
-		got, err := hashFiles(dir, patterns, ProjectConfigScope{ExtensionLayers: []string{"@putnami/typescript"}})
+		got, err := hashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{ExtensionLayers: []string{"@putnami/typescript"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -474,7 +476,7 @@ func TestProjectConfigScope_VerbatimReachesConfigsOutsideTheProject(t *testing.T
 
 	across := func(scope ProjectConfigScope) string {
 		t.Helper()
-		got, err := hashFiles(filepath.Join(root, "proj"), []string{"index.ts", "../other/putnami.json"}, scope)
+		got, err := hashFiles(filepath.Join(root, "proj"), []string{"index.ts", "../other/putnami.json"}, GoEmbedExpander(), scope)
 		if err != nil {
 			t.Fatal(err)
 		}
