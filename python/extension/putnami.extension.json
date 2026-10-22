@@ -37,6 +37,7 @@
         "prependPath": true
       }
     },
+    "resolves": ["uv"],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": ["--output", "{runtimeOutput}"],

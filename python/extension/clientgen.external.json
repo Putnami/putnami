@@ -1,0 +1,28 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "uv release downloads (github.com/astral-sh/uv/releases): the sha256.sum checksum file a release publishes beside its archives",
+      "adapter": "python/extension/internal/toolchain/uvpin.go",
+      "callsites": [
+        {
+          "path": "python/extension/internal/toolchain/uvpin.go",
+          "transport": "http",
+          "symbol": "http.DefaultClient.Do",
+          "fingerprint": "4c508b54a39287ab83c626cc383345a296b7f8d75c287cc20d657a1dd8078aa2"
+        },
+        {
+          "path": "python/extension/internal/toolchain/uvpin.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "b67fb428b2aabab5fd3e98e53773256fc6dcda2c91aee2e8f38f28732bada3bd"
+        }
+      ],
+      "owner": "@putnami/python",
+      "tests": [
+        "python/extension/internal/toolchain/uvpin_test.go"
+      ],
+      "reason": "Reads the SHA-256 of each archive of a declared uv release from the checksum file the release publishes, to answer the toolchain-resolve call. The file format belongs to the uv release process, so no Putnami provider declaration can generate this client."
+    }
+  ]
+}

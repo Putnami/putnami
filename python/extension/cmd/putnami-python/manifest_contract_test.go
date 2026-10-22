@@ -14,6 +14,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/python/extension/internal/toolchain"
 	"go.putnami.dev/sdk/extension/docslinks"
 )
 
@@ -125,6 +126,26 @@ func TestPrepareBuildsWithTheLockedGo(t *testing.T) {
 	}
 	if !reflect.DeepEqual(compiler.Environment, wantEnv) {
 		t.Errorf("runtimeCompiler environment = %+v, want %+v", compiler.Environment, wantEnv)
+	}
+}
+
+// The extension answers the toolchain-resolve call for the uv lock identity,
+// which its uv runtime toolchain locks, and for no other: it does not answer
+// for go, which its runtime compiler locks. runtime.resolves takes no contract
+// rung, so cliContract stays the one the manifest's vocabulary requires.
+func TestRuntimeResolvesTheUVPin(t *testing.T) {
+	m := loadExtensionManifest(t)
+	if m.Runtime == nil {
+		t.Fatal("the manifest declares no runtime")
+	}
+	if got, want := m.Runtime.Resolves, []string{toolchain.UVLockIdentity}; !slices.Equal(got, want) {
+		t.Errorf("runtime.resolves = %v, want %v", got, want)
+	}
+	if lock := m.Runtime.Toolchains["uv"].Lock; lock != toolchain.UVLockIdentity {
+		t.Errorf("uv toolchain lock = %q, want the identity the extension answers for, %q", lock, toolchain.UVLockIdentity)
+	}
+	if m.CLIContract != proto.RequiredCLIContract(m) {
+		t.Errorf("cliContract = %d, want %d", m.CLIContract, proto.RequiredCLIContract(m))
 	}
 }
 
