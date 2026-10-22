@@ -68,6 +68,16 @@ func runEntrypoint(
 		return nil
 	}
 
+	// The toolchain-resolve call is a reserved control call too, with the
+	// probe's transport: one request on stdin, one result document on stdout,
+	// and nothing on stdout when it fails.
+	if handled, err := handleToolchainResolve(args, stdin, stdout); handled {
+		if err != nil {
+			return fmt.Errorf("toolchain-resolve: %w", err)
+		}
+		return nil
+	}
+
 	runSubcommands(commandHandlers())
 	return nil
 }

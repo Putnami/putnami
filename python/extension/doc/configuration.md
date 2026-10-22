@@ -186,6 +186,16 @@ under `[tool]`) or as an inline table (`uv = { managed = true }`). A
 `[tool.uv]` table added for `required-version` would define the table twice.
 Move those settings into a `[tool.uv]` table.
 
+The extension answers the `__putnami toolchain-resolve` control call for the
+`uv` lock identity, which its manifest lists in `runtime.resolves`. The answer
+is the next `toolchains.uv` pin: each platform's archive URL, format and `uv`
+executable path, with its SHA-256. The release comes from the `[tool.uv]`
+`required-version` of the root `pyproject.toml`. The lock's pin is kept when
+it matches that declaration, or when the file declares none. With neither a
+declaration nor a pin, the answer pins the default release, 0.11.32. The
+extension reads a release's checksum file only for a declared release that is
+neither pinned nor the default, and never on an offline request.
+
 A workspace that a CLI older than the uv pin installed has no `toolchains.uv`
 in its lock. See
 [Upgrading an existing workspace](./workspace-install.md#upgrading-an-existing-workspace).
