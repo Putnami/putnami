@@ -1,11 +1,43 @@
 {
-  "version": 3,
+  "version": 5,
   "cli": {
     "source": "workspace"
   },
   "toolchains": {
     "bun": {
       "version": "1.4.0",
+      "archives": {
+        "darwin/amd64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-x64.zip",
+          "format": "zip",
+          "executable": "bun-darwin-x64/bun"
+        },
+        "darwin/arm64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-aarch64.zip",
+          "format": "zip",
+          "executable": "bun-darwin-aarch64/bun"
+        },
+        "linux/amd64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip",
+          "format": "zip",
+          "executable": "bun-linux-x64/bun"
+        },
+        "linux/arm64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-aarch64.zip",
+          "format": "zip",
+          "executable": "bun-linux-aarch64/bun"
+        },
+        "windows/amd64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-x64.zip",
+          "format": "zip",
+          "executable": "bun-windows-x64/bun.exe"
+        },
+        "windows/arm64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-aarch64.zip",
+          "format": "zip",
+          "executable": "bun-windows-aarch64/bun.exe"
+        }
+      },
       "integrities": {
         "darwin/amd64": "1d0211b8f1dc991182344687ad15e72ee86f154845a5f7fa477994cd341dd9b0",
         "darwin/arm64": "c669e97f6164e1c96e0701748db98dfa77492908cbd8394c7557134a735de381",
@@ -13,11 +45,42 @@
         "linux/arm64": "4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e",
         "windows/amd64": "e6f093d39da486b20262ca8cdd5ed6a9e8bc9c2f275b78e6d3a0c5b28cc95901",
         "windows/arm64": "f473bfe2df73ee770548c93dd5d380aea7120c218ec2aa1afdd0bbba7bf18c47"
-      },
-      "source": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/"
+      }
     },
     "go": {
       "version": "1.26.9",
+      "archives": {
+        "darwin/amd64": {
+          "url": "https://go.dev/dl/go1.26.9.darwin-amd64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "darwin/arm64": {
+          "url": "https://go.dev/dl/go1.26.9.darwin-arm64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "linux/amd64": {
+          "url": "https://go.dev/dl/go1.26.9.linux-amd64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "linux/arm64": {
+          "url": "https://go.dev/dl/go1.26.9.linux-arm64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "windows/amd64": {
+          "url": "https://go.dev/dl/go1.26.9.windows-amd64.zip",
+          "format": "zip",
+          "executable": "go/bin/go.exe"
+        },
+        "windows/arm64": {
+          "url": "https://go.dev/dl/go1.26.9.windows-arm64.zip",
+          "format": "zip",
+          "executable": "go/bin/go.exe"
+        }
+      },
       "integrities": {
         "darwin/amd64": "00c29e3d4c8562f547410daa18d2959b641bd691ab00c4a525ea817a0253d4bd",
         "darwin/arm64": "f9bb7c0a02506c5d9bf0d1eb1f7ee6c7684f844ae49558308a0427b830e022cc",
@@ -25,11 +88,42 @@
         "linux/arm64": "4a97373d49fcacdcf3694fea368a500b00ee3e963974f3e7514132717632f052",
         "windows/amd64": "d722201a9c0c086d1610e111c48203009af690892ed708072bd5ae20160e7a59",
         "windows/arm64": "05215f9e71ea27c9e843409314b1e6bf12dc6a5516318126b2357d497fed42c5"
-      },
-      "source": "https://go.dev/dl/"
+      }
     },
     "uv": {
       "version": "0.11.32",
+      "archives": {
+        "darwin/amd64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-x86_64-apple-darwin.tar.gz",
+          "format": "tar.gz",
+          "executable": "uv-x86_64-apple-darwin/uv"
+        },
+        "darwin/arm64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-aarch64-apple-darwin.tar.gz",
+          "format": "tar.gz",
+          "executable": "uv-aarch64-apple-darwin/uv"
+        },
+        "linux/amd64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-x86_64-unknown-linux-musl.tar.gz",
+          "format": "tar.gz",
+          "executable": "uv-x86_64-unknown-linux-musl/uv"
+        },
+        "linux/arm64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-aarch64-unknown-linux-musl.tar.gz",
+          "format": "tar.gz",
+          "executable": "uv-aarch64-unknown-linux-musl/uv"
+        },
+        "windows/amd64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-x86_64-pc-windows-msvc.zip",
+          "format": "zip",
+          "executable": "uv.exe"
+        },
+        "windows/arm64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-aarch64-pc-windows-msvc.zip",
+          "format": "zip",
+          "executable": "uv.exe"
+        }
+      },
       "integrities": {
         "darwin/amd64": "77f5ca26c0de20e992a3677a174fe1121ee25c36f9b1434a863f75bf077a05eb",
         "darwin/arm64": "ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829",
@@ -37,8 +131,7 @@
         "linux/arm64": "d70cdae687feb6aad9a09fe8d686df8c8efaf69a1007fa581379a2025adc10a5",
         "windows/amd64": "acfde570451cfdb8689fa159a138ee805ba4e241c466432750302c86254b0984",
         "windows/arm64": "a7427ea0440bb826b6716d1837ff3d173b8e7d496cb09ee8f456b4e023a2fdcd"
-      },
-      "source": "https://github.com/astral-sh/uv/releases/download/0.11.32/"
+      }
     }
   },
   "extensions": {
