@@ -334,8 +334,8 @@ func finalizerFixture(t *testing.T) (Finalizer, *finalizerGit, *finalizerProvide
 }
 
 func TestFinalizerPartialNeverClosesOrTransitions(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "partial-delivery-never-closes-parent")
-	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-finalizer-publishes-through-the-contracts")
+	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "partial-delivery-never-closes-parent")
+	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "the-finalizer-publishes-through-the-contracts")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.PartialDelivery, opts.TaskSource, opts.TaskID = true, provider.task.Ref.Source, provider.task.Ref.ID
 	if err := os.WriteFile(opts.BodyFile, []byte("Explain the change.\n\nRefs #420"), 0600); err != nil {
@@ -361,7 +361,7 @@ func TestFinalizerPartialNeverClosesOrTransitions(t *testing.T) {
 }
 
 func TestDraftSeedAndLegacyEmptyCommitAllowLaterPartial(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-draft-opens-before-the-first-edit")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "a-draft-opens-before-the-first-edit")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.Draft, opts.VerificationFile = true, ""
 	opts.TaskSource, opts.TaskID, opts.PartialDelivery = provider.task.Ref.Source, provider.task.Ref.ID, true
@@ -387,8 +387,8 @@ func TestDraftSeedAndLegacyEmptyCommitAllowLaterPartial(t *testing.T) {
 }
 
 func TestCurrentProofAndReadbackGuardWrites(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-read-back-carries-what-the-upsert-answered")
-	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "an-unresolved-write-stops-without-a-retry")
+	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "the-read-back-carries-what-the-upsert-answered")
+	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "an-unresolved-write-stops-without-a-retry")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
 	provider.dropLabels = true
@@ -429,7 +429,7 @@ func TestDossierUsesResolvedRemoteBase(t *testing.T) {
 }
 
 func TestExplicitHostedChecksUseNoLocalVerifierAndReturnFailedProposalToDraft(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "an-explicit-hosted-gate-waits-without-local-execution")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "an-explicit-hosted-gate-waits-without-local-execution")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.Gate, opts.VerificationFile = "ci", ""
 	f.Verify = func(context.Context, string, string) (Verified, error) {
@@ -473,7 +473,7 @@ func TestUnsupportedHostedChecksReturnProposalToDraftWithoutPolling(t *testing.T
 }
 
 func TestHostedParentRequiresNativeWorkflowEligibilityAndStatus(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "hosted-parent-workflow-completeness")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "hosted-parent-workflow-completeness")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.Gate, opts.VerificationFile, opts.WorkflowFile = "ci", "", ".context/workflow.json"
 	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
@@ -584,7 +584,7 @@ func TestHostedPartialPromotesOnlyCurrentUnitsAndKeepsParentOpen(t *testing.T) {
 }
 
 func TestHostedFeaturelessPartialUsesHostedChecksWithoutWorkflow(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.Gate, opts.VerificationFile = "ci", ""
 	opts.TaskSource, opts.TaskID, opts.PartialDelivery = provider.task.Ref.Source, provider.task.Ref.ID, true
@@ -701,9 +701,9 @@ func TestPolicyAndTaskReferenceAuthority(t *testing.T) {
 	if err := ValidateTitle("style: align the published layout", []string{"layout.css"}); err != nil {
 		t.Fatalf("repository-authorized Conventional Commits style type was refused: %v", err)
 	}
-	spectest.Proves(t, "cli/contributor-workflows", "repository-policy", "the-policy-selects-the-delivered-state-reference-and-language")
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "the-body-is-the-squash-message")
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "no-publication-names-an-agent")
+	spectest.Proves(t, "tooling/contributor-executable", "repository-policy", "the-policy-selects-the-delivered-state-reference-and-language")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "the-body-is-the-squash-message")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "no-publication-names-an-agent")
 	f, _, provider, opts := finalizerFixture(t)
 	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
 	if _, err := f.Run(context.Background(), opts); err != nil {

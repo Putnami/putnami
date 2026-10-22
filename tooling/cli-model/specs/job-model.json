@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/job-model",
+  "outcomes": [
+    "Every consumer of the CLI's job model sees one deterministic answer for what traits, side effects, kind and verification outputs a job has",
+    "The model stays a pure library: it can be read, tested and depended on without pulling in the engine that drives it"
+  ],
+  "nonGoals": [
+    "Planning and executing the jobs, which tooling/cli owns",
+    "Packaging an extension manifest, which the language extensions own"
+  ],
+  "requirements": [
+    {
+      "id": "extension-verb-vocabulary",
+      "text": "When two loaded vocabularies declare one verb, the declaration of the extension that sorts first by name applies and the merge warns, naming both extensions."
+    },
+    {
+      "id": "vocabulary-default-traits",
+      "text": "A job's side effects are the traits its manifest declares, or its verb's default traits when it declares none. The model keeps no side-effect floor: a vocabulary that gives publish no side effect leaves it with none."
+    },
+    {
+      "id": "command-kinds-and-traits",
+      "text": "A job whose manifest declares no traits takes its verb's default traits whole, kind and workload included. Declared traits replace them wholesale: a command that declares traits without a kind or a workload has none, and one that declares its own keeps it."
+    },
+    {
+      "id": "declared-verification-producers",
+      "text": "A task produces the verification report when it belongs to a verification-kind command and declares a command-output file at the reserved filename, and the criteria projection when it belongs to a criteria-kind command and declares one. No command name decides. A stepless verification job also writes the report."
+    }
+  ]
+}

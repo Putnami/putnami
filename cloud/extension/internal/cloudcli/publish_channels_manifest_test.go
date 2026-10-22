@@ -18,7 +18,7 @@ import (
 // and deployment uploads serve no channel a project declares, so they declare
 // none, and planning them for every project serves nothing.
 func TestPublishTasksDeclareTheChannelsTheyServe(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "the-cloud-extension-declares-its-publish-channels")
+	spectest.Proves(t, "cloud/publish-channels", "publish-tasks-declare-their-channels", "the-cloud-extension-declares-its-publish-channels")
 	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
 	if err != nil {
 		t.Fatalf("read extension manifest: %v", err)

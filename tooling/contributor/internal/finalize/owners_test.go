@@ -215,8 +215,8 @@ func projectOwners() map[string][]wire.OwningProject {
 // and a project is exempt only when it is featureless on the branch and at
 // base, or new on the branch.
 func TestOwnersComeFromTheHostAndFeaturelessnessFromBothRevisions(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "ownership-comes-from-the-host-channel")
-	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
+	spectest.Proves(t, "tooling/contributor-executable", "change-finalize-parity", "ownership-comes-from-the-host-channel")
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
 	repo := newOwnersRepo(t)
 	for _, tc := range []struct {
 		name     string
@@ -262,7 +262,7 @@ func TestOwnersComeFromTheHostAndFeaturelessnessFromBothRevisions(t *testing.T) 
 // changed path outside the workspace prefix has no owner, and that the host
 // is not asked about it.
 func TestAPathOutsideTheWorkspaceIsUnownedWithoutAskingTheHost(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "ownership-comes-from-the-host-channel")
+	spectest.Proves(t, "tooling/contributor-executable", "change-finalize-parity", "ownership-comes-from-the-host-channel")
 	repo := newOwnersRepo(t)
 	fake := newOwnersHost(t, projectOwners(), nil)
 	resolve := HostOwners(repo.root, fake.channel(t).Owners)
@@ -282,7 +282,7 @@ func TestAPathOutsideTheWorkspaceIsUnownedWithoutAskingTheHost(t *testing.T) {
 // TestAHostRefusalFailsTheOwnership pins that a refusal by the host is an
 // error naming the call, and never an empty ownership.
 func TestAHostRefusalFailsTheOwnership(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "ownership-comes-from-the-host-channel")
+	spectest.Proves(t, "tooling/contributor-executable", "change-finalize-parity", "ownership-comes-from-the-host-channel")
 	repo := newOwnersRepo(t)
 	fake := newOwnersHost(t, nil, &wire.Error{Code: wire.CodeUnavailable, Message: "this command runs outside any workspace, so no project owns a path"})
 	resolve := HostOwners(repo.root, fake.channel(t).Owners)
@@ -298,7 +298,7 @@ func TestAHostRefusalFailsTheOwnership(t *testing.T) {
 // not valid UTF-8 fails the ownership with an error naming it, before the
 // host is asked anything.
 func TestAPathTheChannelCannotCarryFailsClosed(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "ownership-comes-from-the-host-channel")
+	spectest.Proves(t, "tooling/contributor-executable", "change-finalize-parity", "ownership-comes-from-the-host-channel")
 	repo := newOwnersRepo(t)
 	fake := newOwnersHost(t, projectOwners(), nil)
 	resolve := HostOwners(repo.root, fake.channel(t).Owners)

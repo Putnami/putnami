@@ -233,5 +233,6 @@ operation the contract does not define: an envelope whose outcome is
 - The core deletes `proposals finalize` and its copies of the finalizer, the
   verifier and the evaluator (section 6). The executable's copies are the only
   ones.
-- The requirement `change-finalize-parity` lists the checks the twin test and
-  the executable's tests prove.
+- The requirement `change-finalize-parity` of `cli/contributor-workflows` lists
+  the check the twin test proves. The requirement of the same name in
+  `tooling/contributor-executable` lists the checks the executable's tests prove.

@@ -88,7 +88,7 @@ func TestParseJSONRejectsWhatJSONParseRejects(t *testing.T) {
 }
 
 func TestParseJSONRejectsDuplicateMembersAfterParsing(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "local-evidence-verification",
+	spectest.Proves(t, "tooling/contributor-executable", "local-evidence-verification",
 		"evidence-is-read-strictly-against-the-git-top-level")
 	t.Parallel()
 	for _, source := range []string{
@@ -106,7 +106,7 @@ func TestParseJSONRejectsDuplicateMembersAfterParsing(t *testing.T) {
 }
 
 func TestParseJSONDecodesLikeAFatalTextDecoder(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "local-evidence-verification",
+	spectest.Proves(t, "tooling/contributor-executable", "local-evidence-verification",
 		"evidence-is-read-strictly-against-the-git-top-level")
 	t.Parallel()
 	value, err := parseJSON([]byte("\xef\xbb\xbf{\"a\":\"\\ud83d\\ude00\"}"))
@@ -187,7 +187,7 @@ func TestJavaScriptHelpers(t *testing.T) {
 // reads Git, so none of these needs a repository. A call with no mode writes
 // one not-verified verdict line on its stdout, which is its only stream.
 func TestVerifierArgumentErrors(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "local-evidence-verification",
+	spectest.Proves(t, "tooling/contributor-executable", "local-evidence-verification",
 		"a-bare-call-is-a-not-verified-verdict-on-stdout-alone")
 	t.Parallel()
 	cases := []struct {
@@ -274,7 +274,7 @@ func verifyJSONRepo(t *testing.T) (root, head string) {
 // path on the command line names a file of the top level, and the output
 // keeps the path as given.
 func TestVerifierResolvesPathsAgainstTheTopLevel(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "local-evidence-verification",
+	spectest.Proves(t, "tooling/contributor-executable", "local-evidence-verification",
 		"evidence-is-read-strictly-against-the-git-top-level")
 	t.Parallel()
 	root, _ := verifyJSONRepo(t)

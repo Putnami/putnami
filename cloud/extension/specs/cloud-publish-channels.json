@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/publish-channels",
+  "outcomes": [
+    "A publishing run counts a project's declared channel as served only by a planned Cloud task that declares it, so the archive and site content uploads serve their channels and the other uploads serve none"
+  ],
+  "nonGoals": [
+    "Choosing a project's channels, which its publish list declares",
+    "Uploading to a registry, which the publication uploader does"
+  ],
+  "requirements": [
+    {
+      "id": "publish-tasks-declare-their-channels",
+      "text": "The Cloud publish command declares the channels its steps serve: the archive upload declares archives and template-archives, the site content upload declares site-content, and the configuration, migration and deployment uploads declare none."
+    }
+  ]
+}

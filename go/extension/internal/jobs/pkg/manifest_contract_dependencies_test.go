@@ -23,7 +23,7 @@ const hookOnlyDependentManifest = `{
 // takes the dependency stamp without the strict requirement of a command,
 // tool or agent content, and loads.
 func TestGateStampsAHookOnlyDependentPutArchive(t *testing.T) {
-	spectest.Proves(t, "cli/extension-dependencies", "the-packager-stamps-a-dependent", "a-hook-only-dependent-is-stamped")
+	spectest.Proves(t, "go/go-project-toolchain", "the-packager-stamps-a-dependent", "a-hook-only-dependent-is-stamped")
 	dir := stageManifest(t, hookOnlyDependentManifest)
 	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("a hook-only dependent must take the dependency stamp: %v", err)

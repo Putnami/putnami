@@ -904,6 +904,60 @@
               "a-failed-lookup-writes-no-record"
             ]
           }
+        },
+        {
+          "id": "the-packager-stamps-a-dependent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hook-only-dependent-is-stamped"
+            ]
+          }
+        },
+        {
+          "id": "command-kinds-and-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-packager-stamps-command-kinds"
+            ]
+          }
+        },
+        {
+          "id": "publish-tasks-declare-their-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-declares-its-publish-channels",
+              "the-go-packager-stamps-publish-channels"
+            ]
+          }
+        },
+        {
+          "id": "vocabulary-default-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-packager-stamps-a-vocabulary-only-manifest",
+              "the-go-packager-validates-a-vocabulary-next-to-a-dependency"
+            ]
+          }
         }
       ]
     },

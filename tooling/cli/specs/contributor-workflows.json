@@ -36,32 +36,12 @@
       "text": "No shipped file invokes a backend client, names a tracker label, a hosted repository address, a private memory identity or storage layout, or this repository's identity. Skills reach tasks, proposals and memory through putnami tasks, proposals or memory operations, or the matching MCP tools."
     },
     {
-      "id": "provider-neutral-publication",
-      "text": "putnami change finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry."
-    },
-    {
       "id": "repository-policy",
-      "text": "options[\"@putnami/contributor\"] holds task sources, claimed/delivered states, tier labels and worker profiles, language/publication controls and active integrations. Removed backlog/filter/rank/plan-label settings have no canonical consumer. Instructions name profiles; host metadata supplies the model mapping."
-    },
-    {
-      "id": "squash-ready-publication",
-      "text": "Build selects one final local or hosted gate after independent review. Publication consumes a current dossier or awaits named hosted checks, never runs a local gate and rechecks proof per boundary. Hosted parent publication needs an immutable workflow and completion eligibility; incomplete parents need partial delivery, needing no workflow when only featureAuthority.none projects own its paths. Exact hosted proof can advance eligible current units, keeps later obligations and yields a replayable receipt."
-    },
-    {
-      "id": "native-workflow-validation",
-      "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
-    },
-    {
-      "id": "change-language-parity",
-      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as goldens recorded from putnami contributor language, the core command it replaces. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
-    },
-    {
-      "id": "change-verify-parity",
-      "text": "putnami change verify, served by the @putnami/contributor executable, prints the same verdict document and exit code as goldens recorded from putnami tree verify, the core command it replaces, in every mode, with or without a workspace. It reads a restored verification report through the host RPC channel putnami opens for the launch; without that channel only such a report is not verified, with a reason naming the channel. No process the verifier starts receives the channel."
+      "text": "Instructions name worker profiles, never models; host metadata supplies the model mapping."
     },
     {
       "id": "change-finalize-parity",
-      "text": "putnami change finalize, served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as goldens recorded from putnami proposals finalize, the core command it replaced, for a draft seed, a hosted gate and a usage error. It reaches the providers, the owners of changed paths and restored verification reports through the one host RPC channel putnami opens for the launch. A usage error never opens it, and no git command it starts receives it."
+      "text": "putnami change finalize, launched by the core and served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as goldens recorded from putnami proposals finalize, the core command it replaced, for a draft seed, a hosted gate and a usage error."
     },
     {
       "id": "canonical-consumer-migration",

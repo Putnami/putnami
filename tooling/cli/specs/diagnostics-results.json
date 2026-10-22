@@ -77,10 +77,6 @@
       "text": "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable. The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not. An MCP run records the agent kind its client named and the session id its environment stated; a terminal run records no agent."
     },
     {
-      "id": "local-evidence-verification",
-      "text": "The evidence verifier that putnami change finalize applies checks an execute run's local evidence against the worktree it runs in, without a workspace, and writes one JSON verdict. A failure, a call with no mode included, writes {\"verdict\":\"not-verified\",\"reason\":...} on one line. Evidence is read as fatal UTF-8, an object that repeats a member is refused, and every path resolves against the Git top level."
-    },
-    {
       "id": "session-summary-view",
       "text": "Summary reduces each recorded session to one row: id, start, commands, selection, tasks total/executed/reused, run.cpu.actualMs, wall and outcome, in export's order and with its deduplication. A run a task spawned names its parent and is marked nested, never counted as a run of its own: --command keeps top-level sessions whose command set is exactly the named list, in any order, and never a nested run whatever it ran. Structured output carries the rows as an array at every count."
     },

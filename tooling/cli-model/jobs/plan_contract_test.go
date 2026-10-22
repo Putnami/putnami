@@ -25,7 +25,7 @@ func ofKind(kind string, job *ScheduledJob) *ScheduledJob {
 // a declaration the job's shape decides: the whole verification command
 // counts, a pipeline step that declares nothing does not.
 func TestProducesVerificationReportFollowsTheKindAndTheDeclaration(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+	spectest.Proves(t, "cli/job-model", "declared-verification-producers",
 		"a-producer-is-a-declaring-task-of-a-command-of-its-kind")
 	t.Parallel()
 	verification := extension.CommandKindVerification
@@ -105,7 +105,7 @@ func TestProducesVerificationReportFollowsTheKindAndTheDeclaration(t *testing.T)
 // reserved filename counts, whatever the command is called. A job without a
 // declaration never does.
 func TestProducesSpecCriteriaProjectionFollowsTheKindAndTheDeclaration(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+	spectest.Proves(t, "cli/job-model", "declared-verification-producers",
 		"a-producer-is-a-declaring-task-of-a-command-of-its-kind")
 	t.Parallel()
 	criteria := extension.CommandKindCriteria
@@ -164,7 +164,7 @@ func TestProducesSpecCriteriaProjectionFollowsTheKindAndTheDeclaration(t *testin
 // projection. No command name decides, and each answer is sorted and free of
 // repeats across extensions.
 func TestCommandsOfKindFollowTheResolvedTraits(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+	spectest.Proves(t, "cli/job-model", "declared-verification-producers",
 		"a-producer-is-a-declaring-task-of-a-command-of-its-kind")
 	t.Parallel()
 	file := func(path string) *extension.TaskDeclaration {

@@ -1555,7 +1555,7 @@ func TestTaskEffectTable(t *testing.T) {
 // fails every run of a project that declares it. A task missing from the table
 // serves no channel.
 func TestPublishChannelTable(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "the-go-extension-declares-its-publish-channels")
+	spectest.Proves(t, "go/go-project-toolchain", "publish-tasks-declare-their-channels", "the-go-extension-declares-its-publish-channels")
 	m := loadExtensionManifest(t)
 
 	want := map[string][]string{

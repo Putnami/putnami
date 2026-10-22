@@ -616,7 +616,6 @@
               "help-lists-the-loaded-vocabulary-first",
               "vocabulary-aliases-resolve-first-and-never-shadow-a-command",
               "completion-offers-the-loaded-vocabulary",
-              "two-vocabularies-declaring-one-verb-warn",
               "a-workspace-alias-wins-over-a-vocabulary-alias",
               "a-provider-process-resolves-no-vocabulary-alias",
               "impact-plan-resolves-the-vocabulary-aliases",
@@ -636,11 +635,7 @@
               "an-undeclared-job-takes-its-verbs-default-traits",
               "a-vocabulary-requires-contract-9",
               "side-effects-come-only-from-loaded-jobs",
-              "traits-alone-give-a-job-its-side-effects",
-              "first-party-jobs-keep-their-traits",
-              "the-go-packager-stamps-a-vocabulary-only-manifest",
-              "the-go-packager-validates-a-vocabulary-next-to-a-dependency",
-              "the-npm-packager-validates-and-stamps-a-vocabulary"
+              "first-party-jobs-keep-their-traits"
             ]
           }
         },
@@ -956,7 +951,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-producer-is-a-declaring-task-of-a-command-of-its-kind",
               "a-verification-kind-command-carries-the-gate",
               "projection-applicability-plans-the-declaring-commands",
               "cache-recovery-plans-the-verification-kind-commands",
@@ -1413,12 +1407,8 @@
             "kind": "acceptance",
             "checks": [
               "a-manifest-declaring-a-kind-or-new-trait-requires-contract-11",
-              "a-job-without-declared-traits-takes-its-verbs-kind-and-workload",
-              "declared-traits-replace-the-verbs-kind-wholesale",
               "an-unknown-kind-workload-or-phase-is-refused",
-              "the-dev-vocabulary-declares-every-first-party-kind",
-              "the-go-packager-stamps-command-kinds",
-              "the-npm-packager-stamps-command-kinds"
+              "the-dev-vocabulary-declares-every-first-party-kind"
             ]
           }
         },
@@ -1433,12 +1423,7 @@
             "checks": [
               "a-manifest-declaring-publish-channels-requires-contract-12",
               "an-invalid-publish-channel-declaration-is-refused",
-              "a-planned-job-exposes-its-tasks-publish-channels",
-              "the-go-extension-declares-its-publish-channels",
-              "the-typescript-extension-declares-its-publish-channels",
-              "the-cloud-extension-declares-its-publish-channels",
-              "the-go-packager-stamps-publish-channels",
-              "the-npm-packager-stamps-publish-channels"
+              "a-planned-job-exposes-its-tasks-publish-channels"
             ]
           }
         },
@@ -1778,20 +1763,6 @@
               "declared-check-failures-carry-a-code",
               "the-declaration-digest-moves-with-declarations-only",
               "an-mcp-run-names-its-agent-and-a-terminal-run-names-none"
-            ]
-          }
-        },
-        {
-          "id": "local-evidence-verification",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-bare-call-is-a-not-verified-verdict-on-stdout-alone",
-              "evidence-is-read-strictly-against-the-git-top-level"
             ]
           }
         },
@@ -3164,90 +3135,13 @@
           }
         },
         {
-          "id": "provider-neutral-publication",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-finalizer-publishes-through-the-contracts",
-              "partial-delivery-never-closes-parent",
-              "the-read-back-carries-what-the-upsert-answered",
-              "an-unresolved-write-stops-without-a-retry"
-            ]
-          }
-        },
-        {
           "id": "repository-policy",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-policy-selects-the-delivered-state-reference-and-language",
               "instructions-name-worker-profiles-not-models"
-            ]
-          }
-        },
-        {
-          "id": "squash-ready-publication",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-draft-opens-before-the-first-edit",
-              "the-body-is-the-squash-message",
-              "no-publication-names-an-agent",
-              "an-explicit-hosted-gate-waits-without-local-execution",
-              "hosted-parent-workflow-completeness",
-              "a-featureless-partial-needs-no-workflow"
-]
-          }
-        },
-        {
-          "id": "native-workflow-validation",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "workflow-versions-and-references",
-              "native-requirement-check-coverage",
-              "relevant-artifact-invalidation",
-              "delivery-receipts-and-parent-completeness",
-              "experiment-and-handoff-inputs",
-              "hosted-workflow-readiness-bound-to-required-checks"
-]
-          }
-        },
-        {
-          "id": "change-language-parity",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "change-language-reports-what-contributor-language-reports",
-              "the-language-check-pages-tasks-through-the-call-seam",
-              "tasks-reach-the-provider-through-the-host-channel",
-              "other-modes-never-dial-the-host",
-              "tasks-without-a-channel-exit-2"
-            ]
-          }
-        },
-        {
-          "id": "change-verify-parity",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "change-verify-prints-what-tree-verify-prints",
-              "a-restored-report-is-read-through-the-host-channel",
-              "without-a-channel-only-a-restored-report-is-not-verified",
-              "no-process-receives-the-host-channel",
-              "change-verify-runs-with-and-without-a-workspace"
             ]
           }
         },
@@ -3258,11 +3152,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "change-finalize-matches-the-core-command",
-              "ownership-comes-from-the-host-channel",
-              "one-host-channel-serves-the-run",
-              "a-usage-error-never-dials-the-host",
-              "no-git-command-receives-the-host-channel"
+              "change-finalize-matches-the-core-command"
             ]
           }
         },
@@ -4277,17 +4167,6 @@
             "kind": "acceptance",
             "checks": [
               "a-dependent-manifest-requires-contract-8"
-            ]
-          }
-        },
-        {
-          "id": "the-packager-stamps-a-dependent",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-hook-only-dependent-is-stamped"
             ]
           }
         }
