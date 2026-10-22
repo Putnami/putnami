@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "toolchains": {
+    "go": {
+      "pin": {
+        "version": "1.26.9",
+        "archives": {
+          "darwin/arm64": {
+            "url": "https://go.dev/dl/go1.26.9.darwin-arm64.tar.gz",
+            "format": "tar.gz",
+            "executable": "go/bin/go"
+          },
+          "linux/amd64": {
+            "url": "https://go.dev/dl/go1.26.9.linux-amd64.tar.gz",
+            "format": "tar.gz",
+            "executable": "go/bin/go"
+          }
+        },
+        "integrities": {
+          "darwin/arm64": "5555555555555555555555555555555555555555555555555555555555555555",
+          "linux/amd64": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      }
+    },
+    "golangci-lint": {
+      "problem": {
+        "message": "the workspace declares golangci-lint 2.5.0 and the lock pins 2.4.0; an offline answer cannot read the 2.5.0 release's digests",
+        "remedy": "resolve with network access to pin 2.5.0, or declare golangci-lint 2.4.0"
+      }
+    }
+  }
+}

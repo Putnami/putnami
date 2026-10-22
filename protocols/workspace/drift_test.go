@@ -57,13 +57,8 @@ func goTypeJSONFields(t *testing.T, v any) []string {
 
 // jsonSchemaDefinitionProperties extracts the property names of one named
 // definition within a JSON Schema file, so a schema that carries several
-// shapes (the probe request/result/merged view) can be drift-checked per shape.
-//
-// The path parameter stays even though only schemas/probe.json carries multiple
-// definitions today: it is the generic form of its two siblings above, and the
-// next multi-shape schema must not have to re-derive it.
-//
-//nolint:unparam // deliberately general, mirroring jsonSchemaProperties/jsonSchemaJobProperties
+// shapes (the probe request/result/merged view, the lock's toolchain entry)
+// can be drift-checked per shape.
 func jsonSchemaDefinitionProperties(t *testing.T, path, definition string) []string {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -171,6 +166,15 @@ func TestDrift_Lock(t *testing.T) {
 	assertFieldParity(t, "LockAgentArtifactEntry",
 		jsonSchemaMapEntryProperties(t, "schemas/lock.json", "agentArtifacts"),
 		goTypeJSONFields(t, LockAgentArtifactEntry{}))
+	// The schema describes the current lock version, whose toolchain entry
+	// does not carry the version 3 and 4 source member the Go type still
+	// reads.
+	entryFields := slices.DeleteFunc(goTypeJSONFields(t, LockToolchainEntry{}), func(name string) bool { return name == "source" })
+	assertFieldParity(t, "LockToolchainEntry",
+		jsonSchemaDefinitionProperties(t, "schemas/lock.json", "toolchainEntry"), entryFields)
+	assertFieldParity(t, "LockToolchainArchive",
+		jsonSchemaDefinitionProperties(t, "schemas/lock.json", "toolchainArchive"),
+		goTypeJSONFields(t, LockToolchainArchive{}))
 }
 
 // TestDrift_HookPhaseConfig keeps the hook execution contract addressable from
@@ -566,19 +570,42 @@ func assertFieldParity(t *testing.T, typeName string, schemaFields, goFields []s
 	}
 }
 
-// The runtimes a lock may pin live in two places: ValidateLock checks
-// lockToolchainNames, and schemas/lock.json states them as the toolchains
-// propertyNames enum. A runtime added to one and not the other would make the
-// schema and the Go validator disagree on the same lock.
-func TestLockSchemaToolchainNamesAgreeWithTheValidator(t *testing.T) {
+// The version 5 toolchain entry rules live in two places: ValidateLock applies
+// them in Go, and schemas/lock.json states them for every non-Go consumer.
+// Nothing in this module runs a JSON Schema validator, so this test reads each
+// schema constraint back and holds it to the constant or set the validator
+// uses, and pins the archive executable pattern's verdict on each shape it
+// must refuse.
+func TestLockSchemaToolchainRulesAgreeWithTheValidator(t *testing.T) {
+	type stringRule struct {
+		Pattern   string   `json:"pattern"`
+		MaxLength int      `json:"maxLength"`
+		Enum      []string `json:"enum"`
+		Ref       string   `json:"$ref"`
+	}
+	type mapRule struct {
+		MaxProperties        int        `json:"maxProperties"`
+		PropertyNames        stringRule `json:"propertyNames"`
+		AdditionalProperties stringRule `json:"additionalProperties"`
+	}
 	var schema struct {
 		Properties struct {
 			Toolchains struct {
-				PropertyNames struct {
-					Enum []string `json:"enum"`
-				} `json:"propertyNames"`
+				PropertyNames        stringRule `json:"propertyNames"`
+				AdditionalProperties stringRule `json:"additionalProperties"`
 			} `json:"toolchains"`
 		} `json:"properties"`
+		Definitions struct {
+			Platform       stringRule `json:"platform"`
+			ToolchainEntry struct {
+				Required   []string                   `json:"required"`
+				Properties map[string]json.RawMessage `json:"properties"`
+			} `json:"toolchainEntry"`
+			ToolchainArchive struct {
+				Required   []string              `json:"required"`
+				Properties map[string]stringRule `json:"properties"`
+			} `json:"toolchainArchive"`
+		} `json:"definitions"`
 	}
 	data, err := os.ReadFile("schemas/lock.json")
 	if err != nil {
@@ -587,16 +614,75 @@ func TestLockSchemaToolchainNamesAgreeWithTheValidator(t *testing.T) {
 	if err := json.Unmarshal(data, &schema); err != nil {
 		t.Fatal(err)
 	}
-	got := slices.Clone(schema.Properties.Toolchains.PropertyNames.Enum)
-	sort.Strings(got)
-	want := slices.Clone(lockToolchainNames)
-	sort.Strings(want)
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("schema toolchain names %v, ValidateLock accepts %v", got, want)
+
+	identity := schema.Properties.Toolchains.PropertyNames
+	if identity.Pattern != lockToolchainIdentityPattern || identity.MaxLength != lockToolchainIdentityMaxBytes {
+		t.Errorf("schema toolchain identity = %q (max %d), ValidateLock applies %q (max %d)",
+			identity.Pattern, identity.MaxLength, lockToolchainIdentityPattern, lockToolchainIdentityMaxBytes)
+	}
+	if ref := schema.Properties.Toolchains.AdditionalProperties.Ref; ref != "#/definitions/toolchainEntry" {
+		t.Errorf("toolchains entries reference %q, want the toolchainEntry definition", ref)
+	}
+	if schema.Definitions.Platform.Pattern != lockPlatformPattern {
+		t.Errorf("schema platform = %q, ValidateLock applies %q", schema.Definitions.Platform.Pattern, lockPlatformPattern)
+	}
+
+	entry := schema.Definitions.ToolchainEntry
+	if want := []string{"version", "archives", "integrities"}; !reflect.DeepEqual(entry.Required, want) {
+		t.Errorf("toolchain entry requires %v, want %v", entry.Required, want)
+	}
+	for _, name := range []string{"archives", "integrities"} {
+		var rule mapRule
+		if err := json.Unmarshal(entry.Properties[name], &rule); err != nil {
+			t.Fatal(err)
+		}
+		if rule.MaxProperties != lockToolchainMaxPlatforms || rule.PropertyNames.Ref != "#/definitions/platform" {
+			t.Errorf("%s = max %d keyed by %q, want max %d keyed by the platform definition",
+				name, rule.MaxProperties, rule.PropertyNames.Ref, lockToolchainMaxPlatforms)
+		}
+		if name == "integrities" && rule.AdditionalProperties.Pattern != sha256HexPattern.String() {
+			t.Errorf("schema integrity = %q, ValidateLock applies %q", rule.AdditionalProperties.Pattern, sha256HexPattern)
+		}
+	}
+
+	archive := schema.Definitions.ToolchainArchive
+	if want := []string{"url", "format", "executable"}; !reflect.DeepEqual(archive.Required, want) {
+		t.Errorf("toolchain archive requires %v, want %v", archive.Required, want)
+	}
+	if got := archive.Properties["format"].Enum; !reflect.DeepEqual(got, lockArchiveFormats) {
+		t.Errorf("schema archive formats %v, ValidateLock accepts %v", got, lockArchiveFormats)
+	}
+	if url := archive.Properties["url"]; url.Pattern != "^https?://" || url.MaxLength != lockArchiveURLMaxBytes {
+		t.Errorf("schema archive url = %q (max %d), want ^https?:// (max %d)", url.Pattern, url.MaxLength, lockArchiveURLMaxBytes)
+	}
+	executable := archive.Properties["executable"]
+	if executable.Pattern != lockArchiveExecutablePattern || executable.MaxLength != lockArchiveExecutableMaxBytes {
+		t.Errorf("schema archive executable = %q (max %d), ValidateLock applies %q (max %d)",
+			executable.Pattern, executable.MaxLength, lockArchiveExecutablePattern, lockArchiveExecutableMaxBytes)
+	}
+	for value, want := range map[string]bool{
+		"go/bin/go": true, "bun-darwin-aarch64/bun": true, "go/bin/go.exe": true, "go": true, "C": true,
+		".tool/bin": true, "..tool/bin": true, "bin/...": true, "1go/bin": true, "bin/C:go": true,
+		"": false, ".": false, "..": false, "../go": false, "go/..": false, "go/./bin": false,
+		"go//bin": false, "go/": false, "/go": false, `go\bin`: false, "C:": false, "C:/go": false,
+		"c:go": false, `\\host\go`: false,
+	} {
+		if got := validLockArchiveExecutable(value); got != want {
+			t.Errorf("validLockArchiveExecutable(%q) = %v, want %v", value, got, want)
+		}
+	}
+
+	// A version 3 or 4 lock keys its toolchains by lockToolchainNames; each
+	// name stays a valid identity, so the vocabulary of a version 5 lock can
+	// pin every runtime an older lock pinned.
+	for _, name := range lockToolchainNames {
+		if !validLockToolchainIdentity(name) {
+			t.Errorf("v3/v4 toolchain name %q is not a valid lock identity", name)
+		}
 	}
 	for _, name := range []string{"go", "bun", "uv"} {
 		if !slices.Contains(lockToolchainNames, name) {
-			t.Errorf("lock must accept a %q pin: Putnami provisions that runtime", name)
+			t.Errorf("a v3/v4 lock must accept a %q pin: Putnami provisions that runtime", name)
 		}
 	}
 }

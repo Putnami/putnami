@@ -1,8 +1,8 @@
 # Workspace Protocol
 
 The typed model for how a Putnami workspace describes itself: configuration,
-project identity, pinned artifacts, and the wire an extension answers project
-discovery over.
+project identity, pinned artifacts, and the wires an extension answers project
+discovery and toolchain pins over.
 
 ## Why
 
@@ -18,7 +18,7 @@ it parses, validates, normalizes and merges, and it runs nothing.
 
 ## What
 
-Five contracts live here.
+Six contracts live here.
 
 ### 1. Workspace and project configuration
 
@@ -177,7 +177,7 @@ to write or remove — including the paths it reads back out of its own ownershi
 bookkeeping — against this same function. A privately re-spelled copy of the
 rule is how a writer ends up accepting what the validator rejected.
 
-### 3. Lock format v4
+### 3. Lock format v5
 
 `putnami.lock.json` is a versioned machine contract pinning the CLI, toolchains,
 extensions, templates, and agent-workflow artifacts.
@@ -192,6 +192,16 @@ extensions, templates, and agent-workflow artifacts.
 - **v4** adds `agentArtifacts`. Each platform-independent entry requires an
   exact version, an archive SHA-256 and a manifest SHA-256; the manifest then
   binds every materialized file.
+- **v5** keys `toolchains` by any lock identity (`^[A-Za-z_][A-Za-z0-9_.-]*$`,
+  at most 128 bytes) and records each platform's archive in the entry itself.
+  `archives.<os/arch>` names the archive's `url` (http or https, without
+  credentials), its `format` (`tar.gz` or `zip`) and the clean relative
+  `executable` path inside it; `integrities.<os/arch>` binds its bytes. Both
+  maps name the same platforms, at most 32, and a v5 entry has no `source`.
+  The extension that answers the toolchain-resolve call (section 6) supplies
+  each entry. Writers emit `archives` before `integrities`, because the
+  `putnamiw` launcher takes the last platform line of the `go` entry as its
+  digest.
 
 The `cli` entry has two shapes, and a reader must branch on them rather than
 read `cli.version` unconditionally. A **published pin** records an exact version
@@ -203,12 +213,16 @@ without a version is unreproducible and a sentinel with one claims an artifact
 the workspace does not have. Omitting the entry entirely still means "no
 opinion" — a launcher keeps whatever binary is running.
 
-New locks are authored as v4. The accepted read window is `LockMinVersion` 2
-through `LockVersion` 4: v2 and v3 parse at their recorded version, and v4
+New locks are authored as v5. The accepted read window is `LockMinVersion` 2
+through `LockVersion` 5: v2, v3 and v4 parse at their recorded version. v4
 vocabulary appearing in an older lock is rejected by the strict validator and
-discarded by the version-projecting CLI reader. `MigrateLockToCurrent` is the
-explicit, non-mutating v2/v3 → v4 projection — **parsing never migrates a lock
-implicitly**.
+discarded by the version-projecting CLI reader; `archives` in a v3 or v4 entry
+is a `field-version` error, and `MarshalLock` writes only the vocabulary of the
+lock's version. `MigrateLockToCurrent` is the explicit, non-mutating
+v2/v3/v4 → v5 projection — **parsing never migrates a lock implicitly**. A
+lock that pins toolchains below v5 does not migrate: its entries have no
+archives, and only the extension that answers for an identity can supply them,
+so the migration reports `needs-resolution` for each entry.
 
 ### 4. Workspace probe v1
 
@@ -306,6 +320,46 @@ Three transport rules:
   errors — so core sees "no result document" rather than a half-truth it might
   merge.
 
+### 6. Toolchain resolve v1
+
+An extension that lists lock identities in its manifest's `runtime.resolves`
+answers for their pins. The extension knows where a release lives, how its
+archives are named, and which digests the vendor publishes. Its answer is a
+lock entry, from which a reader downloads each archive, verifies it, and finds
+its executable without knowing the toolchain.
+
+Core spawns `<executable> __putnami toolchain-resolve` with the workspace root
+as its working directory and the probe's timeout, writes ONE
+`ToolchainResolveRequest` to its stdin, and reads ONE `ToolchainResolveResult`
+from its stdout. The three transport rules of section 5 apply unchanged.
+
+```go
+// extension side, before ordinary subcommand dispatch
+handled, err := workspace.ServeToolchainResolve(os.Args[1:], os.Stdin, os.Stdout, answer)
+```
+
+- **The request** names the asked `extension`, the sorted `identities` (1 to
+  64), the lock's `locked` entries for them as committed (v3, v4 or v5
+  vocabulary), the host `platform` (`os/arch`), and `offline`. It carries no
+  paths.
+- **The result** is the lock's next state for each asked identity. A `pin` is a
+  v5 toolchain entry, which the lock records as written. A `problem` (`message`
+  and an optional `remedy`, each at most 1024 bytes) fails the install. An
+  asked identity the result omits has no pin.
+- **Two checks.** `ValidateToolchainResolveResult` holds each pin to the lock's
+  v5 entry rules, through the function `ValidateLock` uses.
+  `ValidateToolchainResolveAnswer` holds the result to its request: the asked
+  extension, only asked identities, and pins that cover the host platform with
+  both an integrity and an archive. `ServeToolchainResolve` runs both before a
+  byte reaches stdout.
+
+Codes: `invalid-toolchain-resolve-version` at `version`, `conflicting-field` for
+a pin with a problem, `unknown-reference` for an identity the request does not
+ask for, and the lock's entry codes under `toolchains.<id>.pin`.
+
+The reasoning is in
+[ADR 0003](doc/adr/0003-extensions-answer-toolchain-pins.md).
+
 ### `featureAuthority` — why a project declares no feature
 
 A published project is normally expected to declare a user-facing feature, and
@@ -353,7 +407,11 @@ the languages it owns:
 | TypeScript extension | `typescript/extension/cmd/putnami-ts` |
 | Python extension | `python/extension/cmd/putnami-python` |
 
-**Consumers** — `@putnami/cli` reads every contract in this module:
+An extension answers `__putnami toolchain-resolve` for the lock identities its
+manifest lists in `runtime.resolves`.
+
+**Consumers** — `@putnami/cli` reads every contract in this module except the
+toolchain-resolve exchange:
 
 | Consumer | Use |
 |----------|-----|
@@ -369,14 +427,15 @@ the languages it owns:
 
 ## Versioning and compatibility
 
-Four independent version anchors, all pinned by tests:
+Five independent version anchors, all pinned by tests:
 
 | Anchor | Value | Where |
 |--------|-------|-------|
 | `ProtocolVersion` (workspace/project config) | `1` | `conformance_test.go` |
 | `ProbeProtocolVersion` | `1` | probe fixtures and drift tests |
 | `AgentArtifactManifestProtocolVersion` | `1` | `agent_artifact_test.go`, `drift_test.go` |
-| Lock read window | `LockMinVersion` 2 … `LockVersion` 4 | `lock_test.go` |
+| `ToolchainResolveProtocolVersion` | `1` | `toolchain_resolve_test.go` and its fixtures |
+| Lock read window | `LockMinVersion` 2 … `LockVersion` 5 | `lock_test.go` |
 
 The workspace and project configs carry **no** protocol version member on the
 wire: the strict parser accepts a single shape and rejects unknown fields, so
@@ -404,11 +463,14 @@ Compatibility rules that consumers depend on:
 
 ## Schemas and fixtures
 
-Six published schemas in [`schemas/`](schemas):
+Seven published schemas in [`schemas/`](schemas):
 [`workspace.json`](schemas/workspace.json),
 [`project.json`](schemas/project.json), [`scope.json`](schemas/scope.json),
-[`lock.json`](schemas/lock.json), [`probe.json`](schemas/probe.json), and
-[`agent-artifact.json`](schemas/agent-artifact.json).
+[`lock.json`](schemas/lock.json), [`probe.json`](schemas/probe.json),
+[`agent-artifact.json`](schemas/agent-artifact.json), and
+[`toolchain-resolve.json`](schemas/toolchain-resolve.json). The last one
+describes the result at its root and the request under `definitions`, and takes
+a pin's shape from `lock.json`.
 
 Fixtures under [`fixtures/`](fixtures), grouped by shape:
 
@@ -417,14 +479,15 @@ Fixtures under [`fixtures/`](fixtures), grouped by shape:
 | `fixtures/{valid,invalid}` | Workspace config, including the registries section |
 | `fixtures/project/{valid,invalid}` | Project config, including task-timeout rules |
 | `fixtures/scope/{valid,invalid}` | Scope activation, inheritance, and line blocks |
-| `fixtures/lock/{valid,invalid}` | v2, v3 and v4 locks, plus cross-version vocabulary leaks |
+| `fixtures/lock/{valid,invalid}` | v2 to v5 locks, cross-version vocabulary leaks, and v5 toolchain entry rules |
 | `fixtures/probe/{valid,invalid}` and `fixtures/probe-request/{valid,invalid}` | Probe results and requests, including path escapes and duplicates |
 | `fixtures/agent-artifact/{valid,invalid}` | Agent-artifact manifests |
+| `fixtures/toolchain-resolve-request/{valid,invalid}` and `fixtures/toolchain-resolve-result/{valid,invalid}` | Toolchain-resolve requests and results, including pins that break the v5 entry rules |
 
 Three test families hold them together:
 
-- `conformance_test.go` and `shapes_conformance_test.go` run every fixture
-  through its strict pipeline;
+- `conformance_test.go`, `shapes_conformance_test.go` and
+  `toolchain_resolve_test.go` run every fixture through its strict pipeline;
 - `probe_conformance_test.go` replays each probe fixture **as a provider** and
   asserts the four properties a real provider is held to — strict, canonical,
   path-keyed, and mergeable with itself;
@@ -437,21 +500,22 @@ Three test families hold them together:
 | | |
 |---|---|
 | **Status** | `stable` — see the `go.putnami.dev/protocol/workspace` entry in the workspace-root [`putnami.support.json`](../../putnami.support.json), which is the only authority for this value |
-| **Owner** | The `protocols` scope (`protocols/putnami.json`). This module is the sole authority for workspace/project identity, the lock format, and the probe wire; neither the CLI nor a provider may extend them locally. |
+| **Owner** | The `protocols` scope (`protocols/putnami.json`). This module is the sole authority for workspace/project identity, the lock format, the probe wire, and the toolchain-resolve wire; neither the CLI nor an extension may extend them locally. |
 
 Evidence behind `stable`:
 
-- four pinned version anchors, each asserted by a conformance test, and an
-  explicit lock read window with a matrix test across v2/v3/v4;
-- six published JSON Schemas, each held against its Go type by a drift test, so
-  schema and implementation cannot disagree;
-- a fixture corpus spanning six shapes with valid and invalid cases, plus a
+- five pinned version anchors, each asserted by a conformance test, and an
+  explicit lock read window with a matrix test across v2 to v5;
+- seven published JSON Schemas, each held against its Go type by a drift test,
+  so schema and implementation cannot disagree;
+- a fixture corpus spanning seven shapes with valid and invalid cases, plus a
   coverage test proving each digest-protecting reject branch is exercised;
 - a provider conformance suite that replays fixtures as real providers;
 - determinism tests over validation output, extension-name ordering, scope
   name-pattern resolution and agent-artifact canonical bytes;
-- three independent producers (Go, TypeScript and Python extensions) and a
-  consumer that reads every contract here.
+- three independent probe producers (Go, TypeScript and Python extensions)
+  and a consumer that reads every contract here except the toolchain-resolve
+  exchange.
 
 ## Product feature and durable decisions
 
@@ -468,3 +532,4 @@ Durable decisions:
 
 - [ADR 0001 — Core owns identity, providers own language knowledge](doc/adr/0001-core-owns-identity-providers-own-language.md)
 - [ADR 0002 — Lines are scopes, registries are keyed by ecosystem, versions come from git](doc/adr/0002-lines-are-scopes-registries-by-ecosystem.md)
+- [ADR 0003 — Extensions answer toolchain pins](doc/adr/0003-extensions-answer-toolchain-pins.md)

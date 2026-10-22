@@ -97,6 +97,7 @@ func validateRuntimeToolchains(m *Manifest) []diag.Diagnostic {
 		diags = append(diags, validateRuntimeToolchain(base, m.Runtime.Toolchains[alias])...)
 	}
 	diags = append(diags, validateRuntimeToolchainRefs("runtime.runToolchains", m.Runtime.RunToolchains, m.Runtime.Toolchains)...)
+	diags = append(diags, validateRuntimeResolves(m.Runtime.Resolves)...)
 	if m.Runtime.Prepare != nil {
 		diags = append(diags, validateRuntimeToolchainRefs("runtime.prepare.toolchains", m.Runtime.Prepare.Toolchains, m.Runtime.Toolchains)...)
 	}
@@ -230,6 +231,38 @@ func validateRuntimeToolchainRefs(field string, refs []string, declarations map[
 		}
 		if _, ok := declarations[ref]; !ok {
 			diags = append(diags, diag.Errorf("unknown-reference", item, "toolchain %q is not declared by runtime.toolchains", ref))
+		}
+	}
+	return diags
+}
+
+// Bounds of runtime.resolves. An entry is a workspace lock identity, which the
+// workspace protocol caps at 128 bytes.
+const (
+	maxRuntimeResolves        = 16
+	maxRuntimeResolveIdentity = 128
+)
+
+// validateRuntimeResolves checks runtime.resolves: each entry is a lock
+// identity named once. An entry need not name one of the runtime's own
+// toolchains, because the identities an extension answers pins for and the
+// toolchains it runs are independent.
+func validateRuntimeResolves(identities []string) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	if len(identities) > maxRuntimeResolves {
+		diags = append(diags, diag.Errorf("limit-exceeded", "runtime.resolves",
+			"runtime.resolves lists %d identities; at most %d are allowed", len(identities), maxRuntimeResolves))
+	}
+	seen := map[string]bool{}
+	for i, identity := range identities {
+		item := fmt.Sprintf("runtime.resolves[%d]", i)
+		if seen[identity] {
+			diags = append(diags, diag.Errorf("duplicate-value", item, "lock identity %q is listed more than once", identity))
+		}
+		seen[identity] = true
+		if !validRuntimeIdentifier(identity) || len(identity) > maxRuntimeResolveIdentity {
+			diags = append(diags, diag.Errorf("invalid-value", item,
+				"lock identity %q must match ^[A-Za-z_][A-Za-z0-9_.-]*$ and be at most %d bytes", identity, maxRuntimeResolveIdentity))
 		}
 	}
 	return diags

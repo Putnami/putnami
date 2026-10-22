@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "identities": ["go"],
+  "locked": {
+    "bun": {
+      "version": "1.3.14",
+      "integrities": { "darwin/arm64": "3333333333333333333333333333333333333333333333333333333333333333" },
+      "source": "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/"
+    }
+  },
+  "platform": "darwin/arm64"
+}

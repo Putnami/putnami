@@ -470,6 +470,7 @@ func TestValidateRuntimeToolchains(t *testing.T) {
 				},
 			},
 			RunToolchains: []string{"compiler"},
+			Resolves:      []string{"compiler", "linter"},
 			Prepare:       &RuntimePrepare{Command: "make", Inputs: []string{"cmd/**"}, Toolchains: []string{"compiler"}},
 		},
 		Tasks: map[string]TaskDefinition{"build": {Kind: "command", Command: "{extensionRuntime}", Toolchains: []string{"compiler"}}},
@@ -511,6 +512,19 @@ func TestValidateRuntimeToolchains(t *testing.T) {
 			}
 			m.Runtime.Toolchains["compiler"] = r
 		}, "limit-exceeded", "runtime.toolchains.compiler.environment"},
+		{"resolves repeat", func(m *Manifest) { m.Runtime.Resolves = []string{"go", "go"} }, "duplicate-value", "runtime.resolves[1]"},
+		{"resolves leading digit", func(m *Manifest) { m.Runtime.Resolves = []string{"1go"} }, "invalid-value", "runtime.resolves[0]"},
+		{"resolves non ASCII identity", func(m *Manifest) { m.Runtime.Resolves = []string{"go", "gö"} }, "invalid-value", "runtime.resolves[1]"},
+		{"resolves empty identity", func(m *Manifest) { m.Runtime.Resolves = []string{""} }, "invalid-value", "runtime.resolves[0]"},
+		{"resolves 129-byte identity", func(m *Manifest) {
+			m.Runtime.Resolves = []string{strings.Repeat("a", 129)}
+		}, "invalid-value", "runtime.resolves[0]"},
+		{"resolves 17 identities", func(m *Manifest) {
+			m.Runtime.Resolves = nil
+			for i := 0; i < 17; i++ {
+				m.Runtime.Resolves = append(m.Runtime.Resolves, fmt.Sprintf("tool%d", i))
+			}
+		}, "limit-exceeded", "runtime.resolves"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -524,6 +538,78 @@ func TestValidateRuntimeToolchains(t *testing.T) {
 			tc.edit(&copy)
 			assertDiag(t, ValidateRuntime(&copy), tc.code, tc.field)
 		})
+	}
+}
+
+// runtime.resolves names workspace lock identities, not the runtime's own
+// toolchains: an extension may answer pins for a toolchain another extension
+// runs. Sixteen identities of 128 bytes are within bounds.
+func TestValidateRuntimeResolves_AcceptsAnyLockIdentityWithinBounds(t *testing.T) {
+	m := &Manifest{Runtime: &RuntimeDefinition{Executable: "bin/x"}}
+	for i := 0; i < 15; i++ {
+		m.Runtime.Resolves = append(m.Runtime.Resolves, fmt.Sprintf("tool-%d.x_y", i))
+	}
+	m.Runtime.Resolves = append(m.Runtime.Resolves, strings.Repeat("a", 128))
+	if diags := ValidateRuntime(m); len(diags) != 0 {
+		t.Fatalf("resolves within bounds diagnostics = %v", diags)
+	}
+}
+
+func TestNormalizeRuntime_SortsResolves(t *testing.T) {
+	authored := []string{"uv", "bun", "uv", "golangci-lint"}
+	m := &Manifest{Runtime: &RuntimeDefinition{Executable: "bin/x", Resolves: authored}}
+	NormalizeRuntime(m)
+	if want := []string{"bun", "golangci-lint", "uv"}; !reflect.DeepEqual(m.Runtime.Resolves, want) {
+		t.Errorf("resolves = %v, want sorted without repeats %v", m.Runtime.Resolves, want)
+	}
+	if want := []string{"uv", "bun", "uv", "golangci-lint"}; !reflect.DeepEqual(authored, want) {
+		t.Errorf("normalization rewrote the authored slice to %v", authored)
+	}
+}
+
+// runtime.resolves is additive vocabulary inside the runtime section: it adds
+// no contract rung, so adding it alone leaves a manifest's contract as it is,
+// and a core that predates the member ignores it.
+func TestRuntimeResolvesKeepsTheManifestContract(t *testing.T) {
+	base := &Manifest{
+		Name:    "@putnami/go",
+		Tasks:   map[string]TaskDefinition{"build": {Kind: "command", Command: "{extensionRuntime}"}},
+		Runtime: &RuntimeDefinition{Executable: "bin/x"},
+	}
+	withResolves := *base
+	runtime := *base.Runtime
+	runtime.Resolves = []string{"go", "golangci-lint"}
+	withResolves.Runtime = &runtime
+	if got, want := RequiredLoadContract(&withResolves), RequiredLoadContract(base); got != want {
+		t.Errorf("RequiredLoadContract = %d with resolves, %d without", got, want)
+	}
+	if got, want := RequiredCLIContract(&withResolves), RequiredCLIContract(base); got != want {
+		t.Errorf("RequiredCLIContract = %d with resolves, %d without", got, want)
+	}
+	if got, want := ManifestProtocolVersion(&withResolves), ManifestProtocolVersion(base); got != want {
+		t.Errorf("ManifestProtocolVersion = %d with resolves, %d without", got, want)
+	}
+
+	withResolves.CLIContract = RequiredLoadContract(base)
+	data, err := json.Marshal(&withResolves)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := NegotiateManifest(ManifestFilename, data)
+	if err != nil {
+		t.Fatalf("NegotiateManifest refused a manifest stamped at its contract: %v", err)
+	}
+	if want := []string{"go", "golangci-lint"}; !reflect.DeepEqual(loaded.Runtime.Resolves, want) {
+		t.Errorf("loaded resolves = %v, want %v", loaded.Runtime.Resolves, want)
+	}
+
+	var older struct {
+		Runtime struct {
+			Executable string `json:"executable"`
+		} `json:"runtime"`
+	}
+	if err := json.Unmarshal(data, &older); err != nil || older.Runtime.Executable != "bin/x" {
+		t.Errorf("a reader that predates resolves cannot read the runtime: %v", err)
 	}
 }
 

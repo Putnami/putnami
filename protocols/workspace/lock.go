@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -15,10 +17,10 @@ import (
 
 // LockMinVersion and LockVersion are the inclusive read window. The schema
 // pins LockVersion because newly authored files use the current vocabulary;
-// the parser retains v2 and v3 for the CLI's explicit compatibility window.
+// the parser retains v2, v3 and v4 for the CLI's explicit compatibility window.
 const (
 	LockMinVersion = 2
-	LockVersion    = 4
+	LockVersion    = 5
 )
 
 // Lock is the unified lock file (putnami.lock.json): pinned CLI, toolchain,
@@ -93,15 +95,68 @@ var lockCLIPublishedPinFields = []string{
 	"version", "integrity", "integrities", "manifestHash", "protocolVersion",
 }
 
-// lockToolchainNames are the runtimes a lock may pin. Go, Bun and uv are the
-// runtimes Putnami provisions. v3 and v4 also admitted Node pins: historical
-// locks that carry one stay readable even though the current CLI no longer
-// declares or resolves Node, and a toolchain metadata refresh replaces the map
-// with the runtimes Putnami provisions.
-//
-// schemas/lock.json states the same list as the toolchains propertyNames enum;
-// TestLockSchemaToolchainNamesAgreeWithTheValidator reads both.
+// lockToolchainNames are the runtimes a version 3 or 4 lock may pin: Go, Bun
+// and uv, plus Node, which historical locks carry. A version 5 lock keys its
+// toolchains by any lock identity (lockToolchainIdentityPattern) instead, so
+// this list binds only the older vocabulary and schemas/lock.json, which
+// describes version 5, does not state it. Every name in it is also a valid
+// identity; TestLockSchemaToolchainRulesAgreeWithTheValidator checks that.
 var lockToolchainNames = []string{"go", "node", "bun", "uv"}
+
+// lockToolchainIdentityPattern is the grammar of a toolchain lock identity:
+// the key of a version 5 toolchains entry and of a toolchain-resolve answer,
+// and an identity a toolchain-resolve request asks for. It is the grammar an
+// extension manifest applies to runtime.toolchains.<alias>.lock and to
+// runtime.resolves (protocols/extension validRuntimeIdentifier), and
+// runtime.resolves also applies lockToolchainIdentityMaxBytes, so every
+// identity an extension answers for is one a lock can key.
+//
+// schemas/lock.json and schemas/toolchain-resolve.json state the same pattern
+// and lockToolchainIdentityMaxBytes;
+// TestLockSchemaToolchainRulesAgreeWithTheValidator and
+// TestToolchainResolveSchemaAgreesWithTheValidator read them.
+const lockToolchainIdentityPattern = `^[A-Za-z_][A-Za-z0-9_.-]*$`
+
+// lockToolchainIdentityMaxBytes bounds a toolchain lock identity.
+const lockToolchainIdentityMaxBytes = 128
+
+// lockPlatformPattern is the grammar of a platform key: an "os/arch" pair as
+// Go spells them, such as darwin/arm64.
+const lockPlatformPattern = `^[a-z0-9]+/[a-z0-9]+$`
+
+// Bounds of a version 5 toolchain entry.
+const (
+	lockToolchainMaxPlatforms     = 32
+	lockArchiveURLMaxBytes        = 2048
+	lockArchiveExecutableMaxBytes = 512
+)
+
+// lockArchiveExecutablePattern is the grammar of an archive's executable
+// path: a clean relative slash path. It admits no empty, "." or ".." segment,
+// no backslash, no leading slash, and no drive letter ("C:") on the first
+// segment, so the path cannot leave the unpacked archive on any host. The
+// first group is the first segment, the second each later one.
+//
+// schemas/lock.json states the same pattern;
+// TestLockSchemaToolchainRulesAgreeWithTheValidator reads it and pins the
+// pattern's verdict on each shape it must refuse.
+const lockArchiveExecutablePattern = `^(?:[^./\\A-Za-z][^/\\]*|[A-Za-z]|[A-Za-z][^/\\:][^/\\]*|\.[^./\\][^/\\]*|\.\.[^/\\]+)` +
+	`(?:/(?:[^./\\][^/\\]*|\.[^./\\][^/\\]*|\.\.[^/\\]+))*$`
+
+// The archive formats a version 5 toolchain pin may record.
+const (
+	LockArchiveFormatTarGz = "tar.gz"
+	LockArchiveFormatZip   = "zip"
+)
+
+// lockArchiveFormats is the closed set, in the order schemas/lock.json lists it.
+var lockArchiveFormats = []string{LockArchiveFormatTarGz, LockArchiveFormatZip}
+
+var (
+	lockToolchainIdentityRE = regexp.MustCompile(lockToolchainIdentityPattern)
+	lockPlatformRE          = regexp.MustCompile(lockPlatformPattern)
+	lockArchiveExecutableRE = regexp.MustCompile(lockArchiveExecutablePattern)
+)
 
 // lockCLIPublishedPinFieldSet reports the fields a given entry actually sets,
 // in lockCLIPublishedPinFields order, so a diagnostic list is deterministic.
@@ -129,13 +184,43 @@ func (e LockCLIEntry) IsWorkspaceSource() bool {
 	return strings.TrimSpace(e.Source) == LockCLISourceWorkspace
 }
 
-// LockToolchainEntry pins one supported runtime to exact, independently
+// LockToolchainEntry pins one toolchain to exact, independently
 // materializable archives. A distinct type keeps the strict decoder aligned
-// with the v3 schema: extension-only fields cannot leak into toolchain entries.
+// with the schema: extension-only fields cannot leak into toolchain entries.
+//
+// Two vocabularies share the type. A version 5 entry records, per platform,
+// the archive to download (Archives) beside the SHA-256 that binds its bytes
+// (Integrities), and no Source. A version 3 or 4 entry records Integrities and
+// the release's base URL (Source), and no Archives. ValidateLock applies the
+// rules of the lock's own version, and MarshalLock writes only that version's
+// members.
+//
+// Member order is a contract. encoding/json writes struct members in
+// declaration order, and `putnamiw` (function locked_go_sha256) reads the
+// committed lock line by line: it takes the last `"<platform>": ` line indented
+// by eight spaces in the go entry as that platform's digest. An archives map
+// writes the same platform keys at that indentation, so Archives must stay
+// before Integrities. TestMarshalLockWritesIntegritiesAfterArchives pins it.
 type LockToolchainEntry struct {
-	Version     string            `json:"version"`
-	Integrities map[string]string `json:"integrities"`
-	Source      string            `json:"source"`
+	Version     string                          `json:"version"`
+	Archives    map[string]LockToolchainArchive `json:"archives,omitempty"`
+	Integrities map[string]string               `json:"integrities"`
+	Source      string                          `json:"source,omitempty"`
+}
+
+// LockToolchainArchive is one platform's archive of a version 5 toolchain pin:
+// where to download it, how to unpack it, and where the executable sits in it.
+// The integrity recorded for the same platform binds the archive's bytes, so
+// the URL names a location and never vouches for content: a plain http URL
+// serves the same verified bytes as an https one.
+type LockToolchainArchive struct {
+	// URL is the absolute http or https URL of the archive.
+	URL string `json:"url"`
+	// Format is LockArchiveFormatTarGz or LockArchiveFormatZip.
+	Format string `json:"format"`
+	// Executable is the slash-separated path of the toolchain's executable
+	// relative to the unpacked archive's root, such as go/bin/go.
+	Executable string `json:"executable"`
 }
 
 // LockEntry pins one extension or template to a resolved version and its
@@ -173,8 +258,10 @@ func ParseLock(data []byte) (*Lock, []diag.Diagnostic) {
 }
 
 // ValidateLock checks structural invariants on a parsed lock file: the pinned
-// format version, and that every pinned entry (cli, extensions, templates)
-// carries a resolved version. A version-less pin is unreproducible.
+// format version, that every pinned entry (cli, toolchains, extensions,
+// templates) carries a resolved version, and that each toolchain entry uses
+// the vocabulary of the lock's own version. A version-less pin is
+// unreproducible.
 func ValidateLock(l *Lock) []diag.Diagnostic {
 	if l == nil {
 		return []diag.Diagnostic{diag.Errorf("nil-lock", "", "lock file is nil")}
@@ -222,6 +309,16 @@ func ValidateLock(l *Lock) []diag.Diagnostic {
 	}
 	for _, name := range sortedLockKeys(l.Toolchains) {
 		entry := l.Toolchains[name]
+		if l.Version >= 5 {
+			field := fmt.Sprintf("toolchains.%s", name)
+			if !validLockToolchainIdentity(name) {
+				diags = append(diags, diag.Errorf("invalid-value", field,
+					"toolchain identity %q must match %s and be at most %d bytes",
+					name, lockToolchainIdentityPattern, lockToolchainIdentityMaxBytes))
+			}
+			diags = append(diags, validateLockToolchainPin(field, name, entry)...)
+			continue
+		}
 		if !slices.Contains(lockToolchainNames, name) {
 			diags = append(diags, diag.Errorf("unsupported-toolchain",
 				fmt.Sprintf("toolchains.%s", name), "toolchain %q is not supported", name))
@@ -245,6 +342,10 @@ func ValidateLock(l *Lock) []diag.Diagnostic {
 		if strings.TrimSpace(entry.Source) == "" {
 			diags = append(diags, diag.Errorf("required-field",
 				fmt.Sprintf("toolchains.%s.source", name), "toolchain %q pin requires a source", name))
+		}
+		if entry.Archives != nil {
+			diags = append(diags, diag.Errorf("field-version",
+				fmt.Sprintf("toolchains.%s.archives", name), "toolchains.%s.archives requires lock version 5", name))
 		}
 	}
 	for _, name := range sortedLockKeys(l.Extensions) {
@@ -283,6 +384,139 @@ func ValidateLock(l *Lock) []diag.Diagnostic {
 	return diags
 }
 
+// validateLockToolchainPin applies the version 5 toolchain entry rules to
+// entry, reporting under field. A toolchain-resolve answer's pin follows the
+// same rules, because the lock records that pin as written.
+//
+// Diagnostics come out in a fixed order — version, source, the integrities,
+// each archive in platform order, then each integrity without an archive — so
+// one entry produces one report.
+func validateLockToolchainPin(field, identity string, entry LockToolchainEntry) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	if strings.TrimSpace(entry.Version) == "" {
+		diags = append(diags, diag.Errorf("required-field", field+".version",
+			"toolchain %q pin requires a version", identity))
+	}
+	if entry.Source != "" {
+		diags = append(diags, diag.Errorf("field-version", field+".source",
+			"toolchain %q source is lock version 3 and 4 vocabulary; a version 5 pin names each archive's url", identity))
+	}
+	switch {
+	case len(entry.Integrities) == 0:
+		diags = append(diags, diag.Errorf("required-field", field+".integrities",
+			"toolchain %q pin requires integrities", identity))
+	case len(entry.Integrities) > lockToolchainMaxPlatforms:
+		diags = append(diags, diag.Errorf("limit-exceeded", field+".integrities",
+			"toolchain %q pin records %d platforms; at most %d are allowed",
+			identity, len(entry.Integrities), lockToolchainMaxPlatforms))
+	}
+	for _, platform := range sortedLockKeys(entry.Integrities) {
+		item := field + ".integrities." + platform
+		if !validLockPlatform(platform) {
+			diags = append(diags, diag.Errorf("invalid-value", item,
+				"toolchain %q platform %q must match %s", identity, platform, lockPlatformPattern))
+		}
+		if !sha256HexPattern.MatchString(entry.Integrities[platform]) {
+			diags = append(diags, diag.Errorf("invalid-integrity", item,
+				"toolchain %q integrity for %s must be 64 lowercase hexadecimal characters", identity, platform))
+		}
+	}
+	if len(entry.Archives) == 0 {
+		diags = append(diags, diag.Errorf("required-field", field+".archives",
+			"toolchain %q pin requires archives: the url, format and executable of each platform's archive", identity))
+		return diags
+	}
+	if len(entry.Archives) > lockToolchainMaxPlatforms {
+		diags = append(diags, diag.Errorf("limit-exceeded", field+".archives",
+			"toolchain %q pin records %d archives; at most %d are allowed",
+			identity, len(entry.Archives), lockToolchainMaxPlatforms))
+	}
+	for _, platform := range sortedLockKeys(entry.Archives) {
+		item := field + ".archives." + platform
+		if !validLockPlatform(platform) {
+			diags = append(diags, diag.Errorf("invalid-value", item,
+				"toolchain %q platform %q must match %s", identity, platform, lockPlatformPattern))
+		}
+		if _, ok := entry.Integrities[platform]; !ok {
+			diags = append(diags, diag.Errorf("required-field", field+".integrities."+platform,
+				"toolchain %q records an archive for %s and no integrity; the integrity is what binds the archive's bytes",
+				identity, platform))
+		}
+		diags = append(diags, validateLockToolchainArchive(item, identity, platform, entry.Archives[platform])...)
+	}
+	for _, platform := range sortedLockKeys(entry.Integrities) {
+		if _, ok := entry.Archives[platform]; !ok {
+			diags = append(diags, diag.Errorf("required-field", field+".archives."+platform,
+				"toolchain %q records an integrity for %s and no archive to verify it against", identity, platform))
+		}
+	}
+	return diags
+}
+
+// validateLockToolchainArchive checks one platform's archive of a version 5
+// toolchain pin.
+func validateLockToolchainArchive(field, identity, platform string, archive LockToolchainArchive) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	switch {
+	case archive.URL == "":
+		diags = append(diags, diag.Errorf("required-field", field+".url",
+			"toolchain %q archive for %s requires a url", identity, platform))
+	case !validLockArchiveURL(archive.URL):
+		diags = append(diags, diag.Errorf("invalid-value", field+".url",
+			"toolchain %q archive url %q must be an absolute http or https URL with a host and no user information, at most %d bytes",
+			identity, archive.URL, lockArchiveURLMaxBytes))
+	}
+	switch {
+	case archive.Format == "":
+		diags = append(diags, diag.Errorf("required-field", field+".format",
+			"toolchain %q archive for %s requires a format", identity, platform))
+	case !slices.Contains(lockArchiveFormats, archive.Format):
+		diags = append(diags, diag.Errorf("invalid-value", field+".format",
+			"toolchain %q archive format %q is not one of %s",
+			identity, archive.Format, strings.Join(lockArchiveFormats, ", ")))
+	}
+	switch {
+	case archive.Executable == "":
+		diags = append(diags, diag.Errorf("required-field", field+".executable",
+			"toolchain %q archive for %s requires an executable path", identity, platform))
+	case !validLockArchiveExecutable(archive.Executable):
+		diags = append(diags, diag.Errorf("invalid-path", field+".executable",
+			"toolchain %q executable %q must be a clean relative slash path inside the archive, at most %d bytes",
+			identity, archive.Executable, lockArchiveExecutableMaxBytes))
+	}
+	return diags
+}
+
+// validLockToolchainIdentity reports whether value is a toolchain lock
+// identity (lockToolchainIdentityPattern).
+func validLockToolchainIdentity(value string) bool {
+	return len(value) <= lockToolchainIdentityMaxBytes && lockToolchainIdentityRE.MatchString(value)
+}
+
+// validLockPlatform reports whether value is an "os/arch" platform key.
+func validLockPlatform(value string) bool {
+	return lockPlatformRE.MatchString(value)
+}
+
+// validLockArchiveURL reports whether value is an absolute http or https URL
+// with a host and no user information, within lockArchiveURLMaxBytes. User
+// information is refused because a lock is committed: a credential written
+// into it is published with the repository.
+func validLockArchiveURL(value string) bool {
+	if len(value) > lockArchiveURLMaxBytes ||
+		!(strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://")) {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	return err == nil && parsed.Host != "" && parsed.User == nil
+}
+
+// validLockArchiveExecutable reports whether value is a clean relative slash
+// path (lockArchiveExecutablePattern) within lockArchiveExecutableMaxBytes.
+func validLockArchiveExecutable(value string) bool {
+	return len(value) <= lockArchiveExecutableMaxBytes && lockArchiveExecutableRE.MatchString(value)
+}
+
 // ParseAndValidateLock combines strict parsing and validation.
 func ParseAndValidateLock(data []byte) (*Lock, []diag.Diagnostic) {
 	l, diags := ParseLock(data)
@@ -296,9 +530,23 @@ func ParseAndValidateLock(data []byte) (*Lock, []diag.Diagnostic) {
 // read window onto the current format. ParseAndValidateLock never calls this:
 // reading an older lock preserves its recorded version and cannot dirty a
 // workspace as a side effect. The returned lock is a deep copy.
+//
+// A lock older than version 5 that pins a toolchain does not migrate. Its
+// entries record no archives, and only the extension that answers the
+// toolchain-resolve call for an identity can supply them, so the migration
+// fails with one needs-resolution error per entry rather than inventing them.
+// A lock without toolchain entries migrates.
 func MigrateLockToCurrent(l *Lock) (*Lock, []diag.Diagnostic) {
 	diags := ValidateLock(l)
 	if diag.HasErrors(diags) {
+		return nil, diags
+	}
+	if l.Version < 5 && len(l.Toolchains) > 0 {
+		for _, name := range sortedLockKeys(l.Toolchains) {
+			diags = append(diags, diag.Errorf("needs-resolution", fmt.Sprintf("toolchains.%s", name),
+				"toolchain %q is pinned without archives, and only the extension that answers the toolchain-resolve call for it can supply them",
+				name))
+		}
 		return nil, diags
 	}
 	out := cloneLock(l)
@@ -320,7 +568,9 @@ func MigrateLockToCurrent(l *Lock) (*Lock, []diag.Diagnostic) {
 
 // MarshalLock returns deterministic canonical lock bytes without mutating the
 // caller. Map keys are sorted by encoding/json; nil required sections are
-// normalized to empty objects for the version that defines them.
+// normalized to empty objects for the version that defines them, and each
+// toolchain entry carries only its lock version's vocabulary: a version 5
+// entry drops Source, an older one drops Archives.
 func MarshalLock(l *Lock) ([]byte, error) {
 	if l == nil {
 		return nil, fmt.Errorf("marshal lock: lock file is nil")
@@ -346,6 +596,14 @@ func MarshalLock(l *Lock) ([]byte, error) {
 		if out.CLI != nil {
 			out.CLI.ProtocolVersion = nil
 		}
+	}
+	for name, entry := range out.Toolchains {
+		if out.Version >= 5 {
+			entry.Source = ""
+		} else {
+			entry.Archives = nil
+		}
+		out.Toolchains[name] = entry
 	}
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
@@ -387,6 +645,13 @@ func cloneToolchainEntries(entries map[string]LockToolchainEntry) map[string]Loc
 	out := make(map[string]LockToolchainEntry, len(entries))
 	for name, entry := range entries {
 		entry.Integrities = cloneStringMap(entry.Integrities)
+		if entry.Archives != nil {
+			archives := make(map[string]LockToolchainArchive, len(entry.Archives))
+			for platform, archive := range entry.Archives {
+				archives[platform] = archive
+			}
+			entry.Archives = archives
+		}
 		out[name] = entry
 	}
 	return out

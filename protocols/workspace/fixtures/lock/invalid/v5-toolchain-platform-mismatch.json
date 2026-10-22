@@ -1,0 +1,17 @@
+{
+  "version": 5,
+  "toolchains": {
+    "go": {
+      "version": "1.26.9",
+      "archives": {
+        "darwin/arm64": { "url": "https://go.dev/dl/go1.26.9.darwin-arm64.tar.gz", "format": "tar.gz", "executable": "go/bin/go" }
+      },
+      "integrities": {
+        "darwin/arm64": "5555555555555555555555555555555555555555555555555555555555555555",
+        "linux/amd64": "6666666666666666666666666666666666666666666666666666666666666666"
+      }
+    }
+  },
+  "extensions": {},
+  "templates": {}
+}

@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "cli": {
     "version": "1.4.2",
     "integrities": {
@@ -10,10 +10,68 @@
     "protocolVersion": 2
   },
   "toolchains": {
+    "bun": {
+      "version": "1.3.14",
+      "archives": {
+        "darwin/arm64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip",
+          "format": "zip",
+          "executable": "bun-darwin-aarch64/bun"
+        },
+        "linux/amd64": {
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip",
+          "format": "zip",
+          "executable": "bun-linux-x64/bun"
+        }
+      },
+      "integrities": {
+        "darwin/arm64": "3333333333333333333333333333333333333333333333333333333333333333",
+        "linux/amd64": "4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    },
     "go": {
-      "version": "1.26.1",
-      "integrities": { "linux/amd64": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-      "source": "https://go.dev/dl/"
+      "version": "1.26.9",
+      "archives": {
+        "darwin/arm64": {
+          "url": "https://go.dev/dl/go1.26.9.darwin-arm64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "linux/amd64": {
+          "url": "https://go.dev/dl/go1.26.9.linux-amd64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "windows/amd64": {
+          "url": "https://go.dev/dl/go1.26.9.windows-amd64.zip",
+          "format": "zip",
+          "executable": "go/bin/go.exe"
+        }
+      },
+      "integrities": {
+        "darwin/arm64": "5555555555555555555555555555555555555555555555555555555555555555",
+        "linux/amd64": "6666666666666666666666666666666666666666666666666666666666666666",
+        "windows/amd64": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    },
+    "uv": {
+      "version": "0.11.32",
+      "archives": {
+        "darwin/arm64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-aarch64-apple-darwin.tar.gz",
+          "format": "tar.gz",
+          "executable": "uv-aarch64-apple-darwin/uv"
+        },
+        "linux/amd64": {
+          "url": "https://github.com/astral-sh/uv/releases/download/0.11.32/uv-x86_64-unknown-linux-gnu.tar.gz",
+          "format": "tar.gz",
+          "executable": "uv-x86_64-unknown-linux-gnu/uv"
+        }
+      },
+      "integrities": {
+        "darwin/arm64": "ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829",
+        "linux/amd64": "1fd052f196108d87e61fc3d98fe06b4ec758c9a1eb1466a6fd1a436fe45885f2"
+      }
     }
   },
   "extensions": {
