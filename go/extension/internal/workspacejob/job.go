@@ -53,7 +53,7 @@ type Job struct {
 	WorkspaceRoot string
 	// ProjectPath is the project the job runs for, or "" for none.
 	ProjectPath string
-	// GoBinary is the go command ResolveGoBinary selected.
+	// GoBinary is the go command FindGoBinary selected.
 	GoBinary string
 
 	// outsideWorkspaceOnly makes the job find and run no program inside the
@@ -111,16 +111,17 @@ func (j *Job) ExtensionStateRoot() string {
 	return filepath.Join(j.WorkspaceRoot, ".putnami", "extensions", "@putnami-go")
 }
 
-// GoToolchainRoot is the directory the managed Go releases are installed in,
-// one go-<version> directory each, shared by every workspace of the machine:
-// toolchains/go under the Putnami home (toolchain.ResolveGoToolchainRoot).
+// GoToolchainRoot is the directory that holds the Go releases the CLI
+// provisions, one go-<version> directory each, shared by every workspace of
+// the machine: toolchains/go under the Putnami home
+// (toolchain.ResolveGoToolchainRoot).
 func (j *Job) GoToolchainRoot() string {
 	return toolchain.ResolveGoToolchainRoot(j.Env.Get, j.WorkspaceRoot)
 }
 
 // workspaceGoRoot is the directory inside the workspace that holds Go
-// releases, one go-<version> directory each. The job installs none there; it
-// runs one it finds there when the Putnami home holds no install of that
+// releases, one go-<version> directory each. Nothing installs one there; the
+// job runs one it finds there when the Putnami home holds no install of that
 // release.
 func (j *Job) workspaceGoRoot() string {
 	return filepath.Join(j.ExtensionStateRoot(), "libs")

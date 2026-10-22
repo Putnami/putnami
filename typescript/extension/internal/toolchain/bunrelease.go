@@ -17,14 +17,14 @@ import (
 // run with, with one SHA-256 per platform.
 const WorkspaceLockFile = "putnami.lock.json"
 
-// DefaultBunVersion is the Bun release the extension installs for a workspace
-// that declares none. workspace-install then declares it in the root
-// package.json, and the lock pins it.
+// DefaultBunVersion is the Bun release the extension pins for a workspace
+// that declares none: the lock pins it, the CLI provisions it, and
+// workspace-install declares it in the root package.json.
 const DefaultBunVersion = "1.4.0"
 
 // defaultBunIntegrities are the SHA-256 digests of the DefaultBunVersion
 // archives, per "<goos>/<goarch>", as the vendor publishes them for the
-// release. They ship in the extension so that installing the default release
+// release. They ship in the extension so that pinning the default release
 // reads no release metadata from the network.
 var defaultBunIntegrities = map[string]string{
 	"darwin/amd64":  "1d0211b8f1dc991182344687ad15e72ee86f154845a5f7fa477994cd341dd9b0",
@@ -59,7 +59,7 @@ type BunRelease struct {
 	Source string `json:"source"`
 }
 
-// DefaultBunRelease is the release the extension installs when the workspace
+// DefaultBunRelease is the release the extension pins when the workspace
 // declares none: DefaultBunVersion, from the vendor's release downloads, with
 // the digests the extension ships.
 func DefaultBunRelease() BunRelease {
@@ -153,6 +153,16 @@ func lockedBunRelease(workspaceRoot string) (BunRelease, bool, error) {
 		return BunRelease{}, false, nil
 	}
 	return release, true, nil
+}
+
+// wantedBunVersion returns the Bun release workspaceRoot runs: the one its
+// lock pins, else the one its root package.json declares, else "". A lock
+// that cannot be read pins none.
+func wantedBunVersion(workspaceRoot string) string {
+	if locked, pinned, err := lockedBunRelease(workspaceRoot); err == nil && pinned {
+		return locked.Version
+	}
+	return declaredBunVersion(workspaceRoot)
 }
 
 // declaredBunVersion returns the Bun release the workspace root package.json

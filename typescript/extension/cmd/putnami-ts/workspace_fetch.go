@@ -21,7 +21,6 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/typescript/extension/internal/project"
-	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // readJobCredential reads the read credential the engine hands this job.
@@ -62,16 +61,11 @@ func runWorkspaceFetch(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (stri
 	if err != nil {
 		return "FAILED", nil, err
 	}
-	// A hosted run downloads no toolchain: the job runs a bun the runner
-	// holds. A bun the repository commits into its own tree is repository
+	// The job installs no Bun: it runs the one the CLI resolved, outside the
+	// workspace. A bun the repository commits into its own tree is repository
 	// code, and this job holds the read credential: it is never started, not
 	// even to read its version.
-	bunBin, err := provisionBunBin(ctx, emit, toolchain.BunFind, func(path string) string {
-		if within(ctx.WorkspaceRoot, path) {
-			return "it is inside the workspace"
-		}
-		return ""
-	})
+	bunBin, err := resolveBunBin()
 	if err != nil {
 		return "FAILED", nil, err
 	}

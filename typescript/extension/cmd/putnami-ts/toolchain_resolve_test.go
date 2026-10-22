@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
@@ -18,6 +19,8 @@ import (
 // version 4 Bun pin of the declared release comes back as a version 5 pin,
 // offline.
 func TestHandleToolchainResolve_ServesTheReservedInvocation(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"the-reserved-call-reads-one-request-and-writes-one-answer")
 	root := t.TempDir()
 	writeProbeFile(t, filepath.Join(root, "package.json"), `{"name":"repo","packageManager":"bun@1.2.9"}`)
 	t.Chdir(root)

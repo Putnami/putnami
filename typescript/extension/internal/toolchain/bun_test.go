@@ -85,21 +85,6 @@ func writeFakeBun(t *testing.T, dir, program, version string) string {
 	return path
 }
 
-// fakeBunVersion reports the version writeFakeBun wrote, and records which
-// programs were asked.
-func fakeBunVersion(asked *[]string) func(string) (string, error) {
-	return func(path string) (string, error) {
-		if asked != nil {
-			*asked = append(*asked, path)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return strings.TrimSpace(string(data)), nil
-	}
-}
-
 // The buns of the host are listed in the order of the task runtime candidates
 // of the extension manifest: PATH, $BUN_INSTALL/bin, then .bun/bin under the
 // user's home directory, each once.
@@ -140,13 +125,14 @@ func TestHostBuns_FollowTheTaskRuntimeCandidates(t *testing.T) {
 }
 
 // The task runtime of the extension manifest lists the buns of the host in the
-// order hostBuns reads them, then the install under the Putnami home, at the
-// path this package installs a release to. The CLI therefore resolves a
-// release this extension installed, and derives its BUN_INSTALL as the install
-// directory.
-func TestTaskRuntime_ListsTheInstallAsACandidate(t *testing.T) {
+// order hostBuns reads them, then the provisioned release, which the CLI
+// unpacks in toolchains/bun/bun-<version> under the Putnami home and runs at
+// the executable the toolchain-resolve answer names. No candidate names a
+// release the extension installs. BUN_INSTALL, derived from that executable,
+// is the release directory, the one ResolveBun finds the release in.
+func TestTaskRuntime_ListsTheProvisionedBunAsACandidate(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-under-the-putnami-home",
-		"the-install-is-a-task-runtime-candidate")
+		"the-provisioned-bun-is-a-task-runtime-candidate")
 
 	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
 	if err != nil {
@@ -155,7 +141,7 @@ func TestTaskRuntime_ListsTheInstallAsACandidate(t *testing.T) {
 	type candidate struct {
 		From        string `json:"from"`
 		Environment string `json:"environment,omitempty"`
-		Path        string `json:"path"`
+		Path        string `json:"path,omitempty"`
 	}
 	var manifest struct {
 		Runtime struct {
@@ -168,6 +154,7 @@ func TestTaskRuntime_ListsTheInstallAsACandidate(t *testing.T) {
 				} `json:"environment"`
 			} `json:"toolchains"`
 			RunToolchains []string `json:"runToolchains"`
+			Resolves      []string `json:"resolves"`
 		} `json:"runtime"`
 	}
 	if err := json.Unmarshal(data, &manifest); err != nil {
@@ -180,16 +167,28 @@ func TestTaskRuntime_ListsTheInstallAsACandidate(t *testing.T) {
 	if !slices.Contains(manifest.Runtime.RunToolchains, "taskRuntime") {
 		t.Fatalf("runToolchains = %v, want every job to resolve the task runtime", manifest.Runtime.RunToolchains)
 	}
+	if !slices.Contains(manifest.Runtime.Resolves, bunToolchainName) {
+		t.Fatalf("runtime.resolves = %v, want the %s lock the provisioned candidate needs", manifest.Runtime.Resolves, bunToolchainName)
+	}
 	want := []candidate{
 		{From: "path", Path: "bun"},
 		{From: "environment", Environment: bunInstallEnv, Path: "bin/bun"},
 		{From: "home", Path: ".bun/bin/bun"},
-		{From: "putnami-home", Path: "toolchains/bun/bun-{version}/bin/bun"},
+		{From: "provisioned"},
 	}
 	if !slices.Equal(runtime.Candidates, want) {
 		t.Fatalf("task runtime candidates = %+v, want %+v", runtime.Candidates, want)
 	}
+	for _, candidate := range runtime.Candidates {
+		if candidate.From == "putnami-home" {
+			t.Fatalf("a putnami-home candidate names %s: the extension installs no Bun", candidate.Path)
+		}
+	}
 
+	binding, bound := runtime.Environment[bunInstallEnv]
+	if !bound || binding.From != "ancestor" {
+		t.Fatalf("the task runtime derives no %s from its program: %+v", bunInstallEnv, runtime.Environment)
+	}
 	home := filepath.Join(t.TempDir(), ".putnami")
 	lookup := func(key string) string {
 		if key == putnamihome.Env {
@@ -197,24 +196,24 @@ func TestTaskRuntime_ListsTheInstallAsACandidate(t *testing.T) {
 		}
 		return ""
 	}
-	dir := managedBunDir(putnamihome.ToolchainRoot(lookup, "", bunToolchainName), "1.4.0")
-	installed := managedBunPath(dir, "linux")
-	last := runtime.Candidates[len(runtime.Candidates)-1]
-	named := filepath.Join(home, filepath.FromSlash(strings.ReplaceAll(last.Path, "{version}", "1.4.0")))
-	if named != installed {
-		t.Fatalf("the candidate names %s, the extension installs %s", named, installed)
-	}
-
-	binding, bound := runtime.Environment[bunInstallEnv]
-	if !bound || binding.From != "ancestor" {
-		t.Fatalf("the task runtime derives no %s from its program: %+v", bunInstallEnv, runtime.Environment)
-	}
-	derived := installed
-	for range binding.Levels {
-		derived = filepath.Dir(derived)
-	}
-	if derived != dir || !isManagedBunDir(derived) {
-		t.Fatalf("%s derived from %s = %s, want the install directory %s", bunInstallEnv, installed, derived, dir)
+	root := putnamihome.ToolchainRoot(lookup, "", bunToolchainName)
+	pin := bunPinOf(DefaultBunRelease())
+	for target, archive := range pin.Archives {
+		goos, goarch, _ := strings.Cut(target, "/")
+		dir := filepath.Join(home, "toolchains", runtime.Lock, runtime.Lock+"-"+pin.Version)
+		provisioned := writeFakeBun(t, filepath.Dir(filepath.Join(dir, filepath.FromSlash(archive.Executable))),
+			filepath.Base(archive.Executable), pin.Version)
+		if got := provisionedBun(root, pin.Version, platform{goos: goos, goarch: goarch}); got != provisioned {
+			t.Errorf("%s: the CLI provisions %s, ResolveBun finds %q", target, provisioned, got)
+		}
+		derived := provisioned
+		for range binding.Levels {
+			derived = filepath.Dir(derived)
+		}
+		if derived != managedBunDir(root, pin.Version) || !isManagedBunDir(derived) {
+			t.Errorf("%s: %s derived from %s = %s, want the release directory %s",
+				target, bunInstallEnv, provisioned, derived, managedBunDir(root, pin.Version))
+		}
 	}
 }
 
@@ -228,13 +227,19 @@ func TestHostBuns_WithoutAHomeDirectory(t *testing.T) {
 }
 
 // A task takes the bun of the host first: the CLI puts the bun it resolved
-// first on PATH. Without one it takes the install under the Putnami home of
-// the release the workspace pins, and points the environment at it.
-func TestResolveBun_FallsBackToTheInstallUnderThePutnamiHome(t *testing.T) {
+// first on PATH. Without one it takes the release of the version the
+// workspace pins under the Putnami home, at the path the CLI provisions it,
+// else at bin/bun in the release directory, and points the
+// environment at it. It installs none.
+func TestResolveBun_FallsBackToTheReleaseUnderThePutnamiHome(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-under-the-putnami-home",
+		"a-job-without-a-bun-on-path-runs-the-release-under-the-putnami-home")
 	host := newFakeBunHost(t, "linux", "arm64")
 	workspace := t.TempDir()
 	writeBunLock(t, workspace, BunRelease{Version: "1.9.9"})
+	declareBun(t, workspace, "bun@1.8.0")
 	host.env[workspaceRootEnv] = workspace
+	host.env["PATH"] = "/usr/bin"
 
 	_, err := resolveBun(host.bunHost)
 	if err == nil || !strings.Contains(err.Error(), "Bun 1.9.9") || !strings.Contains(err.Error(), "`putnami install`") {
@@ -243,15 +248,35 @@ func TestResolveBun_FallsBackToTheInstallUnderThePutnamiHome(t *testing.T) {
 	if strings.Contains(err.Error(), "bun.sh") {
 		t.Fatalf("the error asks the user to install Bun: %v", err)
 	}
+	if entries, _ := os.ReadDir(filepath.Join(host.home, ".putnami")); len(entries) != 0 {
+		t.Fatalf("resolveBun wrote under the Putnami home: %v", entries)
+	}
 
 	dir := filepath.Join(host.toolchainRoot(), "bun-1.9.9")
-	installed := writeFakeBun(t, filepath.Join(dir, "bin"), "bun", "1.9.9")
+	atBin := writeFakeBun(t, filepath.Join(dir, "bin"), "bun", "1.9.9")
 	got, err := resolveBun(host.bunHost)
-	if err != nil || got != installed {
-		t.Fatalf("resolveBun = (%q, %v), want %q", got, err, installed)
+	if err != nil || got != atBin {
+		t.Fatalf("resolveBun = (%q, %v), want the program at bin/bun %q", got, err, atBin)
+	}
+
+	// The program at bun-<target>/bun comes before the one at bin/bun. The environment
+	// is the job's again, which names neither.
+	provisioned := writeFakeBun(t, filepath.Join(dir, "bun-linux-aarch64"), "bun", "1.9.9")
+	host.env["PATH"] = "/usr/bin"
+	delete(host.env, "BUN_INSTALL")
+	delete(host.env, "BUN_RUNTIME_TRANSPILER_CACHE_PATH")
+	got, err = resolveBun(host.bunHost)
+	if err != nil || got != provisioned {
+		t.Fatalf("resolveBun = (%q, %v), want the provisioned %q", got, err, provisioned)
 	}
 	if host.env["BUN_INSTALL"] != dir {
 		t.Fatalf("BUN_INSTALL = %q, want %q", host.env["BUN_INSTALL"], dir)
+	}
+	if got, want := host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"], filepath.Join(dir, "install", "cache", "@t@"); got != want {
+		t.Fatalf("BUN_RUNTIME_TRANSPILER_CACHE_PATH = %q, want %q", got, want)
+	}
+	if got, want := host.env["PATH"], filepath.Dir(provisioned)+string(os.PathListSeparator)+"/usr/bin"; got != want {
+		t.Fatalf("PATH = %q, want %q", got, want)
 	}
 
 	onPath := writeFakeBun(t, t.TempDir(), "bun", "1.0.0")
@@ -261,15 +286,24 @@ func TestResolveBun_FallsBackToTheInstallUnderThePutnamiHome(t *testing.T) {
 	}
 }
 
-// Without a workspace the release is the extension's default one.
-func TestResolveBun_NamesTheDefaultReleaseOutsideAWorkspace(t *testing.T) {
+// Without a lock pin the release is the one package.json declares, and
+// without a workspace it is the extension's default one.
+func TestResolveBun_NamesTheDeclaredOrTheDefaultRelease(t *testing.T) {
+	declared := newFakeBunHost(t, "linux", "arm64")
+	workspace := t.TempDir()
+	declareBun(t, workspace, "bun@1.8")
+	declared.env[workspaceRootEnv] = workspace
+	if _, err := resolveBun(declared.bunHost); err == nil || !strings.Contains(err.Error(), "Bun 1.8.0") {
+		t.Fatalf("resolveBun: err = %v, want one that names the declared Bun 1.8.0", err)
+	}
+
 	host := newFakeBunHost(t, "linux", "arm64")
 	_, err := resolveBun(host.bunHost)
 	if err == nil || !strings.Contains(err.Error(), "Bun "+DefaultBunVersion) {
 		t.Fatalf("resolveBun: err = %v, want one that names Bun %s", err, DefaultBunVersion)
 	}
 
-	installed := writeFakeBun(t, filepath.Join(host.toolchainRoot(), "bun-"+DefaultBunVersion, "bin"), "bun", DefaultBunVersion)
+	installed := writeFakeBun(t, filepath.Join(host.toolchainRoot(), "bun-"+DefaultBunVersion, "bun-linux-aarch64"), "bun", DefaultBunVersion)
 	if got, err := resolveBun(host.bunHost); err != nil || got != installed {
 		t.Fatalf("resolveBun = (%q, %v), want %q", got, err, installed)
 	}
@@ -284,42 +318,48 @@ func TestResolveBun_NamesTheDefaultReleaseOutsideAWorkspace(t *testing.T) {
 	}
 }
 
-// A Bun that Putnami installed keeps its files under its install directory:
-// BUN_INSTALL names it, the transpiler cache is under its package cache, and
-// its bin directory is first on PATH. A Bun of the host keeps its own
-// locations.
-func TestManagedBunEnv_KeepsTheFilesOfAnInstalledBunUnderItsInstall(t *testing.T) {
+// A Bun under toolchains/bun/bun-<version> in a Putnami home keeps its files
+// in that folder. The CLI names the folder in BUN_INSTALL, two levels above
+// the program it resolved, whether the program is the provisioned
+// bun-<target>/bun or a bin/bun in the same folder, and puts the
+// program first on PATH. The transpiler cache then moves under the package
+// cache, install/cache in that folder, and PATH stays as the CLI set it. A
+// Bun of the host keeps its own locations.
+func TestManagedBunEnv_KeepsTheCachesOfABunUnderThePutnamiHomeInItsFolder(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-under-the-putnami-home",
-		"an-installed-bun-keeps-its-files-under-its-install")
-	host := newFakeBunHost(t, "linux", "arm64")
-	dir := filepath.Join(host.toolchainRoot(), "bun-1.9.9")
-	host.env["PATH"] = "/usr/bin"
+		"a-bun-under-the-putnami-home-keeps-its-caches-in-its-folder")
+	for _, layout := range []string{"bun-linux-aarch64", "bin"} {
+		t.Run(layout, func(t *testing.T) {
+			host := newFakeBunHost(t, "linux", "arm64")
+			dir := filepath.Join(host.toolchainRoot(), "bun-1.9.9")
+			program := filepath.Join(dir, layout, "bun")
+			path := filepath.Dir(program) + string(os.PathListSeparator) + "/usr/bin"
+			host.env["PATH"] = path
+			host.env["BUN_INSTALL"] = filepath.Dir(filepath.Dir(program))
 
-	// The CLI names the install in BUN_INSTALL for a task.
-	host.env["BUN_INSTALL"] = dir
-	host.applyManagedBunEnv()
-	if got, want := host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"], filepath.Join(dir, "install", "cache", "@t@"); got != want {
-		t.Fatalf("BUN_RUNTIME_TRANSPILER_CACHE_PATH = %q, want %q", got, want)
-	}
-	if got, want := host.env["PATH"], filepath.Join(dir, "bin")+string(os.PathListSeparator)+"/usr/bin"; got != want {
-		t.Fatalf("PATH = %q, want %q", got, want)
-	}
-	for _, value := range []string{host.env["BUN_INSTALL"], host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"]} {
-		if strings.HasPrefix(value, filepath.Join(host.home, ".bun")) {
-			t.Fatalf("%q is under .bun in the user's home directory", value)
-		}
-	}
+			host.applyManagedBunEnv()
+			if got := host.env["BUN_INSTALL"]; got != dir {
+				t.Fatalf("BUN_INSTALL = %q, want %q", got, dir)
+			}
+			if got, want := host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"], filepath.Join(dir, "install", "cache", "@t@"); got != want {
+				t.Fatalf("BUN_RUNTIME_TRANSPILER_CACHE_PATH = %q, want %q", got, want)
+			}
+			if got := host.env["PATH"]; got != path {
+				t.Fatalf("PATH = %q, want the CLI's %q", got, path)
+			}
+			for _, value := range []string{host.env["BUN_INSTALL"], host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"]} {
+				if strings.HasPrefix(value, filepath.Join(host.home, ".bun")) {
+					t.Fatalf("%q is under .bun in the user's home directory", value)
+				}
+			}
 
-	// A second application changes nothing, and an explicit transpiler cache
-	// setting is kept.
-	host.applyManagedBunEnv()
-	if got, want := host.env["PATH"], filepath.Join(dir, "bin")+string(os.PathListSeparator)+"/usr/bin"; got != want {
-		t.Fatalf("PATH after a second application = %q, want %q", got, want)
-	}
-	host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"] = "/explicit"
-	host.applyManagedBunEnv()
-	if got := host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"]; got != "/explicit" {
-		t.Fatalf("an explicit transpiler cache was replaced by %q", got)
+			// An explicit transpiler cache setting is kept.
+			host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"] = "/explicit"
+			host.applyManagedBunEnv()
+			if got := host.env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"]; got != "/explicit" {
+				t.Fatalf("an explicit transpiler cache was replaced by %q", got)
+			}
+		})
 	}
 
 	// The host's own Bun: nothing is set.
@@ -346,12 +386,5 @@ func TestIsManagedBunDir(t *testing.T) {
 		if got := isManagedBunDir(dir); got != want {
 			t.Errorf("isManagedBunDir(%q) = %v, want %v", dir, got, want)
 		}
-	}
-	bun := filepath.Join("/home/dev/.putnami", "toolchains", "bun", "bun-1.4.0", "bin", "bun")
-	if got, want := managedBunDirOf(bun), filepath.Dir(filepath.Dir(bun)); got != want {
-		t.Errorf("managedBunDirOf(%q) = %q, want %q", bun, got, want)
-	}
-	if got := managedBunDirOf("/usr/local/bin/bun"); got != "" {
-		t.Errorf("managedBunDirOf of a host bun = %q, want none", got)
 	}
 }

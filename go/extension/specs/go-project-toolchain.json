@@ -205,11 +205,11 @@
     },
     {
       "id": "locked-go-is-exact",
-      "text": "When the workspace lock pins a Go release that meets the workspace's go directive, the extension runs only that release: a go on PATH that reports another release is passed over for the managed install of the pinned one, downloaded once and verified against the pinned digest. Without a pin, or with a pin older than the directive, the directive stays a minimum."
+      "text": "When the workspace lock pins a Go release that meets the workspace's go directive, the extension runs only that release: a go on PATH that reports another release is passed over for the pinned release the CLI provisions under the Putnami home. Without a pin, or with a pin older than the directive, the directive stays a minimum."
     },
     {
       "id": "install-without-go",
-      "text": "workspace-install on a workspace that declares no Go (no Go member, no go.work, no root go.mod, no Go lock pin) and offers no go command skips the Go phase instead of failing. A workspace that declares Go still fails when no verified Go can be installed."
+      "text": "workspace-install on a workspace that declares no Go (no Go member, no go.work, no root go.mod, no Go lock pin) and offers no go command skips the Go phase instead of failing. A workspace that declares Go and offers no go command that qualifies fails, naming `putnami install` as the remedy."
     },
     {
       "id": "included-members-join-go-work",
@@ -225,7 +225,15 @@
     },
     {
       "id": "managed-go-is-shared",
-      "text": "The Go release the workspace lock pins is installed once per machine, in toolchains/go/go-<version> under the Putnami home, the path the putnami-home candidate names, and never into the workspace. A second workspace that pins it downloads nothing, and installs that start together leave one complete install, guarded by the lock file beside it. A copy under a workspace's extension state root runs without a download while the Putnami home holds none. workspace-fetch runs no managed Go inside the workspace."
+      "text": "The job runs the Go release the workspace lock pins from toolchains/go/go-<version> under the Putnami home, where the CLI provisions it, the executable the provisioned candidate names, and installs no Go: it requests no download and writes nothing there or in the workspace. Every workspace of the machine that pins the release runs that one copy. A copy under a workspace's extension state root runs while the Putnami home holds none. workspace-fetch runs no managed Go inside the workspace."
+    },
+    {
+      "id": "go-answers-its-toolchain-pin",
+      "text": "The Go extension answers `__putnami toolchain-resolve` before command dispatch. Its go pin is the release go.work declares, the higher of its go and toolchain directives, with each platform's archive and SHA-256 from the go.dev release index. A committed lock version 5 pin of that release, or any committed pin when go.work declares none, is kept as committed. With no declaration and no committed pin, it pins no Go."
+    },
+    {
+      "id": "go-pin-reuses-the-machine-record",
+      "text": "The Go extension records each release it resolves from the go.dev index as toolchains/go/go-<version>.pin.json under the Putnami home, and answers a release its record names with no request. A record that does not parse or names another release, another source or a value that is not a SHA-256 is ignored and replaced. A Putnami home it cannot write in still yields the pin, and a failed lookup writes no record."
     }
   ],
   "decisions": [

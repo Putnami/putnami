@@ -409,7 +409,7 @@ func TestWorkspaceInstall_OfflineWithoutAQualifyingGoFails(t *testing.T) {
 		t.Fatalf("offline workspace-install = %s, want FAILED:\n%s", status, i.rec.Transcript())
 	}
 	if !i.rec.Contains("No installed go command qualifies for Go 1.999.0, and module downloads are off on this run: " +
-		"a hosted run installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home") {
+		"the job installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home") {
 		t.Errorf("no diagnostic names where a hosted run finds Go:\n%s", i.rec.Transcript())
 	}
 	if got := i.rec.PhaseStatus("go"); got != "failed" {

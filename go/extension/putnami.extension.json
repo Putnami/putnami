@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 12,
+  "cliContract": 13,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -10,7 +10,7 @@
         "candidates": [
           { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
           { "from": "path", "path": "go" },
-          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" },
+          { "from": "provisioned" },
           { "from": "environment", "environment": "PUTNAMI_WORKSPACE_ROOT", "path": ".putnami/extensions/@putnami-go/libs/go-{version}/go/bin/go" }
         ],
         "probe": {
@@ -338,13 +338,13 @@
       ]
     },
     "workspace-install": {
-      "description": "Install Go toolchain, sync go.work, and install dev tools.",
+      "description": "Select the Go the CLI provisioned, sync go.work, and install dev tools.",
       "quiet": true,
       "flags": {
         "force": {
           "type": "boolean",
           "default": false,
-          "description": "Force reinstall of Go toolchain and dev tools"
+          "description": "Force reinstall of the dev tools"
         },
         "remote-build-cache": { "type": "boolean", "default": true, "description": "Back the Go build cache with the run's shared object cache when a cache provider offers one; the local Go cache is used either way. Off keeps the local cache alone." }
       },
@@ -722,7 +722,7 @@
       }
     },
     "workspace-install-exec": {
-      "description": "Install the pinned Go toolchain, sync go.work, and install dev tools. Declares no outputs: everything it produces lives outside the workspace (the toolchain and tool binaries in the machine-global Go caches) or is a shared workspace file (go.work), which the workspace-files effect states.",
+      "description": "Run the pinned Go the CLI provisioned, sync go.work, and install dev tools. It installs no Go. Declares no outputs: everything it produces lives outside the workspace (the tool binaries in the machine-global Go caches) or is a shared workspace file (go.work), which the workspace-files effect states.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-install"],

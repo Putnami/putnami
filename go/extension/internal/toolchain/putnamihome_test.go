@@ -38,8 +38,7 @@ func TestResolvePutnamiHome_Precedence(t *testing.T) {
 
 // The Go releases live in toolchains/go under the Putnami home. A job whose
 // environment names no home uses .putnami under the workspace root, which is
-// the home the CLI resolves the putnami-home candidates of a runtime toolchain
-// against in that case.
+// the home the CLI provisions toolchains in, in that case.
 func TestResolveGoToolchainRoot_FollowsThePutnamiHome(t *testing.T) {
 	env := map[string]string{}
 	lookup := func(key string) string { return env[key] }
