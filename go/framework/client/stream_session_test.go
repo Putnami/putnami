@@ -482,8 +482,16 @@ func TestStreamBudgetsAreDistinctFromTheDeclaredDuration(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("the idle budget never expired")
 		}
-		if !session.idleBudgetExpired() || sessionCtx.Err() == nil {
+		// watchIdle closes the idle channel before it cancels the session, so
+		// a reader that sees the channel closed reports the idle deadline. The
+		// cancellation follows it, not with it: wait for it with a bound.
+		select {
+		case <-sessionCtx.Done():
+		case <-time.After(2 * time.Second):
 			t.Fatal("an expired idle budget did not release the session")
+		}
+		if !session.idleBudgetExpired() {
+			t.Fatal("a released session did not report its idle budget as expired")
 		}
 	})
 }
