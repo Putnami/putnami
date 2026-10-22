@@ -68,9 +68,31 @@
             "checks": [
               "every-uv-task-requires-the-pinned-uv-toolchain",
               "a-uv-of-another-release-never-runs",
-              "workspace-install-provisions-the-pinned-uv-and-declares-it",
-              "a-uv-archive-that-fails-its-digest-is-refused",
-              "a-hosted-run-installs-no-uv"
+              "the-provisioned-uv-is-a-task-runtime-candidate",
+              "a-job-without-a-uv-on-path-runs-the-release-under-the-putnami-home",
+              "workspace-install-runs-the-resolved-uv-and-declares-it",
+              "a-job-without-a-uv-fails-naming-putnami-install-and-requests-nothing",
+              "a-hosted-run-declares-nothing"
+            ]
+          }
+        },
+        {
+          "id": "uv-answers-its-toolchain-pin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reserved-call-reads-one-request-and-writes-one-answer",
+              "the-release-is-the-required-version-declaration",
+              "nothing-declared-pins-the-default-release",
+              "the-default-release-is-pinned-offline-from-the-shipped-digests",
+              "a-declared-release-is-pinned-from-its-checksum-file",
+              "a-committed-version-5-pin-of-the-release-is-kept-as-committed",
+              "offline-an-unpinned-declared-release-is-a-problem-naming-putnami-install",
+              "a-release-that-cannot-be-pinned-is-a-problem-with-a-remedy"
             ]
           }
         },

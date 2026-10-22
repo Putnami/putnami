@@ -24,16 +24,21 @@ putnami workspace-install [options]
   workspace configuration
 - Updates the root `pyproject.toml` `tool.uv.workspace.members`
 - Updates `tool.uv.sources` for workspace packages
-- Selects the uv release the workspace pins (see
-  [uv Release](./configuration.md#uv-release)) and installs it under the
-  Putnami home when the machine holds none
+- Runs the uv the CLI resolved for the release the workspace pins (see
+  [uv Release](./configuration.md#uv-release)). The job installs no uv:
+  `putnami install` provisions the pinned release under the Putnami home
+  before the job starts
 - Declares that release as `required-version = "==<version>"` in the
   `[tool.uv]` table of the root `pyproject.toml` when the file declares no
   `required-version`; `putnami install` then pins it in `putnami.lock.json`
 - Regenerates `uv.lock` with that uv if the workspace changed
 
-On a hosted run, the job installs no uv and writes no file: the runner must
-hold the pinned release on its `PATH` or under the Putnami home.
+On a hosted run, the job writes no file and nothing installs a uv: the runner
+must hold the pinned release on its `PATH` or under the Putnami home.
+
+The job fails when no uv of the pinned release resolves, on a hosted run or
+not. The message names the release and `putnami install`, which provisions it.
+The job requests nothing and runs no other uv.
 
 ## When it fails
 
@@ -56,7 +61,7 @@ A workspace that an older CLI installed has no `toolchains.uv` entry in
 
 1. Upgrade the `putnami` CLI to a release that pins uv.
 2. Run `putnami install` once. It pins the release the root `pyproject.toml`
-   declares, or 0.11.32 when it declares none, installs it under the Putnami
+   declares, or 0.11.32 when it declares none, provisions it under the Putnami
    home, and declares it as `required-version` when the file has none.
 3. Commit `putnami.lock.json` and the root `pyproject.toml`.
 

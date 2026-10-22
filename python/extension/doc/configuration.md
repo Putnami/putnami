@@ -151,12 +151,17 @@ it for each task and keys the task's cache on it. It takes the first of these
 that reports the pinned release with `uv self version --short`:
 
 1. `uv` on `PATH`
-2. `toolchains/uv/uv-<version>/uv` under the Putnami home (`PUTNAMI_HOME`,
-   else `~/.putnami`)
+2. The uv the CLI provisioned, in `toolchains/uv/uv-<version>` under the
+   Putnami home (`PUTNAMI_HOME`, else `~/.putnami`): the `uv` program of the
+   pinned archive, at `uv-<target>/uv` for a tar.gz archive and `uv.exe` at the
+   top for a zip archive
 
-A uv of another release is never run. When neither holds the pinned release,
-`putnami install` downloads it from the pinned source, checks its SHA-256, and
-installs it under the Putnami home.
+A uv of another release is never run. The extension installs no uv. When
+neither holds the pinned release, `putnami install` downloads the pinned
+archive, checks its SHA-256, unpacks it under the Putnami home, and a job runs
+that uv. A hosted run installs nothing and runs the uv the runner holds. A job
+whose uv does not resolve fails with a message that names the release and
+`putnami install`.
 
 The release comes from the root `pyproject.toml`:
 
@@ -166,9 +171,9 @@ required-version = "==0.11.32"
 ```
 
 When the file declares no `required-version`, `putnami workspace-install`
-declares the release it installs, 0.11.32 by default. To move to another
+declares the release it runs, 0.11.32 by default. To move to another
 release, change `required-version` and run `putnami install`: it pins the new
-release and installs it.
+release and provisions it.
 
 The declaration must name one exact release, `"==X.Y.Z"`. Putnami refuses
 these, and `putnami install` and every task that runs uv fail with a message
@@ -189,12 +194,17 @@ Move those settings into a `[tool.uv]` table.
 The extension answers the `__putnami toolchain-resolve` control call for the
 `uv` lock identity, which its manifest lists in `runtime.resolves`. The answer
 is the next `toolchains.uv` pin: each platform's archive URL, format and `uv`
-executable path, with its SHA-256. The release comes from the `[tool.uv]`
+executable path, with its SHA-256. The CLI downloads, verifies and unpacks
+those archives; the extension does not. The release comes from the `[tool.uv]`
 `required-version` of the root `pyproject.toml`. The lock's pin is kept when
 it matches that declaration, or when the file declares none. With neither a
 declaration nor a pin, the answer pins the default release, 0.11.32. The
+default release is pinned offline from the digests the extension ships. The
 extension reads a release's checksum file only for a declared release that is
-neither pinned nor the default, and never on an offline request.
+neither pinned nor the default, and never on an offline request, where that
+release is a problem whose remedy is `putnami install` with network access.
+The answer is also a problem, with a remedy, for a declaration Putnami cannot
+pin and for a host platform uv publishes no archive for.
 
 A workspace that a CLI older than the uv pin installed has no `toolchains.uv`
 in its lock. See

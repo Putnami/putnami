@@ -131,8 +131,9 @@ func TestPrepareBuildsWithTheLockedGo(t *testing.T) {
 
 // The extension answers the toolchain-resolve call for the uv lock identity,
 // which its uv runtime toolchain locks, and for no other: it does not answer
-// for go, which its runtime compiler locks. runtime.resolves takes no contract
-// rung, so cliContract stays the one the manifest's vocabulary requires.
+// for go, which its runtime compiler locks. The provisioned candidate of the
+// uv toolchain needs CLI contract 13, so cliContract is the one the manifest's
+// vocabulary requires.
 func TestRuntimeResolvesTheUVPin(t *testing.T) {
 	m := loadExtensionManifest(t)
 	if m.Runtime == nil {
@@ -146,6 +147,9 @@ func TestRuntimeResolvesTheUVPin(t *testing.T) {
 	}
 	if m.CLIContract != proto.RequiredCLIContract(m) {
 		t.Errorf("cliContract = %d, want %d", m.CLIContract, proto.RequiredCLIContract(m))
+	}
+	if !proto.DeclaresProvisionedToolchain(m) {
+		t.Error("no runtime toolchain lists the provisioned candidate")
 	}
 }
 
@@ -642,7 +646,8 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 
 // Every task that runs uv requires the uv runtime toolchain, bound to the uv
 // pin of the workspace lock: the CLI resolves the pinned release for the task,
-// puts it first on PATH, and keys the task's cache on it. A uv found only by a
+// provisioning it under the Putnami home when the machine holds none, puts it
+// first on PATH, and keys the task's cache on it. A uv found only by a
 // PATH lookup of the extension would run any release and key none.
 func TestUVTasksRequireThePinnedUVToolchain(t *testing.T) {
 	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "every-uv-task-requires-the-pinned-uv-toolchain")
@@ -659,7 +664,7 @@ func TestUVTasksRequireThePinnedUVToolchain(t *testing.T) {
 	}
 	wantCandidates := []proto.RuntimeToolchainCandidate{
 		{From: "path", Path: "uv"},
-		{From: "putnami-home", Path: "toolchains/uv/uv-{version}/uv"},
+		{From: "provisioned"},
 	}
 	if !reflect.DeepEqual(uv.Candidates, wantCandidates) {
 		t.Fatalf("uv candidates = %+v, want %+v", uv.Candidates, wantCandidates)

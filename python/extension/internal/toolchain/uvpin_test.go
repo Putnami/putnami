@@ -10,9 +10,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/uvtoolchain"
 )
+
+// uvPinRequirement is the requirement the uv pin answer proves.
+const uvPinRequirement = "uv-answers-its-toolchain-pin"
 
 // uvPinRequest asks for the uv pin of a workspace on platform, with locked as
 // the committed pin when it is not nil.
@@ -122,11 +126,12 @@ func wantDefaultUVPin(t *testing.T, pin wsproto.LockToolchainEntry) {
 	}
 }
 
-// A required-version that names no release Putnami runs is a problem, with the
-// message the installer gives and the declaration to write, whether or not
-// the lock pins uv. A declaration too long for the protocol is cut to its
-// bound.
+// A required-version that names no release Putnami runs is a problem, with a
+// message that names the declaration and a remedy that says what to write,
+// whether or not the lock pins uv. A declaration too long for the protocol is
+// cut to its bound.
 func TestResolveUVPin_RefusesADeclarationPutnamiCannotPin(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "a-release-that-cannot-be-pinned-is-a-problem-with-a-remedy")
 	committed := &wsproto.LockToolchainEntry{Version: "0.11.20", Integrities: map[string]string{"linux/amd64": sha256Hex(nil)}, Source: "https://mirror.example/uv/"}
 	for name, tc := range map[string]struct{ spec, message, remedy string }{
 		"a range":          {">=0.11", `names no single uv release`, `[tool.uv] table of pyproject.toml, then run ` + "`putnami install`"},
@@ -155,6 +160,7 @@ func TestResolveUVPin_RefusesADeclarationPutnamiCannotPin(t *testing.T) {
 // pyproject.toml declares none, is the answer as committed: a mirror it names
 // is kept.
 func TestResolveUVPin_KeepsACommittedVersion5Pin(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "a-committed-version-5-pin-of-the-release-is-kept-as-committed")
 	mirror := serveUVReleases(t)
 	committed := wsproto.LockToolchainEntry{
 		Version: "0.11.20",
@@ -181,8 +187,7 @@ func TestResolveUVPin_KeepsACommittedVersion5Pin(t *testing.T) {
 	}
 }
 
-// A committed version 3 or 4 pin is kept as the archives the installer
-// downloads from its source, offline: each platform uv publishes an archive
+// A committed version 3 or 4 pin is kept as the archives of its source, offline: each platform uv publishes an archive
 // for keeps its integrity, and the pin records no source. A source the lock
 // cannot record, an integrity that is not a SHA-256, and a release Putnami
 // does not run are problems.
@@ -212,11 +217,11 @@ func TestResolveUVPin_ConvertsACommittedVersion4Pin(t *testing.T) {
 		}
 	})
 
-	t.Run("the installer's archive", func(t *testing.T) {
+	t.Run("the archive of the source", func(t *testing.T) {
 		pin := wantUVPin(t, resolveUVPinFor(t, t.TempDir(), uvPinRequest("linux/amd64", true, &committed)))
 		archive, _ := uvArchiveFor(UVRelease{Version: committed.Version, Source: committed.Source}, "linux", "amd64")
 		if got := pin.Archives["linux/amd64"]; got.URL != archive.pin.URL || got.Format != string(archive.pin.Format) {
-			t.Fatalf("archive = %+v, want the one the installer downloads, %+v", got, archive.pin)
+			t.Fatalf("archive = %+v, want the one the source names, %+v", got, archive.pin)
 		}
 	})
 
@@ -256,6 +261,8 @@ func TestResolveUVPin_ConvertsACommittedVersion4Pin(t *testing.T) {
 // A declared default release the lock does not pin takes the digests the
 // extension ships, offline.
 func TestResolveUVPin_PinsTheDeclaredDefaultReleaseOffline(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "the-release-is-the-required-version-declaration")
+	spectest.Proves(t, uvFeature, uvPinRequirement, "the-default-release-is-pinned-offline-from-the-shipped-digests")
 	mirror := serveUVReleases(t)
 	workspace := t.TempDir()
 	declareUV(t, workspace, "=="+DefaultUVVersion)
@@ -271,6 +278,8 @@ func TestResolveUVPin_PinsTheDeclaredDefaultReleaseOffline(t *testing.T) {
 // Another declared release the lock does not pin takes the digests its
 // checksum file lists, from the release downloads the archives are pinned to.
 func TestResolveUVPin_LooksUpAnotherDeclaredRelease(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "the-release-is-the-required-version-declaration")
+	spectest.Proves(t, uvFeature, uvPinRequirement, "a-declared-release-is-pinned-from-its-checksum-file")
 	mirror := serveUVReleases(t)
 	checksums, digests := uvChecksumsFor(uvtoolchain.Platforms()...)
 	mirror.archives["/0.12.0/"+uvtoolchain.ChecksumsFile] = []byte(checksums)
@@ -294,6 +303,7 @@ func TestResolveUVPin_LooksUpAnotherDeclaredRelease(t *testing.T) {
 // An offline request reads no checksum file, so another declared release the
 // lock does not pin is a problem that says to install with network access.
 func TestResolveUVPin_RefusesALookupOffline(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "offline-an-unpinned-declared-release-is-a-problem-naming-putnami-install")
 	mirror := serveUVReleases(t)
 	workspace := t.TempDir()
 	declareUV(t, workspace, "==0.12.0")
@@ -307,6 +317,7 @@ func TestResolveUVPin_RefusesALookupOffline(t *testing.T) {
 // A checksum file that cannot be read, or lists no archive Putnami installs,
 // is a problem that carries the cause.
 func TestResolveUVPin_ReportsAFailedLookup(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "a-release-that-cannot-be-pinned-is-a-problem-with-a-remedy")
 	mirror := serveUVReleases(t)
 	mirror.archives["/0.12.1/"+uvtoolchain.ChecksumsFile] = []byte("not a checksum line\n")
 	workspace := t.TempDir()
@@ -341,6 +352,8 @@ func httpUnreachable(t *testing.T) string {
 // A workspace that neither declares nor pins uv pins the default release, the
 // one workspace-install declares, offline.
 func TestResolveUVPin_PinsTheDefaultReleaseWithoutDeclarationOrPin(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "nothing-declared-pins-the-default-release")
+	spectest.Proves(t, uvFeature, uvPinRequirement, "the-default-release-is-pinned-offline-from-the-shipped-digests")
 	mirror := serveUVReleases(t)
 	workspace := t.TempDir()
 	if err := os.WriteFile(filepath.Join(workspace, RootPyproject), []byte("[project]\nname = \"ws\"\n"), 0o644); err != nil {
@@ -358,6 +371,7 @@ func TestResolveUVPin_PinsTheDefaultReleaseWithoutDeclarationOrPin(t *testing.T)
 // Putnami installs no uv on, for a committed pin with no archive for the host,
 // and for a release whose checksum file lists none for it.
 func TestResolveUVPin_AnswersAProblemForAPinThatCannotServeTheHost(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvPinRequirement, "a-release-that-cannot-be-pinned-is-a-problem-with-a-remedy")
 	mirror := serveUVReleases(t)
 	checksums, _ := uvChecksumsFor("linux/amd64", "darwin/arm64")
 	mirror.archives["/0.12.0/"+uvtoolchain.ChecksumsFile] = []byte(checksums)

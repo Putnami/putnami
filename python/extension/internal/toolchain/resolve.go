@@ -1,5 +1,5 @@
-// Package toolchain selects and installs the uv release a workspace pins, and
-// builds the uv commands of the Putnami Python extension.
+// Package toolchain selects the uv release a workspace pins, answers the
+// toolchain pin of uv, and builds the uv commands of the Putnami Python extension.
 package toolchain
 
 import (

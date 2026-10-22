@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/python/extension/internal/toolchain"
 	"go.putnami.dev/sdk/extension/cli"
@@ -32,6 +33,8 @@ func runToolchainResolve(t *testing.T, request string) (string, error) {
 // The reserved control call answers on stdout with one result document that
 // passes the toolchain-resolve contract, on its own and against its request.
 func TestToolchainResolve_ServesTheControlCall(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "uv-answers-its-toolchain-pin",
+		"the-reserved-call-reads-one-request-and-writes-one-answer")
 	root := t.TempDir()
 	writeProbeFile(t, filepath.Join(root, "pyproject.toml"),
 		"[project]\nname = \"ws\"\n\n[tool.uv]\nrequired-version = \"=="+toolchain.DefaultUVVersion+"\"\n")

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 11,
+  "cliContract": 13,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-python",
@@ -28,7 +28,7 @@
         "lock": "uv",
         "candidates": [
           { "from": "path", "path": "uv" },
-          { "from": "putnami-home", "path": "toolchains/uv/uv-{version}/uv" }
+          { "from": "provisioned" }
         ],
         "probe": {
           "args": ["self", "version", "--short", "--color", "never"],
@@ -174,7 +174,7 @@
   },
   "tasks": {
     "workspace-install-exec": {
-      "description": "Sync the uv workspace members, install the uv release the workspace pins under the Putnami home when the machine holds none, declare it as the [tool.uv] required-version of the root pyproject.toml when nothing does, and run `uv lock` with it. Declares no outputs: everything it produces is either a shared workspace file (the root pyproject.toml it rewrites, uv.lock) — which the workspace-files effect states — or lives outside the workspace in the Putnami home, the machine-global uv cache and the resolved virtualenv.",
+      "description": "Sync the uv workspace members, declare the uv release the CLI provisioned as the [tool.uv] required-version of the root pyproject.toml when nothing does, and run `uv lock` with it. It installs no uv: it runs the one the CLI resolved for the uv runtime toolchain. Declares no outputs: everything it produces is either a shared workspace file (the root pyproject.toml it rewrites, uv.lock) — which the workspace-files effect states — or lives outside the workspace in the machine-global uv cache and the resolved virtualenv.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-install"],
