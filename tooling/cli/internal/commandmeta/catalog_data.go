@@ -77,16 +77,18 @@ var catalog = []Command{
 		Category:    "Projects",
 		Summary:     "Create a project from template",
 		Description: "Create a project from template",
-		Usage:       "putnami projects create <name> --template <template> [--path <path>] [--force]",
+		Usage:       "putnami projects create <name> --template <template> [--path <path>] [--channel <channel>] [--force]",
 		Flags: []Flag{
 			{Long: "--template", Type: FlagValue, ValueName: "<template>", Description: "Template to scaffold from"},
 			{Long: "--path", Type: FlagValue, ValueName: "<path>", Description: "Workspace-relative project path"},
+			{Long: "--channel", Type: FlagValue, ValueName: "<channel>", Description: "Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)"},
 			{Long: "--force", Description: "Overwrite an existing project directory"},
 		},
 		Positionals: []Positional{{Name: "name", Required: true}},
 		Examples: []string{
 			"putnami projects create my-app --template typescript-web",
 			"putnami projects create my-app --template typescript-web --path apps/my-app",
+			"putnami projects create my-api --template go-server --channel canary",
 		},
 		Related:   []string{"projects list", "extensions list"},
 		Workspace: requiredWorkspace(),
@@ -581,7 +583,7 @@ var catalog = []Command{
 		Flags: []Flag{
 			{Long: "--skip-build", Description: "Render the template without running build and test on it"},
 			{Long: "--keep", Description: "Keep the rendered temporary workspace for inspection"},
-			{Long: "--channel", Type: FlagValue, ValueName: "<channel>", Description: "Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)"},
+			{Long: "--channel", Type: FlagValue, ValueName: "<channel>", Description: "Install the template's extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)"},
 		},
 		Positionals: []Positional{{Name: "path"}},
 		Examples: []string{

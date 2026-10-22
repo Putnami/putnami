@@ -60,7 +60,8 @@ This:
    none is broken;
 4. Copies the template where template discovery finds it, then runs
    `putnami extensions install <extension>` and
-   `putnami projects create <projectName> --template <name>`;
+   `putnami projects create <projectName> --template <name>`, both on the
+   run's channel;
 5. Runs the `build` and `test` commands the extension declares on the created
    project, with `--no-cache`. It fails when the extension declares neither;
 6. Reports pass or fail and removes the temporary workspace.
@@ -71,7 +72,7 @@ A template whose manifest names no `extension` runs only with `--skip-build`.
 |------|---------|
 | `--skip-build` | Stop after rendering and structure validation (steps 1–3) |
 | `--keep` | Keep the temporary workspace and print its path |
-| `--channel <channel>` | Install the extension from this release channel (or `PUTNAMI_CHANNEL`) |
+| `--channel <channel>` | Install the extension and create the project on this release channel (or `PUTNAMI_CHANNEL`) |
 
 ### Test Variables
 

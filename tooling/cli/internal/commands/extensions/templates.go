@@ -208,8 +208,8 @@ func TemplatesValidate(args []string) error {
 // workspace discovers by convention, then runs the build and test the
 // extension declares on the created project. The workspace config lists the
 // extension only; `projects create` adds the project and runs the extension's
-// project-setup job. channel is the release channel the extension installs on,
-// or "" for the workspace default.
+// project-setup job. channel is the release channel the extension installs and
+// the project is created on, or "" for the workspace default.
 func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	var skipBuild, keepDir bool
 	var filteredArgs []string
@@ -335,11 +335,16 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 		return fmt.Errorf("extension install failed: %w", err)
 	}
 
-	// Create the project from the template, as a user does. Create renders it,
-	// lists it in the workspace config and runs the extension's project-setup
-	// job, which pins the toolchains and the module versions.
-	iox.Fprintf(os.Stdout, "\n  Running: putnami projects create %s --template %s\n", vars.ProjectName, manifest.Name)
-	if err := runNestedCLI(ctx, tmpDir, env, cliPath, "projects", "create", vars.ProjectName, "--template", manifest.Name); err != nil {
+	// Create the project from the template on the same channel, as a user
+	// does. Create renders it, lists it in the workspace config and runs the
+	// extension's project-setup job, which pins the toolchains and the module
+	// versions.
+	createArgs := []string{"projects", "create", vars.ProjectName, "--template", manifest.Name}
+	if channel != "" {
+		createArgs = append(createArgs, "--channel", channel)
+	}
+	iox.Fprintf(os.Stdout, "\n  Running: putnami %s\n", strings.Join(createArgs, " "))
+	if err := runNestedCLI(ctx, tmpDir, env, cliPath, createArgs...); err != nil {
 		return fmt.Errorf("projects create failed for template %s: %w", manifest.Name, err)
 	}
 

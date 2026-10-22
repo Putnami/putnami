@@ -649,17 +649,23 @@ func writeAcmeTemplate(t *testing.T, extension string) string {
 func TestTemplatesTest_RunsInstallCreateAndTheDeclaredVerbs(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "templates-test-builds-the-rendered-project",
 		"the-extension-installs-on-the-channel-the-run-chose")
+	spectest.Proves(t, "cli/init-channel", "templates-test-builds-the-rendered-project",
+		"the-project-is-created-on-the-channel-the-run-chose")
 
 	project := template.DefaultTestVars().ProjectName
+	create := []string{"projects", "create", project, "--template", "acme-lib"}
 	tests := []struct {
 		name     string
 		channel  string
 		commands []string
 		artifact string
+		create   []string
 		verbs    string
 	}{
-		{name: "the default channel", channel: "", commands: []string{"build", "test"}, artifact: "@acme/lang", verbs: "build,test"},
-		{name: "a named channel", channel: "canary", commands: []string{"lint", "test"}, artifact: "@acme/lang@canary", verbs: "test"},
+		{name: "the default channel", channel: "", commands: []string{"build", "test"}, artifact: "@acme/lang",
+			create: create, verbs: "build,test"},
+		{name: "a named channel", channel: "canary", commands: []string{"lint", "test"}, artifact: "@acme/lang@canary",
+			create: append(slices.Clone(create), "--channel", "canary"), verbs: "test"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -674,7 +680,7 @@ func TestTemplatesTest_RunsInstallCreateAndTheDeclaredVerbs(t *testing.T) {
 			}
 			want := [][]string{
 				{"extensions", "install", tt.artifact},
-				{"projects", "create", project, "--template", "acme-lib"},
+				tt.create,
 				{tt.verbs, "--projects", project, "--no-cache", "--verbose"},
 			}
 			if len(*runs) != len(want) {

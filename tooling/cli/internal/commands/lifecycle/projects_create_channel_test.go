@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -140,8 +141,10 @@ func TestInitProjectCreateInstallsAMissingTemplateOnTheChannel(t *testing.T) {
 	})
 
 	t.Run("a create without a channel installs on latest", func(t *testing.T) {
+		spectest.Proves(t, "cli/init-channel", "projects-create-takes-a-channel", "create-without-a-choice-installs-on-latest")
 		registry := newTemplateRegistry(t, map[string]string{"latest": "0.3.0", candidateChannel: "0.4.0"})
 		root := emptyWorkspace(t)
+		noInstallRecord(t)
 		out, err := captureStdout(t, func() error {
 			return ProjectsCreate(context.Background(), root, wsproto.Load(root),
 				[]string{"web", "--template", "starter-app"}, LifecycleEnv{Out: io.Discard, RunJob: noProjectJob})
@@ -160,4 +163,108 @@ func TestInitProjectCreateInstallsAMissingTemplateOnTheChannel(t *testing.T) {
 			t.Fatalf("templates.starter-app = %+v (present %v), want the version latest names", pin, ok)
 		}
 	})
+}
+
+// A create run on its own chooses its channel as init does: the flag, the
+// variable, then the install record. The template install it falls back to and
+// the project-setup job read that channel, and neither the workspace config nor
+// the lock names it.
+func TestProjectsCreateResolvesOnTheChannelInitWould(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "projects-create-takes-a-channel", "create-resolves-on-the-channel-init-would")
+
+	for _, choice := range []struct {
+		name     string
+		args     []string
+		variable string
+		record   string
+	}{
+		{name: "by flag", args: []string{"--channel", candidateChannel}, variable: "next"},
+		{name: "by attached flag", args: []string{"--channel=" + candidateChannel}},
+		{name: "by variable", variable: candidateChannel},
+		{name: "by install record", record: "putnami-go-" + candidateChannel},
+	} {
+		t.Run(choice.name, func(t *testing.T) {
+			registry := newTemplateRegistry(t, map[string]string{"latest": "0.3.0", candidateChannel: "0.4.0"})
+			root := emptyWorkspace(t)
+			noInstallRecord(t)
+			if choice.record != "" {
+				installedAs(t, choice.record)
+			}
+			t.Setenv(initChannelEnv, choice.variable)
+			recorder := &jobRecorder{outcome: WorkspaceJobOK}
+
+			args := append([]string{"web", "--template", "starter-app"}, choice.args...)
+			out, err := captureStdout(t, func() error {
+				return ProjectsCreate(context.Background(), root, wsproto.Load(root), args,
+					LifecycleEnv{Out: io.Discard, RunJob: recorder.run})
+			})
+			if err != nil {
+				t.Fatalf("ProjectsCreate: %v\n%s", err, out)
+			}
+			if !strings.Contains(out, "Channel: "+candidateChannel) {
+				t.Errorf("create output does not state its channel:\n%s", out)
+			}
+			for _, asked := range registry.asked() {
+				if strings.HasSuffix(asked, " latest") {
+					t.Fatalf("the registry was asked %v: the template install resolved on latest", registry.asked())
+				}
+			}
+			lock, err := lockfile.ReadLockFile(root)
+			if err != nil || lock == nil {
+				t.Fatalf("read the lock: %v", err)
+			}
+			pin, ok := lock.GetTemplate("starter-app")
+			if !ok || pin.Version != "0.4.0" || strings.Contains(pin.Source, candidateChannel) {
+				t.Fatalf("templates.starter-app = %+v (present %v), want the exact version 0.4.0 and a source that names no channel", pin, ok)
+			}
+			if data, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)); strings.Contains(string(data), candidateChannel) {
+				t.Fatalf("the workspace config names the channel:\n%s", data)
+			}
+			asked := recorder.asked()
+			if len(asked) != 1 {
+				t.Fatalf("create ran %d jobs, want the project-setup job once: %+v", len(asked), asked)
+			}
+			want := `{"path":"web","` + initChannelJobOption + `":"` + candidateChannel + `"}`
+			if got := paramsJSON(t, asked[0]); got != want {
+				t.Fatalf("project-setup params = %s, want %s", got, want)
+			}
+		})
+	}
+
+	t.Run("a channel outside the portable alphabet", func(t *testing.T) {
+		root := emptyWorkspace(t)
+		noInstallRecord(t)
+		recorder := &jobRecorder{outcome: WorkspaceJobOK}
+		err := ProjectsCreate(context.Background(), root, wsproto.Load(root),
+			[]string{"web", "--template", "starter-app", "--channel", "Canary"}, LifecycleEnv{Out: io.Discard, RunJob: recorder.run})
+		if err == nil || !strings.Contains(err.Error(), "invalid channel") {
+			t.Fatalf("ProjectsCreate = %v, want the usage error init raises", err)
+		}
+		if _, statErr := os.Stat(filepath.Join(root, "web")); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("a refused channel left %s behind (stat: %v)", filepath.Join(root, "web"), statErr)
+		}
+		if got := len(recorder.asked()); got != 0 {
+			t.Fatalf("a refused channel ran %d jobs, want none", got)
+		}
+	})
+}
+
+// A create whose setup fails names the create to run again on the same
+// channel, so the retry does not fall back to another one.
+func TestProjectsCreateRetryNamesTheChannel(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "projects-create-takes-a-channel", "the-create-to-run-again-names-the-channel")
+	root := starterWorkspace(t)
+	noInstallRecord(t)
+	recorder := &jobRecorder{outcome: WorkspaceJobFailed}
+	_, err := captureStdout(t, func() error {
+		return ProjectsCreate(context.Background(), root, wsproto.Load(root),
+			[]string{"api", "--template", "starter", "--channel", candidateChannel}, LifecycleEnv{Out: io.Discard, RunJob: recorder.run})
+	})
+	if err == nil {
+		t.Fatal("create succeeded, want the failed setup")
+	}
+	want := "putnami projects create api --template starter --channel " + candidateChannel + " --force"
+	if next := protocolcli.SuggestedNext(err); next != want {
+		t.Fatalf("suggested next = %q, want %q", next, want)
+	}
 }

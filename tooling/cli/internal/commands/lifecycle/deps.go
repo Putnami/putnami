@@ -157,10 +157,11 @@ type LifecycleEnv struct {
 	// fetched records that Install already ran the hosted fetch steps and
 	// BeforeRepositoryCode, so DepsInstall runs none of them again.
 	fetched bool
-	// channel is the release channel `putnami init` resolves on when it is not
-	// latest; every other command leaves it empty. The workspace installers
-	// and the project-setup job receive it as a job option (installParams),
-	// and the project create of init resolves its template on it.
+	// channel is the release channel `putnami init` or `putnami projects
+	// create` resolves on when it is not latest; every other command leaves it
+	// empty. The workspace installers and the project-setup job receive it as a
+	// job option (installParams), and the project create resolves its template
+	// on it.
 	channel string
 	// pinToolchains is the lock step create takes when a toolchain the
 	// project-setup job requires does not resolve (setUpProject). Nil is
@@ -169,8 +170,8 @@ type LifecycleEnv struct {
 }
 
 // installParams is the job options of the workspace fetch and installers: the
-// channel of an init that resolves on one, as the option `putnami upgrade`
-// hands the deps-upgrade job, else none.
+// channel of an init or a create that resolves on one, as the option
+// `putnami upgrade` hands the deps-upgrade job, else none.
 func (e LifecycleEnv) installParams() map[string]any {
 	if e.channel == "" {
 		return nil

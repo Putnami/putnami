@@ -189,12 +189,14 @@ example: putnami pin
 example: putnami pin --remove
 ═══ projects create ═══
 description: Create a project from template
-usage: putnami projects create <name> --template <template> [--path <path>] [--force]
+usage: putnami projects create <name> --template <template> [--path <path>] [--channel <channel>] [--force]
 flag: --template | <template> | Template to scaffold from
 flag: --path | <path> | Workspace-relative project path
+flag: --channel | <channel> | Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
 flag: --force |  | Overwrite an existing project directory
 example: putnami projects create my-app --template typescript-web
 example: putnami projects create my-app --template typescript-web --path apps/my-app
+example: putnami projects create my-api --template go-server --channel canary
 ═══ projects describe ═══
 description: Show detailed project information including dependencies, extensions, and configuration
 usage: putnami projects describe <name> [--output <format>]
@@ -323,7 +325,7 @@ description: Test a template by rendering it, then creating a project from it in
 usage: putnami templates test [path] [--skip-build] [--keep] [--channel <channel>]
 flag: --skip-build |  | Render the template without running build and test on it
 flag: --keep |  | Keep the rendered temporary workspace for inspection
-flag: --channel | <channel> | Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
+flag: --channel | <channel> | Install the template's extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
 example: putnami templates test
 example: putnami templates test ./my-template/ --skip-build
 ═══ templates update ═══

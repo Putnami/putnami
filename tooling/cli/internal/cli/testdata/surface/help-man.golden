@@ -271,13 +271,16 @@ Create a project from template.
 .PP
 .B Usage:
 .br
-putnami projects create <name> --template <template> [--path <path>] [--force]
+putnami projects create <name> --template <template> [--path <path>] [--channel <channel>] [--force]
 .TP
 .B --template
 Template to scaffold from.
 .TP
 .B --path
 Workspace-relative project path.
+.TP
+.B --channel
+Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest).
 .TP
 .B --force
 Overwrite an existing project directory.
@@ -526,7 +529,7 @@ Render the template without running build and test on it.
 Keep the rendered temporary workspace for inspection.
 .TP
 .B --channel
-Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest).
+Install the template's extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest).
 .SS templates package
 Package a template into a distributable archive.
 .PP
