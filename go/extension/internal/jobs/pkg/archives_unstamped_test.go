@@ -29,9 +29,9 @@ import (
 const unstampedRuntimeMain = "package main\n\nfunc main() { println(\"unstamped\") }\n"
 
 // unstampedManifest declares the runtime the way a published extension
-// manifest does: without a name, which the CLI takes from the reference that
-// installs the extension.
+// manifest does: with the name of the extension.
 const unstampedManifest = `{
+	"name": "@putnami/unstamped",
 	"cliContract": 4,
 	"runtime": {"executable": "compiled/putnami-unstamped"},
 	"commands": {
@@ -340,7 +340,7 @@ func extractArchive(t *testing.T, archivePath, dest string) {
 
 // The runtime of an extracted archive answers the runtime-info handshake with
 // the version the packager stamped into the manifest beside it. The archive is
-// packaged from this extension's own manifest, which names no extension, the
+// packaged from this extension's own manifest, which names the extension, the
 // shape every installed Go extension has; the CLI refuses a runtime whose
 // answer differs from that manifest's version.
 func TestPackagedRuntimeAnswersWithTheStampedManifestVersion(t *testing.T) {
@@ -350,17 +350,7 @@ func TestPackagedRuntimeAnswersWithTheStampedManifestVersion(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is required for the packaged checkout")
 	}
-	data, err := os.ReadFile(extensionManifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var manifest map[string]any
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatal(err)
-	}
-	// The packager stamps a version and nothing that names the extension.
-	delete(manifest, "name")
-	published, err := json.MarshalIndent(manifest, "", "  ")
+	published, err := os.ReadFile(extensionManifestPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +375,10 @@ func TestPackagedRuntimeAnswersWithTheStampedManifestVersion(t *testing.T) {
 	installed := t.TempDir()
 	extractArchive(t, packageArchives(t, ctx, "putnami-go", binary), installed)
 
-	stamped := readArchiveManifestVersion(t, filepath.Join(installed, "putnami.extension.json"))
+	name, stamped := readArchiveManifestIdentity(t, filepath.Join(installed, "putnami.extension.json"))
+	if name != "@putnami/go" {
+		t.Fatalf("packaged manifest name = %q, want %q", name, "@putnami/go")
+	}
 	if stamped != version {
 		t.Fatalf("packaged manifest version = %q, want %q", stamped, version)
 	}
@@ -409,9 +402,9 @@ func TestPackagedRuntimeAnswersWithTheStampedManifestVersion(t *testing.T) {
 	}
 }
 
-// readArchiveManifestVersion returns the top-level version of the extension
-// manifest at path.
-func readArchiveManifestVersion(t *testing.T, path string) string {
+// readArchiveManifestIdentity returns the top-level name and version of the
+// extension manifest at path.
+func readArchiveManifestIdentity(t *testing.T, path string) (string, string) {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -424,8 +417,5 @@ func readArchiveManifestVersion(t *testing.T, path string) string {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Name != "" {
-		t.Fatalf("packaged manifest names %q; the published shape names no extension", manifest.Name)
-	}
-	return manifest.Version
+	return manifest.Name, manifest.Version
 }

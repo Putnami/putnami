@@ -14,6 +14,7 @@ import (
 // hookOnlyDependentManifest declares only a hook and a registry extension
 // dependency, the shape of a framework package.
 const hookOnlyDependentManifest = `{
+	"name": "@putnami/testext",
 	"extensionDependencies": ["@putnami/application"],
 	"hooks": {"preBuild": {"kind": "command", "command": "echo"}},
 	"commands": {}
@@ -80,7 +81,7 @@ func TestGateLeavesNPMDependenciesOutOfTheStamp(t *testing.T) {
 // A dependency list that does not decode is gated, so the strict decode
 // refuses it instead of the archive shipping unstamped.
 func TestGateRefusesAMalformedDependencyList(t *testing.T) {
-	dir := stageManifest(t, `{"extensionDependencies": 3, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`)
+	dir := stageManifest(t, `{"name": "@putnami/testext", "extensionDependencies": 3, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`)
 	if err := gateAndStampManifestContract(dir, putArchive); err == nil {
 		t.Fatal("a malformed dependency list must fail packaging")
 	}

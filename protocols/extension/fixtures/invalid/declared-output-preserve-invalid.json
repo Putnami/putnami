@@ -1,5 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@test/extension",
   "commands": {
     "build": {
       "run": [{ "id": "generate", "task": "build-generate" }]

@@ -729,8 +729,8 @@ func (m rawManifest) floorErr() error {
 }
 
 // readRawManifest reads the name, the stamp and the registry dependencies of
-// the manifest in dir. The name falls back as discovery's does: package.json,
-// then putnami.json, then ref.
+// the manifest in dir. The name falls back as discovery's does: putnami.json,
+// then ref.
 func readRawManifest(dir, ref string) rawManifest {
 	path := filepath.Join(dir, ManifestFilename)
 	data, err := os.ReadFile(path)
@@ -746,9 +746,6 @@ func readRawManifest(dir, ref string) rawManifest {
 		return rawManifest{}
 	}
 	name := m.Name
-	if name == "" {
-		name, _ = readPackageNameVersion(dir)
-	}
 	if name == "" {
 		name = readPutnamiRCName(dir)
 	}

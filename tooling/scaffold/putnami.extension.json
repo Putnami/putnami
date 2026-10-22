@@ -1,5 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/scaffold",
   "cliContract": 4,
   "commands": {
     "package": {

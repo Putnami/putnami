@@ -132,8 +132,8 @@ func TestGateAndStampManifestContract_RejectsFutureContractClaim(t *testing.T) {
 // is about what the CONTRACT governs, not about whether the file is usable.
 func TestGateAndStampManifestContract_RejectsUnloadableHookOnlyManifest(t *testing.T) {
 	for name, manifest := range map[string]string{
-		"hooks of the wrong type": `{"commands": {}, "hooks": []}`,
-		"tasks of the wrong type": `{"commands": {}, "tasks": []}`,
+		"hooks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "hooks": []}`,
+		"tasks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "tasks": []}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := stageManifest(t, manifest)
@@ -157,6 +157,7 @@ func TestGateAndStampManifestContract_RejectsUnloadableHookOnlyManifest(t *testi
 // (DeclaresContractSurface), so neither may reject what the other accepts.
 func TestGateAndStampManifestContract_HookOnlyManifestLoadsUnstamped(t *testing.T) {
 	manifest := `{
+	"name": "@putnami/testext",
 	"commands": {},
 	"hooks": {"preBuild": {"kind": "command", "command": "echo"}}
 }`

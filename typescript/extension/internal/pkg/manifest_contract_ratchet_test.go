@@ -135,8 +135,8 @@ func TestCopyHookFiles_RejectsFutureContractClaim(t *testing.T) {
 func TestCopyHookFiles_RejectsUnloadableHookOnlyManifest(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "an-unloadable-hook-only-manifest-fails-packaging")
 	for name, manifest := range map[string]string{
-		"hooks of the wrong type": `{"commands": {}, "hooks": []}`,
-		"tasks of the wrong type": `{"commands": {}, "tasks": []}`,
+		"hooks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "hooks": []}`,
+		"tasks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "tasks": []}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			projDir := stageSourceManifest(t, manifest)

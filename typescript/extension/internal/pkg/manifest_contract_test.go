@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // ---- package-time contract gate + cliContract stamp ----
@@ -229,6 +230,7 @@ func TestCopyHookFiles_HookOnlyManifestNotGated(t *testing.T) {
 	projDir := t.TempDir()
 	outDir := t.TempDir()
 	os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(`{
+		"name": "@putnami/testext",
 		"commands": {},
 		"hooks": {"preBuild": {"kind": "command", "command": "bun"}}
 	}`), 0o644)
@@ -268,6 +270,43 @@ func TestCopyHookFiles_GatesMalformedContractSurface(t *testing.T) {
 		data, _ := os.ReadFile(filepath.Join(outDir, "putnami.extension.json"))
 		if strings.Contains(string(data), "cliContract") {
 			t.Errorf("a gated-and-rejected manifest must not carry the cliContract stamp: %s", m)
+		}
+	}
+}
+
+// TestGateAndStampManifestContract_RefusesANamelessManifest pins that every
+// manifest the packager would publish names its extension, whatever its shape:
+// a conforming one, a hook-only one the strict validation never reaches, and a
+// hook-only dependent. The refusal leaves the staged manifest as staged.
+func TestGateAndStampManifestContract_RefusesANamelessManifest(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "the-packager-refuses-a-nameless-manifest", "the-npm-packager-refuses-a-nameless-manifest")
+	nameless := map[string]string{
+		"conforming":          strings.Replace(conformingCLIManifest, `"name": "@putnami/testext",`, "", 1),
+		"tool-only":           strings.Replace(conformingToolOnlyManifest, `"name": "@putnami/testext",`, "", 1),
+		"hook-only":           `{"commands": {}, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`,
+		"hook-only dependent": `{"extensionDependencies": ["@putnami/application"], "commands": {}, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`,
+		"empty name":          strings.Replace(conformingCLIManifest, `"@putnami/testext"`, `""`, 1),
+	}
+	for name, manifest := range nameless {
+		for form, packageForm := range map[string]packageForm{"archive": putArchive, "npm package": npmPackage} {
+			t.Run(name+"/"+form, func(t *testing.T) {
+				dir := t.TempDir()
+				path := filepath.Join(dir, "putnami.extension.json")
+				if err := os.WriteFile(path, []byte(manifest), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				err := gateAndStampManifestContract(dir, packageForm)
+				if err == nil {
+					t.Fatal("a manifest without a name must fail packaging")
+				}
+				if !strings.Contains(err.Error(), "required-field name") {
+					t.Errorf("error should report the required name field, got %v", err)
+				}
+				data, _ := os.ReadFile(path)
+				if string(data) != manifest {
+					t.Errorf("a refused manifest must be left as staged, got:\n%s", data)
+				}
+			})
 		}
 	}
 }

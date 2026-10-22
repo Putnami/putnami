@@ -1,4 +1,5 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@test/extension",
   "commands": {}
 }

@@ -58,6 +58,14 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 
 	var diags []diag.Diagnostic
 
+	// The name is the extension's identity: a manifest without one is not a
+	// publishable extension. The loader (NegotiateManifest) does not apply this
+	// rule, so an artifact released without a name keeps loading under its
+	// reference name.
+	if m.Name == "" {
+		diags = append(diags, diag.Errorf("required-field", "name", "extension name is required"))
+	}
+
 	// A content-only extension is a complete manifest: it contributes agent
 	// instructions and runs nothing. An empty contribution still fails, because
 	// ValidateAgentContent rejects a section that names neither a source nor a

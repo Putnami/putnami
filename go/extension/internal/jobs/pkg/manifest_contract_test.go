@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func stageManifest(t *testing.T, manifest string) string {
@@ -216,6 +217,7 @@ func TestGateAndStampManifestContract_BlocksReservedShadow(t *testing.T) {
 // full strict validation, so the gate leaves it untouched and unstamped.
 func TestGateAndStampManifestContract_SkipsHookOnlyManifest(t *testing.T) {
 	manifest := `{
+	"name": "@putnami/testext",
 	"commands": {},
 	"hooks": {"preBuild": {"kind": "command", "command": "echo"}}
 }`
@@ -226,6 +228,39 @@ func TestGateAndStampManifestContract_SkipsHookOnlyManifest(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
 	if string(data) != manifest {
 		t.Errorf("hook-only manifest must be left byte-identical, got:\n%s", data)
+	}
+}
+
+// TestGateAndStampManifestContract_RefusesANamelessManifest pins that every
+// manifest the packager would publish names its extension, whatever its
+// shape: a conforming one, a hook-only one the strict validation never reaches,
+// and a hook-only dependent. The refusal leaves the staged manifest as staged.
+func TestGateAndStampManifestContract_RefusesANamelessManifest(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "the-packager-refuses-a-nameless-manifest", "the-go-packager-refuses-a-nameless-manifest")
+	nameless := map[string]string{
+		"conforming":          strings.Replace(conformingManifest, `"name": "@putnami/testext",`, "", 1),
+		"tool-only":           strings.Replace(conformingToolOnlyManifest, `"name": "@putnami/testext",`, "", 1),
+		"hook-only":           `{"commands": {}, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`,
+		"hook-only dependent": strings.Replace(hookOnlyDependentManifest, `"name": "@putnami/testext",`, "", 1),
+		"empty name":          strings.Replace(conformingManifest, `"@putnami/testext"`, `""`, 1),
+	}
+	for name, manifest := range nameless {
+		for form, packageForm := range map[string]packageForm{"archive": putArchive, "npm package": npmPackage} {
+			t.Run(name+"/"+form, func(t *testing.T) {
+				dir := stageManifest(t, manifest)
+				err := gateAndStampManifestContract(dir, packageForm)
+				if err == nil {
+					t.Fatal("a manifest without a name must fail packaging")
+				}
+				if !strings.Contains(err.Error(), "required-field name") {
+					t.Errorf("error should report the required name field, got %v", err)
+				}
+				data, _ := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
+				if string(data) != manifest {
+					t.Errorf("a refused manifest must be left as staged, got:\n%s", data)
+				}
+			})
+		}
 	}
 }
 
@@ -244,7 +279,11 @@ func TestGateAndStampManifestContract_UnparseableStagedManifest(t *testing.T) {
 // rather than publishing an unloadable manifest unstamped that every consumer
 // would fail to unmarshal and skip.
 func TestGateAndStampManifestContract_GatesMalformedContractSurface(t *testing.T) {
-	for _, m := range []string{`{"commands": []}`, `{"commandGroups": "nope"}`, `{"tools": []}`} {
+	for _, m := range []string{
+		`{"name": "@putnami/testext", "commands": []}`,
+		`{"name": "@putnami/testext", "commandGroups": "nope"}`,
+		`{"name": "@putnami/testext", "tools": []}`,
+	} {
 		dir := stageManifest(t, m)
 		if err := gateAndStampManifestContract(dir, putArchive); err == nil {
 			t.Fatalf("a wrong-typed contract surface must fail the gate, not bypass it: %s", m)

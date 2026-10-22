@@ -68,6 +68,7 @@ Every extension is defined by a `putnami.extension.json` file. The manifest decl
 ```json
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/example",
   "commands": {
     "build": {
       "run": [{ "id": "build", "task": "build-exec" }]
@@ -540,6 +541,7 @@ my-extension/
 ```json
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/example",
   "commands": {
     "build": {
       "flags": {
@@ -608,6 +610,7 @@ fi
 ```json
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/example",
   "commands": {
     "test": {
       "run": [{ "id": "test", "task": "test-exec" }]
