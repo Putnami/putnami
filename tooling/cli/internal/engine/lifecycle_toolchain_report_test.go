@@ -70,7 +70,9 @@ func toolchainReportWorkspace(t *testing.T, usedByItself bool) string {
 			}
 		}
 	}`)
+	// A toolchain pin without archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetToolchain("compiler", lockfile.LockEntry{
 		Version:     "1.2.3",
 		Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): "integrity-a"},

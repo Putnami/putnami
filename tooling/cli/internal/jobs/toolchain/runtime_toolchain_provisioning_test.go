@@ -55,7 +55,9 @@ func TestRuntimeToolchainProvisioningCommandRunsWithoutAUsablePin(t *testing.T) 
 		{
 			name: "no host integrity",
 			lock: func(t *testing.T, root string) {
+				// A toolchain pin without archives is lock format version 4.
 				locked := lockfile.NewLockFile()
+				locked.Version = lockfile.FormatVersionV4
 				locked.SetToolchain("compiler", lockfile.LockEntry{Version: "1.2.3", Integrities: map[string]string{"plan9/mips": "integrity-a"}})
 				if err := lockfile.WriteLockFile(root, locked); err != nil {
 					t.Fatal(err)

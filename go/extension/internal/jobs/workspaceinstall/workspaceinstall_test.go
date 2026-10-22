@@ -567,8 +567,8 @@ func TestWorkspaceInstall_ForceRemovesTheMachineToolCopy(t *testing.T) {
 	t.Parallel()
 	workspace := jobtest.RealTempDir(t)
 	i := newInstallJob(t, workspace, jobtest.FileURL(t.TempDir()), jobtest.CacheRoot(t), true)
-	if !i.job.ResolveGoBinary() {
-		t.Fatalf("ResolveGoBinary:\n%s", i.rec.Transcript())
+	if !i.job.FindGoBinary() {
+		t.Fatalf("FindGoBinary found no go:\n%s", i.rec.Transcript())
 	}
 	w := &install{Job: i.job}
 	stale := make([]string, 0, len(devTools))
@@ -633,8 +633,8 @@ func TestWorkspaceInstall_ToolFailureIsAWarning(t *testing.T) {
 func resolvedTools(t *testing.T, workspace string, extra ...string) (*install, *installJob) {
 	t.Helper()
 	i := newInstallJob(t, workspace, jobtest.FileURL(t.TempDir()), jobtest.CacheRoot(t), false, extra...)
-	if !i.job.ResolveGoBinary() {
-		t.Fatalf("ResolveGoBinary:\n%s", i.rec.Transcript())
+	if !i.job.FindGoBinary() {
+		t.Fatalf("FindGoBinary found no go:\n%s", i.rec.Transcript())
 	}
 	i.job.SetupGoEnv("")
 	return &install{Job: i.job, goWork: filepath.Join(workspace, "go.work")}, i
@@ -875,12 +875,13 @@ func goLessJob(t *testing.T, workspace string) *installJob {
 }
 
 // `putnami init --extension go` installs the workspace's dependencies before
-// any Go project exists. On a host without Go, nothing pins a Go release to
-// install yet, and nothing needs one: the job succeeds without Go, and the
-// first Go project pins the release and installs it. A workspace that
-// declares Go still fails without a verified Go to install.
+// any Go project exists. On a host without Go, nothing pins a Go release for
+// the CLI to provision yet, and nothing needs one: the job succeeds without
+// Go, and the first Go project pins the release. A workspace that declares Go
+// and offers no go command fails, naming `putnami install` as the remedy.
 func TestWorkspaceInstall_WithoutGoOrAGoDeclarationSkipsGo(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "install-without-go", "workspace-install-skips-go-when-nothing-declares-it")
+	spectest.Proves(t, "go/go-project-toolchain", "install-without-go", "a-declared-go-with-no-go-command-fails-naming-putnami-install")
 	t.Parallel()
 	workspace := jobtest.RealTempDir(t)
 	jobtest.WriteFile(t, workspace, "putnami.workspace.json", `{"name":"fresh","includes":[]}`+"\n")
@@ -895,7 +896,7 @@ func TestWorkspaceInstall_WithoutGoOrAGoDeclarationSkipsGo(t *testing.T) {
 	if got := i.rec.PhaseStatus("go"); got != "skipped" {
 		t.Errorf("go phase = %q, want skipped:\n%s", got, i.rec.Transcript())
 	}
-	if !i.rec.Contains("The workspace declares no Go module or Go toolchain yet; its first Go project installs Go") {
+	if !i.rec.Contains("The workspace declares no Go module or Go toolchain yet; its first Go project pins Go, which `putnami install` provisions") {
 		t.Errorf("no skip log:\n%s", i.rec.Transcript())
 	}
 	for _, event := range i.rec.Events() {
@@ -920,8 +921,9 @@ func TestWorkspaceInstall_WithoutGoOrAGoDeclarationSkipsGo(t *testing.T) {
 			if status := i.run(t, false); status != statusFailed {
 				t.Fatalf("workspace-install = %s, want FAILED:\n%s", status, i.rec.Transcript())
 			}
-			if !i.rec.Contains("Cannot install a verified Go toolchain") {
-				t.Errorf("no install diagnostic:\n%s", i.rec.Transcript())
+			if !i.rec.Contains("the Go extension installs no Go; run `putnami install`, " +
+				"which provisions the Go the workspace lock pins under the Putnami home") {
+				t.Errorf("no diagnostic names `putnami install`:\n%s", i.rec.Transcript())
 			}
 			if got := i.rec.PhaseStatus("go"); got != "failed" {
 				t.Errorf("go phase = %q, want failed", got)

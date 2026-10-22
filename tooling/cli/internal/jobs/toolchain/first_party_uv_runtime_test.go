@@ -32,9 +32,9 @@ var firstPartyUVTasks = []string{
 // TestFirstPartyUVRuntimeResolvesTheInstallUnderThePutnamiHome resolves the uv
 // runtime toolchain of the shipped Python extension manifest on a machine whose
 // PATH holds a uv of another release than the lock pins. That uv is never
-// substituted. Once the pinned release exists where the Python extension
-// installs it, toolchains/uv/uv-<version>/uv under the Putnami home, the
-// runtime resolves it. Every task that runs uv requires the toolchain, so its
+// substituted. Once the pinned release exists under the Putnami home where the
+// lock's archive puts it, toolchains/uv/uv-<version>/uv, the runtime resolves
+// it. Every task that runs uv requires the toolchain, so its
 // cache key changes with the pinned release.
 func TestFirstPartyUVRuntimeResolvesTheInstallUnderThePutnamiHome(t *testing.T) {
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
@@ -50,7 +50,7 @@ func TestFirstPartyUVRuntimeResolvesTheInstallUnderThePutnamiHome(t *testing.T) 
 	resolve := func(version string) (*extension.ExtensionDescription, model.RuntimeToolchainResolution, error) {
 		t.Helper()
 		root := t.TempDir()
-		writeRuntimeToolchainLock(t, root, "uv", version, "integrity-"+version)
+		writeArchivedToolchainLock(t, root, "uv", version, WithExecutableSuffix(runtime.GOOS, "uv"))
 		ext := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "python", "extension"), "@putnami/python")
 		if ext == nil || ext.Runtime == nil {
 			t.Fatal("python/extension declares no runtime")

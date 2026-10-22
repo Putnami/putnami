@@ -39,10 +39,10 @@ No directory has to be on `PATH` beforehand: a script running as the child of a
 pipe cannot change its parent shell, so the block sets `PATH` itself.
 
 Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
-when it fits. Otherwise Putnami installs Bun at
-`~/.putnami/toolchains/bun/bun-<version>/bin/bun`, from `github.com`, and
-refuses an archive whose SHA-256 is not the expected one. It writes nothing to
-`~/.bun` or to a directory on `PATH`.
+when it fits. Otherwise Putnami installs Bun, at the release the lock pins,
+under `~/.putnami/toolchains/bun/bun-<version>/`, from `github.com`, and
+refuses an archive whose SHA-256 is not the one the lock records. It writes
+nothing to `~/.bun` or to a directory on `PATH`.
 
 **What the installer does, and does not do**
 

@@ -226,6 +226,15 @@ by a planned job whose task declares that channel. A reader below 12 would
 judge those channels by another rule, so it refuses the stamp. The floor binds
 a manifest wherever it loads from. Only a manifest with a task that declares
 the field is stamped 12.
+Contract `13` (`ProvisionedToolchainContract`) is additive for the
+`provisioned` candidate of a runtime toolchain. From 13 on, the CLI downloads,
+verifies and unpacks the host platform's archive of each toolchain the
+workspace lock pins, below the Putnami home, and a `provisioned` candidate
+resolves to the executable the lock's archive names in that tree. The
+candidate names no path, so a reader below 13 would not know where the
+executable is, and it provisions nothing, so it refuses the stamp. The floor
+binds a manifest wherever it loads from. Only a manifest whose runtime
+toolchain declares the candidate is stamped 13.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

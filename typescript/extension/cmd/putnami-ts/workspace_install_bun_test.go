@@ -1,16 +1,14 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -19,10 +17,11 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
 // pinnedBunVersion is the release the workspaces of these tests pin. It is not
-// the extension's default release, so nothing but the lock can verify it.
+// the extension's default release.
 const pinnedBunVersion = "1.9.9"
 
 // hostWithoutBun leaves this process on a machine that holds no bun: an empty
@@ -43,76 +42,78 @@ func hostWithoutBun(t *testing.T) (home, putnamiHome string) {
 }
 
 // pinBunFromAMirror writes a workspace lock that pins pinnedBunVersion from a
-// local server, with the SHA-256 of the archive that server holds for this
-// host. It returns the count of requests the server received.
+// local server, and returns the count of requests that server received: a job
+// that installs no Bun sends it none.
 func pinBunFromAMirror(t *testing.T, workspaceRoot string) *atomic.Int64 {
 	t.Helper()
-	arch, known := map[string]string{"amd64": "x64", "arm64": "aarch64"}[runtime.GOARCH]
-	if !known || (runtime.GOOS != "linux" && runtime.GOOS != "darwin" && runtime.GOOS != "windows") {
-		t.Skipf("Bun publishes no archive for %s/%s", runtime.GOOS, runtime.GOARCH)
-	}
-	if loaders, _ := filepath.Glob("/lib/ld-musl-*.so.1"); len(loaders) > 0 {
-		t.Skip("the lock holds no digest for the musl archive of Bun")
-	}
-	program := "bun"
-	if runtime.GOOS == "windows" {
-		program = "bun.exe"
-	}
-	target := "bun-" + runtime.GOOS + "-" + arch
-
-	var archive bytes.Buffer
-	writer := zip.NewWriter(&archive)
-	header := &zip.FileHeader{Name: target + "/" + program, Method: zip.Deflate}
-	header.SetMode(0o755)
-	file, err := writer.CreateHeader(header)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := file.Write([]byte("a bun program\n")); err != nil {
-		t.Fatal(err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	digest := sha256.Sum256(archive.Bytes())
-
 	var requests atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		if r.URL.Path != "/"+target+".zip" {
-			http.NotFound(w, r)
-			return
-		}
-		_, _ = w.Write(archive.Bytes())
+		http.NotFound(w, r)
 	}))
 	t.Cleanup(server.Close)
 
 	lock := fmt.Sprintf(`{"version":3,"toolchains":{"bun":{"version":%q,"integrities":{%q:%q},"source":%q}}}`+"\n",
-		pinnedBunVersion, runtime.GOOS+"/"+runtime.GOARCH, hex.EncodeToString(digest[:]), server.URL+"/")
+		pinnedBunVersion, runtime.GOOS+"/"+runtime.GOARCH, strings.Repeat("a", 64), server.URL+"/")
 	if err := os.WriteFile(filepath.Join(workspaceRoot, "putnami.lock.json"), []byte(lock), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return &requests
 }
 
-// installedBun is where workspace-install puts pinnedBunVersion under home.
-func installedBun(putnamiHome string) (dir, program string) {
-	dir = filepath.Join(putnamiHome, "toolchains", "bun", "bun-"+pinnedBunVersion)
-	program = filepath.Join(dir, "bin", "bun")
+// provisionBun places pinnedBunVersion under putnamiHome as the CLI provisions
+// it, the archive's bun-<target>/bun in toolchains/bun/bun-<version>, and
+// returns the release directory and the program.
+func provisionBun(t *testing.T, putnamiHome string) (dir, program string) {
+	t.Helper()
+	arch, known := map[string]string{"amd64": "x64", "arm64": "aarch64"}[runtime.GOARCH]
+	if !known || (runtime.GOOS != "linux" && runtime.GOOS != "darwin" && runtime.GOOS != "windows") {
+		t.Skipf("Bun publishes no archive for %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	name := "bun"
 	if runtime.GOOS == "windows" {
-		program += ".exe"
+		name = "bun.exe"
+	}
+	dir = filepath.Join(putnamiHome, "toolchains", "bun", "bun-"+pinnedBunVersion)
+	program = filepath.Join(dir, "bun-"+runtime.GOOS+"-"+arch, name)
+	if err := os.MkdirAll(filepath.Dir(program), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(program, []byte("a bun program\n"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	return dir, program
 }
 
-// On a machine with no bun, workspace-install installs the release the lock
-// pins under the Putnami home and runs `bun install` with it. That bun runs
-// with BUN_INSTALL and its transpiler cache under its install directory, so it
-// writes nothing to .bun in the user's home directory. A second install
-// downloads nothing.
-func TestWorkspaceInstall_InstallsThePinnedBunAndRunsIt(t *testing.T) {
+// filesUnder lists the files under root, relative to it.
+func filesUnder(t *testing.T, root string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			rel, _ := filepath.Rel(root, path)
+			files = append(files, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
+// workspace-install runs the bun the CLI provisioned under the Putnami home and
+// put first on PATH, with BUN_INSTALL naming the release directory, as the
+// task runtime's environment binding derives it. That bun keeps its caches in
+// that directory and writes nothing to .bun in the user's home directory. The
+// job asks the lock's source for nothing and writes nothing under the Putnami
+// home.
+func TestWorkspaceInstall_RunsTheProvisionedBun(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-under-the-putnami-home",
-		"workspace-install-runs-the-bun-it-installed")
+		"workspace-install-runs-the-provisioned-bun")
 	home, putnamiHome := hostWithoutBun(t)
 	ctx, dir := makeTestCtx(t)
 	os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(`{}`), 0644)
@@ -120,7 +121,15 @@ func TestWorkspaceInstall_InstallsThePinnedBunAndRunsIt(t *testing.T) {
 		[]byte(`{"name":"fresh","private":true,"packageManager":"bun@`+pinnedBunVersion+`"}`+"\n"), 0644)
 	writeExtensionBiomeDefault(t, dir)
 	requests := pinBunFromAMirror(t, dir)
-	installDir, program := installedBun(putnamiHome)
+	installDir, program := provisionBun(t, putnamiHome)
+	provisioned := filesUnder(t, putnamiHome)
+
+	// The CLI's environment for a job of the task runtime, then the job's own
+	// start.
+	t.Setenv("PUTNAMI_WORKSPACE_ROOT", dir)
+	t.Setenv("BUN_INSTALL", filepath.Dir(filepath.Dir(program)))
+	t.Setenv("PATH", filepath.Dir(program)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	toolchain.ApplyManagedBunEnv()
 
 	type bunRun struct {
 		program, args, bunInstall, transpilerCache, firstOnPath string
@@ -141,54 +150,53 @@ func TestWorkspaceInstall_InstallsThePinnedBunAndRunsIt(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	for attempt := 1; attempt <= 2; attempt++ {
-		runs = nil
-		status, _, err := runWorkspaceInstall(ctx, jsonl.New(), nil)
-		if err != nil || status != "OK" {
-			t.Fatalf("install %d: runWorkspaceInstall = %q, %v; want OK", attempt, status, err)
+	status, _, err := runWorkspaceInstall(ctx, jsonl.New(), nil)
+	if err != nil || status != "OK" {
+		t.Fatalf("runWorkspaceInstall = %q, %v; want OK", status, err)
+	}
+	if len(runs) == 0 {
+		t.Fatal("bun never ran")
+	}
+	last := runs[len(runs)-1]
+	if last.args != "install" {
+		t.Fatalf("the last bun run is %q, want `bun install`; runs = %+v", last.args, runs)
+	}
+	for _, run := range runs {
+		if run.program != program {
+			t.Errorf("`bun %s` ran %s, want the provisioned %s", run.args, run.program, program)
 		}
-		if info, err := os.Stat(program); err != nil || !info.Mode().IsRegular() {
-			t.Fatalf("install %d: no bun at %s: %v", attempt, program, err)
-		}
-		if len(runs) == 0 {
-			t.Fatalf("install %d: bun never ran", attempt)
-		}
-		last := runs[len(runs)-1]
-		if last.args != "install" {
-			t.Fatalf("install %d: the last bun run is %q, want `bun install`; runs = %+v", attempt, last.args, runs)
-		}
-		for _, run := range runs {
-			if run.program != program {
-				t.Errorf("install %d: `bun %s` ran %s, want the install %s", attempt, run.args, run.program, program)
-			}
-		}
-		if last.bunInstall != installDir {
-			t.Errorf("install %d: BUN_INSTALL = %q during bun install, want %q", attempt, last.bunInstall, installDir)
-		}
-		if want := filepath.Join(installDir, "install", "cache", "@t@"); last.transpilerCache != want {
-			t.Errorf("install %d: transpiler cache = %q during bun install, want %q", attempt, last.transpilerCache, want)
-		}
-		if want := filepath.Join(installDir, "bin"); last.firstOnPath != want {
-			t.Errorf("install %d: first PATH directory = %q during bun install, want %q", attempt, last.firstOnPath, want)
-		}
-		if got := requests.Load(); got != 1 {
-			t.Fatalf("install %d: the mirror received %d requests, want 1 in all", attempt, got)
-		}
+	}
+	if last.bunInstall != installDir {
+		t.Errorf("BUN_INSTALL = %q during bun install, want %q", last.bunInstall, installDir)
+	}
+	if want := filepath.Join(installDir, "install", "cache", "@t@"); last.transpilerCache != want {
+		t.Errorf("transpiler cache = %q during bun install, want %q", last.transpilerCache, want)
+	}
+	if want := filepath.Dir(program); last.firstOnPath != want {
+		t.Errorf("first PATH directory = %q during bun install, want %q", last.firstOnPath, want)
+	}
+	if got := requests.Load(); got != 0 {
+		t.Errorf("the lock's source received %d requests, want none", got)
+	}
+	if got := filesUnder(t, putnamiHome); !slices.Equal(got, provisioned) {
+		t.Errorf("the Putnami home holds %v, want only the provisioned %v", got, provisioned)
 	}
 	if _, err := os.Lstat(filepath.Join(home, ".bun")); !os.IsNotExist(err) {
 		t.Errorf("the install wrote .bun in the user's home directory: %v", err)
 	}
 }
 
-// A hosted run installs no toolchain: workspace-install and workspace-fetch
-// fail on a runner that holds no bun, name the release and where to put it,
-// request nothing, and start no process.
-func TestHostedJobs_DownloadNoBun(t *testing.T) {
+// workspace-install and workspace-fetch install no Bun: on a machine that
+// holds none, on a hosted run or not, they fail with an error that names the
+// pinned release and `putnami install`, request nothing, start no process, and
+// write nothing under the Putnami home.
+func TestWorkspaceJobs_InstallNoBun(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-under-the-putnami-home",
-		"hosted-jobs-download-no-bun")
+		"a-job-without-a-bun-fails-naming-putnami-install-and-downloads-nothing")
 	jobs := map[string]func(t *testing.T) (string, error){
 		"workspace-install": func(t *testing.T) (string, error) {
 			ctx, dir := makeTestCtx(t)
+			t.Setenv("PUTNAMI_WORKSPACE_ROOT", dir)
 			os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"ws","private":true}`), 0644)
 			requests := pinBunFromAMirror(t, dir)
 			t.Cleanup(func() {
@@ -201,6 +209,7 @@ func TestHostedJobs_DownloadNoBun(t *testing.T) {
 		},
 		"workspace-fetch": func(t *testing.T) (string, error) {
 			ctx := fetchUnitWorkspace(t)
+			t.Setenv("PUTNAMI_WORKSPACE_ROOT", ctx.WorkspaceRoot)
 			requests := pinBunFromAMirror(t, ctx.WorkspaceRoot)
 			t.Cleanup(func() {
 				if got := requests.Load(); got != 0 {
@@ -214,26 +223,28 @@ func TestHostedJobs_DownloadNoBun(t *testing.T) {
 		},
 	}
 	for name, run := range jobs {
-		t.Run(name, func(t *testing.T) {
-			_, putnamiHome := hostWithoutBun(t)
-			t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
-			mockAllExec(t, func(bin string, args []string, _ ...exec.Option) (*exec.Result, error) {
-				t.Errorf("%s %v ran although the runner holds no bun", bin, args)
-				return &exec.Result{Success: true}, nil
-			})
+		for _, hosted := range []string{"", "1"} {
+			t.Run(name+" hosted="+hosted, func(t *testing.T) {
+				_, putnamiHome := hostWithoutBun(t)
+				t.Setenv(extensionproto.OfflineDependenciesEnv, hosted)
+				mockAllExec(t, func(bin string, args []string, _ ...exec.Option) (*exec.Result, error) {
+					t.Errorf("%s %v ran although the machine holds no bun", bin, args)
+					return &exec.Result{Success: true}, nil
+				})
 
-			status, err := run(t)
-			if status != "FAILED" || err == nil {
-				t.Fatalf("%s = %q, %v; want a failure", name, status, err)
-			}
-			for _, want := range []string{"Bun " + pinnedBunVersion, "hosted run installs no toolchain"} {
-				if !strings.Contains(err.Error(), want) {
-					t.Errorf("error %q does not hold %q", err, want)
+				status, err := run(t)
+				if status != "FAILED" || err == nil {
+					t.Fatalf("%s = %q, %v; want a failure", name, status, err)
 				}
-			}
-			if _, statErr := os.Lstat(filepath.Join(putnamiHome, "toolchains")); !os.IsNotExist(statErr) {
-				t.Errorf("a hosted run wrote under the Putnami home: %v", statErr)
-			}
-		})
+				for _, want := range []string{"Bun " + pinnedBunVersion, "`putnami install`"} {
+					if !strings.Contains(err.Error(), want) {
+						t.Errorf("error %q does not hold %q", err, want)
+					}
+				}
+				if _, statErr := os.Lstat(filepath.Join(putnamiHome, "toolchains")); !os.IsNotExist(statErr) {
+					t.Errorf("the job wrote under the Putnami home: %v", statErr)
+				}
+			})
+		}
 	}
 }

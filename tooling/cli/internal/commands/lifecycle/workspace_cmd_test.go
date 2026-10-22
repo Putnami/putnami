@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -127,6 +128,19 @@ func TestWorkspaceInitRequiredStageFailuresStopBeforeReady(t *testing.T) {
 			wantNext:    "putnami extensions install",
 		},
 		{
+			name:        "toolchain pins",
+			stage:       "pins",
+			wantMessage: "pin toolchains",
+			wantNext:    "putnami install",
+		},
+		{
+			// A problem an extension answers names its own remedy.
+			name:        "toolchain pins with a remedy",
+			stage:       "pins-remedy",
+			wantMessage: "pin toolchains",
+			wantNext:    initPinsRemedy,
+		},
+		{
 			name:           "initial dependency install",
 			stage:          "dependencies",
 			dependencyCall: 1,
@@ -205,21 +219,25 @@ func TestWorkspaceInitRequiredStageFailuresStopBeforeReady(t *testing.T) {
 	}
 }
 
-// TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall: init ends with the
-// lock refresh `putnami install` ends with, after the dependency install that
-// writes the files the pins derive from, so the commands it prints next find
-// their toolchains pinned.
-func TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall(t *testing.T) {
-	spectest.Proves(t, "cli/toolchain-lock", "init-records-pins", "init-refreshes-the-lock-after-its-last-dependency-install")
+// TestWorkspaceInitPinsToolchainsBeforeItsFirstInstall: init runs the
+// toolchain pins phase once, as an explicit run, after the extension install
+// and before the first workspace install, whose installers run the toolchains
+// the lock pins. A failed phase runs no installer. Init ends with the lock
+// metadata refresh `putnami install` ends with.
+func TestWorkspaceInitPinsToolchainsBeforeItsFirstInstall(t *testing.T) {
+	phaseFailure := errors.New("go: the extension cannot reach go.dev")
 	tests := []struct {
-		name string
-		args []string
-		want string
+		name     string
+		args     []string
+		phaseErr error
+		want     string
 	}{
 		{name: "without a project", args: []string{"--workspace", "test-ws", "--extension", "go"},
-			want: "dependencies,lock"},
+			want: "extension,pins,dependencies,lock"},
 		{name: "with a project", args: []string{"--workspace", "test-ws", "--project", "my-app", "--extension", "go"},
-			want: "dependencies,project,dependencies,lock"},
+			want: "extension,pins,dependencies,project,dependencies,lock"},
+		{name: "a failed phase", args: []string{"--workspace", "test-ws", "--project", "my-app", "--extension", "go"},
+			phaseErr: phaseFailure, want: "extension,pins"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -227,6 +245,10 @@ func TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall(t *testing.T) {
 			stubWorkspaceInitStages(t, "", 0)
 			t.Chdir(dir)
 			var stages []string
+			installExtension = func(context.Context, string, *wsproto.Config, []string, string) error {
+				stages = append(stages, "extension")
+				return nil
+			}
 			installInitDependencies = func(context.Context, string, *wsproto.Config, string, string, LifecycleEnv) error {
 				stages = append(stages, "dependencies")
 				return nil
@@ -234,6 +256,18 @@ func TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall(t *testing.T) {
 			createInitProject = func(context.Context, string, *wsproto.Config, []string, LifecycleEnv) error {
 				stages = append(stages, "project")
 				return nil
+			}
+			var pinnedRoot string
+			pinInitToolchains = func(ctx context.Context, root string, env LifecycleEnv) (toolchainpins.Result, error) {
+				stages = append(stages, "pins")
+				pinnedRoot = root
+				if toolchainPinOptions(ctx).Implicit {
+					t.Errorf("init ran the toolchain pins phase as an implicit install")
+				}
+				if tt.phaseErr != nil {
+					return toolchainpins.Result{}, tt.phaseErr
+				}
+				return toolchainpins.Result{Added: []string{"go"}, Written: true}, nil
 			}
 			var refreshedRoot, refreshedVersion string
 			refreshInitLockMetadata = func(_ context.Context, root, cliVersion string) (bool, error) {
@@ -245,17 +279,26 @@ func TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall(t *testing.T) {
 			output, err := captureStdout(t, func() error {
 				return WorkspaceInit(context.Background(), "", tt.args, LifecycleEnv{CLIVersion: "1.2.3"})
 			})
+			if got := strings.Join(stages, ","); got != tt.want {
+				t.Fatalf("init stages = %s, want %s\n%s", got, tt.want, output)
+			}
+			if filepath.Base(pinnedRoot) != filepath.Base(dir) {
+				t.Fatalf("the toolchain pins phase ran for %q, want the new workspace", pinnedRoot)
+			}
+			if tt.phaseErr != nil {
+				if !errors.Is(err, tt.phaseErr) || protocolcli.SuggestedNext(err) != "putnami install" {
+					t.Fatalf("WorkspaceInit = %v (next %q), want the phase failure and putnami install", err, protocolcli.SuggestedNext(err))
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("WorkspaceInit: %v\n%s", err, output)
-			}
-			if got := strings.Join(stages, ","); got != tt.want {
-				t.Fatalf("init stages = %s, want %s", got, tt.want)
 			}
 			if filepath.Base(refreshedRoot) != filepath.Base(dir) || refreshedVersion != "1.2.3" {
 				t.Fatalf("refresh ran for %q at CLI %q, want the new workspace at the running CLI's version", refreshedRoot, refreshedVersion)
 			}
-			if !strings.Contains(output, "Workspace ready") {
-				t.Fatalf("init did not finish:\n%s", output)
+			if !strings.Contains(output, "Toolchain pins recorded") || !strings.Contains(output, "Workspace ready") {
+				t.Fatalf("init did not report the pins it wrote and finish:\n%s", output)
 			}
 		})
 	}
@@ -364,6 +407,10 @@ func TestWorkspaceInitInAPackageManagerMonorepo(t *testing.T) {
 	}
 }
 
+// initPinsRemedy is the remedy of the toolchain pins failure the init stage
+// stubs answer for the "pins-remedy" stage.
+const initPinsRemedy = "add a go directive to go.work"
+
 func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependencyCall int) error {
 	t.Helper()
 	// No built-in starter opts into agent content, and installing content
@@ -377,12 +424,14 @@ func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependenc
 	origDependencies := installInitDependencies
 	origTemplate := installInitTemplate
 	origProject := createInitProject
+	origPins := pinInitToolchains
 	origRefresh := refreshInitLockMetadata
 	t.Cleanup(func() {
 		installExtension = origExtension
 		installInitDependencies = origDependencies
 		installInitTemplate = origTemplate
 		createInitProject = origProject
+		pinInitToolchains = origPins
 		refreshInitLockMetadata = origRefresh
 	})
 
@@ -412,6 +461,15 @@ func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependenc
 			return failure
 		}
 		return nil
+	}
+	pinInitToolchains = func(context.Context, string, LifecycleEnv) (toolchainpins.Result, error) {
+		switch failingStage {
+		case "pins":
+			return toolchainpins.Result{}, failure
+		case "pins-remedy":
+			return toolchainpins.Result{}, protocolcli.WithNext(failure, initPinsRemedy)
+		}
+		return toolchainpins.Result{}, nil
 	}
 	refreshInitLockMetadata = func(context.Context, string, string) (bool, error) {
 		if failingStage == "lock" {

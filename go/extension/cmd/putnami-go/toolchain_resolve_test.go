@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/go/extension/internal/workspacejob"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 )
@@ -47,6 +48,8 @@ func toolchainResolveWorkspace(t *testing.T) wsproto.ToolchainResolveRequest {
 // ordinary dispatch, and stdout carries one result that passes both of the
 // protocol's checks against the request.
 func TestRunEntrypointAnswersToolchainResolve(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"the-reserved-call-is-answered-before-command-dispatch")
 	request := toolchainResolveWorkspace(t)
 	stdin := filepath.Join(t.TempDir(), "request.json")
 	var encoded bytes.Buffer

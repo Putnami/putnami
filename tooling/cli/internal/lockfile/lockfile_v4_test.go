@@ -9,6 +9,7 @@ import (
 
 func TestLockFileV4AgentArtifactRoundTrip(t *testing.T) {
 	lf := NewLockFile()
+	lf.Version = FormatVersionV4
 	lf.SetAgentArtifact("@putnami/agent-workflows", AgentArtifactLockEntry{
 		Version:      "1.0.0",
 		Integrity:    strings.Repeat("1", 64),
@@ -58,7 +59,7 @@ func TestMigrateLockFileToCurrentIsExplicitAndDeep(t *testing.T) {
 	legacy, err := ParseLockFile([]byte(`{
   "version": 3,
   "cli": {"version":"1.4.2","integrities":{"linux/amd64":"cli"},"protocolVersion":2},
-  "toolchains": {"go":{"version":"1.26.1","integrities":{"linux/amd64":"go"},"source":"https://go.dev/dl/"}},
+  "toolchains": {},
   "extensions": {"@putnami/go":{"version":"2.0.0","integrities":{"linux/amd64":"ext"}}},
   "templates": {}
 }`))
@@ -73,20 +74,17 @@ func TestMigrateLockFileToCurrentIsExplicitAndDeep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if migrated.Version != FormatVersionV4 || migrated.AgentArtifacts == nil {
-		t.Fatalf("migration result = %+v, want v4 with explicit empty agentArtifacts", migrated)
+	if migrated.Version != FormatVersionV5 || migrated.AgentArtifacts == nil {
+		t.Fatalf("migration result = %+v, want v5 with explicit empty agentArtifacts", migrated)
 	}
 	if legacy.Version != FormatVersionV3 || legacy.AgentArtifacts != nil {
 		t.Fatalf("migration mutated source lock: %+v", legacy)
 	}
 
 	migrated.CLI.Integrities["linux/amd64"] = "changed"
-	toolchain := migrated.Toolchains["go"]
-	toolchain.Integrities["linux/amd64"] = "changed"
 	extension := migrated.Extensions["@putnami/go"]
 	extension.Integrities["linux/amd64"] = "changed"
 	if legacy.CLI.Integrities["linux/amd64"] != "cli" ||
-		legacy.Toolchains["go"].Integrities["linux/amd64"] != "go" ||
 		legacy.Extensions["@putnami/go"].Integrities["linux/amd64"] != "ext" {
 		t.Fatalf("migration result aliases source collections: legacy=%+v migrated=%+v", legacy, migrated)
 	}
@@ -100,7 +98,7 @@ func TestMigrateLockFileToCurrentIsExplicitAndDeep(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(first, second) {
-		t.Fatalf("v4 serialization is non-deterministic:\n%s\n%s", first, second)
+		t.Fatalf("v5 serialization is non-deterministic:\n%s\n%s", first, second)
 	}
 }
 

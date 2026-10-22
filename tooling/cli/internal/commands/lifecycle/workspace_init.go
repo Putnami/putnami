@@ -70,6 +70,7 @@ var (
 	installInitDependencies = DepsInstall
 	installInitTemplate     = extensions.TemplatesInstall
 	createInitProject       = createInitProjectFiles
+	pinInitToolchains       = resolveToolchainPins
 	refreshInitLockMetadata = versioncmd.RefreshLockMetadataWithResult
 )
 
@@ -368,12 +369,10 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
-	// Run workspace-install to set up deps.
-	if err := installInitDependencies(ctx, cwd, wsCfg, "", "", env); err != nil {
-		return protocolcli.WithNext(
-			fmt.Errorf("install workspace dependencies: %w", err),
-			"putnami deps install",
-		)
+	// Pin what the extensions answer, then run workspace-install, which runs
+	// the toolchains the lock pins.
+	if err := installInitWorkspace(ctx, cwd, wsCfg, env); err != nil {
+		return err
 	}
 
 	if flags.project != "" {
@@ -382,16 +381,9 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
-	// Pin the toolchains the installed dependencies declare, with the refresh
-	// `putnami install` ends with. It runs after the last dependency install,
-	// which writes the files the pins derive from (go.work for a Go project).
-	// Without it the lock pins no toolchain, and the commands printed below stop
-	// on the missing pin.
+	// End with the lock metadata refresh `putnami install` ends with.
 	if _, err := refreshInitLockMetadata(ctx, cwd, env.CLIVersion); err != nil {
-		return protocolcli.WithNext(
-			fmt.Errorf("refresh lock metadata: %w", err),
-			"putnami install",
-		)
+		return protocolcli.WithNext(fmt.Errorf("refresh lock metadata: %w", err), "putnami install")
 	}
 
 	// --- Summary ---
@@ -411,6 +403,28 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		iox.Fprintln(os.Stdout, "    putnami build --all")
 	}
 
+	return nil
+}
+
+// installInitWorkspace is init's first install: the toolchain pins phase,
+// then the workspace installers, which run the toolchains the lock pins. A
+// failed phase names its own next step, or `putnami install`, and runs no
+// installer.
+func installInitWorkspace(ctx context.Context, cwd string, cfg *wsproto.Config, env LifecycleEnv) error {
+	pins, err := pinInitToolchains(ctx, cwd, env)
+	if err != nil {
+		err = fmt.Errorf("pin toolchains: %w", err)
+		if protocolcli.SuggestedNext(err) != "" {
+			return err
+		}
+		return protocolcli.WithNext(err, "putnami install")
+	}
+	if pins.Written {
+		iox.Fprintln(os.Stdout, "  ✓ Toolchain pins recorded")
+	}
+	if err := installInitDependencies(ctx, cwd, cfg, "", "", env); err != nil {
+		return protocolcli.WithNext(fmt.Errorf("install workspace dependencies: %w", err), "putnami deps install")
+	}
 	return nil
 }
 

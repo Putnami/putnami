@@ -18,9 +18,13 @@ import (
 //
 // For v1 inputs it also records v2's per-extension TaskContract field from the
 // already-installed manifest. It then performs the explicit, non-mutating
-// v2/v3 projection onto v4, which adds empty current-format dimensions without
-// inventing pins. --check is the CI gate (exit 0 clean, exit 2 when a migration
-// is pending) and --apply is the idempotent, atomic conversion.
+// projection onto lock format version 5, which adds empty current-format
+// dimensions without inventing pins. A lock that pins toolchains without
+// archives does not project: the command refuses it, with or without --apply,
+// and names `putnami install`, because each extension supplies the archives of
+// the toolchains it answers for. --check is the CI gate (exit 0 clean, exit 2
+// when a migration is pending) and --apply is the idempotent, atomic
+// conversion.
 //
 // It is deliberately mechanical. It records what the INSTALLED manifests
 // already declare; it never resolves versions, contacts a registry, or changes
@@ -123,6 +127,12 @@ func MigrateVNext(root string, apply bool, outputFormat string) error {
 		return protocolcli.WithNext(
 			protocolcli.NotFoundf("no %s in %s: nothing to migrate", lockfile.LockFilename, root),
 			"putnami install")
+	}
+
+	// A lock that pins toolchains below format 5 converts only through
+	// `putnami install`, so --check refuses it exactly as --apply does.
+	if needsResolution := lf.ToolchainsNeedResolution(); needsResolution != nil {
+		return protocolcli.WithNext(protocolcli.Classify(needsResolution, protocolcli.ErrInvalidConfig), "putnami install")
 	}
 
 	report := planVNextMigration(root, lf)

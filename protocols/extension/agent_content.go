@@ -81,11 +81,12 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: PublishChannelsContract for a task that declares the publish
-// channels it serves, CommandKindContract for command or verb traits that
-// declare a kind, a workload, rewritesSources or consumesReleaseSet, or a
-// task's batchable policy that declares a kind or a phase,
-// SourceBoundCacheContract for a task that declares cache.sourceBound,
+// the manifest: ProvisionedToolchainContract for a runtime toolchain that
+// declares a provisioned candidate, PublishChannelsContract for a task that
+// declares the publish channels it serves, CommandKindContract for command or
+// verb traits that declare a kind, a workload, rewritesSources or
+// consumesReleaseSet, or a task's batchable policy that declares a kind or a
+// phase, SourceBoundCacheContract for a task that declares cache.sourceBound,
 // VerbVocabularyContract for a verb vocabulary, ExtensionDependenciesContract
 // for extensionDependencies that name a registry extension,
 // ReleaseBaselineInputContract for a task that declares the releaseBaseline
@@ -144,7 +145,29 @@ func RequiredLoadContract(m *Manifest) int {
 	if DeclaresCommandKinds(m) {
 		required = max(required, protocolcli.CommandKindContract)
 	}
+	// A provisioned candidate resolves only in a reader that provisions the
+	// pinned archive, whatever origin the manifest loads from.
+	if DeclaresProvisionedToolchain(m) {
+		required = max(required, protocolcli.ProvisionedToolchainContract)
+	}
 	return required
+}
+
+// DeclaresProvisionedToolchain reports whether a runtime toolchain of the
+// manifest declares a candidate from RuntimeToolchainCandidateProvisioned, the
+// vocabulary of protocolcli.ProvisionedToolchainContract.
+func DeclaresProvisionedToolchain(m *Manifest) bool {
+	if m == nil || m.Runtime == nil {
+		return false
+	}
+	for _, toolchain := range m.Runtime.Toolchains {
+		for _, candidate := range toolchain.Candidates {
+			if candidate.From == RuntimeToolchainCandidateProvisioned {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeclaresCommandKinds reports whether the manifest uses the vocabulary of

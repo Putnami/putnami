@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
@@ -17,76 +20,101 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/useragent"
 )
 
 // installWritesWorkspace reports whether an install may write the workspace's
 // own files: putnami.lock.json and the assistant content (AGENTS.md,
 // .mcp.json, agent workflows). A hosted install runs from the committed files
-// and writes none of them (ADR 0055): it pins no toolchain, refreshes no lock
-// metadata, even a CLI pin that a CLI of another version left without its
-// protocol version, and generates no assistant content. The extensions phase
-// refuses a lock change on its own (extensions.ExtensionsInstallWithOptions).
+// and writes none of them (ADR 0055): its toolchain pins stay in memory
+// (toolchainpins.Options.Hosted), it refreshes no lock metadata, even a CLI
+// pin that a CLI of another version left without its protocol version, and it
+// generates no assistant content. The extensions phase refuses a lock change
+// on its own (extensions.ExtensionsInstallWithOptions).
 func installWritesWorkspace() bool {
 	return !runcredential.Hosted()
 }
 
-// fillImplicitToolchainPins is the implicit install's lock step, and the step
-// `projects create` takes when a toolchain the project-setup job requires does
-// not resolve (setUpProject). It is a seam for tests.
-var fillImplicitToolchainPins = versioncmd.FillMissingToolchainPins
+// toolchainPinOptions are the options of the toolchain pins phase for the
+// command ctx belongs to: the first-use install is implicit, a hosted run
+// writes no lock and asks offline, and so does a run whose dependencies are
+// offline (extensionproto.OfflineDependenciesEnv).
+func toolchainPinOptions(ctx context.Context) toolchainpins.Options {
+	hosted := !installWritesWorkspace()
+	return toolchainpins.Options{
+		Implicit: shared.IsImplicitInstall(ctx),
+		Hosted:   hosted,
+		Offline:  hosted || os.Getenv(extensionproto.OfflineDependenciesEnv) == "1",
+	}
+}
 
-// pinExplicitToolchains is the explicit install's lock step before the
-// workspace installers. It is a seam for tests.
-var pinExplicitToolchains = versioncmd.PinDeclaredToolchains
+// resolveToolchainPins runs the toolchain pins phase for the command ctx
+// belongs to: env.pinToolchains when it is set. Otherwise it runs
+// toolchainpins.Resolve, then installs the pinned releases the machine lacks
+// (installToolchainPins).
+func resolveToolchainPins(ctx context.Context, wsRoot string, env LifecycleEnv) (toolchainpins.Result, error) {
+	opts := toolchainPinOptions(ctx)
+	if env.pinToolchains != nil {
+		return env.pinToolchains(ctx, wsRoot, opts)
+	}
+	pins, err := toolchainpins.Resolve(ctx, wsRoot, opts)
+	if err != nil {
+		return pins, err
+	}
+	return pins, installToolchainPins(ctx, wsRoot, pins, opts, env)
+}
 
-// recordMissingToolchainPins runs the implicit install's lock step and records
-// the lock action when it pinned a toolchain.
-func recordMissingToolchainPins(ctx context.Context, wsRoot string, record func(LifecycleAction)) error {
-	if !installWritesWorkspace() {
+// installToolchainPins installs, in identity order, the pinned release of each
+// identity an extension answered for, unless the machine already holds it
+// (toolchain.Provision). A hosted run, or one whose dependencies are offline,
+// installs nothing: it runs the toolchains the machine holds. It reports each
+// release it installed to env.OnAction; with no OnAction the same line goes
+// to env.Out. It stops at the first failure.
+func installToolchainPins(ctx context.Context, wsRoot string, pins toolchainpins.Result, opts toolchainpins.Options, env LifecycleEnv) error {
+	if opts.Hosted || opts.Offline {
 		return nil
 	}
-	changed, err := fillImplicitToolchainPins(ctx, wsRoot)
-	if err != nil {
-		return fmt.Errorf("pin missing toolchains: %w", err)
+	record := env.OnAction
+	if record == nil {
+		out := env.out()
+		record = func(action LifecycleAction) { iox.Fprintf(out, "  ✓ %s\n", action.Description) }
 	}
-	if changed {
-		record(LifecycleAction{Kind: "lock", Name: "putnami.lock.json", Description: "Missing toolchain pins recorded"})
+	for _, identity := range slices.Sorted(maps.Keys(pins.Answers)) {
+		entry, pinned := pins.Toolchains[identity]
+		if !pinned {
+			continue
+		}
+		_, installed, err := toolchain.Provision(ctx, wsRoot, toolchain.ProvisionTarget{
+			Identity:  identity,
+			Entry:     entry,
+			Toolchain: pins.Answers[identity].Toolchain,
+		}, toolchain.ProvisionOptions{UserAgent: useragent.String()})
+		if err != nil {
+			return err
+		}
+		if installed {
+			record(LifecycleAction{Kind: "toolchain", Name: identity,
+				Description: fmt.Sprintf("Installed %s %s under the Putnami home", identity, entry.Version)})
+		}
 	}
 	return nil
 }
 
-// pinToolchainsBeforeInstallers pins the toolchains go.work and
-// package.json#packageManager declare before the workspace installers run:
-// they install the release the lock pins, and the tasks run only that
-// release. An explicit install pins the declared release where the lock pins
-// none or another one. The implicit bootstrap restores the committed lock and
-// only fills a missing pin.
-func pinToolchainsBeforeInstallers(ctx context.Context, wsRoot string, record func(LifecycleAction)) error {
-	if !installWritesWorkspace() {
-		return nil
-	}
-	if shared.IsImplicitInstall(ctx) {
-		return recordMissingToolchainPins(ctx, wsRoot, record)
-	}
-	changed, err := pinExplicitToolchains(ctx, wsRoot)
-	if err != nil {
-		return fmt.Errorf("pin declared toolchains: %w", err)
-	}
-	if changed {
-		record(LifecycleAction{Kind: "lock", Name: "putnami.lock.json", Description: "Declared toolchain pins recorded"})
-	}
-	return nil
-}
-
-// runWorkspaceInstallers is Install's installer phase: it pins the declared
-// toolchains, then runs the workspace installers, which install the pinned
-// releases.
+// runWorkspaceInstallers is Install's installer phase: the toolchain pins
+// phase records the pins the extensions answer, then the workspace installers
+// run with the toolchains the lock pins.
 func runWorkspaceInstallers(ctx context.Context, wsRoot string, cfg *wsproto.Config, phase installPhaseIO) error {
 	phase.display.phase("toolchain pins")
-	if err := pinToolchainsBeforeInstallers(ctx, wsRoot, phase.record); err != nil {
+	pins, err := resolveToolchainPins(ctx, wsRoot, phase.env)
+	if err != nil {
 		return err
+	}
+	if pins.Written {
+		phase.record(LifecycleAction{Kind: "lock", Name: lockfile.LockFilename, Description: "Toolchain pins recorded"})
 	}
 	if phase.env.Display.Verbose || phase.env.Display.Debug {
 		iox.Fprintln(phase.env.out(), "\n  Running workspace installers...")
@@ -275,16 +303,10 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 		return err
 	}
 
-	// The lock is the machine preflight contract as well as the artifact lock:
-	// resolve exact Go/Bun releases and their vendor-published archive
-	// digests after installers have succeeded. This is a deliberate v3 write;
-	// ordinary v2 lock updates remain v2 until install (or pin) derives the new
-	// vocabulary.
-	// An implicit bootstrap restores a checkout from its committed lock. It must
-	// not upgrade that contract as a side effect of an unrelated command, so it
-	// only pins a declared toolchain the lock has no pin for yet: without that
-	// pin, every command that needs the toolchain refuses to run. It runs again
-	// here because the installers can write the declaration a pin derives from.
+	// An explicit install ends by refreshing the lock's metadata: it drops the
+	// agent artifact pins no declaration uses and stamps the CLI pin's output
+	// protocol. An implicit bootstrap restores a checkout from its committed
+	// lock and does neither.
 	if !shared.IsImplicitInstall(ctx) {
 		display.phase("lock metadata")
 		if err := dropAgentArtifactPins(wsRoot, recordAction); err != nil {
@@ -297,8 +319,6 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 		if changed {
 			recordAction(LifecycleAction{Kind: "lock", Name: "putnami.lock.json", Description: "Workspace lock metadata refreshed"})
 		}
-	} else if err := recordMissingToolchainPins(ctx, wsRoot, recordAction); err != nil {
-		return err
 	}
 
 	// Record the post-install workspace lock state so the first-use bootstrap

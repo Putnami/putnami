@@ -1,6 +1,10 @@
 # ADR 0019 — Toolchain locks follow provisioned runtimes
 
-- **Status**: accepted
+- **Status**: accepted, superseded in part by
+  [ADR 0077](0077-the-core-provisions-the-toolchains-extensions-pin.md):
+  decisions 1, 2 and 4, the toolchain steps of decision 5, and the statement
+  of decision 3 that `workspace-install` installs a toolchain. The
+  extensions answer for the pins, and the core installs them.
 - **Amended**: 2026-10-20, decision 5: the core finds no go command. `projects
   create` and `deps add|remove|prune` run the `project-setup` and `deps-edit`
   jobs of the project's extension, with the extension's runtime toolchains, in

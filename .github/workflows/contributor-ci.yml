@@ -11,12 +11,13 @@
 # fresh clone on a stranger's machine.
 #
 # The job reads no secret. It reaches public endpoints anonymously: go.dev for
-# the Go toolchain, putnami.dev for the CLI's extensions, the public npm
-# registry for TypeScript dependencies, and npm.putnami.dev for the
-# @putnami/cloud version that sites/putnami.dev pins, which it serves without
-# an account. The one exception is this repository's GitHub Container Registry
-# (GHCR), which it reads with the run's own GITHUB_TOKEN: GitHub mints that
-# token for each run, and it is not a repository secret.
+# the Go toolchain, github.com for the uv release putnami.lock.json pins when
+# the runner's uv is another release, putnami.dev for the CLI's extensions,
+# the public npm registry for TypeScript dependencies, and npm.putnami.dev for
+# the @putnami/cloud version that sites/putnami.dev pins, which it serves
+# without an account. The one exception is this repository's GitHub Container
+# Registry (GHCR), which it reads with the run's own GITHUB_TOKEN: GitHub mints
+# that token for each run, and it is not a repository secret.
 #
 # On a pull request the gate also checks that the squash commit keeps the
 # breaking marker the commits of the change declare, and that it names no
@@ -143,9 +144,10 @@ jobs:
           go-version-file: go.work
           cache: false
 
-      # The CLI resolves bun and uv from PATH; it does not install them. Keep
-      # this pin equal to package.json#packageManager (the workspace-declared
-      # Bun baseline recorded in putnami.lock.json).
+      # `putnami install` installs the Bun and uv releases putnami.lock.json
+      # pins under ~/.putnami/toolchains when the runner holds no release that
+      # reports them. Keep this Bun pin equal to package.json#packageManager,
+      # the release the lock records, so the runner's Bun is that release.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0

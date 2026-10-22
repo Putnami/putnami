@@ -9,10 +9,10 @@
     "A toolchain the lock does not satisfy stops a run that plans a job requiring it, naming the extension, the alias and the pin",
     "A run that plans no job requiring a toolchain, such as a build in a workspace with an extension and no project of its language, never stops on that toolchain",
     "A workspace whose lock pins no toolchain yet still runs workspace-install, the command whose files the pin derives from",
-    "A toolchain an extension installed inside the workspace resolves like one it finds on PATH"
+    "A toolchain inside the workspace resolves like one on PATH",
+    "Every toolchain the lock pins is installed once per machine from the archive the lock names, verified against its digest"
   ],
   "nonGoals": [
-    "Downloading, installing or provisioning a toolchain",
     "Naming any language, compiler or package manager inside the CLI",
     "Pinning the ambient tools a build legitimately reaches, such as a shell, a linker or git"
   ],
@@ -31,7 +31,7 @@
     },
     {
       "id": "workspace-installed-candidates",
-      "text": "An environment candidate expands against the environment the workspace's jobs receive: PUTNAMI_WORKSPACE_ROOT names that workspace's root, never a value the CLI inherited, so a toolchain an extension installed inside the workspace, such as a managed Go release, qualifies when its probe matches the locked version."
+      "text": "An environment candidate expands against the environment the workspace's jobs receive: PUTNAMI_WORKSPACE_ROOT names that workspace's root, never a value the CLI inherited, so a toolchain inside the workspace qualifies when its probe matches the locked version."
     },
     {
       "id": "provisioning-runs-unpinned",
@@ -50,12 +50,18 @@
       "text": "The error of a required alias whose pinned release no candidate matches names putnami install, the command that installs that release, before the rejected candidates. It names no remedy when a probe timed out, since that toolchain is there and slow, or in a hosted run, which installs no toolchain."
     },
     {
-      "id": "missing-uv-pin-names-the-declaration",
-      "text": "When a lock exists without a uv pin, a required alias locked on uv fails naming the declaration to write, then putnami install, if the root pyproject.toml [tool.uv] required-version names no single release or a release older than 0.11.8: an install alone would pin nothing. Any other missing uv pin gets the error every missing pin gets."
+      "id": "pinned-archives-are-provisioned",
+      "text": "Once the pins are settled, the CLI installs each pinned toolchain that no other candidate of its toolchain answers at the pinned version: it verifies the host-platform archive's SHA-256 and unpacks it, tar.gz or zip, into toolchains/<identity>/<identity>-<version> under the Putnami home, keeping the entries the folder already held. The folder is complete when the probe answers the pinned version, and is then reused without a request. A hosted or offline run installs nothing."
+    },
+    {
+      "id": "provisioned-candidate-resolves-the-pin",
+      "text": "A provisioned candidate resolves to the executable the host platform's archive names, inside toolchains/<lock>/<lock>-<version> under the Putnami home, from the workspace lock's pin. A missing folder or a pin below format 5 leaves it unresolved, and a job that needs it fails naming putnami install."
     }
   ],
   "decisions": [
     "protocols/extension/doc/adr/0002-runtime-toolchains-are-lock-pinned-under-the-current-contract.md",
-    "tooling/cli/doc/adr/0019-toolchain-lock-follows-provisioned-runtimes.md"
+    "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",
+    "tooling/cli/doc/adr/0019-toolchain-lock-follows-provisioned-runtimes.md",
+    "tooling/cli/doc/adr/0077-the-core-provisions-the-toolchains-extensions-pin.md"
   ]
 }

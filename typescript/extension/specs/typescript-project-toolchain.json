@@ -81,7 +81,11 @@
     },
     {
       "id": "bun-under-the-putnami-home",
-      "text": "Workspace install runs with a Bun of the host that reports the release the lock pins, or any when nothing names one. Otherwise it installs the pinned release, or the extension's default one, at toolchains/bun/bun-<version>/bin/bun under the Putnami home, from an archive it refuses unless its SHA-256 is the pinned one, and leaves nothing on disk when it refuses. That Bun keeps its caches under its install, never in ~/.bun. A hosted run installs none. The task runtime lists the install as a candidate."
+      "text": "The task runtime lists the Bun the CLI provisions under the Putnami home as a candidate, and workspace install and fetch run the bun the CLI resolved. With no bun on PATH, a job runs the release the lock pins, else the declared or default one, from toolchains/bun/bun-<version>. The extension installs no Bun: with none, a job fails naming that release and `putnami install`, and requests nothing. A Bun there, at bun-<target>/bun or bin/bun, keeps its caches in its folder's install/cache, never in ~/.bun."
+    },
+    {
+      "id": "bun-answers-its-toolchain-pin",
+      "text": "The TypeScript extension answers `__putnami toolchain-resolve` with one bun pin: the release the root package.json declares as packageManager, else the extension's default release. A committed lock version 5 pin of that release is kept as committed. The default release is pinned offline from the digests the extension ships; another declared release is pinned from the SHA-256 digests its GitHub release lists, and offline it is a problem whose remedy is `putnami install` with network access."
     },
     {
       "id": "workspace-install-lists-the-members",

@@ -21,67 +21,55 @@ putnami workspace-install --force
 
 ## Which Bun runs
 
-The install needs no Bun on the machine. It selects one in this order and
-downloads only at the last step:
+The extension installs no Bun. `putnami install` provisions the Bun release
+the workspace lock pins under the Putnami home, and every job, workspace-install
+and workspace-fetch included, runs the bun the CLI resolved for the extension's
+task runtime. The task runtime takes the first of these candidates that reports
+the pinned release:
 
-1. **A Bun the machine holds**: `bun` on `PATH`, then `bin/bun` under
-   `$BUN_INSTALL`, then `~/.bun/bin/bun`. When the workspace names a release,
-   only a Bun that reports exactly that release qualifies. When it names none,
-   the first one found is used.
-2. **A Bun that Putnami installed before**:
-   `<Putnami home>/toolchains/bun/bun-<version>/bin/bun`. The Putnami home is
-   `PUTNAMI_HOME`, else `~/.putnami`.
-3. **A new install** of the release at that path.
-
-The release is the one `putnami.lock.json` pins under `toolchains.bun`. Without
-a pin it is the one the root `package.json` declares in `packageManager`.
-Without either it is the extension's default release, Bun 1.4.0.
-
-| The workspace | The install downloads | Checked against |
-|---------------|-----------------------|-----------------|
-| pins a release in the lock | `bun-<target>.zip` from the lock's `source` | the lock's SHA-256 for the host platform |
-| names no release | the default release from the vendor's GitHub release | the SHA-256 the extension ships for each of the six platforms |
-| declares a release the lock does not pin yet | nothing for that release: no SHA-256 can check it | see below |
+1. `bun` on `PATH`.
+2. `bin/bun` under `$BUN_INSTALL`.
+3. `~/.bun/bin/bun`.
+4. The release the CLI provisioned:
+   `<Putnami home>/toolchains/bun/bun-<version>/bun-<target>/bun`, the layout
+   of the vendor's archive. The Putnami home is `PUTNAMI_HOME`, else
+   `~/.putnami`.
 
 `<target>` is `darwin-x64`, `darwin-aarch64`, `linux-x64`, `linux-aarch64`,
-`windows-x64` or `windows-aarch64`.
+`windows-x64` or `windows-aarch64`. A Bun on the machine of another release
+does not block anything: the CLI passes over it for the provisioned release.
 
-A download is refused when the release has no SHA-256 for the host platform or
-when the archive's SHA-256 differs. Nothing is extracted and no `bun` is left on
-disk. The error names the release, the URL without its credentials, and the
-command to run next. An archive entry that is a link, or that would land outside
-the install directory, is refused the same way. Two installs of the same release
-at the same time, from two workspaces, leave one complete install.
-
-When the root `package.json` declares a release that the lock does not pin yet,
-this install runs with a Bun of the machine of another release, else with the
-default release, and logs a warning. `putnami install` pins the declared release
-in the lock when it ends, and the next `putnami install` installs that release.
+A job that starts with no bun on `PATH`, in `$BUN_INSTALL` or in `~/.bun` runs
+the release from `toolchains/bun/bun-<version>` under the Putnami home, at
+`bun-<target>/bun` or at `bin/bun`. The release is the one `putnami.lock.json`
+pins under `toolchains.bun`, else the one the root `package.json` declares in
+`packageManager`, else the extension's default release, Bun 1.4.0. When that
+folder holds no Bun, the job fails with a message that names the release and
+`putnami install`. It downloads nothing, on a hosted run or not.
+`workspace-fetch` never runs a bun inside the workspace.
 
 The extension answers the CLI's `__putnami toolchain-resolve` call for the lock
-identity `bun`. The answer comes from the root `package.json`, the lock, and
-the extension's default release. The extension reads the SHA-256 digests from
-the release's metadata on GitHub only for a declared release that the lock does
-not pin and that is not the default. The answer names each platform's archive
-URL, format, and executable beside its SHA-256.
+identity `bun`, which is how `putnami install` pins the release it provisions:
 
-A Bun on the machine that differs from the pin does not block anything: the
-pinned release is installed under the Putnami home and every task runs with it.
-The task runtime of the extension lists the install as its last candidate.
+| The workspace | The answer |
+|---------------|------------|
+| declares no release in `packageManager` | the default release, offline, with the SHA-256 the extension ships for each of the six platforms |
+| declares the default release | the same pin |
+| declares another release | the SHA-256 digests that release's metadata on GitHub lists; offline, a problem whose remedy is `putnami install` with network access |
+| commits a lock version 5 pin of that release | the committed pin, as it is |
 
-A Bun that Putnami installed keeps its own files under its install directory.
-`BUN_INSTALL` is `toolchains/bun/bun-<version>`, its package cache is
-`install/cache` there, and its transpiler cache is `install/cache/@t@` there.
-It writes nothing to `~/.bun`. A Bun the machine holds keeps its own locations.
+The answer names each platform's archive URL, format, and executable beside its
+SHA-256.
 
-The lock holds one SHA-256 for each operating system and architecture, which is
-the glibc archive on Linux. On a musl host such as Alpine, put the musl build of
-the release on `PATH`; the install refuses to download there.
+A Bun under the Putnami home keeps its own files in its release folder.
+`BUN_INSTALL` is `toolchains/bun/bun-<version>`, whether the program is at
+`bun-<target>/bun` or at `bin/bun`. Its package cache is `install/cache` there,
+and its transpiler cache is `install/cache/@t@` there. It writes nothing to
+`~/.bun`. A Bun the machine holds keeps its own locations.
 
-A hosted run downloads no Bun: `workspace-fetch` and `workspace-install` run the
-Bun found at one of the places above, a Bun that Putnami installed earlier
-under the Putnami home included, and fail with a message that names the release
-when there is none.
+The lock pins one archive for each operating system and architecture, which is
+the glibc build on Linux. On a musl host such as Alpine, put the musl build of
+the release on `PATH`.
 
 ## Behavior
 
@@ -92,7 +80,7 @@ The command performs these steps:
 3. **List the workspace members** — writes the root `package.json` `workspaces` from the workspace membership, as `putnami projects sync` does: every member with a `package.json`, the workspace root excluded. A project created after the last `projects sync` is therefore installed, and a list that already matches is not rewritten. If the list cannot be read or written, the install fails before `bun install` runs.
 4. **Seed catalog entries** — for any package a member references with Bun's `catalog:` protocol but that is missing from the root catalog, an entry is added (pinned to `latest`) so `bun install` can resolve it. `@putnami/*` framework packages scaffolded by the templates are seeded this way; `putnami upgrade --deps` later pins them to an exact release. Existing catalog entries — Putnami or otherwise — are never overwritten.
    When the install receives a channel other than `latest` through the `putnami-channel` job option, which `putnami init` sets for the channel it resolves on, a missing `@putnami/*` entry is the exact version that channel's dist-tag names for the package on the registry the workspace declares, never the channel name. A package the channel does not name fails the install before `bun install` runs; the seed does not read `latest` instead.
-5. **Declare the bun version** — when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the Bun it selected (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
+5. **Declare the bun version** — when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the bun it runs (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
 6. **Refresh the private-registry credential** — see below.
 7. **Run `bun install`** — executes `bun install` in the workspace root directory. Bun resolves all `workspace:*` and `catalog:` references and creates symlinks between workspace packages.
 
@@ -100,7 +88,7 @@ When `--force` is not set, Bun skips installation if `bun.lock` is already up to
 
 Downloaded packages are shared across repositories and worktrees through Bun's
 machine-global cache. For a Bun the machine holds, that is
-`~/.bun/install/cache`. For a Bun that Putnami installed, it is
+`~/.bun/install/cache`. For a Bun under the Putnami home, it is
 `<Putnami home>/toolchains/bun/bun-<version>/install/cache`.
 `PUTNAMI_BUN_CACHE_DIR` or `BUN_INSTALL_CACHE_DIR` names another directory for
 both. Each worktree keeps its own `node_modules`, materialized efficiently from
@@ -207,6 +195,6 @@ install scripts would never run.
 - **Scope**: Running `bun install` at workspace root, and on a hosted run
   fetching the locked packages into bun's cache first
 - **Out of scope**: Per-project dependency management, lockfile generation, package resolution
-- **Dependencies**: None on the machine. The command installs Bun when the
-  machine holds none that fits
+- **Dependencies**: None on the machine. `putnami install` provisions Bun under
+  the Putnami home; the command installs none
 - **Extension points**: None

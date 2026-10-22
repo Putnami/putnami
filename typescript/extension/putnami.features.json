@@ -274,18 +274,30 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-refused-archive-leaves-no-bun-on-disk",
-              "a-matching-bun-on-path-starts-no-download",
-              "a-pinned-release-is-installed-when-the-path-bun-differs",
-              "no-network-and-no-bun-fails-with-one-message",
-              "windows-installs-from-the-windows-archive",
-              "nothing-declared-installs-the-default-release",
-              "two-workspaces-leave-one-install",
-              "a-hosted-run-installs-no-bun",
-              "an-installed-bun-keeps-its-files-under-its-install",
-              "the-install-is-a-task-runtime-candidate",
-              "workspace-install-runs-the-bun-it-installed",
-              "hosted-jobs-download-no-bun"
+              "the-provisioned-bun-is-a-task-runtime-candidate",
+              "a-job-without-a-bun-on-path-runs-the-release-under-the-putnami-home",
+              "a-bun-under-the-putnami-home-keeps-its-caches-in-its-folder",
+              "workspace-install-runs-the-provisioned-bun",
+              "a-job-without-a-bun-fails-naming-putnami-install-and-downloads-nothing"
+            ]
+          }
+        },
+        {
+          "id": "bun-answers-its-toolchain-pin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reserved-call-reads-one-request-and-writes-one-answer",
+              "the-release-is-the-package-manager-declaration",
+              "nothing-declared-pins-the-default-release",
+              "the-default-release-is-pinned-offline-from-the-shipped-digests",
+              "a-declared-release-is-pinned-from-its-github-release-digests",
+              "a-committed-version-5-pin-of-the-release-is-kept-as-committed",
+              "offline-an-unpinned-declared-release-is-a-problem-naming-putnami-install"
             ]
           }
         },

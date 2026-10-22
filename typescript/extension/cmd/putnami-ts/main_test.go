@@ -26,20 +26,15 @@ import (
 	"go.putnami.dev/typescript/extension/internal/lint"
 	"go.putnami.dev/typescript/extension/internal/parse"
 	"go.putnami.dev/typescript/extension/internal/testjob"
-	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
-// mockBunResolution sets up a mock for bun resolution that returns a fake path,
-// for the jobs that take the bun the CLI resolved and for the provisioning
-// jobs that select one themselves.
+// mockBunResolution sets up a mock for bun resolution that returns a fake path
+// for every job.
 func mockBunResolution(t *testing.T) {
 	t.Helper()
-	orig, origProvision := resolveBunBin, provisionBunBin
-	t.Cleanup(func() { resolveBunBin, provisionBunBin = orig, origProvision })
+	orig := resolveBunBin
+	t.Cleanup(func() { resolveBunBin = orig })
 	resolveBunBin = func() (string, error) { return "/mock/bun", nil }
-	provisionBunBin = func(*pctx.Context, *jsonl.Emitter, toolchain.BunMode, func(string) string) (string, error) {
-		return "/mock/bun", nil
-	}
 }
 
 // mockBiomeResolution sets up mocks for biome resolution.

@@ -17,7 +17,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -37,7 +36,7 @@ func TestInstall_RunsWorkspaceInstallBeforeTheLockPinsItsToolchain(t *testing.T)
 		t.Skip("shell runtime fixture")
 	}
 	wsRoot := t.TempDir()
-	hometest.Temp(t)
+	isolateHomes(t)
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")
@@ -94,7 +93,9 @@ func TestInstall_RunsWorkspaceInstallBeforeTheLockPinsItsToolchain(t *testing.T)
 		t.Fatalf("the build task ran %d times without a go pin, want 0", runs)
 	}
 
+	// A toolchain pin with a source and no archives is lock format version 4.
 	pinned := lockfile.NewLockFile()
+	pinned.Version = lockfile.FormatVersionV4
 	pinned.SetToolchain("go", lockfile.LockEntry{
 		Version:     goVersion,
 		Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): strings.Repeat("a", 64)},
@@ -126,7 +127,7 @@ func TestBuild_ALockWithoutAPinStopsOnlyAPlannedJob(t *testing.T) {
 		t.Skip("shell runtime fixture")
 	}
 	wsRoot := t.TempDir()
-	hometest.Temp(t)
+	isolateHomes(t)
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")
@@ -175,7 +176,7 @@ func TestBuild_ALockWithoutAPinStopsOnlyAPlannedJob(t *testing.T) {
 
 	writeFixtureFile(t, filepath.Join(wsRoot, "app", "putnami.json"), `{"name":"app","extensions":["@putnami/compiled"]}`, 0o644)
 	result, transcript = build()
-	want := `workspace lock has no exact "go" pin: add a project that declares it, or run ` + "`putnami install`" + ` to record the declared one`
+	want := `workspace lock has no exact "go" pin: run ` + "`putnami install`"
 	if result.Outcome != lifecycle.WorkspaceJobFailed || !strings.Contains(transcript, want) {
 		t.Fatalf("build of a project that uses the extension, without a go pin: outcome %v, want a failure containing %q\n%s",
 			result.Outcome, want, transcript)
@@ -197,7 +198,7 @@ func TestInstall_PreparesALocalExtensionBeforeTheLockPinsItsCompiler(t *testing.
 		t.Skip("shell runtime fixture")
 	}
 	wsRoot := t.TempDir()
-	hometest.Temp(t)
+	isolateHomes(t)
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")

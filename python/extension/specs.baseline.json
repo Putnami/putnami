@@ -13,6 +13,7 @@
     "python/experimental-workspace-integration#explicit-opt-in",
     "python/experimental-workspace-integration#native-tools",
     "python/experimental-workspace-integration#pinned-uv",
+    "python/experimental-workspace-integration#uv-answers-its-toolchain-pin",
     "python/experimental-workspace-integration#workspace-scope"
   ]
 }

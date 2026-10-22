@@ -1,11 +1,16 @@
 package jobs
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -16,8 +21,8 @@ import (
 	"go.putnami.dev/sdk/extension/putnamihome"
 )
 
-// stubUV is the uv program the job tests resolve: the install `putnami install`
-// makes under the Putnami home.
+// stubUV is the uv program the job tests resolve: the release `putnami install`
+// provisions under the Putnami home.
 const stubUV = "/putnami-home/toolchains/uv/uv-0.11.32/uv"
 
 // stubResolveUV replaces the uv the jobs resolve for a workspace.
@@ -37,25 +42,28 @@ type uvCall struct {
 
 // uvStub records how the jobs select and run uv.
 type uvStub struct {
-	// modes are the modes provisionUV was called with.
-	modes []toolchain.UVMode
+	// resolved counts the workspaces whose uv the jobs resolved.
+	resolved int
 	// calls are the uv commands run.
 	calls []uvCall
 }
 
-// stubUVProvisioning makes provisionUV select uv 0.11.32 at stubUV, or fail
-// with provisionErr, and records every uv command instead of running it.
-func stubUVProvisioning(t *testing.T, provisionErr error) *uvStub {
+// stubUVResolution makes the jobs resolve uv 0.11.32 at stubUV, and records
+// every uv command instead of running it.
+func stubUVResolution(t *testing.T) *uvStub {
 	t.Helper()
 	stub := &uvStub{}
-	origProvision, origRun := provisionUV, uvCommandRun
-	t.Cleanup(func() { provisionUV, uvCommandRun = origProvision, origRun })
-	provisionUV = func(_ string, _ *jsonl.Emitter, mode toolchain.UVMode) (toolchain.UV, error) {
-		stub.modes = append(stub.modes, mode)
-		if provisionErr != nil {
-			return toolchain.UV{}, provisionErr
+	origResolve, origVersion, origRun := resolveUV, uvVersion, uvCommandRun
+	t.Cleanup(func() { resolveUV, uvVersion, uvCommandRun = origResolve, origVersion, origRun })
+	resolveUV = func(string) (string, error) {
+		stub.resolved++
+		return stubUV, nil
+	}
+	uvVersion = func(path string) (string, error) {
+		if path != stubUV {
+			return "", errors.New("no uv at " + path)
 		}
-		return toolchain.UV{Path: stubUV, Version: "0.11.32"}, nil
+		return "0.11.32", nil
 	}
 	uvCommandRun = func(uv string, args []string, dir string, _ []string) ([]byte, error) {
 		stub.calls = append(stub.calls, uvCall{uv: uv, args: append([]string(nil), args...), dir: dir})
@@ -105,7 +113,7 @@ func TestWorkspaceInstall_SkipWhenNoMembers(t *testing.T) {
 }
 
 func TestWorkspaceInstall_SkipWhenLockFresh(t *testing.T) {
-	stub := stubUVProvisioning(t, nil)
+	stub := stubUVResolution(t)
 	// Pre-create root pyproject.toml so SyncUVWorkspace reports updated=false
 	tmp := pythonWorkspace(t, "[tool.uv.workspace]\nmembers = [\"pkg\"]\n\n[tool.uv.sources]\npkg = { workspace = true }\n")
 
@@ -184,7 +192,7 @@ func TestWorkspaceInstall_NoWorkspaceConfig(t *testing.T) {
 }
 
 func TestWorkspaceInstall_UpdatedWorkspace(t *testing.T) {
-	stub := stubUVProvisioning(t, nil)
+	stub := stubUVResolution(t)
 	tmp := pythonWorkspace(t, "")
 
 	// No pre-existing root pyproject.toml, so SyncUVWorkspace will create it (updated=true)
@@ -217,7 +225,7 @@ func TestWorkspaceInstall_UpdatedWorkspace(t *testing.T) {
 }
 
 func TestWorkspaceInstall_ForceWithMembers(t *testing.T) {
-	stub := stubUVProvisioning(t, nil)
+	stub := stubUVResolution(t)
 	// Pre-create pyproject.toml and uv.lock (normally would skip lock)
 	tmp := pythonWorkspace(t, "[tool.uv.workspace]\nmembers = [\"pkg\"]\n\n[tool.uv.sources]\npkg = { workspace = true }\n")
 	os.WriteFile(filepath.Join(tmp, "uv.lock"), []byte("# lock"), 0644)
@@ -246,13 +254,13 @@ func TestWorkspaceInstall_ForceWithMembers(t *testing.T) {
 	}
 }
 
-// workspace-install installs the pinned uv when the machine holds none, locks
-// with that uv, and declares its release in the root pyproject.toml, which the
-// CLI then pins in putnami.lock.json.
-func TestWorkspaceInstall_LocksWithTheProvisionedUVAndDeclaresIt(t *testing.T) {
-	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "workspace-install-provisions-the-pinned-uv-and-declares-it")
+// workspace-install runs the uv the CLI resolved, installs none, locks with it,
+// and declares its release in the root pyproject.toml, which the CLI then pins
+// in putnami.lock.json.
+func TestWorkspaceInstall_LocksWithTheResolvedUVAndDeclaresIt(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "workspace-install-runs-the-resolved-uv-and-declares-it")
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
-	stub := stubUVProvisioning(t, nil)
+	stub := stubUVResolution(t)
 	tmp := pythonWorkspace(t, "[project]\nname = \"ws\"\n\n[tool.uv.workspace]\nmembers = [\"pkg\"]\n\n[tool.uv]\n\n[tool.uv.sources]\npkg = { workspace = true }\n")
 
 	captureEvents(t, func(emit *jsonl.Emitter) {
@@ -262,8 +270,8 @@ func TestWorkspaceInstall_LocksWithTheProvisionedUVAndDeclaresIt(t *testing.T) {
 		}
 	})
 
-	if !reflect.DeepEqual(stub.modes, []toolchain.UVMode{toolchain.UVInstall}) {
-		t.Fatalf("provision modes = %v, want one install", stub.modes)
+	if stub.resolved != 1 {
+		t.Fatalf("the job resolved uv %d times, want once", stub.resolved)
 	}
 	want := []uvCall{{uv: stubUV, args: []string{"lock"}, dir: tmp}}
 	if !reflect.DeepEqual(stub.calls, want) {
@@ -278,12 +286,12 @@ func TestWorkspaceInstall_LocksWithTheProvisionedUVAndDeclaresIt(t *testing.T) {
 	}
 }
 
-// A hosted run downloads no toolchain and writes nothing the repository
-// commits: it finds the uv the runner holds and leaves the manifest as it is.
-func TestWorkspaceInstall_HostedRunFindsUVAndDeclaresNothing(t *testing.T) {
-	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "a-hosted-run-installs-no-uv")
+// A hosted run writes nothing the repository commits: it runs the uv the
+// runner holds and leaves the manifest as it is.
+func TestWorkspaceInstall_HostedRunDeclaresNothing(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "a-hosted-run-declares-nothing")
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
-	stub := stubUVProvisioning(t, nil)
+	stub := stubUVResolution(t)
 	manifest := "[tool.uv.workspace]\nmembers = [\"pkg\"]\n\n[tool.uv]\n\n[tool.uv.sources]\npkg = { workspace = true }\n"
 	tmp := pythonWorkspace(t, manifest)
 
@@ -294,8 +302,8 @@ func TestWorkspaceInstall_HostedRunFindsUVAndDeclaresNothing(t *testing.T) {
 		}
 	})
 
-	if !reflect.DeepEqual(stub.modes, []toolchain.UVMode{toolchain.UVFind}) {
-		t.Fatalf("provision modes = %v, want one find", stub.modes)
+	if stub.resolved != 1 || len(stub.calls) != 1 {
+		t.Fatalf("resolved %d times, ran %v; want the resolved uv to lock once", stub.resolved, stub.calls)
 	}
 	data, err := os.ReadFile(filepath.Join(tmp, "pyproject.toml"))
 	if err != nil {
@@ -374,36 +382,72 @@ func TestARangeDeclarationFailsInstallAndTasksWithOneDiagnostic(t *testing.T) {
 	}
 }
 
-// Without the pinned uv, workspace-install fails and never runs another uv.
-func TestWorkspaceInstall_FailsWhenThePinnedUVIsUnavailable(t *testing.T) {
-	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
-	stub := stubUVProvisioning(t, errors.New("no uv 0.11.32 on this machine, and its download failed"))
-	tmp := pythonWorkspace(t, "")
+// Without the uv the CLI resolves, workspace-install fails with a diagnostic
+// that names the release and `putnami install`, runs no uv, installs none and
+// requests nothing, even when the lock names a source to download from.
+func TestWorkspaceInstall_FailsNamingPutnamiInstallWhenNoUVResolves(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "pinned-uv", "a-job-without-a-uv-fails-naming-putnami-install-and-requests-nothing")
+	for _, hosted := range []string{"", "1"} {
+		t.Run("hosted="+hosted, func(t *testing.T) {
+			t.Setenv(extensionproto.OfflineDependenciesEnv, hosted)
+			t.Setenv("PATH", t.TempDir())
+			t.Setenv(putnamihome.Env, t.TempDir())
+			var requests atomic.Int64
+			mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				http.NotFound(w, r)
+			}))
+			t.Cleanup(mirror.Close)
+			ran := 0
+			origRun := uvCommandRun
+			t.Cleanup(func() { uvCommandRun = origRun })
+			uvCommandRun = func(string, []string, string, []string) ([]byte, error) {
+				ran++
+				return nil, nil
+			}
+			tmp := pythonWorkspace(t, "")
+			release := toolchain.UVRelease{
+				Version:     toolchain.DefaultUVVersion,
+				Integrities: map[string]string{runtime.GOOS + "/" + runtime.GOARCH: strings.Repeat("a", 64)},
+				Source:      mirror.URL + "/",
+			}
+			lock, err := json.Marshal(map[string]any{"version": 3, "toolchains": map[string]any{"uv": release}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(tmp, toolchain.WorkspaceLockFile), lock, 0o644); err != nil {
+				t.Fatal(err)
+			}
 
-	events := captureEvents(t, func(emit *jsonl.Emitter) {
-		status, _, err := WorkspaceInstall(&pctx.Context{WorkspaceRoot: tmp}, emit, nil)
-		if err != nil || status != "FAILED" {
-			t.Fatalf("WorkspaceInstall = %s, %v; want FAILED", status, err)
-		}
-	})
+			events := captureEvents(t, func(emit *jsonl.Emitter) {
+				status, _, err := WorkspaceInstall(&pctx.Context{WorkspaceRoot: tmp}, emit, nil)
+				if err != nil || status != "FAILED" {
+					t.Fatalf("WorkspaceInstall = %s, %v; want FAILED", status, err)
+				}
+			})
 
-	if len(stub.calls) != 0 {
-		t.Fatalf("uv ran without the pinned release: %v", stub.calls)
-	}
-	found := false
-	for _, event := range events {
-		if message, _ := event["message"].(string); strings.Contains(message, "no uv 0.11.32") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("no diagnostic carries the provisioning error: %v", events)
+			found := false
+			for _, event := range events {
+				message, _ := event["message"].(string)
+				if strings.Contains(message, "no uv "+toolchain.DefaultUVVersion) && strings.Contains(message, "`putnami install`") {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("no diagnostic names uv %s and `putnami install`: %v", toolchain.DefaultUVVersion, events)
+			}
+			if ran != 0 || requests.Load() != 0 {
+				t.Fatalf("uv ran %d times and the job sent %d requests; want none", ran, requests.Load())
+			}
+			if entries, err := os.ReadDir(os.Getenv(putnamihome.Env)); err != nil || len(entries) != 0 {
+				t.Fatalf("the Putnami home holds %v, %v; want nothing installed", entries, err)
+			}
+		})
 	}
 }
 
 func TestDepsUpgrade_RunsTheResolvedUV(t *testing.T) {
-	stub := stubUVProvisioning(t, nil)
-	stubResolveUV(t, func(string) (string, error) { return stubUV, nil })
+	stub := stubUVResolution(t)
 	tmp := pythonWorkspace(t, "")
 
 	captureEvents(t, func(emit *jsonl.Emitter) {

@@ -789,7 +789,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "workspace-install-skips-go-when-nothing-declares-it"
+              "workspace-install-skips-go-when-nothing-declares-it",
+              "a-declared-go-with-no-go-command-fails-naming-putnami-install"
             ]
           }
         },
@@ -861,11 +862,46 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-pinned-go-installs-under-the-putnami-home",
-              "a-second-workspace-downloads-nothing",
-              "installs-that-start-together-leave-one-complete-install",
+              "the-job-runs-the-pinned-go-provisioned-under-the-putnami-home",
+              "the-job-downloads-no-go-and-writes-nothing",
+              "a-second-workspace-runs-the-same-provisioned-go",
               "a-go-inside-the-workspace-runs-without-a-download",
-              "workspace-fetch-runs-no-managed-go-inside-the-workspace"
+              "workspace-fetch-runs-no-managed-go-inside-the-workspace",
+              "the-provisioned-go-is-a-runtime-compiler-candidate"
+            ]
+          }
+        },
+        {
+          "id": "go-answers-its-toolchain-pin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reserved-call-is-answered-before-command-dispatch",
+              "the-release-is-the-higher-go-work-directive",
+              "each-platform-archive-and-digest-come-from-the-go-dev-index",
+              "a-committed-format-5-pin-of-the-release-is-kept-as-committed",
+              "no-declaration-and-no-committed-pin-pins-no-go"
+            ]
+          }
+        },
+        {
+          "id": "go-pin-reuses-the-machine-record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-resolved-release-is-recorded-under-the-putnami-home",
+              "a-recorded-release-is-answered-without-a-request",
+              "an-invalid-record-is-ignored-and-replaced",
+              "an-unwritable-home-still-pins",
+              "a-failed-lookup-writes-no-record"
             ]
           }
         }

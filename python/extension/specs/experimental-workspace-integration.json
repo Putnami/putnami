@@ -28,11 +28,15 @@
     },
     {
       "id": "pinned-uv",
-      "text": "Every task that runs uv requires the uv runtime toolchain bound to the uv pin of the workspace lock, so it runs and is cache-keyed on that release: uv on PATH, then toolchains/uv/uv-<version> under the Putnami home, and a uv of another release never runs. workspace-install installs the pinned release there when the machine holds none, refuses an archive whose SHA-256 differs, and declares the release as the [tool.uv] required-version of the root pyproject.toml; a hosted run installs and writes nothing."
+      "text": "Every task that runs uv requires the uv runtime toolchain bound to the uv pin of the workspace lock, so it runs and is keyed on that release. The toolchain lists uv on PATH, then the uv the CLI provisions under the Putnami home; a uv of another release never runs. The extension installs no uv: workspace-install runs the resolved uv and, outside a hosted run, declares its release as the [tool.uv] required-version of the root pyproject.toml. With none, a job fails naming the release and `putnami install`."
     },
     {
       "id": "exact-uv-declaration",
-      "text": "A [tool.uv] required-version in the root pyproject.toml that names no single uv release, such as a range, or a release older than 0.11.8, the oldest one Putnami runs, fails workspace-install and every task that runs uv with a diagnostic that names the exact declaration to write, and installs and runs no uv."
+      "text": "A [tool.uv] required-version in the root pyproject.toml that names no single uv release, such as a range, or a release older than 0.11.8, the oldest one Putnami runs, fails workspace-install and every task that runs uv with a diagnostic that names the exact declaration to write, and runs no uv."
+    },
+    {
+      "id": "uv-answers-its-toolchain-pin",
+      "text": "The extension answers `__putnami toolchain-resolve` with one uv pin: the release the root pyproject.toml declares as [tool.uv] required-version, else the default. A committed lock version 5 pin of that release is kept as committed. The default is pinned offline from the digests the extension ships, another declared release from its release checksum file; offline that is a problem whose remedy is `putnami install` with network access. A declaration or host platform it cannot pin is a problem with a remedy."
     },
     {
       "id": "experimental-boundary",

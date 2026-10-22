@@ -11,8 +11,9 @@ compatibility or parity promise with Go or TypeScript.
 ## Prerequisites
 
 - Python 3.11 or higher installed
-- No [uv](https://docs.astral.sh/uv/) install: `putnami install` installs the
-  release the workspace pins (see [uv Release](./configuration.md#uv-release))
+- No [uv](https://docs.astral.sh/uv/) install: `putnami install` provisions
+  the release the workspace pins under the Putnami home, and the extension runs
+  it (see [uv Release](./configuration.md#uv-release))
 - A Putnami workspace
 
 ## Installation

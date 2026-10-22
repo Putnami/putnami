@@ -16,24 +16,6 @@ import (
 // defaultGoProxy is the GOPROXY a job exports when the caller named none.
 const defaultGoProxy = "https://proxy.golang.org,direct"
 
-// supportedPlatform reports whether a managed Go can be installed for the host,
-// emitting the script's diagnostic when it cannot.
-func (j *Job) supportedPlatform() bool {
-	switch runtime.GOOS {
-	case "darwin", "linux", "windows":
-	default:
-		j.Emit.Diagnostic("error", "Unsupported OS: "+runtime.GOOS, "", 0)
-		return false
-	}
-	switch runtime.GOARCH {
-	case "amd64", "arm64":
-	default:
-		j.Emit.Diagnostic("error", "Unsupported architecture: "+runtime.GOARCH, "", 0)
-		return false
-	}
-	return true
-}
-
 // LookPath returns the absolute path of the executable name on the job's
 // PATH, or "". An entry that is not an absolute directory is skipped, as
 // os/exec refuses to run a program found through the current directory. On
@@ -216,30 +198,11 @@ func (j *Job) toolchainBinary(binary, requested string) string {
 	return ""
 }
 
-// ResolveGoBinary selects the go command the job runs and records it in
-// GoBinary: the one findGoBinary finds, else the Go the workspace lock pins,
-// which it installs.
-//
-// It reports false after emitting the reason when no go command qualifies.
-func (j *Job) ResolveGoBinary() bool {
-	if !j.supportedPlatform() {
-		return false
-	}
-	requested := j.RequestedGoVersion()
-	if binary := j.findGoBinary(requested); binary != "" {
-		j.GoBinary = binary
-		return true
-	}
-	binary, ok := j.installLockedGo(requested)
-	if !ok {
-		return false
-	}
-	j.GoBinary = binary
-	return true
-}
-
-// FindGoBinary records in GoBinary the go command ResolveGoBinary would select
-// without installing one, and reports whether there is one.
+// FindGoBinary records in GoBinary the go command the job runs, and reports
+// whether one qualifies. It installs none: before the CLI runs a job, it
+// provisions the Go the workspace lock pins under the Putnami home and puts it
+// first on the job's PATH. It emits no diagnostic, so a caller reports a
+// missing Go with `putnami install` as the remedy.
 func (j *Job) FindGoBinary() bool {
 	binary := j.findGoBinary(j.RequestedGoVersion())
 	if binary == "" {
@@ -249,17 +212,16 @@ func (j *Job) FindGoBinary() bool {
 	return true
 }
 
-// findGoBinary returns the go command that qualifies for requested without an
-// install, or "".
+// findGoBinary returns the go command that qualifies for requested, or "".
 //
 // A Go the workspace lock pins is exact, as it is for the tasks the CLI runs
 // with the extension's runtime toolchain: only a go on PATH that runs the
-// pinned release, or the managed install of it, qualifies. Those are places
-// the tasks look too, and the CLI puts the pinned go it resolved first on the
-// job's PATH. A pin older than requested is not exact: installLockedGo refuses
-// it, and until the lock pins the requested release, the version is a minimum
-// as it is without a pin. Then a go on PATH that satisfies it is used, then a
-// toolchain that go resolves, then a managed install.
+// pinned release, or the release provisioned under the Putnami home, qualifies.
+// Those are places the tasks look too, and the CLI puts the pinned go it
+// resolved first on the job's PATH. A pin older than requested is not exact:
+// until the lock pins the requested release, the version is a minimum as it is
+// without a pin. Then a go on PATH that satisfies it is used, then a toolchain
+// that go resolves, then a managed install.
 func (j *Job) findGoBinary(requested string) string {
 	if pinned := j.pinnedGoVersion(requested); pinned != "" {
 		return j.findPinnedGo(pinned)
@@ -331,8 +293,8 @@ func (j *Job) findPinnedGo(version string) string {
 }
 
 // installedGo returns the go command of the managed install of Go version
-// that the job may run, or "": the install in the Putnami home
-// (GoToolchainRoot), else the one inside the workspace (workspaceGoRoot).
+// that the job may run, or "": the release the CLI provisions in the Putnami
+// home (GoToolchainRoot), else the one inside the workspace (workspaceGoRoot).
 func (j *Job) installedGo(version string) string {
 	for _, root := range []string{j.GoToolchainRoot(), j.workspaceGoRoot()} {
 		if binary := managedGoBinary(root, version); isExecutable(binary) && j.admits(binary) {

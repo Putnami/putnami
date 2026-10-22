@@ -138,8 +138,8 @@ func TestCLIPinSetShowRemove(t *testing.T) {
 	if err != nil || lf == nil {
 		t.Fatalf("read lock after pin: lf=%v err=%v", lf, err)
 	}
-	if lf.Version != lockfile.FormatVersionV4 {
-		t.Fatalf("pin downgraded a new v4 lock to v%d", lf.Version)
+	if lf.Version != lockfile.FormatVersionV5 {
+		t.Fatalf("pin downgraded a new v5 lock to v%d", lf.Version)
 	}
 	entry, ok := lf.GetCLI()
 	if !ok {

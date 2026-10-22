@@ -1,17 +1,11 @@
 package toolchain
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"bytes"
-	"compress/gzip"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -80,6 +74,17 @@ func (h *fakeUVHost) managedDir() string {
 	return filepath.Join(h.home, "toolchains", "uv", "uv-0.11.32")
 }
 
+// provisionedProgram is where the CLI leaves the uv program of uv 0.11.32 on
+// this host: the executable its archive holds, as the pin names it.
+func (h *fakeUVHost) provisionedProgram(t *testing.T) string {
+	t.Helper()
+	archive, ok := uvtoolchain.ArchiveFor(h.goos, h.goarch)
+	if !ok {
+		t.Fatalf("uv publishes no archive for %s/%s", h.goos, h.goarch)
+	}
+	return filepath.Join(h.managedDir(), archive.Dir, uvProgram(h.goos))
+}
+
 // writeFakeUV writes a uv program that reports version at path.
 func writeFakeUV(t *testing.T, path, version string) string {
 	t.Helper()
@@ -118,59 +123,6 @@ func sha256Hex(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// uvTarGz is the archive a uv release publishes for a Unix target: the
-// directory uv-<target>, which holds uv and uvx. Each program holds the release
-// it reports.
-func uvTarGz(t *testing.T, target, version string) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gz)
-	dir := "uv-" + target + "/"
-	if err := tw.WriteHeader(&tar.Header{Name: dir, Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
-		t.Fatal(err)
-	}
-	for _, program := range []string{"uv", "uvx"} {
-		body := []byte(version + "\n")
-		if err := tw.WriteHeader(&tar.Header{Name: dir + program, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(body))}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := tw.Write(body); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := tw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := gz.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
-}
-
-// uvZip is the archive a uv release publishes for Windows: uv.exe, uvx.exe and
-// uvw.exe at its top level.
-func uvZip(t *testing.T, version string) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, program := range []string{"uv.exe", "uvx.exe", "uvw.exe"} {
-		header := &zip.FileHeader{Name: program, Method: zip.Deflate}
-		header.SetMode(0o644)
-		w, err := zw.CreateHeader(header)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := w.Write([]byte(version + "\n")); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
-}
-
 // uvMirror serves uv archives by request path and records every request.
 type uvMirror struct {
 	*httptest.Server
@@ -203,32 +155,10 @@ func (m *uvMirror) requests() []string {
 	return slices.Clone(m.paths)
 }
 
-// uvFiles lists every uv program under root.
-func uvFiles(t *testing.T, root string) []string {
-	t.Helper()
-	var found []string
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				return nil
-			}
-			return err
-		}
-		if !entry.IsDir() && (entry.Name() == "uv" || entry.Name() == "uv.exe") {
-			found = append(found, path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return found
-}
-
 // A task runs only a uv that reports the release the workspace pins: uv on
-// PATH first, then the install under the Putnami home. A uv of another
-// release is never selected, and without the pinned one the error names
-// `putnami install`.
+// PATH first, then the release the CLI provisioned under the Putnami home. A
+// uv of another release is never selected, and without the pinned one the
+// error names `putnami install`.
 func TestResolveUV_RunsOnlyThePinnedRelease(t *testing.T) {
 	spectest.Proves(t, uvFeature, uvRequirement, "a-uv-of-another-release-never-runs")
 	pinned := UVRelease{Version: "0.11.32", Integrities: map[string]string{"linux/amd64": strings.Repeat("a", 64)}}
@@ -250,10 +180,10 @@ func TestResolveUV_RunsOnlyThePinnedRelease(t *testing.T) {
 		}
 	})
 
-	t.Run("the install under the Putnami home", func(t *testing.T) {
+	t.Run("the release under the Putnami home", func(t *testing.T) {
 		host := newFakeUVHost(t, "linux", "amd64")
 		host.onPath = writeFakeUV(t, filepath.Join(t.TempDir(), "uv"), "0.5.18")
-		managed := writeFakeUV(t, filepath.Join(host.managedDir(), "uv"), "0.11.32")
+		provisioned := writeFakeUV(t, host.provisionedProgram(t), "0.11.32")
 		workspace := t.TempDir()
 		writeUVLock(t, workspace, pinned)
 
@@ -261,15 +191,15 @@ func TestResolveUV_RunsOnlyThePinnedRelease(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got != managed {
-			t.Fatalf("resolveUV = %q, want the install under the Putnami home %q", got, managed)
+		if got != provisioned {
+			t.Fatalf("resolveUV = %q, want the release under the Putnami home %q", got, provisioned)
 		}
 	})
 
 	t.Run("the pinned release on PATH comes first", func(t *testing.T) {
 		host := newFakeUVHost(t, "linux", "amd64")
 		host.onPath = writeFakeUV(t, filepath.Join(t.TempDir(), "uv"), "0.11.32")
-		writeFakeUV(t, filepath.Join(host.managedDir(), "uv"), "0.11.32")
+		writeFakeUV(t, host.provisionedProgram(t), "0.11.32")
 		workspace := t.TempDir()
 		writeUVLock(t, workspace, pinned)
 
@@ -294,6 +224,87 @@ func TestResolveUV_RunsOnlyThePinnedRelease(t *testing.T) {
 	})
 }
 
+// The task runtime lists the release the CLI provisions under the Putnami home
+// as a candidate: the executable the pin names inside the release directory,
+// uv-<target>/uv for a tar.gz archive and uv.exe at the top for a zip archive.
+// A job that finds no uv on PATH runs it.
+func TestResolveUV_RunsTheReleaseUnderThePutnamiHome(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvRequirement, "a-job-without-a-uv-on-path-runs-the-release-under-the-putnami-home")
+	for _, tc := range []struct{ goos, goarch, executable string }{
+		{"linux", "amd64", "uv-x86_64-unknown-linux-musl/uv"},
+		{"darwin", "arm64", "uv-aarch64-apple-darwin/uv"},
+		{"windows", "amd64", "uv.exe"},
+	} {
+		t.Run(tc.goos+"/"+tc.goarch, func(t *testing.T) {
+			host := newFakeUVHost(t, tc.goos, tc.goarch)
+			workspace := t.TempDir()
+			writeUVLock(t, workspace, UVRelease{Version: "0.11.32"})
+			want := writeFakeUV(t, filepath.Join(host.managedDir(), filepath.FromSlash(tc.executable)), "0.11.32")
+			if got := host.provisionedProgram(t); got != want {
+				t.Fatalf("provisionedProgram = %q, want the pin's executable %q", got, want)
+			}
+
+			got, err := resolveUV(host.uvHost, workspace)
+			if err != nil || got != want {
+				t.Fatalf("resolveUV = %q, %v; want %q", got, err, want)
+			}
+		})
+	}
+
+	t.Run("a uv at the top of a tar.gz release directory", func(t *testing.T) {
+		host := newFakeUVHost(t, "linux", "arm64")
+		workspace := t.TempDir()
+		writeUVLock(t, workspace, UVRelease{Version: "0.11.32"})
+		want := writeFakeUV(t, filepath.Join(host.managedDir(), "uv"), "0.11.32")
+		if got, err := resolveUV(host.uvHost, workspace); err != nil || got != want {
+			t.Fatalf("resolveUV = %q, %v; want %q", got, err, want)
+		}
+	})
+
+	t.Run("a provisioned uv of another release", func(t *testing.T) {
+		host := newFakeUVHost(t, "linux", "amd64")
+		workspace := t.TempDir()
+		writeUVLock(t, workspace, UVRelease{Version: "0.11.32"})
+		other := writeFakeUV(t, host.provisionedProgram(t), "0.11.31")
+		_, err := resolveUV(host.uvHost, workspace)
+		if err == nil || !strings.Contains(err.Error(), other+" (uv 0.11.31)") {
+			t.Fatalf("err = %v, want the uv of another release passed over", err)
+		}
+	})
+}
+
+// With no uv that reports the release, the error names the release and
+// `putnami install`, which provisions it, whether the lock pins the release or
+// the root pyproject.toml declares it. Nothing is installed.
+func TestResolveUV_WithoutTheReleaseNamesPutnamiInstall(t *testing.T) {
+	for name, prepare := range map[string]func(t *testing.T, workspace string) string{
+		"pinned": func(t *testing.T, workspace string) string {
+			writeUVLock(t, workspace, DefaultUVRelease())
+			return DefaultUVVersion
+		},
+		"declared": func(t *testing.T, workspace string) string { declareUV(t, workspace, "==0.12.0"); return "0.12.0" },
+		"default":  func(*testing.T, string) string { return DefaultUVVersion },
+	} {
+		t.Run(name, func(t *testing.T) {
+			host := newFakeUVHost(t, "linux", "amd64")
+			workspace := t.TempDir()
+			version := prepare(t, workspace)
+			_, err := resolveUV(host.uvHost, workspace)
+			if err == nil {
+				t.Fatal("a uv resolved on a machine that holds none")
+			}
+			for _, want := range []string{"no uv " + version + " on this machine", "`putnami install`", "provisions it"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("the error does not name %q: %v", want, err)
+				}
+			}
+			if entries, err := os.ReadDir(host.home); err != nil || len(entries) != 0 {
+				t.Fatalf("the Putnami home holds %v, %v; want nothing installed", entries, err)
+			}
+		})
+	}
+}
+
 // The wanted release is the lock's pin, else the root pyproject.toml's
 // declaration, else the default one.
 func TestWantedUV_LockThenDeclarationThenDefault(t *testing.T) {
@@ -305,32 +316,20 @@ func TestWantedUV_LockThenDeclarationThenDefault(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want.version != "0.12.0" || want.origin != WorkspaceLockFile || want.release.Version != "0.12.0" {
+		if want.version != "0.12.0" {
 			t.Fatalf("wantedUV = %+v, want the lock's 0.12.0", want)
 		}
 	})
 
-	t.Run("a declaration without a pin has no digest", func(t *testing.T) {
+	t.Run("a declaration without a pin", func(t *testing.T) {
 		workspace := t.TempDir()
 		declareUV(t, workspace, "==0.11.20")
 		want, err := wantedUV(workspace)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want.version != "0.11.20" || want.origin != uvDeclarationOrigin || want.release.Version != "" {
-			t.Fatalf("wantedUV = %+v, want the declared 0.11.20 with no release", want)
-		}
-	})
-
-	t.Run("a declaration of the default release takes the shipped digests", func(t *testing.T) {
-		workspace := t.TempDir()
-		declareUV(t, workspace, DefaultUVVersion)
-		want, err := wantedUV(workspace)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if want.version != DefaultUVVersion || want.release.Integrities["darwin/arm64"] != uvtoolchain.DefaultIntegrities()["darwin/arm64"] {
-			t.Fatalf("wantedUV = %+v, want the default release", want)
+		if want.version != "0.11.20" {
+			t.Fatalf("wantedUV = %+v, want the declared 0.11.20", want)
 		}
 	})
 
@@ -420,80 +419,9 @@ func TestWantedUV_LockThenDeclarationThenDefault(t *testing.T) {
 	})
 }
 
-// `putnami install` installs the pinned uv under the Putnami home when the
-// machine holds none: the archive the lock names for the host platform,
-// checked against the lock's SHA-256, with the programs at the top of the
-// install directory. A uv of another release on PATH does not count, and an
-// installed release is not downloaded again.
-func TestProvisionUV_InstallsThePinnedArchiveUnderThePutnamiHome(t *testing.T) {
-	spectest.Proves(t, uvFeature, uvRequirement, "workspace-install-provisions-the-pinned-uv-and-declares-it")
-	mirror := newUVMirror(t)
-	mirror.archives["/dl/uv-aarch64-unknown-linux-musl.tar.gz"] = uvTarGz(t, "aarch64-unknown-linux-musl", "0.11.32")
-	mirror.archives["/dl/uv-x86_64-pc-windows-msvc.zip"] = uvZip(t, "0.11.32")
-
-	for _, tc := range []struct {
-		goos, goarch, archive string
-		programs              []string
-	}{
-		{"linux", "arm64", "/dl/uv-aarch64-unknown-linux-musl.tar.gz", []string{"uv", "uvx"}},
-		{"windows", "amd64", "/dl/uv-x86_64-pc-windows-msvc.zip", []string{"uv.exe", "uvx.exe", "uvw.exe"}},
-	} {
-		t.Run(tc.goos+"/"+tc.goarch, func(t *testing.T) {
-			host := newFakeUVHost(t, tc.goos, tc.goarch)
-			host.onPath = writeFakeUV(t, filepath.Join(t.TempDir(), "uv"), "0.5.18")
-			workspace := t.TempDir()
-			writeUVLock(t, workspace, UVRelease{
-				Version:     "0.11.32",
-				Integrities: map[string]string{tc.goos + "/" + tc.goarch: sha256Hex(mirror.archives[tc.archive])},
-				Source:      mirror.URL + "/dl/",
-			})
-			before := len(mirror.requests())
-
-			uv, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVInstall}, host.uvHost)
-			if err != nil {
-				t.Fatal(err)
-			}
-			dir := host.managedDir()
-			if want := (UV{Path: filepath.Join(dir, tc.programs[0]), Version: "0.11.32"}); uv != want {
-				t.Fatalf("provisionUV = %+v, want %+v", uv, want)
-			}
-			entries, err := os.ReadDir(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var names []string
-			for _, entry := range entries {
-				names = append(names, entry.Name())
-			}
-			slices.Sort(names)
-			want := slices.Sorted(slices.Values(tc.programs))
-			if !slices.Equal(names, want) {
-				t.Fatalf("the install holds %v, want only %v at its top level", names, want)
-			}
-			if info, err := os.Stat(uv.Path); err != nil || info.Mode().Perm()&0o111 == 0 {
-				t.Fatalf("the uv program is not executable: %v, %v", info, err)
-			}
-			if got := mirror.requests()[before:]; !slices.Equal(got, []string{tc.archive}) {
-				t.Fatalf("requests = %v, want the one archive %s", got, tc.archive)
-			}
-
-			again, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVInstall}, host.uvHost)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if again != uv {
-				t.Fatalf("second provisionUV = %+v, want %+v", again, uv)
-			}
-			if got := len(mirror.requests()) - before; got != 1 {
-				t.Fatalf("an installed release was downloaded again (%d requests)", got)
-			}
-		})
-	}
-}
-
-// With nothing pinned or declared, the default release installs from the uv
-// release downloads with the digests the extension ships; on this platform
-// that must name an archive and a digest.
+// With nothing pinned or declared, the default release is pinned from the uv
+// release downloads with the digests the extension ships; every platform must
+// name an archive and a digest.
 func TestDefaultUVRelease_NamesAnArchiveForEveryPlatform(t *testing.T) {
 	release := DefaultUVRelease()
 	shipped := uvtoolchain.DefaultIntegrities()
@@ -521,140 +449,12 @@ func TestDefaultUVRelease_NamesAnArchiveForEveryPlatform(t *testing.T) {
 	}
 }
 
-// An archive whose SHA-256 differs from the pin is refused, and so is a
-// release that records no SHA-256 for the host: nothing is extracted and no uv
-// is left on disk.
-func TestProvisionUV_RefusesAnArchiveItCannotVerify(t *testing.T) {
-	spectest.Proves(t, uvFeature, uvRequirement, "a-uv-archive-that-fails-its-digest-is-refused")
-	mirror := newUVMirror(t)
-	mirror.archives["/dl/uv-aarch64-unknown-linux-musl.tar.gz"] = uvTarGz(t, "aarch64-unknown-linux-musl", "0.11.32")
-
-	t.Run("the digest differs", func(t *testing.T) {
-		host := newFakeUVHost(t, "linux", "arm64")
-		workspace := t.TempDir()
-		writeUVLock(t, workspace, UVRelease{
-			Version:     "0.11.32",
-			Integrities: map[string]string{"linux/arm64": sha256Hex([]byte("another archive"))},
-			Source:      mirror.URL + "/dl/",
-		})
-		_, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVInstall}, host.uvHost)
-		if err == nil {
-			t.Fatal("an archive whose SHA-256 differs from the pin was installed")
-		}
-		for _, want := range []string{"uv 0.11.32", WorkspaceLockFile, "`putnami install`"} {
-			if !strings.Contains(err.Error(), want) {
-				t.Errorf("the error does not name %q: %v", want, err)
-			}
-		}
-		if left := uvFiles(t, host.home); len(left) != 0 {
-			t.Fatalf("the refused install left %v on disk", left)
-		}
-	})
-
-	t.Run("the lock records no digest for the host", func(t *testing.T) {
-		host := newFakeUVHost(t, "linux", "arm64")
-		workspace := t.TempDir()
-		writeUVLock(t, workspace, UVRelease{
-			Version:     "0.11.32",
-			Integrities: map[string]string{"darwin/arm64": strings.Repeat("a", 64)},
-			Source:      mirror.URL + "/dl/",
-		})
-		before := len(mirror.requests())
-		_, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVInstall}, host.uvHost)
-		if err == nil || !strings.Contains(err.Error(), "linux/arm64") {
-			t.Fatalf("err = %v, want a refusal that names linux/arm64", err)
-		}
-		if got := len(mirror.requests()) - before; got != 0 {
-			t.Fatalf("an unverifiable archive was requested %d times", got)
-		}
-	})
-}
-
-// A hosted run installs no uv, and a release that is declared and not pinned
-// yet has no digest to check its download against: both fail without a
-// request, and name what to do.
-func TestProvisionUV_InstallsNothingItCannotVerifyOrMustNot(t *testing.T) {
-	spectest.Proves(t, uvFeature, uvRequirement, "a-hosted-run-installs-no-uv")
-	mirror := newUVMirror(t)
-
-	t.Run("a hosted run", func(t *testing.T) {
-		host := newFakeUVHost(t, "linux", "amd64")
-		host.onPath = writeFakeUV(t, filepath.Join(t.TempDir(), "uv"), "0.5.18")
-		workspace := t.TempDir()
-		writeUVLock(t, workspace, UVRelease{Version: "0.11.32", Integrities: map[string]string{"linux/amd64": strings.Repeat("a", 64)}, Source: mirror.URL})
-		_, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVFind}, host.uvHost)
-		if err == nil || !strings.Contains(err.Error(), "hosted run installs no toolchain") {
-			t.Fatalf("err = %v, want the hosted refusal", err)
-		}
-	})
-
-	t.Run("a hosted run with the pinned uv on PATH", func(t *testing.T) {
-		host := newFakeUVHost(t, "linux", "amd64")
-		host.onPath = writeFakeUV(t, filepath.Join(t.TempDir(), "uv"), "0.11.32")
-		workspace := t.TempDir()
-		writeUVLock(t, workspace, UVRelease{Version: "0.11.32"})
-		uv, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVFind}, host.uvHost)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if want := (UV{Path: host.onPath, Version: "0.11.32"}); uv != want {
-			t.Fatalf("provisionUV = %+v, want %+v", uv, want)
-		}
-	})
-
-	t.Run("a declared release the lock does not pin", func(t *testing.T) {
-		host := newFakeUVHost(t, "linux", "amd64")
-		workspace := t.TempDir()
-		declareUV(t, workspace, "==0.12.0")
-		_, err := provisionUV(context.Background(), UVRequest{WorkspaceRoot: workspace, Mode: UVInstall}, host.uvHost)
-		if err == nil || !strings.Contains(err.Error(), "`putnami install`") || !strings.Contains(err.Error(), "0.12.0") {
-			t.Fatalf("err = %v, want a refusal that names uv 0.12.0 and `putnami install`", err)
-		}
-	})
-
-	if got := mirror.requests(); len(got) != 0 {
-		t.Fatalf("requests = %v, want none", got)
-	}
-}
-
-// A managed directory that is complete but holds another release is kept by
-// the archive install, which then reports nothing installed: the job does not
-// claim it installed uv, downloads nothing, and names the directory to remove.
-func TestProvisionUV_KeepsAndRefusesAStaleInstall(t *testing.T) {
-	mirror := newUVMirror(t)
-	host := newFakeUVHost(t, "linux", "amd64")
-	writeFakeUV(t, filepath.Join(host.managedDir(), "uv"), "0.11.31")
-	workspace := t.TempDir()
-	writeUVLock(t, workspace, UVRelease{
-		Version:     "0.11.32",
-		Integrities: map[string]string{"linux/amd64": strings.Repeat("a", 64)},
-		Source:      mirror.URL + "/dl/",
-	})
-	var logged []string
-	_, err := provisionUV(context.Background(), UVRequest{
-		WorkspaceRoot: workspace,
-		Mode:          UVInstall,
-		Log:           func(_, message string) { logged = append(logged, message) },
-	}, host.uvHost)
-	if err == nil || !strings.Contains(err.Error(), "holds uv 0.11.31, not uv 0.11.32") {
-		t.Fatalf("err = %v, want the stale install refused", err)
-	}
-	for _, line := range logged {
-		if strings.Contains(line, "uv 0.11.32 installed") {
-			t.Fatalf("the job logged an install it did not make: %q", logged)
-		}
-	}
-	if !slices.ContainsFunc(logged, func(line string) bool { return strings.Contains(line, "Kept the existing uv install") }) {
-		t.Fatalf("logged %q, want the kept install named", logged)
-	}
-	if got := mirror.requests(); len(got) != 0 {
-		t.Fatalf("requests = %v, want none", got)
-	}
-}
-
 // The uv the CLI resolves for a task and the uv the extension runs are the
-// same program, at the same place under the Putnami home, probed the same way.
-func TestManagedUVDirMatchesTheManifestCandidate(t *testing.T) {
+// same program, probed the same way: the manifest lists uv on PATH, then the
+// provisioned release, whose program is the executable the extension's pin
+// names for the host platform.
+func TestProvisionedUVMatchesTheManifestCandidate(t *testing.T) {
+	spectest.Proves(t, uvFeature, uvRequirement, "the-provisioned-uv-is-a-task-runtime-candidate")
 	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -680,21 +480,26 @@ func TestManagedUVDirMatchesTheManifestCandidate(t *testing.T) {
 	if !ok || declared.Lock != "uv" {
 		t.Fatalf("the manifest declares no uv runtime toolchain locked on uv: %+v", manifest.Runtime.Toolchains)
 	}
-	host := newFakeUVHost(t, "linux", "amd64")
-	search := newUVSearch(host.uvHost, t.TempDir(), uvWant{version: "0.11.32"})
-	var homeCandidate string
-	for _, candidate := range declared.Candidates {
-		if candidate.From == "putnami-home" {
-			homeCandidate = strings.ReplaceAll(candidate.Path, "{version}", "0.11.32")
-		}
+	if len(declared.Candidates) != 2 || declared.Candidates[0].From != "path" || declared.Candidates[0].Path != "uv" ||
+		declared.Candidates[1].From != "provisioned" || declared.Candidates[1].Path != "" {
+		t.Fatalf("candidates = %+v, want uv on PATH, which the extension searches first, then the provisioned release", declared.Candidates)
 	}
-	if want := filepath.Join(host.home, filepath.FromSlash(homeCandidate)); search.program() != want {
-		t.Fatalf("the extension runs %q, the manifest resolves %q", search.program(), want)
+	for _, platform := range uvtoolchain.Platforms() {
+		goos, goarch, _ := strings.Cut(platform, "/")
+		host := newFakeUVHost(t, goos, goarch)
+		pin, err := uvLockPin(DefaultUVRelease())
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The CLI unpacks the pinned archive in toolchains/uv/uv-<version>.
+		want := filepath.Join(host.home, "toolchains", "uv", "uv-"+DefaultUVVersion, filepath.FromSlash(pin.Archives[platform].Executable))
+		search := newUVSearch(host.uvHost, t.TempDir(), uvWant{version: DefaultUVVersion})
+		writeFakeUV(t, want, DefaultUVVersion)
+		if got := search.provisioned(); got != want {
+			t.Fatalf("%s: the extension runs %q, the pin resolves %q", platform, got, want)
+		}
 	}
 	if !slices.Equal(declared.Probe.Args, uvVersionArgs) {
 		t.Fatalf("the manifest probes uv with %v, the extension with %v", declared.Probe.Args, uvVersionArgs)
-	}
-	if declared.Candidates[0].From != "path" || declared.Candidates[0].Path != "uv" {
-		t.Fatalf("the first candidate is %+v, want uv on PATH as the extension searches first", declared.Candidates[0])
 	}
 }

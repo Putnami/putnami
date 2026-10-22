@@ -128,7 +128,7 @@ describe('public install to serve golden path', () => {
       expect(document).not.toMatch(/Bun v\d/);
       expect(document).toContain('installs Bun');
     }
-    expect(gettingStarted).toContain('~/.putnami/toolchains/bun/bun-<version>/bin/bun');
+    expect(gettingStarted).toContain('~/.putnami/toolchains/bun/bun-<version>/');
     expect(gettingStarted).toContain('https://npm.putnami.dev');
     expect(gettingStarted).toContain('.npmrc');
     expect(gettingStarted).toContain('This guarantee is deliberately narrow');

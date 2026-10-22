@@ -513,7 +513,14 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // LOWERED 77 → 76: internal/commands/proposals is deleted with `proposals
 // finalize`, which runs as `putnami change finalize` in the
 // @putnami/contributor executable. The ceiling follows the tree down.
-const internalPackageCountCeiling = 76
+//
+// RAISED 76 → 77: internal/jobs/toolchainpins runs the toolchain pins phase of
+// install, init and projects create: it asks each extension that answers for
+// a lock identity for its pin and settles the answers into the workspace lock.
+// It starts the extensions' runtimes through the scheduler, which imports
+// internal/jobs/toolchain, so it cannot live there. It adds no vertical and no
+// engine stage.
+const internalPackageCountCeiling = 77
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

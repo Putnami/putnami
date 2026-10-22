@@ -408,7 +408,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 				continue
 			}
 			return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no exact %q pin: %s",
-				ext.Name, ref, requirement.Lock, missingPinAdvice(workspaceRoot, requirement.Lock))
+				ext.Name, ref, requirement.Lock, missingPinRemedy)
 		}
 		integrity := entry.IntegrityFor(runtime.GOOS, runtime.GOARCH)
 		if strings.TrimSpace(integrity) == "" {
@@ -421,7 +421,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 			}
 			return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no integrity for %s", ext.Name, ref, machineprobe.HostPlatform())
 		}
-		resolution, rejections, found := resolveRuntimeToolchain(ctx, workspaceRoot, requirement, entry.Version, integrity, base)
+		resolution, rejections, found := resolveRuntimeToolchain(ctx, workspaceRoot, requirement, entry, base)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -457,6 +457,12 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 	return validateResolvedRuntimeToolchainEnvironment(ext, refs)
 }
 
+// missingPinRemedy ends the error of a required runtime toolchain whose lock
+// identity the workspace lock does not pin. `putnami install` asks the
+// extensions that answer for the identity, and an answer that cannot pin it
+// reports the declaration to write.
+const missingPinRemedy = "run `putnami install`"
+
 // ReportProvisionedRuntimeToolchains reports, once a run of
 // ToolchainProvisioningCommand ended, on each required toolchain the run
 // resolved unavailable while the lock pins it for this host: no candidate
@@ -487,7 +493,6 @@ func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot strin
 		extension, ref string
 		requirement    extensionproto.RuntimeToolchain
 		entry          lockfile.LockEntry
-		integrity      string
 	}
 	var probes []pending
 	if err := lockRuntimeToolchains(ctx); err != nil {
@@ -508,14 +513,14 @@ func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot strin
 				continue
 			}
 			markRuntimeToolchainProbes(workspaceRoot, ext)
-			probes = append(probes, pending{extension: ext.Name, ref: ref, requirement: requirement, entry: entry, integrity: integrity})
+			probes = append(probes, pending{extension: ext.Name, ref: ref, requirement: requirement, entry: entry})
 		}
 	}
 	runtimeToolchainMu.Unlock()
 
 	base := os.Environ()
 	for _, probe := range probes {
-		_, rejections, found := resolveRuntimeToolchain(ctx, workspaceRoot, probe.requirement, probe.entry.Version, probe.integrity, base)
+		_, rejections, found := resolveRuntimeToolchain(ctx, workspaceRoot, probe.requirement, probe.entry, base)
 		if ctx.Err() != nil {
 			return
 		}
@@ -589,9 +594,11 @@ func newRuntimeToolchainMismatchError(extensionName, ref, version string, reject
 }
 
 // runtimeToolchainInstallRemedy names the command that installs the release
-// the lock pins, or "" when that command does not help: a probe that timed out
-// found a toolchain that is there and slow, and a hosted run installs no
-// toolchain.
+// the lock pins, `putnami install`, which provisions it for a provisioned or a
+// putnami-home candidate. It is "" when that command does not help: a probe
+// that timed out found a toolchain that is there and slow, and a hosted run
+// installs no toolchain, so its candidates find the release where the runner
+// put it.
 func runtimeToolchainInstallRemedy(probes []error) string {
 	if runcredential.Hosted() {
 		return ""
@@ -608,9 +615,11 @@ func (e *runtimeToolchainMismatchError) Error() string { return e.message }
 
 func (e *runtimeToolchainMismatchError) Unwrap() []error { return e.probes }
 
-// resolveRuntimeToolchain returns the first candidate that qualifies. When none
-// does, it returns one rejection per considered candidate, in declaration order.
-func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirement extensionproto.RuntimeToolchain, version, integrity string, base []string) (model.RuntimeToolchainResolution, []runtimeToolchainRejection, bool) {
+// resolveRuntimeToolchain returns the first candidate that qualifies for the
+// workspace lock's entry of requirement.Lock. When none does, it returns one
+// rejection per considered candidate, in declaration order.
+func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirement extensionproto.RuntimeToolchain, entry lockfile.LockEntry, base []string) (model.RuntimeToolchainResolution, []runtimeToolchainRejection, bool) {
+	version := entry.Version
 	rejections := make([]runtimeToolchainRejection, 0, len(requirement.Candidates))
 	candidateEnv := runtimeToolchainCandidateEnv(workspaceRoot, base)
 	insideWorkspace := hostedWorkspaceProgram(workspaceRoot)
@@ -618,13 +627,13 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 		if ctx.Err() != nil {
 			return model.RuntimeToolchainResolution{}, rejections, false
 		}
-		executable := runtimeToolchainCandidatePath(workspaceRoot, candidate, version, candidateEnv)
+		executable := runtimeToolchainCandidatePath(workspaceRoot, requirement.Lock, entry, candidate, candidateEnv)
 		label := describeRuntimeToolchainCandidate(index, candidate, executable)
 		reject := func(reason string) {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: reason})
 		}
 		if executable == "" {
-			reject(unexpandedCandidateReason(candidate))
+			reject(unexpandedCandidateReason(candidate, requirement.Lock, entry))
 			continue
 		}
 		realExecutable, err := filepath.EvalSymlinks(executable)
@@ -644,21 +653,11 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 			reject("not executable")
 			continue
 		}
-		probeEnv := append([]string(nil), base...)
-		for _, name := range requirement.Probe.Unset {
-			probeEnv = envkeys.Host.Remove(probeEnv, name)
-		}
-		for name, value := range requirement.Probe.Environment {
-			probeEnv = envkeys.Host.Set(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
-		}
-		probeEnv = PrependPathWith(envkeys.Host, probeEnv, filepath.Dir(realExecutable))
-		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv,
-			procdeadline.HostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
+		got, want, err := probeRuntimeToolchainVersion(ctx, realExecutable, requirement.Probe, version, base)
 		if err != nil {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
 		}
-		want := strings.ReplaceAll(requirement.Probe.Expect, extensionproto.RuntimeToolchainVersionToken, version)
 		if got != want {
 			reject(fmt.Sprintf("version %q does not match locked %q", got, want))
 			continue
@@ -672,21 +671,44 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 			Available:   true,
 			Executable:  realExecutable,
 			Environment: environment,
-			Identity:    runtimeToolchainIdentity(requirement, version, integrity, true),
+			Identity:    runtimeToolchainIdentity(requirement, entry, true),
 		}, nil, true
 	}
 	return model.RuntimeToolchainResolution{}, rejections, false
 }
 
+// probeRuntimeToolchainVersion runs probe on executable under base, with the
+// variables probe unsets removed, the variables it sets added with {version}
+// expanded to version, and the executable's directory first on PATH. It
+// returns the probe's answer and the answer version requires.
+func probeRuntimeToolchainVersion(ctx context.Context, executable string, probe extensionproto.RuntimeToolchainProbe, version string, base []string) (got, want string, err error) {
+	probeEnv := append([]string(nil), base...)
+	for _, name := range probe.Unset {
+		probeEnv = envkeys.Host.Remove(probeEnv, name)
+	}
+	for name, value := range probe.Environment {
+		probeEnv = envkeys.Host.Set(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
+	}
+	probeEnv = PrependPathWith(envkeys.Host, probeEnv, filepath.Dir(executable))
+	got, err = probeRuntimeToolchain(ctx, executable, probe.Args, probeEnv,
+		procdeadline.HostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
+	return got, strings.ReplaceAll(probe.Expect, extensionproto.RuntimeToolchainVersionToken, version), err
+}
+
 // describeRuntimeToolchainCandidate names a candidate by its 1-based position,
-// its declared source and path, and the host path it expanded to, if any.
+// its declared source and path, and the host path it expanded to, if any. A
+// provisioned candidate declares no path, so none is named.
 func describeRuntimeToolchainCandidate(index int, candidate extensionproto.RuntimeToolchainCandidate, executable string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "candidate %d (%s", index+1, candidate.From)
 	if candidate.Environment != "" {
 		b.WriteString(" " + candidate.Environment)
 	}
-	fmt.Fprintf(&b, " %q)", candidate.Path)
+	if candidate.From == extensionproto.RuntimeToolchainCandidateProvisioned {
+		b.WriteString(")")
+	} else {
+		fmt.Fprintf(&b, " %q)", candidate.Path)
+	}
 	if executable != "" {
 		b.WriteString(" at " + executable)
 	}
@@ -747,8 +769,20 @@ func runtimeToolchainCandidateEnv(workspaceRoot string, base []string) []string 
 	return envkeys.Host.Set(env, runtimeToolchainWorkspaceRootEnv, workspaceRoot)
 }
 
-func runtimeToolchainCandidatePath(workspaceRoot string, candidate extensionproto.RuntimeToolchainCandidate, version string, base []string) string {
-	rel := filepath.FromSlash(strings.ReplaceAll(candidate.Path, extensionproto.RuntimeToolchainVersionToken, version))
+// runtimeToolchainCandidatePath expands candidate against base to a host path,
+// or to "" (unexpandedCandidateReason). entry is the workspace lock's entry of
+// the lock identity lock. A provisioned candidate expands to the executable of
+// the host platform's archive in entry, unpacked in its provisioned folder
+// (ProvisionedExecutable), with no suffix added: the archive names the file.
+func runtimeToolchainCandidatePath(workspaceRoot, lock string, entry lockfile.LockEntry, candidate extensionproto.RuntimeToolchainCandidate, base []string) string {
+	if candidate.From == extensionproto.RuntimeToolchainCandidateProvisioned {
+		archive, err := provisionedArchive(lock, entry, machineprobe.HostPlatform())
+		if err != nil {
+			return ""
+		}
+		return filepath.Join(provisionedFolder(PutnamiHome(workspaceRoot, base), lock, entry.Version), filepath.FromSlash(archive.Executable))
+	}
+	rel := filepath.FromSlash(strings.ReplaceAll(candidate.Path, extensionproto.RuntimeToolchainVersionToken, entry.Version))
 	var path string
 	switch candidate.From {
 	case extensionproto.RuntimeToolchainCandidatePath:
@@ -779,8 +813,9 @@ func WithExecutableSuffix(goos, path string) string {
 
 // unexpandedCandidateReason says why candidate expanded to no path on this
 // host: the variable it is relative to has no value, PATH holds no such
-// program, or no home directory resolves.
-func unexpandedCandidateReason(candidate extensionproto.RuntimeToolchainCandidate) string {
+// program, no home directory resolves, or the workspace lock's entry of the
+// lock identity lock records no archive a provisioned candidate can name.
+func unexpandedCandidateReason(candidate extensionproto.RuntimeToolchainCandidate, lock string, entry lockfile.LockEntry) string {
 	switch candidate.From {
 	case extensionproto.RuntimeToolchainCandidateEnvironment:
 		return "environment variable " + candidate.Environment + " is not set"
@@ -788,6 +823,10 @@ func unexpandedCandidateReason(candidate extensionproto.RuntimeToolchainCandidat
 		return "no executable on PATH"
 	case extensionproto.RuntimeToolchainCandidateHome:
 		return "no home directory is set"
+	case extensionproto.RuntimeToolchainCandidateProvisioned:
+		if _, err := provisionedArchive(lock, entry, machineprobe.HostPlatform()); err != nil {
+			return err.Error()
+		}
 	}
 	return "path missing"
 }
@@ -795,8 +834,9 @@ func unexpandedCandidateReason(candidate extensionproto.RuntimeToolchainCandidat
 // PutnamiHome returns the Putnami home of a command that runs in workspaceRoot
 // with env: PUTNAMI_HOME, else .putnami under the user's home directory, else
 // .putnami under workspaceRoot. It is the directory a putnami-home candidate
-// of a runtime toolchain is relative to, so everything the CLI reads or writes
-// beside a toolchain resolves the home through it.
+// of a runtime toolchain is relative to and the one a provisioned toolchain is
+// unpacked below, so everything the CLI reads or writes beside a toolchain
+// resolves the home through it.
 func PutnamiHome(workspaceRoot string, env []string) string {
 	if root := strings.TrimSpace(envkeys.Host.Last(env, "PUTNAMI_HOME")); root != "" {
 		return filepath.Clean(root)
@@ -1237,18 +1277,27 @@ func LockedRuntimeToolchainIdentityForRefs(workspaceRoot string, ext *model.Exte
 			return "", fmt.Errorf("extension %q runtime toolchain %q: workspace lock has no exact %q pin with an integrity for %s",
 				ext.Name, ref, requirement.Lock, machineprobe.HostPlatform())
 		}
-		parts = append(parts, ref+"="+runtimeToolchainIdentity(requirement, entry.Version, integrity, available))
+		parts = append(parts, ref+"="+runtimeToolchainIdentity(requirement, entry, available))
 	}
 	return strings.Join(parts, ";"), nil
 }
 
-func runtimeToolchainIdentity(requirement extensionproto.RuntimeToolchain, version, integrity string, available bool) string {
+// runtimeToolchainIdentity is the cache-key identity of requirement resolved
+// against entry, the workspace lock's entry of its lock identity, on this
+// host: the declaration, the version, the platform, the host's integrity and
+// whether a candidate qualified. A declaration with a provisioned candidate
+// also binds the executable of the host's archive, the file of the pinned
+// archive that candidate runs, which the declaration does not name.
+func runtimeToolchainIdentity(requirement extensionproto.RuntimeToolchain, entry lockfile.LockEntry, available bool) string {
 	h := sha256.New()
 	declaration, _ := json.Marshal(requirement)
 	framing.HashField(h, "declaration", declaration)
-	framing.HashField(h, "version", []byte(version))
+	framing.HashField(h, "version", []byte(entry.Version))
 	framing.HashField(h, "platform", []byte(machineprobe.HostPlatform()))
-	framing.HashField(h, "integrity", []byte(integrity))
+	framing.HashField(h, "integrity", []byte(entry.IntegrityFor(runtime.GOOS, runtime.GOARCH)))
+	if declaresProvisionedCandidate(requirement) {
+		framing.HashField(h, "executable", []byte(entry.Archives[machineprobe.HostPlatform()].Executable))
+	}
 	availability := unavailableRuntimeToolchainIdentity
 	if available {
 		availability = "available"
@@ -1258,8 +1307,15 @@ func runtimeToolchainIdentity(requirement extensionproto.RuntimeToolchain, versi
 }
 
 func unavailableRuntimeToolchainResolution(requirement extensionproto.RuntimeToolchain, entry lockfile.LockEntry) model.RuntimeToolchainResolution {
-	return model.RuntimeToolchainResolution{Identity: runtimeToolchainIdentity(requirement, entry.Version,
-		entry.IntegrityFor(runtime.GOOS, runtime.GOARCH), false)}
+	return model.RuntimeToolchainResolution{Identity: runtimeToolchainIdentity(requirement, entry, false)}
+}
+
+// declaresProvisionedCandidate reports whether requirement lists a provisioned
+// candidate.
+func declaresProvisionedCandidate(requirement extensionproto.RuntimeToolchain) bool {
+	return slices.ContainsFunc(requirement.Candidates, func(candidate extensionproto.RuntimeToolchainCandidate) bool {
+		return candidate.From == extensionproto.RuntimeToolchainCandidateProvisioned
+	})
 }
 
 func sortedRuntimeToolchainRefs(refs map[string]bool) []string {

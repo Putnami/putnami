@@ -47,6 +47,6 @@ this build does with it.
 ## Recorded gaps
 
 `provenance.json` also carries a `gaps` array: shapes the compatibility budget
-covers for which this repository has no recoverable artifact (today: lock format
-v4 and any lock carrying a `cli` pin). Naming a gap is the point — a corpus that
+covers for which this repository has no recoverable artifact (today: lock formats
+v4 and v5, and any lock carrying a `cli` pin). Naming a gap is the point — a corpus that
 silently omitted them would read as complete.

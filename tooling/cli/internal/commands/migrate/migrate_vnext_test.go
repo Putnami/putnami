@@ -126,7 +126,7 @@ func readMigratableLock(t *testing.T, root string) *lockfile.LockFile {
 // needs migrating, the check says so without writing, and the failure carries
 // the usage exit code plus the command that fixes it.
 func TestMigrateVNextCheck_ReportsPendingMigration(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-v4-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
 	root := t.TempDir()
 	seedInstalledExtension(t, root, "@putnami/typescript", v3ManifestJSON)
 	seedInstalledExtension(t, root, "@putnami/go", v2ManifestJSON)
@@ -160,11 +160,11 @@ func TestMigrateVNextCheck_ReportsPendingMigration(t *testing.T) {
 	if report.Outcome != VNextOutcomeMigrate {
 		t.Errorf("outcome = %q, want %q", report.Outcome, VNextOutcomeMigrate)
 	}
-	if report.LockVersion != lockfile.FormatVersionV1 || report.TargetVersion != lockfile.FormatVersionV4 {
-		t.Errorf("versions = %d → %d, want 1 → 4", report.LockVersion, report.TargetVersion)
+	if report.LockVersion != lockfile.FormatVersionV1 || report.TargetVersion != lockfile.FormatVersionV5 {
+		t.Errorf("versions = %d → %d, want 1 → 5", report.LockVersion, report.TargetVersion)
 	}
 	assertChanges(t, report.Changes, []VNextChange{
-		{Kind: VNextChangeLockVersion, From: 1, To: 4},
+		{Kind: VNextChangeLockVersion, From: 1, To: 5},
 		{Kind: VNextChangeTaskContract, Extension: "@putnami/go", From: 0, To: 2},
 		{Kind: VNextChangeTaskContract, Extension: "@putnami/typescript", From: 0, To: 3},
 	})
@@ -186,7 +186,7 @@ func TestMigrateVNextCheck_ReportsPendingMigration(t *testing.T) {
 // contract: apply records exactly what the check planned, a re-check is clean,
 // and a second apply changes nothing on disk.
 func TestMigrateVNextApply_ConvertsAndIsIdempotent(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-v4-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
 	root := t.TempDir()
 	seedInstalledExtension(t, root, "@putnami/typescript", v3ManifestJSON)
 	seedInstalledExtension(t, root, "@putnami/go", v2ManifestJSON)
@@ -200,8 +200,8 @@ func TestMigrateVNextApply_ConvertsAndIsIdempotent(t *testing.T) {
 	}
 
 	migrated := readLock(t, root)
-	if migrated.Version != lockfile.FormatVersionV4 {
-		t.Fatalf("lock version after apply = %d, want %d", migrated.Version, lockfile.FormatVersionV4)
+	if migrated.Version != lockfile.FormatVersionV5 {
+		t.Fatalf("lock version after apply = %d, want %d", migrated.Version, lockfile.FormatVersionV5)
 	}
 	if migrated.AgentArtifacts == nil || migrated.Toolchains == nil {
 		t.Fatalf("current-format dimensions were not initialized: %+v", migrated)
@@ -244,12 +244,12 @@ func TestMigrateVNextApply_ConvertsAndIsIdempotent(t *testing.T) {
 	}
 }
 
-// A v2 or v3 lock is already readable, but it still cannot carry an
-// agentArtifacts pin. Migration must be explicit, preserve every existing pin,
-// initialize the v4 dimensions, and remain byte-idempotent.
-func TestMigrateVNext_V2AndV3ProjectToV4WithoutChangingPins(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-v4-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
-	for _, version := range []int{lockfile.FormatVersionV2, lockfile.FormatVersionV3} {
+// A v2, v3 or v4 lock that pins no toolchain is already readable, but it is
+// not at the current format. Migration must be explicit, preserve every
+// existing pin, initialize the current dimensions, and remain byte-idempotent.
+func TestMigrateVNext_V2ThroughV4ProjectToV5WithoutChangingPins(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
+	for _, version := range []int{lockfile.FormatVersionV2, lockfile.FormatVersionV3, lockfile.FormatVersionV4} {
 		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
 			root := t.TempDir()
 			lf := &lockfile.LockFile{
@@ -271,11 +271,6 @@ func TestMigrateVNext_V2AndV3ProjectToV4WithoutChangingPins(t *testing.T) {
 					"go-server": {Version: "2.0.0", Integrity: "template-digest"},
 				},
 			}
-			if version >= lockfile.FormatVersionV3 {
-				lf.Toolchains = map[string]lockfile.LockEntry{
-					"go": {Version: "1.25.7", Source: "https://registry.example/go"},
-				}
-			}
 			if err := lockfile.WriteLockFile(root, lf); err != nil {
 				t.Fatal(err)
 			}
@@ -286,14 +281,14 @@ func TestMigrateVNext_V2AndV3ProjectToV4WithoutChangingPins(t *testing.T) {
 
 			_, checkErr := sharedtest.CaptureStdout(t, func() error { return MigrateVNext(root, false, "") })
 			if checkErr == nil {
-				t.Fatalf("v%d must report an explicit migration to v4", version)
+				t.Fatalf("v%d must report an explicit migration to v5", version)
 			}
 			report, ok := shared.ResultData(checkErr).(VNextReport)
 			if !ok {
 				t.Fatalf("check carried no report: %#v", shared.ResultData(checkErr))
 			}
 			assertChanges(t, report.Changes, []VNextChange{{
-				Kind: VNextChangeLockVersion, From: version, To: lockfile.FormatVersionV4,
+				Kind: VNextChangeLockVersion, From: version, To: lockfile.FormatVersionV5,
 			}})
 			afterCheck, err := os.ReadFile(filepath.Join(root, lockfile.LockFilename))
 			if err != nil {
@@ -307,7 +302,7 @@ func TestMigrateVNext_V2AndV3ProjectToV4WithoutChangingPins(t *testing.T) {
 				t.Fatalf("apply: %v", err)
 			}
 			migrated := readLock(t, root)
-			if migrated.Version != lockfile.FormatVersionV4 || migrated.AgentArtifacts == nil || migrated.Toolchains == nil {
+			if migrated.Version != lockfile.FormatVersionV5 || migrated.AgentArtifacts == nil || migrated.Toolchains == nil {
 				t.Fatalf("migrated dimensions = %+v", migrated)
 			}
 			if got, _ := migrated.GetExtension("@putnami/go"); got.Version != "1.2.3" || got.ManifestHash != "extension-manifest" || got.TaskContract != 3 {
@@ -316,12 +311,6 @@ func TestMigrateVNext_V2AndV3ProjectToV4WithoutChangingPins(t *testing.T) {
 			if got, _ := migrated.GetTemplate("go-server"); got.Version != "2.0.0" || got.Integrity != "template-digest" {
 				t.Errorf("template pin changed: %+v", got)
 			}
-			if version == lockfile.FormatVersionV3 {
-				if got, ok := migrated.Toolchains["go"]; !ok || got.Version != "1.25.7" {
-					t.Errorf("toolchain pin changed: %+v", migrated.Toolchains)
-				}
-			}
-
 			first, err := os.ReadFile(filepath.Join(root, lockfile.LockFilename))
 			if err != nil {
 				t.Fatal(err)
@@ -335,6 +324,67 @@ func TestMigrateVNext_V2AndV3ProjectToV4WithoutChangingPins(t *testing.T) {
 			}
 			if !bytes.Equal(first, second) {
 				t.Fatal("second apply changed migrated lock bytes")
+			}
+		})
+	}
+}
+
+// A v3 or v4 lock that pins toolchains does not project onto version 5: a
+// version 5 toolchain entry records each platform's archive, which only the
+// extension that answers for the toolchain supplies. --check and --apply both
+// refuse with `putnami install` as the remedy and leave the lock as it was.
+func TestMigrateVNext_ALockThatPinsToolchainsIsRefusedWithInstallAsTheRemedy(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "a-lock-that-pins-toolchains-is-refused-in-both-modes")
+	for _, tc := range []struct {
+		version int
+		apply   bool
+	}{
+		{lockfile.FormatVersionV3, false}, {lockfile.FormatVersionV3, true},
+		{lockfile.FormatVersionV4, false}, {lockfile.FormatVersionV4, true},
+	} {
+		version := tc.version
+		t.Run(fmt.Sprintf("v%d/apply=%t", version, tc.apply), func(t *testing.T) {
+			root := t.TempDir()
+			lf := &lockfile.LockFile{
+				Version: version,
+				Toolchains: map[string]lockfile.LockEntry{
+					"go":  {Version: "1.25.7", Integrities: map[string]string{"linux/amd64": "go-digest"}, Source: "https://registry.example/go"},
+					"bun": {Version: "1.3.0", Integrities: map[string]string{"linux/amd64": "bun-digest"}, Source: "https://registry.example/bun"},
+				},
+				Extensions: map[string]lockfile.LockEntry{},
+				Templates:  map[string]lockfile.LockEntry{},
+			}
+			if err := lockfile.WriteLockFile(root, lf); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(filepath.Join(root, lockfile.LockFilename))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, applyErr := sharedtest.CaptureStdout(t, func() error { return MigrateVNext(root, tc.apply, "") })
+			var needsResolution *lockfile.ToolchainsNeedResolutionError
+			if !errors.As(applyErr, &needsResolution) {
+				t.Fatalf("apply = %v, want *lockfile.ToolchainsNeedResolutionError", applyErr)
+			}
+			if got := strings.Join(needsResolution.Identities, ","); got != "bun,go" {
+				t.Errorf("refused identities = %q, want bun,go", got)
+			}
+			if !errors.Is(applyErr, protocolcli.ErrInvalidConfig) {
+				t.Errorf("apply error class = %v, want ErrInvalidConfig", applyErr)
+			}
+			if next := protocolcli.SuggestedNext(applyErr); next != "putnami install" {
+				t.Errorf("suggested next = %q, want putnami install", next)
+			}
+			if !strings.Contains(applyErr.Error(), "only `putnami install` can pin them") {
+				t.Errorf("refusal %q does not name putnami install", applyErr)
+			}
+			after, err := os.ReadFile(filepath.Join(root, lockfile.LockFilename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(before, after) {
+				t.Fatal("a refused migration changed the lock")
 			}
 		})
 	}
@@ -365,8 +415,8 @@ func TestMigrateVNext_IsTheOnlyReaderOfAV1Lock(t *testing.T) {
 		t.Fatalf("migrate vnext --apply on a v1 lock: %v", applyErr)
 	}
 	migrated := readLock(t, root)
-	if migrated.Version != lockfile.FormatVersionV4 {
-		t.Fatalf("lock version after apply = %d, want %d", migrated.Version, lockfile.FormatVersionV4)
+	if migrated.Version != lockfile.FormatVersionV5 {
+		t.Fatalf("lock version after apply = %d, want %d", migrated.Version, lockfile.FormatVersionV5)
 	}
 }
 
@@ -555,8 +605,8 @@ func TestMigrateVNext_StructuredOutput(t *testing.T) {
 	if envelope.Data.Outcome != VNextOutcomeApplied {
 		t.Errorf("data.outcome = %q, want %q", envelope.Data.Outcome, VNextOutcomeApplied)
 	}
-	if envelope.Data.LockVersion != lockfile.FormatVersionV1 || envelope.Data.TargetVersion != lockfile.FormatVersionV4 {
-		t.Errorf("data versions = %d → %d, want 1 → 4", envelope.Data.LockVersion, envelope.Data.TargetVersion)
+	if envelope.Data.LockVersion != lockfile.FormatVersionV1 || envelope.Data.TargetVersion != lockfile.FormatVersionV5 {
+		t.Errorf("data versions = %d → %d, want 1 → 5", envelope.Data.LockVersion, envelope.Data.TargetVersion)
 	}
 }
 
@@ -576,7 +626,7 @@ func TestMigrateVNext_ProbesTheVersionedArtifactDirectory(t *testing.T) {
 
 	report := planVNextMigration(root, readMigratableLock(t, root))
 	assertChanges(t, report.Changes, []VNextChange{
-		{Kind: VNextChangeLockVersion, From: 1, To: 4},
+		{Kind: VNextChangeLockVersion, From: 1, To: 5},
 		{Kind: VNextChangeTaskContract, Extension: "@putnami/typescript", From: 0, To: 3},
 	})
 }

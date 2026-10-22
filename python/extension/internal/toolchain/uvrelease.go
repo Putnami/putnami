@@ -21,10 +21,10 @@ const WorkspaceLockFile = "putnami.lock.json"
 // the uv release, as required-version.
 const RootPyproject = uvtoolchain.Pyproject
 
-// DefaultUVVersion is the uv release the extension installs for a workspace
-// that pins and declares none (uvtoolchain.DefaultVersion). workspace-install
-// then declares it as the required-version of the root pyproject.toml, and the
-// lock pins it.
+// DefaultUVVersion is the uv release the extension pins for a workspace that
+// pins and declares none (uvtoolchain.DefaultVersion): the lock pins it, the
+// CLI provisions it, and workspace-install declares it as the
+// required-version of the root pyproject.toml.
 const DefaultUVVersion = uvtoolchain.DefaultVersion
 
 // UVRelease is one uv release and what verifies its archives.
@@ -39,10 +39,10 @@ type UVRelease struct {
 	Source string `json:"source"`
 }
 
-// DefaultUVRelease is the release the extension installs when the workspace
-// pins and declares none: DefaultUVVersion, from the uv release downloads,
-// with the digests it ships (uvtoolchain.DefaultIntegrities), so installing it
-// reads no release metadata from the network.
+// DefaultUVRelease is the release the extension pins when the workspace pins
+// and declares none: DefaultUVVersion, from the uv release downloads, with the
+// digests it ships (uvtoolchain.DefaultIntegrities), so pinning it reads no
+// release metadata from the network.
 func DefaultUVRelease() UVRelease {
 	return UVRelease{
 		Version:     DefaultUVVersion,
@@ -90,22 +90,12 @@ func uvArchiveFor(release UVRelease, goos, goarch string) (uvArchive, bool) {
 	}, true
 }
 
-// uvPrograms are the programs of a uv install, by their file name on goos:
-// uv, and uvx, which runs a tool the way `uv tool run` does.
-func uvPrograms(goos string) []string {
-	return []string{uvProgram(goos), executableName("uvx", goos)}
-}
-
 // uvProgram is the file name of the uv program on goos.
 func uvProgram(goos string) string {
-	return executableName("uv", goos)
-}
-
-func executableName(name, goos string) string {
 	if goos == "windows" {
-		return name + ".exe"
+		return "uv.exe"
 	}
-	return name
+	return "uv"
 }
 
 // lockedUVRelease returns the uv release the workspace lock pins, and false

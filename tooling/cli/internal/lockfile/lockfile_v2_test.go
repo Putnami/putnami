@@ -400,16 +400,16 @@ func TestWriteLockFilePreservesAnExistingV2Lock(t *testing.T) {
 	}
 }
 
-// TestNewLockFileDefaultsToV4 pins the current write default: a lock
+// TestNewLockFileDefaultsToV5 pins the current write default: a lock
 // this CLI creates is born at the version this CLI requires, so `putnami
 // install` in a fresh workspace never produces a file its own next run refuses.
-func TestNewLockFileDefaultsToV4(t *testing.T) {
-	if got := NewLockFile().Version; got != FormatVersionV4 {
-		t.Errorf("NewLockFile().Version = %d, want %d", got, FormatVersionV4)
+func TestNewLockFileDefaultsToV5(t *testing.T) {
+	if got := NewLockFile().Version; got != FormatVersionV5 {
+		t.Errorf("NewLockFile().Version = %d, want %d", got, FormatVersionV5)
 	}
-	if DefaultWriteVersion != FormatVersionV4 {
+	if DefaultWriteVersion != FormatVersionV5 {
 		t.Errorf("DefaultWriteVersion = %d, want %d — flipping it is a lock-format change",
-			DefaultWriteVersion, FormatVersionV4)
+			DefaultWriteVersion, FormatVersionV5)
 	}
 	if MinSupportedVersion != FormatVersionV2 {
 		t.Errorf("MinSupportedVersion = %d, want %d", MinSupportedVersion, FormatVersionV2)

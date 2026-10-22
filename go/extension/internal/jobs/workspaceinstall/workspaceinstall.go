@@ -1,8 +1,9 @@
 // Package workspaceinstall is the workspace-install job `putnami install` runs:
-// it resolves or installs Go, syncs go.work with the workspace's Go projects,
-// fills the module cache with the complete build list, and installs the pinned
-// development tools. A workspace that declares no Go yet and has no go command
-// gets none of it: its first Go project pins the Go release and installs it.
+// it selects the Go the CLI provisioned, syncs go.work with the workspace's Go
+// projects, fills the module cache with the complete build list, and installs
+// the pinned development tools. It installs no Go. A workspace that declares no
+// Go yet and has no go command gets none of it: its first Go project pins the
+// Go release, which the CLI then provisions.
 //
 // It is the Go port of the former bin/workspace-install script, and it starts
 // no shell: see package workspacejob.
@@ -42,9 +43,9 @@ type mode int
 
 const (
 	// modeInstall is workspace-install without the offline signal: it
-	// resolves or installs Go, syncs go.work, and downloads the build list
-	// and the pinned tools with the machine's own credentials. It is the only
-	// mode that writes go.work or a go.mod.
+	// selects Go, syncs go.work, and downloads the build list and the pinned
+	// tools with the machine's own credentials. It is the only mode that
+	// writes go.work or a go.mod.
 	modeInstall mode = iota
 	// modeFetch is workspace-fetch: modeInstall with module downloads allowed
 	// whatever the offline signal says, and the read credential the engine
@@ -53,9 +54,9 @@ const (
 	// repository-controlled process starts.
 	modeFetch
 	// modeOffline is workspace-install on a hosted run, after workspace-fetch
-	// downloaded everything: it downloads nothing. It selects a Go without
-	// installing one, keeps go.work as committed, skips the module warm-up, and resolves
-	// the pinned tools from what is already on the machine.
+	// downloaded everything: it downloads nothing. It keeps go.work as
+	// committed, skips the module warm-up, and resolves the pinned tools from
+	// what is already on the machine.
 	modeOffline
 )
 
@@ -167,10 +168,10 @@ func execute(j *workspacejob.Job, force bool, contextOrigin string, members []st
 
 	j.Emit.PhaseStart("go")
 	if !w.declaresGo() && !j.FindGoBinary() {
-		// No Go release is pinned or requested, so there is no verified Go to
-		// install, and nothing needs one: the Go tasks run for Go projects,
-		// and the first one pins the release and runs this job again.
-		j.Emit.Log("info", "The workspace declares no Go module or Go toolchain yet; its first Go project installs Go")
+		// No Go release is pinned or requested, so no Go is provisioned, and
+		// nothing needs one: the Go tasks run for Go projects, and the first
+		// one pins the release and runs this job again.
+		j.Emit.Log("info", "The workspace declares no Go module or Go toolchain yet; its first Go project pins Go, which `putnami install` provisions")
 		j.Emit.PhaseEnd("go", "skipped")
 		return statusOK
 	}
@@ -232,24 +233,12 @@ func execute(j *workspacejob.Job, force bool, contextOrigin string, members []st
 	return w.installTools(force)
 }
 
-// selectGo records the go command the run uses: the one ResolveGoBinary
-// selects, which it installs when needed, or offline the one FindGoBinary
-// finds, since installing one downloads it.
+// selectGo records the go command the run uses (FindGoBinary): the Go the CLI
+// provisioned under the Putnami home and put first on PATH, or another go
+// that qualifies. The job installs none, and fails naming the remedy when no
+// go command qualifies. workspace-fetch runs no program from the workspace
+// tree, so it selects a go command outside the workspace.
 func (w *install) selectGo() bool {
-	if w.mode == modeFetch {
-		// A hosted run installs no Go, and this job runs no program from the
-		// workspace tree: it selects a go command the runner already holds
-		// outside the workspace.
-		if w.FindGoBinary() {
-			return true
-		}
-		w.Emit.Diagnostic("error", "No go command outside the workspace qualifies for workspace-fetch: "+
-			"a hosted run installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home", "", 0)
-		return false
-	}
-	if w.mode != modeOffline {
-		return w.ResolveGoBinary()
-	}
 	if w.FindGoBinary() {
 		return true
 	}
@@ -257,8 +246,17 @@ func (w *install) selectGo() bool {
 	if requested := w.RequestedGoVersion(); requested != "" {
 		missing = "No installed go command qualifies for Go " + requested
 	}
-	w.Emit.Diagnostic("error", missing+", and module downloads are off on this run: "+
-		"a hosted run installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home", "", 0)
+	switch w.mode {
+	case modeFetch:
+		w.Emit.Diagnostic("error", "No go command outside the workspace qualifies for workspace-fetch: "+
+			"the job installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home", "", 0)
+	case modeOffline:
+		w.Emit.Diagnostic("error", missing+", and module downloads are off on this run: "+
+			"the job installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home", "", 0)
+	default:
+		w.Emit.Diagnostic("error", missing+": the Go extension installs no Go; "+
+			"run `putnami install`, which provisions the Go the workspace lock pins under the Putnami home", "", 0)
+	}
 	return false
 }
 

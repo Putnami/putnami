@@ -31,7 +31,7 @@ func TestRuntimeToolchainUnsatisfiedByTheLockFailsOnlyAPlannedJob(t *testing.T) 
 			name: "no pin",
 			lock: func(t *testing.T, root string) { writeRuntimeToolchainLock(t, root, "other", "1.2.3", "integrity-a") },
 			want: `resolve extension runtime toolchains: resolve extension "example" runtime toolchain "compiler": ` +
-				"workspace lock has no exact \"compiler\" pin: add a project that declares it, or run `putnami install` to record the declared one",
+				"workspace lock has no exact \"compiler\" pin: run `putnami install`",
 		},
 		{
 			name: "no matching candidate",

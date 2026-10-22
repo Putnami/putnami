@@ -3,51 +3,46 @@
   "protocolVersion": 1,
   "feature": "cli/toolchain-lock",
   "outcomes": [
-    "A workspace install records exact Go, Bun and uv releases with vendor sources and per-platform SHA-256 digests",
-    "A package.json engines.node declaration neither creates a toolchain pin nor causes a Node metadata request",
-    "Refreshing toolchain metadata removes stale runtime entries that Putnami does not provision",
-    "Historical v3/v4 Node pins remain readable until that explicit refresh",
-    "A toolchain pin survives the refresh while a declared extension's runtime resolves it, even in a workspace with no project of that language",
-    "A workspace putnami init creates pins the toolchains it declares, so the commands init prints next resolve them",
-    "A checkout whose lock lacks a pin for a declared toolchain gets it from the first command's implicit install, and keeps every committed pin",
-    "A machine that pinned a Go release pins it again in any workspace with no request to go.dev"
+    "A workspace install pins, for each toolchain an installed extension answers for, an exact release with each platform's archive and SHA-256 digest",
+    "The CLI names no toolchain vendor, release index or declaration file: the extension that runs a toolchain answers for its pin",
+    "A workspace putnami init pins what its extensions answer, so the commands init prints next resolve them",
+    "A checkout whose lock lacks a pin gets it from the first command's implicit install, and keeps every committed format 5 pin",
+    "An answer that fails, or two answers that disagree, stop the install before any installer runs"
   ],
   "nonGoals": [
     "Provisioning or managing a Node runtime",
     "Removing the TypeScript compiler's Node-compatible output target",
-    "Changing the lock format version or its compatibility window"
+    "Choosing between two extensions that answer one identity"
   ],
   "requirements": [
     {
-      "id": "supported-runtimes-only",
-      "text": "Toolchain refresh derives entries only from go.work, package.json#packageManager when it names Bun, and an exact required-version in the [tool.uv] table of the root pyproject.toml when a declared extension's runtime resolves the uv lock identity. It ignores package.json#engines.node, contacts no Node release endpoint, and replaces the toolchain map so a stale Node entry no declared extension resolves cannot survive. Historical v3/v4 Node pins remain readable before that refresh."
-    },
-    {
-      "id": "verified-release-metadata",
-      "text": "Every generated Go, Bun or uv toolchain entry carries an exact version, its vendor release source, and at least one vendor-published SHA-256 digest keyed by os/arch. A uv release older than 0.11.8, the oldest one Putnami runs, is refused with that minimum before any release metadata is read."
-    },
-    {
-      "id": "extension-resolved-pins-survive",
-      "text": "When no go.work, package.json or pyproject.toml declaration derives a toolchain, the refresh keeps the committed pin verbatim while a declared extension's runtime resolves its lock identity: through a task, runToolchains, or the prepare step of a local source. It makes no metadata request for it. Once no declared extension resolves it, the refresh drops the pin."
-    },
-    {
-      "id": "init-records-pins",
-      "text": "putnami init ends with the toolchain refresh putnami install ends with, after its last dependency install, so the lock pins what the new workspace declares before the commands init prints next run. A failed refresh fails init and names putnami install."
-    },
-    {
-      "id": "implicit-install-fills-missing-pins",
-      "text": "The first-use install a command runs implicitly pins each toolchain go.work, package.json#packageManager or the root pyproject.toml [tool.uv] required-version declares that the lock does not pin yet, with the same verified release metadata. It keeps every other entry as committed, stamps no CLI protocol, and creates no lock. Without a missing pin it reads no release metadata and writes nothing."
+      "id": "extensions-answer-pins",
+      "text": "putnami install, putnami init, putnami projects create and the implicit install send, before any workspace-install, one toolchain-resolve request to each installed extension whose manifest lists runtime.resolves. The request names those identities, the lock's committed entries for them, the host platform and whether the run is offline. The CLI validates each answer with the workspace protocol's rules before it uses it."
     },
     {
       "id": "install-pins-before-installers",
-      "text": "An explicit putnami install pins each toolchain go.work, package.json#packageManager or the root pyproject.toml [tool.uv] required-version declares, at the declared release, when the lock pins none or another release, before any workspace installer runs, so the installers install the release the lock pins. A failed pin stops the install before the installers run. The implicit first-use install still only fills a missing pin."
+      "text": "An explicit putnami install, putnami init or putnami projects create sets the lock's toolchains to exactly the answered pins: an identity an answer omits, or that no installed extension answers for, is removed. A lock whose toolchains change is written at format 5 and its other entries keep their content, so a format 3 or 4 lock that pins toolchains becomes format 5."
     },
     {
-      "id": "go-pin-reuses-the-machine-record",
-      "text": "A Go pin takes the entry go.dev published for the release from a record under the Putnami home, toolchains/go/go-<version>.pin.json, and makes no request. It asks the release index only without a record that names the version and the go.dev source and maps only supported platforms to SHA-256 digests. It then writes the fetched entry as the record through a rename; a write that fails does not fail the pin. The lock holds the same bytes from the record and from the index."
+      "id": "implicit-install-fills-missing-pins",
+      "text": "The implicit install a command runs first keeps a committed format 5 pin as committed, takes the answer for every other identity it asks for, and removes no pin. When no pin changes, it writes nothing."
+    },
+    {
+      "id": "hosted-runs-write-no-pins",
+      "text": "A hosted run writes no lock. It uses the answered pins in memory for the rest of the command."
+    },
+    {
+      "id": "failed-answers-stop-the-install",
+      "text": "An answer's problem fails the command with the problem's message and remedy before any installer runs. A failed, timed-out or invalid answer fails it naming the extension, and two extensions that answer one identity with different pins fail it naming both."
+    },
+    {
+      "id": "init-records-pins",
+      "text": "putnami init runs the toolchain pins phase putnami install runs, so the lock pins what the new workspace's extensions answer before the commands init prints next run. A failed phase fails init."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0019-toolchain-lock-follows-provisioned-runtimes.md"
+    "tooling/cli/doc/adr/0019-toolchain-lock-follows-provisioned-runtimes.md",
+    "tooling/cli/doc/adr/0077-the-core-provisions-the-toolchains-extensions-pin.md",
+    "protocols/workspace/doc/adr/0003-extensions-answer-toolchain-pins.md"
   ]
 }

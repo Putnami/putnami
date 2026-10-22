@@ -6,9 +6,6 @@ import "os"
 // names: they import jobtest, which imports this package, so they cannot live
 // inside it.
 
-// InstallLockedGo runs the verified install of the Go release the lock pins.
-func (j *Job) InstallLockedGo(requested string) (string, bool) { return j.installLockedGo(requested) }
-
 // IsPlainGoRelease reports whether version is a Go release name.
 func IsPlainGoRelease(version string) bool { return isPlainGoRelease(version) }
 
@@ -34,11 +31,12 @@ func (t *Trap) Deliver(sig os.Signal) {
 // ExitCodeFor is the status the trap exits with after sig.
 var ExitCodeFor = exitCodeFor
 
-// GoInstallComplete is the completeness predicate of a managed Go install.
-var GoInstallComplete = goInstallComplete
-
 // ManagedGoBinary is where a managed install keeps its go command.
 var ManagedGoBinary = managedGoBinary
+
+// GoArchivesPin is the lock version 5 pin the toolchain-resolve answer gives
+// for a Go release.
+var GoArchivesPin = goArchivesPin
 
 // ManagedGoDir is the directory of a managed install.
 var ManagedGoDir = managedGoDir

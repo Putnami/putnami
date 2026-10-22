@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
@@ -18,6 +20,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
@@ -267,79 +270,16 @@ func TestInstall_RunsTemplatesPhaseWhenConfigured(t *testing.T) {
 	}
 }
 
-// The first-use install that a command runs implicitly fills the lock pins
-// its workspace files declare and the lock lacks, instead of the refresh an
-// explicit install runs; its failure fails the install and names the step.
-// It fills before the workspace installers, which install what the lock pins,
-// and again after them, which can write a declaration. An explicit install
-// never takes the fill path.
-func TestInstall_TheFirstUseInstallFillsMissingToolchainPins(t *testing.T) {
-	spectest.Proves(t, "cli/toolchain-lock", "implicit-install-fills-missing-pins",
-		"the-first-use-install-fills-pins-and-an-explicit-install-refreshes")
+// Install runs the toolchain pins phase once, before the workspace
+// installers, which install what the lock pins: an explicit install asks it as
+// explicit, the first-use install as implicit. A phase that wrote the lock is
+// recorded as a lock action. A failed phase stops the install before the
+// installers, with the phase's own error and next step.
+func TestInstall_RunsTheToolchainPinsPhaseBeforeTheInstallers(t *testing.T) {
 	hometest.Temp(t)
-	orig := fillImplicitToolchainPins
-	t.Cleanup(func() { fillImplicitToolchainPins = orig })
-	var filled []string
-	var fillErr error
-	fillImplicitToolchainPins = func(_ context.Context, root string) (bool, error) {
-		filled = append(filled, root)
-		return fillErr == nil, fillErr
-	}
-	run := func(ctx context.Context) (string, error) {
-		t.Helper()
-		dir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name":"install-ws"}`), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		var out strings.Builder
-		_, err := captureStdout(t, func() error {
-			return Install(ctx, dir, wsproto.Load(dir), nil, installTestEnv(&out, WorkspaceJobOK))
-		})
-		return dir, err
-	}
-
-	if _, err := run(context.Background()); err != nil {
-		t.Fatalf("explicit Install: %v", err)
-	}
-	if len(filled) != 0 {
-		t.Fatalf("an explicit install took the implicit fill path: %v", filled)
-	}
-
-	implicit := shared.WithImplicitInstall(context.Background())
-	dir, err := run(implicit)
-	if err != nil {
-		t.Fatalf("implicit Install: %v", err)
-	}
-	if len(filled) != 2 || filled[0] != dir || filled[1] != dir {
-		t.Fatalf("implicit install filled %v, want %s before and after the installers", filled, dir)
-	}
-
-	fillErr = errors.New("metadata unreachable")
-	if _, err := run(implicit); err == nil || !strings.Contains(err.Error(), "pin missing toolchains") || !errors.Is(err, fillErr) {
-		t.Fatalf("implicit Install with a failed fill = %v, want the fill failure named", err)
-	}
-}
-
-// An explicit install pins the toolchains the workspace declares before the
-// workspace installers run, because they install the release the lock pins:
-// after a go.work bump, one install pins the new release and installs it. Its
-// failure stops the install before the installers and names the step.
-func TestInstall_PinsTheDeclaredToolchainsBeforeTheInstallers(t *testing.T) {
-	spectest.Proves(t, "cli/toolchain-lock", "install-pins-before-installers", "explicit-install-pins-before-the-installers-run")
-	hometest.Temp(t)
-	origPin, origFill := pinExplicitToolchains, fillImplicitToolchainPins
-	t.Cleanup(func() { pinExplicitToolchains, fillImplicitToolchainPins = origPin, origFill })
 	var steps []string
-	var pinErr error
-	pinExplicitToolchains = func(context.Context, string) (bool, error) {
-		steps = append(steps, "pin")
-		return pinErr == nil, pinErr
-	}
-	fillImplicitToolchainPins = func(context.Context, string) (bool, error) {
-		t.Fatal("an explicit install took the implicit fill path")
-		return false, nil
-	}
-	run := func() error {
+	var phaseErr error
+	run := func(ctx context.Context) ([]LifecycleAction, error) {
 		t.Helper()
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name":"install-ws"}`), 0o644); err != nil {
@@ -351,33 +291,50 @@ func TestInstall_PinsTheDeclaredToolchainsBeforeTheInstallers(t *testing.T) {
 			steps = append(steps, "installers")
 			return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
 		}
+		env.pinToolchains = func(_ context.Context, root string, opts toolchainpins.Options) (toolchainpins.Result, error) {
+			if root != dir || opts.Hosted {
+				t.Errorf("the phase ran for %s with %+v, want %s and a local run", root, opts, dir)
+			}
+			steps = append(steps, fmt.Sprintf("pins implicit=%v", opts.Implicit))
+			return toolchainpins.Result{Written: phaseErr == nil}, phaseErr
+		}
 		var actions []LifecycleAction
 		env.OnAction = func(action LifecycleAction) { actions = append(actions, action) }
 		_, err := captureStdout(t, func() error {
-			return Install(context.Background(), dir, wsproto.Load(dir), nil, env)
+			return Install(ctx, dir, wsproto.Load(dir), nil, env)
 		})
-		if err == nil && !slices.ContainsFunc(actions, func(a LifecycleAction) bool {
-			return a.Description == "Declared toolchain pins recorded"
-		}) {
-			t.Errorf("actions = %+v, want the pin recorded", actions)
-		}
-		return err
+		return actions, err
+	}
+	recorded := func(actions []LifecycleAction) bool {
+		return slices.ContainsFunc(actions, func(a LifecycleAction) bool {
+			return a.Kind == "lock" && a.Description == "Toolchain pins recorded"
+		})
 	}
 
-	if err := run(); err != nil {
+	actions, err := run(context.Background())
+	if err != nil {
 		t.Fatalf("explicit Install: %v", err)
 	}
-	if want := []string{"pin", "installers"}; !slices.Equal(steps, want) {
-		t.Fatalf("steps = %v, want %v", steps, want)
+	if want := []string{"pins implicit=false", "installers"}; !slices.Equal(steps, want) || !recorded(actions) {
+		t.Fatalf("steps = %v, actions = %+v; want %v and the pins recorded", steps, actions, want)
 	}
 
 	steps = nil
-	pinErr = errors.New("metadata unreachable")
-	if err := run(); err == nil || !strings.Contains(err.Error(), "pin declared toolchains") || !errors.Is(err, pinErr) {
-		t.Fatalf("explicit Install with a failed pin = %v, want the pin failure named", err)
+	if _, err := run(shared.WithImplicitInstall(context.Background())); err != nil {
+		t.Fatalf("implicit Install: %v", err)
 	}
-	if want := []string{"pin"}; !slices.Equal(steps, want) {
-		t.Fatalf("steps = %v, want the installers not to run after a failed pin", steps)
+	if want := []string{"pins implicit=true", "installers"}; !slices.Equal(steps, want) {
+		t.Fatalf("steps = %v, want %v: the first-use install runs the phase once, before the installers", steps, want)
+	}
+
+	steps = nil
+	phaseErr = protocolcli.WithNext(errors.New("toolchain pins: go: no go.work"), "putnami install")
+	_, err = run(context.Background())
+	if err == nil || !errors.Is(err, phaseErr) || protocolcli.SuggestedNext(err) != "putnami install" {
+		t.Fatalf("Install with a failed phase = %v, want the phase's error and next step", err)
+	}
+	if want := []string{"pins implicit=false"}; !slices.Equal(steps, want) {
+		t.Fatalf("steps = %v, want the installers not to run after a failed phase", steps)
 	}
 }
 

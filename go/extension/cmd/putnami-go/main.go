@@ -16,9 +16,9 @@
 //	serve           Run Go application with hot-reload
 //	run             Run a Go workload once and forward its exit code
 //	package         Create distribution packages
-//	workspace-fetch    Download Go, the modules and the pinned dev tools, the one
+//	workspace-fetch    Download the modules and the pinned dev tools, the one
 //	                   job a hosted run gives the registry credential
-//	workspace-install  Install Go and the pinned dev tools (`putnami install`)
+//	workspace-install  Install the pinned dev tools with the provisioned Go (`putnami install`)
 //	deps-upgrade       Upgrade the go.putnami.dev release lock (`putnami upgrade`)
 //	project-setup      Set a created Go project up (`putnami projects create`)
 //	deps-edit          Edit a Go module's requirements (`putnami deps add|remove|prune`)

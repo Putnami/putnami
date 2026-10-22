@@ -302,8 +302,10 @@ func run(j *workspacejob.Job, opts Options, members []string) string {
 		return statusFailed
 	}
 
-	if !j.ResolveGoBinary() {
-		j.Emit.Log("error", "Go binary not found")
+	// The job installs no Go: the CLI provisions the one the workspace lock
+	// pins before it runs the job.
+	if !j.FindGoBinary() {
+		j.Emit.Diagnostic("error", "deps upgrade: no go command is available; run `putnami install`", "", 0)
 		return statusFailed
 	}
 	SetupModuleEnv(j, opts)

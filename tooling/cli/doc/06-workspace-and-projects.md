@@ -17,16 +17,17 @@ command checks the workspace locks and restores the workspace when necessary.
 1. Restore extensions from their locked versions and run installation hooks.
 2. Check generated agent context and install declared templates and workflows.
 3. Prepare the provider index used to resolve projects and dependencies.
-4. Pin each toolchain that `go.work` or `package.json#packageManager` declares
-   at a release the lock does not pin, so the installers install that release.
+4. Ask each extension that answers for a toolchain to pin it, write the
+   answered pins to the lock, and install each pinned toolchain under the
+   Putnami home. See [Toolchain pins](07-extensions.md#toolchain-and-cli-protocol-preflight).
 5. Run the workspace installers for dependencies, tools and extension setup.
 6. Finalize lock metadata and record the successful installation state.
 
 Automatic installation follows the same preparation and setup steps, but keeps
 the committed lock metadata unchanged before recording installation success,
-except that it adds a pin that `go.work` or `package.json#packageManager`
-declares and the lock does not carry yet. Only an explicit `putnami install`
-refreshes that metadata or changes a committed pin.
+except that it adds the pin an extension answers for a toolchain the lock does
+not pin at format 5 yet. Only an explicit `putnami install` refreshes that
+metadata or changes a committed pin.
 
 Independent artifact restorations and provider probes run concurrently with a
 bounded worker count. Their results are merged in stable order; hooks and shared

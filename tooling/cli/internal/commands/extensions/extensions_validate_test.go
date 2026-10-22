@@ -246,6 +246,54 @@ func TestExtensionsValidate_AnInvalidPublishChannelDeclarationIsRefused(t *testi
 	}
 }
 
+// `putnami extensions validate` refuses a provisioned candidate that names a
+// path, a toolchain that lists two, and one whose lock identity the manifest
+// does not answer for, and names each offending candidate.
+func TestExtensionsValidate_AnInvalidProvisionedCandidateIsRefused(t *testing.T) {
+	manifest := `{
+  "name": "@putnami/test-ext",
+  "cliContract": 13,
+  "commands": {"build": {"run": [{"id": "build", "task": "build"}]}},
+  "tasks": {"build": {"kind": "command", "command": "{extensionRuntime}", "toolchains": ["compiler", "linter", "runner"]}},
+  "runtime": {
+    "executable": "bin/test-ext",
+    "resolves": ["compiler", "linter"],
+    "toolchains": {
+      "compiler": {"lock": "compiler", "candidates": [{"from": "provisioned", "path": "bin/compiler"}], "probe": {"expect": "{version}"}},
+      "linter": {"lock": "linter", "candidates": [{"from": "provisioned"}, {"from": "provisioned"}], "probe": {"expect": "{version}"}},
+      "runner": {"lock": "runner", "candidates": [{"from": "provisioned"}], "probe": {"expect": "{version}"}}
+    }
+  }
+}`
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("an invalid provisioned candidate validated:\n%s", out)
+	}
+	for _, want := range []string{
+		"runtime.toolchains.compiler.candidates[0].path", "invalid-value",
+		"runtime.toolchains.linter.candidates[1]", "duplicate-value",
+		"runtime.toolchains.runner.candidates[0]", "unknown-reference",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	valid := strings.NewReplacer(`{"from": "provisioned", "path": "bin/compiler"}`, `{"from": "provisioned"}`,
+		`[{"from": "provisioned"}, {"from": "provisioned"}]`, `[{"from": "provisioned"}]`,
+		`"resolves": ["compiler", "linter"]`, `"resolves": ["compiler", "linter", "runner"]`).Replace(manifest)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(valid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) }); err != nil {
+		t.Fatalf("the same manifest with valid provisioned candidates must validate: %v\n%s", err, out)
+	}
+}
+
 func TestExtensionsValidate_MissingPath(t *testing.T) {
 	err := ExtensionsValidate([]string{filepath.Join(t.TempDir(), "missing")})
 	if err == nil || !strings.Contains(err.Error(), "path not found") {

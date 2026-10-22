@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -15,7 +16,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
-	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -45,12 +46,12 @@ var errProjectSetup = errors.New("the project-setup job failed")
 //
 // Before the run, the toolchains the job requires resolve as they do for the
 // job (toolchain.UnresolvedRuntimeToolchainLocks). When one does not, the job
-// first runs its prepare stage, which writes the files a pin derives from;
-// the implicit install's lock step then pins what is missing, and the
-// workspace installers run when it pinned a toolchain the extension's runtime
-// locks. The job then runs once. installErr is the failure of that lock step
-// or of those installers: the setup may still succeed, and the caller reports
-// it.
+// first runs its prepare stage, which writes the files the extensions read
+// their pins from; the toolchain pins phase then records what the extensions
+// answer, and the workspace installers run when it added or changed the pin
+// of a toolchain the extension's runtime locks. The job then runs once.
+// installErr is the failure of that phase or of those installers: the setup
+// may still succeed, and the caller reports it.
 func setUpProject(ctx context.Context, wsRoot, projectPath string, env LifecycleEnv) (installErr, err error) {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
@@ -100,8 +101,8 @@ func setUpProject(ctx context.Context, wsRoot, projectPath string, env Lifecycle
 	if err := run(projectSetupPrepareStage); err != nil {
 		return nil, err
 	}
-	pinned, err := pinMissingToolchains(ctx, wsRoot, extension.RuntimeToolchainLocks(ext), env)
-	switch {
+	pins, err := resolveToolchainPins(ctx, wsRoot, env)
+	switch pinned := pinnedLocks(pins, extension.RuntimeToolchainLocks(ext)); {
 	case err != nil:
 		installErr = err
 	case len(pinned) > 0:
@@ -111,50 +112,17 @@ func setUpProject(ctx context.Context, wsRoot, projectPath string, env Lifecycle
 	return installErr, run("")
 }
 
-// pinMissingToolchains runs the implicit install's lock step (env.pinToolchains)
-// and returns the sorted names of locks it pinned that were unpinned before.
-func pinMissingToolchains(ctx context.Context, wsRoot string, locks []string, env LifecycleEnv) ([]string, error) {
-	before, err := pinnedToolchains(wsRoot, locks)
-	if err != nil {
-		return nil, err
-	}
-	pin := env.pinToolchains
-	if pin == nil {
-		pin = fillImplicitToolchainPins
-	}
-	if _, err := pin(ctx, wsRoot); err != nil {
-		return nil, fmt.Errorf("pin missing toolchains: %w", err)
-	}
-	after, err := pinnedToolchains(wsRoot, locks)
-	if err != nil {
-		return nil, err
-	}
+// pinnedLocks returns the sorted locks whose pin the toolchain pins phase
+// added or changed.
+func pinnedLocks(pins toolchainpins.Result, locks []string) []string {
 	var pinned []string
 	for _, lock := range locks {
-		if after[lock] && !before[lock] {
+		if slices.Contains(pins.Added, lock) || slices.Contains(pins.Changed, lock) {
 			pinned = append(pinned, lock)
 		}
 	}
-	return pinned, nil
-}
-
-// pinnedToolchains reports which of locks the workspace lock pins at a
-// version. Without a lock, none is.
-func pinnedToolchains(wsRoot string, locks []string) (map[string]bool, error) {
-	lf, err := lockfile.ReadLockFile(wsRoot)
-	if err != nil {
-		return nil, fmt.Errorf("read the workspace lock: %w", err)
-	}
-	pinned := map[string]bool{}
-	if lf == nil {
-		return pinned, nil
-	}
-	for _, lock := range locks {
-		if entry, ok := lf.GetToolchain(lock); ok && strings.TrimSpace(entry.Version) != "" {
-			pinned[lock] = true
-		}
-	}
-	return pinned, nil
+	sort.Strings(pinned)
+	return pinned
 }
 
 // projectAtPath is the project of ws whose directory is the workspace-relative

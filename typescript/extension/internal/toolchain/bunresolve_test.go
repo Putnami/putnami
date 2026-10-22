@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -185,6 +186,8 @@ func TestReadDeclaredBunVersion_NormalizesLikeTheCLI(t *testing.T) {
 // A committed version 5 pin of the declared release is the answer as it is,
 // with no lookup, even online.
 func TestResolveBun_KeepsACommittedVersion5PinAsItIs(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"a-committed-version-5-pin-of-the-release-is-kept-as-committed")
 	noBunReleaseLookup(t)
 	committed := vendorPin("1.3.0", digestsFor("1.3.0"))
 	committed.Archives["linux/amd64"] = wsproto.LockToolchainArchive{
@@ -240,6 +243,8 @@ func TestResolveBun_ConvertsACommittedVersion4PinOffline(t *testing.T) {
 // A declared default release the lock does not pin is pinned from the digests
 // the extension ships, offline, at the vendor's release downloads.
 func TestResolveBun_PinsTheDeclaredDefaultReleaseOffline(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"the-default-release-is-pinned-offline-from-the-shipped-digests")
 	noBunReleaseLookup(t)
 	committed := wsproto.LockToolchainEntry{Version: "1.2.9", Integrities: digestsFor("1.2.9"), Source: bunReleaseSource("1.2.9")}
 	root := bunWorkspace(t, `{"packageManager":"bun@`+DefaultBunVersion+`"}`)
@@ -256,6 +261,10 @@ func TestResolveBun_PinsTheDeclaredDefaultReleaseOffline(t *testing.T) {
 // pin, is pinned from the SHA-256 digests its GitHub release lists for the six
 // archives; the other assets are ignored.
 func TestResolveBun_LooksUpADeclaredRelease(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"the-release-is-the-package-manager-declaration")
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"a-declared-release-is-pinned-from-its-github-release-digests")
 	digests := digestsFor("1.3.2")
 	var mu sync.Mutex
 	var paths, agents []string
@@ -299,6 +308,8 @@ func TestBunReleaseAPIURL_IsTheVendorRelease(t *testing.T) {
 // Offline, a declared release that is neither pinned nor the default one has
 // no digests to pin, and the remedy is an install with network access.
 func TestResolveBun_OfflineCannotPinAnUnpinnedRelease(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"offline-an-unpinned-declared-release-is-a-problem-naming-putnami-install")
 	noBunReleaseLookup(t)
 	committed := vendorPin("1.2.9", digestsFor("1.2.9"))
 	root := bunWorkspace(t, `{"packageManager":"bun@1.3.2"}`)
@@ -345,6 +356,10 @@ func TestResolveBun_ADeclarationThatIsNoReleaseIsAProblem(t *testing.T) {
 // Nothing declared and nothing pinned pins the default release offline: the
 // release workspace-install declares for such a workspace.
 func TestResolveBun_PinsTheDefaultReleaseWhenNothingIsDeclared(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"nothing-declared-pins-the-default-release")
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-answers-its-toolchain-pin",
+		"the-default-release-is-pinned-offline-from-the-shipped-digests")
 	noBunReleaseLookup(t)
 	for _, manifest := range []string{"", `{"name":"repo"}`, `{"packageManager":"npm@10.0.0"}`} {
 		got := wantPin(t, answerBun(t, bunWorkspace(t, manifest), bunResolveRequest("linux/amd64", nil, false)))

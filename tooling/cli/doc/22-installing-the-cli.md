@@ -37,9 +37,10 @@ the public site/registry, and network access to the public package registry
 beforehand.
 
 Bun is not a prerequisite. `putnami init` uses a Bun the machine already holds
-when it fits. Otherwise `@putnami/typescript` installs Bun at
-`~/.putnami/toolchains/bun/bun-<version>/bin/bun` from the vendor's release on
-`github.com`, and refuses an archive whose SHA-256 is not the expected one. See
+when it fits. Otherwise Putnami installs the Bun release the lock pins under
+`~/.putnami/toolchains/bun/bun-<version>/`, from the vendor's release on
+`github.com`, and refuses an archive whose SHA-256 is not the one the lock
+records. See
 [Workspace install](../../../typescript/extension/doc/08-workspace-install.md#which-bun-runs).
 
 The first command installs the newest stable CLI into `~/.putnami/bin`, links it
@@ -624,10 +625,10 @@ registry (`https://npm.putnami.dev`) that `bun install` uses.
 
 Bun is not a prerequisite on Windows either. `@putnami/typescript` looks for
 `bun` on `PATH`, then where Bun's installer puts it: `%BUN_INSTALL%\bin`, by
-default `%USERPROFILE%\.bun\bin`. When none fits, it installs
-`bun-windows-x64.zip` from the vendor's release on `github.com` at
-`%USERPROFILE%\.putnami\toolchains\bun\bun-<version>\bin\bun.exe`, checked
-against its SHA-256.
+default `%USERPROFILE%\.bun\bin`. When none fits, Putnami installs
+`bun-windows-x64.zip` from the vendor's release on `github.com` under
+`%USERPROFILE%\.putnami\toolchains\bun\bun-<version>\`, checked against the
+SHA-256 the lock records.
 
 Workspaces check out with LF line endings. `putnami init` writes a
 `.gitattributes` file with `* text=auto eol=lf` when the workspace has none,

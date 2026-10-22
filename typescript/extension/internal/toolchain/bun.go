@@ -2,7 +2,6 @@ package toolchain
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,8 +37,6 @@ type bunHost struct {
 	lookPath func(file string) (string, error)
 	// userHome returns the user's home directory.
 	userHome func() (string, error)
-	// client downloads a release. Nil selects the client of pinnedarchive.
-	client *http.Client
 }
 
 // currentBunHost is the machine this process runs on.
@@ -53,13 +50,15 @@ func currentBunHost() bunHost {
 	}
 }
 
-// ResolveBun finds the bun a task runs with.
+// ResolveBun finds the bun a job or a task runs with. It installs none.
 //
-// A bun the host holds comes first (see hostBuns): the CLI puts the bun it
-// resolved for the task first on PATH. Then comes the install under the
+// A bun the host holds comes first (see hostBuns): the CLI resolves the
+// task runtime before it starts a job, provisioning the release the
+// workspace lock pins under the Putnami home when the host holds none, and
+// puts the bun it resolved first on PATH. Then comes the release under the
 // Putnami home of the release the workspace pins or declares, or of the
-// extension's default release. ResolveBun installs nothing: `putnami install`
-// does, and the error names it.
+// extension's default release (provisionedBun). The error names
+// `putnami install`, which provisions it.
 func ResolveBun() (string, error) {
 	return resolveBun(currentBunHost())
 }
@@ -71,26 +70,22 @@ func resolveBun(host bunHost) (string, error) {
 	version := DefaultBunVersion
 	workspaceRoot := strings.TrimSpace(host.lookup(workspaceRootEnv))
 	if workspaceRoot != "" {
-		if want, err := wantedBun(workspaceRoot); err == nil && want.version != "" {
-			version = want.version
+		if wanted := wantedBunVersion(workspaceRoot); wanted != "" {
+			version = wanted
 		}
 	}
 	// Without a workspace root and without a home directory there is no
 	// Putnami home to look under.
-	root := ""
 	if workspaceRoot != "" || putnamihome.Resolve(host.lookup) != "" {
-		root = putnamihome.ToolchainRoot(host.lookup, workspaceRoot, bunToolchainName)
-	}
-	if root != "" && IsPlainBunRelease(version) {
-		dir := managedBunDir(root, version)
-		if bun := managedBunPath(dir, host.platform.goos); isRegularFile(bun) {
-			if err := host.useManagedBun(dir); err != nil {
+		root := putnamihome.ToolchainRoot(host.lookup, workspaceRoot, bunToolchainName)
+		if bun := provisionedBun(root, version, host.platform); bun != "" {
+			if err := host.useManagedBun(managedBunDir(root, version), filepath.Dir(bun)); err != nil {
 				return "", err
 			}
 			return bun, nil
 		}
 	}
-	return "", fmt.Errorf("no Bun %s on this machine: run `putnami install`, which installs it under the Putnami home", version)
+	return "", fmt.Errorf("no Bun %s on this machine: run `putnami install`, which provisions it under the Putnami home", version)
 }
 
 // hostBuns lists the bun programs the host holds, in the order the task
@@ -125,43 +120,47 @@ func (h bunHost) hostBuns() []string {
 	return found
 }
 
-// managedBunDir is the directory of the Bun version Putnami installs under
-// root, the toolchains/bun directory of a Putnami home.
+// managedBunDir is the directory of a Bun release under root, the
+// toolchains/bun directory of a Putnami home.
 func managedBunDir(root, version string) string {
 	return filepath.Join(root, "bun-"+version)
 }
 
-// managedBunPath is the bun program of the install at dir.
-func managedBunPath(dir, goos string) string {
-	return filepath.Join(dir, "bin", bunProgram(goos))
-}
-
-// managedBunDirOf returns the install directory when bun is the program of a
-// Bun that Putnami installed, and "" otherwise. Such an install is
-// toolchains/bun/bun-<version> under a Putnami home, and its program is
-// bin/bun in it.
-func managedBunDirOf(bun string) string {
-	dir := filepath.Dir(filepath.Dir(bun))
-	if !isManagedBunDir(dir) {
+// provisionedBun returns the bun program of Bun version under root, or "".
+// The CLI provisions a release there as its archive unpacks, the program at
+// bun-<target>/bun in the release directory, which is the executable the
+// toolchain-resolve answer names (bunPinOf). A release directory that holds its
+// program at bin/bun instead is found too.
+func provisionedBun(root, version string, host platform) string {
+	if !IsPlainBunRelease(version) {
 		return ""
 	}
-	return dir
+	dir := managedBunDir(root, version)
+	program := bunProgram(host.goos)
+	var candidates []string
+	if archive, ok := bunArchiveFor(BunRelease{Version: version}, host.goos, host.goarch); ok {
+		candidates = append(candidates, filepath.Join(dir, archive.dir, program))
+	}
+	for _, candidate := range append(candidates, filepath.Join(dir, "bin", program)) {
+		if isRegularFile(candidate) {
+			return candidate
+		}
+	}
+	return ""
 }
 
 // isManagedBunDir reports whether dir has the place and the name of a Bun
-// that Putnami installed: toolchains/bun/bun-<version>.
+// release under a Putnami home: toolchains/bun/bun-<version>.
 func isManagedBunDir(dir string) bool {
 	return putnamihome.IsToolchainInstall(dir, bunToolchainName)
 }
 
-// useManagedBun makes this process, and every program it starts, run the Bun
-// that Putnami installed at dir, and keeps what that Bun writes under dir:
-// BUN_INSTALL names dir, so its package cache is install/cache there, the
-// transpiler cache is the @t@ directory of that cache, and bin is first on
-// PATH. An explicit transpiler cache setting is left alone.
-//
-// A Bun the host holds gets none of this: it keeps its own locations.
-func (h bunHost) useManagedBun(dir string) error {
+// keepBunFilesUnder makes the Bun release at dir keep what it writes under
+// dir, for this process and every program it starts: BUN_INSTALL names dir,
+// so its package cache is install/cache there, and the transpiler cache is
+// the @t@ directory of that cache. An explicit transpiler cache setting is
+// left alone.
+func (h bunHost) keepBunFilesUnder(dir string) error {
 	if err := h.setenv(bunInstallEnv, dir); err != nil {
 		return fmt.Errorf("set %s: %w", bunInstallEnv, err)
 	}
@@ -170,27 +169,41 @@ func (h bunHost) useManagedBun(dir string) error {
 			return fmt.Errorf("set %s: %w", bunTranspilerCacheEnv, err)
 		}
 	}
-	bin := filepath.Join(dir, "bin")
+	return nil
+}
+
+// useManagedBun makes this process, and every program it starts, run the Bun
+// release at dir whose program is in programDir: its files stay under dir
+// (keepBunFilesUnder), and programDir is first on PATH.
+//
+// A Bun the host holds gets none of this: it keeps its own locations.
+func (h bunHost) useManagedBun(dir, programDir string) error {
+	if err := h.keepBunFilesUnder(dir); err != nil {
+		return err
+	}
 	path := h.lookup("PATH")
-	if first, _, _ := strings.Cut(path, string(os.PathListSeparator)); first == bin {
+	if first, _, _ := strings.Cut(path, string(os.PathListSeparator)); first == programDir {
 		return nil
 	}
 	if path != "" {
-		bin += string(os.PathListSeparator) + path
+		programDir += string(os.PathListSeparator) + path
 	}
-	if err := h.setenv("PATH", bin); err != nil {
+	if err := h.setenv("PATH", programDir); err != nil {
 		return fmt.Errorf("set PATH: %w", err)
 	}
 	return nil
 }
 
-// ApplyManagedBunEnv keeps the files of a Bun that Putnami installed under
-// its install directory, for this process and everything it starts.
+// ApplyManagedBunEnv keeps the files of a Bun release under a Putnami home in
+// that release's directory, for this process and everything it starts.
 //
-// The CLI names the install the task runs with in BUN_INSTALL. When that is a
-// Bun that Putnami installed, bun's transpiler cache moves under it too (see
-// useManagedBun), so that such a Bun writes nothing to .bun in the user's home
-// directory. Called once, at process start.
+// The CLI names the release the task runtime resolved in BUN_INSTALL, two
+// levels above its program, and puts the program first on PATH. A provisioned
+// program at bun-<target>/bun and a program at bin/bun in the same folder
+// both give the release directory, toolchains/bun/bun-<version>. For such a
+// Bun, bun's transpiler cache moves under that directory too
+// (keepBunFilesUnder), so it writes nothing to .bun in the user's home
+// directory. PATH is left as the CLI set it. Called once, at process start.
 func ApplyManagedBunEnv() {
 	currentBunHost().applyManagedBunEnv()
 }
@@ -202,7 +215,7 @@ func (h bunHost) applyManagedBunEnv() {
 	}
 	// Setting a variable fails only for a name or a value the system
 	// refuses, and these come from the environment itself.
-	_ = h.useManagedBun(dir)
+	_ = h.keepBunFilesUnder(dir)
 }
 
 // isRegularFile reports whether path names a regular file, through symbolic

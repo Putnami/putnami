@@ -54,7 +54,7 @@ const uvLockOrigin = "toolchains.uv in " + WorkspaceLockFile
 //     release Putnami runs (uvtoolchain Declaration.Problem) is a problem.
 //   - A committed pin of the declared release, or any committed pin when the
 //     file declares none, is kept: a lock version 5 entry as is, and a version
-//     3 or 4 entry as the archives the installer downloads from its source
+//     3 or 4 entry as the archives of its source
 //     (uvLockPin). A kept release must be one Putnami runs.
 //   - A declared release the lock does not pin is pinned: DefaultUVVersion
 //     with the digests the extension ships, and any other release with the
@@ -161,14 +161,14 @@ func uvServes(pin wsproto.LockToolchainEntry, platform, origin, remedy string) w
 
 // uvLockPin returns release as a lock version 5 pin. Each platform the release
 // records a SHA-256 for, and uvArchiveFor names an archive for, gets the
-// archive the installer downloads: its URL, its format, and the path of the uv
+// archive uv publishes for it: its URL, its format, and the path of the uv
 // program inside it. Any other platform is left out.
 //
 // The error says why the release names no archive a lock records: a source
 // that is not an http or https URL with a host, a source that carries
 // credentials, or a SHA-256 that is not 64 hexadecimal characters once
-// trimmed and lowercased, as the installer reads it. It never repeats the
-// source, which may hold credentials.
+// trimmed and lowercased. It never repeats the source, which may hold
+// credentials.
 func uvLockPin(release UVRelease) (wsproto.LockToolchainEntry, error) {
 	pin := wsproto.LockToolchainEntry{
 		Version:     release.Version,

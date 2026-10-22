@@ -19,7 +19,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -134,7 +133,7 @@ func TestDepsInstallFetchesThroughTheEngineOnAHostedRun(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			wsRoot := t.TempDir()
-			hometest.Temp(t)
+			isolateHomes(t)
 			t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 			t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
 			log := writeFetchingLifecycleFixture(t, wsRoot, tc.fetchExit, tc.scriptFetch)

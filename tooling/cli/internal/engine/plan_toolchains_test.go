@@ -19,7 +19,9 @@ import (
 // process-wide os.Stderr.
 func TestBuildPlan_FailsOnlyAPlannedJobWithAnUnresolvedToolchain(t *testing.T) {
 	root := t.TempDir()
+	// A toolchain pin without archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetToolchain("other", lockfile.LockEntry{Version: "1.2.3"})
 	if err := lockfile.WriteLockFile(root, locked); err != nil {
 		t.Fatal(err)
@@ -69,7 +71,7 @@ func TestBuildPlan_FailsOnlyAPlannedJobWithAnUnresolvedToolchain(t *testing.T) {
 
 	planned, code, stderr = plan("@putnami/go")
 	want := `resolve extension "@putnami/go" runtime toolchain "compiler": workspace lock has no exact "go" pin: ` +
-		"add a project that declares it, or run `putnami install` to record the declared one"
+		"run `putnami install`"
 	if code != ExitError || planned != nil || !strings.Contains(stderr, want) {
 		t.Fatalf("a plan with a @putnami/go job: code %d, %d job(s), stderr %q; want ExitError naming %q", code, len(planned), stderr, want)
 	}

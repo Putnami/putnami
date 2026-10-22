@@ -21,12 +21,9 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 	force := ctx.Params.Bool("force", false)
 	hosted := registrycred.OfflineDependencies()
 
-	// A hosted run downloads no toolchain: it runs the bun the runner holds.
-	mode := toolchain.BunInstall
-	if hosted {
-		mode = toolchain.BunFind
-	}
-	bunBin, err := provisionBunBin(ctx, emit, mode, nil)
+	// The job installs no Bun: it runs the one the CLI resolved, which the
+	// CLI provisions under the Putnami home when the host holds none.
+	bunBin, err := resolveBunBin()
 	if err != nil {
 		return "FAILED", nil, err
 	}

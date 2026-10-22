@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -146,6 +147,8 @@ func goDotDevPin(version string, integrities map[string]string) wsproto.LockTool
 // toolchain directives, and a missing go.work, or one that names neither,
 // declares none.
 func TestGoWorkDeclarationIsTheHigherDirective(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"the-release-is-the-higher-go-work-directive")
 	for _, tc := range []struct {
 		name, goWork, want string
 	}{
@@ -177,6 +180,8 @@ func TestGoWorkDeclarationIsTheHigherDirective(t *testing.T) {
 // committed pin when go.work declares none, is kept as committed, with no
 // request.
 func TestAnswerKeepsACommittedFormat5Pin(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"a-committed-format-5-pin-of-the-release-is-kept-as-committed")
 	committed := wsproto.LockToolchainEntry{
 		Version: "1.26.1",
 		Archives: map[string]wsproto.LockToolchainArchive{
@@ -247,6 +252,8 @@ func TestAnswerConvertsACommittedFormat4PinOffline(t *testing.T) {
 // Rule c: a declared release the lock does not pin is resolved from its pin
 // record under the Putnami home, with no request.
 func TestAnswerResolvesTheDeclaredReleaseFromItsPinRecord(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-pin-reuses-the-machine-record",
+		"a-recorded-release-is-answered-without-a-request")
 	records := isolatedPutnamiHome(t)
 	forbidReleaseIndex(t)
 	integrities := map[string]string{"linux/amd64": digestOf('c'), "windows/arm64": digestOf('d')}
@@ -282,6 +289,10 @@ func TestGoPinRecordAcceptsOnlyTheIndexEntry(t *testing.T) {
 // release index, and the answer is written as the pin record the CLI reads,
 // so the next answer makes no request.
 func TestAnswerResolvesTheDeclaredReleaseFromTheIndexAndRecordsIt(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"each-platform-archive-and-digest-come-from-the-go-dev-index")
+	spectest.Proves(t, "go/go-project-toolchain", "go-pin-reuses-the-machine-record",
+		"a-resolved-release-is-recorded-under-the-putnami-home")
 	records := isolatedPutnamiHome(t)
 	index := []goRelease{
 		{Version: "go1.26.1", Files: []goFile{{OS: "linux", Arch: "amd64", Kind: "archive", SHA256: digestOf('0')}}},
@@ -334,6 +345,72 @@ func TestAnswerResolvesTheDeclaredReleaseFromTheIndexAndRecordsIt(t *testing.T) 
 	}
 }
 
+// singleReleaseIndex is a go.dev release index that publishes Go version for
+// linux/amd64 alone, with digest.
+func singleReleaseIndex(version, digest string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]goRelease{{Version: "go" + version, Files: []goFile{
+			{Filename: "go" + version + ".linux-amd64.tar.gz", OS: "linux", Arch: "amd64", Kind: "archive", SHA256: digest},
+		}}})
+	}
+}
+
+// Rule c: a pin record the answer cannot use, whatever makes it so, is
+// ignored: the release is resolved from the index and the record is replaced
+// with the index's answer.
+func TestAnswerReplacesAPinRecordItCannotUse(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-pin-reuses-the-machine-record",
+		"an-invalid-record-is-ignored-and-replaced")
+	for _, tc := range []struct{ name, record string }{
+		{"malformed", `{"version":`},
+		{"another release", `{"version":"1.26.1","integrities":{"linux/amd64":"` + digestOf('a') + `"},"source":"https://go.dev/dl/"}`},
+		{"another source", `{"version":"1.26.2","integrities":{"linux/amd64":"` + digestOf('a') + `"},"source":"https://mirror.example/go/"}`},
+		{"a digest that is not SHA-256", `{"version":"1.26.2","integrities":{"linux/amd64":"abc"},"source":"https://go.dev/dl/"}`},
+		{"no platform", `{"version":"1.26.2","integrities":{},"source":"https://go.dev/dl/"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			records := isolatedPutnamiHome(t)
+			path := filepath.Join(records, "go-1.26.2.pin.json")
+			if err := os.MkdirAll(records, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(tc.record), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			requests := serveReleaseIndex(t, singleReleaseIndex("1.26.2", digestOf('2')))
+			integrities := map[string]string{"linux/amd64": digestOf('2')}
+			pin := goPinOf(t, answerGo(t, goWorkspace(t, "go 1.26.2\n"), goResolveRequest("linux/amd64", false, nil)))
+			if want := goDotDevPin("1.26.2", integrities); !reflect.DeepEqual(pin, want) {
+				t.Fatalf("pin = %+v, want the index's %+v", pin, want)
+			}
+			if got := requests.Load(); got != 1 {
+				t.Fatalf("the release index was requested %d times, want once", got)
+			}
+			record, ok := readGoPinRecord(records, "1.26.2")
+			if want := (GoLock{Version: "1.26.2", Integrities: integrities, Source: goReleaseSource}); !ok || !reflect.DeepEqual(record, want) {
+				t.Fatalf("pin record = %+v (%v), want the index's answer %+v", record, ok, want)
+			}
+		})
+	}
+}
+
+// Rule c: a Putnami home the answer cannot write a record in still yields the
+// pin the index publishes.
+func TestAnswerPinsWhenThePutnamiHomeCannotBeWritten(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-pin-reuses-the-machine-record",
+		"an-unwritable-home-still-pins")
+	home := filepath.Join(t.TempDir(), "home")
+	if err := os.WriteFile(home, []byte("a file, not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PUTNAMI_HOME", home)
+	serveReleaseIndex(t, singleReleaseIndex("1.26.3", digestOf('3')))
+	pin := goPinOf(t, answerGo(t, goWorkspace(t, "go 1.26.3\n"), goResolveRequest("linux/amd64", false, nil)))
+	if want := goDotDevPin("1.26.3", map[string]string{"linux/amd64": digestOf('3')}); !reflect.DeepEqual(pin, want) {
+		t.Fatalf("pin = %+v, want the index's %+v", pin, want)
+	}
+}
+
 // Rule c: offline, a declared release with no committed pin and no record is
 // a problem whose remedy is an install with network access.
 func TestAnswerOfflineWithoutPinRecordIsAProblem(t *testing.T) {
@@ -352,6 +429,8 @@ func TestAnswerOfflineWithoutPinRecordIsAProblem(t *testing.T) {
 // Rule c: a lookup that fails is a problem carrying the error, and writes no
 // pin record.
 func TestAnswerFailedLookupIsAProblem(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-pin-reuses-the-machine-record",
+		"a-failed-lookup-writes-no-record")
 	for _, tc := range []struct {
 		name    string
 		handler http.HandlerFunc
@@ -384,6 +463,8 @@ func TestAnswerFailedLookupIsAProblem(t *testing.T) {
 // Rule d: with no declaration and no committed pin, the answer omits Go, so
 // the lock keeps no Go pin.
 func TestAnswerOmitsGoWithoutDeclarationOrPin(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"no-declaration-and-no-committed-pin-pins-no-go")
 	for _, tc := range []struct{ name, goWork string }{
 		{"no go.work", ""},
 		{"go.work without a release", "use ./app\n"},
