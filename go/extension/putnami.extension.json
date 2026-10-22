@@ -29,6 +29,7 @@
     },
     "runToolchains": ["runtimeCompiler"],
     "resolves": ["go"],
+    "inputSelectors": ["go-embed:build", "go-embed:test"],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": ["--output", "{runtimeOutput}"],
