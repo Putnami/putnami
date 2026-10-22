@@ -59,7 +59,9 @@ func TestInstall_KeepsTheToolchainPinADeclaredExtensionPreparesWith(t *testing.T
 		},
 		Source: "https://go.dev/dl/",
 	}
+	// A toolchain pin with a source and no archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetToolchain("go", pinned)
 	if err := lockfile.WriteLockFile(wsRoot, locked); err != nil {
 		t.Fatal(err)

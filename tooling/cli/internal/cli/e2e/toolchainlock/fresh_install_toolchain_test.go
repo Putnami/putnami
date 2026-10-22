@@ -94,7 +94,9 @@ func TestInstall_RunsWorkspaceInstallBeforeTheLockPinsItsToolchain(t *testing.T)
 		t.Fatalf("the build task ran %d times without a go pin, want 0", runs)
 	}
 
+	// A toolchain pin with a source and no archives is lock format version 4.
 	pinned := lockfile.NewLockFile()
+	pinned.Version = lockfile.FormatVersionV4
 	pinned.SetToolchain("go", lockfile.LockEntry{
 		Version:     goVersion,
 		Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): strings.Repeat("a", 64)},

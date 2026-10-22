@@ -140,6 +140,18 @@ directory is the only declared addition to `PATH`. The lock version, platform
 integrity, declaration and availability form the portable toolchain identity in
 runtime and task cache keys.
 
+A candidate comes `from` one of five sources:
+
+- `path`: the bare executable name `path`, looked up on `PATH`.
+- `environment`: `path` below the value of the variable `environment` names.
+- `home`: `path` below the user's home directory.
+- `putnami-home`: `path` below the Putnami home.
+- `provisioned`: no `path` and no `environment`. The candidate resolves to
+  `<PutnamiHome>/toolchains/<lock>/<lock>-<version>/<executable>`, where
+  `<executable>` is the `executable` of the host platform's archive in the
+  workspace lock's entry for the toolchain's `lock` identity. A toolchain lists
+  at most one `provisioned` candidate.
+
 An `environment` candidate resolves below the value of the variable it names,
 read from the CLI's environment with `PUTNAMI_WORKSPACE_ROOT` set to the
 workspace root, the value every job receives. A toolchain that an extension
@@ -208,6 +220,14 @@ bytes), listed once, at most 16 entries; normalization sorts the list. An entry
 need not be the `lock` of one of the runtime's own toolchains, so an extension
 can answer for a toolchain another extension runs. The member adds no CLI
 contract rung: a core that predates it ignores it.
+
+A toolchain whose `lock` identity the same manifest lists in `runtime.resolves`
+may name the `provisioned` candidate. The core unpacks the host platform's
+archive that the answer pins, and the candidate resolves to its executable. A
+manifest that declares the candidate requires CLI contract 13
+(`ProvisionedToolchainContract`), and validation refuses one whose identity
+`runtime.resolves` does not list (`unknown-reference`). The reasoning is in
+[ADR 0012](adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md).
 
 Core asks for the pins with the reserved control call
 `<runtime> __putnami toolchain-resolve`, with the working directory set to the
@@ -525,6 +545,7 @@ validation codes, which never use the dotted spelling:
 | `invalid-workspace-path` | A marker, input, or exclude is absolute, escapes its root, or uses a template variable |
 | `marker-not-input` | A declared marker is missing from `workspace.inputs` |
 | `unresolved-sync-task` | `workspace.syncTask` names a task the manifest does not define |
+| `unknown-reference` | A toolchain reference names no `runtime.toolchains` alias, or a `provisioned` candidate's `lock` identity is missing from `runtime.resolves` |
 | `redundant-exclude` | *(warning)* An exclude restates a core-owned exclusion |
 | `duplicate-value` | A pattern set declares the same pattern twice |
 | `invocation-scope-required` | A `runtime-file` or `sensitive` output is not invocation-scoped |

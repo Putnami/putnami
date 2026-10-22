@@ -45,6 +45,16 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	13: ADDITIVE — the provisioned toolchain candidate (`"from":
+//	   "provisioned"` in a runtime toolchain's candidates). From 13 on, the
+//	   CLI downloads, verifies and unpacks the host platform's archive of
+//	   each toolchain the workspace lock pins, below the Putnami home, and a
+//	   provisioned candidate resolves to the executable the lock's archive
+//	   names in that tree. The candidate names no path, so an older reader
+//	   would not know where the executable is, and it provisions nothing, so
+//	   it must refuse the stamp. Only a manifest whose runtime toolchain
+//	   declares the candidate is stamped 13, and the floor binds it from
+//	   every origin.
 //	12: ADDITIVE — the publish channels a publish task serves
 //	   (`declares.publishChannels`). From 12 on, a publishing run counts a
 //	   project's declared publish channel as served only by a planned job
@@ -190,7 +200,15 @@ const CommandKindContract = 11
 // channels by another rule.
 const PublishChannelsContract = 12
 
+// ProvisionedToolchainContract is required by a manifest whose runtime
+// toolchain declares a provisioned candidate. A reader at this contract
+// unpacks the host platform's archive of each pinned toolchain below the
+// Putnami home and resolves the candidate to the executable the lock names in
+// it, so an older reader, which knows neither the archive nor the executable,
+// refuses the stamp instead of resolving the toolchain without them.
+const ProvisionedToolchainContract = 13
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = PublishChannelsContract
+const LatestContract = ProvisionedToolchainContract

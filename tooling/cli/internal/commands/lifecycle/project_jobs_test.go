@@ -206,7 +206,10 @@ func setupToolchainWorkspace(t *testing.T, pinned bool) string {
   "tasks": { "project-setup-exec": { "kind": "command", "command": "{extensionRuntime}", "cache": false } }
 }`)
 	writeRawFile(t, filepath.Join(root, "api", "putnami.json"), `{"name":"api","extensions":["@acme/app"]}`)
+	// pinSetupToolchain writes a toolchain pin without archives, which lock
+	// format version 4 records.
 	lock := lockfile.NewLockFile()
+	lock.Version = lockfile.FormatVersionV4
 	if pinned {
 		pinSetupToolchain(lock, "acme")
 		fixtureproc.Write(t, filepath.Join(root, "tools", "acme"), fixtureproc.Program{Stdout: setupToolchainRelease + "\n"})

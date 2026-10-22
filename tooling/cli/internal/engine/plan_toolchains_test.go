@@ -19,7 +19,9 @@ import (
 // process-wide os.Stderr.
 func TestBuildPlan_FailsOnlyAPlannedJobWithAnUnresolvedToolchain(t *testing.T) {
 	root := t.TempDir()
+	// A toolchain pin without archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetToolchain("other", lockfile.LockEntry{Version: "1.2.3"})
 	if err := lockfile.WriteLockFile(root, locked); err != nil {
 		t.Fatal(err)

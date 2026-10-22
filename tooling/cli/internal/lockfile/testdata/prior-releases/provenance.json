@@ -35,7 +35,7 @@
       "sourcePath": "putnami.lock.json",
       "committed": "2026-07-30",
       "sha256": "2c5fcfba9d2ac109c44adbb76be2a8022c9ab5b43fff879ece93a0ada0af0b18",
-      "why": "A fully populated v2: `taskContract: 3` recorded plus two real per-platform archive digests. It is the fixture that proves a v2→v4 migration carries every platform's digest, not just the one the migrating machine runs."
+      "why": "A fully populated v2: `taskContract: 3` recorded plus two real per-platform archive digests. It is the fixture that proves a v2→v5 migration carries every platform's digest, not just the one the migrating machine runs."
     },
     {
       "file": "lock-v3-fb2f6edfb.json",
@@ -49,8 +49,8 @@
   ],
   "gaps": [
     {
-      "shape": "lock format v4",
-      "reason": "v4 shipped in a later release but this workspace's committed lock is still v3, so no v4 artifact exists to recover. v4 is covered as the OUTPUT of MigrateLockFileToCurrent, which is the only way a v4 lock is produced from an older one."
+      "shape": "lock formats v4 and v5",
+      "reason": "This workspace's committed lock is still v3, so no v4 or v5 artifact exists to recover. v4 is covered by the in-package writer and reader tests. v5 is covered as the OUTPUT of MigrateLockFileToCurrent for a lock that pins no toolchain, and by lockfile_v5_test.go: a lock that pins toolchains reaches v5 only through `putnami install`, so the v3 fixture's expected migration verdict is the refusal that names it."
     },
     {
       "shape": "a lock carrying a `cli` pin",

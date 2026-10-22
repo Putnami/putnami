@@ -770,7 +770,9 @@ func runtimeToolchainExtension(requirement extensionproto.RuntimeToolchain) *mod
 
 func writeRuntimeToolchainLock(t *testing.T, root, name, version, integrity string) {
 	t.Helper()
+	// A toolchain pin without archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetToolchain(name, lockfile.LockEntry{
 		Version:     version,
 		Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): integrity},

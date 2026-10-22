@@ -43,7 +43,9 @@ func newSourceBuiltFixture(t *testing.T) sourceBuiltFixture {
 		"#!/bin/sh\nprintf 'probe\\n' >> "+shellQuote(f.probes)+"\nprintf 'go1.26.9\\n'\n")
 	t.Setenv("ACME_TEST_GOROOT", compiler)
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", f.store)
+	// A toolchain pin without archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetCLI(lockfile.LockEntry{Source: lockfile.SourceWorkspace})
 	locked.SetToolchain("go", lockfile.LockEntry{
 		Version:     "1.26.9",

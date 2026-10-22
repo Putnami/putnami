@@ -92,7 +92,9 @@ func TestRefreshLockMetadataWithResultSkipsByteIdenticalLockWrite(t *testing.T) 
 
 	ws := t.TempDir()
 	mustWriteToolchainTestFile(t, filepath.Join(ws, "package.json"), `{"packageManager":"bun@1.4.0"}`)
+	// A toolchain pin with a source and no archives is lock format version 4.
 	lf := lockfile.NewLockFile()
+	lf.Version = lockfile.FormatVersionV4
 	lf.SetToolchain("bun", lockfile.LockEntry{
 		Version:     "1.4.0",
 		Integrities: map[string]string{"linux/amd64": bunSHA},
@@ -151,8 +153,8 @@ func TestRefreshToolchainLockDropsNodeDeclarationAndStalePin(t *testing.T) {
 	if metadataRequests != 0 {
 		t.Fatalf("engines.node caused %d metadata requests, want none", metadataRequests)
 	}
-	if lf.Version != lockfile.FormatVersionV4 {
-		t.Fatalf("toolchain refresh downgraded lock v4 to v%d", lf.Version)
+	if lf.Version != lockfile.FormatVersionV5 {
+		t.Fatalf("toolchain refresh downgraded lock v5 to v%d", lf.Version)
 	}
 	spectest.Proves(t, "cli/toolchain-lock", "supported-runtimes-only", "only-go-and-bun-declarations-are-locked")
 }

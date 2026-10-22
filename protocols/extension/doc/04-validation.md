@@ -181,16 +181,18 @@ the lowest contract whose vocabulary covers the manifest
 `protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary,
 `protocols/cli.SourceBoundCacheContract` (10) for a task that declares
 `cache.sourceBound`, `protocols/cli.CommandKindContract` (11) for a command
-kind, workload or effect, or a batchable kind or phase, or
+kind, workload or effect, or a batchable kind or phase,
 `protocols/cli.PublishChannelsContract` (12) for a task that declares
-`declares.publishChannels`.
+`declares.publishChannels`, or
+`protocols/cli.ProvisionedToolchainContract` (13) for a runtime toolchain that
+declares a `provisioned` candidate.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
 input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 6, 7, 8, 9, 10, 11 and 12 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 6, 7, 8, 9, 10, 11, 12 and 13 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content but no Go embed inputs requires
@@ -222,9 +224,12 @@ includes that rung as well. A manifest with a task that declares
 `declares.publishChannels` requires contract 12 wherever it loads from: a
 publishing run counts a project's declared channel as served only by a planned
 job whose task declares it, and an older reader would judge those channels by
-another rule. `RequiredLoadContract` includes that rung too. The reader loads
-every stamp from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (12):
+another rule. `RequiredLoadContract` includes that rung too. A manifest whose
+runtime toolchain declares a `provisioned` candidate requires contract 13
+wherever it loads from: the candidate names no path, and only a reader that
+unpacks the pinned archive knows where its executable is. `RequiredLoadContract`
+includes that rung as well. The reader loads every stamp from the one the
+manifest's vocabulary requires up to `protocols/cli.LatestContract` (13):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -263,8 +268,9 @@ this build does not have, whatever surface it happens to declare today, so it is
 rejected like any other future manifest. `TestLoadManifest_CompatibilityMatrix`
 (manifest_matrix_test.go) is the executable form of this table — the full cross
 product of {absent, one behind, current, latest, one ahead} × {commands,
-command groups, tools, agent content, none}. Ratcheting a row means editing
-that table and this one together.
+command groups, tools, agent content, verbs, command kinds, publish channels,
+provisioned toolchain, none}. Ratcheting a row means editing that table and
+this one together.
 
 ### The packaging ratchet
 

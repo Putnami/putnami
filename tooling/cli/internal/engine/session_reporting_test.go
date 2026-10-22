@@ -289,7 +289,9 @@ func TestNativeSessionReportingManagedToolchain(t *testing.T) {
 	// warmed first.
 	fixtureproc.Warm(t, fixtureproc.Binary(t, filepath.Join(managedRoot, "toolchains", "compiler", "compiler-1.2.3", "bin", reporterCompiler)), "--version")
 	t.Setenv("PUTNAMI_HOME", managedRoot)
+	// A toolchain pin without archives is lock format version 4.
 	locked := lockfile.NewLockFile()
+	locked.Version = lockfile.FormatVersionV4
 	locked.SetToolchain("compiler", lockfile.LockEntry{Version: "1.2.3", Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): "test-integrity"}})
 	if err := lockfile.WriteLockFile(root, locked); err != nil {
 		t.Fatal(err)

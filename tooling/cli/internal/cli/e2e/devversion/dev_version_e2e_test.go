@@ -100,9 +100,11 @@ func TestVersionGetRunsThroughTheDevExtensionBuiltFromSource(t *testing.T) {
 	if err := os.Symlink(filepath.Join(repoRoot, "tooling", "dev"), filepath.Join(root, "tooling", "dev")); err != nil {
 		t.Skipf("the platform cannot link the extension into the fixture: %v", err)
 	}
-	// The lock carries the Go release the runtime builds with, and nothing
-	// else of this repository's.
+	// The lock carries the Go release the runtime builds with, at the lock
+	// format the repository records it in, and nothing else of this
+	// repository's.
 	lock := lockfile.NewLockFile()
+	lock.Version = locked.Version
 	lock.SetToolchain("go", pin)
 	if err := lockfile.WriteLockFile(root, lock); err != nil {
 		t.Fatal(err)

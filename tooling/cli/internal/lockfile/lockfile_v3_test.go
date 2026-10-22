@@ -1,8 +1,6 @@
 package lockfile
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -62,19 +60,5 @@ func TestLockFileV2ProjectionDropsV3VocabularyWithoutMutation(t *testing.T) {
 	}
 	if _, ok := lf.GetToolchain("go"); !ok {
 		t.Fatal("v2 projection mutated the caller's toolchain map")
-	}
-}
-
-func TestLockFileReadWindowAcceptsV2ThroughV4(t *testing.T) {
-	for _, version := range []int{FormatVersionV2, FormatVersionV3, FormatVersionV4} {
-		data := []byte(fmt.Sprintf(`{"version":%d,"extensions":{},"templates":{}}`, version))
-		if _, err := ParseLockFile(data); err != nil {
-			t.Errorf("ParseLockFile(v%d): %v", version, err)
-		}
-	}
-	_, err := ParseLockFile([]byte(`{"version":5,"extensions":{},"templates":{}}`))
-	var unsupported *UnsupportedVersionError
-	if !errors.As(err, &unsupported) || unsupported.Max != FormatVersionV4 {
-		t.Fatalf("ParseLockFile(v5) error = %v, want max v4", err)
 	}
 }

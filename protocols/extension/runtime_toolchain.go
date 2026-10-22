@@ -2,6 +2,7 @@ package extension
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,6 +18,10 @@ const (
 	RuntimeToolchainCandidateHome = "home"
 	// RuntimeToolchainCandidatePutnamiHome resolves below Putnami's managed home.
 	RuntimeToolchainCandidatePutnamiHome = "putnami-home"
+	// RuntimeToolchainCandidateProvisioned resolves to the executable of the
+	// archive the workspace lock pins for the host platform, unpacked below
+	// Putnami's managed home. It takes no path and no environment name.
+	RuntimeToolchainCandidateProvisioned = "provisioned"
 
 	// RuntimeToolchainEnvironmentExecutable publishes the exact resolved executable.
 	RuntimeToolchainEnvironmentExecutable = "executable"
@@ -43,9 +48,17 @@ type RuntimeToolchain struct {
 }
 
 // RuntimeToolchainCandidate declares one ordered location for the executable.
+//
+// A provisioned candidate names no location of its own. It resolves to
+// <PutnamiHome>/toolchains/<lock>/<lock>-<version>/<executable>, where <lock>
+// is the toolchain's lock identity, <version> the version the workspace lock
+// pins for it, and <executable> the executable of the host platform's entry
+// in that pin's archives. Path and Environment stay empty, so Path is omitted
+// when it is empty: a provisioned candidate marshals without a "path" member,
+// and every other candidate, whose path is required, marshals as before.
 type RuntimeToolchainCandidate struct {
 	From        string `json:"from"`
-	Path        string `json:"path"`
+	Path        string `json:"path,omitempty"`
 	Environment string `json:"environment,omitempty"`
 }
 
@@ -95,6 +108,7 @@ func validateRuntimeToolchains(m *Manifest) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf("invalid-value", base, "toolchain alias %q is invalid", alias))
 		}
 		diags = append(diags, validateRuntimeToolchain(base, m.Runtime.Toolchains[alias])...)
+		diags = append(diags, validateProvisionedCandidates(base, m.Runtime.Toolchains[alias], m.Runtime.Resolves)...)
 	}
 	diags = append(diags, validateRuntimeToolchainRefs("runtime.runToolchains", m.Runtime.RunToolchains, m.Runtime.Toolchains)...)
 	diags = append(diags, validateRuntimeResolves(m.Runtime.Resolves)...)
@@ -177,7 +191,49 @@ func validateRuntimeToolchain(base string, requirement RuntimeToolchain) []diag.
 	return diags
 }
 
+// validateProvisionedCandidates checks the provisioned candidates of one
+// toolchain: at most one, and only for a lock identity the same manifest lists
+// in runtime.resolves. The archive a provisioned candidate unpacks comes from
+// the lock entry that the extension's toolchain-resolve answer writes, so an
+// extension that does not answer for the identity cannot rely on that entry
+// recording an archive.
+func validateProvisionedCandidates(base string, requirement RuntimeToolchain, resolves []string) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	seen := false
+	for i, candidate := range requirement.Candidates {
+		if candidate.From != RuntimeToolchainCandidateProvisioned {
+			continue
+		}
+		field := fmt.Sprintf("%s.candidates[%d]", base, i)
+		if seen {
+			diags = append(diags, diag.Errorf("duplicate-value", field,
+				"a toolchain lists at most one %q candidate", RuntimeToolchainCandidateProvisioned))
+			continue
+		}
+		seen = true
+		if validRuntimeIdentifier(requirement.Lock) && !slices.Contains(resolves, requirement.Lock) {
+			diags = append(diags, diag.Errorf("unknown-reference", field,
+				"a %q candidate requires runtime.resolves to list lock identity %q: add it there, so this extension answers the toolchain-resolve call that pins the archive the candidate unpacks",
+				RuntimeToolchainCandidateProvisioned, requirement.Lock))
+		}
+	}
+	return diags
+}
+
 func validateRuntimeToolchainCandidate(field string, candidate RuntimeToolchainCandidate) []diag.Diagnostic {
+	if candidate.From == RuntimeToolchainCandidateProvisioned {
+		var diags []diag.Diagnostic
+		if candidate.Path != "" {
+			diags = append(diags, diag.Errorf("invalid-value", field+".path",
+				"a %q candidate accepts no path: the executable of the host platform's archive in the workspace lock names it",
+				RuntimeToolchainCandidateProvisioned))
+		}
+		if candidate.Environment != "" {
+			diags = append(diags, diag.Errorf("invalid-value", field+".environment",
+				"candidate source %q accepts no environment name", candidate.From))
+		}
+		return diags
+	}
 	if strings.TrimSpace(candidate.Path) == "" || len(candidate.Path) > 512 {
 		return []diag.Diagnostic{diag.Errorf("required-field", field+".path", "candidate path is required")}
 	}

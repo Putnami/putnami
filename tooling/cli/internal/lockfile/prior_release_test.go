@@ -274,7 +274,8 @@ func TestPriorReleaseLocksMeetTheCompatibilityBudget(t *testing.T) {
 			}
 
 			// An ordinary write preserves the workspace's version too, so
-			// `putnami install` on a v2 workspace never emits v4 vocabulary.
+			// `putnami install` on a v2 workspace never emits v3 or later
+			// vocabulary.
 			if err := WriteLockFile(dir, lf); err != nil {
 				t.Fatalf("WriteLockFile: %v", err)
 			}
@@ -362,12 +363,35 @@ func migratePriorRelease(t *testing.T, fixture priorReleaseFixture, data []byte)
 		return migrated
 	}
 
-	// v2/v3 → v4: the explicit projection onto the current format.
+	// v2–v4 → v5: the explicit projection onto the current format.
 	lf, err := ReadLockFile(dir)
 	if err != nil {
 		t.Fatalf("ReadLockFile: %v", err)
 	}
 	current, err := MigrateLockFileToCurrent(lf)
+	var needsResolution *ToolchainsNeedResolutionError
+	if errors.As(err, &needsResolution) {
+		// A lock that pins toolchains does not project: only `putnami install`
+		// can supply a version 5 toolchain entry's archives. The refusal names
+		// every pinned identity, and the workspace keeps its lock at its own
+		// version, which is what an ordinary write renders.
+		want := make([]string, 0, len(lf.Toolchains))
+		for identity := range lf.Toolchains {
+			want = append(want, identity)
+		}
+		sort.Strings(want)
+		if strings.Join(needsResolution.Identities, ",") != strings.Join(want, ",") || len(want) == 0 {
+			t.Fatalf("refused identities = %v, want the pinned toolchains %v", needsResolution.Identities, want)
+		}
+		if !strings.Contains(needsResolution.Error(), "putnami install") {
+			t.Fatalf("refusal %q does not name `putnami install`", needsResolution.Error())
+		}
+		kept, err := MarshalLockFile(lf)
+		if err != nil {
+			t.Fatalf("MarshalLockFile: %v", err)
+		}
+		return kept
+	}
 	if err != nil {
 		t.Fatalf("MigrateLockFileToCurrent: %v", err)
 	}
@@ -539,11 +563,11 @@ func TestMigrationPreservesTheCLIPinDigests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MigrateLockFileToCurrent: %v", err)
 	}
-	v4Bytes, err := MarshalLockFile(current)
+	currentBytes, err := MarshalLockFile(current)
 	if err != nil {
 		t.Fatalf("MarshalLockFile: %v", err)
 	}
-	assertCLIDigestsSurvive(t, "v2→v4", source, rawDigestInventory(t, v4Bytes))
+	assertCLIDigestsSurvive(t, "v2→v5", source, rawDigestInventory(t, currentBytes))
 }
 
 func assertCLIDigestsSurvive(t *testing.T, step string, before, after map[string]string) {

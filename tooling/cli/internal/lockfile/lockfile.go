@@ -12,7 +12,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 const LockFilename = "putnami.lock.json"
@@ -50,12 +54,21 @@ const (
 	// Each entry binds both the registry archive and its file manifest; ordinary
 	// reads and writes preserve v2/v3 instead of silently promoting them.
 	FormatVersionV4 = 4
+	// FormatVersionV5 records, in each toolchain entry, every platform's
+	// archive (LockEntry.Archives: its URL, format and executable) beside the
+	// digest that binds its bytes, and no Source. The extension that answers
+	// the toolchain-resolve call for an identity supplies the entry, so a
+	// reader installs any toolchain without knowing it, and the toolchains
+	// section keys any lock identity. A toolchain entry follows the version 5
+	// entry rules of go.putnami.dev/protocol/workspace. Extension, CLI and
+	// template entries keep Source and never carry Archives.
+	FormatVersionV5 = 5
 	// DefaultWriteVersion is the version stamped on a lock that records none.
-	DefaultWriteVersion = FormatVersionV4
+	DefaultWriteVersion = FormatVersionV5
 	// MinSupportedVersion is the oldest format version this CLI reads.
 	MinSupportedVersion = FormatVersionV2
 	// MaxSupportedVersion is the newest format version this CLI reads.
-	MaxSupportedVersion = FormatVersionV4
+	MaxSupportedVersion = FormatVersionV5
 )
 
 // UnsupportedVersionError reports a lock file whose format version is newer than
@@ -97,6 +110,46 @@ func (e *OutdatedVersionError) Error() string {
 		LockFilename, found, e.Min)
 }
 
+// VocabularyError reports a lock file whose members break the vocabulary of
+// the format version it records: a member that version does not define, or a
+// version 5 toolchain entry that breaks that version's entry rules. Like the
+// version errors above, it refuses the file instead of acting on part of it.
+type VocabularyError struct {
+	// Version is the format version the file records.
+	Version int
+	// Diagnostics name each offending member, in file order: the CLI entry,
+	// then toolchains, extensions and templates, each by name.
+	Diagnostics []diag.Diagnostic
+}
+
+func (e *VocabularyError) Error() string {
+	problems := make([]string, 0, len(e.Diagnostics))
+	for _, d := range e.Diagnostics {
+		problems = append(problems, d.Field+": "+d.Message)
+	}
+	return fmt.Sprintf("%s is lock format version %d and breaks its rules: %s",
+		LockFilename, e.Version, strings.Join(problems, "; "))
+}
+
+// ToolchainsNeedResolutionError reports a lock below FormatVersionV5 that pins
+// toolchains, which MigrateLockFileToCurrent refuses to project onto version
+// 5. A version 5 toolchain entry records each platform's archive, an older one
+// records none, and only the extension that answers the toolchain-resolve call
+// for an identity can supply them.
+type ToolchainsNeedResolutionError struct {
+	// Found is the format version the lock records.
+	Found int
+	// Identities are the pinned toolchain identities, sorted.
+	Identities []string
+}
+
+func (e *ToolchainsNeedResolutionError) Error() string {
+	return fmt.Sprintf(
+		"%s is lock format version %d and pins toolchains without archives (%s): only `putnami install` can pin them at "+
+			"lock format version %d, because each extension supplies the archives of the toolchains it answers for",
+		LockFilename, e.Found, strings.Join(e.Identities, ", "), FormatVersionV5)
+}
+
 // LockFile represents the contents of putnami.lock.json.
 // It records the exact resolved versions and integrity hashes of the
 // pinned CLI binary and the installed extensions and templates.
@@ -124,9 +177,11 @@ type LockFile struct {
 	// extensions; note the CLI digest is of the binary, whereas an extension's
 	// is of its download archive.
 	CLI *LockEntry `json:"cli,omitempty"`
-	// Toolchains maps runtime names (go, bun, uv, and node in older locks) to
-	// exact, independently materializable release entries. It is lock format
-	// v3 vocabulary.
+	// Toolchains maps toolchain identities to exact, independently
+	// materializable release entries. It is lock format v3 vocabulary. A v3 or
+	// v4 lock keys it by runtime name (go, bun, uv, and node in older locks)
+	// and records each release's Source; a v5 lock keys it by any lock
+	// identity and records each platform's archive in Archives instead.
 	Toolchains map[string]LockEntry `json:"toolchains,omitempty"`
 	// Extensions maps extension names to their resolved entries.
 	Extensions map[string]LockEntry `json:"extensions"`
@@ -148,7 +203,27 @@ type AgentArtifactLockEntry struct {
 	Source       string `json:"source,omitempty"`
 }
 
-// LockEntry is a single locked CLI, extension, or template.
+// LockArchive is one platform's archive of a version 5 toolchain pin: where to
+// download it, how to unpack it, and where the executable sits in it. The
+// digest LockEntry.Integrities records for the same platform binds its bytes.
+type LockArchive struct {
+	// URL is the absolute http or https URL of the archive.
+	URL string `json:"url"`
+	// Format is the archive format, tar.gz or zip.
+	Format string `json:"format"`
+	// Executable is the slash-separated path of the toolchain's executable
+	// relative to the unpacked archive's root, such as go/bin/go.
+	Executable string `json:"executable"`
+}
+
+// LockEntry is a single locked CLI, toolchain, extension, or template.
+//
+// Member order is a contract. encoding/json writes struct members in
+// declaration order, and `putnamiw` (function locked_go_sha256) reads the
+// committed lock line by line: it takes the last `"<platform>": ` line indented
+// by eight spaces in the go toolchain entry as that platform's digest. An
+// Archives map writes the same platform keys at that indentation, so Archives
+// stays before Integrities.
 type LockEntry struct {
 	// Version is the resolved exact version.
 	//
@@ -165,6 +240,11 @@ type LockEntry struct {
 	// cross-platform verification. Readers retain it for backward compatibility;
 	// canonical v2 extension writes omit it once Integrities is available.
 	Integrity string `json:"integrity,omitempty"`
+	// Archives maps a platform key ("os/arch") to the archive a version 5
+	// toolchain pin downloads for that platform. It is lock format v5
+	// vocabulary and toolchain entries only: an entry of an older lock, and an
+	// extension, CLI or template entry, never carries it.
+	Archives map[string]LockArchive `json:"archives,omitempty"`
 	// Integrities maps a platform key ("os/arch") to the SHA-256 of that
 	// platform's download archive. A lock generated on one platform records
 	// only that platform initially; every other platform appends its digest on
@@ -177,7 +257,8 @@ type LockEntry struct {
 	// The manifest is platform-independent, so this binds a cross-platform
 	// install to the locked artifact and detects post-install tampering.
 	ManifestHash string `json:"manifestHash,omitempty"`
-	// Source is the download URL or path used to install.
+	// Source is the download URL or path used to install. A v5 toolchain
+	// entry carries none: each archive records its own URL.
 	Source string `json:"source,omitempty"`
 	// TaskContract is the task-contract protocol version the pinned artifact's
 	// extension manifest declares: 2 for a manifest whose tasks carry no
@@ -315,6 +396,11 @@ func ReadMigratableLockFile(workspaceRoot string) (*LockFile, error) {
 //     the one a silent upgrade would hide;
 //   - vocabulary a version does not define is discarded, so a hand-edited v1
 //     lock carrying a v2 field cannot smuggle a contract record into a v1 read.
+//
+// Archives are the exception to the third rule, because a reader acts on them:
+// an entry below FormatVersionV5 that carries archives, a version 5 extension,
+// CLI or template entry that carries them, and a version 5 toolchain entry that
+// breaks that version's entry rules are each a *VocabularyError.
 func parseLockFile(data []byte, minVersion, maxVersion int) (*LockFile, error) {
 	var lf LockFile
 	if err := json.Unmarshal(data, &lf); err != nil {
@@ -327,6 +413,9 @@ func parseLockFile(data []byte, minVersion, maxVersion int) (*LockFile, error) {
 	// itself, so it is compared like any other version rather than defaulted.
 	if effectiveVersion(lf.Version) < minVersion {
 		return nil, &OutdatedVersionError{Found: lf.Version, Min: minVersion}
+	}
+	if diags := lf.vocabularyDiagnostics(); len(diags) > 0 {
+		return nil, &VocabularyError{Version: effectiveVersion(lf.Version), Diagnostics: diags}
 	}
 
 	if lf.Extensions == nil {
@@ -404,8 +493,8 @@ func canonicalBytesDifferFromDisk(workspaceRoot string, lf *LockFile) ([]byte, b
 }
 
 // Clone returns a deep copy of lf: every entry map and every per-platform
-// integrity map is fresh, so a caller can edit the copy without the original
-// observing it. A nil lf clones to nil.
+// integrity and archive map is fresh, so a caller can edit the copy without
+// the original observing it. A nil lf clones to nil.
 func (lf *LockFile) Clone() *LockFile {
 	if lf == nil {
 		return nil
@@ -418,7 +507,7 @@ func (lf *LockFile) Clone() *LockFile {
 		AgentArtifacts: copyAgentArtifactEntries(lf.AgentArtifacts),
 	}
 	if lf.CLI != nil {
-		cli := copyEntries(map[string]LockEntry{"": *lf.CLI})[""]
+		cli := lf.CLI.clone()
 		out.CLI = &cli
 	}
 	return out
@@ -442,10 +531,31 @@ func prepareLockFileForWrite(lf *LockFile) {
 	}
 }
 
-// MigrateLockFileToCurrent explicitly projects a supported v2/v3 lock onto
-// the current format. Ordinary reads and writes never call this function, so
+// ToolchainsNeedResolution returns the *ToolchainsNeedResolutionError that
+// MigrateLockFileToCurrent refuses lf with, and nil when it projects lf: a lock
+// below FormatVersionV5 whose own vocabulary pins any toolchain needs
+// `putnami install`.
+func (lf *LockFile) ToolchainsNeedResolution() *ToolchainsNeedResolutionError {
+	version := effectiveVersion(lf.Version)
+	if version >= FormatVersionV5 {
+		return nil
+	}
+	pinned := lf.canonicalFor(lf.Version).Toolchains
+	if len(pinned) == 0 {
+		return nil
+	}
+	return &ToolchainsNeedResolutionError{Found: version, Identities: sortedEntryNames(pinned)}
+}
+
+// MigrateLockFileToCurrent explicitly projects a supported lock onto
+// FormatVersionV5. Ordinary reads and writes never call this function, so
 // they preserve the version recorded by the workspace. The returned value is a
 // deep copy and can be updated without aliasing the source lock.
+//
+// A lock below FormatVersionV5 that pins any toolchain is refused with a
+// *ToolchainsNeedResolutionError: a version 5 toolchain entry records each
+// platform's archive, and only `putnami install`, through the extension that
+// answers for the identity, can supply it.
 func MigrateLockFileToCurrent(lf *LockFile) (*LockFile, error) {
 	if lf == nil {
 		return nil, fmt.Errorf("migrate lock file: lock file is nil")
@@ -457,8 +567,11 @@ func MigrateLockFileToCurrent(lf *LockFile) (*LockFile, error) {
 	if version > MaxSupportedVersion {
 		return nil, &UnsupportedVersionError{Found: lf.Version, Max: MaxSupportedVersion}
 	}
+	if needsResolution := lf.ToolchainsNeedResolution(); needsResolution != nil {
+		return nil, needsResolution
+	}
 	out := lf.canonicalFor(lf.Version)
-	out.Version = FormatVersionV4
+	out.Version = FormatVersionV5
 	if out.Toolchains == nil {
 		out.Toolchains = make(map[string]LockEntry)
 	}
@@ -502,6 +615,10 @@ func writeLockFile(workspaceRoot string, lf *LockFile) error {
 // indentation, one trailing newline, sections ordered by name, and only the
 // vocabulary the file's own format version defines.
 //
+// A version 5 toolchain entry that breaks that version's entry rules after the
+// projection, such as one without archives, is a *VocabularyError: the CLI
+// never writes a lock its next read refuses.
+//
 // Determinism is structural, not incidental: every collection in the file is a
 // map that encoding/json emits in sorted key order, so the bytes do not depend
 // on map iteration order and are safe to digest.
@@ -520,6 +637,9 @@ func writeLockFile(workspaceRoot string, lf *LockFile) error {
 // a URL can contain.
 func MarshalLockFile(lf *LockFile) ([]byte, error) {
 	out := lf.canonicalFor(lf.Version)
+	if diags := out.vocabularyDiagnostics(); len(diags) > 0 {
+		return nil, &VocabularyError{Version: effectiveVersion(out.Version), Diagnostics: diags}
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -546,13 +666,7 @@ func (lf *LockFile) canonicalFor(version int) LockFile {
 		AgentArtifacts: copyAgentArtifactEntries(lf.AgentArtifacts),
 	}
 	if lf.CLI != nil {
-		cli := *lf.CLI
-		if lf.CLI.Integrities != nil {
-			cli.Integrities = make(map[string]string, len(lf.CLI.Integrities))
-			for platform, digest := range lf.CLI.Integrities {
-				cli.Integrities[platform] = digest
-			}
-		}
+		cli := lf.CLI.clone()
 		out.CLI = &cli
 	}
 	if out.Extensions == nil {
@@ -580,6 +694,23 @@ func (lf *LockFile) canonicalFor(version int) LockFile {
 			out.Extensions[name] = entry
 		}
 	}
+	if version >= FormatVersionV5 {
+		// A version 5 toolchain entry names each archive's URL instead of a
+		// source, and only a toolchain entry records archives.
+		for name, entry := range out.Toolchains {
+			entry.Source = ""
+			out.Toolchains[name] = entry
+		}
+		if out.CLI != nil {
+			out.CLI.Archives = nil
+		}
+		for _, entries := range []map[string]LockEntry{out.Extensions, out.Templates} {
+			for name, entry := range entries {
+				entry.Archives = nil
+				entries[name] = entry
+			}
+		}
+	}
 	out.dropFieldsAbove(version)
 	return out
 }
@@ -588,6 +719,22 @@ func (lf *LockFile) canonicalFor(version int) LockFile {
 // the one place the version→vocabulary mapping is stated, so a v3 field has
 // exactly one line to add here.
 func (lf *LockFile) dropFieldsAbove(version int) {
+	if version >= FormatVersionV5 {
+		return
+	}
+	// v5 vocabulary: the archives of a toolchain entry.
+	if lf.CLI != nil {
+		lf.CLI.Archives = nil
+	}
+	for _, entries := range []map[string]LockEntry{lf.Toolchains, lf.Extensions, lf.Templates} {
+		for name, entry := range entries {
+			if entry.Archives == nil {
+				continue
+			}
+			entry.Archives = nil
+			entries[name] = entry
+		}
+	}
 	if version >= FormatVersionV4 {
 		return
 	}
@@ -629,21 +776,127 @@ func effectiveVersion(recorded int) int {
 }
 
 // copyEntries deeply copies an entry map so canonical projections and explicit
-// migrations never alias a caller's per-platform integrity maps.
+// migrations never alias a caller's per-platform integrity or archive maps.
 func copyEntries(entries map[string]LockEntry) map[string]LockEntry {
 	if entries == nil {
 		return nil
 	}
 	out := make(map[string]LockEntry, len(entries))
 	for name, entry := range entries {
-		if entry.Integrities != nil {
-			integrities := make(map[string]string, len(entry.Integrities))
-			for platform, digest := range entry.Integrities {
-				integrities[platform] = digest
-			}
-			entry.Integrities = integrities
+		out[name] = entry.clone()
+	}
+	return out
+}
+
+// clone returns e with fresh per-platform integrity and archive maps.
+func (e LockEntry) clone() LockEntry {
+	if e.Integrities != nil {
+		integrities := make(map[string]string, len(e.Integrities))
+		for platform, digest := range e.Integrities {
+			integrities[platform] = digest
 		}
-		out[name] = entry
+		e.Integrities = integrities
+	}
+	if e.Archives != nil {
+		archives := make(map[string]LockArchive, len(e.Archives))
+		for platform, archive := range e.Archives {
+			archives[platform] = archive
+		}
+		e.Archives = archives
+	}
+	return e
+}
+
+// vocabularyDiagnostics reports the members of lf that break the vocabulary
+// of the format version lf records: archives on an entry below
+// FormatVersionV5 or on a version 5 extension, CLI or template entry, and each
+// version 5 toolchain entry rule of go.putnami.dev/protocol/workspace that an
+// entry breaks. The order is fixed: the CLI entry, then toolchains, extensions
+// and templates, each by name.
+func (lf *LockFile) vocabularyDiagnostics() []diag.Diagnostic {
+	version := effectiveVersion(lf.Version)
+	var diags []diag.Diagnostic
+	archivesOutsideToolchains := func(section string, entry LockEntry) {
+		if entry.Archives == nil {
+			return
+		}
+		if version < FormatVersionV5 {
+			diags = append(diags, diag.Errorf("field-version", section+".archives",
+				"archives requires lock format version %d", FormatVersionV5))
+			return
+		}
+		diags = append(diags, diag.Errorf("unknown-field", section+".archives",
+			"archives belongs to a toolchain entry; this entry records its source"))
+	}
+	if lf.CLI != nil {
+		archivesOutsideToolchains("cli", *lf.CLI)
+	}
+	if version < FormatVersionV5 {
+		for _, name := range sortedEntryNames(lf.Toolchains) {
+			archivesOutsideToolchains("toolchains."+name, lf.Toolchains[name])
+		}
+	} else if len(lf.Toolchains) > 0 {
+		pins := make(map[string]wsproto.LockToolchainEntry, len(lf.Toolchains))
+		for name, entry := range lf.Toolchains {
+			pins[name] = entry.ProtocolToolchainEntry()
+		}
+		diags = append(diags, diag.Errors(wsproto.ValidateLock(&wsproto.Lock{Version: FormatVersionV5, Toolchains: pins}))...)
+	}
+	for _, name := range sortedEntryNames(lf.Extensions) {
+		archivesOutsideToolchains("extensions."+name, lf.Extensions[name])
+	}
+	for _, name := range sortedEntryNames(lf.Templates) {
+		archivesOutsideToolchains("templates."+name, lf.Templates[name])
+	}
+	return diags
+}
+
+func sortedEntryNames(entries map[string]LockEntry) []string {
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// ToolchainEntryFromProtocol converts a version 5 toolchain pin of
+// go.putnami.dev/protocol/workspace, such as the pin of a toolchain-resolve
+// answer, into a lock entry. The result shares no map with entry.
+func ToolchainEntryFromProtocol(entry wsproto.LockToolchainEntry) LockEntry {
+	out := LockEntry{Version: entry.Version, Source: entry.Source}
+	if entry.Integrities != nil {
+		out.Integrities = make(map[string]string, len(entry.Integrities))
+		for platform, digest := range entry.Integrities {
+			out.Integrities[platform] = digest
+		}
+	}
+	if entry.Archives != nil {
+		out.Archives = make(map[string]LockArchive, len(entry.Archives))
+		for platform, archive := range entry.Archives {
+			out.Archives[platform] = LockArchive{URL: archive.URL, Format: archive.Format, Executable: archive.Executable}
+		}
+	}
+	return out
+}
+
+// ProtocolToolchainEntry converts e into the toolchain entry of
+// go.putnami.dev/protocol/workspace. Only the members a toolchain entry
+// defines carry over: the version, archives, integrities and source. The
+// result shares no map with e.
+func (e LockEntry) ProtocolToolchainEntry() wsproto.LockToolchainEntry {
+	out := wsproto.LockToolchainEntry{Version: e.Version, Source: e.Source}
+	if e.Integrities != nil {
+		out.Integrities = make(map[string]string, len(e.Integrities))
+		for platform, digest := range e.Integrities {
+			out.Integrities[platform] = digest
+		}
+	}
+	if e.Archives != nil {
+		out.Archives = make(map[string]wsproto.LockToolchainArchive, len(e.Archives))
+		for platform, archive := range e.Archives {
+			out.Archives[platform] = wsproto.LockToolchainArchive{URL: archive.URL, Format: archive.Format, Executable: archive.Executable}
+		}
 	}
 	return out
 }
