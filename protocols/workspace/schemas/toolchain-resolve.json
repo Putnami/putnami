@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-toolchain-resolve.json",
+  "title": "Putnami Toolchain Resolve Result",
+  "description": "Toolchain-resolve protocol v1. An extension answers the core's toolchainResolveRequest, sent through `<executable> __putnami toolchain-resolve`, with this result: the lock's next state for each asked identity. A pin is what the lock records; a problem fails the install and is shown with its remedy; an asked identity the result omits has no pin, because the workspace declares no release of it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "extension"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Toolchain-resolve protocol version. A mismatch is rejected, never guessed at."
+    },
+    "extension": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of the answering extension. It must be the extension the request asked."
+    },
+    "toolchains": {
+      "type": "object",
+      "description": "Resolution of each asked identity, keyed by identity. Every key is an identity the request asks for.",
+      "propertyNames": { "$ref": "#/definitions/identity" },
+      "additionalProperties": { "$ref": "#/definitions/toolchainResolution" }
+    }
+  },
+  "definitions": {
+    "identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$",
+      "maxLength": 128,
+      "description": "Toolchain lock identity: the key of a lock's toolchains entry, and the rule an extension manifest applies to each runtime.resolves entry."
+    },
+    "platform": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+/[a-z0-9]+$",
+      "description": "Platform: an \"os/arch\" pair as Go spells them, such as \"darwin/arm64\"."
+    },
+    "toolchainResolveRequest": {
+      "type": "object",
+      "description": "The core's question to one extension. It carries no paths: the core runs the executable with the workspace root as its working directory and the probe's timeout.",
+      "additionalProperties": false,
+      "required": ["version", "extension", "identities", "platform"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1,
+          "description": "Toolchain-resolve protocol version."
+        },
+        "extension": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Asked extension name, echoed back in the result so a misrouted answer is detectable."
+        },
+        "identities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Lock identities asked: the extension's runtime.resolves, sorted.",
+          "items": { "$ref": "#/definitions/identity" }
+        },
+        "locked": {
+          "type": "object",
+          "description": "The workspace lock's committed entries for asked identities, as committed: a lock version 3, 4 or 5 toolchain entry. Every key is an asked identity.",
+          "propertyNames": { "$ref": "#/definitions/identity" },
+          "additionalProperties": { "$ref": "#/definitions/lockedToolchainEntry" }
+        },
+        "platform": {
+          "allOf": [{ "$ref": "#/definitions/platform" }],
+          "description": "Host platform. Every pin the answer records must cover it."
+        },
+        "offline": {
+          "type": "boolean",
+          "description": "Answer without the network: from the committed pins, the workspace's declarations and the extension's own knowledge."
+        }
+      }
+    },
+    "lockedToolchainEntry": {
+      "type": "object",
+      "description": "A committed lock toolchain entry in the vocabulary of its lock version: version 5 records archives, versions 3 and 4 record source. The request carries it as committed, and the protocol does not validate it again.",
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "archives": {
+          "type": "object",
+          "additionalProperties": { "$ref": "https://putnami.dev/schemas/putnami-lock.json#/definitions/toolchainArchive" }
+        },
+        "integrities": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "source": { "type": "string" }
+      }
+    },
+    "toolchainResolution": {
+      "type": "object",
+      "description": "The answer for one identity: exactly one of pin and problem.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "pin": {
+          "allOf": [{ "$ref": "https://putnami.dev/schemas/putnami-lock.json#/definitions/toolchainEntry" }],
+          "description": "A lock version 5 toolchain entry, which the lock records as written. It covers the request's platform with both an integrity and an archive."
+        },
+        "problem": { "$ref": "#/definitions/toolchainProblem" }
+      }
+    },
+    "toolchainProblem": {
+      "type": "object",
+      "description": "Why the extension cannot pin an identity. It fails the install and is shown with its remedy.",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "What is wrong."
+        },
+        "remedy": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "What to change, such as the declaration to write."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "identities": ["go lang"],
+  "platform": "darwin/arm64"
+}

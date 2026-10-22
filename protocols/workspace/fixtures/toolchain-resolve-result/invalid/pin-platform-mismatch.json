@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "toolchains": {
+    "go": {
+      "pin": {
+        "version": "1.26.9",
+        "archives": {
+          "linux/amd64": { "url": "https://go.dev/dl/go1.26.9.linux-amd64.tar.gz", "format": "tar.gz", "executable": "go/bin/go" }
+        },
+        "integrities": { "darwin/arm64": "5555555555555555555555555555555555555555555555555555555555555555" }
+      }
+    }
+  }
+}

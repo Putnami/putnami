@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "identities": ["go", "golangci-lint"],
+  "locked": {
+    "go": {
+      "version": "1.26.1",
+      "integrities": { "darwin/arm64": "5555555555555555555555555555555555555555555555555555555555555555" },
+      "source": "https://go.dev/dl/"
+    },
+    "golangci-lint": {
+      "version": "2.4.0",
+      "archives": {
+        "darwin/arm64": {
+          "url": "https://github.com/golangci/golangci-lint/releases/download/v2.4.0/golangci-lint-2.4.0-darwin-arm64.tar.gz",
+          "format": "tar.gz",
+          "executable": "golangci-lint-2.4.0-darwin-arm64/golangci-lint"
+        }
+      },
+      "integrities": { "darwin/arm64": "8888888888888888888888888888888888888888888888888888888888888888" }
+    }
+  },
+  "platform": "darwin/arm64",
+  "offline": true
+}

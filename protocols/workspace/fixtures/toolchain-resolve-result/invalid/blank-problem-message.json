@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "toolchains": {
+    "go": {
+      "problem": { "message": "   ", "remedy": "declare a Go release in go.mod" }
+    }
+  }
+}

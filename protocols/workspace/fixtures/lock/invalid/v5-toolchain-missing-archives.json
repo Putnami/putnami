@@ -1,0 +1,11 @@
+{
+  "version": 5,
+  "toolchains": {
+    "go": {
+      "version": "1.26.9",
+      "integrities": { "darwin/arm64": "5555555555555555555555555555555555555555555555555555555555555555" }
+    }
+  },
+  "extensions": {},
+  "templates": {}
+}

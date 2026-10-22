@@ -95,26 +95,34 @@ func EncodeProbeRequest(w io.Writer, request ProbeRequest) error {
 // silently replaced by the log line's parse failure. Both are extension bugs
 // that must be reported as such.
 func DecodeProbeDocument(r io.Reader) ([]byte, error) {
+	return decodeControlDocument(r, "probe document")
+}
+
+// decodeControlDocument reads exactly one JSON document of at most
+// MaxProbeDocumentBytes from r, for any control call that shares the probe's
+// transport. Each error names the document, so a caller that reads two kinds
+// can tell which one failed.
+func decodeControlDocument(r io.Reader, document string) ([]byte, error) {
 	limited := io.LimitReader(r, MaxProbeDocumentBytes+1)
 	data, err := io.ReadAll(limited)
 	if err != nil {
-		return nil, fmt.Errorf("read probe document: %w", err)
+		return nil, fmt.Errorf("read %s: %w", document, err)
 	}
 	if len(data) > MaxProbeDocumentBytes {
-		return nil, fmt.Errorf("probe document exceeds the %d byte contract cap", MaxProbeDocumentBytes)
+		return nil, fmt.Errorf("%s exceeds the %d byte contract cap", document, MaxProbeDocumentBytes)
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
-		return nil, errors.New("probe document is empty")
+		return nil, fmt.Errorf("%s is empty", document)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	var probe json.RawMessage
-	if err := decoder.Decode(&probe); err != nil {
-		return nil, fmt.Errorf("probe document is not one JSON value: %w", err)
+	var value json.RawMessage
+	if err := decoder.Decode(&value); err != nil {
+		return nil, fmt.Errorf("%s is not one JSON value: %w", document, err)
 	}
 	var extra json.RawMessage
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return nil, errors.New("probe document carries trailing data; stdout must carry the result and nothing else")
+		return nil, fmt.Errorf("%s carries trailing data; stdout must carry the result and nothing else", document)
 	}
 	return data, nil
 }

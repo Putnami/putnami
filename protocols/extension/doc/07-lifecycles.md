@@ -189,6 +189,36 @@ one build. A manifest cannot opt out of this and does not need to: an extension
 whose prepare depends on another extension's output would be reading outside its
 own module, which the isolation above already forbids.
 
+### Answering toolchain pins
+
+An extension that knows where a toolchain's releases live lists its lock
+identities in `runtime.resolves`, and answers for their pins:
+
+```json
+{
+  "runtime": {
+    "executable": "bin/putnami-go",
+    "resolves": ["go"]
+  }
+}
+```
+
+Each entry is a lock identity (`^[A-Za-z_][A-Za-z0-9_.-]*$`, at most 128
+bytes), listed once, at most 16 entries; normalization sorts the list. An entry
+need not be the `lock` of one of the runtime's own toolchains, so an extension
+can answer for a toolchain another extension runs. The member adds no CLI
+contract rung: a core that predates it ignores it.
+
+Core asks for the pins with the reserved control call
+`<runtime> __putnami toolchain-resolve`, with the working directory set to the
+workspace root and the probe's timeout. It writes one `ToolchainResolveRequest`
+to stdin and reads one `ToolchainResolveResult` from stdout, under the probe's
+transport rules. The answer is the lock's next state for each asked identity: a
+version 5 lock entry that records each platform's archive and digest, a problem
+that fails the install, or no entry. The wire, its rules, and the
+`ServeToolchainResolve` helper live in `protocol/workspace`; the reasoning is in
+its [ADR 0003](../../workspace/doc/adr/0003-extensions-answer-toolchain-pins.md).
+
 ### Lifecycle states
 
 | State | Meaning |

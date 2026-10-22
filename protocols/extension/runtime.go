@@ -107,6 +107,14 @@ type RuntimeDefinition struct {
 	// RunToolchains are required by every task executed through this runtime.
 	// A task may add narrower requirements through TaskDefinition.Toolchains.
 	RunToolchains []string `json:"runToolchains,omitempty"`
+	// Resolves lists the workspace lock identities this extension answers the
+	// toolchain-resolve control call for: the core asks the extension for
+	// their pins through `<executable> __putnami toolchain-resolve`. An
+	// identity need not be one of the runtime's own Toolchains, because an
+	// extension can pin a toolchain another extension runs. At most 16 valid
+	// identities of at most 128 bytes, each named once; normalization sorts
+	// them.
+	Resolves []string `json:"resolves,omitempty"`
 	// Prepare describes how to BUILD Executable from the extension's sources.
 	// Absent means the executable ships ready to run in each platform archive
 	// and the CLI never builds anything.
@@ -387,6 +395,7 @@ func NormalizeRuntime(m *Manifest) {
 		m.Runtime.Executable = normalized
 	}
 	m.Runtime.RunToolchains = normalizeReferenceList(m.Runtime.RunToolchains)
+	m.Runtime.Resolves = normalizeReferenceList(m.Runtime.Resolves)
 	for name, task := range m.Tasks {
 		task.Toolchains = normalizeReferenceList(task.Toolchains)
 		m.Tasks[name] = task
@@ -399,12 +408,13 @@ func NormalizeRuntime(m *Manifest) {
 	prepare.Toolchains = normalizeReferenceList(prepare.Toolchains)
 }
 
-// normalizeReferenceList sorts a toolchain reference list and drops repeats.
-// Authoring order carries no meaning here, and a reference named twice is the
-// same requirement: leaving the repeat in would give one declaration two
-// canonical forms, so two spellings of one runtime would produce two artifact
-// digests. ValidateRuntime still reports the duplicate, because validation runs
-// before normalization and an authored repeat is an authoring mistake.
+// normalizeReferenceList sorts a toolchain reference or lock identity list
+// and drops repeats. Authoring order carries no meaning here, and an entry
+// named twice is the same requirement: leaving the repeat in would give one
+// declaration two canonical forms, so two spellings of one runtime would
+// produce two artifact digests. ValidateRuntime still reports the duplicate,
+// because validation runs before normalization and an authored repeat is an
+// authoring mistake.
 func normalizeReferenceList(values []string) []string {
 	if len(values) == 0 {
 		return values

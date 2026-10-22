@@ -1438,6 +1438,13 @@
           "uniqueItems": true,
           "description": "Toolchain aliases required by every task executed through this runtime."
         },
+        "resolves": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$", "maxLength": 128 },
+          "description": "Workspace lock identities this extension answers the toolchain-resolve control call for: the core asks `<executable> __putnami toolchain-resolve` for their pins. An identity need not be one of this runtime's toolchains."
+        },
         "prepare": {
           "$ref": "#/$defs/runtimePrepare"
         }
