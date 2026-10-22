@@ -550,11 +550,6 @@
         "**/*.grit"
       ],
       "flags": {
-        "config-path": {
-          "type": "string",
-          "default": "node_modules/@putnami/typescript/config",
-          "description": "Path to Biome config"
-        },
         "fix": {
           "type": "boolean",
           "default": true,

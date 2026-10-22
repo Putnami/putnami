@@ -30,9 +30,6 @@ putnami lint . --max-diagnostics 100
 
 # Show all severity levels (including info)
 putnami lint . --diagnostic-level info
-
-# Use a custom Biome config file or config directory
-putnami lint . --config-path ./biome.json
 ```
 
 ## Pipeline
@@ -285,7 +282,6 @@ To override the defaults, create a `biome.json` in your project root. It extends
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--fix` | `boolean` | `true` | Auto-fix issues. When `true`, runs the format + lint writer phases; when `false`, runs a single read-only `biome check` pass |
-| `--config-path` | `string` | `node_modules/@putnami/typescript/config` | Path to a Biome config file, or to a directory containing `biome.json` |
 | `--max-diagnostics` | `number` | `10` | Maximum number of diagnostics to display |
 | `--diagnostic-level` | `string` | `warn` | Minimum severity to report: `error`, `warn`, or `info` |
 | `--skip-guard` | `boolean` | `true` | Refuse a focused test and a test skip without a guard. See [Skip guard](#skip-guard) |
