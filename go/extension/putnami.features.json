@@ -358,6 +358,15 @@
           }
         },
         {
+          "id": "image-packager-route",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-image-routed-to-another-packager-plans-no-go-image-step"]
+          }
+        },
+        {
           "id": "package-channel-index",
           "stage": "coded",
           "evidenceKinds": [

@@ -484,7 +484,7 @@
         },
         { "id": "cross-compile", "heavy": true, "task": "build-cross-compile", "dependsOn": ["describe"], "if": "!params.image" },
         { "id": "archives", "task": "package-archives", "dependsOn": ["cross-compile"], "if": "params.archives && !params.image" },
-        { "id": "docker", "task": "package-docker", "dependsOn": ["cross-compile", "^image"], "if": "params.docker && !params.image" },
+        { "id": "docker", "task": "package-docker", "dependsOn": ["cross-compile", "^image"], "if": "params.docker && !params.image && (!commandParams.publish.docker-package-publisher || commandParams.publish.docker-package-publisher == '@putnami/go')" },
         { "id": "image", "task": "package-docker", "dependsOn": ["^image"], "if": "params.image" },
         { "id": "go", "task": "package-go", "dependsOn": ["describe"], "if": "params.go && !params.image" },
         { "id": "deployment", "task": "package-deployment", "dependsOn": ["generate", "describe"], "if": "params.deployment && !params.image" }
@@ -495,7 +495,7 @@
       "traits": { "injectPublishChannels": true, "sideEffects": "registry" },
       "description": "Publish pre-built packages to registries (Go module, Docker). Auto-runs package first; that pipeline owns every required build step while its image-project branch stays compiler-free. @putnami/cloud, when installed, provides the go.putnami.dev registry credential and the oci tag-digest fast path; otherwise explicit credentials / native docker auth are used.",
       "flags": {
-        "docker-package-publisher": { "type": "string", "description": "Extension whose package command produces this OCI member; defaults to @putnami/go" },
+        "docker-package-publisher": { "type": "string", "description": "Extension whose package command produces this OCI member; defaults to @putnami/go. Another extension's name removes Go's own docker step from the package command that publish runs" },
         "docker-package-step": { "type": "string", "description": "Exact package step producing this OCI member; defaults to docker" },
         "docker-registry": { "type": "string", "description": "Docker registry URL prefix (e.g. us-docker.pkg.dev/project/repo)" },
         "go-registry-token": { "type": "string", "description": "Explicit Go module registry bearer-token override. Also resolved from PUTNAMI_REGISTRY_TOKEN; otherwise requested from @putnami/cloud for the registry host." },

@@ -144,6 +144,10 @@
       "text": "Image packaging materializes the project's declared build producers before assembly, including when the image is selected through an upstream package dependency; it does not enter Go compiler steps for an image project."
     },
     {
+      "id": "image-packager-route",
+      "text": "When a project's publish route names another extension as the producer of its OCI image, publication plans no Go image step, and no cross-compile step unless the archives channel consumes it; every other package channel, the deployment declaration included, plans as without the route. Without a route, or with a route naming this extension, the plan does not change."
+    },
+    {
       "id": "package-channel-index",
       "text": "Packaging records the channels it produced inside the output directory it owns, so the index publishers read is derived from every owned record and a cache restore of one packager's output restores its channel without a sibling running. Nothing is written outside a declared output. The archive packager alone writes the archive publication manifest naming the version, artifact and channel an archive uploader reads."
     },
