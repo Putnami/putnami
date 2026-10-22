@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "inputs": [
+    {
+      "project": "cmd/tool",
+      "selector": "go-embed:build",
+      "patterns": ["cmd/[a-/*.go"]
+    }
+  ]
+}

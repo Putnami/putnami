@@ -19,6 +19,8 @@ func TestInvalidFixtureCoverage(t *testing.T) {
 	lock := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateLock(b); return d }
 	resolveRequest := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateToolchainResolveRequest(b); return d }
 	resolveResult := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateToolchainResolveResult(b); return d }
+	inputRequest := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateInputResolveRequest(b); return d }
+	inputResult := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateInputResolveResult(b); return d }
 	cases := []struct {
 		fixture string
 		parse   func([]byte) []diag.Diagnostic
@@ -226,6 +228,45 @@ func TestInvalidFixtureCoverage(t *testing.T) {
 		{"fixtures/toolchain-resolve-result/invalid/pin-platform-mismatch.json", resolveResult, "required-field", "toolchains.go.pin.integrities.linux/amd64"},
 		{"fixtures/toolchain-resolve-result/invalid/pin-bad-format.json", resolveResult, "invalid-value", "toolchains.go.pin.archives.darwin/arm64.format"},
 		{"fixtures/toolchain-resolve-result/invalid/pin-escaping-executable.json", resolveResult, "invalid-path", "toolchains.go.pin.archives.darwin/arm64.executable"},
+		// Input-resolve v1: a request the extension cannot fully read, and a
+		// result whose files leave the project, escape its order, or are not
+		// bound by the basis the core digests.
+		{"fixtures/input-resolve-request/invalid/unknown-field.json", inputRequest, "parse-error", ""},
+		{"fixtures/input-resolve-request/invalid/trailing-document.json", inputRequest, "parse-error", ""},
+		{"fixtures/input-resolve-request/invalid/bad-version.json", inputRequest, "invalid-input-resolve-version", "version"},
+		{"fixtures/input-resolve-request/invalid/missing-extension.json", inputRequest, "required-field", "extension"},
+		{"fixtures/input-resolve-request/invalid/no-inputs.json", inputRequest, "required-field", "inputs"},
+		{"fixtures/input-resolve-request/invalid/missing-project.json", inputRequest, "required-field", "inputs[0].project"},
+		{"fixtures/input-resolve-request/invalid/escaping-project.json", inputRequest, "invalid-path", "inputs[0].project"},
+		{"fixtures/input-resolve-request/invalid/unclean-project.json", inputRequest, "invalid-path", "inputs[0].project"},
+		{"fixtures/input-resolve-request/invalid/missing-selector.json", inputRequest, "required-field", "inputs[0].selector"},
+		{"fixtures/input-resolve-request/invalid/git-selector.json", inputRequest, "invalid-value", "inputs[0].selector"},
+		{"fixtures/input-resolve-request/invalid/invalid-selector.json", inputRequest, "invalid-value", "inputs[0].selector"},
+		{"fixtures/input-resolve-request/invalid/selector-as-pattern.json", inputRequest, "invalid-value", "inputs[0].patterns[1]"},
+		{"fixtures/input-resolve-request/invalid/absolute-pattern.json", inputRequest, "invalid-value", "inputs[0].patterns[0]"},
+		{"fixtures/input-resolve-request/invalid/backslash-pattern.json", inputRequest, "invalid-value", "inputs[0].patterns[0]"},
+		{"fixtures/input-resolve-request/invalid/bad-glob-pattern.json", inputRequest, "invalid-value", "inputs[0].patterns[0]"},
+		{"fixtures/input-resolve-request/invalid/duplicate-input.json", inputRequest, "duplicate-value", "inputs[1]"},
+		{"fixtures/input-resolve-result/invalid/unknown-field.json", inputResult, "parse-error", ""},
+		{"fixtures/input-resolve-result/invalid/bad-version.json", inputResult, "invalid-input-resolve-version", "version"},
+		{"fixtures/input-resolve-result/invalid/missing-extension.json", inputResult, "required-field", "extension"},
+		{"fixtures/input-resolve-result/invalid/no-inputs.json", inputResult, "required-field", "inputs"},
+		{"fixtures/input-resolve-result/invalid/invalid-project.json", inputResult, "invalid-path", "inputs[0].project"},
+		{"fixtures/input-resolve-result/invalid/invalid-selector.json", inputResult, "invalid-value", "inputs[0].selector"},
+		{"fixtures/input-resolve-result/invalid/blank-error.json", inputResult, "required-field", "inputs[0].error"},
+		{"fixtures/input-resolve-result/invalid/error-with-files.json", inputResult, "conflicting-field", "inputs[0]"},
+		{"fixtures/input-resolve-result/invalid/error-with-basis.json", inputResult, "conflicting-field", "inputs[0]"},
+		{"fixtures/input-resolve-result/invalid/escaping-file.json", inputResult, "invalid-path", "inputs[0].files[0]"},
+		{"fixtures/input-resolve-result/invalid/unclean-file.json", inputResult, "invalid-path", "inputs[0].files[0]"},
+		{"fixtures/input-resolve-result/invalid/unsorted-files.json", inputResult, "invalid-order", "inputs[0].files[1]"},
+		{"fixtures/input-resolve-result/invalid/duplicate-file.json", inputResult, "duplicate-value", "inputs[0].files[1]"},
+		{"fixtures/input-resolve-result/invalid/unselected-file.json", inputResult, "unselected-file", "inputs[0].files[1]"},
+		{"fixtures/input-resolve-result/invalid/excluded-file.json", inputResult, "unselected-file", "inputs[0].files[1]"},
+		{"fixtures/input-resolve-result/invalid/empty-pattern-set.json", inputResult, "required-field", "inputs[0].basis.content[0]"},
+		{"fixtures/input-resolve-result/invalid/exclusions-only-set.json", inputResult, "required-field", "inputs[0].basis.listing[1]"},
+		{"fixtures/input-resolve-result/invalid/git-pattern.json", inputResult, "invalid-value", "inputs[0].basis.content[0][0]"},
+		{"fixtures/input-resolve-result/invalid/escaping-pattern.json", inputResult, "invalid-value", "inputs[0].basis.content[0][1]"},
+		{"fixtures/input-resolve-result/invalid/bad-glob-pattern.json", inputResult, "invalid-value", "inputs[0].basis.listing[1][0]"},
 	}
 
 	for _, tc := range cases {

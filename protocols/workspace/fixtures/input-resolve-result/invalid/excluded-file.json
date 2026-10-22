@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "inputs": [
+    {
+      "project": "cmd/tool",
+      "selector": "go-embed:build",
+      "files": ["static/index.html", "static/private/key.pem"],
+      "basis": {
+        "content": [["**/*.go", "go.mod"]],
+        "listing": [["static/**", "!static/private/**"]]
+      }
+    }
+  ]
+}

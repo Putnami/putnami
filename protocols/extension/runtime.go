@@ -115,6 +115,14 @@ type RuntimeDefinition struct {
 	// identities of at most 128 bytes, each named once; normalization sorts
 	// them.
 	Resolves []string `json:"resolves,omitempty"`
+	// InputSelectors lists the selectors this extension expands through
+	// input-resolve: the core asks `<executable> __putnami input-resolve`
+	// for the files a task input that names one of them reads. Each is a
+	// selector name, `<scheme>:<name>` with a scheme other than `git`, of at
+	// most 128 bytes, named once, at most 16 of them; normalization sorts
+	// them. The member takes no CLI contract rung: a core that does not read
+	// it ignores it, and expands go-embed:build and go-embed:test itself.
+	InputSelectors []string `json:"inputSelectors,omitempty"`
 	// Prepare describes how to BUILD Executable from the extension's sources.
 	// Absent means the executable ships ready to run in each platform archive
 	// and the CLI never builds anything.
@@ -187,6 +195,7 @@ func ValidateRuntime(m *Manifest) []diag.Diagnostic {
 
 	if runtime.Prepare == nil {
 		diags = append(diags, validateRuntimeToolchains(m)...)
+		diags = append(diags, validateRuntimeInputSelectors(runtime.InputSelectors)...)
 		return diags
 	}
 	prepare := runtime.Prepare
@@ -232,6 +241,7 @@ func ValidateRuntime(m *Manifest) []diag.Diagnostic {
 	}
 
 	diags = append(diags, validateRuntimeToolchains(m)...)
+	diags = append(diags, validateRuntimeInputSelectors(runtime.InputSelectors)...)
 
 	return diags
 }
@@ -396,6 +406,7 @@ func NormalizeRuntime(m *Manifest) {
 	}
 	m.Runtime.RunToolchains = normalizeReferenceList(m.Runtime.RunToolchains)
 	m.Runtime.Resolves = normalizeReferenceList(m.Runtime.Resolves)
+	m.Runtime.InputSelectors = normalizeReferenceList(m.Runtime.InputSelectors)
 	for name, task := range m.Tasks {
 		task.Toolchains = normalizeReferenceList(task.Toolchains)
 		m.Tasks[name] = task
@@ -408,13 +419,13 @@ func NormalizeRuntime(m *Manifest) {
 	prepare.Toolchains = normalizeReferenceList(prepare.Toolchains)
 }
 
-// normalizeReferenceList sorts a toolchain reference or lock identity list
-// and drops repeats. Authoring order carries no meaning here, and an entry
-// named twice is the same requirement: leaving the repeat in would give one
-// declaration two canonical forms, so two spellings of one runtime would
-// produce two artifact digests. ValidateRuntime still reports the duplicate,
-// because validation runs before normalization and an authored repeat is an
-// authoring mistake.
+// normalizeReferenceList sorts a toolchain reference, lock identity or input
+// selector list and drops repeats. Authoring order carries no meaning here,
+// and an entry named twice is the same requirement: leaving the repeat in
+// would give one declaration two canonical forms, so two spellings of one
+// runtime would produce two artifact digests. ValidateRuntime still reports
+// the duplicate, because validation runs before normalization and an
+// authored repeat is an authoring mistake.
 func normalizeReferenceList(values []string) []string {
 	if len(values) == 0 {
 		return values

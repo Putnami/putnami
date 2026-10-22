@@ -121,11 +121,11 @@ func cloneToolchainResolveRequest(r ToolchainResolveRequest) ToolchainResolveReq
 	return r
 }
 
-// decodeToolchainResolveStrict strict-decodes exactly one document of the
-// exchange into out. An unknown member is an error, because a reader that
-// skips a member answers a question it did not read, and so is a second
-// document.
-func decodeToolchainResolveStrict(data []byte, out any) error {
+// decodeStrictControlDocument strict-decodes exactly one document of a
+// control exchange, such as toolchain-resolve or input-resolve, into out. An
+// unknown member is an error, because a reader that skips a member answers a
+// question it did not read, and so is a second document.
+func decodeStrictControlDocument(data []byte, out any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(out); err != nil {
@@ -143,7 +143,7 @@ func decodeToolchainResolveStrict(data []byte, out any) error {
 // ParseToolchainResolveRequest strict-decodes a toolchain-resolve request.
 func ParseToolchainResolveRequest(data []byte) (*ToolchainResolveRequest, []diag.Diagnostic) {
 	var r ToolchainResolveRequest
-	if err := decodeToolchainResolveStrict(data, &r); err != nil {
+	if err := decodeStrictControlDocument(data, &r); err != nil {
 		return nil, []diag.Diagnostic{
 			diag.Errorf("parse-error", "", "failed to parse toolchain-resolve request: %v", err),
 		}
@@ -220,7 +220,7 @@ func ParseAndValidateToolchainResolveRequest(data []byte) (*ToolchainResolveRequ
 // ParseToolchainResolveResult strict-decodes a toolchain-resolve result.
 func ParseToolchainResolveResult(data []byte) (*ToolchainResolveResult, []diag.Diagnostic) {
 	var r ToolchainResolveResult
-	if err := decodeToolchainResolveStrict(data, &r); err != nil {
+	if err := decodeStrictControlDocument(data, &r); err != nil {
 		return nil, []diag.Diagnostic{
 			diag.Errorf("parse-error", "", "failed to parse toolchain-resolve result: %v", err),
 		}

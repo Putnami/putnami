@@ -613,6 +613,172 @@ func TestRuntimeResolvesKeepsTheManifestContract(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeInputSelectors(t *testing.T) {
+	tooMany := make([]string, 0, maxRuntimeInputSelectors+1)
+	for i := 0; i <= maxRuntimeInputSelectors; i++ {
+		tooMany = append(tooMany, fmt.Sprintf("scheme:name-%d", i))
+	}
+	cases := []struct {
+		name      string
+		selectors []string
+		code      string
+		field     string
+	}{
+		{"repeat", []string{"go-embed:build", "go-embed:build"}, "duplicate-value", "runtime.inputSelectors[1]"},
+		{"reserved git scheme", []string{"git:build"}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"uppercase scheme", []string{"go-embed:build", "Go-embed:test"}, "invalid-value", "runtime.inputSelectors[1]"},
+		{"underscore scheme", []string{"go_embed:build"}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"no scheme", []string{"build"}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"empty name", []string{"go-embed:"}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"leading hyphen name", []string{"go-embed:-build"}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"glob name", []string{"go-embed:**"}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"empty selector", []string{""}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"129-byte selector", []string{"s:" + strings.Repeat("n", 127)}, "invalid-value", "runtime.inputSelectors[0]"},
+		{"17 selectors", tooMany, "limit-exceeded", "runtime.inputSelectors"},
+	}
+	for _, tc := range cases {
+		for _, prepare := range []*RuntimePrepare{nil, {Command: "make", Inputs: []string{"cmd/**"}}} {
+			t.Run(fmt.Sprintf("%s/prepare=%v", tc.name, prepare != nil), func(t *testing.T) {
+				m := &Manifest{Runtime: &RuntimeDefinition{Executable: "bin/x", Prepare: prepare, InputSelectors: tc.selectors}}
+				assertDiag(t, ValidateRuntime(m), tc.code, tc.field)
+				assertDiag(t, ValidateManifest(m), tc.code, tc.field)
+			})
+		}
+	}
+}
+
+// Sixteen selectors, one of them 128 bytes, are within bounds, whatever their
+// scheme: the manifest names the selectors its extension expands.
+func TestValidateRuntimeInputSelectors_AcceptsSelectorsWithinBounds(t *testing.T) {
+	m := &Manifest{Runtime: &RuntimeDefinition{Executable: "bin/x"}}
+	m.Runtime.InputSelectors = []string{"go-embed:build", "go-embed:test", "gitx:0", "a1-b:c-2"}
+	for i := len(m.Runtime.InputSelectors); i < maxRuntimeInputSelectors-1; i++ {
+		m.Runtime.InputSelectors = append(m.Runtime.InputSelectors, fmt.Sprintf("proto:file-%d", i))
+	}
+	m.Runtime.InputSelectors = append(m.Runtime.InputSelectors, "s:"+strings.Repeat("n", 126))
+	if diags := ValidateRuntime(m); len(diags) != 0 {
+		t.Fatalf("input selectors within bounds diagnostics = %v", diags)
+	}
+}
+
+func TestNormalizeRuntime_SortsInputSelectors(t *testing.T) {
+	authored := []string{"go-embed:test", "go-embed:build", "go-embed:test"}
+	m := &Manifest{Runtime: &RuntimeDefinition{Executable: "bin/x", InputSelectors: authored}}
+	NormalizeRuntime(m)
+	if want := []string{"go-embed:build", "go-embed:test"}; !reflect.DeepEqual(m.Runtime.InputSelectors, want) {
+		t.Errorf("input selectors = %v, want sorted without repeats %v", m.Runtime.InputSelectors, want)
+	}
+	if want := []string{"go-embed:test", "go-embed:build", "go-embed:test"}; !reflect.DeepEqual(authored, want) {
+		t.Errorf("normalization rewrote the authored slice to %v", authored)
+	}
+}
+
+// runtime.inputSelectors is additive vocabulary inside the runtime section: it
+// adds no contract rung, so adding it alone leaves a manifest's contract as it
+// is, the negotiated loader keeps the go-embed rules it applies, and a core
+// that predates the member ignores it.
+func TestRuntimeInputSelectorsKeepTheManifestContract(t *testing.T) {
+	base := &Manifest{
+		Name:    "@putnami/go",
+		Tasks:   map[string]TaskDefinition{"build": {Kind: "command", Command: "{extensionRuntime}"}},
+		Runtime: &RuntimeDefinition{Executable: "bin/x"},
+	}
+	withSelectors := *base
+	runtime := *base.Runtime
+	runtime.InputSelectors = []string{"go-embed:build", "go-embed:test"}
+	withSelectors.Runtime = &runtime
+	if got, want := RequiredLoadContract(&withSelectors), RequiredLoadContract(base); got != want {
+		t.Errorf("RequiredLoadContract = %d with input selectors, %d without", got, want)
+	}
+	if got, want := RequiredCLIContract(&withSelectors), RequiredCLIContract(base); got != want {
+		t.Errorf("RequiredCLIContract = %d with input selectors, %d without", got, want)
+	}
+	if got, want := ManifestProtocolVersion(&withSelectors), ManifestProtocolVersion(base); got != want {
+		t.Errorf("ManifestProtocolVersion = %d with input selectors, %d without", got, want)
+	}
+
+	withSelectors.CLIContract = RequiredLoadContract(base)
+	data, err := json.Marshal(&withSelectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := NegotiateManifest(ManifestFilename, data)
+	if err != nil {
+		t.Fatalf("NegotiateManifest refused a manifest stamped at its contract: %v", err)
+	}
+	if want := []string{"go-embed:build", "go-embed:test"}; !reflect.DeepEqual(loaded.Runtime.InputSelectors, want) {
+		t.Errorf("loaded input selectors = %v, want %v", loaded.Runtime.InputSelectors, want)
+	}
+
+	// A listed selector does not widen what a task may name: the loader still
+	// refuses a go-embed selector it does not expand.
+	listed := withSelectors
+	listedRuntime := runtime
+	listedRuntime.InputSelectors = []string{"go-embed:other"}
+	listed.Runtime = &listedRuntime
+	listed.Tasks = map[string]TaskDefinition{"build": {Kind: "command", Command: "{extensionRuntime}", Inputs: map[string]TaskInputPort{
+		"sources": {From: TaskInputFromProject, Files: []string{"go-embed:other"}},
+	}}}
+	if data, err = json.Marshal(&listed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NegotiateManifest(ManifestFilename, data); err == nil || !strings.Contains(err.Error(), "unsupported go embed selector") {
+		t.Errorf("NegotiateManifest = %v, want the unsupported go embed selector refused", err)
+	}
+
+	var older struct {
+		Runtime struct {
+			Executable string `json:"executable"`
+		} `json:"runtime"`
+	}
+	if err := json.Unmarshal(data, &older); err != nil || older.Runtime.Executable != "bin/x" {
+		t.Errorf("a reader that predates input selectors cannot read the runtime: %v", err)
+	}
+}
+
+// schemas/extension.json states the selector grammar and the bounds the
+// validator applies to runtime.inputSelectors.
+func TestRuntimeInputSelectorsSchemaAgreesWithTheValidator(t *testing.T) {
+	var schema struct {
+		Defs struct {
+			Runtime struct {
+				Properties struct {
+					InputSelectors struct {
+						MaxItems    int  `json:"maxItems"`
+						UniqueItems bool `json:"uniqueItems"`
+						Items       struct {
+							Pattern   string `json:"pattern"`
+							MaxLength int    `json:"maxLength"`
+							Not       struct {
+								Pattern string `json:"pattern"`
+							} `json:"not"`
+						} `json:"items"`
+					} `json:"inputSelectors"`
+				} `json:"properties"`
+			} `json:"runtimeDefinition"`
+		} `json:"$defs"`
+	}
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	selectors := schema.Defs.Runtime.Properties.InputSelectors
+	if selectors.MaxItems != maxRuntimeInputSelectors || !selectors.UniqueItems {
+		t.Errorf("schema bounds inputSelectors at %d (unique %v), the validator at %d unique entries",
+			selectors.MaxItems, selectors.UniqueItems, maxRuntimeInputSelectors)
+	}
+	if selectors.Items.Pattern != runtimeInputSelectorPattern || selectors.Items.MaxLength != maxRuntimeInputSelectorBytes {
+		t.Errorf("schema selector = %q (max %d), the validator applies %q (max %d)",
+			selectors.Items.Pattern, selectors.Items.MaxLength, runtimeInputSelectorPattern, maxRuntimeInputSelectorBytes)
+	}
+	if want := "^" + runtimeInputSelectorReservedScheme + ":"; selectors.Items.Not.Pattern != want {
+		t.Errorf("schema refuses selectors matching %q, want %q", selectors.Items.Not.Pattern, want)
+	}
+}
+
 // TestRuntimeSectionMakesAManifestV3 pins that the runtime vocabulary is
 // self-identifying: a manifest carrying it is a v3 manifest even when no task
 // declares a contract.

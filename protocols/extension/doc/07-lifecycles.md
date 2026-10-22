@@ -239,6 +239,44 @@ that fails the install, or no entry. The wire, its rules, and the
 `ServeToolchainResolve` helper live in `protocol/workspace`; the reasoning is in
 its [ADR 0003](../../workspace/doc/adr/0003-extensions-answer-toolchain-pins.md).
 
+### Expanding input selectors
+
+A task file pattern can name an input selector, such as `go-embed:build`. An
+extension that expands selectors lists them in `runtime.inputSelectors`:
+
+```json
+{
+  "runtime": {
+    "executable": "bin/putnami-go",
+    "inputSelectors": ["go-embed:build", "go-embed:test"]
+  }
+}
+```
+
+Each entry is a selector name, `<scheme>:<name>`
+(`^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9-]*$`, at most 128 bytes), whose scheme is
+not `git`, which the core's `git:` file pattern reserves. An entry is listed
+once, at most 16 entries; normalization sorts the list. Validation reports
+`invalid-value`, `duplicate-value` or `limit-exceeded` at
+`runtime.inputSelectors`. The member adds no CLI contract rung: a core that
+does not read it ignores it, and expands `go-embed:build` and `go-embed:test`
+itself.
+
+Core asks for an expansion with the reserved control call
+`<runtime> __putnami input-resolve`, with the working directory set to the
+workspace root and the probe's timeout. It writes one `InputResolveRequest` to
+stdin and reads one `InputResolveResult` from stdout, under the probe's
+transport rules. The answer gives each input, in request order, either an
+`error` that fails the task reading it, or the `files` the selector reads now
+and the `basis` they were computed from: `content` pattern sets for the bytes
+it read, `listing` sets for the paths whose existence, kind or link target it
+read. An answer stays exact while the `InputBasisDigest` of its basis holds,
+so a core may keep it until a write changes what the basis selects: the basis
+covers everything the answer read. The wire, its rules, and the
+`ServeInputResolve` and `InputBasisDigest` helpers live in
+`protocol/workspace`; the reasoning is in its
+[ADR 0004](../../workspace/doc/adr/0004-extensions-expand-their-input-selectors.md).
+
 ### Lifecycle states
 
 | State | Meaning |
