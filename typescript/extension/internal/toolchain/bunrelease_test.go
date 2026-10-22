@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // sha256Hex is the SHA-256 of data as 64 lowercase hexadecimal characters, the
@@ -45,8 +48,8 @@ func declareBun(t *testing.T, workspace, packageManager string) {
 }
 
 // The default release ships one valid SHA-256 for each platform Bun publishes
-// an archive for, and it is the release this repository's own lock pins, with
-// the digests the CLI read from the vendor when it wrote that lock.
+// an archive for, and this repository's own lock pins it as the extension
+// answers it: the same version, archives and digests.
 func TestDefaultBunRelease_ShipsTheVendorDigests(t *testing.T) {
 	release := DefaultBunRelease()
 	if !IsPlainBunRelease(release.Version) {
@@ -72,19 +75,18 @@ func TestDefaultBunRelease_ShipsTheVendorDigests(t *testing.T) {
 	if root == "" {
 		t.Skip("not inside the repository: no lock to compare with")
 	}
-	locked, pinned, err := lockedBunRelease(root)
-	if err != nil || !pinned {
-		t.Fatalf("the repository lock pins no Bun: %v", err)
+	data, err := os.ReadFile(filepath.Join(root, WorkspaceLockFile))
+	if err != nil {
+		t.Fatal(err)
 	}
-	want := DefaultBunRelease()
-	if locked.Version != want.Version || locked.Source != want.Source {
-		t.Fatalf("the repository lock pins Bun %s from %s; the default release is Bun %s from %s",
-			locked.Version, locked.Source, want.Version, want.Source)
+	var lock struct {
+		Toolchains map[string]wsproto.LockToolchainEntry `json:"toolchains"`
 	}
-	for platform, digest := range want.Integrities {
-		if locked.Integrities[platform] != digest {
-			t.Errorf("%s: the default release ships %s, the repository lock records %s", platform, digest, locked.Integrities[platform])
-		}
+	if err := json.Unmarshal(data, &lock); err != nil {
+		t.Fatalf("parse the repository lock: %v", err)
+	}
+	if got, want := lock.Toolchains[bunLock], bunPinOf(DefaultBunRelease()); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the repository lock pins Bun as\n%+v\nthe default release's pin is\n%+v", got, want)
 	}
 }
 
