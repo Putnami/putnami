@@ -1123,12 +1123,16 @@ The top-level `version` field is the lock **format** version, and it is load-bea
 |---------|------|
 | `1` | Resolved versions, `integrity`/`integrities`, `manifestHash`, `source`. **No longer read** since 0.3.0. |
 | `2` | `taskContract` per entry — the task-contract protocol version the pinned extension's manifest declares (`2`, or `3` when any of its tasks carries a `declares` block). The current read floor. |
-| `3` | Top-level `toolchains` pins, plus `cli.protocolVersion` for machine-output preflight. Current writers pin Go, Bun and uv only; historical Node entries remain readable. |
-| `4` | Platform-independent `agentArtifacts` pins of separately declared agent workflows, which no current command adds. The current write default. |
+| `3` | Top-level `toolchains` pins, plus `cli.protocolVersion` for machine-output preflight. |
+| `4` | Platform-independent `agentArtifacts` pins of separately declared agent workflows, which no current command adds. |
+| `5` | `archives` per toolchain entry: each platform's archive URL, format and executable path, beside the digest that binds its bytes. A toolchain entry records no `source`, and `toolchains` keys any lock identity. The current write default. |
 
-The read window is `[2, 4]`. Existing v2 and v3 locks remain readable; ordinary
-reads and writes preserve the recorded version. `putnami migrate vnext --apply`
-is the explicit projection to v4. A v1 lock — including a file that records no
+The read window is `[2, 5]`. Existing v2 to v4 locks remain readable; ordinary
+reads and writes preserve the recorded version, and a command that writes
+toolchain pins writes v5. `putnami migrate vnext --apply` is the explicit
+projection to v5. It refuses a lock below v5 that pins toolchains, because
+only the extension that answers for a toolchain supplies its archives: run
+`putnami install` instead. A v1 lock — including a file that records no
 `version` at all, which is how v1 spells itself — is refused with:
 
 ```
@@ -1139,7 +1143,7 @@ It is refused rather than silently upgraded: an unrelated command must not conve
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "extensions": {
     "@putnami/typescript": {
       "version": "2.1.0",
@@ -1155,61 +1159,60 @@ Recording the contract level in the lock is what lets a command know a pinned ex
 
 #### Toolchain and CLI protocol preflight
 
-Lock format v3 adds a `toolchains` map beside `cli`, `extensions`, and
-`templates`. `putnami install` derives Go from `go.work` and Bun from
-`package.json#packageManager`, then records exact versions, vendor release
-sources, and vendor-published SHA-256 archive digests for supported `os/arch`
-pairs. Other runtime declarations, including `package.json#engines.node`, are
-outside the current writer contract and are not provisioned by Putnami. A Node
-pin already present in a v3/v4 lock remains readable for compatibility, but a
-metadata refresh removes it.
+The `toolchains` map sits beside `cli`, `extensions`, and `templates`. The CLI
+resolves no toolchain release itself: an extension lists the lock identities it
+answers for in `runtime.resolves`, and answers for their pins. The Go extension
+answers for `go` from `go.work`, the TypeScript extension for `bun` from
+`package.json#packageManager`, and the Python extension for `uv` from the
+`[tool.uv]` table of the root `pyproject.toml`. Each pins its default release
+when the workspace declares none, and each extension's documentation describes
+its answer.
 
-A pin that neither file derives stays in the lock, unchanged and without a
-metadata request, while a declared extension's runtime resolves its identity:
-through a task, `runtime.runToolchains`, or, for an extension declared by path,
-`runtime.prepare.toolchains`. A TypeScript-only workspace that declares
-`@putnami/typescript` by path keeps its `go` pin this way, because that
-extension compiles its runtime with the pinned Go. The refresh drops the pin
-once no declared extension resolves it, and never adds one the lock does not
-already carry.
+`putnami install`, `putnami init`, `putnami projects create` and the implicit
+install run a toolchain pins phase before any `workspace-install`. The phase
+sends one request to each installed extension that answers for a toolchain,
+through `<executable> __putnami toolchain-resolve`, with the transport and
+timeout of the workspace probe. The request names the identities, the lock's
+committed entries for them, the host platform, and whether the run is hosted.
+The answer gives each identity an exact version and, per platform, the archive's
+URL, its format (`tar.gz` or `zip`), the executable's path inside it and its
+SHA-256 digest. It can give a problem with a remedy instead, such as the
+declaration to write.
 
-The pins derive from files that `workspace-install` and `project-setup` write,
-such as `go.work`, so those commands run before the lock pins anything they
-need. A toolchain alias that only they, or the `workspace-fetch` that runs
-before `workspace-install`, need resolves as if it were optional: when the lock
-does not pin it, has no digest for the host, or no candidate matches, the job
-runs under the unavailable identity. The prepare toolchains of an extension
-declared by path resolve the same way, but only in a run whose every command is
-one of them. Every other command still stops on a missing
-pin, even in the same run, once it plans a job that needs the toolchain. A
-workspace that declares `@putnami/go` and has no Go project yet builds without
-a `go` pin, because the build plans no Go job. `putnami install` and
-`putnami init` end with the refresh that records the pins. An explicit `putnami install` also pins, before
-its installers run, each toolchain that `go.work` or `packageManager` declares
-at a release the lock does not pin, so the installers install the declared
-release in the same run. The implicit install that a command runs in a
-fresh checkout does not refresh them: it only adds a pin that `go.work` or
-`packageManager` declares and the lock does not carry yet, so the first project
-of a language gets its pin on the next command. After you change a declared
-version, run `putnami install`.
+- An explicit command writes exactly the answered pins: an identity that an
+  answer omits, or that no installed extension answers for, leaves the lock.
+- The implicit install keeps a committed v5 pin, takes the answer for every
+  other identity, and removes nothing.
+- A hosted run writes no lock, and uses the answers in memory.
+- A problem, a failed or invalid answer, or two extensions that answer one
+  identity with different pins stop the command before any installer runs.
 
-The Go entry comes from the go.dev release index. The first pin of a release on
-a machine fetches the index and writes the entry to a pin record under the
-Putnami home, `toolchains/go/go-<version>.pin.json`, beside the directory the
-release installs in. Every later pin of that release, in any workspace of the
-machine, reads the record and makes no request to go.dev, because a published
-Go release never changes its archives. The lock holds the same bytes from the
-record and from the index.
+After you change a declared version, run `putnami install`.
 
-A record is used only when it names the requested version and the go.dev
-source, and maps only supported `os/arch` pairs to SHA-256 digests. Any other
-record is ignored, and the entry of the next fetch replaces it. A Putnami home
-that cannot hold the record does not fail the pin: each pin then asks the
-index. To make the next pin ask the index again, delete the record.
+The CLI then installs each pinned toolchain that the machine lacks: one that
+no other candidate of the extension's runtime toolchain answers at the pinned
+version, such as a `bun` on `PATH`. It downloads the host's archive, verifies
+its digest, and unpacks it into `toolchains/<identity>/<identity>-<version>/`
+under the Putnami home, keeping the entries the folder already held, such as
+Bun's package cache. The folder is complete when the toolchain's probe answers
+the pinned version from the archive's executable, and a complete folder is
+reused with no request. A hosted run installs no toolchain: it runs the one the
+runner holds. A runtime toolchain candidate `{"from": "provisioned"}` names the
+executable of that folder.
+
+A toolchain alias that only `workspace-install` or `project-setup`, or the
+`workspace-fetch` that runs before `workspace-install`, need resolves as if it
+were optional: when the lock does not pin it, has no digest for the host, or no
+candidate matches, the job runs under the unavailable identity. The prepare
+toolchains of an extension declared by path resolve the same way, but only in a
+run whose every command is one of them. Every other command still stops on a
+missing pin, even in the same run, once it plans a job that needs the
+toolchain. A workspace that declares `@putnami/go` and has no Go project yet
+builds without a `go` pin, because the build plans no Go job.
 
 ```json
 {
-  "version": 3,
+  "version": 5,
   "cli": {
     "version": "1.4.2",
     "protocolVersion": 2
@@ -1217,11 +1220,22 @@ index. To make the next pin ask the index again, delete the record.
   "toolchains": {
     "go": {
       "version": "1.26.1",
-      "integrities": {
-        "linux/amd64": "…",
-        "darwin/arm64": "…"
+      "archives": {
+        "darwin/arm64": {
+          "url": "https://go.dev/dl/go1.26.1.darwin-arm64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        },
+        "linux/amd64": {
+          "url": "https://go.dev/dl/go1.26.1.linux-amd64.tar.gz",
+          "format": "tar.gz",
+          "executable": "go/bin/go"
+        }
       },
-      "source": "https://go.dev/dl/"
+      "integrities": {
+        "darwin/arm64": "…",
+        "linux/amd64": "…"
+      }
     }
   },
   "extensions": {},

@@ -20,10 +20,11 @@ import (
 // already-installed manifest. It then performs the explicit, non-mutating
 // projection onto lock format version 5, which adds empty current-format
 // dimensions without inventing pins. A lock that pins toolchains without
-// archives does not project: --apply refuses it and names `putnami install`,
-// because each extension supplies the archives of the toolchains it answers
-// for. --check is the CI gate (exit 0 clean, exit 2 when a migration is
-// pending) and --apply is the idempotent, atomic conversion.
+// archives does not project: the command refuses it, with or without --apply,
+// and names `putnami install`, because each extension supplies the archives of
+// the toolchains it answers for. --check is the CI gate (exit 0 clean, exit 2
+// when a migration is pending) and --apply is the idempotent, atomic
+// conversion.
 //
 // It is deliberately mechanical. It records what the INSTALLED manifests
 // already declare; it never resolves versions, contacts a registry, or changes

@@ -40,7 +40,8 @@ internal/
 │   ├── publication/           Release sets, publication and deploy targets a run adds to its plan
 │   ├── remotecache/           Remote cache client: provider session, negotiation, restore, upload, run markers
 │   ├── scheduler/             Scheduler and runner: DAG dispatch, subprocess execution, task capture and restore
-│   └── toolchain/             Runtime toolchain resolution against the lock, child environment, key identity
+│   ├── toolchain/             Runtime toolchain resolution against the lock, child environment, key identity, provisioning
+│   └── toolchainpins/         Toolchain pins phase: the extensions' toolchain-resolve answers become the lock's toolchains
 ├── output/                    Renderers (text, live TUI, JSONL, cloud-logging)
 ├── machine/                   Machine-readable run/report documents
 ├── changeplan/                CI impact plan projection
@@ -71,7 +72,7 @@ Principal packages only. `internal/` holds 77 production packages in all — the
 | `migrate` | `migrate vnext`, the lock-file format migration |
 | `sdd` | `contracts`, `features`, `specs` and their diffs |
 | `sessions` | `sessions`, the gate, inspection, reports |
-| `versioncmd` | `version`, `pin`, release/source install, the Go/Bun toolchain lock |
+| `versioncmd` | `version`, `pin`, release/source install |
 
 Plus two landing zones for what verticals share:
 

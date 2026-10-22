@@ -118,9 +118,10 @@ This CLI accepts lock format versions 2 – 5 and writes new locks at version 5.
   CI check: exit 0 when clean, exit 2 when a migration is pending.
 - **A lock below v5 that pins toolchains does not migrate.** A v5 toolchain
   entry records each platform's archive, and only the extension that answers
-  for the toolchain supplies it, so `putnami migrate vnext --apply` refuses the
-  lock, names every pinned toolchain, and leaves the file as it was. Only
-  `putnami install` can pin those toolchains at format version 5.
+  for the toolchain supplies it, so `putnami migrate vnext` refuses the lock,
+  with or without `--apply`, names every pinned toolchain, and leaves the file
+  as it was. Only `putnami install` can pin those toolchains at format
+  version 5.
 - Ordinary reads, writes, and artifact installs preserve the version the
   workspace committed, so no unrelated command promotes the lock as a side
   effect.
@@ -148,7 +149,7 @@ until a verified install supplies the map.
 | version 1, or no `version` member | `putnami.lock.json is lock format version 1, but this putnami requires version 2` | `putnami migrate vnext --apply` |
 | version 6 or higher | `putnami.lock.json is lock format version 6, but this putnami reads at most version 5` | `putnami upgrade` |
 | below version 5 with `archives` on an entry, or version 5 with a toolchain entry that records a `source` or lacks an archive | `putnami.lock.json is lock format version N and breaks its rules: <field>: <reason>` | Restore the lock the CLI wrote, for example from version control |
-| below version 5 with toolchain pins, under `putnami migrate vnext --apply` | ``putnami.lock.json is lock format version N and pins toolchains without archives (<identities>): only `putnami install` can pin them at lock format version 5, …`` | `putnami install` |
+| below version 5 with toolchain pins, under `putnami migrate vnext`, with or without `--apply` | ``putnami.lock.json is lock format version N and pins toolchains without archives (<identities>): only `putnami install` can pin them at lock format version 5, …`` | `putnami install` |
 
 Refusal never rewrites the file. A reader that silently upgraded a lock would
 convert your workspace as a side effect of an unrelated command, and a reader

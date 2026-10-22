@@ -126,7 +126,7 @@ func readMigratableLock(t *testing.T, root string) *lockfile.LockFile {
 // needs migrating, the check says so without writing, and the failure carries
 // the usage exit code plus the command that fixes it.
 func TestMigrateVNextCheck_ReportsPendingMigration(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-v4-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
 	root := t.TempDir()
 	seedInstalledExtension(t, root, "@putnami/typescript", v3ManifestJSON)
 	seedInstalledExtension(t, root, "@putnami/go", v2ManifestJSON)
@@ -186,7 +186,7 @@ func TestMigrateVNextCheck_ReportsPendingMigration(t *testing.T) {
 // contract: apply records exactly what the check planned, a re-check is clean,
 // and a second apply changes nothing on disk.
 func TestMigrateVNextApply_ConvertsAndIsIdempotent(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-v4-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
 	root := t.TempDir()
 	seedInstalledExtension(t, root, "@putnami/typescript", v3ManifestJSON)
 	seedInstalledExtension(t, root, "@putnami/go", v2ManifestJSON)
@@ -248,7 +248,7 @@ func TestMigrateVNextApply_ConvertsAndIsIdempotent(t *testing.T) {
 // not at the current format. Migration must be explicit, preserve every
 // existing pin, initialize the current dimensions, and remain byte-idempotent.
 func TestMigrateVNext_V2ThroughV4ProjectToV5WithoutChangingPins(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-v4-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "vnext-check-and-apply-are-explicit-and-idempotent")
 	for _, version := range []int{lockfile.FormatVersionV2, lockfile.FormatVersionV3, lockfile.FormatVersionV4} {
 		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
 			root := t.TempDir()
@@ -334,6 +334,7 @@ func TestMigrateVNext_V2ThroughV4ProjectToV5WithoutChangingPins(t *testing.T) {
 // extension that answers for the toolchain supplies. --check and --apply both
 // refuse with `putnami install` as the remedy and leave the lock as it was.
 func TestMigrateVNext_ALockThatPinsToolchainsIsRefusedWithInstallAsTheRemedy(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "explicit-lock-migration", "a-lock-that-pins-toolchains-is-refused-in-both-modes")
 	for _, tc := range []struct {
 		version int
 		apply   bool

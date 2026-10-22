@@ -8,7 +8,7 @@
     "A clone reproduces the exact files of the extension release the committed lock pins, without resolving a version",
     "A user who edited a shipped workflow keeps that edit, and is told which file blocked the run",
     "Repeating any of the three commands with the same pin changes nothing on disk",
-    "A v2 or v3 workspace can explicitly migrate its lock to v4",
+    "A workspace whose lock is below format 5 can explicitly migrate it to format 5, and one that pins toolchains reaches it through putnami install",
     "A workspace that opts into an extension's agent content receives the instructions of exactly the extension version it installed",
     "A workspace that still declares or records its workflows as separate artifacts is refused with nothing written and told what to replace or delete"
   ],
@@ -17,7 +17,7 @@
     "Merging a shipped workflow with a local edit",
     "Adding agent content to a workspace that did not opt into it",
     "Installing agent workflows as an artifact outside an extension",
-    "Converting a lock older than format version 4 as a side effect",
+    "Converting a lock older than format version 5 as a side effect",
     "Downloading anything during putnami upgrade --dry-run"
   ],
   "requirements": [
@@ -46,8 +46,8 @@
       "text": "Repeating a run at the same extension release changes no byte, rewrites no file and leaves the ownership record as it was."
     },
     {
-      "id": "explicit-v4-migration",
-      "text": "putnami migrate vnext --check and --apply provide a read-only preview and atomic idempotent v2/v3 to v4 projection without changing existing pins; install never performs that projection as a side effect."
+      "id": "explicit-lock-migration",
+      "text": "putnami migrate vnext --check and --apply provide a read-only preview and an atomic, idempotent projection of a lock below format 5 to format 5 without changing existing pins. Both refuse a lock that pins toolchains and name putnami install. Install never performs that projection as a side effect: it writes format 5 only when it writes toolchain pins."
     },
     {
       "id": "reinit-preserves-optin",

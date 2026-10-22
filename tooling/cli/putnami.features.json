@@ -2007,7 +2007,7 @@
           }
         },
         {
-          "id": "explicit-v4-migration",
+          "id": "explicit-lock-migration",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -2015,7 +2015,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "vnext-check-and-apply-are-explicit-and-idempotent"
+              "vnext-check-and-apply-are-explicit-and-idempotent",
+              "a-lock-that-pins-toolchains-is-refused-in-both-modes"
             ]
           }
         },
@@ -2188,12 +2189,12 @@
       "id": "cli/toolchain-lock",
       "type": "feature",
       "name": "Reproducible toolchain lock",
-      "outcome": "Install and pin record verifiable toolchain metadata only for runtimes Putnami actually provisions",
+      "outcome": "Install pins, for each toolchain an installed extension answers for, an exact release and each platform's verified archive",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
         {
-          "id": "supported-runtimes-only",
+          "id": "extensions-answer-pins",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -2201,65 +2202,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "only-go-and-bun-declarations-are-locked",
-              "only-an-exact-tool-uv-required-version-is-locked",
-              "a-uv-declaration-pins-nothing-without-an-extension-that-runs-uv"
-            ]
-          }
-        },
-        {
-          "id": "verified-release-metadata",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "go-and-bun-pins-carry-version-source-and-digests",
-              "uv-pins-carry-version-source-and-digests",
-              "a-uv-release-older-than-the-minimum-is-refused"
-            ]
-          }
-        },
-        {
-          "id": "extension-resolved-pins-survive",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "install-keeps-a-pin-a-declared-extension-prepares-with",
-              "refresh-keeps-only-pins-a-declared-extension-resolves"
-            ]
-          }
-        },
-        {
-          "id": "init-records-pins",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "init-refreshes-the-lock-after-its-last-dependency-install"
-            ]
-          }
-        },
-        {
-          "id": "implicit-install-fills-missing-pins",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-missing-pin-is-filled-and-every-other-entry-is-kept",
-              "the-first-use-install-fills-pins-and-an-explicit-install-refreshes"
+              "install-asks-each-extension-that-resolves-once",
+              "the-request-carries-the-committed-entries"
             ]
           }
         },
@@ -2272,13 +2216,14 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "explicit-install-pins-before-the-installers-run",
-              "a-declaration-the-lock-does-not-match-is-repinned"
+              "explicit-install-writes-the-answered-pins-at-format-5",
+              "an-identity-no-answer-pins-is-removed",
+              "a-format-3-lock-is-rewritten-at-format-5"
             ]
           }
         },
         {
-          "id": "go-pin-reuses-the-machine-record",
+          "id": "implicit-install-fills-missing-pins",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -2286,12 +2231,48 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-recorded-go-release-pins-without-a-request",
-              "an-invalid-record-is-ignored-and-replaced",
-              "an-unwritable-home-still-pins",
-              "the-lock-holds-the-same-bytes-from-the-record-and-from-the-index",
-              "pins-that-start-together-leave-one-complete-record",
-              "a-second-init-makes-no-request-to-the-release-index"
+              "the-implicit-install-keeps-a-committed-pin-and-fills-a-missing-one"
+            ]
+          }
+        },
+        {
+          "id": "hosted-runs-write-no-pins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hosted-run-writes-no-pins"
+            ]
+          }
+        },
+        {
+          "id": "failed-answers-stop-the-install",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-problem-fails-install-with-its-remedy",
+              "two-extensions-that-disagree-fail-install",
+              "a-failed-answer-names-the-extension"
+            ]
+          }
+        },
+        {
+          "id": "init-records-pins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-pins-what-the-extensions-answer"
             ]
           }
         }
@@ -2719,7 +2700,7 @@
           }
         },
         {
-          "id": "missing-uv-pin-names-the-declaration",
+          "id": "pinned-archives-are-provisioned",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -2727,7 +2708,25 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-missing-uv-pin-names-the-declaration-to-write"
+              "a-pinned-archive-is-verified-and-unpacked",
+              "a-digest-or-probe-mismatch-is-refused",
+              "a-complete-folder-is-reused-without-a-request",
+              "a-held-release-is-not-downloaded",
+              "a-folder-of-another-layout-keeps-its-entries"
+            ]
+          }
+        },
+        {
+          "id": "provisioned-candidate-resolves-the-pin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-provisioned-candidate-resolves-the-archive-executable",
+              "a-missing-folder-or-a-pin-below-format-5-names-putnami-install"
             ]
           }
         }
