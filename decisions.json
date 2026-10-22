@@ -175,8 +175,8 @@
     },
     {
       "id": "D-024",
-      "statement": "publication uploads have two uploaders: a standard one in @putnami/dev that uses the standard protocols (OCI, npm), and one in @putnami/cloud for the Putnami registries, which can optimize transfer and cost",
-      "settled": "2026-10-20",
+      "statement": "publication uploads to the Putnami registries go through the @putnami/cloud uploader, which can optimize transfer and cost; a publication job uploads to any other registry itself, with its environment's credentials",
+      "settled": "2026-10-22",
       "settledBy": "fdumay",
       "reviewOnly": true
     }
