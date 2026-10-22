@@ -135,6 +135,8 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/cli/model/jobs",
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/sdk/extension/envkeys",
+			"go.putnami.dev/sdk/extension/pinnedarchive",
+			"go.putnami.dev/sdk/extension/robustio",
 			"go.putnami.dev/tooling/cli/internal/extension",
 			"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing",
 			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
@@ -153,7 +155,8 @@ var jobsSplitPackages = []jobsSplitPackage{
 		why: "runtime toolchains: they resolve an extension's declared toolchains against the lock of " +
 			"the workspace root the caller names, which needs the extension model, the lock, the " +
 			"artifact store root, and the run credential's custody mark and hosted check before a " +
-			"probe starts repository code",
+			"probe starts repository code; and they install a pinned toolchain under the Putnami " +
+			"home, which needs the pinned-archive installer and its file moves",
 	},
 	{
 		dir: "internal/jobs/remotecache",

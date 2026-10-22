@@ -699,50 +699,21 @@ func TestRuntimeToolchainWithALockButNoPinFailsClosed(t *testing.T) {
 	}
 }
 
-// TestRuntimeToolchainMissingPinNamesTheInstalledCause: when the installed
-// MissingPinCause explains a missing pin, the error names that cause and
-// `putnami install`, which alone would pin nothing. A cause that explains
-// nothing, and no cause, keep the remedy every missing pin gets.
-func TestRuntimeToolchainMissingPinNamesTheInstalledCause(t *testing.T) {
+// TestRuntimeToolchainMissingPinNamesTheInstall: the error of a required
+// toolchain the lock does not pin ends with `putnami install`, which asks the
+// extensions that answer for the lock identity to pin it. No workspace
+// declaration is read to explain the missing pin.
+func TestRuntimeToolchainMissingPinNamesTheInstall(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	writeRuntimeToolchainLock(t, workspaceRoot, "other", "1.2.3", "integrity-a")
-	resolve := func() error {
-		t.Helper()
-		ext := runtimeToolchainExtension(runtimeToolchainFixture("explained"))
-		err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + t.TempDir()})
-		if err == nil {
-			t.Fatal("a required toolchain resolved without a pin")
-		}
-		return err
+	if err := os.WriteFile(filepath.Join(workspaceRoot, "pyproject.toml"), []byte("[tool.uv]\nrequired-version = \">=0.5\"\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	const generic = `workspace lock has no exact "explained" pin: add a project that declares it, or run ` + "`putnami install`" + ` to record the declared one`
-
-	var asked []string
-	restore := InstallMissingPinCause(func(root, lock string) error {
-		asked = append(asked, lock)
-		if root != workspaceRoot || lock != "explained" {
-			return nil
-		}
-		return errors.New("the explained declaration names no release: declare one")
-	})
-	err := resolve()
-	restore()
-	want := `workspace lock has no exact "explained" pin: the explained declaration names no release: declare one, then run ` + "`putnami install`"
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("missing-pin error = %v, want it to name %q", err, want)
-	}
-	if !slices.Equal(asked, []string{"explained"}) {
-		t.Fatalf("the cause was asked about %v, want the lock identity \"explained\" once", asked)
-	}
-
-	restore = InstallMissingPinCause(func(string, string) error { return nil })
-	err = resolve()
-	restore()
-	if !strings.Contains(err.Error(), generic) {
-		t.Fatalf("missing-pin error with a cause that explains nothing = %v, want %q", err, generic)
-	}
-	if err := resolve(); !strings.Contains(err.Error(), generic) {
-		t.Fatalf("missing-pin error without a cause = %v, want %q", err, generic)
+	ext := runtimeToolchainExtension(runtimeToolchainFixture("uv"))
+	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, []string{"PATH=" + t.TempDir()})
+	want := `resolve extension "example" runtime toolchain "compiler": workspace lock has no exact "uv" pin: run ` + "`putnami install`"
+	if err == nil || err.Error() != want {
+		t.Fatalf("missing-pin error = %v\nwant %s", err, want)
 	}
 }
 

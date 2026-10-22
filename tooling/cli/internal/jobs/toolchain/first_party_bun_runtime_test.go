@@ -3,6 +3,7 @@ package toolchain
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -14,10 +15,10 @@ import (
 // TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome resolves the
 // bun runtime of the shipped TypeScript and clientgen manifests on a machine
 // whose PATH holds a bun of another release than the lock pins. That bun is
-// never substituted. Once the pinned release exists where the TypeScript
-// extension installs it, toolchains/bun/bun-<version>/bin/bun under the
-// Putnami home, the runtime resolves it and BUN_INSTALL names its install
-// directory, so the bun keeps its own files there.
+// never substituted. Once the pinned release exists under the Putnami home
+// where the lock's archive puts it, toolchains/bun/bun-<version>/bin/bun, the
+// runtime resolves it and BUN_INSTALL names its install directory, so the bun
+// keeps its own files there.
 func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T) {
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
 		"a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home")
@@ -35,7 +36,7 @@ func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			writeRuntimeToolchainLock(t, root, "bun", pinned, "integrity-a")
+			writeArchivedToolchainLock(t, root, "bun", pinned, "bin/"+WithExecutableSuffix(runtime.GOOS, "bun"))
 			onPath := t.TempDir()
 			writeRuntimeTool(t, filepath.Join(onPath, "bun"), ambient)
 			home := t.TempDir()

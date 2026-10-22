@@ -2,12 +2,14 @@ package toolchain
 
 import (
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -52,7 +54,8 @@ func TestHostedRunProbesNoToolchainInsideTheWorkspace(t *testing.T) {
 	workspaceOnly := requirement
 	workspaceOnly.Candidates = requirement.Candidates[:1]
 	restore := runcredential.SetForTest("run-bearer")
-	_, rejections, found := resolveRuntimeToolchain(t.Context(), workspaceRoot, workspaceOnly, "1.2.3", "integrity-a", base)
+	pin := lockfile.LockEntry{Version: "1.2.3", Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): "integrity-a"}}
+	_, rejections, found := resolveRuntimeToolchain(t.Context(), workspaceRoot, workspaceOnly, pin, base)
 	restore()
 	if found || len(rejections) != 1 || !strings.Contains(rejections[0].reason, "inside the workspace") {
 		t.Fatalf("rejections = %+v, want the workspace candidate rejected as inside the workspace", rejections)

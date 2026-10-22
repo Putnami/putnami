@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -70,6 +71,68 @@ func TestPrepareJobInvocationResolvesToolchainBeforeBuildingEnvironment(t *testi
 	}
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "minimal-child-environment",
 		"the-pinned-tool-answers-every-bare-name-lookup")
+}
+
+// A job whose toolchain declares a provisioned candidate runs with the
+// executable of the host's archive in the folder the core provisions for the
+// workspace lock's pin, ahead of a mismatching one on PATH.
+func TestPrepareJobInvocationResolvesAProvisionedToolchain(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv("PUTNAMI_HOME", filepath.Join(t.TempDir(), "putnami-home"))
+	host := lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)
+	entry := lockfile.LockEntry{
+		Version: "1.2.3",
+		Archives: map[string]lockfile.LockArchive{host: {
+			URL: "https://archives.example/compiler-1.2.3.tar.gz", Format: "tar.gz",
+			Executable: "compiler-1.2.3/bin/" + toolchain.WithExecutableSuffix(runtime.GOOS, "compiler"),
+		}},
+		Integrities: map[string]string{host: strings.Repeat("a", 64)},
+	}
+	locked := lockfile.NewLockFile()
+	locked.SetToolchain("compiler", entry)
+	if err := lockfile.WriteLockFile(workspaceRoot, locked); err != nil {
+		t.Fatal(err)
+	}
+	provisioned, err := toolchain.ProvisionedExecutable(workspaceRoot, "compiler", entry, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisioned, err = filepath.EvalSymlinks(writeRuntimeTool(t, strings.TrimSuffix(provisioned, ".exe"), "1.2.3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongBin := t.TempDir()
+	writeRuntimeTool(t, filepath.Join(wrongBin, "compiler"), "9.9.9")
+	t.Setenv("PATH", wrongBin)
+
+	requirement := runtimeToolchainFixture("compiler")
+	requirement.Candidates = []extensionproto.RuntimeToolchainCandidate{
+		{From: extensionproto.RuntimeToolchainCandidatePath, Path: "compiler"},
+		{From: extensionproto.RuntimeToolchainCandidateProvisioned},
+	}
+	project := &workspace.Project{ID: "/provider", Name: "provider", Path: "."}
+	ws := workspace.NewWorkspace(workspaceRoot, nil, []*workspace.Project{project})
+	job := &ScheduledJob{
+		Project:   project,
+		Extension: runtimeToolchainExtension(requirement),
+		JobDef: &model.JobDefinition{
+			Name: "generate", Kind: "command", Command: "/bin/true", Toolchains: []string{"compiler"},
+		},
+	}
+
+	_, cancel, invocation, err := prepareJobInvocation(context.Background(), ws, job, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cancel()
+	defer func() { _ = os.Remove(invocation.contextFile) }()
+	if got, want := envLastValue(invocation.env, "COMPILER_ROOT"), filepath.Dir(filepath.Dir(provisioned)); got != want {
+		t.Fatalf("invocation compiler root = %q, want the archive's root %q", got, want)
+	}
+	paths := filepath.SplitList(envLastValue(invocation.env, "PATH"))
+	if len(paths) == 0 || filepath.Clean(paths[0]) != filepath.Dir(provisioned) {
+		t.Fatalf("invocation PATH = %q, want the provisioned compiler first", envLastValue(invocation.env, "PATH"))
+	}
 }
 
 func TestPrepareJobInvocationResolvedToolchainPrecedesMismatchedCLISibling(t *testing.T) {
