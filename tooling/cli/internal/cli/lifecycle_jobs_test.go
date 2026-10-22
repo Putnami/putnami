@@ -519,28 +519,35 @@ func TestCaptureLifecycleStreams_DrainsBothStreamsBeyondPipeCapacity(t *testing.
 }
 
 // The completed action of a project job of create or deps names what the job
-// did, not a workspace setup.
+// did, not a workspace setup. A deps-edit under --dry-run says it changed no
+// file.
 func TestReportWorkspaceJobActionsNamesTheProjectJobs(t *testing.T) {
 	t.Parallel()
-	for job, want := range map[string]string{
-		"workspace-install": "Workspace setup completed (@acme/go)",
-		"project-setup":     "Project setup completed (@acme/go)",
-		"deps-edit":         "Dependencies edited (@acme/go)",
+	for _, tc := range []struct {
+		job    string
+		params map[string]any
+		want   string
+	}{
+		{"workspace-install", nil, "Workspace setup completed (@acme/go)"},
+		{"project-setup", nil, "Project setup completed (@acme/go)"},
+		{"deps-edit", nil, "Dependencies edited (@acme/go)"},
+		{"deps-edit", map[string]any{"dry-run": true}, "Dependency edit planned, no file changed (@acme/go)"},
 	} {
 		scheduled := &scheduler.ScheduledJob{
 			Project:   &workspace.Project{ID: "/api", Name: "api"},
 			Extension: &extension.ExtensionDescription{Name: "@acme/go"},
-			JobDef:    &extension.JobDefinition{Name: job},
+			JobDef:    &extension.JobDefinition{Name: tc.job},
 		}
 		var got []string
 		reportWorkspaceJobActions(lifecycle.WorkspaceJobRequest{
-			Job:      job,
+			Job:      tc.job,
+			Params:   tc.params,
 			OnAction: func(action lifecycle.LifecycleAction) { got = append(got, action.Description) },
 		}, []*scheduler.ScheduledJob{scheduled}, map[string]*scheduler.JobResult{
 			scheduled.Key(): {Status: string(scheduler.TaskStatusSuccess)},
 		})
-		if len(got) != 1 || got[0] != want {
-			t.Errorf("actions of %s = %v, want [%s]", job, got, want)
+		if len(got) != 1 || got[0] != tc.want {
+			t.Errorf("actions of %s with %v = %v, want [%s]", tc.job, tc.params, got, tc.want)
 		}
 	}
 }

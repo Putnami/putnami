@@ -32,7 +32,8 @@ import (
 
 // Event is one event a job emitted.
 type Event struct {
-	// Kind is "log", "diagnostic", "metric", "phase-start" or "phase-end".
+	// Kind is "log", "diagnostic", "metric", "summary", "phase-start" or
+	// "phase-end".
 	Kind string
 	// Level is the log level or the diagnostic severity.
 	Level string
@@ -42,8 +43,9 @@ type Event struct {
 	Status  string
 	Message string
 	File    string
-	Value   any
-	Unit    string
+	// Value is the metric value, or the data of a summary.
+	Value any
+	Unit  string
 }
 
 // String renders the event on one transcript line.
@@ -59,6 +61,8 @@ func (e Event) String() string {
 		return line
 	case "metric":
 		return fmt.Sprintf("metric %s=%v %s", e.Name, e.Value, e.Unit)
+	case "summary":
+		return fmt.Sprintf("summary %v: %s", e.Value, e.Message)
 	case "phase-start":
 		return "phase " + e.Name + " start"
 	default:
@@ -101,6 +105,11 @@ func (r *Recorder) Diagnostic(severity, message, file string, _ int) {
 // Metric records a metric.
 func (r *Recorder) Metric(name string, value any, unit string) {
 	r.add(Event{Kind: "metric", Name: name, Value: value, Unit: unit})
+}
+
+// SummaryWithData records a summary and its data.
+func (r *Recorder) SummaryWithData(message string, data map[string]any) {
+	r.add(Event{Kind: "summary", Message: message, Value: data})
 }
 
 // Events returns the recorded events in emission order.
@@ -181,6 +190,11 @@ func (p Printer) Diagnostic(severity, message, file string, _ int) {
 // Metric prints a metric.
 func (p Printer) Metric(name string, value any, unit string) {
 	p.print(Event{Kind: "metric", Name: name, Value: value, Unit: unit})
+}
+
+// SummaryWithData prints a summary and its data.
+func (p Printer) SummaryWithData(message string, data map[string]any) {
+	p.print(Event{Kind: "summary", Message: message, Value: data})
 }
 
 // NewJob returns a job that records its events in rec, exports environ to its

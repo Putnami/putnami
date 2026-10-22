@@ -1411,6 +1411,33 @@ func TestFinalSummaryVisibleSummary(t *testing.T) {
 	}
 }
 
+// A lifecycle run prints a summary the job marks always visible, such as the
+// plan of deps add --dry-run, and no session summary.
+func TestLifecycleFinishPrintsAVisibleSummary(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "deps-edit-runs-in-the-project-extension",
+		"a-lifecycle-run-prints-an-always-visible-summary")
+	edit := makeLiveTestJob("api", "deps-edit")
+	r, errOut := newTestRenderer(t, 140, edit)
+	r.lifecycleMode = true
+	plan := "Planned edit of api/go.mod:\n  + require example.com/lib v0.3.0"
+	summary := jobs.RawJobEvent{
+		Type: jobs.EventTypeSummary,
+		Data: map[string]any{"message": plan, "visibility": "always"},
+	}
+
+	r.JobStart(edit)
+	r.JobComplete(edit, &jobs.JobResult{Status: "success", Events: []jobs.RawJobEvent{summary}})
+	r.Finish(map[string]*jobs.JobResult{edit.Key(): {Status: "success", Events: []jobs.RawJobEvent{summary}}}, jobs.SessionOutcome{})
+
+	out := errOut.String()
+	if !strings.Contains(out, plan) {
+		t.Errorf("expected the plan in the lifecycle output: %s", out)
+	}
+	if strings.Contains(out, "Session completed") {
+		t.Errorf("a lifecycle run printed a session summary: %s", out)
+	}
+}
+
 func TestFinalSummaryFailureDetailsIncludeErrorLogs(t *testing.T) {
 	build := makeLiveTestJob("app", "build")
 	r, errOut := newTestRenderer(t, 120, build)

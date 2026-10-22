@@ -800,6 +800,7 @@ putnami deps install                       # Install all dependencies (default)
 putnami deps add golang.org/x/text@latest  # Add a Go module (sole editable project, or --projects <name>)
 putnami deps add rsc.io/quote@v1.5.2 --projects api
 putnami deps remove golang.org/x/text      # Drop a Go module and tidy
+putnami deps remove golang.org/x/text --dry-run  # Print the planned edit and change nothing
 putnami deps prune                         # Remove declared edges no import backs
 putnami deps prune --dry-run               # List them and change nothing
 putnami deps prune --projects api          # Narrow to one project
@@ -810,8 +811,11 @@ the sole project whose extension declares the `deps-edit` job. They run that
 job for the project, with the action and the dependencies you pass. A project
 whose extensions declare no `deps-edit` job is refused, and the error names its
 extensions. `add <module>@none` is a usage error before any job runs, and the
-error names `putnami deps remove <module>`. `@putnami/go` declares the job: it edits `go.mod` and tidies the
-module, without `go get`, with the Go the workspace lock pins. When that Go is
+error names `putnami deps remove <module>`. With `--dry-run`, they hand the job
+the param `dry-run`, and the job prints the planned edit and writes no file. `@putnami/go` declares the job: it edits `go.mod` and tidies the
+module, without `go get`, with the Go the workspace lock pins. Under `--dry-run`
+it makes the edit and the tidy on a copy of `go.mod` and `go.sum`, and prints
+each requirement that would change. When that Go is
 missing, the error names `putnami install`. See
 [the Go extension](../../../go/extension/doc/getting-started.md#project-setup-and-dependency-edits).
 For TypeScript, edit `package.json` and run `putnami deps install`.

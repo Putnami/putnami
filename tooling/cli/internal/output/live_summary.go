@@ -24,6 +24,9 @@ func (r *LiveRenderer) Finish(results map[string]*jobs.JobResult, outcome jobs.S
 		r.clearLiveZone()
 		iox.Fprint(r.errOut, ShowCursor)
 		r.printLifecycleDiagnostics(results)
+		// A lifecycle job's dry-run plan, such as the edit of deps add
+		// --dry-run, is the one success output the user asked to see.
+		renderVisibleSummaries(r.errOut, results)
 		if outcome.Aborted || hasFailedResult(results) {
 			r.printFailuresBlock(results)
 		}

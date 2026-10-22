@@ -26,8 +26,12 @@ import (
 const (
 	// depsEditJob edits the manifest of a project's language for deps add,
 	// remove and prune. Its params are action (add, remove or prune) and edits,
-	// one {project, path, modules} entry per project.
+	// one {project, path, modules} entry per project, and dry-run, true under
+	// --dry-run.
 	depsEditJob = "deps-edit"
+	// depsEditDryRunParam is the deps-edit param that asks the job to report
+	// the edit and to write no file. It is the param deps-upgrade reads.
+	depsEditDryRunParam = "dry-run"
 )
 
 // projectSetupPrepareStage is the params.stage of the project-setup run that
@@ -235,8 +239,10 @@ type depsEditEntry struct {
 
 // runDepsEdit runs the deps-edit job of editor, the extension of every project
 // edits names, with action and one {project, path, modules} entry per edit.
-// A run in which no deps-edit job matched a project edited nothing, and fails.
-func runDepsEdit(ctx context.Context, wsRoot, editor, action string, edits []depsEdit, env LifecycleEnv) error {
+// dryRun adds the param dry-run, under which the job reports the edit and
+// writes no file. A run in which no deps-edit job matched a project edited
+// nothing, and fails.
+func runDepsEdit(ctx context.Context, wsRoot, editor, action string, edits []depsEdit, dryRun bool, env LifecycleEnv) error {
 	ids := make([]string, 0, len(edits))
 	entries := make([]depsEditEntry, 0, len(edits))
 	for _, edit := range edits {
@@ -247,11 +253,15 @@ func runDepsEdit(ctx context.Context, wsRoot, editor, action string, edits []dep
 			Project: edit.project.Name,
 		})
 	}
+	params := map[string]any{"action": action, "edits": entries}
+	if dryRun {
+		params[depsEditDryRunParam] = true
+	}
 	result, err := runWorkspaceJob(ctx, env, WorkspaceJobRequest{
 		WorkspaceRoot: wsRoot,
 		Config:        wsproto.Load(wsRoot),
 		Job:           depsEditJob,
-		Params:        map[string]any{"action": action, "edits": entries},
+		Params:        params,
 		Projects:      strings.Join(ids, ","),
 		Display:       env.Display,
 		OnAction:      env.OnAction,

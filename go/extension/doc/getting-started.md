@@ -447,7 +447,10 @@ steps in this extension, as two lifecycle jobs
   removes one with `go mod edit -droprequire`. It never runs `go get`, so it
   edits a `go.mod` that requires a version no proxy serves. It then tidies each
   module with the `replace` directives of `go.work`. When a step fails, every
-  `go.mod` and `go.sum` the run edited is put back.
+  `go.mod` and `go.sum` the run edited is put back. With `--dry-run`, it makes
+  the edit and the tidy on a copy of `go.mod` and `go.sum`, prints each
+  requirement and `replace` directive that would be added, dropped or changed,
+  and the number of `go.sum` lines, and writes no file.
 
 #### Adding a workspace module
 

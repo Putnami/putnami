@@ -298,12 +298,13 @@ func depsFetch(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTa
 // `putnami deps …` instead of a package manager" rule has a real path for
 // adding, not just installing. A project whose extensions declare no
 // deps-edit job is refused, naming them (depsEditTarget). A spec at the
-// version none is refused before any job runs (refuseDropOnAdd).
-func DepsAdd(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
+// version none is refused before any job runs (refuseDropOnAdd). dryRun asks
+// the job to report the edit and to write no file.
+func DepsAdd(ctx context.Context, wsRoot string, modules []string, projectSelector string, dryRun bool, env LifecycleEnv) error {
 	if err := refuseDropOnAdd(modules, projectSelector); err != nil {
 		return err
 	}
-	return editDeps(ctx, wsRoot, "add", modules, projectSelector, env)
+	return editDeps(ctx, wsRoot, "add", modules, projectSelector, dryRun, env)
 }
 
 // refuseDropOnAdd fails `deps add` with a usage error for a spec whose version
@@ -341,13 +342,13 @@ func splitSpecVersion(spec string) (path, version string, ok bool) {
 
 // DepsRemove drops one or more dependencies from a project's manifest through
 // the deps-edit job of the project's extension. See DepsAdd.
-func DepsRemove(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
-	return editDeps(ctx, wsRoot, "remove", modules, projectSelector, env)
+func DepsRemove(ctx context.Context, wsRoot string, modules []string, projectSelector string, dryRun bool, env LifecycleEnv) error {
+	return editDeps(ctx, wsRoot, "remove", modules, projectSelector, dryRun, env)
 }
 
 // editDeps selects the project and its editor (depsEditTarget), then runs the
 // editor's deps-edit job with action on modules.
-func editDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector string, env LifecycleEnv) error {
+func editDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector string, dryRun bool, env LifecycleEnv) error {
 	if len(modules) == 0 {
 		return cmderr.Usagef("deps %s requires at least one dependency: putnami deps %s <dependency>... [--projects <name>]", action, action)
 	}
@@ -363,7 +364,7 @@ func editDeps(ctx context.Context, wsRoot, action string, modules []string, proj
 	if err != nil {
 		return err
 	}
-	return runDepsEdit(ctx, wsRoot, editors[project.ID], action, []depsEdit{{project: project, modules: modules}}, env)
+	return runDepsEdit(ctx, wsRoot, editors[project.ID], action, []depsEdit{{project: project, modules: modules}}, dryRun, env)
 }
 
 // depsEditTarget selects the single project a deps add or remove edits. A

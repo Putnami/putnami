@@ -1525,6 +1525,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-lifecycle-run-prints-an-always-visible-summary",
+              "deps-add-and-remove-forward-dry-run-to-the-deps-edit-job",
               "deps-add-and-remove-run-the-deps-edit-job-of-the-project",
               "deps-refuses-a-project-whose-extensions-declare-no-deps-edit"
             ]

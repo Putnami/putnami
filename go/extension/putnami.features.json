@@ -1163,6 +1163,19 @@
           }
         },
         {
+          "id": "deps-dry-run-writes-no-file",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "add-and-remove-under-dry-run-report-the-edit-and-write-no-file"
+            ]
+          }
+        },
+        {
           "id": "deps-add-resolves-a-workspace-member-from-the-tree",
           "stage": "coded",
           "evidenceKinds": [
