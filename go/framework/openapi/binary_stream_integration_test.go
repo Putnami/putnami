@@ -19,7 +19,7 @@ import (
 )
 
 func TestTheEmittedGoClientStreamsCallerLabelledOctetsThroughTheRealProvider(t *testing.T) {
-	spectest.Proves(t, "go/api-contracts", "streamed-binary-payloads", "the-emitted-client-uploads-and-downloads-caller-labeled-octets-through-a-real-provider")
+	spectest.Proves(t, "go/api-contracts", "streamed-binary-payloads", "the-emitted-client-uploads-and-downloads-caller-labelled-octets-through-a-real-provider")
 	httpServer := phttp.NewServerPlugin(phttp.ServerConfig{})
 	provider := api.New(httpServer, api.WithClientService(api.ClientServiceOptions{
 		Service: clientcontract.Service{ID: "stream-blobs", Audience: "urn:stream-blobs"},
