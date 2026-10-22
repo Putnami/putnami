@@ -354,6 +354,83 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	}
 }
 
+// TestARoutedImageKeepsTheDeploymentMemberKeyable publishes a workload whose
+// OCI image another extension packages, with the real @putnami/go manifest.
+// The workload's OCI member routes its package step to that extension, and
+// its deployment member names Go's deployment step. The publish plan holds
+// both steps without an output conflict, so both members get a selection
+// fingerprint.
+func TestARoutedImageKeepsTheDeploymentMemberKeyable(t *testing.T) {
+	repoRoot := findJobsRepoRoot(t)
+	goExtension := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "go", "extension"), "/go/extension")
+	if goExtension == nil {
+		t.Fatal("go/extension/putnami.extension.json did not load")
+	}
+	goExtension.LocalSource = false
+	pinInstalledTree(t, goExtension)
+
+	const packager = "@test/oci"
+	directory := func(path string) extension.DeclaredOutput {
+		return extension.DeclaredOutput{Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: path, OptionalEmpty: true}
+	}
+	imagePackager := &extension.ExtensionDescription{
+		Name: packager, Version: "1.0.0", Path: t.TempDir(),
+		Jobs: map[string]*extension.JobDefinition{"package": {
+			ExtensionName: packager, Name: "package", Kind: "command",
+			Traits:        extension.CommandTraits{InjectPublishChannels: true},
+			PipelineSteps: []extension.PipelineStep{{ID: "oci-image", Task: "oci-image", If: "params.docker"}},
+		}},
+		Tasks: map[string]extension.TaskDefinition{"oci-image": {Kind: "command", Command: "true", Declares: &extension.TaskDeclaration{
+			Outputs: map[string]extension.DeclaredOutput{"bin": directory("bin"), "docker": directory("docker")},
+		}}},
+	}
+
+	root := t.TempDir()
+	writeProjectFile(t, root, "app", "go.mod", "module example.com/app\n")
+	writeProjectFile(t, root, "app", "main.go", "package main\n\nfunc main() {}\n")
+	writeProjectFile(t, root, "app", wsproto.ConfigFilename, `{"publish":["docker","deployment"],"options":{"@putnami/go:publish":`+
+		`{"docker-package-publisher":"`+packager+`","docker-package-step":"oci-image"}}}`)
+	metadata := releaseSetProjectMembers(t, releaseset.MemberDeclaration{
+		Ecosystem: "put", Coordinate: "putnami/app-deployment",
+		PackagePublisher: goExtension.Name, PackageStep: "deployment", PublishStep: "publish-deployment",
+	})
+	metadata[goExtension.Name] = releaseSetProjectMembers(t, releaseset.MemberDeclaration{
+		Ecosystem: "oci", Coordinate: "putnami/app",
+		PackagePublisher: packager, PackageStep: "oci-image", PublishStep: "docker",
+	})["test-provider"]
+	app := &workspace.Project{
+		ID: "/app", Name: "app", Path: "app", Version: "1.0.0", Type: "application",
+		Extensions: []string{goExtension.Name, packager}, Metadata: metadata,
+		Config: wsproto.LoadProjectConfig(filepath.Join(root, "app")),
+	}
+	app.Publish = app.Config.Publish
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{app})
+	ws.Graph = workspace.BuildGraph(ws.Projects)
+
+	planned, err := planner.Plan(ws, []string{"publish"}, []*workspace.Project{app},
+		[]*extension.ExtensionDescription{goExtension, imagePackager}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("plan publish: %v", err)
+	}
+	routes := []*extension.ExtensionDescription{{Name: "test-provider", Jobs: map[string]*extension.JobDefinition{
+		"publish": {Name: "publish", CommandDependsOn: []string{"package"}, Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+	}}, goExtension, imagePackager}
+	members := map[string]*workspace.Project{
+		releaseset.MemberKey("put", "putnami/app-deployment"): app,
+		releaseset.MemberKey("oci", "putnami/app"):            app,
+	}
+	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+	fingerprints, err := cachekey.SelectionFingerprints(ws, planned, nil, cache, deploymentProfiles(t), routes, members)
+	if err != nil {
+		t.Fatalf("SelectionFingerprints: %v", err)
+	}
+	for key := range members {
+		if fingerprints[key] == "" {
+			t.Errorf("no selection fingerprint for member %s in %v", cachekey.PrintableMemberKey(key), fingerprints)
+		}
+	}
+}
+
 // pinInstalledTree points ext, loaded from this repository as an installed
 // extension, at a copy of its manifest. The key of an installed extension's
 // task digests every file under ext.Path, and a build of the same run writes

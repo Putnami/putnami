@@ -22,6 +22,7 @@
     "go/go-project-toolchain#go-ecosystem-profile",
     "go/go-project-toolchain#grpc-inventory-checked-before-promotion",
     "go/go-project-toolchain#image-input-producers",
+    "go/go-project-toolchain#image-packager-route",
     "go/go-project-toolchain#included-members-are-go-projects",
     "go/go-project-toolchain#included-members-join-go-work",
     "go/go-project-toolchain#install-without-go",

@@ -1808,6 +1808,65 @@ func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	}
 }
 
+// TestAnImageRoutedToAnotherPackagerLeavesGoNoImageStep pins the manifest half
+// of the image route. A project names the producer of its OCI image in
+// options["@putnami/go:publish"].docker-package-publisher, the option the
+// workspace probe reads into the member's package route. When that producer is
+// another extension, Go's docker step is excluded, so the two packagers never
+// both claim bin/ and docker/. The cross-compile step feeds only the archives
+// and docker steps, so the planner drops it with them unless archives is on.
+// Every other step keeps its own gate. The planner half, which plans the real
+// manifest, is TestPlan_GoPackageYieldsTheImageToTheRoutedPackager in the CLI.
+func TestAnImageRoutedToAnotherPackagerLeavesGoNoImageStep(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "image-packager-route", "an-image-routed-to-another-packager-plans-no-go-image-step")
+	m := loadExtensionManifest(t)
+	steps := map[string]proto.PipelineStep{}
+	for _, step := range m.Commands["package"].Run {
+		steps[step.ID] = step
+	}
+	if _, ok := m.Commands["publish"].Flags["docker-package-publisher"]; !ok {
+		t.Fatal("publish declares no docker-package-publisher option; the docker step reads the route from it")
+	}
+
+	docker := steps["docker"]
+	for _, tc := range []struct {
+		name  string
+		route any
+		image bool
+		want  bool
+	}{
+		{name: "no route", route: nil, want: true},
+		{name: "route names this extension", route: "@putnami/go", want: true},
+		{name: "route names another extension", route: "@acme/oci", want: false},
+		{name: "image project", route: nil, image: true, want: false},
+	} {
+		ctx := &proto.WhenContext{
+			Params:        proto.ParamMap{"docker": true, "image": tc.image},
+			CommandParams: map[string]proto.ParamMap{"publish": {"docker-package-publisher": tc.route}},
+		}
+		got, valid := proto.EvaluateExpressionChecked(docker.If, ctx)
+		if !valid || got != tc.want {
+			t.Errorf("%s: docker step if %q = %t (valid %t), want %t", tc.name, docker.If, got, valid, tc.want)
+		}
+	}
+
+	var consumers []string
+	for _, step := range m.Commands["package"].Run {
+		if containsString(step.DependsOn, "cross-compile") {
+			consumers = append(consumers, step.ID)
+		}
+	}
+	sort.Strings(consumers)
+	if !slices.Equal(consumers, []string{"archives", "docker"}) {
+		t.Errorf("steps that consume cross-compile = %v, want [archives docker]: the planner drops cross-compile only when every consumer is excluded", consumers)
+	}
+	for _, id := range []string{"tidy", "generate", "describe", "cross-compile", "archives", "go", "deployment"} {
+		if strings.Contains(steps[id].If, "docker-package-publisher") {
+			t.Errorf("package step %q if %q reads the image route; only the docker step yields to another packager", id, steps[id].If)
+		}
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

@@ -213,12 +213,27 @@ assembled in-process and do not get reproducible digests).
 
 ### go channel
 
-A project with a custom OCI packager can name its producer in
+A project whose OCI image another extension packages names that producer in
 `options["@putnami/go:publish"]`: set `docker-package-publisher` to the extension
 name and `docker-package-step` to its exact `package` step (for example a CGO
 packager's `cgo` step). The workspace probe carries that route into release-set
-selection fingerprints. Go still owns the Docker upload, and Go-module members
-keep their own package route. Omitted values retain `@putnami/go` / `docker`.
+selection fingerprints. Go still owns the Docker upload: `publish --docker`
+pushes the image that step writes under `.putnami/out/{project}/package/docker/`,
+after every `package` step of the project. Go-module members keep their own
+package route. Omitted values retain `@putnami/go` / `docker`.
+
+When the route names another extension, the `package` command that
+`putnami publish` runs plans no Go `docker` step, and no `cross-compile` step
+unless the archives channel is on. The `go` and `deployment` channels, and the
+`tidy`, `generate` and `describe` steps they need, plan as usual. Do not disable
+the `@putnami/go:package` job to make room for the other packager: that also
+removes the deployment step. Without the route, or with the route naming
+`@putnami/go`, the plan does not change.
+
+The route is a `publish` option, so only a run that includes `publish` reads
+it. `putnami package` on its own plans the Go `docker` step next to the other
+extension's step, and the planner refuses the plan because both steps declare
+the same outputs.
 
 1. Copy Go module source to a staging directory
 2. Strip all `replace` directives from `go.mod` (workspace-local paths are not valid for published modules)
@@ -374,6 +389,12 @@ The channel is off by default. Turn it on for a project in any of these ways:
 A member of kind `deployment` declared for a project without the channel fails
 the publication before anything runs: its package step is not planned, so its
 selection fingerprint cannot be computed.
+
+A project whose image another extension packages keeps this channel. Its image
+route (see [go channel](#go-channel)) removes only Go's `docker` and
+`cross-compile` steps from the publication, so the `deployment` step still
+plans. A `disable.jobs: ["@putnami/go:package"]` entry is not needed, and it
+removes the deployment step with the rest of the job.
 
 The task is cached. It runs after the `generate` and `describe` steps, which
 commit `infra/requirements.json`, and its key covers:
