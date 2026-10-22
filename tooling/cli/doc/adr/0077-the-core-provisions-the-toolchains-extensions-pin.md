@@ -59,16 +59,19 @@ A runtime toolchain candidate may come from `provisioned`, under CLI contract
    network access. An incomplete one keeps each entry the archive does not
    provide, so a released extension's install in it, such as Bun's package
    cache, survives. Go's folder is the one `putnamiw` installs into. A hosted
-   run provisions nothing: it runs the toolchain the runner holds.
+   run, or one whose dependencies are offline, provisions nothing: it runs
+   the toolchain the machine holds.
 5. **An extension installs no toolchain.** Each extension lists a
    `provisioned` candidate for the toolchain it answers for, in place of its
    `putnami-home` one. A missing or incomplete folder fails a job that needs
-   it, with `putnami install` as the remedy. A toolchain that locks an
-   identity another extension answers for keeps its `putnami-home` candidate
-   when that path is the provisioned executable, as the `go` runtime compiler
-   of every other extension does: Go's archive holds `go/bin/go`. Otherwise it
-   lists the `provisioned` candidate, as the Bun of `@putnami/clientgen`'s
-   TypeScript emitter does.
+   it, with `putnami install` as the remedy. A `provisioned` candidate locks
+   only an identity its own manifest lists in `runtime.resolves`. A toolchain
+   that locks an identity another extension answers for lists a
+   `putnami-home` candidate for the executable of the archive that extension
+   pins: the `go` runtime compiler of every other extension lists
+   `toolchains/go/go-{version}/go/bin/go`, and the Bun of
+   `@putnami/clientgen`'s TypeScript emitter lists the program of each Bun
+   target, since Bun's archive holds it in a `bun-<target>` directory.
 6. **Each extension keeps its declaration and its default.** It reads its own
    declaration (`go.work`, `packageManager`, `[tool.uv]`). The TypeScript and
    Python extensions pin their default release when the workspace declares
@@ -90,9 +93,8 @@ ADR 0019 decisions 6 and 7 stand. Decision 3 still resolves an alias that only
 ## Consequences
 
 - Pinning a new toolchain changes one extension, not the core.
-- The CLI and the Go, TypeScript, Python and clientgen extensions ship
-  together: their manifests require contract 13, which only this core
-  implements.
+- The CLI and the Go, TypeScript and Python extensions ship together: their
+  manifests require contract 13, which only this core implements.
 - The CLI unpacks `zip` toolchain archives, because Bun publishes only zip
   archives and Go and uv publish zip archives for Windows. CLI decision D-W2
   states which archives stay `tar.gz`.

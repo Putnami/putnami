@@ -255,9 +255,12 @@ Before it runs the job, `projects create` checks whether the toolchains the
 extension's runtime locks resolve, such as the Go of `@putnami/go`. When one
 does not, the job first runs with `stage` set to `prepare`, which only writes
 the files a pin derives from, such as the `go.work` of a new Go project. The
-command then pins what the workspace lock misses, installs only a newly pinned
-toolchain that the extension locks, and runs the job once. A pinned toolchain
-that is not installed ends that run with an error that names `putnami install`.
+command then runs the toolchain pins phase of `putnami install`: the
+extensions answer their pins, and the CLI installs each pinned release the
+machine lacks under the Putnami home. When a toolchain the extension locks
+gained or changed a pin, the workspace installers run. The job then runs once.
+A pinned toolchain that is not installed ends that run with an error that
+names `putnami install`.
 When the installers fail but the job then succeeds, the project stays and the
 command exits non-zero with the command to run next: `putnami deps install`.
 
@@ -404,11 +407,15 @@ One `putnami pin <version>` call records the digest for every platform Putnami p
 
 ### `install`
 
-Run workspace-level installation: extensions, extension install hooks, templates (if configured), agent workflows (if declared), and dependencies.
+Run workspace-level installation: extensions, extension install hooks, templates (if configured), toolchains, agent workflows (if declared), and dependencies.
 
 ```bash
 putnami install
 ```
+
+#### Toolchains
+
+Before the workspace installers, `install` asks each installed extension for the toolchains it pins, records the answers in `putnami.lock.json`, and installs each pinned release the machine lacks under the Putnami home. The summary lists each release it installed, such as `✓ Installed go 1.26.9 under the Putnami home`. A hosted run, or one whose dependencies are offline, installs none. See [Toolchain pins](07-extensions.md#toolchain-and-cli-protocol-preflight).
 
 #### Agent workflows
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 13,
+  "cliContract": 7,
   "name": "@putnami/clientgen",
   "runtime": {
     "executable": "compiled/putnami-clientgen",
@@ -31,7 +31,12 @@
           { "from": "path", "path": "bun" },
           { "from": "environment", "environment": "BUN_INSTALL", "path": "bin/bun" },
           { "from": "home", "path": ".bun/bin/bun" },
-          { "from": "provisioned" }
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-darwin-aarch64/bun" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-darwin-x64/bun" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-linux-aarch64/bun" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-linux-x64/bun" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-windows-aarch64/bun.exe" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-windows-x64/bun.exe" }
         ],
         "probe": { "args": ["--version"], "expect": "{version}" },
         "environment": {

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -18,9 +20,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/useragent"
 )
 
 // installWritesWorkspace reports whether an install may write the workspace's
@@ -49,13 +53,55 @@ func toolchainPinOptions(ctx context.Context) toolchainpins.Options {
 }
 
 // resolveToolchainPins runs the toolchain pins phase for the command ctx
-// belongs to: env.pinToolchains, or toolchainpins.Resolve when it is nil.
+// belongs to: env.pinToolchains when it is set. Otherwise it runs
+// toolchainpins.Resolve, then installs the pinned releases the machine lacks
+// (installToolchainPins).
 func resolveToolchainPins(ctx context.Context, wsRoot string, env LifecycleEnv) (toolchainpins.Result, error) {
-	resolve := env.pinToolchains
-	if resolve == nil {
-		resolve = toolchainpins.Resolve
+	opts := toolchainPinOptions(ctx)
+	if env.pinToolchains != nil {
+		return env.pinToolchains(ctx, wsRoot, opts)
 	}
-	return resolve(ctx, wsRoot, toolchainPinOptions(ctx))
+	pins, err := toolchainpins.Resolve(ctx, wsRoot, opts)
+	if err != nil {
+		return pins, err
+	}
+	return pins, installToolchainPins(ctx, wsRoot, pins, opts, env)
+}
+
+// installToolchainPins installs, in identity order, the pinned release of each
+// identity an extension answered for, unless the machine already holds it
+// (toolchain.Provision). A hosted run, or one whose dependencies are offline,
+// installs nothing: it runs the toolchains the machine holds. It reports each
+// release it installed to env.OnAction; with no OnAction the same line goes
+// to env.Out. It stops at the first failure.
+func installToolchainPins(ctx context.Context, wsRoot string, pins toolchainpins.Result, opts toolchainpins.Options, env LifecycleEnv) error {
+	if opts.Hosted || opts.Offline {
+		return nil
+	}
+	record := env.OnAction
+	if record == nil {
+		out := env.out()
+		record = func(action LifecycleAction) { iox.Fprintf(out, "  ✓ %s\n", action.Description) }
+	}
+	for _, identity := range slices.Sorted(maps.Keys(pins.Answers)) {
+		entry, pinned := pins.Toolchains[identity]
+		if !pinned {
+			continue
+		}
+		_, installed, err := toolchain.Provision(ctx, wsRoot, toolchain.ProvisionTarget{
+			Identity:  identity,
+			Entry:     entry,
+			Toolchain: pins.Answers[identity].Toolchain,
+		}, toolchain.ProvisionOptions{UserAgent: useragent.String()})
+		if err != nil {
+			return err
+		}
+		if installed {
+			record(LifecycleAction{Kind: "toolchain", Name: identity,
+				Description: fmt.Sprintf("Installed %s %s under the Putnami home", identity, entry.Version)})
+		}
+	}
+	return nil
 }
 
 // runWorkspaceInstallers is Install's installer phase: the toolchain pins

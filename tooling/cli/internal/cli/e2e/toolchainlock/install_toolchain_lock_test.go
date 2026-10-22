@@ -1,12 +1,17 @@
 package toolchainlock
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -24,7 +29,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
-	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -224,16 +229,49 @@ func runPinsExtensionFixture(dir string, args []string) int {
 	return 0
 }
 
-// fixturePin is a lock version 5 pin of version for this host.
+// fixturePin is a lock version 5 pin of version for this host: the archive
+// toolchainReleases serves for it, with its SHA-256.
 func fixturePin(version string) *wsproto.LockToolchainEntry {
 	platform := lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)
 	return &wsproto.LockToolchainEntry{
 		Version:     version,
-		Integrities: map[string]string{platform: sha256Hex([]byte(version))},
+		Integrities: map[string]string{platform: sha256Hex(toolArchive(version))},
 		Archives: map[string]wsproto.LockToolchainArchive{platform: {
-			URL: "https://example.test/toolchain-" + version + ".tar.gz", Format: wsproto.LockArchiveFormatTarGz, Executable: "bin/tool",
+			URL: toolchainReleases.URL + "/toolchain-" + version + ".tar.gz", Format: wsproto.LockArchiveFormatTarGz, Executable: "bin/tool",
 		}},
 	}
+}
+
+// toolchainReleases serves toolArchive(version) at
+// /toolchain-<version>.tar.gz, the archive of each fixturePin. TestMain
+// starts it.
+var toolchainReleases *httptest.Server
+
+func serveToolchainReleases() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		version, prefixed := strings.CutPrefix(r.URL.Path, "/toolchain-")
+		version, suffixed := strings.CutSuffix(version, ".tar.gz")
+		if !prefixed || !suffixed {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(toolArchive(version))
+	}))
+}
+
+// toolArchive is the tar.gz of a fixture toolchain release: bin/tool, which
+// prints version. It is the same bytes for the same version.
+func toolArchive(version string) []byte {
+	content := "#!/bin/sh\necho " + version + "\n"
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+	// Writes to a bytes.Buffer do not fail, and the header is valid.
+	_ = tw.WriteHeader(&tar.Header{Name: "bin/tool", Mode: 0o755, Size: int64(len(content)), Typeflag: tar.TypeReg})
+	_, _ = io.WriteString(tw, content)
+	_ = tw.Close()
+	_ = zw.Close()
+	return buf.Bytes()
 }
 
 // sourcePin is a lock version 3 or 4 pin of version: an integrity and the
@@ -246,7 +284,8 @@ func sourcePin(version string) lockfile.LockEntry {
 	}
 }
 
-// setUpPinsTest isolates the Putnami home, store and artifacts of one test,
+// setUpPinsTest isolates the user and Putnami homes, store and artifacts of
+// one test (isolateHomes),
 // and lets its install run as a command run by hand.
 func setUpPinsTest(t *testing.T) string {
 	t.Helper()
@@ -254,7 +293,7 @@ func setUpPinsTest(t *testing.T) string {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell runtime fixture")
 	}
-	hometest.Temp(t)
+	isolateHomes(t)
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
 	t.Setenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED", "")
@@ -298,10 +337,12 @@ func installWorkspace(ctx context.Context, t *testing.T, wsRoot string) (string,
 // the committed lock entries of its identities, and records exactly the pins
 // they answer before the workspace installers run: an identity no answer pins
 // leaves the lock, and a lock below version 5 is written at version 5. The
-// chain is the real one: Install → the toolchain pins phase → each
-// extension's runtime → DepsInstall → RunWorkspaceJob → Engine.Run → the
-// extensions' install task.
+// CLI installs each pinned release under the Putnami home before the
+// installers run. The chain is the real one: Install → the toolchain pins
+// phase → each extension's runtime → DepsInstall → RunWorkspaceJob →
+// Engine.Run → the extensions' install task.
 func TestInstall_RecordsTheAnsweredPinsBeforeTheInstallers(t *testing.T) {
+	spectest.Proves(t, "cli/runtime-toolchain-pinning", "pinned-archives-are-provisioned", "a-pinned-archive-is-verified-and-unpacked")
 	spectest.Proves(t, "cli/toolchain-lock", "extensions-answer-pins", "install-asks-each-extension-that-resolves-once")
 	spectest.Proves(t, "cli/toolchain-lock", "extensions-answer-pins", "the-request-carries-the-committed-entries")
 	spectest.Proves(t, "cli/toolchain-lock", "install-pins-before-installers", "explicit-install-writes-the-answered-pins-at-format-5")
@@ -331,7 +372,8 @@ func TestInstall_RecordsTheAnsweredPinsBeforeTheInstallers(t *testing.T) {
 	}
 	writeCommittedLock(t, wsRoot, committed)
 
-	if transcript, err := installWorkspace(context.Background(), t, wsRoot); err != nil {
+	transcript, err := installWorkspace(context.Background(), t, wsRoot)
+	if err != nil {
 		t.Fatalf("putnami install: %v\n%s", err, transcript)
 	}
 
@@ -341,6 +383,17 @@ func TestInstall_RecordsTheAnsweredPinsBeforeTheInstallers(t *testing.T) {
 	}
 	if got.Version != lockfile.FormatVersionV5 {
 		t.Fatalf("lock version = %d, want 5", got.Version)
+	}
+	// Each answered release is unpacked under the Putnami home, and the
+	// install says so.
+	for identity, version := range map[string]string{"go": "1.26.1", "node": "22.1.0"} {
+		tool := filepath.Join(toolchain.ProvisionedFolder(wsRoot, identity, version), "bin", "tool")
+		if data, err := os.ReadFile(tool); err != nil || !strings.Contains(string(data), "echo "+version) {
+			t.Fatalf("%s %s under the Putnami home: %q, %v; want the archive's bin/tool", identity, version, data, err)
+		}
+		if want := "Installed " + identity + " " + version + " under the Putnami home"; !strings.Contains(transcript, want) {
+			t.Fatalf("install transcript =\n%s\nwant %q", transcript, want)
+		}
 	}
 	recorded := map[string]wsproto.LockToolchainEntry{}
 	for identity, entry := range got.Toolchains {

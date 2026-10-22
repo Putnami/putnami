@@ -1197,9 +1197,10 @@ its digest, and unpacks it into `toolchains/<identity>/<identity>-<version>/`
 under the Putnami home, keeping the entries the folder already held, such as
 Bun's package cache. The folder is complete when the toolchain's probe answers
 the pinned version from the archive's executable, and a complete folder is
-reused with no request. A hosted run installs no toolchain: it runs the one the
-runner holds. A runtime toolchain candidate `{"from": "provisioned"}` names the
-executable of that folder.
+reused with no request. A hosted run, or one whose dependencies are offline
+(`PUTNAMI_OFFLINE_DEPENDENCIES=1`), installs no toolchain: it runs the one the
+machine holds. A runtime toolchain candidate `{"from": "provisioned"}` names
+the executable of that folder.
 
 A toolchain alias that only `workspace-install` or `project-setup`, or the
 `workspace-fetch` that runs before `workspace-install`, need resolves as if it
@@ -1315,11 +1316,13 @@ that renders a `go.mod` to `go.work` and runs `go mod tidy` in it. Before the
 run, create checks whether the toolchains the extension's runtime locks
 resolve. When one does not, the job first runs with `stage` set to `prepare`,
 which only writes the files a pin derives from, such as the `go.work` of a new
-Go project. Create then pins what the lock misses, installs only a newly pinned
-toolchain that the extension locks, and runs the job once. A pinned toolchain
-that is not installed ends that run with an error that names `putnami install`.
-See ADR 0019. When the job fails, create keeps the project and exits non-zero,
-naming the create command to run again with `--force`.
+Go project. Create then runs the toolchain pins phase, which installs each
+pinned release the machine lacks. When a toolchain the extension locks gained
+or changed a pin, the workspace installers run. The job then runs once. A
+pinned toolchain that is not installed ends that run with an error that names
+`putnami install`. See ADR 0019 and ADR 0077. When the job fails, create keeps
+the project and exits non-zero, naming the create command to run again with
+`--force`.
 
 ### Template Installation
 

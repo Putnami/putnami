@@ -16,13 +16,23 @@ import (
 // bun runtime of the shipped TypeScript and clientgen manifests on a machine
 // whose PATH holds a bun of another release than the lock pins. That bun is
 // never substituted. Once the pinned release exists under the Putnami home
-// where the lock's archive puts it, toolchains/bun/bun-<version>/bin/bun, the
-// runtime resolves it and BUN_INSTALL names its install directory, so the bun
-// keeps its own files there.
+// where Bun's archive puts it, toolchains/bun/bun-<version>/bun-<target>/bun,
+// the runtime resolves it and BUN_INSTALL names its install directory, so the
+// bun keeps its own files there.
 func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T) {
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
 		"a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home")
 	const pinned, ambient = "1.9.9", "1.4.0"
+	// Bun's archive for a platform holds bun in a bun-<target> directory.
+	target, published := map[string]string{
+		"darwin/amd64": "darwin-x64", "darwin/arm64": "darwin-aarch64",
+		"linux/amd64": "linux-x64", "linux/arm64": "linux-aarch64",
+		"windows/amd64": "windows-x64", "windows/arm64": "windows-aarch64",
+	}[runtime.GOOS+"/"+runtime.GOARCH]
+	if !published {
+		t.Skipf("Bun publishes no archive for %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	program := "bun-" + target + "/" + WithExecutableSuffix(runtime.GOOS, "bun")
 	repoRoot := findJobsRepoRoot(t)
 	cases := []struct {
 		dir, name, alias string
@@ -36,7 +46,7 @@ func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			writeArchivedToolchainLock(t, root, "bun", pinned, "bin/"+WithExecutableSuffix(runtime.GOOS, "bun"))
+			writeArchivedToolchainLock(t, root, "bun", pinned, program)
 			onPath := t.TempDir()
 			writeRuntimeTool(t, filepath.Join(onPath, "bun"), ambient)
 			home := t.TempDir()
@@ -67,7 +77,7 @@ func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T)
 				t.Fatalf("optional resolution with only bun %s on PATH = %+v, %v; want unavailable", ambient, resolution, err)
 			}
 
-			installed := writeRuntimeTool(t, filepath.Join(installDir, "bin", "bun"), pinned)
+			installed := writeRuntimeTool(t, filepath.Join(installDir, filepath.FromSlash(program)), pinned)
 			resolution, err = resolve()
 			if err != nil {
 				t.Fatalf("resolution with bun %s installed under the Putnami home: %v", pinned, err)

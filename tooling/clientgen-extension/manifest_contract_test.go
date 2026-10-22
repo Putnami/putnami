@@ -235,10 +235,12 @@ func TestTaskEffectTable(t *testing.T) {
 }
 
 // The TypeScript emitter runs with the bun the workspace lock pins. A host that
-// holds no bun of that release gets it from `putnami install`, which puts it
-// under the Putnami home: the emitter toolchain lists that install after the
-// host's own locations, so the emitter runs on a host where nobody installed
-// Bun.
+// holds no bun of that release gets it from `putnami install`, which unpacks
+// the archive @putnami/typescript pins under the Putnami home: the archive
+// holds bun in a bun-<target> directory, one per Bun target. The emitter
+// toolchain lists the program of each target after the host's own locations,
+// so the emitter runs on a host where nobody installed Bun. It lists no
+// provisioned candidate, since @putnami/clientgen answers for no bun pin.
 func TestTypeScriptEmitterResolvesTheBunUnderThePutnamiHome(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "portable-emitter-resolution",
 		"the-typescript-emitter-resolves-the-bun-under-the-putnami-home")
@@ -251,7 +253,12 @@ func TestTypeScriptEmitterResolvesTheBunUnderThePutnamiHome(t *testing.T) {
 		{From: proto.RuntimeToolchainCandidatePath, Path: "bun"},
 		{From: proto.RuntimeToolchainCandidateEnvironment, Environment: "BUN_INSTALL", Path: "bin/bun"},
 		{From: proto.RuntimeToolchainCandidateHome, Path: ".bun/bin/bun"},
-		{From: proto.RuntimeToolchainCandidateProvisioned},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-darwin-aarch64/bun"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-darwin-x64/bun"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-linux-aarch64/bun"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-linux-x64/bun"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-windows-aarch64/bun.exe"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-windows-x64/bun.exe"},
 	}
 	if !reflect.DeepEqual(emitter.Candidates, want) {
 		t.Fatalf("typescriptEmitter candidates = %+v, want %+v", emitter.Candidates, want)

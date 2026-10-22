@@ -99,8 +99,8 @@ var spawnSites = map[string]spawnSite{
 		why: "an extension tool runs in the workspace"},
 	"runnerprovider/session.go:Spawn": {spawns: 1, verdict: marked, by: "runnerprovider/launch.go:LaunchSpecFor",
 		why: "the runner provider of an extension not installed from the artifact store"},
-	"workspace/probe_exec.go:(*ExecProbeProvider).Probe": {spawns: 1, verdict: marked, by: "workspace/probe_exec.go:(*ExecProbeProvider).Probe",
-		why: "the workspace probe of an extension not installed from the artifact store"},
+	"workspace/probe_exec.go:(*ExecProbeProvider).exchange": {spawns: 1, verdict: marked, by: "workspace/probe_exec.go:(*ExecProbeProvider).exchange",
+		why: "the workspace probe or toolchain-resolve call of an extension not installed from the artifact store"},
 
 	// Credential holders, started through StartHolder.
 	"cacheprovider/session.go:Spawn": {spawns: 1, verdict: holder, by: "jobs/remotecache/remote_provider.go:(*RemoteCache).ensureProvider",

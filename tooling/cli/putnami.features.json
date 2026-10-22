@@ -2712,7 +2712,8 @@
               "a-digest-or-probe-mismatch-is-refused",
               "a-complete-folder-is-reused-without-a-request",
               "a-held-release-is-not-downloaded",
-              "a-folder-of-another-layout-keeps-its-entries"
+              "a-folder-of-another-layout-keeps-its-entries",
+              "a-hosted-or-offline-run-installs-nothing"
             ]
           }
         },
