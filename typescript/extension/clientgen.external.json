@@ -41,6 +41,29 @@
         "typescript/extension/cmd/putnami-ts/publish_test.go"
       ],
       "reason": "Publishes a package tarball and reads back its published metadata. A dry-run publish sends one GET of the version's tarball to ask whether the registry already holds the package."
+    },
+    {
+      "authority": "the GitHub REST releases API (docs.github.com/rest/releases)",
+      "adapter": "typescript/extension/internal/toolchain/bunresolve.go",
+      "callsites": [
+        {
+          "path": "typescript/extension/internal/toolchain/bunresolve.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "5e7839aff490c16ff8d8bd0a6040cf3b379052979c6bae7fe36686d4e3e8bded"
+        },
+        {
+          "path": "typescript/extension/internal/toolchain/bunresolve.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "0c83c6844bd80f856fdc373206a442b12c937a569e13e46dfee4ef27d6550648"
+        }
+      ],
+      "owner": "@putnami/typescript",
+      "tests": [
+        "typescript/extension/internal/toolchain/bunresolve_test.go"
+      ],
+      "reason": "Reads the SHA-256 digests of a Bun release's archives to pin a declared release that the lock does not pin, in the answer to the toolchain-resolve call."
     }
   ]
 }

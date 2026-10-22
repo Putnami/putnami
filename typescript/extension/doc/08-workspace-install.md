@@ -58,6 +58,13 @@ this install runs with a Bun of the machine of another release, else with the
 default release, and logs a warning. `putnami install` pins the declared release
 in the lock when it ends, and the next `putnami install` installs that release.
 
+The extension answers the CLI's `__putnami toolchain-resolve` call for the lock
+identity `bun`. The answer comes from the root `package.json`, the lock, and
+the extension's default release. The extension reads the SHA-256 digests from
+the release's metadata on GitHub only for a declared release that the lock does
+not pin and that is not the default. The answer names each platform's archive
+URL, format, and executable beside its SHA-256.
+
 A Bun on the machine that differs from the pin does not block anything: the
 pinned release is installed under the Putnami home and every task runs with it.
 The task runtime of the extension lists the install as its last candidate.
