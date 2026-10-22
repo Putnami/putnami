@@ -78,7 +78,7 @@ func TestGoEmbedSourceLinkReferentIsCapturedAndMaterialized(t *testing.T) {
 	if err := os.Symlink(".source.txt", filepath.Join(root, "app/embed.go")); err != nil {
 		t.Skipf("source-file symlinks unavailable: %v", err)
 	}
-	collected, err := store.CollectKeyFiles(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"})
+	collected, err := store.CollectKeyFiles(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestGoEmbedSemanticInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T
 	}
 	plan := func(t *testing.T, root string, outputs ...string) cachekey.PortablePlanInputs {
 		t.Helper()
-		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"})
+		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,7 +260,7 @@ func TestGoSourceAliasesSelectedByGoInputsCaptureTheirReferents(t *testing.T) {
 			if err := os.Symlink(test.target, link); err != nil {
 				t.Skipf("source-file symlinks unavailable: %v", err)
 			}
-			selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"})
+			selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -327,7 +327,7 @@ func TestGoSourceAliasUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing
 	}
 	plan := func() cachekey.PortablePlanInputs {
 		t.Helper()
-		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"})
+		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
 		if err != nil {
 			t.Fatal(err)
 		}

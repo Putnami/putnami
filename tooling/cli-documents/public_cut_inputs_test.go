@@ -72,7 +72,7 @@ func TestPublicCutCandidateInputsInvalidateTheRecordedVerdict(t *testing.T) {
 	for _, file := range files {
 		scanned = append(scanned, filepath.Join(root, filepath.FromSlash(file.path)))
 	}
-	keyed, err := store.CollectKeyFiles(project, patterns)
+	keyed, err := store.CollectKeyFiles(project, patterns, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

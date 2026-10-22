@@ -38,8 +38,8 @@ func TestClosureInputsDigest_IsIndependentOfTheCheckoutDirectory(t *testing.T) {
 
 	leftWS, leftJob := build(t.TempDir())
 	rightWS, rightJob := build(t.TempDir())
-	left, leftErr := closureInputsDigest(leftWS, leftJob, store.NewCacheManager(store.NewLocalStore(t.TempDir())))
-	right, rightErr := closureInputsDigest(rightWS, rightJob, store.NewCacheManager(store.NewLocalStore(t.TempDir())))
+	left, leftErr := closureInputsDigest(leftWS, leftJob, store.NewCacheManager(store.NewLocalStore(t.TempDir())), store.GoEmbedExpander())
+	right, rightErr := closureInputsDigest(rightWS, rightJob, store.NewCacheManager(store.NewLocalStore(t.TempDir())), store.GoEmbedExpander())
 	if leftErr != nil || rightErr != nil {
 		t.Fatalf("closure inputs: %v, %v", leftErr, rightErr)
 	}
@@ -52,7 +52,7 @@ func TestClosureInputsDigest_IsIndependentOfTheCheckoutDirectory(t *testing.T) {
 
 	// A task that declares no closure input pays nothing and folds nothing.
 	bare := &jobmodel.ScheduledJob{Project: leftJob.Project, JobDef: &extension.JobDefinition{Name: "test~run"}}
-	if got, err := closureInputsDigest(leftWS, bare, store.NewCacheManager(store.NewLocalStore(t.TempDir()))); err != nil || got != "" {
+	if got, err := closureInputsDigest(leftWS, bare, store.NewCacheManager(store.NewLocalStore(t.TempDir())), store.GoEmbedExpander()); err != nil || got != "" {
 		t.Errorf("undeclared closure digest = %q, want empty", got)
 	}
 }

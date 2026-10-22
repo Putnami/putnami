@@ -65,7 +65,7 @@ func TestInvocationProducerGoEmbedFailureReachesConsumerKeys(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			key, err := test.key()
-			if !errors.Is(err, store.ErrGoEmbedInput) || key != "" || !strings.Contains(err.Error(), "missing.sql") {
+			if !errors.Is(err, store.ErrInputSelector) || key != "" || !strings.Contains(err.Error(), "missing.sql") {
 				t.Fatalf("invalid invocation producer yielded consumer key %q, %v", key, err)
 			}
 		})
@@ -120,7 +120,7 @@ func TestClosureGoEmbedFailureTerminatesConsumerBeforeExecution(t *testing.T) {
 	cache := func() *store.CacheManager {
 		return store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
 	}
-	if _, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache(), nil); !errors.Is(err, store.ErrGoEmbedInput) {
+	if _, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache(), nil); !errors.Is(err, store.ErrInputSelector) {
 		t.Fatalf("closure member failure lost typed semantic category: %v", err)
 	}
 	for _, tc := range []struct {

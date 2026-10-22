@@ -140,7 +140,7 @@ func TestGoEmbedUnsafeAliasFailsBeforeTaskExecution(t *testing.T) {
 	if err := os.Symlink("../outside.src", filepath.Join(ws.Root, "app", "alias.go")); err != nil {
 		t.Skipf("source symlink unavailable: %v", err)
 	}
-	if matched, err := store.HasMatchingFiles(filepath.Join(ws.Root, "app"), job.JobDef.FilePatterns); err != nil || !matched {
+	if matched, err := store.HasMatchingFiles(filepath.Join(ws.Root, "app"), job.JobDef.FilePatterns, store.GoEmbedExpander()); err != nil || !matched {
 		t.Fatalf("ordinary batch probe should reach task-opening alias validation: matched=%v err=%v", matched, err)
 	}
 	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, sharedRuntimeCache(t))
@@ -244,7 +244,7 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 				Kind: "command", Command: hookPath,
 			}}
 			cache := sharedRuntimeCache(t)
-			if _, err := cachekey.ComputeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrGoEmbedInput) || !strings.Contains(err.Error(), "resolve Git input repository") {
+			if _, err := cachekey.ComputeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrInputSelector) || !strings.Contains(err.Error(), "resolve Git input repository") {
 				t.Fatalf("fixture must fail generically in producer before consumer Go hashing: %v", err)
 			}
 			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)

@@ -8,6 +8,7 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -43,7 +44,7 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 	unkeyed := job("unkeyed", false, extension.JobDefinition{TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Env: []string{"IGNORED"}}}})
 	unkeyedPatterned := job("unkeyed", false, extension.JobDefinition{FilePatterns: []string{"conf/*.yaml"}})
 
-	inputs, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned, wholeTree, unkeyed, unkeyedPatterned}, nil)
+	inputs, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned, wholeTree, unkeyed, unkeyedPatterned}, nil, store.GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +84,7 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(root, "app", "conf")); err != nil {
 		t.Fatal(err)
 	}
-	remaining, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned}, nil)
+	remaining, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned}, nil, store.GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,18 +102,18 @@ func TestPortableInputsMemoizesEachRootAndPatternSetOnce(t *testing.T) {
 	root := t.TempDir()
 	writeProjectFile(t, root, "app", "src/main.go", "package main")
 	memo := keyFileMemo{}
-	first, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"})
+	first, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}, store.GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
 	writeProjectFile(t, root, "app", "src/second.go", "package main")
-	if again, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}); err != nil || len(again) != len(first) || len(again) != 1 {
+	if again, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}, store.GoEmbedExpander()); err != nil || len(again) != len(first) || len(again) != 1 {
 		t.Fatalf("the second collect walked again: %v then %v", first, again)
 	}
-	if other, err := memo.collect(filepath.Join(root, "app"), []string{"src/**"}); err != nil || len(other) != 2 {
+	if other, err := memo.collect(filepath.Join(root, "app"), []string{"src/**"}, store.GoEmbedExpander()); err != nil || len(other) != 2 {
 		t.Fatalf("a different pattern set shared a memo entry: %v", other)
 	}
-	if fresh, err := (keyFileMemo{}).collect(filepath.Join(root, "app"), []string{"src/*.go"}); err != nil || len(fresh) != 2 {
+	if fresh, err := (keyFileMemo{}).collect(filepath.Join(root, "app"), []string{"src/*.go"}, store.GoEmbedExpander()); err != nil || len(fresh) != 2 {
 		t.Fatalf("the memo outlived its call: %v", fresh)
 	}
 }

@@ -278,7 +278,7 @@ func (s *selectionScanner) selectsThroughLink(dir string, patterns []string) boo
 	if linked, ok := s.links[key]; ok {
 		return linked
 	}
-	linked := store.SelectsThroughLink(dir, patterns)
+	linked := store.SelectsThroughLink(dir, patterns, store.GoEmbedExpander())
 	if s.links == nil {
 		s.links = make(map[string]bool)
 	}

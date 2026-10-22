@@ -173,7 +173,7 @@ func TestGoDescribeSourceSymlinkAssetEditMovesLibraryAndDependentKeys(t *testing
 	if old, err := cache.Lookup(changedLib); err != nil || old != nil {
 		t.Fatalf("old bundle answered new key: %v, %v", old, err)
 	}
-	projection, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.lib}, nil)
+	projection, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.lib}, nil, store.GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestGoEmbedPortableInputsBindAssetAndFailOnDeletion(t *testing.T) {
 	writeTestFile(t, filepath.Join(fixture.appDir, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed local.sql\nvar SQL string\n")
 	asset := filepath.Join(fixture.appDir, "local.sql")
 	writeTestFile(t, asset, "SELECT 1;\n")
-	projection, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.app}, nil)
+	projection, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.app}, nil, store.GoEmbedExpander())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func TestGoEmbedPortableInputsBindAssetAndFailOnDeletion(t *testing.T) {
 	if err := os.Remove(asset); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.app}, nil); err == nil {
+	if _, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.app}, nil, store.GoEmbedExpander()); err == nil {
 		t.Fatal("deleted embedded asset silently omitted from portable projection")
 	}
 }
