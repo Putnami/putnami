@@ -38,9 +38,10 @@ import (
 const unavailableRuntimeToolchainIdentity = "unavailable"
 
 // ToolchainProvisioningCommand is the well-known verb whose tasks install the
-// workspace's language ecosystem. Its run writes the files the lock's toolchain
-// pins derive from (go.work, package.json#packageManager), and `putnami install`
-// pins them only after it succeeds. Its toolchain references therefore resolve
+// workspace's language ecosystem. Its run can need a toolchain the machine does
+// not hold: an extension pins no release of a toolchain the workspace does not
+// declare yet, such as Go before a go.work names one, and a hosted or offline
+// run installs no pinned archive. Its toolchain references therefore resolve
 // as if optional: a missing pin, a missing host integrity or no matching
 // candidate yields the unavailable identity instead of failing the run, so a
 // workspace whose lock does not pin a toolchain yet can always be installed. A
@@ -51,10 +52,9 @@ const unavailableRuntimeToolchainIdentity = "unavailable"
 // extension resolve the same way only in a run whose every active command is
 // ToolchainProvisioningCommand (ProvisioningOnlyRun).
 //
-// extensionproto.WorkspaceFetchCommand resolves the same way: a hosted run
-// fetches the dependencies before the installers run, so the fetch starts
-// before the pinned toolchain may be installed (IsToolchainProvisioningCommand).
-// So does ProjectSetupCommand.
+// extensionproto.WorkspaceFetchCommand, which a hosted run starts before the
+// installers, resolves the same way (IsToolchainProvisioningCommand). So does
+// ProjectSetupCommand.
 const ToolchainProvisioningCommand = "workspace-install"
 
 // ProjectSetupCommand is the job `putnami projects create` runs in the
