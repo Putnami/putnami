@@ -6,14 +6,17 @@
 package removedroots
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -175,6 +178,59 @@ func TestRemovedRootsAreRefusedOutsideAWorkspace(t *testing.T) {
 			}
 			requireRefusal(t, removedPath(args), output)
 		})
+	}
+}
+
+// machineLoadShape is the human output of `doctor --machine`: the load, or
+// unknown where the host does not report it.
+var machineLoadShape = regexp.MustCompile(`^(unknown|\d+\.\d\d)\n$`)
+
+// TestDoctorMachinePrintsTheLoadInEachFormat runs `putnami doctor --machine`,
+// which reads the machine load in place of the removed `contributor
+// machine-load`, through the real CLI in a workspace. The live load moves
+// between two runs, so the test checks the shape of stdout in each format:
+// the load line, or the doctor result whose data carries the load. The doctor
+// package tests pin the exact bytes for a fixed sample.
+func TestDoctorMachinePrintsTheLoadInEachFormat(t *testing.T) {
+	t.Setenv(noAutoInstallEnv, "1")
+	root := t.TempDir()
+	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"machine-load"}`)
+	for _, format := range []string{"", "json"} {
+		args := []string{"doctor", "--machine"}
+		if format != "" {
+			args = append(args, "--output="+format)
+		}
+		var code int
+		stdout, stderr := clitest.CaptureStreams(t, func() {
+			app, err := cli.NewApp()
+			if err != nil {
+				t.Fatalf("NewApp: %v", err)
+			}
+			t.Chdir(root)
+			code = app.Run(context.Background(), args)
+		})
+		if code != 0 {
+			t.Fatalf("%s: exit %d:\n%s%s", strings.Join(args, " "), code, stdout, stderr)
+		}
+		if format == "" {
+			if !machineLoadShape.MatchString(stdout) {
+				t.Errorf("human output has the wrong shape: %q", stdout)
+			}
+			continue
+		}
+		var result struct {
+			Command string `json:"command"`
+			Status  string `json:"status"`
+			Data    struct {
+				Known *bool `json:"known"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+			t.Fatalf("structured output is not one JSON document: %v\n%s", err, stdout)
+		}
+		if result.Command != "doctor" || result.Status != "success" || result.Data.Known == nil {
+			t.Errorf("structured output does not carry the doctor result and its load: %s", stdout)
+		}
 	}
 }
 
