@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "inputs": [
+    {
+      "project": "cmd/tool",
+      "selector": "go-embed:build",
+      "basis": {
+        "listing": [["static/**"]]
+      },
+      "error": "main.go:3: pattern static/*.css: no matching files found"
+    }
+  ]
+}

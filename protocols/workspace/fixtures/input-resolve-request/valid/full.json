@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "extension": "@putnami/go",
+  "inputs": [
+    {
+      "project": "go/framework/web",
+      "selector": "go-embed:build",
+      "patterns": ["**/*.go", "!**/*_test.go"]
+    },
+    {
+      "project": "go/framework/web",
+      "selector": "go-embed:test",
+      "patterns": ["**/*.go", "git:../shared/**"]
+    },
+    {
+      "project": ".",
+      "selector": "go-embed:build"
+    }
+  ]
+}

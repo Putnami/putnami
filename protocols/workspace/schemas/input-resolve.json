@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-input-resolve.json",
+  "title": "Putnami Input Resolve Result",
+  "description": "Input-resolve protocol v1. An extension answers the core's inputResolveRequest, sent through `<executable> __putnami input-resolve`, with this result: for each asked input, in request order, the files its selector reads now and the basis they were computed from, or the error that makes the selection invalid. The answer stays exact while the digest of the project directory under its basis is unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "extension", "inputs"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Input-resolve protocol version. A mismatch is rejected, never guessed at."
+    },
+    "extension": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of the answering extension. It must be the extension the request asked."
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One answer per asked input, in request order, each with the asked input's project and selector.",
+      "items": { "$ref": "#/definitions/inputResolveAnswer" }
+    }
+  },
+  "definitions": {
+    "selector": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9-]*$",
+      "maxLength": 128,
+      "not": { "pattern": "^git:" },
+      "description": "Input selector name, `<scheme>:<name>`, such as go-embed:build. The scheme `git` is reserved for the core's `git:` file pattern. It is the rule an extension manifest applies to each runtime.inputSelectors entry."
+    },
+    "path": {
+      "type": "string",
+      "pattern": "^(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+)(?:/(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+))*$",
+      "description": "Clean relative slash path inside its root: no empty, \".\" or \"..\" segment, no backslash and no leading slash."
+    },
+    "project": {
+      "anyOf": [{ "type": "string", "pattern": "^\\.$" }, { "$ref": "#/definitions/path" }],
+      "description": "Project directory relative to the workspace root: \".\" for the root, otherwise a clean relative slash path."
+    },
+    "pattern": {
+      "type": "string",
+      "pattern": "^!?(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+)(?:/(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+))*$",
+      "not": { "pattern": "^!?git:" },
+      "description": "Basis pattern in the file-pattern grammar, relative to the project: an optional leading \"!\" that makes it an exclusion, then a clean relative slash path whose segments are valid path.Match globs, where \"**\" matches any number of segments. No `git:` prefix: a basis selects the tree as it is."
+    },
+    "patternSet": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/pattern" },
+      "contains": { "not": { "pattern": "^!" } },
+      "description": "Pattern set matched on its own: a path is selected when an include of the set matches it and no exclusion of the same set does. A set names at least one include."
+    },
+    "inputBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What an answer was computed from, as pattern sets relative to the project directory. The digest of the project directory under the basis binds the bytes, link target and kind of each path a content set selects, and the kind and link target of each path a listing set selects. The walk never follows a link.",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/patternSet" },
+          "description": "Sets whose files' bytes the answer read."
+        },
+        "listing": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/patternSet" },
+          "description": "Sets whose paths' existence, kind or link target the answer read."
+        }
+      }
+    },
+    "inputResolveRequest": {
+      "type": "object",
+      "description": "The core's question to one extension: the files each listed input reads now. The core runs the executable with the workspace root as its working directory and the probe's timeout.",
+      "additionalProperties": false,
+      "required": ["version", "extension", "inputs"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1,
+          "description": "Input-resolve protocol version."
+        },
+        "extension": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Asked extension name, echoed back in the result so a misrouted answer is detectable."
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Asked inputs, in the core's order, which the result follows. Two inputs never share a project, a selector and a pattern set.",
+          "items": { "$ref": "#/definitions/inputResolveQuery" }
+        }
+      }
+    },
+    "inputResolveQuery": {
+      "type": "object",
+      "description": "One asked input: a selector that a task input of one project names.",
+      "additionalProperties": false,
+      "required": ["project", "selector"],
+      "properties": {
+        "project": { "$ref": "#/definitions/project" },
+        "selector": { "$ref": "#/definitions/selector" },
+        "patterns": {
+          "type": "array",
+          "description": "The other file patterns of the task input that names the selector, as declared, in the file-pattern grammar: an optional \"!\", an optional `git:` prefix, then a relative slash path that may leave the project with \"../\". No selector name.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "inputResolveAnswer": {
+      "type": "object",
+      "description": "The answer for one input: either an error, or the files and the basis they were computed from.",
+      "additionalProperties": false,
+      "required": ["project", "selector"],
+      "properties": {
+        "project": { "$ref": "#/definitions/project" },
+        "selector": { "$ref": "#/definitions/selector" },
+        "files": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/path" },
+          "description": "Every file the selector reads now, relative to the project, sorted. A set of the basis selects each one. The core hashes their exact bytes."
+        },
+        "basis": { "$ref": "#/definitions/inputBasis" },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "Why the selection is invalid now. It fails the task that reads the input."
+        }
+      },
+      "if": { "required": ["error"] },
+      "then": { "not": { "anyOf": [{ "required": ["files"] }, { "required": ["basis"] }] } }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 The typed model for how a Putnami workspace describes itself: configuration,
 project identity, pinned artifacts, and the wires an extension answers project
-discovery and toolchain pins over.
+discovery, toolchain pins and input selectors over.
 
 ## Why
 
@@ -18,7 +18,7 @@ it parses, validates, normalizes and merges, and it runs nothing.
 
 ## What
 
-Six contracts live here.
+Seven contracts live here.
 
 ### 1. Workspace and project configuration
 
@@ -360,6 +360,66 @@ ask for, and the lock's entry codes under `toolchains.<id>.pin`.
 The reasoning is in
 [ADR 0003](doc/adr/0003-extensions-answer-toolchain-pins.md).
 
+### 7. Input resolve v1
+
+A task file pattern can name an input selector, `<scheme>:<name>`, such as
+`go-embed:build`. `IsInputSelectorName` states the grammar: a scheme that
+matches `[a-z][a-z0-9-]*` and is not `git`, which the core's `git:` file
+pattern reserves, a name that matches `[a-z0-9][a-z0-9-]*`, and at most 128
+bytes. The extension that declares the task lists the selector in its
+manifest's `runtime.inputSelectors` and expands it: it answers which files the
+selector reads now, and what that answer was computed from.
+
+Core spawns `<executable> __putnami input-resolve` with the workspace root as
+its working directory and the probe's timeout, writes ONE
+`InputResolveRequest` to its stdin, and reads ONE `InputResolveResult` from its
+stdout. The three transport rules of section 5 apply unchanged.
+
+```go
+// extension side, before ordinary subcommand dispatch
+handled, err := workspace.ServeInputResolve(os.Args[1:], os.Stdin, os.Stdout, answer)
+```
+
+- **The request** names the asked `extension` and its `inputs`, at least one.
+  An input names a `project` directory (`.` or a clean relative slash path
+  from the workspace root), a `selector`, and the other `patterns` of the task
+  input that names it, as declared. Those patterns may use `git:` and `../`,
+  as the file-pattern grammar allows, and never name a selector. Two inputs
+  never share a project, a selector and a pattern set.
+- **The result** answers every input, in request order, with its project and
+  selector. An answer carries either an `error`, at most 4096 bytes, that
+  fails the task reading the input, or `files` and a `basis`. `files` are
+  every file the selector reads now: sorted, unique, clean relative slash
+  paths inside the project. `basis.content` lists the pattern sets whose
+  files' bytes the answer read; `basis.listing` lists the sets whose paths'
+  existence, kind or link target it read. A set is a list in the file-pattern
+  grammar, matched on its own, so one set's `!` exclusions never remove
+  another set's paths. A basis pattern is a clean relative path inside the
+  project, with no `git:` prefix, and each set names an include. Each listed
+  file is one that a basis set selects.
+- **Two checks.** `ValidateInputResolveResult` holds a result to these rules.
+  `ValidateInputResolveAnswer` holds it to its request: the asked extension,
+  and each asked input answered at its position. `ServeInputResolve` runs both
+  before a byte reaches stdout.
+- **The basis digest.** `InputBasisDigest(projectDir, basis)` hashes the tree
+  as the basis selects it: for each path a content set selects, its kind and
+  the sha256 of a file's bytes or a link's target; for each path a listing
+  set selects, its kind and a link's target. The walk never follows a link,
+  and the records are sorted before they are hashed, so the digest is the
+  same on every host. An answer stays exact while the digest of its basis is
+  unchanged, so a consumer keeps it until a write changes what the basis
+  selects. An extension computes the same digest in its tests, to prove that
+  its basis covers what it reads.
+
+Codes: `invalid-input-resolve-version` at `version`, `invalid-path` for a
+project or file that is not clean or leaves its root, `invalid-order` and
+`duplicate-value` for files, `unselected-file` for a file no basis set selects,
+`conflicting-field` for an error with files or a basis, and `invalid-value`
+for a selector, a pattern, or an answer that does not match its request.
+
+The reasoning is in
+[ADR 0004](doc/adr/0004-extensions-expand-their-input-selectors.md).
+
 ### `featureAuthority` — why a project declares no feature
 
 A published project is normally expected to declare a user-facing feature, and
@@ -408,10 +468,11 @@ the languages it owns:
 | Python extension | `python/extension/cmd/putnami-python` |
 
 An extension answers `__putnami toolchain-resolve` for the lock identities its
-manifest lists in `runtime.resolves`.
+manifest lists in `runtime.resolves`, and `__putnami input-resolve` for the
+input selectors it lists in `runtime.inputSelectors`.
 
 **Consumers** — `@putnami/cli` reads every contract in this module except the
-toolchain-resolve exchange:
+input-resolve exchange:
 
 | Consumer | Use |
 |----------|-----|
@@ -427,7 +488,7 @@ toolchain-resolve exchange:
 
 ## Versioning and compatibility
 
-Five independent version anchors, all pinned by tests:
+Six independent version anchors, all pinned by tests:
 
 | Anchor | Value | Where |
 |--------|-------|-------|
@@ -435,6 +496,7 @@ Five independent version anchors, all pinned by tests:
 | `ProbeProtocolVersion` | `1` | probe fixtures and drift tests |
 | `AgentArtifactManifestProtocolVersion` | `1` | `agent_artifact_test.go`, `drift_test.go` |
 | `ToolchainResolveProtocolVersion` | `1` | `toolchain_resolve_test.go` and its fixtures |
+| `InputResolveProtocolVersion` | `1` | `input_resolve_test.go` and its fixtures |
 | Lock read window | `LockMinVersion` 2 … `LockVersion` 5 | `lock_test.go` |
 
 The workspace and project configs carry **no** protocol version member on the
@@ -463,14 +525,15 @@ Compatibility rules that consumers depend on:
 
 ## Schemas and fixtures
 
-Seven published schemas in [`schemas/`](schemas):
+Eight published schemas in [`schemas/`](schemas):
 [`workspace.json`](schemas/workspace.json),
 [`project.json`](schemas/project.json), [`scope.json`](schemas/scope.json),
 [`lock.json`](schemas/lock.json), [`probe.json`](schemas/probe.json),
-[`agent-artifact.json`](schemas/agent-artifact.json), and
-[`toolchain-resolve.json`](schemas/toolchain-resolve.json). The last one
-describes the result at its root and the request under `definitions`, and takes
-a pin's shape from `lock.json`.
+[`agent-artifact.json`](schemas/agent-artifact.json),
+[`toolchain-resolve.json`](schemas/toolchain-resolve.json), and
+[`input-resolve.json`](schemas/input-resolve.json). The last two describe the
+result at their root and the request under `definitions`;
+`toolchain-resolve.json` takes a pin's shape from `lock.json`.
 
 Fixtures under [`fixtures/`](fixtures), grouped by shape:
 
@@ -483,11 +546,13 @@ Fixtures under [`fixtures/`](fixtures), grouped by shape:
 | `fixtures/probe/{valid,invalid}` and `fixtures/probe-request/{valid,invalid}` | Probe results and requests, including path escapes and duplicates |
 | `fixtures/agent-artifact/{valid,invalid}` | Agent-artifact manifests |
 | `fixtures/toolchain-resolve-request/{valid,invalid}` and `fixtures/toolchain-resolve-result/{valid,invalid}` | Toolchain-resolve requests and results, including pins that break the v5 entry rules |
+| `fixtures/input-resolve-request/{valid,invalid}` and `fixtures/input-resolve-result/{valid,invalid}` | Input-resolve requests and results, including escaping paths, unselected files and invalid basis sets |
 
 Three test families hold them together:
 
-- `conformance_test.go`, `shapes_conformance_test.go` and
-  `toolchain_resolve_test.go` run every fixture through its strict pipeline;
+- `conformance_test.go`, `shapes_conformance_test.go`,
+  `toolchain_resolve_test.go` and `input_resolve_test.go` run every fixture
+  through its strict pipeline;
 - `probe_conformance_test.go` replays each probe fixture **as a provider** and
   asserts the four properties a real provider is held to — strict, canonical,
   path-keyed, and mergeable with itself;
@@ -495,26 +560,30 @@ Three test families hold them together:
   `invalid_fixture_coverage_test.go` proves every reject branch that protects
   the digest has a fixture triggering it.
 
+`input_basis_test.go` holds `InputBasisDigest` to its contract on real trees:
+what changes the digest and what leaves it unchanged, links never followed,
+and a pruned walk that records exactly what a full walk records.
+
 ## Support status, owner, and evidence
 
 | | |
 |---|---|
 | **Status** | `stable` — see the `go.putnami.dev/protocol/workspace` entry in the workspace-root [`putnami.support.json`](../../putnami.support.json), which is the only authority for this value |
-| **Owner** | The `protocols` scope (`protocols/putnami.json`). This module is the sole authority for workspace/project identity, the lock format, the probe wire, and the toolchain-resolve wire; neither the CLI nor an extension may extend them locally. |
+| **Owner** | The `protocols` scope (`protocols/putnami.json`). This module is the sole authority for workspace/project identity, the lock format, the probe wire, the toolchain-resolve wire, and the input-resolve wire; neither the CLI nor an extension may extend them locally. |
 
 Evidence behind `stable`:
 
-- five pinned version anchors, each asserted by a conformance test, and an
+- six pinned version anchors, each asserted by a conformance test, and an
   explicit lock read window with a matrix test across v2 to v5;
-- seven published JSON Schemas, each held against its Go type by a drift test,
+- eight published JSON Schemas, each held against its Go type by a drift test,
   so schema and implementation cannot disagree;
-- a fixture corpus spanning seven shapes with valid and invalid cases, plus a
+- a fixture corpus spanning eight shapes with valid and invalid cases, plus a
   coverage test proving each digest-protecting reject branch is exercised;
 - a provider conformance suite that replays fixtures as real providers;
 - determinism tests over validation output, extension-name ordering, scope
   name-pattern resolution and agent-artifact canonical bytes;
 - three independent probe producers (Go, TypeScript and Python extensions)
-  and a consumer that reads every contract here except the toolchain-resolve
+  and a consumer that reads every contract here except the input-resolve
   exchange.
 
 ## Product feature and durable decisions
@@ -533,3 +602,4 @@ Durable decisions:
 - [ADR 0001 — Core owns identity, providers own language knowledge](doc/adr/0001-core-owns-identity-providers-own-language.md)
 - [ADR 0002 — Lines are scopes, registries are keyed by ecosystem, versions come from git](doc/adr/0002-lines-are-scopes-registries-by-ecosystem.md)
 - [ADR 0003 — Extensions answer toolchain pins](doc/adr/0003-extensions-answer-toolchain-pins.md)
+- [ADR 0004 — Extensions expand their input selectors](doc/adr/0004-extensions-expand-their-input-selectors.md)

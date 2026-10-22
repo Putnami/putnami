@@ -1445,6 +1445,18 @@
           "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$", "maxLength": 128 },
           "description": "Workspace lock identities this extension answers the toolchain-resolve control call for: the core asks `<executable> __putnami toolchain-resolve` for their pins. An identity need not be one of this runtime's toolchains, but a toolchain with a provisioned candidate must have its lock identity listed here."
         },
+        "inputSelectors": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9-]*$",
+            "maxLength": 128,
+            "not": { "pattern": "^git:" }
+          },
+          "description": "Input selectors this extension expands through the input-resolve control call: the core asks `<executable> __putnami input-resolve` for the files a task input that names one of them reads. A selector name is `<scheme>:<name>`; the scheme `git` is reserved for the core's `git:` file pattern. The member takes no CLI contract rung: a core that does not read it ignores it."
+        },
         "prepare": {
           "$ref": "#/$defs/runtimePrepare"
         }
