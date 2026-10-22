@@ -101,7 +101,8 @@ describe('hydratePage', () => {
         window?: Record<string, unknown>;
       }
     ).window = {
-      location: { pathname: '/docs' },
+      location: { pathname: '/docs', search: '' },
+      addEventListener: () => undefined,
       __basename: '/docs',
       requestAnimationFrame: (cb: () => void) => {
         animationFrameQueue.push(cb);
@@ -200,9 +201,9 @@ describe('hydratePage', () => {
       ];
       expect(element.props.value).toEqual(securityContext);
       expect(element.props.children.props.router).toBe(lastRouter);
-      // Navigation announcements are wired once, on the router that was handed
-      // to RouterProvider.
-      expect(routerSubscribers).toHaveLength(1);
+      // Navigation announcements and fragment steps are each wired once, on the
+      // router that was handed to RouterProvider.
+      expect(routerSubscribers).toHaveLength(2);
       (options.onRecoverableError as (error: Error, info: { componentStack: string }) => void)(
         new Error('recoverable'),
         {

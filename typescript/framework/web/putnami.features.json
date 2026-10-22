@@ -220,11 +220,21 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-fragment-link-keeps-the-scroll-to-its-target",
               "a-new-location-scrolls-to-its-hash-target",
               "a-new-location-scrolls-to-the-top",
               "back-and-forward-restore-the-saved-position",
               "the-hydrated-root-route-restores-scroll"
             ]
+          }
+        },
+        {
+          "id": "fragment-history-steps",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-history-step-that-changes-only-the-fragment-keeps-the-loaded-data"]
           }
         },
         {

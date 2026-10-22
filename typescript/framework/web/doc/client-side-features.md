@@ -467,6 +467,13 @@ the position the page had. Pass `preventScrollReset` to keep the current positio
 <Link to="?tab=2" preventScrollReset>Next tab</Link>
 ```
 
+A plain link to an in-page `#id`, such as `<a href="#install">`, keeps the
+browser's scroll to its target. Back and forward between entries that differ
+only by their fragment restore the position each entry had and keep the loaded
+data: no loader runs. A route that must reload on such a step returns `true`
+from its `shouldRevalidate`; it receives `defaultShouldRevalidate: false` for
+that step.
+
 ## Navigation events
 
 The browser router announces every client-side route change on the DOM. Use it
