@@ -20,7 +20,7 @@ jobs:
           - { ref_name: oct01, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e }
           - { ref_name: oct13, ref: 711d2a7004e8cfed139bf6c8fb90319c4f12656d }
           - { ref_name: oct23, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72 }
-          - { ref_name: oct23, ref: cc79a82f, cmd: 'test', nocov: true }
+          - { ref_name: oct23-nocov, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: 'test', nocov: true }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
