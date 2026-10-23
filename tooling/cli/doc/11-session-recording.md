@@ -573,7 +573,9 @@ latter for transfer accounting in benchmarks, and keep byte totals separate from
 both the session wall (`run.durationMs`) and OS CPU time. When the spec gate
 fetches the entry of a test task the run did not plan, to read its verification
 report, the fetch adds to `bytesFetched` and `restoreMs` only: no task reused
-the entry, so `hits`, `restored` and `timeSavedMs` do not move.
+the entry, so `hits`, `restored` and `timeSavedMs` do not move. The fetch
+follows the provider's `summary`, so the `providerSummary*` fields do not count
+it.
 
 ```json
 {

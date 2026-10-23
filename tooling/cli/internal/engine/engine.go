@@ -960,8 +960,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// verification kind in any discovered extension.
 	if gate := specGateFinalizer(req, ws, planned,
 		scheduler.CommandsOfKind(discovered.Extensions, extension.CommandKindVerification),
-		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager).
-			readingRemote(ctx, req.executionRemoteEntries),
+		runObservationRecovery(ctx, req, ws, planningExtensions, cacheManager),
 		&projectionProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)

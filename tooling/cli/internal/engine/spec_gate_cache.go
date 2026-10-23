@@ -141,6 +141,15 @@ func (source *cachedObservationRecovery) readingRemote(ctx context.Context,
 	return source
 }
 
+// runObservationRecovery is the recovery source of a run's spec gate: the
+// run's cache manager, then, on a local miss, the remote cache the session
+// records when its execution starts (Request.executionRemote), asked under the
+// run's context ctx.
+func runObservationRecovery(ctx context.Context, req *Request, ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription, cache *store.CacheManager) *cachedObservationRecovery {
+	return newCachedObservationRecovery(req, ws, extensions, cache).readingRemote(ctx, req.executionRemoteEntries)
+}
+
 // RecoverReports keys one plan of the loaded verification commands over the
 // candidate set and reports where each candidate's captured verification
 // report lives, or why it could not be consulted. Only the tasks that can

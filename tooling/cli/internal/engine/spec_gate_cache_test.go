@@ -21,6 +21,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -692,6 +693,28 @@ func TestRecoverReportsAsksNoRemoteCacheItCannotWaitFor(t *testing.T) {
 				t.Errorf("reason = %q, want %q", got, testCase.want)
 			}
 		})
+	}
+}
+
+// TestRunObservationRecoveryAsksTheRemoteTheSessionRecords pins the gate's
+// wiring: a run that is not hosted records its remote cache when execution
+// starts, after the spec gate is assembled, and the run's recovery source
+// resolves that remote cache at lookup time.
+func TestRunObservationRecoveryAsksTheRemoteTheSessionRecords(t *testing.T) {
+	t.Parallel()
+	fixture := newRecoveryPlanFixture(t, false)
+	req := &Request{Commands: []string{"test"}}
+	source := runObservationRecovery(t.Context(), req, fixture.ws, fixture.source.extensions, fixture.cache)
+	if source == nil || source.remote == nil {
+		t.Fatal("the run's recovery source reads no remote cache")
+	}
+	if remote := source.remote(); remote != nil {
+		t.Fatalf("before execution starts the source resolved %#v, want none", remote)
+	}
+	recorded := &remotecache.RemoteCache{}
+	req.executionRemote = recorded
+	if remote := source.remote(); remote != remoteTaskEntries(recorded) {
+		t.Fatalf("the source resolved %#v, want the remote cache the session recorded", remote)
 	}
 }
 

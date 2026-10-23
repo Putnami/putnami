@@ -266,7 +266,9 @@ const (
 	// socket.
 	OpObjectPut ProviderOp = "object-put"
 	// OpSummary drains pending background uploads and returns the run's cache
-	// statistics. It is sent once, after the build, before shutdown.
+	// statistics. It is sent once, after the build, before shutdown. Core may
+	// still send restore and marker-write after it, until shutdown, and the
+	// statistics it returned do not count them.
 	OpSummary ProviderOp = "summary"
 	// OpShutdown asks the provider to flush and exit cleanly. Core sends it
 	// best-effort, then closes stdin; a provider that has already exited or does
