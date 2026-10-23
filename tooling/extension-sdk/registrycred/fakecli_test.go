@@ -22,6 +22,10 @@ func TestMain(m *testing.M) {
 	if spec := os.Getenv(fakeCLIEnv); spec != "" {
 		os.Exit(runFakeCLI(spec, os.Args[1:]))
 	}
+	// A loaded host can take longer than the production bound to start a fake
+	// CLI, and the call would then read as a timeout no test asked for. A test
+	// of the bound lowers it itself.
+	materializeTimeout = 2 * time.Minute
 	os.Exit(m.Run())
 }
 

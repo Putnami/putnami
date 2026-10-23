@@ -19,8 +19,9 @@ import (
 // materializeTimeout bounds the credential call an install makes. It is shorter
 // than cloudTokenTimeout because an install must not stall on it: a publish that
 // waits 30 s and then works is a good trade, an install that waits 30 s before
-// running `bun install` is not.
-const materializeTimeout = 10 * time.Second
+// running `bun install` is not. The package's tests raise it, because a loaded
+// host can take longer than that to start their fake CLI.
+var materializeTimeout = 10 * time.Second
 
 // SignInHint is the exact instruction shown when the machine has a cloud but no
 // session. It is a constant so every caller prints the same words.

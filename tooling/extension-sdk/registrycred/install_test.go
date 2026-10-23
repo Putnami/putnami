@@ -246,6 +246,22 @@ func TestEnsureNativeCredential_CancelledContextIsAWarning(t *testing.T) {
 	}
 }
 
+// A credential call that outlives its bound is a warning that names the
+// bound, and the install continues with the credential the machine has.
+func TestEnsureNativeCredential_ACallPastItsBoundIsAWarning(t *testing.T) {
+	previous := materializeTimeout
+	t.Cleanup(func() { materializeTimeout = previous })
+	materializeTimeout = 100 * time.Millisecond
+	fakeMaterializeCLI(t, fakeCLI{Sleep: time.Minute})
+	outcome := EnsureNativeCredential(context.Background(), "", "npm.putnami.dev")
+	if outcome.Kind != KindFailed || outcome.Level != "warn" {
+		t.Fatalf("outcome = %+v, want a KindFailed warning", outcome)
+	}
+	if !strings.Contains(outcome.Message, "timed out after 100ms") {
+		t.Errorf("Message = %q, want the bound named", outcome.Message)
+	}
+}
+
 func TestFirstLine_BoundsTheRelayedDiagnostic(t *testing.T) {
 	if got := firstLine("\n\n  hello  \nworld\n"); got != "hello" {
 		t.Errorf("firstLine = %q, want hello", got)
