@@ -1,0 +1,87 @@
+# Temporary benchmark of the credential-free gate. Not for main.
+name: CI bench (temporary)
+on:
+  push:
+    branches: [fdumay/ci-bench]
+permissions:
+  contents: read
+  packages: read
+jobs:
+  bench:
+    name: ${{ matrix.ref_name }} ${{ matrix.cmd }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        ref_name: [oct01, oct13, oct23]
+        cmd: ['lint', 'test', 'build', 'lint,test,build,validate']
+        include:
+          - { ref_name: oct01, ref: f6260437 }
+          - { ref_name: oct13, ref: 711d2a7004 }
+          - { ref_name: oct23, ref: cc79a82f }
+          - { ref_name: oct23, ref: cc79a82f, cmd: 'test', nocov: true }
+    services:
+      postgres:
+        image: ghcr.io/putnami/putnami/postgres:17-alpine
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports: ['6432:5432']
+        options: >-
+          --health-cmd "pg_isready --username test --dbname test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      CONFIG_SERVER_URL: ''
+      CONFIG_SERVER_TOKEN: ''
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ matrix.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - uses: astral-sh/setup-uv@v6
+      - name: Machine
+        run: nproc; free -g; df -h / | tail -1
+      - name: Install
+        run: /usr/bin/time -v -o "$RUNNER_TEMP/time-install.txt" ./putnamiw install
+      - name: Cache off
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
+      - name: Bench
+        env:
+          CMD: ${{ matrix.cmd }}
+          COV: ${{ matrix.nocov && '' || '--enforce-coverage' }}
+        run: |
+          set -uo pipefail
+          vmstat -t 5 > "$RUNNER_TEMP/vmstat.txt" &
+          VM=$!
+          ./putnamiw "$CMD" --all $COV --plan > "$RUNNER_TEMP/plan.txt" 2>&1 || true
+          tail -n 3 "$RUNNER_TEMP/plan.txt"
+          /usr/bin/time -v -o "$RUNNER_TEMP/time.txt" ./putnamiw "$CMD" --all $COV --continue-on-error --trace-profile "$RUNNER_TEMP/trace.json"
+          echo "exit=$?" >> "$RUNNER_TEMP/time.txt"
+          kill $VM || true
+          cat "$RUNNER_TEMP/time.txt"
+          mkdir -p "$RUNNER_TEMP/out"
+          cp -r .putnami/stats "$RUNNER_TEMP/out/" 2>/dev/null || true
+          cp "$RUNNER_TEMP"/*.txt "$RUNNER_TEMP"/trace.json "$RUNNER_TEMP/out/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-${{ matrix.ref_name }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/out
