@@ -1082,6 +1082,36 @@ func TestProjectsForChangedFiles_GitCandidateReadersIncludeRemovedPaths(t *testi
 	}
 }
 
+// A wildcard of an ordinary declared input stays inside the root it is written
+// against. "**" keys the project's own tree, so a change outside the project
+// must not select it: otherwise a project declaring "**" is a reader of every
+// file in the workspace, which its cache key never reads.
+func TestProjectsForChangedFiles_DeclaredWildcardDoesNotLeaveItsRoot(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "change-impact", "declared-file-inputs-select-their-project")
+	ws := NewWorkspace("/workspace", nil, []*Project{
+		{ID: "/apps/api", Name: "api", Path: "apps/api", Config: declaredInputConfig(t, "api", "test", "**", "**/testdata/**", "../../shared/**")},
+		{ID: "/libs/core", Name: "core", Path: "libs/core"},
+	})
+
+	for path, want := range map[string][]string{
+		"docs/README.md":                  {},
+		"libs/core/testdata/fixture.json": {"/libs/core"},
+		"shared/schema.json":              {"/apps/api"},
+		"apps/api/conf/env.yaml":          {"/apps/api"},
+	} {
+		got := ownerProjectIDs(ProjectsForChangedFiles(ws, []string{path}, ChangeImpactOptions{}))
+		if len(got) != len(want) {
+			t.Errorf("change %s selected %v, want %v", path, got, want)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("change %s selected %v, want %v", path, got, want)
+			}
+		}
+	}
+}
+
 // An exclusion declared in the pattern set applies to selection exactly as it
 // applies to the cache key — one declaration read one way.
 func TestProjectsForChangedFiles_DeclaredInputExclusionIsHonored(t *testing.T) {

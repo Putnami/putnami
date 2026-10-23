@@ -474,7 +474,7 @@ A project declares the files its commands read as `options.<layer>.filePatterns`
 
 One declaration serves two readers. The build cache hashes the files a pattern set selects, and `--impacted` selects the declaring project when a changed file matches one. Every option layer counts, so `lint`, `build`, `validate` and extension-keyed layers (`options."/typescript/extension"`) all select; the plan then decides which of the selected project's jobs to schedule.
 
-Both readers share one grammar, in `protocols/workspace`: `*` matches inside a segment, `**` matches any number of segments including none, and a leading `!` excludes.
+Both readers share one grammar, in `protocols/workspace`: `*` matches inside a segment, `**` matches any number of segments including none, and a leading `!` excludes. In an include without the `git:` prefix, a wildcard never matches a `..` segment; only a literal `../` reaches outside the project. So `**` and `**/testdata/**` select files under the project directory, never the rest of the workspace, exactly as the cache hashes them.
 
 Prefix an input with `git:` to read only tracked files and non-ignored new
 files from the containing Git repository. `git:**` covers that entire candidate
