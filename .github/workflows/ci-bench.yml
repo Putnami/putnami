@@ -15,15 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: put-test-nocov, kind: put, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--all --no-coverage' }
-          - { name: put-cli-nocov, kind: put, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli --no-coverage' }
-          - { name: raw-test-one, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test-one, args: '' }
-          - { name: raw-test-permod, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test-permod, args: '' }
-          - { name: raw-test-permod-coverpkg, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test-permod-coverpkg, args: '' }
-          - { name: raw-cli-cover, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: cli-cover, args: '' }
-          - { name: raw-cli-coverpkg, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: cli-coverpkg, args: '' }
-          - { name: raw-lint-permod, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: lint-permod, args: '' }
-          - { name: raw-build-one, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: build-one, args: '' }
+          - { name: put-cli-sampled, kind: put, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli --no-coverage' }
+          - { name: raw-cli-sampled, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: cli-cover, args: '' }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -52,9 +45,10 @@ jobs:
           ref: ${{ matrix.ref }}
           fetch-depth: 0
       - uses: actions/checkout@v5
-        if: matrix.kind == 'raw'
         with:
           path: bench-tools
+      - name: Move bench tools out of the workspace
+        run: mv bench-tools "$RUNNER_TEMP/bench-tools"
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.work
@@ -88,15 +82,17 @@ jobs:
           set +e
           vmstat -t 5 > "$RUNNER_TEMP/vmstat.txt" &
           VM=$!
+          $RUNNER_TEMP/bench-tools/.github/bench/sample.sh "$RUNNER_TEMP/out/sample" &
+          SP=$!
           mkdir -p "$RUNNER_TEMP/out"
           if [ "${{ matrix.kind }}" = raw ]; then
             export GOCACHE="$RUNNER_TEMP/gocache-run"
-            /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" bench-tools/.github/bench/raw.sh "$CMD" > "$RUNNER_TEMP/out/run.log" 2>&1
+            /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" $RUNNER_TEMP/bench-tools/.github/bench/raw.sh "$CMD" > "$RUNNER_TEMP/out/run.log" 2>&1
           else
             /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" ./putnamiw "$CMD" $ARGS --continue-on-error --trace-profile "$RUNNER_TEMP/out/trace.json" > "$RUNNER_TEMP/out/run.log" 2>&1
           fi
           echo "exit=$?" >> "$RUNNER_TEMP/out/time.txt"
-          kill $VM
+          kill $VM $SP
           tail -n 40 "$RUNNER_TEMP/out/run.log"
           cat "$RUNNER_TEMP/out/time.txt"
           cp -r .putnami/stats 2>/dev/null "$RUNNER_TEMP/out/"
@@ -108,5 +104,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench4-${{ matrix.name }}
+          name: bench5-${{ matrix.name }}
           path: ${{ runner.temp }}/out
