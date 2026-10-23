@@ -8,19 +8,20 @@ permissions:
   packages: read
 jobs:
   bench:
-    name: ${{ matrix.ref_name }} ${{ matrix.cmd }}
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        ref_name: [oct01, oct13, oct23]
-        cmd: ['lint', 'test', 'build', 'lint,test,build,validate']
         include:
-          - { ref_name: oct01, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e }
-          - { ref_name: oct13, ref: 711d2a7004e8cfed139bf6c8fb90319c4f12656d }
-          - { ref_name: oct23, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72 }
-          - { ref_name: oct23-nocov, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: 'test', nocov: true }
+          - { name: oct01-test, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e, cmd: test, args: '--all --enforce-coverage' }
+          - { name: oct13-test, ref: 711d2a7004e8cfed139bf6c8fb90319c4f12656d, cmd: test, args: '--all --enforce-coverage' }
+          - { name: oct23-cli-verbose, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli --test-json' }
+          - { name: oct23-cli-compile-only, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: "--projects @putnami/cli --run ^$ --no-enforce-coverage" }
+          - { name: oct23-clidocs-verbose, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli-documents --test-json' }
+          - { name: oct23-goext-cloudext-verbose, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/go,@putnami/cloud-extension --test-json' }
+          - { name: oct01-cli-verbose, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e, cmd: test, args: '--projects @putnami/cli --test-json' }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -66,22 +67,24 @@ jobs:
       - name: Bench
         env:
           CMD: ${{ matrix.cmd }}
-          COV: ${{ matrix.nocov && '' || '--enforce-coverage' }}
+          ARGS: ${{ matrix.args }}
         run: |
-          set -uo pipefail
+          set +e
           vmstat -t 5 > "$RUNNER_TEMP/vmstat.txt" &
           VM=$!
-          ./putnamiw "$CMD" --all $COV --plan > "$RUNNER_TEMP/plan.txt" 2>&1 || true
-          tail -n 3 "$RUNNER_TEMP/plan.txt"
-          /usr/bin/time -v -o "$RUNNER_TEMP/time.txt" ./putnamiw "$CMD" --all $COV --continue-on-error --trace-profile "$RUNNER_TEMP/trace.json"
-          echo "exit=$?" >> "$RUNNER_TEMP/time.txt"
-          kill $VM || true
-          cat "$RUNNER_TEMP/time.txt"
           mkdir -p "$RUNNER_TEMP/out"
-          cp -r .putnami/stats "$RUNNER_TEMP/out/" 2>/dev/null || true
-          cp "$RUNNER_TEMP"/*.txt "$RUNNER_TEMP"/trace.json "$RUNNER_TEMP/out/" 2>/dev/null || true
+          /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" ./putnamiw "$CMD" $ARGS --continue-on-error --trace-profile "$RUNNER_TEMP/out/trace.json" > "$RUNNER_TEMP/out/run.log" 2>&1
+          echo "exit=$?" >> "$RUNNER_TEMP/out/time.txt"
+          kill $VM
+          tail -n 40 "$RUNNER_TEMP/out/run.log"
+          cat "$RUNNER_TEMP/out/time.txt"
+          cp -r .putnami/stats "$RUNNER_TEMP/out/"
+          cp "$RUNNER_TEMP/vmstat.txt" "$RUNNER_TEMP/out/"
+          find . -path ./node_modules -prune -o -name '*.json' -newer "$RUNNER_TEMP/vmstat.txt" -path '*test*' -print 2>/dev/null | head -50 > "$RUNNER_TEMP/out/newjson.txt"
+          find . -path '*/.putnami/*' -name '*.jsonl' -newer go.work 2>/dev/null | head -50 >> "$RUNNER_TEMP/out/newjson.txt"
+          exit 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench-${{ matrix.ref_name }}-${{ strategy.job-index }}
+          name: bench2-${{ matrix.name }}
           path: ${{ runner.temp }}/out
