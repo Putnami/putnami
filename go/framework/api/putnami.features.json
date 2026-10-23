@@ -21,7 +21,7 @@
               "a-streamed-body-preserves-octets-and-the-callers-media-type-without-buffering",
               "a-streamed-body-refuses-a-missing-or-nonconcrete-media-type-before-reading",
               "the-contract-and-generated-client-preserve-explicit-streaming-and-caller-owned-media-types",
-              "the-emitted-client-uploads-and-downloads-caller-labelled-octets-through-a-real-provider"
+              "the-emitted-client-uploads-and-downloads-caller-labeled-octets-through-a-real-provider"
             ]
           }
         },
