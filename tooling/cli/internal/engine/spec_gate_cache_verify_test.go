@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -89,5 +90,34 @@ func TestVerifyCachedReportRequiresCurrentNativeProducerAndManifest(t *testing.T
 	}
 	if entry.Result.Status != "success" {
 		t.Fatalf("fixture was not a successful native producer: %+v", entry.Result)
+	}
+}
+
+// TestVerifyCachedReportReadsTheLocalStoreOnly pins that the read-only bridge
+// keeps no remote cache. A source built as VerifyCachedVerificationReport
+// builds it carries none even when its request names the run's remote cache,
+// so a report whose entry only a remote cache holds is refused, and nothing is
+// fetched into the local store.
+func TestVerifyCachedReportReadsTheLocalStoreOnly(t *testing.T) {
+	t.Parallel()
+	fixture := newRecoveryPlanFixture(t, false)
+	remote := newRemoteEntryFake()
+	fixture.stageRemote(t, remote, recoveryReportTask, []store.DeclaredEntryOutput{recoveryReportOutput}, recoveryReportBytes)
+	req := &Request{Commands: []string{"test"}, executionRemote: &remotecache.RemoteCache{}}
+	bridge := newCachedObservationRecovery(req, fixture.ws, fixture.source.extensions, fixture.cache)
+	if bridge.remote != nil {
+		t.Fatal("the verification bridge's source reads a remote cache")
+	}
+	sum := sha256.Sum256([]byte(recoveryReportBytes))
+	reference := features.VerificationReportRef{Task: recoveryReportTask, Project: recoveryProjectID,
+		Path: ".putnami/store/report.json", Digest: "sha256:" + hex.EncodeToString(sum[:]), Restored: true}
+	if _, err := bridge.verifyCachedReport(reference); err == nil {
+		t.Fatal("a report without a local producer entry was accepted")
+	}
+	if entry, err := fixture.cache.LookupTaskEntry(fixture.keys[recoveryReportTask]); err != nil || entry != nil {
+		t.Fatalf("the bridge published an entry into the local store (entry %v, err %v)", entry, err)
+	}
+	if asked := remote.askedKeys(); len(asked) != 0 {
+		t.Fatalf("the bridge asked a remote cache for %v", asked)
 	}
 }

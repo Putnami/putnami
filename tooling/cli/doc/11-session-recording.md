@@ -570,7 +570,10 @@ contains a `cache` object. Its live counters (`hits`, `misses`, `bytesFetched`,
 `bytesUploaded`, and timing fields) describe scheduler activity; the
 `providerSummary*` fields are the provider's terminal `summary` totals. Use the
 latter for transfer accounting in benchmarks, and keep byte totals separate from
-both the session wall (`run.durationMs`) and OS CPU time.
+both the session wall (`run.durationMs`) and OS CPU time. When the spec gate
+fetches the entry of a test task the run did not plan, to read its verification
+report, the fetch adds to `bytesFetched` and `restoreMs` only: no task reused
+the entry, so `hits`, `restored` and `timeSavedMs` do not move.
 
 ```json
 {

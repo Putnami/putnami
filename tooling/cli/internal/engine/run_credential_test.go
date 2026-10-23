@@ -438,6 +438,37 @@ func TestSchedulerRemoteIsANilInterfaceForALocalRun(t *testing.T) {
 	}
 }
 
+// The session records the remote cache its scheduler runs with on the request,
+// so the spec gate's recovery asks that remote cache and no other: a hosted
+// run's, or the one a run that is not hosted loaded, which replaces whatever
+// an earlier session left on the request.
+func TestSessionRemoteCacheRecordsTheRemoteTheSchedulerRunsWith(t *testing.T) {
+	restore := runcredential.SetForTest("prc_engine_session_remote")
+	hosted := &remotecache.RemoteCache{}
+	req := &Request{hostedRemote: hosted}
+	remote, release := sessionRemoteCache(t.Context(), req, &extension.DiscoveryResult{}, &store.CacheManager{})
+	release()
+	restore()
+	if remote != hosted || req.executionRemote != hosted {
+		t.Fatalf("a hosted session ran with %p and recorded %p, want the hosted remote cache %p", remote, req.executionRemote, hosted)
+	}
+	if entries := req.executionRemoteEntries(); entries != remoteTaskEntries(hosted) {
+		t.Fatalf("the gate resolves %#v, want the hosted remote cache", entries)
+	}
+
+	defer runcredential.SetForTest("")()
+	req = &Request{
+		Global:          GlobalFlags{CacheTrust: string(store.CacheTrustNone)},
+		runRemote:       &remotecache.RunRemoteCache{},
+		executionRemote: hosted,
+	}
+	remote, release = sessionRemoteCache(t.Context(), req, &extension.DiscoveryResult{}, &store.CacheManager{})
+	release()
+	if remote != nil || req.executionRemote != nil || req.executionRemoteEntries() != nil {
+		t.Fatalf("a session that loaded no remote cache ran with %p and recorded %p, want none", remote, req.executionRemote)
+	}
+}
+
 // requireHostedProviders refuses a hosted run whose CI configuration needs a
 // capability that only a path extension declares: the release-set provider for
 // a rule that publishes. The cache provider is no such need, even for a run

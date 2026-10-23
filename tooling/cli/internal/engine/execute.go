@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
@@ -184,6 +185,43 @@ func (e *Engine) execute(
 	return e.executeSession(ctx, req, ws, selectedProjects, discovered, planned, cache, sink, resultFinalizers...)
 }
 
+// sessionRemoteCache returns the remote cache the session's scheduler runs
+// with, or nil, and records it on req (Request.executionRemote). release closes
+// the provider this call loaded, and does nothing for one it did not.
+//
+// The remote build cache is on when an extension declares the cache provider;
+// the provider owns its configuration and says at initialize whether it serves
+// the run. Local caching must be on for it to apply. Provider resolution
+// happens before the run timer starts, so its cost is timed here and
+// attributed to the cache stats — otherwise it is the invisible "before
+// negotiate" overhead the session clock misses. The bearer is resolved lazily
+// inside the first negotiate, so its cost falls within the run timer. A run
+// that is not hosted reads the remote cache the bare selection loaded, if it
+// did (Request.runRemote). A hosted run reads the remote cache execute
+// resolved (hostedRunRemoteCache).
+func sessionRemoteCache(
+	ctx context.Context,
+	req *Request,
+	discovered *extension.DiscoveryResult,
+	cache *store.CacheManager,
+) (remote *remotecache.RemoteCache, release func()) {
+	remote, release = req.hostedRemote, func() {}
+	if cache != nil && !runcredential.Hosted() {
+		setupStart := time.Now()
+		var cacheNotice string
+		remote, cacheNotice = req.runRemote.Load(ctx, req.WorkspaceRoot, discovered.Extensions, discovered, store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
+		// A declared provider that cannot serve the run never degrades to
+		// local-only silently — surface the one-line notice.
+		if cacheNotice != "" {
+			iox.Fprintln(os.Stderr, cacheNotice)
+		}
+		remote.RecordSetup(time.Since(setupStart))
+		release = remote.Close
+	}
+	req.executionRemote = remote
+	return remote, release
+}
+
 // executeSession runs while execute holds the scratch generation across task
 // gaps, capture, and watch iterations. Read-only previews never acquire it.
 func (e *Engine) executeSession(
@@ -330,34 +368,11 @@ func (e *Engine) executeSession(
 
 	prof := profiler.New(req.Global.TraceProfile != "")
 
-	// Enable the remote build cache when an extension declares the cache
-	// provider; the provider owns its configuration and says at initialize
-	// whether it serves the run. Local caching must be on for it to apply.
-	// Provider resolution happens before the run timer starts, so its cost is
-	// timed here and attributed to the cache stats — otherwise it is the
-	// invisible "before negotiate" overhead the session clock misses. The
-	// bearer is resolved lazily inside the first negotiate, so its cost falls
-	// within the run timer. A run that is not hosted reads the remote cache
-	// the bare selection loaded, if it did (Request.runRemote). A hosted run
-	// reads the remote cache execute resolved (hostedRunRemoteCache).
-	var cacheSetup time.Duration
-	remote := req.hostedRemote
-	if cache != nil && !runcredential.Hosted() {
-		setupStart := time.Now()
-		var cacheNotice string
-		remote, cacheNotice = req.runRemote.Load(ctx, wsRoot, extensions, discovered, store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
-		// A declared provider that cannot serve the run never degrades to
-		// local-only silently — surface the one-line notice.
-		if cacheNotice != "" {
-			iox.Fprintln(os.Stderr, cacheNotice)
-		}
-		cacheSetup = time.Since(setupStart)
-		remote.RecordSetup(cacheSetup)
-		// The scheduler's end-of-run Stop leaves the provider session open so the
-		// post-run success marker (recordSuccessfulBuild, below) can still reach it.
-		// Release it here, after this function returns and the marker is published.
-		defer remote.Close()
-	}
+	// The scheduler's end-of-run Stop leaves the provider session open so the
+	// post-run success marker (recordSuccessfulBuild, below) can still reach it.
+	// Release it after this function returns and the marker is published.
+	remote, releaseRemote := sessionRemoteCache(ctx, req, discovered, cache)
+	defer releaseRemote()
 
 	// Wire scheduler/recovery audit signals into the v2 artifact and profiler.
 	// Canonical task ends are recorded by renderer.JobComplete, so the recorder

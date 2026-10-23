@@ -375,6 +375,11 @@ type Request struct {
 	// run-marker lookup and execute read it through one provider. Engine.Run
 	// creates it and closes it; nil gives each stage its own.
 	runRemote *remotecache.RunRemoteCache
+	// executionRemote is the remote cache the session's scheduler runs with,
+	// hosted or not, or nil; sessionRemoteCache sets it before the scheduler
+	// starts. The spec gate's observation recovery reads it at gate time
+	// (Request.executionRemoteEntries).
+	executionRemote *remotecache.RemoteCache
 	// Hooks are the workspace lifecycle hooks to run around the lifecycle. Nil
 	// runs none: only the terminal adapter passes them today, for the same
 	// reason Observer is injected.
@@ -949,12 +954,14 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	req.specGate = &specGateOutcome{}
 	// The gate's cache-recovery source reuses THIS run's cache manager, so the
 	// memoized file-hash pass built for the execution keys is the one a recovery
-	// lookup keys against; a second manager would walk the tree again. The gate
-	// attaches when the session names a command of the verification kind in any
-	// discovered extension.
+	// lookup keys against; a second manager would walk the tree again. On a local
+	// miss it asks the remote cache the session executes with, under the run's
+	// context. The gate attaches when the session names a command of the
+	// verification kind in any discovered extension.
 	if gate := specGateFinalizer(req, ws, planned,
 		scheduler.CommandsOfKind(discovered.Extensions, extension.CommandKindVerification),
-		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager),
+		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager).
+			readingRemote(ctx, req.executionRemoteEntries),
 		&projectionProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)

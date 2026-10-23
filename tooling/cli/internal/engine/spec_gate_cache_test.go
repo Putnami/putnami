@@ -1,12 +1,20 @@
 package engine
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"go.putnami.dev/cli/model/extension"
+	cache "go.putnami.dev/protocol/cache"
 	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
@@ -74,16 +82,21 @@ func TestCandidateOutcomeSeparatesSilenceFromUnreachability(t *testing.T) {
 // TestNoCacheRunConsultsNothingAndSaysWhy pins that --no-cache serves no stored
 // byte and reports every candidate unconsulted with the accurate cause, so the
 // resulting warning names the real reason rather than inventing a missing entry.
+// The run's remote cache is never asked either.
 func TestNoCacheRunConsultsNothingAndSaysWhy(t *testing.T) {
 	t.Parallel()
 	fixture := newSpecGateFixture(t, "passed")
 	req := &Request{Commands: []string{"test"}}
 	req.Global.NoCache = true
-	source := newCachedObservationRecovery(req, fixture.ws, nil, nil)
+	remote := newRemoteEntryFake()
+	source := newCachedObservationRecovery(req, fixture.ws, nil, nil).readingRemote(t.Context(), remote.resolve)
 	if source == nil {
 		t.Fatal("no recovery source was built for a --no-cache run")
 	}
 	recovery := source.RecoverReports(fixture.ws.Projects)
+	if asked := remote.askedKeys(); len(asked) != 0 {
+		t.Errorf("--no-cache asked the remote cache for %v", asked)
+	}
 	if len(recovery.Reports) != 0 {
 		t.Errorf("--no-cache served %d cached report(s)", len(recovery.Reports))
 	}
@@ -414,5 +427,288 @@ func TestRecoverReportsPlansTheVerificationKindCommands(t *testing.T) {
 	if recovery := fixture.source.RecoverReports(fixture.ws.Projects); len(recovery.Reports) != 0 ||
 		len(recovery.Unconsulted) != 0 {
 		t.Errorf("recovery = %+v, want nothing planned for a check command without the verification kind", recovery)
+	}
+}
+
+// remoteEntryFake stands in for the run's remote cache in the recovery's one
+// remote operation. hits holds the entries a provider would serve, staged as an
+// upload leaves them: payload blobs and descriptor in an exchange directory. A
+// served hit publishes into the caller's store through the store's own
+// MaterializeTaskEntry, as remotecache.RemoteCache.FetchTaskEntry does. err,
+// when set, is the answer to every lookup.
+type remoteEntryFake struct {
+	mu     sync.Mutex
+	hits   map[string]remoteEntryHit
+	err    error
+	asked  []string
+	within []time.Duration
+}
+
+type remoteEntryHit struct {
+	hit      store.RemoteTaskEntryHit
+	exchange string
+}
+
+func newRemoteEntryFake() *remoteEntryFake {
+	return &remoteEntryFake{hits: map[string]remoteEntryHit{}}
+}
+
+func (f *remoteEntryFake) resolve() remoteTaskEntries { return f }
+
+func (f *remoteEntryFake) FetchTaskEntry(_ context.Context, within time.Duration, hash string,
+	_ *scheduler.ScheduledJob, cm *store.CacheManager) (*store.TaskEntry, error) {
+	f.mu.Lock()
+	f.asked = append(f.asked, hash)
+	f.within = append(f.within, within)
+	hit, ok := f.hits[hash]
+	err := f.err
+	f.mu.Unlock()
+	if err != nil || !ok {
+		return nil, err
+	}
+	return cm.MaterializeTaskEntry(hit.hit, func(digest string) (io.ReadCloser, error) {
+		path, ok := cache.BlobExchangePath(hit.exchange, digest)
+		if !ok {
+			return nil, fmt.Errorf("invalid digest %q", digest)
+		}
+		return os.Open(path)
+	})
+}
+
+func (f *remoteEntryFake) askedKeys() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.asked)
+}
+
+// stageRemote publishes task's entry in a producer store of its own, at the
+// key the plan derived, and stages it in remote as a provider serves it. The
+// fixture's store keeps no entry for the task.
+func (f *recoveryPlanFixture) stageRemote(t *testing.T, remote *remoteEntryFake, task string,
+	outputs []store.DeclaredEntryOutput, report string) {
+	t.Helper()
+	hash := f.keys[task]
+	if hash == "" {
+		t.Fatalf("the plan derived no cache key for %s (keys %v)", task, f.keys)
+	}
+	producer := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+	staging := t.TempDir()
+	if report != "" {
+		writeSpecGateFile(t, store.TaskStagingPath(staging, outputs[0]), report)
+	}
+	entry, err := producer.IngestTaskEntry(staging, store.TaskEntrySpec{
+		Key: hash, Result: &store.EntryResult{Status: "success"}, Outputs: outputs,
+	})
+	if err != nil {
+		t.Fatalf("ingest %s in the producer store: %v", task, err)
+	}
+	transfer, err := store.NewTaskEntryTransfer(entry)
+	if err != nil {
+		t.Fatalf("prepare %s for the remote cache: %v", task, err)
+	}
+	exchange := t.TempDir()
+	if err := producer.ExportManifestBlobs(transfer.Payload, exchange); err != nil {
+		t.Fatalf("export %s payload: %v", task, err)
+	}
+	if err := store.StageExchangeBlob(exchange, transfer.DescriptorDigest, transfer.Descriptor); err != nil {
+		t.Fatalf("stage %s descriptor: %v", task, err)
+	}
+	remote.mu.Lock()
+	remote.hits[hash] = remoteEntryHit{
+		hit:      store.RemoteTaskEntryHit{Key: hash, Result: entry.Result, Manifest: transfer.Manifest},
+		exchange: exchange,
+	}
+	remote.mu.Unlock()
+	if local, err := f.cache.LookupTaskEntry(hash); err != nil || local != nil {
+		t.Fatalf("the fixture's store must miss %s for this scenario (entry %v, err %v)", task, local, err)
+	}
+}
+
+// TestRecoverReportsFetchesAnEntryOnlyTheRemoteCacheHolds is the hosted-runner
+// case: the attester's report task ran in another run, which published its
+// entry to the remote cache only. On the local miss the recovery fetches that
+// entry into the local store and reads the report in place there. Only the
+// report task is asked, nothing reaches the workspace, and a second lookup is
+// served locally.
+func TestRecoverReportsFetchesAnEntryOnlyTheRemoteCacheHolds(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "spec-gate-evidence-scope",
+		"an-unplanned-attester-resolves-from-its-cache-entry")
+	t.Parallel()
+	fixture := newRecoveryPlanFixture(t, true)
+	fixture.requirePlanShape(t, true)
+	remote := newRemoteEntryFake()
+	fixture.stageRemote(t, remote, recoveryReportTask, []store.DeclaredEntryOutput{recoveryReportOutput}, recoveryReportBytes)
+	fixture.source.readingRemote(t.Context(), remote.resolve)
+
+	recovery := fixture.source.RecoverReports(fixture.ws.Projects)
+	if len(recovery.Unconsulted) != 0 {
+		t.Errorf("a candidate the remote cache answered for was reported unconsulted: %+v", recovery.Unconsulted)
+	}
+	if len(recovery.Reports) != 1 {
+		t.Fatalf("reports = %+v, want the candidate's report from the remote entry", recovery.Reports)
+	}
+	report := recovery.Reports[0]
+	if report.Project != recoveryProjectID || report.Task != recoveryReportTask {
+		t.Errorf("report attributed to %s/%s, want %s/%s", report.Project, report.Task, recoveryProjectID, recoveryReportTask)
+	}
+	entry, err := fixture.cache.LookupTaskEntry(fixture.keys[recoveryReportTask])
+	if err != nil || entry == nil {
+		t.Fatalf("the fetched entry is not in the local store (entry %v, err %v)", entry, err)
+	}
+	if want := filepath.Join(entry.FilesDir, recoveryReportOutput.ID); report.Path != want {
+		t.Errorf("report path = %s, want the local store's copy at %s", report.Path, want)
+	}
+	if relative, err := filepath.Rel(fixture.cache.StoreRoot(), report.Path); err != nil || strings.HasPrefix(relative, "..") {
+		t.Errorf("report path %s is outside the store %s", report.Path, fixture.cache.StoreRoot())
+	}
+	if got, err := os.ReadFile(report.Path); err != nil || string(got) != recoveryReportBytes {
+		t.Errorf("report bytes = %q (err %v), want the captured report", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.ws.Root, ".putnami", "out")); !os.IsNotExist(err) {
+		t.Errorf("recovery wrote the session output tree (stat err %v)", err)
+	}
+	if asked := remote.askedKeys(); !slices.Equal(asked, []string{fixture.keys[recoveryReportTask]}) {
+		t.Errorf("remote lookups = %v, want only the report task's key %s", asked, fixture.keys[recoveryReportTask])
+	}
+	if within := remote.within[0]; within <= 0 || within > specGateRemoteLookupTimeout {
+		t.Errorf("remote lookup bound = %s, want a positive bound of at most %s", within, specGateRemoteLookupTimeout)
+	}
+
+	if again := fixture.source.RecoverReports(fixture.ws.Projects); len(again.Reports) != 1 {
+		t.Fatalf("second recovery = %+v, want the report from the local store", again)
+	}
+	if asked := remote.askedKeys(); len(asked) != 1 {
+		t.Errorf("a locally held entry was asked of the remote cache again: %v", asked)
+	}
+}
+
+// TestRecoverReportsKeepsARemoteMissUnconsulted pins that a miss in both caches
+// keeps the existing reason, and that the remote cache is asked for a key at
+// most once per gate.
+func TestRecoverReportsKeepsARemoteMissUnconsulted(t *testing.T) {
+	t.Parallel()
+	fixture := newRecoveryPlanFixture(t, true)
+	fixture.requirePlanShape(t, true)
+	fixture.publish(t, recoveryGenerateTask, nil, "")
+	remote := newRemoteEntryFake()
+	fixture.source.readingRemote(t.Context(), remote.resolve)
+
+	for range 2 {
+		recovery := fixture.source.RecoverReports(fixture.ws.Projects)
+		if len(recovery.Reports) != 0 || len(recovery.Unconsulted) != 1 {
+			t.Fatalf("recovery = %+v, want the candidate unconsulted", recovery)
+		}
+		const want = "not selected, and the test task that writes its verification report has no cache entry for these inputs"
+		if got := recovery.Unconsulted[0].Reason; got != want {
+			t.Errorf("reason = %q, want %q", got, want)
+		}
+	}
+	if asked := remote.askedKeys(); !slices.Equal(asked, []string{fixture.keys[recoveryReportTask]}) {
+		t.Errorf("remote lookups = %v, want the report task's key once", asked)
+	}
+}
+
+// TestRecoverReportsSaysWhyTheRemoteCacheDidNotAnswer pins the reasons of a
+// remote lookup that ran out of time or failed: the candidate stays
+// unconsulted, and the reason names the remote cache rather than claim the
+// entry does not exist.
+func TestRecoverReportsSaysWhyTheRemoteCacheDidNotAnswer(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		err  error
+		want string
+	}{
+		"a lookup that ran out of time": {
+			err:  fmt.Errorf("provider op restore: %w", context.DeadlineExceeded),
+			want: "not selected, and the remote cache did not answer in time for the test task that writes its verification report",
+		},
+		"a lookup that failed": {
+			err: errors.New("cache provider session ended"),
+			want: "not selected, and the remote cache lookup for the test task that writes its verification report failed: " +
+				"cache provider session ended",
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newRecoveryPlanFixture(t, false)
+			remote := newRemoteEntryFake()
+			remote.err = testCase.err
+			fixture.source.readingRemote(t.Context(), remote.resolve)
+
+			recovery := fixture.source.RecoverReports(fixture.ws.Projects)
+			if len(recovery.Reports) != 0 || len(recovery.Unconsulted) != 1 {
+				t.Fatalf("recovery = %+v, want the candidate unconsulted", recovery)
+			}
+			if got := recovery.Unconsulted[0].Reason; got != testCase.want {
+				t.Errorf("reason = %q, want %q", got, testCase.want)
+			}
+			if asked := remote.askedKeys(); len(asked) != 1 {
+				t.Errorf("remote lookups = %v, want one", asked)
+			}
+		})
+	}
+}
+
+// TestRecoverReportsAsksNoRemoteCacheItCannotWaitFor pins the two cases that
+// skip the remote lookup: the run's context ended, or the gate's remote
+// budget is spent. Neither asks, and the reason says which.
+func TestRecoverReportsAsksNoRemoteCacheItCannotWaitFor(t *testing.T) {
+	t.Parallel()
+	ended, cancel := context.WithCancel(t.Context())
+	cancel()
+	cases := map[string]struct {
+		ctx    context.Context
+		budget time.Duration
+		want   string
+	}{
+		"the run ended": {
+			ctx: ended, budget: specGateRemoteBudget,
+			want: "not selected, and the remote cache lookup for the test task that writes its verification report failed: " +
+				"context canceled",
+		},
+		"the budget is spent": {
+			ctx: t.Context(), budget: 0,
+			want: "not selected, and the remote cache did not answer in time for the test task that writes its verification report",
+		},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newRecoveryPlanFixture(t, false)
+			remote := newRemoteEntryFake()
+			fixture.stageRemote(t, remote, recoveryReportTask, []store.DeclaredEntryOutput{recoveryReportOutput}, recoveryReportBytes)
+			fixture.source.readingRemote(testCase.ctx, remote.resolve)
+			fixture.source.remoteBudget = testCase.budget
+
+			recovery := fixture.source.RecoverReports(fixture.ws.Projects)
+			if asked := remote.askedKeys(); len(asked) != 0 {
+				t.Errorf("remote lookups = %v, want none", asked)
+			}
+			if len(recovery.Reports) != 0 || len(recovery.Unconsulted) != 1 {
+				t.Fatalf("recovery = %+v, want the candidate unconsulted", recovery)
+			}
+			if got := recovery.Unconsulted[0].Reason; got != testCase.want {
+				t.Errorf("reason = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+// TestRecoverReportsWithoutARunRemoteReadsTheLocalStoreOnly pins the run that
+// carries no remote cache: the request resolves to a nil interface, never to
+// a nil pointer the lookup would call, and the candidate keeps the local
+// reason.
+func TestRecoverReportsWithoutARunRemoteReadsTheLocalStoreOnly(t *testing.T) {
+	t.Parallel()
+	req := &Request{}
+	if remote := req.executionRemoteEntries(); remote != nil {
+		t.Fatalf("a request without a remote cache resolved to %#v", remote)
+	}
+	fixture := newRecoveryPlanFixture(t, false)
+	fixture.source.readingRemote(t.Context(), req.executionRemoteEntries)
+	recovery := fixture.source.RecoverReports(fixture.ws.Projects)
+	if len(recovery.Unconsulted) != 1 || !strings.HasSuffix(recovery.Unconsulted[0].Reason, "has no cache entry for these inputs") {
+		t.Fatalf("recovery = %+v, want the candidate unconsulted for a missing entry", recovery)
 	}
 }

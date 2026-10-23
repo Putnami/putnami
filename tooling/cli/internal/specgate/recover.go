@@ -60,8 +60,10 @@ import (
 type ObservationRecovery interface {
 	// RecoverReports answers for every candidate exactly once. Candidates are
 	// passed in canonical project-ID order and the result must be deterministic:
-	// this decides a gate verdict, so two runs over the same store must produce
-	// the same answer.
+	// this decides a gate verdict, so two runs that read the same cache entries
+	// must produce the same answer. A source that cannot be read leaves its
+	// candidate unconsulted, and an unconsulted candidate never makes a check
+	// block.
 	RecoverReports(candidates []*workspace.Project) Recovery
 }
 
