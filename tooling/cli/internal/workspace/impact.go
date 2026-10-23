@@ -204,12 +204,17 @@ type ImpactTraceEdge struct {
 	Project string `json:"project"`
 	From    string `json:"from"`
 	Kind    string `json:"kind"`
-	// Via is present on a contract edge: the provider's committed contract
-	// that changed, which is the only reason that edge fires.
+	// Via is the changed file the edge rests on. On a contract edge it is the
+	// provider's committed contract that changed, which is the only reason
+	// that edge fires. On an extension-consumer edge Cause says what it is.
 	Via string `json:"via,omitempty"`
-	// ContractSHA256 is present beside Via: the full sha256 of that contract
-	// in the tree the selection read.
+	// ContractSHA256 is present beside a contract edge's Via: the full sha256
+	// of that contract in the tree the selection read.
 	ContractSHA256 string `json:"contractSha256,omitempty"`
+	// Cause is present beside an extension-consumer edge's Via: runtime-input
+	// when the edge carries every task of the extension, task-declaration
+	// when it carries the tasks a change of its manifest moved.
+	Cause string `json:"cause,omitempty"`
 }
 
 // ImpactTraceScope is one scope line of an ImpactTraceRecord: a selected
@@ -270,7 +275,7 @@ func (s ImpactedSelection) TraceRecord() ImpactTraceRecord {
 		if edge, ok := s.Trace.Edges[p.ID]; ok {
 			record.Edges = append(record.Edges, ImpactTraceEdge{
 				Project: p.ID, From: edge.From, Kind: string(edge.Kind),
-				Via: filepath.ToSlash(edge.Via), ContractSHA256: edge.ContractSHA256,
+				Via: filepath.ToSlash(edge.Via), ContractSHA256: edge.ContractSHA256, Cause: string(edge.Cause),
 			})
 		}
 		if scope := s.Trace.ScopeOf(p.ID); scope != nil {
@@ -285,14 +290,24 @@ func (s ImpactedSelection) TraceRecord() ImpactTraceRecord {
 // `impacted` MCP answer carry all 64.
 const impactTraceDigestShown = 12
 
-// edgeEvidence renders what a fired contract edge rests on, inside its edge
-// line: ` services/catalog/schema/openapi.json sha256:0123456789ab`. It is ""
-// for an edge that names no file, which is every edge but a contract edge.
+// edgeEvidence renders the changed file an edge rests on, inside its edge
+// line. A contract edge names the contract and its digest:
+// ` services/catalog/schema/openapi.json sha256:0123456789ab`. An
+// extension-consumer edge names what it carries before the file:
+// ` runtime input tooling/extension-sdk/registrycred/install.go`, or
+// ` task declaration go/extension/putnami.extension.json`. It is "" for an
+// edge that names no file.
 func edgeEvidence(edge ImpactEdge) string {
 	if edge.Via == "" {
 		return ""
 	}
 	evidence := " " + filepath.ToSlash(edge.Via)
+	switch edge.Cause {
+	case ImpactCauseRuntimeInput:
+		evidence = " runtime input" + evidence
+	case ImpactCauseTaskDeclaration:
+		evidence = " task declaration" + evidence
+	}
 	if digest := edge.ContractSHA256; digest != "" {
 		if len(digest) > impactTraceDigestShown {
 			digest = digest[:impactTraceDigestShown]
@@ -451,6 +466,12 @@ func ImpactedSelectionForBaselineWithTasks(
 	if len(diff.Files) == 0 {
 		return ImpactedSelection{Baseline: resolved.Ref, BaselineSource: resolved.Source, DiffBase: diff.Base}, nil
 	}
+
+	// A change to an extension's manifest is measured against the manifest the
+	// diff's base records (TaskImpactIndex.TasksOfManifestChange).
+	tasks = WithManifestBaseline(tasks, func(path string) ([]byte, bool) {
+		return git.FileAtRevision(ws.Root, diff.Base, path)
+	})
 
 	// An index that expands input selectors asks each extension once for the
 	// projects the diff falls in, before the mapping reads them path by path.

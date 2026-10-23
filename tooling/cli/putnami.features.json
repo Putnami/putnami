@@ -194,7 +194,9 @@
               "a-criteria-kind-command-is-never-narrowed",
               "a-scope-keeps-functional-predecessors-only",
               "a-kept-spec-gate-keeps-no-unscoped-test",
-              "a-narrowed-plan-orders-its-jobs-as-the-full-plan-does"
+              "a-narrowed-plan-orders-its-jobs-as-the-full-plan-does",
+              "a-manifest-change-reaches-the-tasks-it-moves",
+              "the-trace-names-the-runtime-input"
             ]
           }
         },

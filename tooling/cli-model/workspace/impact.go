@@ -75,6 +75,17 @@ type TaskImpactIndex interface {
 	// vocabulary above.
 	TasksOfExtension(extensionProjectID string) []string
 
+	// TasksOfManifestChange answers a change to an in-workspace extension
+	// project's own manifest at path. confined reports whether the change
+	// stays inside task and step declarations. When it does, tasks lists the
+	// steps whose declaration moved, the steps that reference a task whose
+	// contract moved, added and removed ones included, and the tasks that
+	// depend on those inside a project, qualified as TasksOfExtension
+	// qualifies them. confined is false when anything else in the manifest
+	// moved, or when the content the change started from cannot be read: the
+	// extension then stays whole, and its consumers take every task.
+	TasksOfManifestChange(extensionProjectID, path string) (tasks []string, confined bool)
+
 	// ReadsAsExtensionRuntime reports whether a path is part of an
 	// in-workspace extension's runtime — built or embedded into the binary its
 	// consumers execute — rather than an input of one of its own tasks. Such a
@@ -139,10 +150,11 @@ const (
 	// so it never names a reason here.
 	ImpactEdgeDependency ImpactEdgeKind = "dependency"
 	// ImpactEdgeExtensionConsumer is an impact-only extension-consumer edge from
-	// extensionConsumerIndex. It leaves an extension whose binary the change
-	// rebuilt and reaches a consumer for that extension's tasks only: the
-	// consumer is task-scoped (ImpactTrace.Scopes), and nothing propagates out
-	// of it.
+	// extensionConsumerIndex. It leaves an extension whose runtime the change
+	// rebuilt, and reaches a consumer for every task of that extension; or it
+	// leaves an extension whose manifest moved only task and step
+	// declarations, and reaches a consumer for those tasks. The consumer is
+	// task-scoped (ImpactTrace.Scopes), and nothing propagates out of it.
 	ImpactEdgeExtensionConsumer ImpactEdgeKind = "extension-consumer"
 	// ImpactEdgeContract is the derived edge from a provider to a generated
 	// client of its contract (DependencyGraph.ContractClientsOf). The contract
@@ -183,16 +195,37 @@ type ImpactEdge struct {
 	From string
 	// Kind is one of the three edge kinds.
 	Kind ImpactEdgeKind
-	// Via is, on a contract edge a change fired, the provider's committed
-	// contract that changed: workspace-relative, in slash form. It is empty
-	// on every other kind, and on a contract edge ImpactReach crossed, which
-	// names no changed file.
+	// Via is the changed file the edge rests on, workspace-relative, in slash
+	// form. On a contract edge a change fired, it is the provider's committed
+	// contract that changed. On an extension-consumer edge, Cause says what it
+	// is. It is empty on a dependency edge, and on an edge ImpactReach
+	// crossed, which names no changed file.
 	Via string
 	// ContractSHA256 is, beside Via, the sha256 of that contract as the
 	// workspace loaded it (Project.ContractSHA256): the digest a client
 	// regenerated from it records.
 	ContractSHA256 string
+	// Cause is present beside Via on an extension-consumer edge, and names
+	// what the edge carries.
+	Cause ImpactEdgeCause
 }
+
+// ImpactEdgeCause names why an extension-consumer edge fired, and so which
+// tasks of the extension it carries.
+type ImpactEdgeCause string
+
+const (
+	// ImpactCauseRuntimeInput is an extension whose runtime moved: the
+	// extension is whole, or the tasks it runs reach a dependent's task. The
+	// edge carries every task of the extension. Via is the changed file the
+	// walk traced to that runtime: the claim that made the extension whole,
+	// else the first claim or edge that gave it a task to carry.
+	ImpactCauseRuntimeInput ImpactEdgeCause = "runtime-input"
+	// ImpactCauseTaskDeclaration is an extension whose manifest moved task
+	// and step declarations and nothing else, while its runtime did not move.
+	// The edge carries the tasks whose declaration moved. Via is the manifest.
+	ImpactCauseTaskDeclaration ImpactEdgeCause = "task-declaration"
+)
 
 // ImpactTrace explains one change-to-project mapping. Every selected project
 // has an entry in exactly one of Seeds and Edges: a project with seeds has no
@@ -385,11 +418,31 @@ func ImpactPathWithTasks(ws *Workspace, from, to string, index TaskImpactIndex) 
 type impactScope struct {
 	full  bool
 	tasks map[string]bool
+	// runtimeTasks are the tasks of tasks that a claim or an edge added, as
+	// opposed to the tasks that read a manifest whose change stayed inside
+	// task and step declarations. Only they decide whether an extension's
+	// runtime moved: such a manifest is no runtime input
+	// (TaskImpactIndex.ReadsAsExtensionRuntime keeps one that is whole).
+	runtimeTasks map[string]bool
 	// toolTasks are the tasks an extension-consumer edge added: the project
-	// runs them because the tool that executes them was rebuilt, not because
+	// runs them because the tool that executes them moved, not because
 	// anything the project reads changed. They are part of its scope and
 	// nothing propagates out of them — the approximation ADR 0042 names.
 	toolTasks map[string]bool
+	// declared are, on an extension project, the qualified tasks whose
+	// declaration a confined change to its manifest moved
+	// (TaskImpactIndex.TasksOfManifestChange). The extension-consumer edge
+	// carries them when the runtime did not move. They are in toolTasks too,
+	// because an extension that runs under itself runs them on itself; on
+	// another extension project they name no job.
+	declared map[string]bool
+	// declaredBy is the manifest whose confined change the project claimed.
+	declaredBy string
+	// cause is the changed file the walk traces the project's runtime to: the
+	// claim that made it full, else the first claim whose tasks reach a
+	// dependent's task, else the cause of the project whose edge first reached
+	// it. The runtime extension-consumer edge names it.
+	cause string
 }
 
 // mark identifies the size of what a scope PROPAGATES: -1 for full, the task
@@ -439,21 +492,82 @@ func (s *impactScope) scope() []string {
 func (s *impactScope) makeFull() {
 	s.full = true
 	s.tasks = nil
+	s.runtimeTasks = nil
 	s.toolTasks = nil
+	s.declared = nil
+	s.declaredBy = ""
 }
 
+// makeFullBy makes the scope full and names the file that did it as its
+// cause, unless it was full already.
+func (s *impactScope) makeFullBy(file string) {
+	if !s.full || s.cause == "" {
+		s.cause = file
+	}
+	s.makeFull()
+}
+
+// declare records a confined change of the project's own manifest and the
+// tasks it moved: the extension runs them on itself, and its consumer edge
+// carries them.
+func (s *impactScope) declare(tasks []string, manifest string) {
+	if s.full {
+		return
+	}
+	if s.declaredBy == "" {
+		s.declaredBy = manifest
+	}
+	s.addTool(tasks)
+	for _, task := range tasks {
+		if task == "" {
+			continue
+		}
+		if s.declared == nil {
+			s.declared = make(map[string]bool, len(tasks))
+		}
+		s.declared[task] = true
+	}
+}
+
+// add merges tasks a claim or an edge reached; they count toward the runtime.
 func (s *impactScope) add(tasks []string) {
+	s.merge(tasks, true)
+}
+
+// addReaders merges the tasks that read a manifest whose change stayed inside
+// task and step declarations; they propagate, and leave the runtime alone.
+func (s *impactScope) addReaders(tasks []string) {
+	s.merge(tasks, false)
+}
+
+func (s *impactScope) merge(tasks []string, runtime bool) {
 	if s.full {
 		return
 	}
 	if s.tasks == nil {
 		s.tasks = make(map[string]bool, len(tasks))
 	}
+	if runtime && s.runtimeTasks == nil {
+		s.runtimeTasks = make(map[string]bool, len(tasks))
+	}
 	for _, task := range tasks {
-		if task != "" {
-			s.tasks[task] = true
+		if task == "" {
+			continue
+		}
+		s.tasks[task] = true
+		if runtime {
+			s.runtimeTasks[task] = true
 		}
 	}
+}
+
+// carriedCause is the file a project hands its dependents as their cause: its
+// own, else the manifest whose readers it propagates.
+func (s *impactScope) carriedCause() string {
+	if s.cause != "" {
+		return s.cause
+	}
+	return s.declaredBy
 }
 
 func (s *impactScope) addTool(tasks []string) {
@@ -502,13 +616,24 @@ func sortedKeys(set map[string]bool) []string {
 //     project.
 //
 // An in-workspace extension project is the last full case, and for the same
-// reason. Its putnami.extension.json IS the declaration every consumer's jobs
-// are planned from, so no task can be said to read it; and a file of it no task
-// declares may be the RUNTIME its consumers execute — a shell entrypoint, a
-// bundled script — which is not the extension's own input but is every
-// consumer's tool. Both keep the extension whole, exactly as an implementation
-// change does. A file of the extension some task does read is attributed
-// normally, so a `_test.go` inside it still re-runs its tests alone.
+// reason. A file of it no task declares may be the RUNTIME its consumers
+// execute — a shell entrypoint, a bundled script — which is not the extension's
+// own input but is every consumer's tool, and it keeps the extension whole,
+// exactly as an implementation change does. A file of the extension some task
+// does read is attributed normally, so a `_test.go` inside it still re-runs its
+// tests alone.
+//
+// Its own putnami.extension.json is the declaration every consumer's jobs are
+// planned from, and the index decides how much of it moved
+// (TaskImpactIndex.TasksOfManifestChange). A change that stays inside task and
+// step declarations moves those tasks, on the extension and through its
+// consumer edge, and the tasks that read the manifest run as for any file. Any
+// other change keeps the extension whole, as does an extension no `extensions`
+// list names, whose consumers reach it as a package dependency.
+//
+// Each scope also names its cause (impactScope.cause), which the
+// extension-consumer edge reports. Without an index every seed is full, and its
+// cause is its first claim.
 func scopeSeedsToTasks(
 	ws *Workspace,
 	index TaskImpactIndex,
@@ -516,7 +641,17 @@ func scopeSeedsToTasks(
 	seeds map[string][]ImpactSeed,
 ) (map[string][]ImpactSeed, map[string]*impactScope) {
 	if index == nil {
-		return seeds, nil
+		scopes := make(map[string]*impactScope, len(seeds))
+		for id, claims := range seeds {
+			scope := &impactScope{}
+			if len(claims) > 0 {
+				scope.makeFullBy(claims[0].File)
+			} else {
+				scope.makeFull()
+			}
+			scopes[id] = scope
+		}
+		return seeds, scopes
 	}
 	kept := make(map[string][]ImpactSeed, len(seeds))
 	scopes := make(map[string]*impactScope, len(seeds))
@@ -554,18 +689,51 @@ func claimTasks(
 	scope *impactScope,
 ) bool {
 	if claim.Kind == ImpactSeedScopeConfig || claim.Kind == ImpactSeedWorkspaceInput ||
-		isExtensionManifestOf(p, claim.File) || index.ReadsAsExtensionRuntime(p.ID, claim.File) {
-		scope.makeFull()
+		index.ReadsAsExtensionRuntime(p.ID, claim.File) {
+		scope.makeFullBy(claim.File)
 		return true
+	}
+	if isExtensionManifestOf(p, claim.File) {
+		return claimManifest(index, consumers, p, claim, scope)
 	}
 	if tasks := index.TasksReadingPath(p.ID, claim.File); len(tasks) > 0 {
 		scope.add(tasks)
+		if scope.cause == "" && !scope.full && len(index.TasksReachedFrom(tasks)) > 0 {
+			scope.cause = claim.File
+		}
 		return true
 	}
 	if claim.Kind != ImpactSeedRootWatchedFile && !isExtensionProject(p, consumers) {
 		return false
 	}
-	scope.makeFull()
+	scope.makeFullBy(claim.File)
+	return true
+}
+
+// claimManifest merges a change to a project's own extension manifest. On an
+// extension some `extensions` list names, a change the index confines to task
+// and step declarations runs the tasks it moved and the tasks that read the
+// manifest, and reports false when there are none. Any other change keeps the
+// project whole.
+func claimManifest(
+	index TaskImpactIndex,
+	consumers map[string][]string,
+	p *Project,
+	claim ImpactSeed,
+	scope *impactScope,
+) bool {
+	if isExtensionProject(p, consumers) {
+		if moved, confined := index.TasksOfManifestChange(p.ID, claim.File); confined {
+			readers := index.TasksReadingPath(p.ID, claim.File)
+			if len(readers) == 0 && len(moved) == 0 {
+				return false
+			}
+			scope.addReaders(readers)
+			scope.declare(moved, claim.File)
+			return true
+		}
+	}
+	scope.makeFullBy(claim.File)
 	return true
 }
 
@@ -589,12 +757,12 @@ func isExtensionProject(p *Project, consumers map[string][]string) bool {
 //
 // It asks the FILE, not the consumer index. A putnami.extension.json is the
 // declaration every consumer's jobs are planned from — its hooks, its tasks,
-// its cache contracts — so no task of the declaring project can be said to read
-// it and the project keeps its whole self. Deriving "is an extension" from the
-// consumer index here would miss every extension a consumer reaches as a
-// package dependency rather than through an `extensions` entry: changing such a
-// manifest's preBuild hook would then select the declaring project alone and no
-// project that RUNS the hook, which is a gate that never ran.
+// its cache contracts. Deriving "is an extension" from the consumer index here
+// would miss every extension a consumer reaches as a package dependency rather
+// than through an `extensions` entry: changing such a manifest's preBuild hook
+// would then select the declaring project alone and no project that RUNS the
+// hook, which is a gate that never ran. claimManifest keeps such a project
+// whole.
 func isExtensionManifestOf(p *Project, file string) bool {
 	return filepath.Base(file) == extproto.ManifestFilename &&
 		cleanIndexPath(filepath.Dir(file)) == cleanIndexPath(p.Path)
@@ -626,14 +794,19 @@ func isExtensionManifestOf(p *Project, file string) bool {
 // edge with no evidence, which is ImpactReach's question about a change to a
 // project as a whole; the zero value fires none.
 //
-// The extension-consumer edge fires from an extension whose binary the change
-// rebuilt, which is the question `^` already answers: it fires when the
-// extension is full, or when the tasks it runs reach a dependent's task at all.
-// A `_test.go` inside an extension therefore re-runs that extension's tests and
-// nothing else in the workspace, while one byte of its implementation or its
-// manifest re-runs that extension's tasks on every consumer. Nothing propagates
-// out of the tasks that edge added: the consumer's own sources did not change,
-// which is the approximation ADR 0042 names and the cache key catches.
+// The extension-consumer edge carries what the change moved in the tool a
+// consumer runs. An extension whose runtime the change moved hands every
+// consumer every task it declares. Whether the runtime moved is the question
+// `^` already answers: the extension is full, or the tasks a claim or an edge
+// gave it reach a dependent's task at all. A `_test.go` inside an extension
+// therefore re-runs that extension's tests and nothing else in the workspace,
+// while one byte of its implementation re-runs that extension's tasks on every
+// consumer, and the edge names the changed file it traced that runtime to. An
+// extension whose manifest moved task and step declarations alone hands every
+// consumer the tasks whose declaration moved, and the edge names the manifest.
+// Nothing propagates out of the tasks the edge added: the consumer's own
+// sources did not change, which is the approximation ADR 0042 names and the
+// cache key catches.
 //
 // Without a TaskImpactIndex the walk is the project-level one it was before ADR
 // 0044: a seed is full, a dependency or contract edge makes a dependent full,
@@ -720,25 +893,67 @@ func (w *impactWalk) run() {
 			// both families reach names the dependency edge, the stronger
 			// reason: it reads the changed project's own bytes, while a
 			// contract edge reads only the contract.
+			cause := scope.carriedCause()
 			for _, next := range w.ws.Graph.ImpactDependentsOf(current) {
-				w.reach(next, ImpactEdge{From: current, Kind: ImpactEdgeDependency}, carried)
+				w.reach(next, ImpactEdge{From: current, Kind: ImpactEdgeDependency}, carried, cause)
 			}
 			if edge, fires := w.contractEdgeFrom(current); fires {
 				for _, next := range w.ws.Graph.ContractClientsOf(current) {
-					w.reach(next, edge, carried)
+					w.reach(next, edge, carried, cause)
 				}
 			}
 		}
-		// An extension whose whole self is impacted rebuilt the binary its
-		// consumers run, whatever its manifest declares about ordering; one
-		// whose tasks carry nothing across an edge rebuilt nothing.
-		if !scope.full && !carries {
+		consumers := w.consumers[current]
+		if len(consumers) == 0 {
 			continue
 		}
-		for _, next := range w.consumers[current] {
-			w.reachConsumer(current, next)
+		edge, tasks, fires := w.consumerEdgeFrom(current, scope, carries)
+		if !fires {
+			continue
+		}
+		for _, next := range consumers {
+			w.reachConsumer(next, edge, tasks)
 		}
 	}
+}
+
+// consumerEdgeFrom returns the extension-consumer edge out of an extension, the
+// tasks it carries, and whether it fires at all.
+//
+// An extension whose whole self is impacted moved the runtime its consumers
+// run, whatever its manifest declares about ordering, and so did one whose
+// runtime tasks carry across an edge: the edge carries every task the extension
+// declares, and names the scope's cause. Otherwise the edge carries the tasks a
+// confined change of the extension's manifest moved, and names the manifest. An
+// extension with neither moved nothing its consumers run.
+func (w *impactWalk) consumerEdgeFrom(extensionID string, scope *impactScope, carries bool) (ImpactEdge, []string, bool) {
+	edge := ImpactEdge{From: extensionID, Kind: ImpactEdgeExtensionConsumer}
+	if scope.full || w.runtimeCarries(scope, carries) {
+		if scope.cause != "" {
+			edge.Via, edge.Cause = scope.cause, ImpactCauseRuntimeInput
+		}
+		if w.index == nil {
+			// The project-level scope: the extension project's own ID.
+			return edge, []string{extensionID}, true
+		}
+		return edge, w.index.TasksOfExtension(extensionID), true
+	}
+	if len(scope.declared) == 0 {
+		return ImpactEdge{}, nil, false
+	}
+	edge.Via, edge.Cause = scope.declaredBy, ImpactCauseTaskDeclaration
+	return edge, sortedKeys(scope.declared), true
+}
+
+// runtimeCarries reports whether the tasks a claim or an edge gave a project
+// reach a dependent's task. carries answers the same question for every task
+// it runs, the readers of a confined manifest change included, and the two
+// agree when it has no such readers.
+func (w *impactWalk) runtimeCarries(scope *impactScope, carries bool) bool {
+	if !carries || w.index == nil || len(scope.runtimeTasks) == len(scope.tasks) {
+		return carries
+	}
+	return len(w.index.TasksReachedFrom(sortedKeys(scope.runtimeTasks))) > 0
 }
 
 // carried answers what one project hands across an edge: the tasks a dependent
@@ -776,8 +991,10 @@ func (w *impactWalk) contractEdgeFrom(provider string) (ImpactEdge, bool) {
 // reach merges what a dependency or contract edge carries into a project and
 // enqueues it when that changed what the project propagates. The edge is
 // recorded on the first reach and rewritten when the project is upgraded to
-// full, so a project that runs everything names the reason it does.
-func (w *impactWalk) reach(to string, edge ImpactEdge, tasks []string) {
+// full, so a project that runs everything names the reason it does. cause is
+// the source's (impactScope.carriedCause): the project takes it on the same
+// terms as the edge, or when it has none yet.
+func (w *impactWalk) reach(to string, edge ImpactEdge, tasks []string, cause string) {
 	if to == edge.From {
 		return
 	}
@@ -795,6 +1012,10 @@ func (w *impactWalk) reach(to string, edge ImpactEdge, tasks []string) {
 	}
 	if !w.seed[to] && (!wasSelected || after == -1) {
 		w.edges[to] = edge
+		scope.cause = cause
+	}
+	if scope.cause == "" {
+		scope.cause = cause
 	}
 	w.queue = append(w.queue, to)
 }
@@ -837,26 +1058,28 @@ func movedContracts(ws *Workspace, changedFiles []string) contractMoves {
 	return contractMoves{byProvider: moved}
 }
 
-// reachConsumer applies the extension-consumer edge: the consumer runs the
-// tasks of the rebuilt extension and stays where it is. Nothing is enqueued —
-// those tasks propagate nothing.
-func (w *impactWalk) reachConsumer(extensionID, consumerID string) {
-	if consumerID == extensionID {
+// reachConsumer applies an extension-consumer edge (consumerEdgeFrom): the
+// consumer runs the tasks it carries and stays where it is. Nothing is enqueued
+// — those tasks propagate nothing. The edge is recorded on the first reach, and
+// a runtime edge replaces the declaration edge of the same extension, so a
+// consumer that runs every task of it names the reason it does.
+func (w *impactWalk) reachConsumer(consumerID string, edge ImpactEdge, tasks []string) {
+	if consumerID == edge.From {
 		return
 	}
 	scope := w.scopeOf(consumerID)
 	if scope.full {
 		return
 	}
-	if !scope.selected() && !w.seed[consumerID] {
-		w.edges[consumerID] = ImpactEdge{From: extensionID, Kind: ImpactEdgeExtensionConsumer}
+	if !w.seed[consumerID] {
+		recorded, reached := w.edges[consumerID]
+		upgraded := reached && recorded.From == edge.From &&
+			recorded.Cause == ImpactCauseTaskDeclaration && edge.Cause != ImpactCauseTaskDeclaration
+		if !scope.selected() || upgraded {
+			w.edges[consumerID] = edge
+		}
 	}
-	if w.index == nil {
-		// The project-level scope: the extension project's own ID.
-		scope.addTool([]string{extensionID})
-		return
-	}
-	scope.addTool(w.index.TasksOfExtension(extensionID))
+	scope.addTool(tasks)
 }
 
 func (w *impactWalk) scopeOf(id string) *impactScope {
