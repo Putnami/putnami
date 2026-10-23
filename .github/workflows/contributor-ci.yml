@@ -190,6 +190,14 @@ jobs:
       # actions/cache saves only after a green job, so while the gate was red
       # no run ever stored these directories and every run compiled the race
       # build of every Go package from nothing.
+      #
+      # Each run on main saves under a key of its own, and every run restores
+      # the latest one. A key that changes only with the lock files is never
+      # saved twice, so the Go build cache behind it ages with every merge: a
+      # wide change that restored a three-week-old one ran 82 minutes of
+      # tasks, and 42 with a fresh one. Pull request runs do not save: a pull
+      # request reads only its own caches and main's, and 1.7 GB per pull
+      # request would evict main's from the repository's cache quota.
       - name: Restore toolchain and dependency caches
         id: dependency-cache
         uses: actions/cache/restore@v4
@@ -200,8 +208,9 @@ jobs:
             ~/.putnami/artifacts
             ~/.bun/install/cache
             ~/.putnami/tools/go
-          key: putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}
+          key: putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            putnami-${{ runner.os }}-${{ hashFiles('putnami.lock.json', 'go.work.sum', 'bun.lock', 'go/extension/tools/versions.json') }}-
             putnami-${{ runner.os }}-
 
       # .putnami/stats/tasks.json records how long each task ran. The scheduler
@@ -333,10 +342,10 @@ jobs:
             exit 1
           fi
 
-      # Store the caches the restore step above names, also after a red gate.
-      # An exact hit is already stored under this key, so it is not saved again.
+      # Store the caches the restore step above names, also after a red gate,
+      # from every run that is not a pull request's.
       - name: Save toolchain and dependency caches
-        if: always() && steps.dependency-cache.outputs.cache-hit != 'true'
+        if: always() && github.event_name != 'pull_request'
         uses: actions/cache/save@v4
         with:
           path: |
