@@ -31,6 +31,39 @@
       }
     },
     {
+      "id": "envelope.non-run.workspace-warnings",
+      "document": "resultEnvelope",
+      "expect": "accept",
+      "summary": "A command that loads the workspace carries each load warning with its stable code beside an unchanged data payload.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "projects list",
+        "status": "success",
+        "exitCode": 0,
+        "data": { "id": "/apps/web", "name": "web", "path": "apps/web" },
+        "workspaceWarnings": [
+          {
+            "code": "workspace.provider_view_unavailable",
+            "message": "no workspace provider view (.putnami/workspace-index.json): 1 project(s) (apps/web) resolve from authored config alone"
+          }
+        ]
+      }
+    },
+    {
+      "id": "envelope.non-run.failure-with-workspace-warnings",
+      "document": "resultEnvelope",
+      "expect": "accept",
+      "summary": "Workspace warnings are allowed beside any status: a load that warned can still end in a failure.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "projects describe",
+        "status": "failure",
+        "exitCode": 1,
+        "error": { "code": "failure", "message": "project not found: api" },
+        "workspaceWarnings": [{ "code": "workspace.name_divergence", "message": "project apps/web: source name \"site\" differs from resolved name \"web\"" }]
+      }
+    },
+    {
       "id": "envelope.plan-preview",
       "document": "resultEnvelope",
       "expect": "accept",
@@ -977,6 +1010,36 @@
       "summary": "Documents are closed: an undeclared member is drift, not an extension point.",
       "value": { "protocolVersion": 2, "command": "build", "status": "success", "exitCode": 0, "summary": "3 jobs" },
       "violations": [{ "code": "cli.result.unknown_field", "path": "summary" }]
+    },
+    {
+      "id": "invalid.envelope.workspace-warnings-empty",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "workspaceWarnings is absent when the load recorded no warning; an empty array is drift.",
+      "value": { "protocolVersion": 2, "command": "projects list", "status": "success", "exitCode": 0, "data": [], "workspaceWarnings": [] },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "workspaceWarnings" }]
+    },
+    {
+      "id": "invalid.envelope.workspace-warning-shape",
+      "document": "resultEnvelope",
+      "expect": "reject",
+      "summary": "A workspace warning is closed and carries both its code and its message.",
+      "value": {
+        "protocolVersion": 2,
+        "command": "projects list",
+        "status": "success",
+        "exitCode": 0,
+        "data": [],
+        "workspaceWarnings": [
+          { "message": "no workspace provider view", "severity": "warning" },
+          { "code": "", "message": "workspace index could not be read" }
+        ]
+      },
+      "violations": [
+        { "code": "cli.result.missing_field", "path": "workspaceWarnings[0].code" },
+        { "code": "cli.result.unknown_field", "path": "workspaceWarnings[0].severity" },
+        { "code": "cli.result.invalid_value", "path": "workspaceWarnings[1].code" }
+      ]
     },
     {
       "id": "invalid.envelope.command-not-a-string",

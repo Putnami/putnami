@@ -357,15 +357,15 @@ func cmdProjects(env *CommandEnv) error {
 	}
 	switch env.Sub {
 	case "list", "":
-		return lifecycle.ProjectsList(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
+		return lifecycle.ProjectsList(env.WsRoot, env.Cfg, env.OutputFormat, env.WorkspaceWarnings())
 	case "create":
 		return lifecycle.ProjectsCreate(env.Ctx, env.WsRoot, env.Cfg, env.Args, lifecycleEnv(env))
 	case "describe":
-		return lifecycle.ProjectsDescribe(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, warningWriter(env))
+		return lifecycle.ProjectsDescribe(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, env.WorkspaceWarnings())
 	case "sync":
 		return lifecycle.ProjectsSync(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.Global.DryRun, lifecycleEnv(env))
 	case "tag":
-		return lifecycle.ProjectsTag(env.WsRoot, env.Cfg, env.Args, warningWriter(env))
+		return lifecycle.ProjectsTag(env.WsRoot, env.Cfg, env.Args, env.WorkspaceWarnings())
 	default:
 		return usageErrorf("unknown subcommand: projects %s", env.Sub)
 	}
@@ -377,7 +377,7 @@ func cmdScopes(env *CommandEnv) error {
 	}
 	switch env.Sub {
 	case "list", "":
-		return lifecycle.ScopesList(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
+		return lifecycle.ScopesList(env.WsRoot, env.Cfg, env.OutputFormat, env.WorkspaceWarnings())
 	default:
 		return usageErrorf("unknown subcommand: scopes %s\n  Available: list", env.Sub)
 	}
@@ -395,7 +395,7 @@ func cmdWorkspace(env *CommandEnv) error {
 		if err := env.requireWorkspace(); err != nil {
 			return err
 		}
-		return lifecycle.WorkspaceDescribe(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
+		return lifecycle.WorkspaceDescribe(env.WsRoot, env.Cfg, env.OutputFormat, env.WorkspaceWarnings())
 	default:
 		return usageErrorf("unknown subcommand: workspace %s", env.Sub)
 	}
@@ -880,7 +880,7 @@ func cmdCompletion(env *CommandEnv) error {
 	if shell == "" && len(env.Args) > 0 {
 		shell = env.Args[0]
 	}
-	warnings := warningWriter(env)
+	warnings := env.WorkspaceWarnings()
 	switch shell {
 	case "bash":
 		completion.CompletionBash(os.Stdout, env.WsRoot, env.Cfg, warnings)

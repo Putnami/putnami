@@ -13,6 +13,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/completion"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // This pins the generated shell-completion scripts and the
@@ -80,7 +81,7 @@ func firstSurfaceGoldenDiff(want, got string) string {
 func TestGoldenCompletionScripts(t *testing.T) {
 	generators := []struct {
 		name     string
-		generate func(io.Writer, string, *wsproto.Config, io.Writer)
+		generate func(io.Writer, string, *wsproto.Config, *workspace.WarningReport)
 	}{
 		{"completion-bash", completion.CompletionBash},
 		{"completion-zsh", completion.CompletionZsh},

@@ -20,7 +20,7 @@
     },
     {
       "id": "project-inventory",
-      "text": "Project listing and description expose canonical identities, physical paths, tags, dependencies, dependents, extensions, and metadata from the same loaded workspace graph."
+      "text": "Project listing and description expose canonical identities, physical paths, tags, dependencies, dependents, extensions, and metadata from the same loaded workspace graph, and report the warnings that load recorded on stderr and, with their stable code, in the result envelope's workspaceWarnings."
     },
     {
       "id": "target-selection",

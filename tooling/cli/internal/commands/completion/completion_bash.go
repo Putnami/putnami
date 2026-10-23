@@ -7,10 +7,11 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // CompletionBash generates a bash completion script.
-func CompletionBash(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings io.Writer) {
+func CompletionBash(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings *workspace.WarningReport) {
 	ctx := gatherCompletionContext(wsRoot, cfg, warnings)
 
 	allCommands := make([]string, 0, len(ctx.commands)+len(ctx.structured))

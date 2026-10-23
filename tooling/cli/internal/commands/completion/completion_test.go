@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1008,12 +1009,15 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 }
 
 func TestCompletionWarnsOnAnUnindexedWorkspace(t *testing.T) {
-	generators := map[string]func(w, warnings *bytes.Buffer, root string){
-		"bash": func(w, warnings *bytes.Buffer, root string) { CompletionBash(w, root, &wsproto.Config{}, warnings) },
-		"zsh":  func(w, warnings *bytes.Buffer, root string) { CompletionZsh(w, root, &wsproto.Config{}, warnings) },
-		"fish": func(w, warnings *bytes.Buffer, root string) { CompletionFish(w, root, &wsproto.Config{}, warnings) },
+	scripts := map[string]func(io.Writer, string, *wsproto.Config, *workspace.WarningReport){
+		"bash": CompletionBash,
+		"zsh":  CompletionZsh,
+		"fish": CompletionFish,
 	}
-	for shell, generate := range generators {
+	for shell, script := range scripts {
+		generate := func(w, warnings *bytes.Buffer, root string) {
+			script(w, root, &wsproto.Config{}, workspace.NewWarningReport(warnings))
+		}
 		t.Run(shell, func(t *testing.T) {
 			root := sharedtest.UnindexedWorkspace(t)
 			var script, warnings bytes.Buffer

@@ -619,6 +619,12 @@
         "error": {
           "$ref": "#/$defs/resultError",
           "description": "Present exactly when status is not \"success\". An aborted run carries code \"signal\"."
+        },
+        "workspaceWarnings": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/workspaceWarning" },
+          "description": "The non-fatal warnings the command's workspace load recorded, in load order: the same warnings the command writes to stderr. Optional and additive: absent when the load recorded none or the command loads no workspace, never an empty array. Allowed beside any status. Unrelated to the per-task diagnostic warning counts of a run."
         }
       },
       "allOf": [
@@ -656,6 +662,24 @@
           }
         }
       ]
+    },
+    "workspaceWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "description": "One non-fatal warning a workspace load recorded. A reader branches on code, never on message.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable machine reason, e.g. \"workspace.provider_view_unavailable\". The set is open: a reader ignores a code it does not know."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable warning, the text the command also writes to stderr."
+        }
+      }
     },
     "machineOutputBudget": {
       "type": "object",

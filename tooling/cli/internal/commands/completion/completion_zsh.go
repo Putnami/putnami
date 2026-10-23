@@ -7,10 +7,11 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // CompletionZsh generates a zsh completion script.
-func CompletionZsh(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings io.Writer) {
+func CompletionZsh(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings *workspace.WarningReport) {
 	ctx := gatherCompletionContext(wsRoot, cfg, warnings)
 
 	iox.Fprintf(w, `#compdef putnami

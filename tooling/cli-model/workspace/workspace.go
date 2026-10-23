@@ -21,18 +21,36 @@ const (
 	// WarningCodeProviderViewUnavailable means provider-derived project identity
 	// or dependency edges could not be adopted and are therefore incomplete.
 	WarningCodeProviderViewUnavailable WarningCode = "workspace.provider_view_unavailable"
+	// WarningCodeProbeViewRejected means a fresh probe answer was refused and
+	// the previously resolved identity is kept.
+	WarningCodeProbeViewRejected WarningCode = "workspace.probe_view_rejected"
+	// WarningCodeIndexUnreadable means the recorded workspace index could not
+	// be read and is treated as absent.
+	WarningCodeIndexUnreadable WarningCode = "workspace.index_unreadable"
+	// WarningCodeNameDivergence means a project manifest spells the project
+	// differently from the name the workspace resolved for it.
+	WarningCodeNameDivergence WarningCode = "workspace.name_divergence"
+	// WarningCodeJobsIgnored means a project declares `jobs`, which the
+	// workspace parses and ignores.
+	WarningCodeJobsIgnored WarningCode = "workspace.jobs_ignored"
 )
+
+// Warning is one non-fatal finding a workspace load recorded: its stable
+// machine code and its human message.
+type Warning struct {
+	Code    WarningCode
+	Message string
+}
 
 // Workspace represents a discovered workspace.
 type Workspace struct {
-	Name         string
-	Root         string
-	Config       *wsproto.Config
-	Projects     []*Project
-	Graph        *DependencyGraph
-	Warnings     []string            // non-fatal warnings detected during loading
-	WarningCodes []WarningCode       // stable meanings for warnings consumed by policy
-	ScopeIndex   *wsproto.ScopeIndex // aggregated aliases, groups and lines from all scopes
+	Name       string
+	Root       string
+	Config     *wsproto.Config
+	Projects   []*Project
+	Graph      *DependencyGraph
+	Warnings   []Warning           // non-fatal warnings detected during loading, in order
+	ScopeIndex *wsproto.ScopeIndex // aggregated aliases, groups and lines from all scopes
 	// Registries is the workspace's registry endpoints, one raw entry per
 	// ecosystem id. The entry's shape belongs to the ecosystem profile its
 	// extension declares, so core carries it without reading inside it.
@@ -74,15 +92,12 @@ func (ws *Workspace) ProjectPaths() []string {
 	return paths
 }
 
-// AddWarning appends human prose and, when provided, its stable machine code.
+// AddWarning records one warning: its stable machine code and its human prose.
 func (ws *Workspace) AddWarning(code WarningCode, message string) {
 	if ws == nil {
 		return
 	}
-	ws.Warnings = append(ws.Warnings, message)
-	if code != "" && !ws.HasWarningCode(code) {
-		ws.WarningCodes = append(ws.WarningCodes, code)
-	}
+	ws.Warnings = append(ws.Warnings, Warning{Code: code, Message: message})
 }
 
 // HasWarningCode reports whether workspace loading emitted a stable warning
@@ -91,12 +106,24 @@ func (ws *Workspace) HasWarningCode(code WarningCode) bool {
 	if ws == nil {
 		return false
 	}
-	for _, candidate := range ws.WarningCodes {
-		if candidate == code {
+	for _, warning := range ws.Warnings {
+		if warning.Code == code {
 			return true
 		}
 	}
 	return false
+}
+
+// WarningMessages returns the message of every recorded warning, in order.
+func (ws *Workspace) WarningMessages() []string {
+	if ws == nil || len(ws.Warnings) == 0 {
+		return nil
+	}
+	messages := make([]string, len(ws.Warnings))
+	for i, warning := range ws.Warnings {
+		messages[i] = warning.Message
+	}
+	return messages
 }
 
 // CanonicalRoot resolves a workspace root to its absolute, link-free form:

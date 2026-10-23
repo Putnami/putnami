@@ -95,7 +95,7 @@ func TestLoad_RecordedViewThatCannotBeAdoptedDegradesInsteadOfWedging(t *testing
 					"so this is the wedge: %v", err)
 			}
 
-			warning := strings.Join(reloaded.Warnings, "\n")
+			warning := strings.Join(reloaded.WarningMessages(), "\n")
 			if !strings.Contains(warning, view.reason) {
 				t.Errorf("warnings do not say WHY the index was rejected (%q):\n%s", view.reason, warning)
 			}
@@ -306,7 +306,7 @@ func TestSynchronize_NoBindingsReportsThatTheRecordedAnswersWereKept(t *testing.
 func TestLoad_WarnsWhenMembersHaveNoProviderView(t *testing.T) {
 	ws := syncFixture(t) // web/package.json and svc/go.mod, neither with a putnami.json
 
-	warning := strings.Join(ws.Warnings, "\n")
+	warning := strings.Join(ws.WarningMessages(), "\n")
 	if !strings.Contains(warning, WorkspaceIndexFilename) {
 		t.Fatalf("a workspace with no index and provider-only members warned nothing:\n%v", ws.Warnings)
 	}
@@ -332,7 +332,7 @@ func TestLoad_WarnsWhenMembersHaveNoProviderView(t *testing.T) {
 		t.Error("fully authored workspace received a false provider-view warning code")
 	}
 	for _, w := range core.Warnings {
-		if strings.Contains(w, WorkspaceIndexFilename) {
+		if strings.Contains(w.Message, WorkspaceIndexFilename) {
 			t.Errorf("a Putnami-only workspace was told its index is missing: %s", w)
 		}
 	}

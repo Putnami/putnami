@@ -162,7 +162,7 @@ func loadUncached(root string) (*Workspace, error) {
 	// accepted by the parser, so without this the operator's config silently does
 	// nothing.
 	if declaring := projectsDeclaringJobs(ws); len(declaring) > 0 {
-		ws.Warnings = append(ws.Warnings, fmt.Sprintf(
+		ws.AddWarning(WarningCodeJobsIgnored, fmt.Sprintf(
 			"%d project(s) (%s) declare `jobs` in %s, but project-level jobs are NOT implemented — "+
 				"the key is parsed and ignored; use `disable.jobs` to opt out of an extension-provided job, "+
 				"or `tasks` for per-project execution tuning",
@@ -188,7 +188,7 @@ func loadUncached(root string) (*Workspace, error) {
 	// unreachable.
 	snapshot, snapshotErr := LoadSnapshot(root)
 	if snapshotErr != nil {
-		ws.Warnings = append(ws.Warnings, fmt.Sprintf(
+		ws.AddWarning(WarningCodeIndexUnreadable, fmt.Sprintf(
 			"workspace index could not be read and will be rebuilt on the next `putnami projects sync`: %v", snapshotErr))
 	}
 	merged := mergeRecordedResults(snapshot, ws)
@@ -256,7 +256,9 @@ func loadUncached(root string) (*Workspace, error) {
 	// only problem is that it has never been probed. The run's probe phase
 	// reports the real divergences once it has an answer.
 	if len(merged) > 0 {
-		ws.Warnings = append(ws.Warnings, NameDivergences(ws)...)
+		for _, divergence := range NameDivergences(ws) {
+			ws.AddWarning(WarningCodeNameDivergence, divergence)
+		}
 	}
 
 	// Project names are identities: they key ProjectByName selection and the

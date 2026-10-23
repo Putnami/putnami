@@ -7,10 +7,11 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // CompletionFish generates a fish completion script.
-func CompletionFish(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings io.Writer) {
+func CompletionFish(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings *workspace.WarningReport) {
 	ctx := gatherCompletionContext(wsRoot, cfg, warnings)
 
 	iox.Fprintf(w, `# fish completion for putnami

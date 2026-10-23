@@ -739,6 +739,22 @@ type ResultV2 struct {
 	// Error is present exactly when Status is not StatusSuccess. An aborted run
 	// carries code "signal".
 	Error *ResultError `json:"error,omitempty"`
+	// WorkspaceWarnings are the non-fatal warnings the command's workspace load
+	// recorded, in the order it recorded them. Absent when the load recorded
+	// none or the command loads no workspace; never an empty array.
+	WorkspaceWarnings []WorkspaceWarning `json:"workspaceWarnings,omitempty"`
+}
+
+// WorkspaceWarning is one non-fatal warning a workspace load recorded. A reader
+// branches on Code, never on Message: the code is stable, the prose is not.
+type WorkspaceWarning struct {
+	// Code is the stable machine reason, for example
+	// "workspace.provider_view_unavailable". The set is open: a reader ignores
+	// a code it does not know.
+	Code string `json:"code"`
+	// Message is the human-readable warning, the text the command also writes
+	// to stderr.
+	Message string `json:"message"`
 }
 
 // SessionStreamRecord is one --output=jsonl line. Task/session variants are

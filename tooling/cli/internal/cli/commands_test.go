@@ -260,7 +260,7 @@ func TestWriteStructuredFailureHumanMode(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	err := protocolcli.WithNext(cmderr.ErrNoWorkspace, "putnami workspace init")
 
-	code := writeStructuredFailure(&out, &errBuf, protocolcli.OutputText, "projects list", err)
+	code := writeStructuredFailure(&out, &errBuf, protocolcli.OutputText, "projects list", err, nil)
 
 	if out.Len() != 0 {
 		t.Errorf("human mode wrote to stdout: %q", out.String())
@@ -291,7 +291,7 @@ func TestWriteStructuredFailureEmitsEnvelope(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	err := protocolcli.WithNext(cmderr.ErrNoWorkspace, "putnami workspace init")
 
-	code := writeStructuredFailure(&out, &errBuf, protocolcli.OutputJSONL, "projects list", err)
+	code := writeStructuredFailure(&out, &errBuf, protocolcli.OutputJSONL, "projects list", err, nil)
 
 	var result protocolcli.ResultV2
 	if e := json.Unmarshal(out.Bytes(), &result); e != nil {
@@ -336,7 +336,7 @@ func TestWriteStructuredFailureReportsAnInterruptAsAborted(t *testing.T) {
 	var out, errBuf bytes.Buffer
 
 	code := writeStructuredFailure(&out, &errBuf, protocolcli.OutputJSONL, "deps install",
-		protocolcli.ErrSignal)
+		protocolcli.ErrSignal, nil)
 
 	var result protocolcli.ResultV2
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {

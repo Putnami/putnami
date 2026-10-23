@@ -73,7 +73,7 @@ func (ws *Workspace) AdoptProbeView(merged map[string]wsproto.MergedProject) {
 		return
 	}
 	if err := ws.AdoptValidatedProbeView(merged); err != nil {
-		ws.Warnings = append(ws.Warnings, fmt.Sprintf(
+		ws.AddWarning(WarningCodeProbeViewRejected, fmt.Sprintf(
 			"workspace probe: %v; the reported view was NOT adopted and the previously resolved identity is kept", err))
 	}
 	// Name divergences are NOT appended here. Load already recorded the ones its

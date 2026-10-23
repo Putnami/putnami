@@ -19,9 +19,17 @@ type Workspace = model.Workspace
 // WarningCode is a stable machine-readable workspace warning reason.
 type WarningCode = model.WarningCode
 
-// WarningCodeProviderViewUnavailable marks an incomplete provider-derived
-// project identity and dependency view.
-const WarningCodeProviderViewUnavailable = model.WarningCodeProviderViewUnavailable
+// Warning is one non-fatal finding a workspace load recorded.
+type Warning = model.Warning
+
+// The stable workspace warning codes.
+const (
+	WarningCodeProviderViewUnavailable = model.WarningCodeProviderViewUnavailable
+	WarningCodeProbeViewRejected       = model.WarningCodeProbeViewRejected
+	WarningCodeIndexUnreadable         = model.WarningCodeIndexUnreadable
+	WarningCodeNameDivergence          = model.WarningCodeNameDivergence
+	WarningCodeJobsIgnored             = model.WarningCodeJobsIgnored
+)
 
 // Project represents a discovered project within a workspace.
 type Project = model.Project

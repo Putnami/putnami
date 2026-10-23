@@ -436,11 +436,11 @@ func TestLoad_WarnsOnIgnoredProjectJobs(t *testing.T) {
 
 	var warning string
 	for _, w := range ws.Warnings {
-		if strings.Contains(w, "`jobs`") {
+		if w.Code == WarningCodeJobsIgnored {
 			if warning != "" {
 				t.Fatalf("two projects declaring jobs produced two warnings, want one:\n%v", ws.Warnings)
 			}
-			warning = w
+			warning = w.Message
 		}
 	}
 	if warning == "" {
@@ -505,8 +505,8 @@ func TestLoad_WarnsOnEmptyProjectJobsBlock(t *testing.T) {
 
 	var warning string
 	for _, w := range ws.Warnings {
-		if strings.Contains(w, "`jobs`") {
-			warning = w
+		if w.Code == WarningCodeJobsIgnored {
+			warning = w.Message
 		}
 	}
 	if warning == "" {

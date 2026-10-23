@@ -388,6 +388,18 @@ func arrayOf(item check) check {
 	}
 }
 
+// nonEmptyArrayOf checks every element of an array that holds at least one: an
+// optional list with nothing to report is absent, never empty.
+func nonEmptyArrayOf(item check) check {
+	return func(v *validator, path string, value any) {
+		if items, ok := value.([]any); ok && len(items) == 0 {
+			v.add(ViolationInvalidValue, path)
+			return
+		}
+		arrayOf(item)(v, path, value)
+	}
+}
+
 // intMapValues checks an object whose values are all non-negative integers.
 func intMapValues(v *validator, path string, value any) {
 	obj, ok := value.(map[string]any)

@@ -62,7 +62,7 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 			if sub != "" {
 				cmdPath = cmd + " " + sub
 			}
-			return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err)
+			return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
 		}
 		return ExitSuccess
 	}
@@ -74,7 +74,7 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 	if c.rawMachineOutput {
 		if err := c.run(env); err != nil {
 			return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output),
-				commandmeta.CanonicalPath(cmd, sub), err)
+				commandmeta.CanonicalPath(cmd, sub), err, env.envelopeWarnings())
 		}
 		return ExitSuccess
 	}
@@ -90,7 +90,7 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 		cmdPath = cmd + " " + sub
 	}
 	if err != nil {
-		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err)
+		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
 	}
 	if envelope, ok := capturedResultEnvelope(captured); ok {
 		code, _ := protocolcli.WriteResultV2(os.Stdout, protocolcli.OutputMode(parsed.Global.Output), envelope)
@@ -98,10 +98,11 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 	}
 	data, err := structuredPayload(captured)
 	if err != nil {
-		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err)
+		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
 	}
-	code, writeErr := protocolcli.WriteResultV2(os.Stdout, protocolcli.OutputMode(parsed.Global.Output),
-		protocolcli.NewResultV2(cmdPath, data, nil))
+	result := protocolcli.NewResultV2(cmdPath, data, nil)
+	result.WorkspaceWarnings = env.envelopeWarnings()
+	code, writeErr := protocolcli.WriteResultV2(os.Stdout, protocolcli.OutputMode(parsed.Global.Output), result)
 	if writeErr != nil {
 		return code
 	}
@@ -175,19 +176,24 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 // emit a single object), so the envelope uses the selected structured mode just
 // as their success output does. In human mode it prints "putnami: <message>"
 // plus, when a suggestion is present, an indented "  Try: <next>" line to
-// stderr.
+// stderr. The envelope carries warnings, the workspace load warnings the
+// command reported before it failed, in workspaceWarnings.
 //
 // This is the single failure envelope of EVERY structured command, which is why
 // converting it (B1b) is what took the last versionless documents off the
 // CLI's stdout. One behavior follows from the v2 contract rather than from this
 // function: a signal-classified failure now reports status "aborted" with exit
 // code 130 instead of being folded into a plain failure.
-func writeStructuredFailure(stdout, stderr io.Writer, mode protocolcli.OutputMode, cmdPath string, err error) int {
+func writeStructuredFailure(stdout, stderr io.Writer, mode protocolcli.OutputMode, cmdPath string, err error,
+	warnings []protocolcli.WorkspaceWarning,
+) int {
 	if !mode.IsStructured() {
 		printCommandError(stderr, err)
 		return exitCodeForError(err)
 	}
-	code, _ := protocolcli.WriteResultV2(stdout, mode, protocolcli.NewResultV2(cmdPath, shared.ResultData(err), err))
+	result := protocolcli.NewResultV2(cmdPath, shared.ResultData(err), err)
+	result.WorkspaceWarnings = warnings
+	code, _ := protocolcli.WriteResultV2(stdout, mode, result)
 	iox.Fprintf(stderr, "putnami: %v\n", err)
 	return code
 }

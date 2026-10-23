@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
@@ -14,9 +13,9 @@ import (
 )
 
 // ProjectsTag manages project tags. The warnings workspace.Load recorded go to
-// warnings (nil writes none).
+// warnings (nil reports none).
 // Usage: projects tag <project> [tags] [--remove] [--set]
-func ProjectsTag(wsRoot string, cfg *wsproto.Config, args []string, warnings io.Writer) error {
+func ProjectsTag(wsRoot string, cfg *wsproto.Config, args []string, warnings *workspace.WarningReport) error {
 	if len(args) < 1 {
 		return cmderr.Usagef("project name required: projects tag <project> [tags] [--remove] [--set]")
 	}
@@ -42,7 +41,7 @@ func ProjectsTag(wsRoot string, cfg *wsproto.Config, args []string, warnings io.
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
-	workspace.WriteWarnings(warnings, ws)
+	warnings.Report(ws)
 
 	proj := ws.ProjectByName(projectName)
 	if proj == nil {
