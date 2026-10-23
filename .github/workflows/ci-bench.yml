@@ -15,8 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: put-cli-sampled, kind: put, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli --no-coverage' }
-          - { name: raw-cli-sampled, kind: raw, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: cli-cover, args: '' }
+          - { name: ab-cli, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'put-cli-race put-cli-norace raw-cli-race raw-cli-norace' }
+          - { name: ab-cli-rev, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'raw-cli-norace raw-cli-race put-cli-norace put-cli-race' }
+          - { name: ab-all, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'put-all-cov put-all-nocov' }
+          - { name: ab-all-rev, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'put-all-nocov put-all-cov' }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -68,10 +70,10 @@ jobs:
           GOCACHE="$RUNNER_TEMP/toolcache" go list -deps -test $(go list -m -f '{{.Path}}/...') > /dev/null || true
           go clean -cache
       - name: Install
-        if: matrix.kind == 'put'
+        if: matrix.kind != 'raw'
         run: /usr/bin/time -v -o "$RUNNER_TEMP/time-install.txt" ./putnamiw install
       - name: Cache off
-        if: matrix.kind == 'put'
+        if: matrix.kind != 'raw'
         run: |
           echo '{"enabled": false}' > .putnami/cache.json
       - name: Bench
@@ -85,7 +87,9 @@ jobs:
           $RUNNER_TEMP/bench-tools/.github/bench/sample.sh "$RUNNER_TEMP/out/sample" &
           SP=$!
           mkdir -p "$RUNNER_TEMP/out"
-          if [ "${{ matrix.kind }}" = raw ]; then
+          if [ "${{ matrix.kind }}" = ab ]; then
+            /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" $RUNNER_TEMP/bench-tools/.github/bench/ab.sh "$RUNNER_TEMP/out" $ARGS > "$RUNNER_TEMP/out/run.log" 2>&1
+          elif [ "${{ matrix.kind }}" = raw ]; then
             export GOCACHE="$RUNNER_TEMP/gocache-run"
             /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" $RUNNER_TEMP/bench-tools/.github/bench/raw.sh "$CMD" > "$RUNNER_TEMP/out/run.log" 2>&1
           else
@@ -104,5 +108,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench5-${{ matrix.name }}
+          name: bench6-${{ matrix.name }}
           path: ${{ runner.temp }}/out
