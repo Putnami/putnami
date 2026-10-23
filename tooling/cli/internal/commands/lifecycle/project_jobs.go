@@ -262,6 +262,7 @@ func runDepsEdit(ctx context.Context, wsRoot, editor, action string, edits []dep
 		Config:        wsproto.Load(wsRoot),
 		Job:           depsEditJob,
 		Params:        params,
+		DryRun:        dryRun,
 		Projects:      strings.Join(ids, ","),
 		Display:       env.Display,
 		OnAction:      env.OnAction,

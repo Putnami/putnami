@@ -255,7 +255,7 @@ func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*schedu
 			description = "Project setup completed (" + name + ")"
 		case "deps-edit":
 			description = "Dependencies edited (" + name + ")"
-			if dryRun, _ := req.Params["dry-run"].(bool); dryRun {
+			if req.DryRun {
 				description = "Dependency edit planned, no file changed (" + name + ")"
 			}
 		}

@@ -47,6 +47,9 @@ type WorkspaceJobRequest struct {
 	// Job is the workspace-level job name ("workspace-install", "deps-upgrade").
 	Job    string
 	Params map[string]any
+	// DryRun records that Params asks the job to write no file, so the
+	// completion line says nothing changed.
+	DryRun bool
 	// Projects selects the projects whose extensions run the job, as a
 	// --projects value: comma-separated project IDs for the project jobs of
 	// create and deps (project_jobs.go). Empty selects every project.

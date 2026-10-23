@@ -1419,11 +1419,8 @@ func TestLifecycleFinishPrintsAVisibleSummary(t *testing.T) {
 	edit := makeLiveTestJob("api", "deps-edit")
 	r, errOut := newTestRenderer(t, 140, edit)
 	r.lifecycleMode = true
-	plan := "Planned edit of api/go.mod:\n  + require example.com/lib v0.3.0"
-	summary := jobs.RawJobEvent{
-		Type: jobs.EventTypeSummary,
-		Data: map[string]any{"message": plan, "visibility": "always"},
-	}
+	plan := visibleDryRunPlan
+	summary := visibleDryRunPlanEvent()
 
 	r.JobStart(edit)
 	r.JobComplete(edit, &jobs.JobResult{Status: "success", Events: []jobs.RawJobEvent{summary}})

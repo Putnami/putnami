@@ -525,13 +525,13 @@ func TestReportWorkspaceJobActionsNamesTheProjectJobs(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		job    string
-		params map[string]any
+		dryRun bool
 		want   string
 	}{
-		{"workspace-install", nil, "Workspace setup completed (@acme/go)"},
-		{"project-setup", nil, "Project setup completed (@acme/go)"},
-		{"deps-edit", nil, "Dependencies edited (@acme/go)"},
-		{"deps-edit", map[string]any{"dry-run": true}, "Dependency edit planned, no file changed (@acme/go)"},
+		{"workspace-install", false, "Workspace setup completed (@acme/go)"},
+		{"project-setup", false, "Project setup completed (@acme/go)"},
+		{"deps-edit", false, "Dependencies edited (@acme/go)"},
+		{"deps-edit", true, "Dependency edit planned, no file changed (@acme/go)"},
 	} {
 		scheduled := &scheduler.ScheduledJob{
 			Project:   &workspace.Project{ID: "/api", Name: "api"},
@@ -541,13 +541,13 @@ func TestReportWorkspaceJobActionsNamesTheProjectJobs(t *testing.T) {
 		var got []string
 		reportWorkspaceJobActions(lifecycle.WorkspaceJobRequest{
 			Job:      tc.job,
-			Params:   tc.params,
+			DryRun:   tc.dryRun,
 			OnAction: func(action lifecycle.LifecycleAction) { got = append(got, action.Description) },
 		}, []*scheduler.ScheduledJob{scheduled}, map[string]*scheduler.JobResult{
 			scheduled.Key(): {Status: string(scheduler.TaskStatusSuccess)},
 		})
 		if len(got) != 1 || got[0] != tc.want {
-			t.Errorf("actions of %s with %v = %v, want [%s]", tc.job, tc.params, got, tc.want)
+			t.Errorf("actions of %s (dry run %t) = %v, want [%s]", tc.job, tc.dryRun, got, tc.want)
 		}
 	}
 }

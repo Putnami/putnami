@@ -431,8 +431,8 @@ func TestDepsAddAndRemoveForwardDryRunToTheDepsEditJob(t *testing.T) {
 		action, module string
 	}{{"add", "example.com/x@v1.2.3"}, {"remove", "example.com/y"}} {
 		params := `{"action":"` + want.action + `","dry-run":true,"edits":[{"modules":["` + want.module + `"],"path":"api","project":"api"}]}`
-		if got := paramsJSON(t, asked[i]); got != params {
-			t.Errorf("deps %s --dry-run params = %s, want %s", want.action, got, params)
+		if got := paramsJSON(t, asked[i]); got != params || !asked[i].DryRun {
+			t.Errorf("deps %s --dry-run params = %s (dry run %t), want %s (dry run)", want.action, got, asked[i].DryRun, params)
 		}
 	}
 }
