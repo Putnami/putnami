@@ -212,7 +212,10 @@ broke and is worth fixing on its own. It is scoped by `--impacted`, so a documen
 selects zero projects and passes having run nothing; the job summary prints the
 selected project and job counts so that case is visible. It runs when a pull
 request opens, reopens, receives a push, leaves draft, or changes its base
-branch. A title or body edit runs nothing.
+branch. A title or body edit runs nothing. A push to `main` runs the same job
+over every project, which keeps the caches that pull requests restore current:
+the toolchain and dependency cache, and the task duration history the scheduler
+reads to start the longest task first.
 
 The job publishes one service container: a `postgres:17-alpine` on port 6432,
 pulled from this repository's GitHub Container Registry (GHCR) with the run's

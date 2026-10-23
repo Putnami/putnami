@@ -32,9 +32,16 @@ name: Contributor CI (without credentials)
 # A stacked pull request retargeted to main after its parent merges otherwise
 # has no result and cannot merge. A title or body edit runs nothing: the job's
 # `if` skips it, and the concurrency group below keeps it from cancelling a run.
+#
+# A push to main gates every project. A pull request can read only the caches
+# of its own branch and of main, so this run is what keeps main's caches
+# current: the dependency cache and the task duration history every new pull
+# request starts from.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       scope:
@@ -52,9 +59,11 @@ permissions:
 
 # A title or body edit starts a workflow run whose job is skipped. That run takes
 # a group of its own, so it never cancels the gate running for the same ref.
+# A new push to a pull request cancels its previous run. On main, runs queue
+# instead, so a run of every merge can complete and save the caches.
 concurrency:
   group: contributor-ci-${{ (github.event.action == 'edited' && !github.event.changes.base) && format('edit-{0}', github.run_id) || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gate:
@@ -195,9 +204,24 @@ jobs:
           restore-keys: |
             putnami-${{ runner.os }}-
 
+      # .putnami/stats/tasks.json records how long each task ran. The scheduler
+      # reads it to start the longest task first. Without it, every task looks
+      # equally short: the CLI test suite, the longest task of a wide change,
+      # waited up to 12 minutes behind short tasks and then ran alone at the
+      # end. The file holds durations, never results, so it cannot change what
+      # the gate decides. It changes on every run, so each run saves it under a
+      # key of its own and restores the latest one.
+      - name: Restore task duration history
+        uses: actions/cache/restore@v4
+        with:
+          path: .putnami/stats
+          key: putnami-stats-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            putnami-stats-${{ runner.os }}-
+
       - name: Resolve the gate scope
         env:
-          SCOPE: ${{ inputs.scope || 'impacted' }}
+          SCOPE: ${{ github.event_name == 'push' && 'all' || inputs.scope || 'impacted' }}
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
@@ -322,3 +346,10 @@ jobs:
             ~/.bun/install/cache
             ~/.putnami/tools/go
           key: ${{ steps.dependency-cache.outputs.cache-primary-key }}
+
+      - name: Save task duration history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .putnami/stats
+          key: putnami-stats-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
