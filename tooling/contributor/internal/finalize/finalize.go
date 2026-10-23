@@ -265,8 +265,12 @@ func (f Finalizer) Run(ctx context.Context, opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := f.seedAndFind(ctx, &candidate); err != nil {
+	settled, err := f.seedAndFind(ctx, &candidate)
+	if err != nil {
 		return Result{}, err
+	}
+	if settled != nil {
+		return *settled, nil
 	}
 	return f.publish(ctx, &candidate)
 }

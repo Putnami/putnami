@@ -42,7 +42,7 @@ type Command struct {
 
 // Run runs the command with args, the flags after `change finalize`, and
 // returns the exit code: 2 for a usage error, 1 for a failure, 0 for a
-// published proposal.
+// published proposal or one the branch already merged.
 func (c Command) Run(ctx context.Context, args []string) int {
 	output := ""
 	if c.ContextFile != "" {
@@ -70,6 +70,10 @@ func (c Command) Run(ctx context.Context, args []string) int {
 		fmt.Fprintf(c.Stderr, "change finalize: %v\n", err)
 		return 1
 	}
+	merged := result.State == collab.ProposalStateMerged
+	if merged {
+		fmt.Fprintf(c.Stderr, "change finalize: proposal %s/%s is already merged; nothing was published\n", result.ProposalRef.Source, result.ProposalRef.ID)
+	}
 	if structuredOutput(output) {
 		data, err := json.Marshal(result)
 		if err != nil {
@@ -83,6 +87,9 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	fmt.Fprintf(c.Stdout, "PROPOSAL_REF=%s\n", ref)
 	if result.ProposalURL != "" {
 		fmt.Fprintf(c.Stdout, "PROPOSAL_URL=%s\n", result.ProposalURL)
+	}
+	if merged {
+		fmt.Fprintf(c.Stdout, "PROPOSAL_STATE=%s\n", result.State)
 	}
 	return 0
 }
