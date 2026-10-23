@@ -431,6 +431,14 @@ type Request struct {
 	// UNEXPORTED for the same reason preparation is: Engine.Run reads it
 	// itself, and nothing an adapter can set replaces it.
 	ancestry *AncestrySnapshot
+	// workspaceWarnings are the warnings the run's workspace load reported, in
+	// their result envelope shape: every result envelope the run writes carries
+	// them in workspaceWarnings, under --quiet too. Nil when the load reported
+	// none.
+	//
+	// UNEXPORTED for the same reason preparation is: the engine sets it when
+	// it loads the workspace, and nothing an adapter can set replaces it.
+	workspaceWarnings []protocolcli.WorkspaceWarning
 	// Stdout receives the notices the ENGINE itself prints on the human stdout
 	// stream: "No impacted projects found", "No projects matched", "No jobs
 	// matched", the --plan table, the auto-selection line, and a blocked

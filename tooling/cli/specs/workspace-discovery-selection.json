@@ -20,7 +20,7 @@
     },
     {
       "id": "project-inventory",
-      "text": "Project listing and description expose canonical identities, physical paths, tags, dependencies, dependents, extensions, and metadata from the same loaded workspace graph, and report the warnings that load recorded on stderr and, with their stable code, in the result envelope's workspaceWarnings."
+      "text": "Project listing and description expose canonical identities, physical paths, tags, dependencies, dependents, extensions, and metadata from the same loaded workspace graph, and report the warnings that load recorded on stderr and, with their stable code, in the result envelope's workspaceWarnings. A command that runs jobs carries the same member in its --output=json envelope, plan-only previews included."
     },
     {
       "id": "target-selection",

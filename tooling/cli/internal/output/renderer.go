@@ -34,6 +34,10 @@ type Config struct {
 	// The live renderer orders its command columns by it; the verbs it does
 	// not name follow in the renderer's fallback order.
 	VerbOrder []string
+	// WorkspaceWarnings are the warnings the run's workspace load reported.
+	// The --output=json envelope carries them in workspaceWarnings; no other
+	// renderer reads them.
+	WorkspaceWarnings []protocolcli.WorkspaceWarning
 
 	// Out and Err are the streams the selected renderer writes to. Nil means
 	// os.Stdout / os.Stderr, which is every terminal-shaped caller.
@@ -93,10 +97,9 @@ func NewRenderer(cfg Config) jobs.Renderer {
 	// internal/machine.
 	switch cfg.Output {
 	case "json":
-		if machineOutputMode(cfg) == protocolcli.MachineOutputModeNormal {
-			return newMachineV2Renderer(cfg.out(), cfg.Command, false)
-		}
-		return newMachineV2RendererMode(cfg.out(), cfg.Command, false, machineOutputMode(cfg))
+		renderer := newMachineV2RendererMode(cfg.out(), cfg.Command, false, machineOutputMode(cfg))
+		renderer.workspaceWarnings = cfg.WorkspaceWarnings
+		return renderer
 	case "jsonl":
 		if machineOutputMode(cfg) == protocolcli.MachineOutputModeNormal {
 			return newMachineV2Renderer(cfg.out(), cfg.Command, true)

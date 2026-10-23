@@ -1,8 +1,9 @@
 // Package workspacewarnings drives the structured workspace-reading commands
 // through the real CLI on a workspace with no index: each one reports the load
-// warning on stderr and in its result envelope's workspaceWarnings. These tests
-// swap the process streams and the working directory, so they run in their own
-// test binary.
+// warning on stderr and in its result envelope's workspaceWarnings. A command
+// that runs jobs does the same on a workspace that loads with a warning. These
+// tests swap the process streams and the working directory, so they run in
+// their own test binary.
 package workspacewarnings
 
 import (
@@ -107,10 +108,14 @@ func TestStructuredCommandsCarryWorkspaceLoadWarnings(t *testing.T) {
 
 	t.Run("projects list keeps its data payload", func(t *testing.T) {
 		root := sharedtest.UnindexedWorkspace(t)
-		_, envelope, _, _ := run(t, root, "projects", "list", "--output=json")
-		row, ok := envelope.Data.(map[string]any)
-		if !ok || row["id"] != "/web" {
-			t.Errorf("data = %#v, want the one project row", envelope.Data)
+		_, _, stdout, _ := run(t, root, "projects", "list", "--output=json")
+		var document struct {
+			Data struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &document); err != nil || document.Data.ID != "/web" {
+			t.Errorf("data does not hold the one project row (%v):\n%s", err, stdout)
 		}
 	})
 

@@ -70,7 +70,8 @@ func executionRenderer(
 		ServeMode:      isServeMode || isRunMode,
 		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
 		// The live view orders its command columns by the merged vocabulary.
-		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
+		VerbOrder:         extension.MergeVocabulary(extensions, nil).VerbNames(),
+		WorkspaceWarnings: req.workspaceWarnings,
 	})
 }
 

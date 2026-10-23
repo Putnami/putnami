@@ -69,7 +69,7 @@ func runProductionPreflight(req *Request, selectedProjects []*workspace.Project)
 	}
 	if req.Preflight == nil {
 		report := doctor.Report{Profile: doctor.ProfileProduction}
-		renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, errNoPreflightGate)
+		renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, errNoPreflightGate, req.workspaceWarnings)
 		return protocolcli.ExitCodeForError(errNoPreflightGate), true
 	}
 
@@ -80,7 +80,7 @@ func runProductionPreflight(req *Request, selectedProjects []*workspace.Project)
 		// execution proceed.
 		return ExitSuccess, false
 	}
-	renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, gateErr)
+	renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, gateErr, req.workspaceWarnings)
 	return protocolcli.ExitCodeForError(gateErr), true
 }
 
@@ -91,11 +91,15 @@ func runProductionPreflight(req *Request, selectedProjects []*workspace.Project)
 // agent gets the machine-readable findings — and echoes the message to stderr
 // for a watching human. In human mode it prints the blocking findings to stderr
 // as a pre-execution abort notice. Either way the build is aborted before any
-// job runs.
-func renderProductionPreflightFailure(stdout, stderr io.Writer, outputFormat string, report doctor.Report, gateErr error) {
+// job runs. The envelope carries warnings, the run's workspace load warnings,
+// in workspaceWarnings.
+func renderProductionPreflightFailure(stdout, stderr io.Writer, outputFormat string, report doctor.Report, gateErr error,
+	warnings []protocolcli.WorkspaceWarning,
+) {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		_, _ = protocolcli.WriteResultV2(stdout, protocolcli.OutputJSONL,
-			protocolcli.NewResultV2("doctor", report, gateErr))
+		result := protocolcli.NewResultV2("doctor", report, gateErr)
+		result.WorkspaceWarnings = warnings
+		_, _ = protocolcli.WriteResultV2(stdout, protocolcli.OutputJSONL, result)
 		iox.Fprintf(stderr, "putnami: %v\n", gateErr)
 		return
 	}

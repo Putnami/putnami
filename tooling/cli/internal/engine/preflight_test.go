@@ -203,7 +203,7 @@ func TestRenderProductionPreflightFailure_StructuredCarriesReport(t *testing.T) 
 	}
 
 	var buf strings.Builder
-	renderProductionPreflightFailure(&buf, io.Discard, "jsonl", report, gateErr)
+	renderProductionPreflightFailure(&buf, io.Discard, "jsonl", report, gateErr, nil)
 	out := buf.String()
 	if n := strings.Count(strings.TrimSpace(out), "\n"); n != 0 {
 		t.Fatalf("structured render must be a single JSONL line, got %d newlines:\n%s", n, out)
@@ -237,7 +237,7 @@ func TestRenderProductionPreflightFailure_HumanListsBlockingFindings(t *testing.
 	}
 
 	var errBuf strings.Builder
-	renderProductionPreflightFailure(io.Discard, &errBuf, "", report, gateErr)
+	renderProductionPreflightFailure(io.Discard, &errBuf, "", report, gateErr, nil)
 	got := errBuf.String()
 	if !strings.Contains(got, string(doctor.CheckMissingRequiredConfig)) {
 		t.Errorf("human render must name the blocking check code, got:\n%s", got)
