@@ -347,14 +347,14 @@ func declaresFile(path string) *extension.TaskDeclaration {
 	}}
 }
 
-// A task-scoped project whose kept criteria command projects its spec criteria
-// keeps its verification command, whose reports those criteria are judged
-// against: the step that writes them, its predecessors, and the finalizer that
-// tears down its environment. The spec gate then reads the same reports a full
-// plan gives it. A project whose kept plan projects no criteria still drops
-// the tests its scope does not name, and so does a command of another kind.
-func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
+// A task-scoped project keeps its criteria commands, and a kept criteria
+// projection keeps no verification job the scope does not name: the spec gate
+// reads the report of a dropped verification job from that task's cache entry.
+// A scope that names the test keeps it, with the jobs it depends on and nothing
+// it is only ordered after.
+func TestNarrowToTaskScopes_AKeptSpecGateKeepsNoUnscopedTest(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-kept-spec-gate-keeps-no-unscoped-test")
 	sdd := &workspace.Project{ID: "/tooling/sdd-extension", Name: "@putnami/sdd", Path: "tooling/sdd-extension"}
 	http := &workspace.Project{ID: "/libs/http", Name: "http", Path: "libs/http"}
 	core := &workspace.Project{ID: "/libs/core", Name: "core", Path: "libs/core"}
@@ -377,32 +377,283 @@ func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 		}
 		return planned
 	}
-	planned := append(plan(http, true), plan(core, false)...)
-	sddTasks := []string{"/tooling/sdd-extension#validate~features", "/tooling/sdd-extension#validate~specs"}
-	scopes := map[string][]string{"/libs/http": sddTasks, "/libs/core": sddTasks}
-
-	var got []string
-	for _, job := range narrowToTaskScopes(ws, planned, scopes) {
-		got = append(got, job.Key())
+	narrow := func(scopes map[string][]string) []string {
+		var got []string
+		for _, job := range narrowToTaskScopes(ws, append(plan(http, true), plan(core, false)...), scopes) {
+			got = append(got, job.Key())
+		}
+		return got
 	}
-	want := []string{
-		"/libs/http:build~compile", "/libs/http:test~generate", "/libs/http:test~test", "/libs/http:test~test-env-teardown",
+
+	sddTasks := []string{"/tooling/sdd-extension#validate~features", "/tooling/sdd-extension#validate~specs"}
+	got := narrow(map[string][]string{"/libs/http": sddTasks, "/libs/core": sddTasks})
+	want := []string{"/libs/http:validate~features", "/libs/http:validate~specs", "/libs/core:validate~features"}
+	if !slices.Equal(got, want) {
+		t.Errorf("narrowed = %v, want %v: the spec gate keeps no test its scope does not name", got, want)
+	}
+
+	got = narrow(map[string][]string{"/libs/http": {"test~test"}, "/libs/core": sddTasks})
+	want = []string{
+		"/libs/http:build~compile", "/libs/http:test~generate", "/libs/http:test~test",
 		"/libs/http:validate~features", "/libs/http:validate~specs",
 		"/libs/core:validate~features",
 	}
 	if !slices.Equal(got, want) {
+		t.Errorf("narrowed = %v, want %v: a named test keeps the jobs it depends on", got, want)
+	}
+}
+
+// planFixtureLanguage writes manifest as the extension @fixture/lang, loads it
+// through the loader a run uses, and returns a workspace whose one project,
+// /lib, runs it, with a function that plans build, test and lint on it through
+// the planner a run uses.
+func planFixtureLanguage(t *testing.T, manifest string) (*workspace.Workspace, func() []*scheduler.ScheduledJob) {
+	t.Helper()
+	root := t.TempDir()
+	for rel, content := range map[string]string{"lib/a.src": "a\n", "lang/putnami.extension.json": manifest} {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := extension.LoadManifest(filepath.Join(root, "lang", "putnami.extension.json")); err != nil {
+		t.Fatalf("load the fixture manifest: %v", err)
+	}
+	ext := extension.LoadExtensionFromDir(filepath.Join(root, "lang"), "@fixture/lang")
+	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib", Extensions: []string{"@fixture/lang"}, Config: &wsproto.ProjectConfig{}}
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "scope"}, []*workspace.Project{lib})
+	ws.Graph = workspace.BuildGraph(ws.Projects)
+	return ws, func() []*scheduler.ScheduledJob {
+		t.Helper()
+		planned, err := planner.Plan(ws, []string{"build", "test", "lint"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("plan: %v", err)
+		}
+		return planned
+	}
+}
+
+// jobByKey returns the planned job key names, and fails the test when there is
+// none.
+func jobByKey(t *testing.T, planned []*scheduler.ScheduledJob, key string) *scheduler.ScheduledJob {
+	t.Helper()
+	for _, job := range planned {
+		if job.Key() == key {
+			return job
+		}
+	}
+	t.Fatalf("no job %s in %v", key, sortedJobKeys(planned))
+	return nil
+}
+
+// runsBefore maps each planned job to every job the plan orders before it,
+// through functional and write-serialization edges, however many hops away.
+func runsBefore(planned []*scheduler.ScheduledJob) map[string]map[string]bool {
+	byKey := make(map[string]*scheduler.ScheduledJob, len(planned))
+	for _, job := range planned {
+		byKey[job.Key()] = job
+	}
+	before := make(map[string]map[string]bool, len(planned))
+	for _, job := range planned {
+		seen := make(map[string]bool)
+		stack := slices.Clone(job.SchedulingPredecessors())
+		for len(stack) > 0 {
+			key := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			if predecessor := byKey[key]; predecessor != nil {
+				stack = append(stack, predecessor.SchedulingPredecessors()...)
+			}
+		}
+		before[job.Key()] = seen
+	}
+	return before
+}
+
+// A kept job keeps the jobs it depends on and none it is only serialized
+// after. The planner serializes a source writer such as a fixing linter after
+// every job that reads the sources, so a scope that names the lint steps runs
+// them without the build and the test. A kept job's ordering edge to a dropped
+// job becomes edges to the kept jobs that dropped job waits for, here none, and
+// the narrowed plan validates. The manifest goes through the loader and the
+// planner a run uses, so the edges are the ones a run plans.
+func TestNarrowToTaskScopes_AKeptJobKeepsNoJobItIsOnlySerializedAfter(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-scope-keeps-functional-predecessors-only")
+	ws, plan := planFixtureLanguage(t, `{"name":"@fixture/lang","version":"1.0.0","cliContract":4,"commands":{`+
+		`"build":{"run":[{"id":"compile","task":"compile"}]},`+
+		`"test":{"run":[{"id":"test","task":"test"}]},`+
+		`"lint":{"run":[{"id":"fix","task":"fix"},{"id":"check","task":"check","dependsOn":["fix"]}]}},`+
+		`"tasks":{`+
+		`"compile":{"kind":"command","command":"fixture","cache":false,"reads":["sources"]},`+
+		`"test":{"kind":"command","command":"fixture","cache":false,"reads":["sources"]},`+
+		`"fix":{"kind":"command","command":"fixture","cache":false,"writes":["sources"]},`+
+		`"check":{"kind":"command","command":"fixture","cache":false,"reads":["sources"]}}}`)
+	// The planner orders the source writer after both readers that precede it.
+	if got := jobByKey(t, plan(), "/lib:lint~fix").SerializeAfter; !slices.Equal(got, []string{"/lib:build~compile", "/lib:test~test"}) {
+		t.Fatalf("lint~fix is serialized after %v, want the compile and the test that read the sources", got)
+	}
+
+	narrowed := narrowToTaskScopes(ws, plan(), map[string][]string{"/lib": {"lint~fix", "lint~check"}})
+	if got, want := sortedJobKeys(narrowed), []string{"/lib:lint~check", "/lib:lint~fix"}; !slices.Equal(got, want) {
+		t.Fatalf("narrowed = %v, want %v: lint is only serialized after the compile and the test", got, want)
+	}
+	if got := jobByKey(t, narrowed, "/lib:lint~fix").SerializeAfter; len(got) != 0 {
+		t.Errorf("lint~fix is serialized after %v, which the narrowed plan dropped", got)
+	}
+	if err := planner.ValidatePlanDAG(narrowed); err != nil {
+		t.Errorf("the narrowed plan does not validate: %v", err)
+	}
+
+	narrowed = narrowToTaskScopes(ws, plan(), map[string][]string{"/lib": {"lint~fix", "build~compile"}})
+	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:lint~fix"}; !slices.Equal(got, want) {
 		t.Fatalf("narrowed = %v, want %v", got, want)
+	}
+	if got := jobByKey(t, narrowed, "/lib:lint~fix").SerializeAfter; !slices.Equal(got, []string{"/lib:build~compile"}) {
+		t.Errorf("lint~fix is serialized after %v, want the compile the plan kept and not the test it dropped", got)
+	}
+	if err := planner.ValidatePlanDAG(narrowed); err != nil {
+		t.Errorf("the narrowed plan does not validate: %v", err)
+	}
+}
+
+// For any two jobs a narrowed plan keeps, it orders them as the full plan
+// does: no order is lost with a job the scope drops, and none is added. The
+// check runs over every scope of a planned project with two source writers,
+// the readers between them, and the readers that derive from each, and the
+// narrowing leaves the full plan's jobs as the planner returned them.
+func TestNarrowToTaskScopes_KeepsTheOrderOfEveryPairOfKeptJobs(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-narrowed-plan-orders-its-jobs-as-the-full-plan-does")
+	ws, plan := planFixtureLanguage(t, `{"name":"@fixture/lang","version":"1.0.0","cliContract":4,"commands":{`+
+		`"build":{"run":[{"id":"generate","task":"generate"},{"id":"compile","task":"compile","dependsOn":["generate"]}]},`+
+		`"test":{"run":[{"id":"test","task":"test"}]},`+
+		`"lint":{"run":[{"id":"fix","task":"fix"},{"id":"check","task":"check","dependsOn":["fix"]}]}},`+
+		`"tasks":{`+
+		`"generate":{"kind":"command","command":"fixture","cache":false,"writes":["sources"]},`+
+		`"compile":{"kind":"command","command":"fixture","cache":false,"reads":["sources"]},`+
+		`"test":{"kind":"command","command":"fixture","cache":false,"reads":["sources"]},`+
+		`"fix":{"kind":"command","command":"fixture","cache":false,"writes":["sources"]},`+
+		`"check":{"kind":"command","command":"fixture","cache":false,"reads":["sources"]}}}`)
+	edges := func(planned []*scheduler.ScheduledJob) string {
+		var lines []string
+		for _, job := range planned {
+			lines = append(lines, job.Key()+" "+strings.Join(job.DependsOn, ",")+" | "+strings.Join(job.SerializeAfter, ","))
+		}
+		return strings.Join(lines, "\n")
+	}
+	full := plan()
+	fullEdges, fullBefore := edges(full), runsBefore(full)
+	tasks := []string{"build~generate", "build~compile", "test~test", "lint~fix", "lint~check"}
+	for subset := range 1 << len(tasks) {
+		var scope []string
+		for i, task := range tasks {
+			if subset&(1<<i) != 0 {
+				scope = append(scope, task)
+			}
+		}
+		input := plan()
+		narrowed := narrowToTaskScopes(ws, input, map[string][]string{"/lib": scope})
+		if got := edges(input); got != fullEdges {
+			t.Errorf("scope %v: the narrowing changed the planned jobs:\n%s\nwant\n%s", scope, got, fullEdges)
+		}
+		if err := planner.ValidatePlanDAG(narrowed); err != nil {
+			t.Errorf("scope %v: the narrowed plan does not validate: %v", scope, err)
+			continue
+		}
+		kept := make(map[string]bool, len(narrowed))
+		for _, job := range narrowed {
+			kept[job.Key()] = true
+		}
+		for key, before := range runsBefore(narrowed) {
+			for earlier := range fullBefore[key] {
+				if kept[earlier] && !before[earlier] {
+					t.Errorf("scope %v: %s runs before %s in the full plan and not in the narrowed one", scope, earlier, key)
+				}
+			}
+			for earlier := range before {
+				if !fullBefore[key][earlier] {
+					t.Errorf("scope %v: the narrowed plan orders %s before %s, which the full plan does not", scope, earlier, key)
+				}
+			}
+		}
+	}
+}
+
+// A job the scope drops can be the only link between two jobs it keeps. A
+// client's generator can wait for its provider's through dropped jobs. The
+// contract pass orders no client job after a provider job that already runs
+// after that client job, so the provider job's order can rest on a dropped job
+// alone. The narrowed plan keeps each such order with a direct edge to the
+// nearest kept job, walked through dropped jobs only, and adds no edge a
+// functional dependency already gives. The jobs the planner returned keep
+// their edges.
+func TestNarrowToTaskScopes_KeepsAnOrderThatRestsOnADroppedJob(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-narrowed-plan-orders-its-jobs-as-the-full-plan-does")
+	provider := &workspace.Project{ID: "/api", Name: "api", Path: "api"}
+	client := &workspace.Project{ID: "/client", Name: "client", Path: "client"}
+	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{provider, client})
+	providerGenerate := declaredJob(provider, "go/extension", "build", "generate", nil)
+	providerDescribe := declaredJob(provider, "go/extension", "build", "describe", nil, "/api:build~generate")
+	providerTest := declaredJob(provider, "go/extension", "test", "generate", nil)
+	providerTest.SerializeAfter = []string{"/api:build~describe"}
+	clientGenerate := declaredJob(client, "go/extension", "build", "generate", nil)
+	clientGenerate.SerializeAfter = []string{"/api:test~generate"}
+	clientCompile := declaredJob(client, "go/extension", "build", "compile", nil, "/api:build~generate", "/client:build~generate")
+	clientCompile.SerializeAfter = []string{"/api:test~generate"}
+	clientLint := declaredJob(client, "go/extension", "lint", "check", nil)
+	providerFix := declaredJob(provider, "go/extension", "lint", "fix", nil)
+	providerFix.SerializeAfter = []string{"/client:test~test"}
+	clientTest := declaredJob(client, "go/extension", "test", "test", nil)
+	clientTest.SerializeAfter = []string{"/client:lint~check"}
+	planned := []*scheduler.ScheduledJob{
+		providerGenerate, providerDescribe, providerTest, clientGenerate, clientCompile, clientLint, providerFix, clientTest,
+	}
+	scopes := map[string][]string{
+		"/api":    {"build~generate", "lint~fix"},
+		"/client": {"build~generate", "build~compile", "lint~check"},
+	}
+
+	narrowed := narrowToTaskScopes(ws, planned, scopes)
+	if got, want := sortedJobKeys(narrowed), []string{
+		"/api:build~generate", "/api:lint~fix", "/client:build~compile", "/client:build~generate", "/client:lint~check",
+	}; !slices.Equal(got, want) {
+		t.Fatalf("narrowed = %v, want %v", got, want)
+	}
+	for key, want := range map[string][]string{
+		// Two dropped jobs stood between the client's generator and the provider's.
+		"/client:build~generate": {"/api:build~generate"},
+		// The compile depends on the provider's generator, so it needs no edge to it.
+		"/client:build~compile": nil,
+		// The provider's writer ran after the client's lint through the client's test.
+		"/api:lint~fix": {"/client:lint~check"},
+	} {
+		if got := jobByKey(t, narrowed, key).SerializeAfter; !slices.Equal(got, want) {
+			t.Errorf("%s is serialized after %v, want %v", key, got, want)
+		}
+	}
+	if err := planner.ValidatePlanDAG(narrowed); err != nil {
+		t.Errorf("the narrowed plan does not validate: %v", err)
+	}
+	if !slices.Equal(clientGenerate.SerializeAfter, []string{"/api:test~generate"}) || !slices.Equal(providerFix.SerializeAfter, []string{"/client:test~test"}) {
+		t.Errorf("the narrowing changed a planned job's edges: %v, %v", clientGenerate.SerializeAfter, providerFix.SerializeAfter)
 	}
 }
 
 // The end-to-end shape of the spec gate rule: a change to the extension that
 // provides the spec gate reaches its consumers for that extension's tasks only,
-// and each consumer still runs the test that writes the verification report its
-// kept `validate~validate` is judged against. Each manifest declares its
-// command's kind, as a first-party manifest or the @putnami/dev vocabulary
-// does.
-func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
+// and each consumer runs its kept `validate~validate` and no test. Each
+// manifest declares its command's kind, as a first-party manifest or the
+// @putnami/dev vocabulary does.
+func TestRunStartsNoTestOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-kept-spec-gate-keeps-no-unscoped-test")
 	root := t.TempDir()
 	write := func(rel, content string) {
 		t.Helper()
@@ -461,9 +712,9 @@ func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
 		}
 	}
 	slices.Sort(started)
-	want := []string{"/app:test~test", "/app:validate~validate", "/lib:test~test", "/lib:validate~validate"}
+	want := []string{"/app:validate~validate", "/lib:validate~validate"}
 	if !slices.Equal(started, want) {
-		t.Errorf("tasks started = %v, want %v: each consumer's spec gate and the test it judges", started, want)
+		t.Errorf("tasks started = %v, want %v: each consumer's spec gate and no test", started, want)
 	}
 }
 

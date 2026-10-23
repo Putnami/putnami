@@ -238,6 +238,15 @@ provider's writer depends on already run before it, through the writer's
 dependencies, and the other client jobs wait. The check covers functional, write-serialization, and contract edges, so
 the plan stays a DAG.
 
+A skipped edge leaves the order to the path that already exists, and that path
+can pass through a job an `--impacted` task scope drops. A task scope keeps
+the jobs a kept job depends on, and never a job it is only serialized after.
+It replaces a kept job's serialize edge to a dropped job with edges to the
+kept jobs that the dropped job waits for, found through dropped jobs only, and
+leaves out an edge that duplicates a functional dependency. For any two kept
+jobs, the narrowed plan orders them as the full plan does, whichever pass
+added the edges.
+
 ### Cross-Command Shared Executions
 
 Several commands can schedule separate DAG nodes over the **same** manifest

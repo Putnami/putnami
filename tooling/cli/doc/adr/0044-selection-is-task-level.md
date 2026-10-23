@@ -6,6 +6,14 @@
 - **Scope**: `@putnami/cli-model` (`workspace.TraceChangeImpact`,
   `TaskImpactIndex`), `@putnami/cli` (`internal/workspace.NewTaskIndex`,
   `internal/engine` plan narrowing)
+- **Amended**: 2026-10-23, §3: an in-workspace extension's own manifest
+  keeps the project full unless the index confines its change to task and
+  step declarations; a confined change runs the steps it moved and the tasks
+  that read the manifest.
+- **Amended**: 2026-10-23, §5: a kept job keeps the jobs it depends on and
+  no job it is only serialized after, the narrowed plan orders any two kept
+  jobs as the full plan does, and a kept `validate` job keeps no `test` job
+  the scope does not name.
 
 ## Context
 
@@ -56,9 +64,17 @@ These claims are not task declarations:
 - a caller's own workspace-input pattern (watch);
 - a workspace-root entry a provider claimed through `watchedFiles` that no
   `from: "workspace"` input declares;
-- a file of an in-workspace extension project that no task reads. Its
-  `putnami.extension.json` is the task declaration, and an unattributed file
-  may be the runtime its consumers execute.
+- a file of an in-workspace extension project that no task reads, because
+  it may be the runtime its consumers execute;
+- the extension's own `putnami.extension.json`, unless the index confines its
+  change (`TaskImpactIndex.TasksOfManifestChange`). The index compares the
+  manifest the diff's base records with the working tree's, and confines a
+  change that differs only in task and step declarations to the steps it
+  moved. The extension then runs those steps beside the tasks that read the
+  manifest, and its consumers run those steps alone
+  ([ADR 0042](0042-impacted-plans-from-the-commit-and-records-why.md) §3).
+  The tasks that read the manifest propagate as any reader does, and do not
+  count as a runtime change.
 
 A task wrongly left out is a gate that never ran; one wrongly left in is a
 cache hit. The index errs wide.
@@ -81,10 +97,16 @@ something. `impacted` and `why_impacted` name the same scopes as the run.
 - A project reached twice runs the union. Full dominates, and an upgrade
   re-propagates.
 - `narrowToTaskScopes` keeps a job when its project is not task-scoped, when
-  the scope names its task, or when a kept job depends on or is serialized
-  after it, whichever extension owns it. The plan stays a closed DAG. It also
-  keeps a project's `test` jobs when a kept `validate` job of that project
-  projects the spec criteria judged against their verification reports.
+  the scope names its task, or when a kept job depends on it, whichever
+  extension owns it. The plan stays a closed DAG.
+- A write-serialization edge (`SerializeAfter`) orders two jobs and keeps
+  neither. A kept job's edge to a job the narrowing drops becomes edges to the
+  kept jobs that the dropped job waits for, found through dropped jobs only.
+  An edge that duplicates a functional dependency is left out. For any two
+  kept jobs, the narrowed plan orders them as the full plan does.
+- A kept `validate` job keeps no `test` job the scope does not name. The spec
+  gate reads that job's report from its cache entry, and a check no entry
+  answers warns ([ADR 0026](0026-spec-gate-evidence-scope.md) §5).
 - `publish`, `deploy`, `validate` and `validate-workspace` are never narrowed.
   The release-set coordinator decides release members, and the validate steps
   read session reports rather than files.

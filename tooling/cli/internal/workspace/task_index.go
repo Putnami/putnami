@@ -88,6 +88,13 @@ type taskIndex struct {
 	// extension-root-relative patterns its runtime is prepared from, test files
 	// excluded (ReadsAsExtensionRuntime).
 	runtimeInputs map[string][]string
+	// ownManifests holds the in-workspace extension projects whose loaded
+	// manifest is their own putnami.extension.json, with no pinned build
+	// replacing it (TasksOfManifestChange).
+	ownManifests map[string]bool
+	// baseline reads a manifest as the diff's base records it; nil reads
+	// nothing (WithManifestBaseline).
+	baseline ManifestBaseline
 }
 
 // indexedTask is one declared task scope, merged across every manifest that
@@ -140,6 +147,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		byExtension:       make(map[string][]string),
 		extensionProjects: make(map[string][]string),
 		runtimeInputs:     make(map[string][]string),
+		ownManifests:      make(map[string]bool),
 	}
 	// successors is the intra-project task graph: a task scope mapped to the
 	// task scopes of the same project that depend on it.
@@ -383,12 +391,15 @@ func (idx *taskIndex) buildClosure(successors map[string]map[string]bool) {
 // workspace-relative path is the project's path; names are not compared,
 // because a registry-installed extension can share a name with a project. A
 // pinned build that replaces a project's manifest of the same name binds that
-// project to the tasks the pinned build declares.
+// project to the tasks the pinned build declares, and the project then has no
+// own manifest: the file in its directory is not what its consumers run
+// (TasksOfManifestChange).
 func (idx *taskIndex) bindExtensionProjects(extensions []*extension.ExtensionDescription) {
 	byPath := make(map[string]string, len(idx.ws.Projects))
 	for _, p := range idx.ws.Projects {
 		byPath[cleanWorkspacePath(p.Path)] = p.ID
 	}
+	pinned := make(map[string]bool)
 	for _, ext := range extensions {
 		if ext == nil {
 			continue
@@ -404,6 +415,11 @@ func (idx *taskIndex) bindExtensionProjects(extensions []*extension.ExtensionDes
 		if !ok {
 			continue
 		}
+		if ext.RelPath == "" {
+			pinned[id] = true
+		} else {
+			idx.ownManifests[id] = true
+		}
 		scopes := append([]string(nil), idx.extensionProjects[id]...)
 		for _, scope := range idx.byExtension[declared] {
 			scopes = append(scopes, id+extensionScopeSeparator+scope)
@@ -412,6 +428,9 @@ func (idx *taskIndex) bindExtensionProjects(extensions []*extension.ExtensionDes
 		if ext.Runtime != nil && ext.Runtime.Prepare != nil && len(ext.Runtime.Prepare.Inputs) > 0 {
 			idx.runtimeInputs[id] = append(append([]string(nil), ext.Runtime.Prepare.Inputs...), "!**/*_test.go")
 		}
+	}
+	for id := range pinned {
+		delete(idx.ownManifests, id)
 	}
 }
 

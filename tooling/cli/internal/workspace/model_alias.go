@@ -142,7 +142,10 @@ type ImpactStep = model.ImpactStep
 // ImpactEdgeKind names the relation that put a project into the impacted set.
 type ImpactEdgeKind = model.ImpactEdgeKind
 
-// Re-exported impact seed and edge kinds.
+// ImpactEdgeCause names why an extension-consumer edge fired.
+type ImpactEdgeCause = model.ImpactEdgeCause
+
+// Re-exported impact seed and edge kinds, and extension-consumer edge causes.
 const (
 	ImpactSeedPathOwner         = model.ImpactSeedPathOwner
 	ImpactSeedRootWatchedFile   = model.ImpactSeedRootWatchedFile
@@ -152,6 +155,8 @@ const (
 	ImpactEdgeDependency        = model.ImpactEdgeDependency
 	ImpactEdgeExtensionConsumer = model.ImpactEdgeExtensionConsumer
 	ImpactEdgeContract          = model.ImpactEdgeContract
+	ImpactCauseRuntimeInput     = model.ImpactCauseRuntimeInput
+	ImpactCauseTaskDeclaration  = model.ImpactCauseTaskDeclaration
 )
 
 // ProjectsForChangedFiles maps changed workspace-relative paths onto every
