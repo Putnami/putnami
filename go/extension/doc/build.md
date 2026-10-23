@@ -263,6 +263,72 @@ converged tree, so the evidence a run leaves names the tree it leaves. See [Sour
 `test-exec` declares `**/*_test.go`, because it runs those files: excluding them
 there would serve a stored verdict for a test the run never executed.
 
+## Input resolution for go:embed
+
+The manifest lists `go-embed:build` and `go-embed:test` in
+`runtime.inputSelectors`. The extension expands them when it receives the
+`__putnami input-resolve` control call, run from the workspace root and
+answered before command dispatch. For each asked input, the answer lists the
+files the core's cache key reads for that selector, as project-relative slash
+paths, sorted:
+
+- every Go source the embed scan reads, and the regular referent of each Go
+  source link it reads; `go-embed:test` also reads `_test.go` sources
+- every file a `//go:embed` directive of those sources names
+- every Go source link the input's own patterns select, and its referent
+
+The answer also states a basis: the pattern sets whose digest
+(`InputBasisDigest`) the core records. While that digest is unchanged, a fresh
+answer equals the recorded one, so the core keeps it. The basis selects every
+path whose bytes, existence, kind or link target the answer read:
+
+| Set | Kind | What it covers |
+| --- | --- | --- |
+| `**/*.go` without ignored paths, and without `_test.go` for build | content | the sources the scan parses |
+| each link referent | content | the source a link resolves to |
+| `**/go.mod` in any letter case, without ignored paths | listing | the module boundaries the scan stops at |
+| the input's patterns | listing | the Go source links they select |
+| each directive with `/**`, and each proper prefix of it | listing | what a directive matches, and the paths it is resolved through |
+| each proper prefix of an input pattern, its literal names in any letter case | listing | the directories the core opens or lists to expand it |
+| the directories a referent is reached through | listing | the path of each referent |
+| the `go.mod` of each directory between the project and a listed file | listing | a nested module a listed file would cross |
+
+Ignored paths are those the scan skips: anything under `testdata` or `vendor`,
+and any name that starts with `.` or `_`. A path copied into the basis matches
+itself alone: `*`, `?` and `[` become `[*]`, `[?]` and `[[]`, and a leading `!`
+or `git:` starts with a one-character class.
+
+An input the basis cannot bind is an error answer; the other inputs of the
+call are answered. The answer is an error when:
+
+- the selector is not `go-embed:build` or `go-embed:test`
+- a pattern starts with `git:`, which selects from Git's candidate list
+- a pattern climbs out with `..`, or is not a clean relative slash path
+- a directive matches no file, or the core's own rules refuse a target or a
+  link
+- a listed path holds a backslash or is not valid UTF-8
+
+Some reads follow a link or a file system's spelling rules, which the digest
+does not see. Each one makes the input an error rather than an answer that
+could go stale under an unchanged digest:
+
+- a `go.mod` that is a link, in a directory the scan visits or between the
+  project and a listed file: the scan follows it
+- a link at a path a proper prefix of a directive matches: `filepath.Glob`
+  follows it
+- a link at a path a proper prefix of an input pattern without `**`
+  matches, or on the literal prefix of a `**` pattern
+- a glob metacharacter in the absolute directory of a package with
+  directives, or in the absolute project directory when an input pattern has
+  no `**`: `filepath.Glob` reads that directory as a pattern
+- a Go source link whose target names a directory and climbs out of it with
+  `..`: the scan resolves the link through that directory
+- a project directory that is a link, or not a directory
+- a name opened in another letter case than the one on disk, on a
+  case-insensitive file system: the basis matches names exactly
+- a byte outside ASCII in the literal prefix of an input pattern: the basis
+  cannot list the Unicode spellings a file system resolves it to
+
 ## Execution Flow
 
 1. **Tidy** (unless `--skip-deps`):

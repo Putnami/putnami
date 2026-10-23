@@ -254,6 +254,10 @@
     {
       "id": "the-packager-refuses-a-nameless-manifest",
       "text": "The Go archive packager refuses to publish an extension manifest without a name, a hook-only one included, before it stamps a contract, and leaves the staged manifest as staged."
+    },
+    {
+      "id": "go-answers-its-input-selectors",
+      "text": "The Go extension answers `__putnami input-resolve` for go-embed:build and go-embed:test before command dispatch. Each answer lists the files the core's cache key reads: the Go sources the embed scan reads, the files their //go:embed directives name, and each selected Go source link with its referent. Its basis selects every path the answer read, so an unchanged basis digest keeps the answer exact. A read the digest cannot see, an unknown selector, and a git: or ../ pattern make the input an error."
     }
   ],
   "decisions": [

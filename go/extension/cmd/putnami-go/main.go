@@ -200,6 +200,13 @@ func runEntrypoint(
 		}
 		return nil
 	}
+	// The input-resolve call is a control call of the same shape.
+	if handled, err := handleInputResolve(args, os.Stdin, stdout); handled {
+		if err != nil {
+			return fmt.Errorf("input-resolve: %w", err)
+		}
+		return nil
+	}
 	if len(args) > 0 && args[0] == mcpToolArg {
 		return runMCPTool(context.Background(), os.Stdin, stdout)
 	}

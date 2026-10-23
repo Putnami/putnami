@@ -971,6 +971,24 @@
               "the-go-packager-refuses-a-nameless-manifest"
             ]
           }
+        },
+        {
+          "id": "go-answers-its-input-selectors",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reserved-call-is-answered-before-command-dispatch",
+              "the-manifest-lists-both-selectors",
+              "the-files-are-the-cores-embed-selection",
+              "an-unchanged-basis-digest-keeps-the-answer-exact",
+              "a-read-the-digest-cannot-see-is-an-error-answer",
+              "an-invalid-selection-is-an-error-answer"
+            ]
+          }
         }
       ]
     },
