@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -58,9 +59,49 @@ func relativeSlashPaths(t *testing.T, root string, paths []string) []string {
 	return out
 }
 
+// listExpander answers each selector it maps with the files it maps it to,
+// relative to the directory, and refuses any other selector.
+type listExpander map[string][]string
+
+func (e listExpander) ExpandInput(dir, selector string) (InputExpansion, error) {
+	files, ok := e[selector]
+	if !ok {
+		return InputExpansion{}, fmt.Errorf("%w: no answer for %q", ErrInputSelector, selector)
+	}
+	return InputExpansion{Files: files}, nil
+}
+
+func (e listExpander) Identity() string {
+	selectors := make([]string, 0, len(e))
+	for selector, files := range e {
+		selectors = append(selectors, selector+"="+strings.Join(files, ","))
+	}
+	slices.Sort(selectors)
+	return strings.Join(selectors, ";")
+}
+
+// goEmbedAnswers are the files the Go extension answers for the selectors of
+// writeSelectorKeyTree: every file the key reads except testdata/helper.go,
+// a regular source in a directory the Go source scan skips, which only the
+// ordinary `**/*.go` glob selects. go/extension's
+// TestAnswerKeepsTheCoreKeyFixtureFiles pins the same lists against the
+// extension's own answer, so the two tests together pin the key a Go task
+// computes through the extension.
+var goEmbedAnswers = listExpander{
+	"go-embed:build": {
+		"alias.go", "assets/a.txt", "assets/sub/b.txt", "main.go", "shared/linked.txt",
+		"src/alias.txt", "static.txt", "testdata/linked.go",
+	},
+	"go-embed:test": {
+		"alias.go", "assets/a.txt", "assets/sub/b.txt", "main.go", "main_test.go", "shared/linked.txt",
+		"src/alias.txt", "static.txt", "testdata/fixture.txt", "testdata/linked.go",
+	},
+}
+
 // TestGoEmbedSelectorKeysArePinned pins, for the build and the test pattern
 // sets of the Go extension's source input, the files the key reads, the subset
-// it hashes as exact bytes, the file digest and the whole key.
+// it hashes as exact bytes, the file digest and the whole key, when the
+// extension answers its selectors with goEmbedAnswers.
 //
 // The file digest is sha256 over each file in path order: its slash path, NUL,
 // the 32 bytes of sha256 of its content, NUL; a link contributes its
@@ -70,22 +111,11 @@ func relativeSlashPaths(t *testing.T, root string, paths []string) []string {
 // the key of every Go task, a whole-cache miss for every user, so it is made on
 // purpose or not at all.
 func TestGoEmbedSelectorKeysArePinned(t *testing.T) {
-	buildFiles := []string{
-		"alias.go", "assets/a.txt", "assets/sub/b.txt", "main.go", "shared/linked.txt",
-		"src/alias.txt", "static.txt", "testdata/helper.go", "testdata/linked.go",
-	}
-	testFiles := []string{
-		"alias.go", "assets/a.txt", "assets/sub/b.txt", "main.go", "main_test.go", "shared/linked.txt",
-		"src/alias.txt", "static.txt", "testdata/fixture.txt", "testdata/helper.go", "testdata/linked.go",
-	}
-	withoutHelper := func(files []string) []string {
-		return slices.DeleteFunc(slices.Clone(files), func(file string) bool { return file == "testdata/helper.go" })
-	}
 	for _, tc := range []struct {
 		name     string
 		task     string
 		patterns []string
-		files    []string
+		selector string
 		digest   string
 		key      string
 	}{
@@ -93,7 +123,7 @@ func TestGoEmbedSelectorKeysArePinned(t *testing.T) {
 			name:     "build",
 			task:     "build~compile",
 			patterns: []string{"**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"},
-			files:    buildFiles,
+			selector: "go-embed:build",
 			digest:   "de2493cfa500958b1cf028b685e7a2c98b0210a1144f04d124fb22c8767c8cf0",
 			key:      "e22f071de14ad9d36783893fcbdcf7f03d17294852d67d11c016072c2a33f772",
 		},
@@ -101,26 +131,27 @@ func TestGoEmbedSelectorKeysArePinned(t *testing.T) {
 			name:     "test",
 			task:     "test~test",
 			patterns: []string{"**/*.go", "go-embed:test", "!**/.gen/**"},
-			files:    testFiles,
+			selector: "go-embed:test",
 			digest:   "6e78c44c9f6be19d29bb4fac08348ec498df8cce292f9d959a32d6c15a26fc10",
 			key:      "2f03900c9e17d39ffbe0c104d8c8af5db1ed27d06bb558db8731648493e56641",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := writeSelectorKeyTree(t)
-			selection, err := CollectKeyFileSelection(root, tc.patterns, GoEmbedExpander())
+			exact := goEmbedAnswers[tc.selector]
+			files := append(slices.Clone(exact), "testdata/helper.go")
+			slices.Sort(files)
+			selection, err := CollectKeyFileSelection(root, tc.patterns, goEmbedAnswers)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := relativeSlashPaths(t, root, selection.Files); !slices.Equal(got, tc.files) {
-				t.Errorf("files = %q, want %q", got, tc.files)
+			if got := relativeSlashPaths(t, root, selection.Files); !slices.Equal(got, files) {
+				t.Errorf("files = %q, want %q", got, files)
 			}
-			// Only the regular .go file in a directory the source scan skips is
-			// read through the ordinary glob alone.
-			if got, want := relativeSlashPaths(t, root, selection.GoEmbed), withoutHelper(tc.files); !slices.Equal(got, want) {
-				t.Errorf("exact-bytes files = %q, want %q", got, want)
+			if got := relativeSlashPaths(t, root, selection.Selected); !slices.Equal(got, exact) {
+				t.Errorf("exact-bytes files = %q, want %q", got, exact)
 			}
-			digest, err := hashFiles(root, tc.patterns, GoEmbedExpander(), ProjectConfigScope{})
+			digest, err := hashFiles(root, tc.patterns, goEmbedAnswers, ProjectConfigScope{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -133,7 +164,7 @@ func TestGoEmbedSelectorKeysArePinned(t *testing.T) {
 				Project:       "app",
 				ProjectRoot:   root,
 				FilePatterns:  tc.patterns,
-				InputExpander: GoEmbedExpander(),
+				InputExpander: goEmbedAnswers,
 			}
 			got, err := key.ComputeHashUsing(NewCacheManager(nil))
 			if err != nil {
@@ -146,27 +177,6 @@ func TestGoEmbedSelectorKeysArePinned(t *testing.T) {
 	}
 }
 
-// The go-embed expander answers with sorted, unique slash paths relative to
-// the directory: the referent of a link the scan reads and the same link
-// selected by a glob appear once.
-func TestGoEmbedExpanderListsRelativeSortedFiles(t *testing.T) {
-	root := writeSelectorKeyTree(t)
-	expansion, err := GoEmbedExpander().ExpandInput(root, "go-embed:build", []string{"**/*.go", "!**/*_test.go", "!**/.gen/**"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{
-		"alias.go", "assets/a.txt", "assets/sub/b.txt", "main.go", "shared/linked.txt",
-		"src/alias.txt", "static.txt", "testdata/linked.go",
-	}
-	if !slices.Equal(expansion.Files, want) {
-		t.Fatalf("expansion = %q, want %q", expansion.Files, want)
-	}
-	if _, err := GoEmbedExpander().ExpandInput(root, "go-embed:unknown", nil); !errors.Is(err, ErrInputSelector) {
-		t.Fatalf("unsupported selector = %v, want ErrInputSelector", err)
-	}
-}
-
 // recordingExpander answers every selector with files and err, and records
 // the directory and patterns each call receives.
 type recordingExpander struct {
@@ -175,14 +185,16 @@ type recordingExpander struct {
 	calls []string
 }
 
-func (e *recordingExpander) ExpandInput(dir, selector string, patterns []string) (InputExpansion, error) {
-	e.calls = append(e.calls, dir+"|"+selector+"|"+strings.Join(patterns, ","))
+func (e *recordingExpander) ExpandInput(dir, selector string) (InputExpansion, error) {
+	e.calls = append(e.calls, dir+"|"+selector)
 	return InputExpansion{Files: e.files}, e.err
 }
 
-// The collector asks the expander once per selector, with the other patterns
-// of the set, and hashes every file it lists as exact bytes: a project config
-// it lists keeps its tasks block, which a pattern alone reads without.
+func (e *recordingExpander) Identity() string { return "recording" }
+
+// The collector asks the expander once per selector a set names, and hashes
+// every file it lists as exact bytes: a project config it lists keeps its
+// tasks block, which a pattern alone reads without.
 func TestCollectorReadsTheExpansionAsExactBytes(t *testing.T) {
 	root := t.TempDir()
 	gitInputWrite(t, root, "src/a.txt", "a\n")
@@ -190,24 +202,21 @@ func TestCollectorReadsTheExpansionAsExactBytes(t *testing.T) {
 	config := filepath.Join(root, "putnami.json")
 	gitInputWrite(t, root, "putnami.json", `{"name":"app","tasks":{"a":1}}`)
 	expander := &recordingExpander{files: []string{"putnami.json"}}
-	patterns := []string{"src/*.txt", "go-embed:build", "!src/skip.txt", "go-embed:test"}
+	patterns := []string{"src/*.txt", "sel:build", "!src/skip.txt", "sel:test", "sel:build"}
 
 	selection, err := CollectKeyFileSelection(root, patterns, expander)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantCalls := []string{
-		root + "|go-embed:build|src/*.txt,!src/skip.txt",
-		root + "|go-embed:test|src/*.txt,!src/skip.txt",
-	}
+	wantCalls := []string{root + "|sel:build", root + "|sel:test"}
 	if !slices.Equal(expander.calls, wantCalls) {
 		t.Fatalf("expander calls = %q, want %q", expander.calls, wantCalls)
 	}
 	if got := relativeSlashPaths(t, root, selection.Files); !slices.Equal(got, []string{"putnami.json", "src/a.txt"}) {
 		t.Fatalf("files = %q", got)
 	}
-	if !slices.Equal(selection.GoEmbed, []string{config}) {
-		t.Fatalf("exact-bytes files = %q, want the listed config", selection.GoEmbed)
+	if !slices.Equal(selection.Selected, []string{config}) {
+		t.Fatalf("exact-bytes files = %q, want the listed config", selection.Selected)
 	}
 
 	named := []string{"src/*.txt", "putnami.json"}
@@ -239,7 +248,7 @@ func TestCollectorReadsTheExpansionAsExactBytes(t *testing.T) {
 func TestFailedExpansionIsAnInvalidInputSelection(t *testing.T) {
 	root := t.TempDir()
 	gitInputWrite(t, root, "main.go", "package main\n")
-	patterns := []string{"**/*.go", "go-embed:build"}
+	patterns := []string{"**/*.go", "sel:build"}
 	for _, tc := range []struct {
 		name     string
 		expander InputExpander

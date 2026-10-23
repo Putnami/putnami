@@ -155,7 +155,8 @@ func sourceInputDigest(
 			"task %q rewrites its sources but declares no keyed file patterns", job.JobDef.Name)
 	}
 	scope := cachekey.JobConfigScope(ws, job)
-	digest, err := cache.HashFiles(filepath.Join(ws.Root, job.Project.Path), patterns, store.GoEmbedExpander(), scope)
+	expander := cachekey.JobInputExpander(ws, job, commandParams, cache.InputResolver())
+	digest, err := cache.HashFiles(filepath.Join(ws.Root, job.Project.Path), patterns, expander, scope)
 	if err != nil {
 		return "", err
 	}
@@ -163,7 +164,7 @@ func sourceInputDigest(
 		return digest, nil
 	}
 	// The same whole-document rule the key applies to workspace patterns.
-	workspaceDigest, err := cache.HashFiles(ws.Root, workspacePatterns, store.GoEmbedExpander(),
+	workspaceDigest, err := cache.HashFiles(ws.Root, workspacePatterns, nil,
 		store.ProjectConfigScope{Verbatim: scope.Verbatim})
 	if err != nil {
 		return "", err
@@ -791,7 +792,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	s.cacheStats.RecordLocalKeys(keyStarted, time.Now())
 	if err != nil || hash == "" {
 		if err != nil && !errors.Is(err, store.ErrInputSelector) {
-			if semanticErr := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams, store.GoEmbedExpander()); semanticErr != nil {
+			if semanticErr := cachekey.ValidateUnkeyedInputSelectors(s.ws, job, s.commandParams, s.cache.InputResolver()); semanticErr != nil {
 				err = semanticErr
 			}
 		}

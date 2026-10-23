@@ -120,8 +120,9 @@ type RuntimeDefinition struct {
 	// for the files a task input that names one of them reads. Each is a
 	// selector name, `<scheme>:<name>` with a scheme other than `git`, of at
 	// most 128 bytes, named once, at most 16 of them; normalization sorts
-	// them. The member takes no CLI contract rung: a core that does not read
-	// it ignores it, and expands go-embed:build and go-embed:test itself.
+	// them. A task file pattern of this manifest that names a selector names
+	// one listed here. Listing one requires protocol/cli
+	// InputSelectorsContract.
 	InputSelectors []string `json:"inputSelectors,omitempty"`
 	// Prepare describes how to BUILD Executable from the extension's sources.
 	// Absent means the executable ships ready to run in each platform archive

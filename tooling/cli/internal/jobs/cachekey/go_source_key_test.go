@@ -1,13 +1,10 @@
 package cachekey
 
 import (
-	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
-	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -88,10 +85,13 @@ func newGoSourceKeyFixture(t *testing.T, taskName, jobName string, crossProjectE
 // keys returns the library's key and the app's key, computed the way
 // PrecomputeKeys computes them: the library first, its value folded into the
 // app's. Each call builds a fresh CacheManager so the per-session file-hash memo
-// cannot serve a digest from before the edit under test.
+// cannot serve a digest from before the edit under test. Its resolver answers
+// each Go input selector with no file: the fixture embeds nothing, and the Go
+// extension's own tests pin what its answers list.
 func (f *goSourceKeyFixture) keys(t *testing.T) (libKey, appKey string) {
 	t.Helper()
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(f.ws.Root, ".putnami", "store")))
+	cache.SetInputResolver(listingResolver(nil))
 	libKey, err := ComputeJobCacheHash(f.ws, f.lib, nil, nil, cache, nil)
 	if err != nil {
 		t.Fatalf("compute dependency cache key: %v", err)
@@ -101,185 +101,6 @@ func (f *goSourceKeyFixture) keys(t *testing.T) (libKey, appKey string) {
 		t.Fatalf("compute dependent cache key: %v", err)
 	}
 	return libKey, appKey
-}
-
-// An embedded asset is Go source input even when no .go byte changes. This
-// specifically prevents a cached describe from restoring an old migration
-// bundle after its SQL changed, and pins the dependent's ^describe edge.
-func TestGoDescribeKeyIncludesEmbeddedAssetOnlyEdit(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-key-includes-embedded-asset-only-edit")
-	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
-	writeTestFile(t, filepath.Join(fixture.libDir, "embed.go"), "package lib\nimport _ \"embed\"\n//go:embed migration.sql\nvar SQL string\n")
-	writeTestFile(t, filepath.Join(fixture.libDir, "migration.sql"), "SELECT 1;\n")
-	baseLib, baseApp := fixture.keys(t)
-	writeTestFile(t, filepath.Join(fixture.libDir, "migration.sql"), "SELECT 2;\n")
-	changedLib, changedApp := fixture.keys(t)
-	if changedLib == baseLib || changedApp == baseApp {
-		t.Fatalf("embedded asset edit did not move describe and dependent keys: %s/%s -> %s/%s", baseLib, baseApp, changedLib, changedApp)
-	}
-	writeTestFile(t, filepath.Join(fixture.libDir, "lib_test.go"), "package lib\nfunc TestNoop() {}\n")
-	stableLib, stableApp := fixture.keys(t)
-	if stableLib != changedLib || stableApp != changedApp {
-		t.Fatal("non-test describe key moved on test-only edit")
-	}
-}
-
-func TestGoDescribeKeyIncludesBuildableSubpackageEmbedBehindBlockComment(t *testing.T) {
-	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
-	writeTestFile(t, filepath.Join(fixture.libDir, "out", "p", "embed.go"), "/*\n//go:build ignore\n*/\npackage p\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
-	asset := filepath.Join(fixture.libDir, "out", "p", "payload.txt")
-	writeTestFile(t, asset, "A")
-	beforeLib, beforeApp := fixture.keys(t)
-	writeTestFile(t, asset, "B")
-	afterLib, afterApp := fixture.keys(t)
-	if beforeLib == afterLib || beforeApp == afterApp {
-		t.Fatalf("buildable out/p embed asset edit did not move library and dependent keys: %s/%s -> %s/%s", beforeLib, beforeApp, afterLib, afterApp)
-	}
-}
-
-func TestGoDescribeKeyIncludesLexicalSourceInOutSubpackage(t *testing.T) {
-	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
-	source := filepath.Join(fixture.libDir, "out", "p", "source.go")
-	writeTestFile(t, source, "package p\nconst Value = 1\n")
-	beforeLib, beforeApp := fixture.keys(t)
-	writeTestFile(t, source, "package p\nconst Value = 2\n")
-	afterLib, afterApp := fixture.keys(t)
-	if beforeLib == afterLib || beforeApp == afterApp {
-		t.Fatalf("out/p lexical source edit did not move library/dependent keys: %s/%s -> %s/%s", beforeLib, beforeApp, afterLib, afterApp)
-	}
-}
-
-func TestGoDescribeSourceSymlinkAssetEditMovesLibraryAndDependentKeys(t *testing.T) {
-	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", true)
-	writeTestFile(t, filepath.Join(fixture.libDir, ".source.txt"), "package lib\nimport _ \"embed\"\n//go:embed migration.sql\nvar SQL string\n")
-	if err := os.Symlink(".source.txt", filepath.Join(fixture.libDir, "embed.go")); err != nil {
-		t.Skipf("source-file symlinks unavailable: %v", err)
-	}
-	asset := filepath.Join(fixture.libDir, "migration.sql")
-	writeTestFile(t, asset, "SELECT 1;\n")
-	initialLib, initialApp := fixture.keys(t)
-	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(fixture.ws.Root, "source-link-cache")))
-	output := filepath.Join(fixture.ws.Root, "described")
-	writeTestFile(t, filepath.Join(output, "bundle.sql"), "SELECT 1;\n")
-	meta := &store.EntryMetadata{Extension: "@putnami/go", Task: "build-describe", Project: "lib"}
-	if err := cache.Save(initialLib, &store.EntryResult{Status: "success"}, meta, output); err != nil {
-		t.Fatal(err)
-	}
-	writeTestFile(t, asset, "SELECT 2;\n")
-	changedLib, changedApp := fixture.keys(t)
-	if changedLib == initialLib || changedApp == initialApp {
-		t.Fatalf("source-link asset edit left cache keys unchanged: lib %s/%s, app %s/%s", initialLib, changedLib, initialApp, changedApp)
-	}
-	if old, err := cache.Lookup(changedLib); err != nil || old != nil {
-		t.Fatalf("old bundle answered new key: %v, %v", old, err)
-	}
-	projection, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.lib}, nil, store.GoEmbedExpander())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Contains(projection.Tasks[0].Files, "lib/migration.sql") {
-		t.Fatalf("source-link asset absent from portable inputs: %v", projection.Tasks[0].Files)
-	}
-	if !slices.Contains(projection.Tasks[0].Files, "lib/.source.txt") {
-		t.Fatalf("source-link target absent from portable inputs: %v", projection.Tasks[0].Files)
-	}
-	if !slices.Contains(projection.Tasks[0].GoEmbedFiles, "lib/.source.txt") {
-		t.Fatalf("source-link target lost semantic provenance: %v", projection.Tasks[0].GoEmbedFiles)
-	}
-}
-
-func TestGoDescribeCachedOldBundleCannotRestoreAfterEmbeddedAssetEdit(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-cached-old-bundle-cannot-restore-after-embedded-asset-edit")
-	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", false)
-	writeTestFile(t, filepath.Join(fixture.appDir, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed migration.sql\nvar SQL string\n")
-	asset := filepath.Join(fixture.appDir, "migration.sql")
-	writeTestFile(t, asset, "SELECT 'A';\n")
-	// The app key is the one whose describe output owns the bundle.
-	_, keyA := fixture.keys(t)
-	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(fixture.ws.Root, "cache")))
-	output := filepath.Join(fixture.ws.Root, "describe-output")
-	writeTestFile(t, filepath.Join(output, "migration-bundle", "payload.sql"), "SELECT 'A';\n")
-	meta := &store.EntryMetadata{Extension: "@putnami/go", Task: "build-describe", Project: "app"}
-	if err := cache.Save(keyA, &store.EntryResult{Status: "success"}, meta, output); err != nil {
-		t.Fatal(err)
-	}
-	writeTestFile(t, asset, "SELECT 'B';\n")
-	_, keyB := fixture.keys(t)
-	if keyA == keyB {
-		t.Fatal("asset-only edit reused old describe identity")
-	}
-	if old, err := cache.Lookup(keyB); err != nil || old != nil {
-		t.Fatalf("A entry answered B key: %v, %v", old, err)
-	}
-	writeTestFile(t, filepath.Join(output, "migration-bundle", "payload.sql"), "SELECT 'B';\n")
-	if err := cache.Save(keyB, &store.EntryResult{Status: "success"}, meta, output); err != nil {
-		t.Fatal(err)
-	}
-	entry, err := cache.Lookup(keyB)
-	if err != nil || entry == nil {
-		t.Fatalf("B bundle not stored: %v", err)
-	}
-	restored := filepath.Join(fixture.ws.Root, "restored")
-	if _, err := cache.RestoreFiles(entry, restored); err != nil {
-		t.Fatal(err)
-	}
-	got, err := os.ReadFile(filepath.Join(restored, "migration-bundle", "payload.sql"))
-	if err != nil || string(got) != "SELECT 'B';\n" {
-		t.Fatalf("final described bundle = %q, %v", got, err)
-	}
-}
-
-func TestGoEmbedPortableInputsBindAssetAndFailOnDeletion(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-embed-portable-inputs-bind-asset-and-fail-on-deletion")
-	fixture := newGoSourceKeyFixture(t, "build-describe", "build~describe", false)
-	writeTestFile(t, filepath.Join(fixture.appDir, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed local.sql\nvar SQL string\n")
-	asset := filepath.Join(fixture.appDir, "local.sql")
-	writeTestFile(t, asset, "SELECT 1;\n")
-	projection, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.app}, nil, store.GoEmbedExpander())
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, file := range projection.Tasks[0].Files {
-		if file == "app/local.sql" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("embedded asset missing from portable binding: %v", projection.Tasks[0].Files)
-	}
-	if !slices.Contains(projection.Tasks[0].GoEmbedFiles, "app/local.sql") {
-		t.Fatalf("embedded asset lost semantic provenance: %v", projection.Tasks[0].GoEmbedFiles)
-	}
-	if err := os.Remove(asset); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := PortableInputs(fixture.ws, []*jobmodel.ScheduledJob{fixture.app}, nil, store.GoEmbedExpander()); err == nil {
-		t.Fatal("deleted embedded asset silently omitted from portable projection")
-	}
-}
-
-func TestGoTestOnlyEmbedDoesNotMoveBuildKey(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-test-only-embed-does-not-move-build-key")
-	build := newGoSourceKeyFixture(t, "build-compile", "build~compile", false)
-	writeTestFile(t, filepath.Join(build.appDir, "payload_test.go"), "package main\nimport _ \"embed\"\n//go:embed fixture.txt\nvar fixture string\n")
-	writeTestFile(t, filepath.Join(build.appDir, "fixture.txt"), "A")
-	_, before := build.keys(t)
-	writeTestFile(t, filepath.Join(build.appDir, "fixture.txt"), "B")
-	_, after := build.keys(t)
-	if before != after {
-		t.Fatal("build key read a test-only embed")
-	}
-
-	test := newGoSourceKeyFixture(t, "test-exec", "test~test", false)
-	writeTestFile(t, filepath.Join(test.appDir, "payload_test.go"), "package main\nimport _ \"embed\"\n//go:embed fixture.txt\nvar fixture string\n")
-	writeTestFile(t, filepath.Join(test.appDir, "fixture.txt"), "A")
-	_, testBefore := test.keys(t)
-	writeTestFile(t, filepath.Join(test.appDir, "fixture.txt"), "B")
-	_, testAfter := test.keys(t)
-	if testBefore == testAfter {
-		t.Fatal("test key omitted a test-only embed")
-	}
 }
 
 // TestGoDescribeKeyIgnoresADependencyTestFile pins the cross-project half of the
@@ -418,11 +239,10 @@ func TestGoBuildKeyIgnoresADependencyForeignOptions(t *testing.T) {
 }
 
 // A Go source key ignores the .go files under .gen: build-describe stages a
-// generated client there during the run, and no Go source task compiles it, so
-// it would otherwise move the key the run computed before describe ran. An
-// embed directive that names a file under .gen still binds it.
+// generated client there during the run, and the manifest's source inputs
+// exclude the tree, so it cannot move the key the run computed before
+// describe ran.
 func TestGoSourceKeyIgnoresGoFilesUnderTheGeneratedTree(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "go-generated-tree-sources", "go-source-key-ignores-go-files-under-the-generated-tree")
 	for _, task := range []struct{ name, job string }{{"build-compile", "build~compile"}, {"test-exec", "test~test"}} {
 		t.Run(task.name, func(t *testing.T) {
 			fixture := newGoSourceKeyFixture(t, task.name, task.job, false)
@@ -430,14 +250,6 @@ func TestGoSourceKeyIgnoresGoFilesUnderTheGeneratedTree(t *testing.T) {
 			writeTestFile(t, filepath.Join(fixture.appDir, ".gen", "clientgen", "go", "client.gen.go"), "package client\n")
 			if _, after := fixture.keys(t); after != before {
 				t.Fatal("a .go file under .gen moved the key")
-			}
-
-			writeTestFile(t, filepath.Join(fixture.appDir, "assets.go"), "package main\nimport _ \"embed\"\n//go:embed .gen/assets/security.txt\nvar asset string\n")
-			writeTestFile(t, filepath.Join(fixture.appDir, ".gen", "assets", "security.txt"), "A")
-			_, embedded := fixture.keys(t)
-			writeTestFile(t, filepath.Join(fixture.appDir, ".gen", "assets", "security.txt"), "B")
-			if _, edited := fixture.keys(t); edited == embedded {
-				t.Fatal("an edit to an embedded file under .gen left the key unmoved")
 			}
 		})
 	}

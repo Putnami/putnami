@@ -302,6 +302,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 		// A fresh manager each time: the memoized file hashes would otherwise
 		// hide the content change the key is supposed to see.
 		cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+		cache.SetInputResolver(noListedFiles{})
 		got, err := cachekey.SelectionFingerprints(ws, planned, params, cache, deploymentProfiles(t), routes, members)
 		if err != nil {
 			t.Fatalf("SelectionFingerprints: %v", err)
@@ -420,6 +421,7 @@ func TestARoutedImageKeepsTheDeploymentMemberKeyable(t *testing.T) {
 		releaseset.MemberKey("oci", "putnami/app"):            app,
 	}
 	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
+	cache.SetInputResolver(noListedFiles{})
 	fingerprints, err := cachekey.SelectionFingerprints(ws, planned, nil, cache, deploymentProfiles(t), routes, members)
 	if err != nil {
 		t.Fatalf("SelectionFingerprints: %v", err)
@@ -445,3 +447,13 @@ func pinInstalledTree(t *testing.T, ext *extension.ExtensionDescription) {
 	ext.Path = t.TempDir()
 	writeTestFile(t, filepath.Join(ext.Path, extension.ManifestFilename), string(manifest))
 }
+
+// noListedFiles answers every input selector with no file: the fixtures' Go
+// sources embed nothing, so the Go extension's answers list none.
+type noListedFiles struct{}
+
+func (noListedFiles) ResolveInput(store.InputQuery) (store.InputExpansion, error) {
+	return store.InputExpansion{}, nil
+}
+
+func (noListedFiles) PrimeInputs([]store.InputQuery) {}

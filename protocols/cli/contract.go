@@ -45,6 +45,16 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	14: the input selectors an extension expands (`runtime.inputSelectors`,
+//	   and a task file pattern that names one). From 14 on, the CLI asks the
+//	   extension that declares a task for the files each selector reads, through
+//	   `<executable> __putnami input-resolve`, and expands no selector itself.
+//	   A manifest that lists a selector or names one is stamped 14, and the
+//	   floor binds it from every origin: an older reader expands rung 6's two
+//	   selectors itself or not at all, so it must refuse the stamp. The rung
+//	   retires rung 6's meaning: a manifest stamped below 14 that names a
+//	   selector is refused, and its remedy is a build stamped 14 (`putnami
+//	   extensions update`). A manifest that names no selector keeps its stamp.
 //	13: ADDITIVE — the provisioned toolchain candidate (`"from":
 //	   "provisioned"` in a runtime toolchain's candidates). From 13 on, the
 //	   CLI downloads, verifies and unpacks the host platform's archive of
@@ -112,9 +122,11 @@ package cli
 //	     pattern itself is older than 7, but no manifest declared one on a
 //	     task before it; the floor makes a reader that keys the old meaning
 //	     refuse the manifest.
-//	6: ADDITIVE — go-embed:build and go-embed:test task file selectors.
-//	   Older readers would silently treat them as unmatched globs and
-//	   restore outputs against changed embedded bytes.
+//	6: ADDITIVE — go-embed:build and go-embed:test task file selectors,
+//	   which the CLI expanded itself. Older readers would silently treat them
+//	   as unmatched globs and restore outputs against changed embedded bytes.
+//	   Rung 14 retires the meaning: no reader from 14 on loads a manifest
+//	   stamped below 14 that names a selector.
 //	5: ADDITIVE — the agent-content contribution (`agentContent`): skills,
 //	   worker profiles, references and helpers with their host adapters,
 //	   bound by digest to the extension version that ships them. Only a
@@ -150,10 +162,6 @@ const CurrentContract = 4
 // predates it refuses the package instead of loading the extension without its
 // instructions.
 const AgentContentContract = 5
-
-// GoEmbedInputsContract is required only by manifests declaring Go embed
-// selectors. Older readers refuse its stamp before considering a cache hit.
-const GoEmbedInputsContract = 6
 
 // ReleaseBaselineInputContract is required only by manifests whose tasks
 // declare the releaseBaseline runtime input. Older readers refuse its stamp
@@ -208,7 +216,15 @@ const PublishChannelsContract = 12
 // refuses the stamp instead of resolving the toolchain without them.
 const ProvisionedToolchainContract = 13
 
+// InputSelectorsContract is required by a manifest that lists input selectors
+// in runtime.inputSelectors or whose task file pattern names one. A reader at
+// this contract asks the extension that declares a task for the files each
+// selector reads (the workspace protocol's input-resolve call) and expands no
+// selector itself, so an older reader refuses the stamp instead of keying the
+// task on files it lists by another rule.
+const InputSelectorsContract = 14
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ProvisionedToolchainContract
+const LatestContract = InputSelectorsContract

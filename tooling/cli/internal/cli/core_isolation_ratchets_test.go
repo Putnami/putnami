@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"go/ast"
+	"go/token"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -116,6 +119,30 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 			t.Errorf("allowlisted package %s no longer exists — it was deleted; remove the "+
 				"entry so the allowlist stays an inventory, not a graveyard", pkg)
 		}
+	}
+}
+
+// TestTheCoreExpandsNoInputSelector keeps input selectors extension-owned: the
+// extension that lists a selector in runtime.inputSelectors answers what it
+// reads, through the workspace protocol's input-resolve call, and the core
+// asks. No production file of the CLI imports the SDK's goembed reader, and no
+// string literal in one names a go-embed selector, so the core cannot expand
+// one by a rule of its own.
+func TestTheCoreExpandsNoInputSelector(t *testing.T) {
+	t.Parallel()
+	fset, files := moduleProductionASTs(t, moduleRoot(t))
+	for rel, file := range files {
+		for _, spec := range file.Imports {
+			if path, err := strconv.Unquote(spec.Path.Value); err == nil && path == "go.putnami.dev/sdk/extension/goembed" {
+				t.Errorf("%s imports %s: the Go extension expands its selectors; the core asks it", rel, path)
+			}
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			if lit, ok := node.(*ast.BasicLit); ok && lit.Kind == token.STRING && strings.Contains(lit.Value, "go-embed:") {
+				t.Errorf("%s:%d names %s: the core names no input selector", rel, fset.Position(lit.Pos()).Line, lit.Value)
+			}
+			return true
+		})
 	}
 }
 
@@ -520,7 +547,15 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // It starts the extensions' runtimes through the scheduler, which imports
 // internal/jobs/toolchain, so it cannot live there. It adds no vertical and no
 // engine stage.
-const internalPackageCountCeiling = 77
+//
+// RAISED 77 → 78: internal/jobs/inputresolve expands the input selectors a
+// run's keys and change impact read: it asks the extension that lists each
+// selector through the input-resolve call and keeps the answers while the
+// digest of their basis holds. It prepares an extension's runtime through the
+// scheduler, as toolchainpins does, so it cannot live in the store or the
+// workspace package, which the scheduler imports. It adds no vertical and no
+// engine stage.
+const internalPackageCountCeiling = 78
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

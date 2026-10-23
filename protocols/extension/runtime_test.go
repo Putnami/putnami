@@ -673,69 +673,6 @@ func TestNormalizeRuntime_SortsInputSelectors(t *testing.T) {
 	}
 }
 
-// runtime.inputSelectors is additive vocabulary inside the runtime section: it
-// adds no contract rung, so adding it alone leaves a manifest's contract as it
-// is, the negotiated loader keeps the go-embed rules it applies, and a core
-// that predates the member ignores it.
-func TestRuntimeInputSelectorsKeepTheManifestContract(t *testing.T) {
-	base := &Manifest{
-		Name:    "@putnami/go",
-		Tasks:   map[string]TaskDefinition{"build": {Kind: "command", Command: "{extensionRuntime}"}},
-		Runtime: &RuntimeDefinition{Executable: "bin/x"},
-	}
-	withSelectors := *base
-	runtime := *base.Runtime
-	runtime.InputSelectors = []string{"go-embed:build", "go-embed:test"}
-	withSelectors.Runtime = &runtime
-	if got, want := RequiredLoadContract(&withSelectors), RequiredLoadContract(base); got != want {
-		t.Errorf("RequiredLoadContract = %d with input selectors, %d without", got, want)
-	}
-	if got, want := RequiredCLIContract(&withSelectors), RequiredCLIContract(base); got != want {
-		t.Errorf("RequiredCLIContract = %d with input selectors, %d without", got, want)
-	}
-	if got, want := ManifestProtocolVersion(&withSelectors), ManifestProtocolVersion(base); got != want {
-		t.Errorf("ManifestProtocolVersion = %d with input selectors, %d without", got, want)
-	}
-
-	withSelectors.CLIContract = RequiredLoadContract(base)
-	data, err := json.Marshal(&withSelectors)
-	if err != nil {
-		t.Fatal(err)
-	}
-	loaded, err := NegotiateManifest(ManifestFilename, data)
-	if err != nil {
-		t.Fatalf("NegotiateManifest refused a manifest stamped at its contract: %v", err)
-	}
-	if want := []string{"go-embed:build", "go-embed:test"}; !reflect.DeepEqual(loaded.Runtime.InputSelectors, want) {
-		t.Errorf("loaded input selectors = %v, want %v", loaded.Runtime.InputSelectors, want)
-	}
-
-	// A listed selector does not widen what a task may name: the loader still
-	// refuses a go-embed selector it does not expand.
-	listed := withSelectors
-	listedRuntime := runtime
-	listedRuntime.InputSelectors = []string{"go-embed:other"}
-	listed.Runtime = &listedRuntime
-	listed.Tasks = map[string]TaskDefinition{"build": {Kind: "command", Command: "{extensionRuntime}", Inputs: map[string]TaskInputPort{
-		"sources": {From: TaskInputFromProject, Files: []string{"go-embed:other"}},
-	}}}
-	if data, err = json.Marshal(&listed); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NegotiateManifest(ManifestFilename, data); err == nil || !strings.Contains(err.Error(), "unsupported go embed selector") {
-		t.Errorf("NegotiateManifest = %v, want the unsupported go embed selector refused", err)
-	}
-
-	var older struct {
-		Runtime struct {
-			Executable string `json:"executable"`
-		} `json:"runtime"`
-	}
-	if err := json.Unmarshal(data, &older); err != nil || older.Runtime.Executable != "bin/x" {
-		t.Errorf("a reader that predates input selectors cannot read the runtime: %v", err)
-	}
-}
-
 // schemas/extension.json states the selector grammar and the bounds the
 // validator applies to runtime.inputSelectors.
 func TestRuntimeInputSelectorsSchemaAgreesWithTheValidator(t *testing.T) {

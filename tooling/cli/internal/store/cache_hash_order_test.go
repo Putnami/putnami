@@ -121,7 +121,7 @@ func TestHashFiles_FoldsSlashPathsInAbsoluteSlashOrder(t *testing.T) {
 		t.Fatalf("the structural expectation drifted from the golden: %s != %s", structural, golden)
 	}
 
-	got, err := hashFiles(dir, []string{"z.go", "a1", "sub/*.go", "../sibling/shared.txt", "a/b"}, GoEmbedExpander(), ProjectConfigScope{})
+	got, err := hashFiles(dir, []string{"z.go", "a1", "sub/*.go", "../sibling/shared.txt", "a/b"}, nil, ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}

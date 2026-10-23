@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/tooling/cli/internal/extension"
 
+	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -31,9 +31,34 @@ import (
 // direction: a task wrongly left out is a gate that never ran, one wrongly left
 // in is a cache hit.
 
+// InputSelectorQuery is one input selector a task names in one project: the
+// extension that lists it, the absolute project directory, the selector, and
+// the other file patterns of the task input that names it.
+type InputSelectorQuery struct {
+	Extension string
+	Dir       string
+	Selector  string
+	Patterns  []string
+}
+
+// InputSelectorMatcher answers which paths an input selector reads, through
+// the extension that lists it.
+type InputSelectorMatcher interface {
+	// SelectsInput reports whether the selector reads rel, a slash path
+	// relative to the query's directory: a file its expansion lists, or a path
+	// a set of its basis selects. A selector it cannot expand selects every
+	// path.
+	SelectsInput(query InputSelectorQuery, rel string) bool
+	// PrimeInputs asks each extension once for every query.
+	PrimeInputs(queries []InputSelectorQuery)
+}
+
 // taskIndex answers the task-level impact questions for one loaded workspace.
 type taskIndex struct {
 	ws *Workspace
+	// inputs expands the input selectors tasks name; nil selects every path
+	// for each of them.
+	inputs InputSelectorMatcher
 	// tasks holds one entry per declared task scope, keyed by `<command>~<step>`
 	// (or the command alone for a command with no pipeline).
 	tasks map[string]*indexedTask
@@ -82,20 +107,32 @@ type indexedTask struct {
 	// files it reads in EVERY project of its dependency closure, not only its
 	// own (closureScopePrefix).
 	closureFiles []string
+	// selectors are the input selectors the task's project inputs name, each
+	// with the extension that lists it and the other patterns of its input.
+	selectors []indexedSelector
 }
 
-// NewTaskIndex builds the index from the extensions a run loaded.
+// indexedSelector is one input selector a task names in a project input.
+type indexedSelector struct {
+	extension string
+	input     extproto.SelectorInput
+}
+
+// NewTaskIndex builds the index from the extensions a run loaded. inputs
+// expands the input selectors their tasks name; a nil matcher has each
+// selector select every path of a project.
 //
 // It returns a nil INTERFACE when no manifest declares a task, never a nil
 // pointer inside one: a caller that could not load the extensions must keep the
 // project-level behavior, and an index that answers "no task reads this" for
 // every path would select nothing at all.
-func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription) TaskImpactIndex {
+func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, inputs InputSelectorMatcher) TaskImpactIndex {
 	if ws == nil || len(extensions) == 0 {
 		return nil
 	}
 	idx := &taskIndex{
 		ws:                ws,
+		inputs:            inputs,
 		tasks:             make(map[string]*indexedTask),
 		closure:           make(map[string][]string),
 		reachedBy:         make(map[string][]string),
@@ -209,14 +246,14 @@ func (idx *taskIndex) addCommand(
 	if len(job.PipelineSteps) == 0 {
 		// A command with no pipeline is one job named after the command.
 		scope := command
-		idx.mergeTask(scope, command, job.FilePatterns, nil, nil)
+		idx.mergeTask(scope, command, job.FilePatterns, nil, nil, nil)
 		return []string{scope}
 	}
 	scopes := make([]string, 0, len(job.PipelineSteps))
 	for _, step := range job.PipelineSteps {
 		scope := taskScope(command, step.ID)
 		files, closureFiles, workspaceFiles := stepKeyPatterns(ext, step.Task)
-		idx.mergeTask(scope, command, append(files, job.FilePatterns...), closureFiles, workspaceFiles)
+		idx.mergeTask(scope, command, append(files, job.FilePatterns...), closureFiles, workspaceFiles, stepSelectors(ext, step.Task))
 		scopes = append(scopes, scope)
 		for _, dep := range step.DependsOn {
 			if upstream, ok := strings.CutPrefix(dep, "^"); ok {
@@ -266,7 +303,21 @@ func stepKeyPatterns(ext *extension.ExtensionDescription, taskName string) (file
 	return nil, nil, nil
 }
 
-func (idx *taskIndex) mergeTask(scope, command string, files, closureFiles, workspaceFiles []string) {
+// stepSelectors lists the input selectors a step's task names in its project
+// inputs, each with the extension that declares the task.
+func stepSelectors(ext *extension.ExtensionDescription, taskName string) []indexedSelector {
+	task, ok := ext.Tasks[taskName]
+	if !ok {
+		return nil
+	}
+	var selectors []indexedSelector
+	for _, input := range extproto.TaskSelectorInputs(task) {
+		selectors = append(selectors, indexedSelector{extension: ext.Name, input: input})
+	}
+	return selectors
+}
+
+func (idx *taskIndex) mergeTask(scope, command string, files, closureFiles, workspaceFiles []string, selectors []indexedSelector) {
 	task, known := idx.tasks[scope]
 	if !known {
 		task = &indexedTask{scope: scope, command: command}
@@ -275,6 +326,7 @@ func (idx *taskIndex) mergeTask(scope, command string, files, closureFiles, work
 	task.files = mergePatterns(task.files, files)
 	task.closureFiles = mergePatterns(task.closureFiles, closureFiles)
 	task.workspaceFiles = mergePatterns(task.workspaceFiles, workspaceFiles)
+	task.selectors = append(task.selectors, selectors...)
 }
 
 // buildClosure resolves the transitive intra-project successors of every task
@@ -422,16 +474,17 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	}
 	inProject := relative && !isParentRelative(rel)
 	reading := make(map[string]bool)
+	dir := filepath.Join(idx.ws.Root, project.Path)
 	for _, scope := range idx.every {
 		task := idx.tasks[scope]
-		if inProject && selectsTaskPath(filepath.Join(idx.ws.Root, project.Path), rel, task.files) {
+		if inProject && (wsproto.SelectsPath(rel, task.files) || idx.selectorsRead(task, dir, rel)) {
 			reading[scope] = true
-			if selectsTaskPath(filepath.Join(idx.ws.Root, project.Path), rel, task.closureFiles) {
+			if wsproto.SelectsPath(rel, task.closureFiles) {
 				reading[closureScopePrefix+scope] = true
 			}
 			continue
 		}
-		if selectsTaskPath(idx.ws.Root, lookup, task.workspaceFiles) {
+		if wsproto.SelectsPath(lookup, task.workspaceFiles) {
 			reading[scope] = true
 		}
 	}
@@ -449,23 +502,61 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	return idx.closureOf(sortedSet(reading))
 }
 
-// selectsTaskPath interprets semantic Go embed selectors alongside literal
-// globs. A deleted asset still matches its Go source directive. A scan error
-// widens impact rather than dropping a task; key computation later fails closed.
-func selectsTaskPath(root, relative string, patterns []string) bool {
-	if wsproto.SelectsPath(relative, patterns) {
-		return true
-	}
-	for _, pattern := range patterns {
-		if !goembed.IsSelector(pattern) {
-			continue
-		}
-		selected, err := goembed.SelectsPath(root, relative, pattern == goembed.TestSelector)
-		if err != nil || selected {
+// selectorsRead reports whether an input selector the task names reads rel in
+// the project directory dir. Without a matcher each selector reads every
+// path: a task wrongly left out is a gate that never ran.
+func (idx *taskIndex) selectorsRead(task *indexedTask, dir, rel string) bool {
+	for _, selector := range task.selectors {
+		if idx.inputs == nil || idx.inputs.SelectsInput(selectorQuery(selector, dir), rel) {
 			return true
 		}
 	}
 	return false
+}
+
+// PrimeChangedPaths asks the extensions once for every input selector the
+// tasks name in each project a changed path falls in, before the impact pass
+// reads them path by path.
+func (idx *taskIndex) PrimeChangedPaths(paths []string) {
+	if idx.inputs == nil {
+		return
+	}
+	projects := make(map[string]*Project)
+	for _, path := range paths {
+		for _, project := range ProjectOwnersForPath(idx.ws, filepath.ToSlash(filepath.Clean(path))) {
+			projects[project.ID] = project
+		}
+	}
+	var queries []InputSelectorQuery
+	for _, id := range sortedProjectIDs(projects) {
+		dir := filepath.Join(idx.ws.Root, projects[id].Path)
+		for _, scope := range idx.every {
+			for _, selector := range idx.tasks[scope].selectors {
+				queries = append(queries, selectorQuery(selector, dir))
+			}
+		}
+	}
+	if len(queries) > 0 {
+		idx.inputs.PrimeInputs(queries)
+	}
+}
+
+func selectorQuery(selector indexedSelector, dir string) InputSelectorQuery {
+	return InputSelectorQuery{
+		Extension: selector.extension,
+		Dir:       dir,
+		Selector:  selector.input.Selector,
+		Patterns:  selector.input.Patterns,
+	}
+}
+
+func sortedProjectIDs(projects map[string]*Project) []string {
+	ids := make([]string, 0, len(projects))
+	for id := range projects {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // TasksReachedFrom returns the tasks a dependent runs because the listed tasks

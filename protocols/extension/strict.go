@@ -1045,7 +1045,7 @@ func isExternalRef(ref string) bool {
 func FullValidateManifest(m *Manifest) []diag.Diagnostic {
 	diags := ValidateManifest(m)
 	if m != nil {
-		diags = append(diags, validateGoEmbedSelectors(m)...)
+		diags = append(diags, validateInputSelectors(m)...)
 	}
 	if diag.HasErrors(diags) {
 		return diags

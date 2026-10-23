@@ -411,6 +411,14 @@ handled, err := workspace.ServeInputResolve(os.Args[1:], os.Stdin, os.Stdout, an
   selects. An extension computes the same digest in its tests, to prove that
   its basis covers what it reads.
 
+The core asks from CLI contract 14 on (`protocol/cli`
+`InputSelectorsContract`): a manifest that lists or names a selector is
+stamped 14, and the core expands no selector itself. It keeps each answer for
+the length of its process, with the digest of its basis, and asks again for
+one input when that digest changes. A failed call, a rejected answer or an
+`error` answer fails every task that reads the input before cache restore or
+execution.
+
 Codes: `invalid-input-resolve-version` at `version`, `invalid-path` for a
 project or file that is not clean or leaves its root, `invalid-order` and
 `duplicate-value` for files, `unselected-file` for a file no basis set selects,
@@ -471,8 +479,7 @@ An extension answers `__putnami toolchain-resolve` for the lock identities its
 manifest lists in `runtime.resolves`, and `__putnami input-resolve` for the
 input selectors it lists in `runtime.inputSelectors`.
 
-**Consumers** — `@putnami/cli` reads every contract in this module except the
-input-resolve exchange:
+**Consumers** — `@putnami/cli` reads every contract in this module:
 
 | Consumer | Use |
 |----------|-----|
@@ -480,6 +487,7 @@ input-resolve exchange:
 | `tooling/cli/internal/extension` | Extension declarations, install and lock entries |
 | `tooling/cli/internal/jobs/planner`, `.../jobs/cachekey`, `.../engine` | Plan-time option resolution and project selection |
 | `tooling/cli/internal/watch` | Watched-file invalidation |
+| `tooling/cli/internal/jobs/inputresolve` | Input-resolve requests, answers and basis digests for the input selectors a task names |
 | `tooling/cli/internal/store` | Store tuning from workspace config |
 | `tooling/cli/internal/mcp`, `.../features`, `.../mapgen`, `.../hooks`, `.../cli` | Project identity, hooks, and generated views |
 
@@ -583,8 +591,7 @@ Evidence behind `stable`:
 - determinism tests over validation output, extension-name ordering, scope
   name-pattern resolution and agent-artifact canonical bytes;
 - three independent probe producers (Go, TypeScript and Python extensions)
-  and a consumer that reads every contract here except the input-resolve
-  exchange.
+  and a consumer that reads every contract here.
 
 ## Product feature and durable decisions
 

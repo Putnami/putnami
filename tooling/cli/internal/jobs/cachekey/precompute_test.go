@@ -132,12 +132,12 @@ func TestPrecomputeKeys_SkipsDisabledJobs(t *testing.T) {
 	}
 }
 
-func TestSelectionFingerprintsPropagateInvocationProducerGoEmbedInputs(t *testing.T) {
+// A selection fingerprint folds the input selectors of the producer whose
+// invocation-scoped resource a package job consumes: a listed file that is gone
+// fails it, and the file's bytes move it.
+func TestSelectionFingerprintsPropagateInvocationProducerSelectorInputs(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "library"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "library", "embed.go"), []byte("package library\nimport _ \"embed\"\n//go:embed missing.sql\nvar payload string\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	project := &workspace.Project{
@@ -150,11 +150,15 @@ func TestSelectionFingerprintsPropagateInvocationProducerGoEmbedInputs(t *testin
 	producer := cacheableJob("prepare", project.ID, project.Name, project.Path)
 	producer.Project = project
 	producer.JobDef.Cache = false
-	producer.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Files: []string{"go-embed:build"}}}
+	policy := &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Files: []string{"sel:build"}}}
+	producer.JobDef.TaskCachePolicy = policy
+	producer.Extension.Tasks["cacheable"] = extension.TaskDefinition{Cache: policy}
 	packageJob := packageTaskFixture(project, "test-provider", "1.0.0", t.TempDir())
 	planned := []*jobmodel.ScheduledJob{producer, packageJob}
+	resolver := listingResolver(map[string][]string{"library": {"missing.sql"}})
 	fingerprint := func() (string, error) {
 		cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
+		cache.SetInputResolver(resolver)
 		got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), memberRoute("test-provider", "npm"), members)
 		return got[memberKey], err
 	}
@@ -174,6 +178,9 @@ func TestSelectionFingerprintsPropagateInvocationProducerGoEmbedInputs(t *testin
 	withProducer, err := fingerprint()
 	if err != nil || withProducer == "" || withProducer == withoutProducer {
 		t.Fatalf("valid invocation producer selection fingerprint = %q (without producer %q), %v", withProducer, withoutProducer, err)
+	}
+	if len(resolver.primed) == 0 {
+		t.Fatal("selection fingerprints asked for the producer's selector without priming it")
 	}
 }
 

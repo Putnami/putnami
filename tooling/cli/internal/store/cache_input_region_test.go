@@ -61,8 +61,8 @@ func TestFileInputRegionBoundsEveryPatternShape(t *testing.T) {
 			misses:   []string{dir, at("a_test.go")},
 		},
 		{
-			name:     "a Go embed selector stays in the project",
-			patterns: []string{"go-embed:build"},
+			name:     "an input selector stays in the project",
+			patterns: []string{"sel:build"},
 			reaches:  []string{at("assets/logo.svg")},
 			misses:   []string{filepath.Join(ws, "apps", "api")},
 		},
@@ -206,7 +206,7 @@ func TestInvalidateFileHashesUnderDropsTheDigestsAWriteCanMove(t *testing.T) {
 	cm := NewCacheManager(nil)
 	digest := func(patterns ...string) string {
 		t.Helper()
-		hash, err := cm.HashFiles(dir, patterns, GoEmbedExpander(), ProjectConfigScope{})
+		hash, err := cm.HashFiles(dir, patterns, nil, ProjectConfigScope{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -255,11 +255,11 @@ func TestDigestSpanningAnInvalidationIsNotMemoized(t *testing.T) {
 		return hash, err
 	}
 
-	stale, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
+	stale, err := cm.HashFiles(dir, []string{".gen/**"}, nil, ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
+	fresh, err := cm.HashFiles(dir, []string{".gen/**"}, nil, ProjectConfigScope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,13 +299,13 @@ func TestDigestSpanningUnrelatedInvalidationsIsMemoizedWhileTheyAreRemembered(t 
 				return hash, err
 			}
 
-			first, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
+			first, err := cm.HashFiles(dir, []string{".gen/**"}, nil, ProjectConfigScope{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			// An edit no invalidation names: only a fresh computation sees it.
 			writeRegionFile(t, layer, "edited layer")
-			second, err := cm.HashFiles(dir, []string{".gen/**"}, GoEmbedExpander(), ProjectConfigScope{})
+			second, err := cm.HashFiles(dir, []string{".gen/**"}, nil, ProjectConfigScope{})
 			if err != nil {
 				t.Fatal(err)
 			}

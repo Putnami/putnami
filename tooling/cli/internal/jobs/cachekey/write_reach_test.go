@@ -1,10 +1,12 @@
 package cachekey
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -25,7 +27,7 @@ func TestFileSelectionReachesOnlyWhatItsPatternsSelect(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "proj")
 	at := func(rel string) string { return filepath.Join(dir, filepath.FromSlash(rel)) }
 	var scanner selectionScanner
-	selection := scanner.Select(dir, []string{"**/*.go", "!**/*_test.go", "!**/.gen/**", "go.mod"})
+	selection := scanner.Select(dir, []string{"**/*.go", "!**/*_test.go", "!**/.gen/**", "go.mod"}, nil)
 	cases := []struct {
 		name  string
 		write plannedWrite
@@ -55,76 +57,82 @@ func TestFileSelectionReachesOnlyWhatItsPatternsSelect(t *testing.T) {
 	}
 }
 
-// A Go embed selector reads the Go sources outside every directory the Go
-// tool skips and the files its embed directives name. A write elsewhere in
-// the project, under .gen included, does not reach it.
-func TestFileSelectionBoundsAGoEmbedSelectorByItsDirectives(t *testing.T) {
+// fixedExpander expands every selector to one expansion, or fails with err.
+type fixedExpander struct {
+	expansion store.InputExpansion
+	err       error
+}
+
+func (e fixedExpander) ExpandInput(string, string) (store.InputExpansion, error) {
+	return e.expansion, e.err
+}
+
+func (e fixedExpander) Identity() string { return fmt.Sprintf("%v|%v", e.expansion, e.err) }
+
+// An input selector reads the files its answer lists and depends on the paths
+// its basis selects. A write elsewhere in the project does not reach it, and
+// a write a content or a listing set of its basis selects can change the
+// answer.
+func TestFileSelectionBoundsASelectorByItsAnswerAndBasis(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "proj")
 	at := func(rel string) string { return filepath.Join(dir, filepath.FromSlash(rel)) }
-	writeSelectionFile(t, at("go.mod"), "module example.com/proj\n")
-	writeSelectionFile(t, at("version.go"), "package proj\nimport _ \"embed\"\n//go:embed .gen/version.json\nvar version []byte\n")
-	writeSelectionFile(t, at(".gen/version.json"), "{}")
+	writeSelectionFile(t, at("src/main.go"), "package proj\n")
+	writeSelectionFile(t, at("assets/a.txt"), "A")
+	expander := fixedExpander{expansion: store.InputExpansion{
+		Files: []string{"assets/a.txt", "src/main.go"},
+		Basis: wsproto.InputBasis{Content: [][]string{{"src/*.go", "!src/*_test.go"}}, Listing: [][]string{{"assets/*.txt"}}},
+	}}
 	var scanner selectionScanner
-	selection := scanner.Select(dir, []string{"go-embed:build"})
+	selection := scanner.Select(dir, []string{"sel:build"}, expander)
 	cases := []struct {
-		name       string
-		write      plannedWrite
-		reaches    bool
-		directives bool
+		name    string
+		write   plannedWrite
+		reaches bool
+		basis   bool
 	}{
-		{"a tree beside the embedded file", plannedWrite{Path: at(".gen/conf"), Tree: true}, false, false},
-		{"a file beside it", plannedWrite{Path: at(".gen/schema.json")}, false, false},
-		{"the embedded file", plannedWrite{Path: at(".gen/version.json")}, true, false},
-		{"a tree holding it", plannedWrite{Path: at(".gen"), Tree: true}, true, false},
-		{"a module file that can reject it", plannedWrite{Path: at(".gen/go.mod")}, true, true},
-		{"a new source", plannedWrite{Path: at("pkg/new.go")}, true, true},
-		{"a tree that can hold a source", plannedWrite{Path: at("pkg"), Tree: true}, true, true},
-		{"a file the scan ignores", plannedWrite{Path: at("testdata/x.go")}, false, false},
-		{"a file that is no source", plannedWrite{Path: at("README.md")}, false, false},
+		{"a tree no file or set holds", plannedWrite{Path: at("gen/conf"), Tree: true}, false, false},
+		{"a file beside the listed file", plannedWrite{Path: at("assets/b.json")}, false, false},
+		{"the listed file", plannedWrite{Path: at("assets/a.txt")}, true, true},
+		{"a file a listing set selects", plannedWrite{Path: at("assets/new.txt")}, true, true},
+		{"a tree holding the listed file", plannedWrite{Path: at("assets"), Tree: true}, true, true},
+		{"a file a content set selects", plannedWrite{Path: at("src/new.go")}, true, true},
+		{"a file a content set excludes", plannedWrite{Path: at("src/a_test.go")}, false, false},
+		{"a tree a content set can select in", plannedWrite{Path: at("src/pkg"), Tree: true}, true, true},
+		{"a file outside every set", plannedWrite{Path: at("README.md")}, false, false},
 	}
 	for _, testCase := range cases {
 		if got := selection.Reaches(testCase.write); got != testCase.reaches {
 			t.Errorf("%s: Reaches = %v, want %v", testCase.name, got, testCase.reaches)
 		}
-		if got := selection.ReachesDirectives(testCase.write); got != testCase.directives {
-			t.Errorf("%s: ReachesDirectives = %v, want %v", testCase.name, got, testCase.directives)
+		if got := selection.ReachesBasis(testCase.write); got != testCase.basis {
+			t.Errorf("%s: ReachesBasis = %v, want %v", testCase.name, got, testCase.basis)
 		}
 	}
-	if !selection.ReachesDirectivesIn(store.PathsRegion([]string{at("pkg")})) {
-		t.Error("a region in the project can change the directives")
+	if !selection.ReachesBasisIn(store.PathsRegion([]string{at("src")})) {
+		t.Error("a region in the project can change the basis")
+	}
+	failed := scanner.Select(filepath.Join(t.TempDir(), "failed"), []string{"sel:build"}, fixedExpander{err: store.ErrInputSelector})
+	write := plannedWrite{Path: filepath.Join(failed.dir, "README.md")}
+	if !failed.Reaches(write) || !failed.ReachesBasis(write) {
+		t.Error("a failed expansion is bounded by less than its region")
 	}
 }
 
 // A pattern set the selection cannot narrow is bounded by its region: no
-// pattern, a Git candidate pattern, and a Go embed selector whose sources
-// include a link or whose directives do not parse.
+// pattern, a Git candidate pattern, an excluded selector, and a selector that
+// does not expand.
 func TestFileSelectionKeepsTheRegionItCannotNarrow(t *testing.T) {
-	root := t.TempDir()
-	linked := filepath.Join(root, "linked")
-	writeSelectionFile(t, filepath.Join(linked, "shared.go.txt"), "package linked\n")
-	if err := os.Symlink("shared.go.txt", filepath.Join(linked, "a.go")); err != nil {
-		t.Fatal(err)
-	}
-	broken := filepath.Join(root, "broken")
-	writeSelectionFile(t, filepath.Join(broken, "a.go"), "package broken\nimport _ \"embed\"\n//go:embed ../escape\nvar x []byte\n")
-	plain := filepath.Join(root, "plain")
+	plain := filepath.Join(t.TempDir(), "plain")
 	var scanner selectionScanner
 	for name, selection := range map[string]fileSelection{
-		"no pattern":      scanner.Select(plain, nil),
-		"a git pattern":   scanner.Select(plain, []string{"git:**/*.go", "!**/.gen/**"}),
-		"a source link":   scanner.Select(linked, []string{"go-embed:build"}),
-		"a bad directive": scanner.Select(broken, []string{"go-embed:build"}),
-		"a region":        regionSelection(store.PathsRegion([]string{filepath.Join(plain, ".gen")})),
-		"an unknown kind": scanner.Select(plain, []string{"go-embed:other", "!**/.gen/**"}),
+		"no pattern":           scanner.Select(plain, nil, nil),
+		"a git pattern":        scanner.Select(plain, []string{"git:**/*.go", "!**/.gen/**"}, nil),
+		"an excluded selector": scanner.Select(plain, []string{"**/*.go", "!sel:build"}, nil),
+		"no expander":          scanner.Select(plain, []string{"sel:build", "!**/.gen/**"}, nil),
+		"a failed expansion":   scanner.Select(plain, []string{"sel:build"}, fixedExpander{err: store.ErrInputSelector}),
+		"a region":             regionSelection(store.PathsRegion([]string{filepath.Join(plain, ".gen")})),
 	} {
-		dir := plain
-		switch name {
-		case "a source link":
-			dir = linked
-		case "a bad directive":
-			dir = broken
-		}
-		if !selection.Reaches(plannedWrite{Path: filepath.Join(dir, ".gen", "conf"), Tree: true}) {
+		if !selection.Reaches(plannedWrite{Path: filepath.Join(plain, ".gen", "conf"), Tree: true}) {
 			t.Errorf("%s: a write in its region does not reach it", name)
 		}
 	}
@@ -150,7 +158,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 		var scanner selectionScanner
 		patterns := []string{"**/*.json", "!**/.gen/**"}
 		write := plannedWrite{Path: at(".gen/version.json")}
-		if scanner.Select(dir, patterns).Reaches(write) {
+		if scanner.Select(dir, patterns, nil).Reaches(write) {
 			t.Fatal("an excluded file reached a selection that reads no link")
 		}
 		if err := os.MkdirAll(at("src"), 0o755); err != nil {
@@ -160,7 +168,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 			t.Skipf("symlinks unavailable: %v", err)
 		}
 		var fresh selectionScanner
-		if !fresh.Select(dir, patterns).Reaches(write) {
+		if !fresh.Select(dir, patterns, nil).Reaches(write) {
 			t.Fatal("a write to the target of a selected link did not reach the selection")
 		}
 	})
@@ -168,10 +176,10 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 	t.Run("a literal segment in another case", func(t *testing.T) {
 		fixture(t)
 		var scanner selectionScanner
-		if !scanner.Select(dir, []string{"Config/*.yaml"}).Reaches(plannedWrite{Path: at("config/app.json")}) {
+		if !scanner.Select(dir, []string{"Config/*.yaml"}, nil).Reaches(plannedWrite{Path: at("config/app.json")}) {
 			t.Fatal("a write that spells the pattern's literal segment in another case was decided by pattern")
 		}
-		if scanner.Select(dir, []string{"Config/*.yaml"}).Reaches(plannedWrite{Path: at("Config/app.json")}) {
+		if scanner.Select(dir, []string{"Config/*.yaml"}, nil).Reaches(plannedWrite{Path: at("Config/app.json")}) {
 			t.Fatal("a write spelled as the pattern is, that the pattern does not match, reached the selection")
 		}
 	})
@@ -182,7 +190,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 		write := plannedWrite{Path: at("config/new.json")}
 		_, err := os.Lstat(at("config"))
 		caseInsensitive := err == nil
-		if got := scanner.Select(dir, []string{"**/*.json", "!config/**"}).Reaches(write); got != caseInsensitive {
+		if got := scanner.Select(dir, []string{"**/*.json", "!config/**"}, nil).Reaches(write); got != caseInsensitive {
 			t.Fatalf("Reaches = %v, want %v: the write lands in Config on a case-insensitive filesystem only", got, caseInsensitive)
 		}
 	})
@@ -190,7 +198,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 	t.Run("a pattern not in clean form", func(t *testing.T) {
 		fixture(t)
 		var scanner selectionScanner
-		if !scanner.Select(dir, []string{"Config/./*.yaml"}).Reaches(plannedWrite{Path: at("Config/app.json")}) {
+		if !scanner.Select(dir, []string{"Config/./*.yaml"}, nil).Reaches(plannedWrite{Path: at("Config/app.json")}) {
 			t.Fatal("a pattern the store cleans was decided by matching it as written")
 		}
 	})

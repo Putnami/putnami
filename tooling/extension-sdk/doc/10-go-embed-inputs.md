@@ -1,15 +1,15 @@
 # Go embed source inputs
 
-`goembed` is the shared reader for the CLI's `go-embed:build` and
-`go-embed:test` selectors and the Go module packager. `Patterns` parses actual
+`goembed` is the shared reader for the Go extension's `go-embed:build` and
+`go-embed:test` selectors, which it answers through the workspace protocol's
+input-resolve call, and for the Go module packager. `Patterns` parses actual
 `//go:embed` comments. `Resolve` returns their regular payload files;
 `ResolveInputs` adds lexical `.go` sources and the regular referents of
-supported source-file symlinks. The CLI hashes these inputs as raw bytes.
-`SelectsPath` recognizes selected lexical sources, payloads and referents,
-including deleted paths, so source impact can select their owning task or fail
-before cache reuse. `ReadSource` is the packager's source reader;
-`SourceReferent` gives the CLI the same validated target for an already
-selected `.go` alias in a directory the Go source scanner ignores.
+supported source-file symlinks. The Go extension lists these inputs in its
+answer, and the CLI hashes each listed file as raw bytes. `ReadSource` is the
+packager's source reader; `SourceReferent` gives the Go extension the same
+validated target for an already selected `.go` alias in a directory the Go
+source scanner ignores.
 
 A supported source link is direct and relative, points to a regular file in
 the same project and Go module, and has no symlink component in its target

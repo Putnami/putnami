@@ -63,11 +63,12 @@ func LoadManifest(path string) (*Manifest, error) {
 //     manifest relies on — the four that move together at 3 (task contract
 //     v3, job context v2, runtime event protocol v2, lock format v2), the
 //     session prerequisites of 4, and, for a manifest that declares agent
-//     content, a verb vocabulary, command kinds, publish channels or a
-//     provisioned toolchain candidate, the additive contract 5, 9, 11, 12 or
-//     13. Loading a manifest stamped below that would run a task whose
-//     outputs the scheduler cannot capture from a declaration, or accept
-//     agent content a reader of its stamp never had to represent.
+//     content, a verb vocabulary, command kinds, publish channels, a
+//     provisioned toolchain candidate or input selectors, the additive
+//     contract 5, 9, 11, 12, 13 or 14. Loading a manifest stamped below that
+//     would run a task whose outputs the scheduler cannot capture from a
+//     declaration, or accept agent content a reader of its stamp never had
+//     to represent.
 //
 // A manifest that declares no contract surface at all is outside the ladder
 // (DeclaresContractSurface): the packager never stamps one, so requiring a
@@ -84,15 +85,18 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("parse extension manifest %s: %w", path, err)
 	}
-	if diags := validateGoEmbedSelectors(&m); diag.HasErrors(diags) {
-		return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
-	}
 	required := RequiredLoadContract(&m)
 	switch {
 	case m.CLIContract > protocolcli.LatestContract:
 		return nil, fmt.Errorf("extension manifest %s requires a newer putnami (contract %d > %d)",
 			path, m.CLIContract, protocolcli.LatestContract)
 	case m.CLIContract >= required:
+		// The selector rules run after the floor: a manifest stamped below
+		// InputSelectorsContract that names a selector is refused for its
+		// stamp, with the remedy that moves it.
+		if diags := validateInputSelectors(&m); diag.HasErrors(diags) {
+			return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+		}
 		if diags := ValidateNoReservedFlagShadows(&m); diag.HasErrors(diags) {
 			return nil, fmt.Errorf("extension manifest %s has reserved global flag shadows: %s", path, formatDiagnostics(diags))
 		}
@@ -101,10 +105,15 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 		// Hook-only: nothing the contract governs, and nothing the packager
 		// stamps. Loading it is not a tolerated downgrade — the contract simply
 		// has no claim on this document.
+		if diags := validateInputSelectors(&m); diag.HasErrors(diags) {
+			return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+		}
 		return &m, nil
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.InputSelectorsContract:
+			reason = " for its input selectors"
 		case required == protocolcli.ProvisionedToolchainContract:
 			reason = " for its provisioned toolchain candidate"
 		case required == protocolcli.PublishChannelsContract:
@@ -123,45 +132,6 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 				"re-package the extension with putnami %d (or run `putnami extensions update` to pull a build that has been)",
 			path, m.CLIContract, required, reason, required)
 	}
-}
-
-// validateGoEmbedSelectors is shared by the early negotiated loader and the
-// full authoring validator. Both must reject a selector the CLI cannot read.
-func validateGoEmbedSelectors(m *Manifest) []diag.Diagnostic {
-	var diags []diag.Diagnostic
-	check := func(pattern, where string, allowed bool) {
-		if !strings.HasPrefix(pattern, "go-embed:") {
-			return
-		}
-		if pattern != "go-embed:build" && pattern != "go-embed:test" {
-			diags = append(diags, diag.Errorf("invalid-value", where, "unsupported go embed selector %q", pattern))
-			return
-		}
-		if !allowed {
-			diags = append(diags, diag.Errorf("invalid-value", where, "go embed selector %q is only valid in project task inputs", pattern))
-		}
-	}
-	for _, name := range sortedKeys(m.Tasks) {
-		task := m.Tasks[name]
-		for _, portName := range sortedKeys(task.Inputs) {
-			port := task.Inputs[portName]
-			for index, pattern := range port.Files {
-				check(pattern, fmt.Sprintf("tasks.%s.inputs.%s.files[%d]", name, portName, index), port.From == TaskInputFromProject)
-			}
-		}
-		if task.Cache != nil && task.Cache.Key != nil {
-			for index, pattern := range task.Cache.Key.Files {
-				check(pattern, fmt.Sprintf("tasks.%s.cache.key.files[%d]", name, index), true)
-			}
-			for index, pattern := range task.Cache.Key.ClosureFiles {
-				check(pattern, fmt.Sprintf("tasks.%s.cache.key.closureFiles[%d]", name, index), false)
-			}
-			for index, pattern := range task.Cache.Key.WorkspaceFiles {
-				check(pattern, fmt.Sprintf("tasks.%s.cache.key.workspaceFiles[%d]", name, index), false)
-			}
-		}
-	}
-	return diags
 }
 
 func formatDiagnostics(diags []diag.Diagnostic) string {

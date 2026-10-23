@@ -12,6 +12,7 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
@@ -195,17 +196,23 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 
 // A write moves a key only when it can reach a file the key selects: a tree
 // the key's exclusions cover, a file its patterns do not match, and a path
-// beside every file its Go embed directives name leave it unmoved, while a
-// write that can change those directives makes every write in the key's
-// region count again.
+// beside every file its input selector's answer lists and its basis selects
+// leave it unmoved, while a write a content or a listing set of the basis
+// selects can change the answer, so every write in the key's region counts
+// again.
 func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "planned-write-reach",
 		"a-write-that-reaches-no-selected-file-leaves-a-key-unmoved")
-	sources := []string{"**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"}
+	resolver := listedInputs(store.InputExpansion{
+		Files: []string{".gen/version.json", "version.go"},
+		Basis: wsproto.InputBasis{
+			Content: [][]string{{"**/*.go", "!**/*_test.go", "!**/.*/**"}},
+			Listing: [][]string{{"go.mod"}},
+		},
+	})
 	compile := func() *ScheduledJob {
-		job := declaredJob("build~compile", "compile", &extension.TaskDeclaration{})
-		job.JobDef.FilePatterns = sources
-		return job
+		return nameSelectorInput(declaredJob("build~compile", "compile", &extension.TaskDeclaration{}),
+			"**/*.go", "!**/*_test.go", "sel:build", "!**/.gen/**")
 	}
 	writer := func(name string, output extension.DeclaredOutput) *ScheduledJob {
 		return declaredJob(name, name, &extension.TaskDeclaration{
@@ -215,10 +222,11 @@ func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
 	key := func(name string) string { return "/" + captureTestProject + ":" + name }
 	writeSources := func(t *testing.T, f *captureFixture) {
 		project := filepath.Join(f.ws.Root, captureTestProject)
-		writeFileAt(t, filepath.Join(project, "go.mod"), "module example.com/proj\n")
-		writeFileAt(t, filepath.Join(project, "version.go"),
-			"package proj\nimport _ \"embed\"\n//go:embed .gen/version.json\nvar version []byte\n")
+		writeFileAt(t, filepath.Join(project, "version.go"), "package proj\n")
 		writeFileAt(t, filepath.Join(project, ".gen", "version.json"), "{}")
+	}
+	inputs := func(f *captureFixture) cachekey.KeyInputs {
+		return cachekey.KeyInputs{Workspace: f.ws, Resolver: resolver}
 	}
 
 	t.Run("an excluded tree and an unselected file", func(t *testing.T) {
@@ -230,7 +238,7 @@ func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
 		f := newCaptureFixture(t, planned...)
 		writeSources(t, f)
 
-		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		movement := cachekey.PlanKeyMovement(inputs(f), planned)
 		if movement.Moving[key("build~compile")] {
 			t.Fatalf("compile moved by writes none of its files can lie under: writers %v", movement.Writers[key("build~compile")])
 		}
@@ -239,29 +247,73 @@ func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
 		}
 	})
 
-	t.Run("an embedded file", func(t *testing.T) {
+	t.Run("a listed file", func(t *testing.T) {
 		stamp := writer("build~stamp", fileDeclaration(extension.OutputRootProject, ".gen/version.json", false))
 		conf := writer("build~conf", dirDeclaration(extension.OutputRootProject, ".gen/conf", true))
 		planned := []*ScheduledJob{stamp, conf, compile()}
 		f := newCaptureFixture(t, planned...)
 		writeSources(t, f)
 
-		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		movement := cachekey.PlanKeyMovement(inputs(f), planned)
 		if got := movement.Writers[key("build~compile")]; !reflect.DeepEqual(got, []string{key("build~stamp")}) {
-			t.Fatalf("writers of compile = %v, want the writer of the file it embeds alone", got)
+			t.Fatalf("writers of compile = %v, want the writer of the file the answer lists alone", got)
 		}
 	})
 
-	t.Run("a write that can change a directive", func(t *testing.T) {
+	t.Run("a write that can change the answer", func(t *testing.T) {
 		conf := writer("build~conf", dirDeclaration(extension.OutputRootProject, ".gen/conf", true))
 		client := writer("build~client", dirDeclaration(extension.OutputRootProject, "client", true))
 		planned := []*ScheduledJob{conf, client, compile()}
 		f := newCaptureFixture(t, planned...)
 		writeSources(t, f)
 
-		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		movement := cachekey.PlanKeyMovement(inputs(f), planned)
 		if got := movement.Writers[key("build~compile")]; !reflect.DeepEqual(got, []string{key("build~client"), key("build~conf")}) {
-			t.Fatalf("writers of compile = %v, want both: a source the client writes may embed the conf tree", got)
+			t.Fatalf("writers of compile = %v, want both: a source the client writes may change the answer", got)
+		}
+	})
+
+	t.Run("a write a listing set selects", func(t *testing.T) {
+		// Deleting sub/go.mod brings sub/*.go into the scan, and a directive
+		// there can embed sub/assets/x.txt, a path no set of the answer as
+		// it stands selects: the writer of that path counts too.
+		nested := listedInputs(store.InputExpansion{
+			Files: []string{"assets/a.txt", "version.go"},
+			Basis: wsproto.InputBasis{
+				Content: [][]string{{"**/*.go", "!**/*_test.go", "!**/.*/**"}},
+				Listing: [][]string{{"**/[gG][oO].[mM][oO][dD]"}, {"assets/**"}},
+			},
+		})
+		unnest := writer("build~unnest", fileDeclaration(extension.OutputRootProject, "sub/go.mod", false))
+		embed := writer("build~embed", fileDeclaration(extension.OutputRootProject, "sub/assets/x.txt", false))
+		producer := declaredJob("build~produce", "produce", &extension.TaskDeclaration{})
+		producer.DependsOn = []string{unnest.Key()}
+		consumer := compile()
+		planned := []*ScheduledJob{unnest, embed, producer, consumer}
+		f := newCaptureFixture(t, planned...)
+		writeSources(t, f)
+		project := filepath.Join(f.ws.Root, captureTestProject)
+		writeFileAt(t, filepath.Join(project, "assets", "a.txt"), "A")
+		writeFileAt(t, filepath.Join(project, "sub", "go.mod"), "module sub\n")
+
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws, Resolver: nested}, planned)
+		if got := movement.Writers[consumer.Key()]; !reflect.DeepEqual(got, []string{embed.Key(), unnest.Key()}) {
+			t.Fatalf("writers of compile = %v, want both: removing a go.mod the listing selects can change the answer", got)
+		}
+		if cachekey.SettlesBefore(producer, consumer, movement, cachekey.JobsByKey(planned)) {
+			t.Fatal("compile's key settles before the producer starts, although the writer of sub/assets/x.txt may run after it")
+		}
+	})
+
+	t.Run("a selector that does not expand", func(t *testing.T) {
+		conf := writer("build~conf", dirDeclaration(extension.OutputRootProject, ".gen/conf", true))
+		planned := []*ScheduledJob{conf, compile()}
+		f := newCaptureFixture(t, planned...)
+		writeSources(t, f)
+
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		if !movement.Moving[key("build~compile")] {
+			t.Fatal("a key whose selector has no resolver kept its precomputed key")
 		}
 	})
 }

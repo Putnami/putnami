@@ -55,6 +55,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/inputresolve"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
@@ -298,6 +299,13 @@ type Request struct {
 	// UNEXPORTED for the same reason preparation is: it is engine-internal
 	// plumbing between two of this package's own phases.
 	synchronizedExtensions []*extension.ExtensionDescription
+	// inputResolver expands the input selectors of the run's tasks through the
+	// extensions that list them, for change impact, every cache key, the
+	// portable admission and key movement alike. Nil before phase 1d.
+	//
+	// UNEXPORTED for the same reason preparation is: it is engine-internal
+	// plumbing between two of this package's own phases.
+	inputResolver *inputresolve.Resolver
 	// specGate carries the spec-verification record from the post-session
 	// finalizer to execute's session-persistence block.
 	//
@@ -740,6 +748,10 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if code := synchronizeWorkspaceProbe(ctx, req, ws, discovered); code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil
 	}
+	// One resolver answers the run's input selectors from here on. The
+	// descriptions phase 1c prepared come first, so an extension it prepared
+	// is not prepared again; any other one is prepared on its first call.
+	req.inputResolver = inputresolve.New(ctx, ws, append(slices.Clone(planningExtensions), extensions...), req.preparation)
 
 	// Phase 2: select and filter projects. The resolved extensions go with it:
 	// auto-selection's speculative run-marker lookup resolves its cache provider

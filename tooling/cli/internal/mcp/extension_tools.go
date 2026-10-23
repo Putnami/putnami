@@ -19,6 +19,7 @@ import (
 	proto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/inputresolve"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -76,13 +77,16 @@ func (s *Server) discoverExtensions() (*extension.DiscoveryResult, error) {
 // `why_impacted` answer at project resolution rather than answering nothing.
 //
 // Both tools read it, so the pair cannot disagree about a project's task scope
-// any more than they can disagree about its reach.
-func (s *Server) taskIndex(ws *workspace.Workspace) workspace.TaskImpactIndex {
+// any more than they can disagree about its reach. The input selectors its
+// tasks name expand through the extensions that list them, as a run's do; an
+// extension's runtime is prepared on its first answer, within ctx.
+func (s *Server) taskIndex(ctx context.Context, ws *workspace.Workspace) workspace.TaskImpactIndex {
 	discovered, err := s.discoverExtensions()
 	if err != nil || discovered == nil {
 		return nil
 	}
-	return workspace.NewTaskIndex(ws, discovered.Extensions)
+	resolver := inputresolve.New(ctx, ws, discovered.Extensions, nil)
+	return workspace.NewTaskIndex(ws, discovered.Extensions, resolver.Matcher())
 }
 
 // registerExtensionTools discovers manifest-declared tools once, when the MCP

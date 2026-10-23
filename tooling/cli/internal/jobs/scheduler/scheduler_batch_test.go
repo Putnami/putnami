@@ -23,16 +23,24 @@ type batchCompletenessRenderer struct {
 	batchEvents []RawJobEvent
 }
 
-func TestGoEmbedInvalidBatchMemberNeverReachesSharedProcess(t *testing.T) {
+// A batch member whose selector fails is failed before the shared process
+// starts, and the shared process runs for the other members alone.
+func TestSelectorInvalidBatchMemberNeverReachesSharedProcess(t *testing.T) {
 	requireShell(t)
 	logPath := filepath.Join(t.TempDir(), "batch-invocations")
 	ws, jobs := makeBatchSchedulerFixture(t, logPath)
-	writeTestFile(t, filepath.Join(ws.Root, "a", "main.go"), "package a\nimport _ \"embed\"\n//go:embed missing.txt\nvar payload string\n")
-	writeTestFile(t, filepath.Join(ws.Root, "b", "main.go"), "package b\n")
+	writeTestFile(t, filepath.Join(ws.Root, "b", "payload.txt"), "b")
 	for _, job := range jobs {
-		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+		nameSelectorInput(job, "**/*.txt", "sel:build")
 	}
+	resolver := &stubInputResolver{answer: func(query store.InputQuery) (store.InputExpansion, error) {
+		if filepath.Base(query.Dir) == "a" {
+			return store.InputExpansion{Files: []string{"missing.txt"}}, nil
+		}
+		return store.InputExpansion{Files: []string{"payload.txt"}}, nil
+	}}
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
+	cache.SetInputResolver(resolver)
 	result := runSharedScheduler(context.Background(), ws, jobs, SchedulerConfig{MaxParallel: 2, ContinueOnError: true}, cache)
 	a, b := result.Results[jobs[0].Key()], result.Results[jobs[1].Key()]
 	if a == nil || a.Status != string(TaskStatusFailed) || a.Error == nil || !strings.Contains(a.Error.Message, "missing.txt") {

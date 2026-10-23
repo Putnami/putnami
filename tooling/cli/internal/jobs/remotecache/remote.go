@@ -356,7 +356,7 @@ func (r *RemoteCache) Negotiate(
 		return
 	}
 	r.Keys = keys
-	if movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams}, planned); len(movement.Moving) > 0 {
+	if movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned); len(movement.Moving) > 0 {
 		r.Keys = make(map[string]string, len(keys))
 		for jobKey, hash := range keys {
 			if !movement.Moving[jobKey] {

@@ -137,7 +137,7 @@ func TestGoldenTaskKey(t *testing.T) {
 	if got := ws.MetadataDigestFor(project); got != goldenMetadataDigest {
 		t.Errorf("metadata digest = %s, want %s", got, goldenMetadataDigest)
 	}
-	files, err := cache.HashFiles(filepath.Join(root, "app"), []string{"src/*.txt"}, store.GoEmbedExpander(), JobConfigScope(ws, job))
+	files, err := cache.HashFiles(filepath.Join(root, "app"), []string{"src/*.txt"}, nil, JobConfigScope(ws, job))
 	if err != nil {
 		t.Fatal(err)
 	}

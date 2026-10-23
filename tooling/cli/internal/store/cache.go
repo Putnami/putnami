@@ -26,6 +26,8 @@ type CacheManager struct {
 	sourceStateMu   sync.Mutex
 	digests         map[string]*memoizedDigest // memoizes Digest: key → one computation
 	digestsMu       sync.Mutex
+	inputResolver   InputResolver // expands the input selectors a key reads
+	inputResolverMu sync.Mutex
 }
 
 // invalidationLogSize is how many invalidations an inputHashMemo remembers
@@ -131,8 +133,9 @@ func NewCacheManager(store *LocalStore) *CacheManager {
 // while an invalidation named a path in its region may hold bytes from before
 // that write, so it is returned but not memoized (inputHashMemo.memoize).
 //
-// The memo key leaves expander out: every caller of one manager passes
-// expanders that expand a selector alike (InputExpander).
+// The memo key holds the expander's identity when patterns name an input
+// selector: two jobs whose patterns read alike can still name a selector in
+// inputs with other patterns, and so read other files.
 func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander InputExpander, scope ProjectConfigScope) (string, error) {
 	// The scope selects which bytes of a project config the digest reads, so two
 	// scopes are two different values and must never share one memo entry.
@@ -140,6 +143,9 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, expander I
 		"|" + strings.Join(scope.ForeignNamespaces, "\x00")
 	if scope.Verbatim {
 		key += "|verbatim"
+	}
+	if namesInputSelector(patterns) && expander != nil {
+		key += "|expander\x00" + expander.Identity()
 	}
 
 	cached, generation, ok := cm.fileHashes.lookup(key)

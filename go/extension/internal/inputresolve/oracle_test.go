@@ -13,12 +13,13 @@ import (
 )
 
 // coreRawEmbedFiles is the oracle the equivalence tests compare an answer's
-// files with. It reproduces, statement for statement, the files the core's
-// cache key marks rawEmbed for one task input of a project directory that
-// names selector beside patterns: collectFiles in
-// tooling/cli/internal/store/cache_hash.go with collectOrdinaryFiles,
-// ordinaryFileEntry, globDoubleStar, appendSelectedGoReferents and
-// appendGoEmbedInputs. It returns absolute paths, sorted and unique.
+// files with: the files a cache key hashes as exact bytes for one task input
+// of a project directory that names selector beside patterns, as
+// doc/build.md states the rule. It is written apart from the resolver: it
+// selects the patterns' ordinary files as the core selects them, adds the
+// referent of each selected Go source link, then the files the //go:embed
+// directives of each selected package read. It returns absolute paths, sorted
+// and unique.
 func coreRawEmbedFiles(dir string, patterns []string, selector string) ([]string, error) {
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	var ordinary []string

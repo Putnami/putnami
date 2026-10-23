@@ -72,6 +72,14 @@ func (b *Builder) AgentContent(content proto.AgentContentContribution) *Builder 
 	return b
 }
 
+// Runtime declares the extension's runtime: its executable, its preparation,
+// and the input selectors it expands (InputSelectors). A later call replaces
+// the earlier one: a manifest carries at most one.
+func (b *Builder) Runtime(runtime proto.RuntimeDefinition) *Builder {
+	b.manifest.Runtime = &runtime
+	return b
+}
+
 // Command adds a command. A later call with the same name replaces the earlier
 // one, so a generator can compose a manifest without checking what it already
 // wrote.

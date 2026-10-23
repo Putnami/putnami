@@ -17,9 +17,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/changeplan"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/inputresolve"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -160,7 +162,7 @@ func planRange(ctx context.Context, wsRoot, baseSHA, headSHA string, opts PlanOp
 		DirectProjects:   planDirectProjects(ws, changedFiles),
 		ImpactedProjects: result.Projects,
 		Planned:          result.Jobs,
-		Cache:            buildPlanCache(ws, result.Jobs, result.Versions, opts.NoCache),
+		Cache:            buildPlanCache(ctx, ws, result.Jobs, result.Versions, opts.NoCache),
 	}, nil
 }
 
@@ -181,7 +183,7 @@ func planDirectProjects(ws *workspace.Workspace, paths []string) []*workspace.Pr
 	return projects
 }
 
-func buildPlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versions cachekey.RunVersions, noCache bool) ciproto.ChangePlanCache {
+func buildPlanCache(ctx context.Context, ws *workspace.Workspace, planned []*jobs.ScheduledJob, versions cachekey.RunVersions, noCache bool) ciproto.ChangePlanCache {
 	if noCache {
 		return ciproto.ChangePlanCache{Status: "disabled"}
 	}
@@ -189,6 +191,15 @@ func buildPlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versi
 		return ciproto.ChangePlanCache{Status: "unavailable", Reason: "ambient-input"}
 	}
 	cache := store.NewCacheManager(store.NewLocalStore(store.ResolveStoreRoot(ws.Root)))
+	// The keys expand their input selectors through the extensions the plan's
+	// jobs run under, as the run's keys do.
+	var extensions []*extension.ExtensionDescription
+	for _, job := range planned {
+		if job != nil && job.Extension != nil {
+			extensions = append(extensions, job.Extension)
+		}
+	}
+	cache.SetInputResolver(inputresolve.New(ctx, ws, extensions, nil))
 	keys, err := cachekey.PrecomputeKeys(ws, planned, nil, versions, cache, cachekey.CacheBypass{})
 	if err != nil {
 		return ciproto.ChangePlanCache{Status: "unavailable", Reason: "key-computation-failed"}

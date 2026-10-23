@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/inputresolve"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -42,6 +44,7 @@ func VerifyCachedVerificationReport(root string, report features.VerificationRep
 	req := &Request{WorkspaceRoot: ws.Root, Config: ws.Config,
 		Commands:        scheduler.CommandsOfKind(discovered.Extensions, extension.CommandKindVerification),
 		VersionSnapshot: snapshot}
+	req.inputResolver = inputresolve.New(context.Background(), ws, discovered.Extensions, nil)
 	cache := newRunCacheManager(req, ws)
 	source := newCachedObservationRecovery(req, ws, discovered.Extensions, cache)
 	return source.verifyCachedReport(report)

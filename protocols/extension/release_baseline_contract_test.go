@@ -11,7 +11,7 @@ import (
 // task without it, so a manifest that declares it needs the contract that
 // names it, whatever other additive vocabulary it also uses.
 func TestReleaseBaselineInputRequiresAdditiveCLIContract(t *testing.T) {
-	manifest := []byte(`{"name":"@test/go","cliContract":6,"commands":{"validate":{"run":[{"id":"api","task":"api"}]}},"tasks":{"api":{"kind":"command","command":"echo","inputs":{"sources":{"from":"project","files":["**/*.go","go-embed:build"]},"releaseBaseline":{"from":"runtime"}}}}}`)
+	manifest := []byte(`{"name":"@test/go","cliContract":6,"commands":{"validate":{"run":[{"id":"api","task":"api"}]}},"tasks":{"api":{"kind":"command","command":"echo","inputs":{"sources":{"from":"project","files":["**/*.go"]},"releaseBaseline":{"from":"runtime"}}}}}`)
 	if _, err := NegotiateManifest("go.json", manifest); err == nil || !strings.Contains(err.Error(), "requires 7") {
 		t.Fatalf("contract-6 stamp accepted the releaseBaseline input: %v", err)
 	}
@@ -48,12 +48,11 @@ func TestAGitInputRequiresTheContractThatKeysTheMode(t *testing.T) {
 	}
 
 	for name, task := range map[string]TaskDefinition{
-		"project port":         {Inputs: map[string]TaskInputPort{"r": {From: TaskInputFromProject, Files: []string{"git:**"}}}},
-		"closure port":         {Inputs: map[string]TaskInputPort{"r": {From: TaskInputFromClosure, Files: []string{"git:doc/**"}}}},
-		"cache key files":      {Cache: &TaskCachePolicy{Key: &TaskCacheKey{Files: []string{"git:**"}}}},
-		"cache key workspace":  {Cache: &TaskCachePolicy{Key: &TaskCacheKey{WorkspaceFiles: []string{"git:**"}}}},
-		"cache key closure":    {Cache: &TaskCachePolicy{Key: &TaskCacheKey{ClosureFiles: []string{"git:**"}}}},
-		"beside an embed rung": {Inputs: map[string]TaskInputPort{"r": {From: TaskInputFromProject, Files: []string{"go-embed:build", "git:**"}}}},
+		"project port":        {Inputs: map[string]TaskInputPort{"r": {From: TaskInputFromProject, Files: []string{"git:**"}}}},
+		"closure port":        {Inputs: map[string]TaskInputPort{"r": {From: TaskInputFromClosure, Files: []string{"git:doc/**"}}}},
+		"cache key files":     {Cache: &TaskCachePolicy{Key: &TaskCacheKey{Files: []string{"git:**"}}}},
+		"cache key workspace": {Cache: &TaskCachePolicy{Key: &TaskCacheKey{WorkspaceFiles: []string{"git:**"}}}},
+		"cache key closure":   {Cache: &TaskCachePolicy{Key: &TaskCacheKey{ClosureFiles: []string{"git:**"}}}},
 	} {
 		if got := RequiredCLIContract(&Manifest{Tasks: map[string]TaskDefinition{"t": task}}); got != protocolcli.GitInputModeContract {
 			t.Errorf("%s: RequiredCLIContract = %d, want %d", name, got, protocolcli.GitInputModeContract)
@@ -69,11 +68,11 @@ func TestAGitInputRequiresTheContractThatKeysTheMode(t *testing.T) {
 	}
 }
 
-// Every task counts: a task that needs a lower rung, met first, cannot mask a
-// task that needs the release-baseline rung.
+// Every task counts: a task that needs no rung, or a lower one, met first,
+// cannot mask a task that needs a higher rung.
 func TestRequiredCLIContractTakesTheHighestRungAcrossTasks(t *testing.T) {
-	embed := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
-		"sources": {From: TaskInputFromProject, Files: []string{"go-embed:build"}},
+	selector := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
+		"sources": {From: TaskInputFromProject, Files: []string{"sel:build"}},
 	}}
 	plain := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
 		"sources": {From: TaskInputFromProject, Files: []string{"**/*.go"}},
@@ -93,9 +92,9 @@ func TestRequiredCLIContractTakesTheHighestRungAcrossTasks(t *testing.T) {
 		want  int
 	}{
 		{"none", map[string]TaskDefinition{"a": plain}, protocolcli.CurrentContract},
-		{"embed only", map[string]TaskDefinition{"a": plain, "b": embed}, protocolcli.GoEmbedInputsContract},
-		{"input port", map[string]TaskDefinition{"a": embed, "b": byPort}, protocolcli.ReleaseBaselineInputContract},
-		{"cache key runtime", map[string]TaskDefinition{"a": embed, "b": byCacheKey}, protocolcli.ReleaseBaselineInputContract},
+		{"input port", map[string]TaskDefinition{"a": plain, "b": byPort}, protocolcli.ReleaseBaselineInputContract},
+		{"cache key runtime", map[string]TaskDefinition{"a": plain, "b": byCacheKey}, protocolcli.ReleaseBaselineInputContract},
+		{"beside a selector rung", map[string]TaskDefinition{"a": byPort, "b": selector}, protocolcli.InputSelectorsContract},
 		{"same name, params origin", map[string]TaskDefinition{"a": sameNameOtherOrigin}, protocolcli.CurrentContract},
 	} {
 		t.Run(test.name, func(t *testing.T) {

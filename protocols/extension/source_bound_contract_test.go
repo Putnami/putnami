@@ -46,8 +46,8 @@ func TestASourceBoundTaskRequiresTheSourceBoundCacheContract(t *testing.T) {
 // false, leaves the floor where its other vocabulary puts it.
 func TestRequiredCLIContractRaisesToSourceBoundOnlyForADeclaringTask(t *testing.T) {
 	bound := TaskDefinition{Kind: "command", Command: "echo", Cache: &TaskCachePolicy{SourceBound: true}}
-	embed := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
-		"sources": {From: TaskInputFromProject, Files: []string{"go-embed:build"}},
+	gitInput := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
+		"sources": {From: TaskInputFromProject, Files: []string{"git:**"}},
 	}}
 	unbound := TaskDefinition{Kind: "command", Command: "echo", Cache: &TaskCachePolicy{Deterministic: true}}
 	disabled := TaskDefinition{Kind: "command", Command: "echo"}
@@ -59,8 +59,8 @@ func TestRequiredCLIContractRaisesToSourceBoundOnlyForADeclaringTask(t *testing.
 	}{
 		{"no cache policy", map[string]TaskDefinition{"a": disabled}, protocolcli.CurrentContract},
 		{"sourceBound false", map[string]TaskDefinition{"a": unbound}, protocolcli.CurrentContract},
-		{"beside an embed rung", map[string]TaskDefinition{"a": embed, "b": bound}, protocolcli.SourceBoundCacheContract},
-		{"embed only", map[string]TaskDefinition{"a": embed, "b": unbound}, protocolcli.GoEmbedInputsContract},
+		{"beside a git input rung", map[string]TaskDefinition{"a": gitInput, "b": bound}, protocolcli.SourceBoundCacheContract},
+		{"git input only", map[string]TaskDefinition{"a": gitInput, "b": unbound}, protocolcli.GitInputModeContract},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Map iteration order is random; repeat so an early return on a

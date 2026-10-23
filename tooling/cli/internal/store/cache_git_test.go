@@ -175,7 +175,7 @@ func TestGitInputsFilterProjectRelativePathsAndFailClosed(t *testing.T) {
 	gitInputWrite(t, root, "tools/other/doc/a.md", "included")
 	gitInputWrite(t, root, "tools/other/doc/excluded.md", "excluded")
 	project := filepath.Join(root, "tools/gate")
-	files, err := CollectKeyFiles(project, []string{"git:../other/doc/**", "!git:../other/doc/excluded.md"}, GoEmbedExpander())
+	files, err := CollectKeyFiles(project, []string{"git:../other/doc/**", "!git:../other/doc/excluded.md"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestGitInputsFilterProjectRelativePathsAndFailClosed(t *testing.T) {
 	// prefix case runs on Unix only.
 	if runtime.GOOS != "windows" {
 		gitInputWrite(t, root, "git:literal.txt", "literal prefix")
-		files, err = CollectKeyFiles(root, []string{"git:git:literal.txt"}, GoEmbedExpander())
+		files, err = CollectKeyFiles(root, []string{"git:git:literal.txt"}, nil)
 		if err != nil || !reflect.DeepEqual(files, []string{filepath.Join(root, "git:literal.txt")}) {
 			t.Fatalf("literal git: filename selected %v, error %v", files, err)
 		}
@@ -208,7 +208,7 @@ func TestGitInputsFilterProjectRelativePathsAndFailClosed(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(root, "unsupported/file"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CollectKeyFiles(root, []string{"git:**"}, GoEmbedExpander()); err == nil {
+	if _, err := CollectKeyFiles(root, []string{"git:**"}, nil); err == nil {
 		t.Fatal("tracked non-regular input was silently omitted")
 	}
 }
@@ -229,7 +229,7 @@ func TestGitInputsResolveProjectDirectoryAliasesBeforeParentPaths(t *testing.T) 
 		if direct, linked := gitInputKey(t, project, patterns...), gitInputKey(t, alias, patterns...); direct != linked {
 			t.Fatalf("alias changed Git input key for %v: %s != %s", patterns, direct, linked)
 		}
-		files, err := CollectKeyFiles(alias, patterns, GoEmbedExpander())
+		files, err := CollectKeyFiles(alias, patterns, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,17 +249,17 @@ func TestGitInputsBatchGuardUsesTheCandidateSet(t *testing.T) {
 	gitInputWrite(t, root, ".gitignore", "tools/gate/ignored.md\n")
 	gitInputWrite(t, root, "tools/gate/ignored.md", "ignored")
 	project := filepath.Join(root, "tools/gate")
-	if matched, err := HasMatchingFiles(project, []string{"git:**/*.md"}, GoEmbedExpander()); err != nil || matched {
+	if matched, err := HasMatchingFiles(project, []string{"git:**/*.md"}, nil); err != nil || matched {
 		t.Fatalf("ignored-only Git input matched=%v, error=%v", matched, err)
 	}
-	if matched, err := HasMatchingFiles(project, []string{"**/*.md"}, GoEmbedExpander()); err != nil || !matched {
+	if matched, err := HasMatchingFiles(project, []string{"**/*.md"}, nil); err != nil || !matched {
 		t.Fatalf("ordinary pattern behavior changed: matched=%v, error=%v", matched, err)
 	}
 	if err := os.Remove(filepath.Join(project, "ignored.md")); err != nil {
 		t.Fatal(err)
 	}
 	gitInputWrite(t, root, "tools/reader.md", "candidate outside the project")
-	if matched, err := HasMatchingFiles(project, []string{"git:**/*.md"}, GoEmbedExpander()); err != nil || !matched {
+	if matched, err := HasMatchingFiles(project, []string{"git:**/*.md"}, nil); err != nil || !matched {
 		t.Fatalf("external candidate input matched=%v, error=%v", matched, err)
 	}
 }
@@ -378,15 +378,15 @@ func TestGitInputsRefuseUnmergedAndSubmoduleCandidates(t *testing.T) {
 	if out, err := merge.CombinedOutput(); err == nil {
 		t.Fatalf("the merge did not conflict:\n%s", out)
 	}
-	if _, err := CollectKeyFiles(root, []string{"git:**"}, GoEmbedExpander()); err == nil {
+	if _, err := CollectKeyFiles(root, []string{"git:**"}, nil); err == nil {
 		t.Fatal("an unmerged candidate produced a key")
 	}
-	if files, err := CollectKeyFiles(root, []string{"git:f"}, GoEmbedExpander()); err != nil || len(files) != 1 {
+	if files, err := CollectKeyFiles(root, []string{"git:f"}, nil); err != nil || len(files) != 1 {
 		t.Fatalf("an unmerged path outside the pattern blocked its key: files %v, error %v", files, err)
 	}
 	gitInputWrite(t, root, "conflict.txt", "resolved\n")
 	gitInputRun(t, root, "add", "conflict.txt")
-	if _, err := CollectKeyFiles(root, []string{"git:**"}, GoEmbedExpander()); err != nil {
+	if _, err := CollectKeyFiles(root, []string{"git:**"}, nil); err != nil {
 		t.Fatalf("the resolved candidate still produced no key: %v", err)
 	}
 	gitInputRun(t, root, "commit", "-m", "resolve")
@@ -404,7 +404,7 @@ func TestGitInputsRefuseUnmergedAndSubmoduleCandidates(t *testing.T) {
 	gitInputRun(t, sub, "add", "inner.txt")
 	gitInputRun(t, sub, "commit", "-m", "inner")
 	gitInputRun(t, root, "-c", "advice.addEmbeddedRepo=false", "add", "sub")
-	if _, err := CollectKeyFiles(root, []string{"git:**"}, GoEmbedExpander()); err == nil {
+	if _, err := CollectKeyFiles(root, []string{"git:**"}, nil); err == nil {
 		t.Fatal("a submodule candidate produced a key that cannot hold its commit")
 	}
 	if digest, err := (&CacheKey{ProjectRoot: root, FilePatterns: []string{"git:**"}}).ComputeHashUsing(NewCacheManager(nil)); err == nil || digest != "" {
@@ -469,7 +469,7 @@ func TestGitInputsListOnlyBelowTheBoundOfTheirPatterns(t *testing.T) {
 			}
 		}
 		listed = nil
-		got, collectErr := CollectKeyFiles(project, tc.patterns, GoEmbedExpander())
+		got, collectErr := CollectKeyFiles(project, tc.patterns, nil)
 		if collectErr != nil {
 			t.Fatal(collectErr)
 		}

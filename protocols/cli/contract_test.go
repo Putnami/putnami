@@ -31,17 +31,20 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 		t.Fatalf("AgentContentContract = %d, want CurrentContract+1 (%d): a base-contract reader must see it as newer",
 			AgentContentContract, CurrentContract+1)
 	}
-	if GoEmbedInputsContract != AgentContentContract+1 || ReleaseBaselineInputContract != GoEmbedInputsContract+1 ||
+	// Rung 6 named the go-embed selectors the CLI expanded itself; rung 14
+	// retires it, and its number stays taken.
+	if ReleaseBaselineInputContract != AgentContentContract+2 ||
 		ExtensionDependenciesContract != ReleaseBaselineInputContract+1 ||
 		VerbVocabularyContract != ExtensionDependenciesContract+1 ||
 		SourceBoundCacheContract != VerbVocabularyContract+1 ||
 		CommandKindContract != SourceBoundCacheContract+1 ||
 		PublishChannelsContract != CommandKindContract+1 ||
-		ProvisionedToolchainContract != PublishChannelsContract+1 || LatestContract != ProvisionedToolchainContract {
-		t.Fatalf("additive contract ladder = base %d, agent %d, embed %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, latest %d",
-			CurrentContract, AgentContentContract, GoEmbedInputsContract, ReleaseBaselineInputContract,
+		ProvisionedToolchainContract != PublishChannelsContract+1 ||
+		InputSelectorsContract != ProvisionedToolchainContract+1 || LatestContract != InputSelectorsContract {
+		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, latest %d",
+			CurrentContract, AgentContentContract, ReleaseBaselineInputContract,
 			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, CommandKindContract,
-			PublishChannelsContract, ProvisionedToolchainContract, LatestContract)
+			PublishChannelsContract, ProvisionedToolchainContract, InputSelectorsContract, LatestContract)
 	}
 	// Rung 7 names two meanings that one CLI release added together.
 	if GitInputModeContract != ReleaseBaselineInputContract {

@@ -50,60 +50,82 @@ func admissionRepo(t *testing.T) string {
 	return root
 }
 
-func TestGoEmbedSourceLinkReferentIsCapturedAndMaterialized(t *testing.T) {
-	root := admissionRepo(t)
+// listedInputs expands each selector to the files it lists, relative to the
+// directory the selection reads.
+type listedInputs map[string][]string
+
+func (l listedInputs) ExpandInput(_, selector string) (store.InputExpansion, error) {
+	files, ok := l[selector]
+	if !ok {
+		return store.InputExpansion{}, fmt.Errorf("%w: %s lists nothing", store.ErrInputSelector, selector)
+	}
+	return store.InputExpansion{Files: files}, nil
+}
+
+func (l listedInputs) Identity() string { return fmt.Sprint(map[string][]string(l)) }
+
+// writeAdmissionFile writes contents at rel under root.
+func writeAdmissionFile(t *testing.T, root, rel, contents string) {
+	t.Helper()
+	p := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// appendIgnore appends lines to the repository's .gitignore.
+func appendIgnore(t *testing.T, root, lines string) {
+	t.Helper()
 	ignore, err := os.OpenFile(filepath.Join(root, ".gitignore"), os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ignore.WriteString("app/.source.txt\n"); err != nil {
+	if _, err := ignore.WriteString(lines); err != nil {
 		_ = ignore.Close()
 		t.Fatal(err)
 	}
 	if err := ignore.Close(); err != nil {
 		t.Fatal(err)
 	}
-	write := func(rel, content string) {
-		t.Helper()
-		p := filepath.Join(root, rel)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("app/.source.txt", "package app\nimport _ \"embed\"\n//go:embed assets/payload.sql\nvar payload string\n")
-	write("app/assets/payload.sql", "SELECT 1;\n")
-	if err := os.Symlink(".source.txt", filepath.Join(root, "app/embed.go")); err != nil {
-		t.Skipf("source-file symlinks unavailable: %v", err)
-	}
-	collected, err := store.CollectKeyFiles(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
+}
+
+// selectorPlan collects the app project's selection of **/*.go and sel:build
+// as one task's portable inputs, its paths relative to root.
+func selectorPlan(t *testing.T, root string, expander store.InputExpander, outputs ...string) cachekey.PortablePlanInputs {
+	t.Helper()
+	selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "sel:build"}, expander)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var files []string
-	for _, file := range collected {
-		rel, err := filepath.Rel(root, file)
-		if err != nil {
-			t.Fatal(err)
+	relative := func(paths []string) []string {
+		var names []string
+		for _, p := range paths {
+			rel, err := filepath.Rel(root, p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			names = append(names, filepath.ToSlash(rel))
 		}
-		files = append(files, filepath.ToSlash(rel))
+		return names
 	}
-	if !slices.Contains(files, "app/.source.txt") || !slices.Contains(files, "app/assets/payload.sql") {
-		t.Fatalf("collector omitted source referent or embed payload: %v", files)
-	}
-	inputs := cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{Key: "/app:build~describe", Files: files}}}
-	admission, err := AdmitInputs(context.Background(), root, inputs)
-	if err != nil || !slices.Equal(admission.Bound, []string{"app/.source.txt"}) {
-		t.Fatalf("source referent admission = %+v, %v", admission, err)
-	}
+	return cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{
+		Key: "/app:build~describe", Files: relative(selection.Files), SelectedFiles: relative(selection.Selected),
+	}}, Outputs: outputs}
+}
+
+// captureAndMaterialize captures bound from root and materializes the
+// snapshot in a fresh directory.
+func captureAndMaterialize(t *testing.T, root string, bound []string) string {
+	t.Helper()
 	sourceStore, err := runnersource.OpenStore(filepath.Join(t.TempDir(), "source-store"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = sourceStore.Close() })
-	snapshot, err := sourceStore.Capture(context.Background(), root, admission.Bound)
+	snapshot, err := sourceStore.Capture(context.Background(), root, bound)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,11 +133,31 @@ func TestGoEmbedSourceLinkReferentIsCapturedAndMaterialized(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for rel, want := range map[string]string{
-		"app/.source.txt":        "package app\nimport _ \"embed\"\n//go:embed assets/payload.sql\nvar payload string\n",
-		"app/embed.go":           "package app\nimport _ \"embed\"\n//go:embed assets/payload.sql\nvar payload string\n",
-		"app/assets/payload.sql": "SELECT 1;\n",
-	} {
+	return materialized
+}
+
+// An ignored file a selector lists binds, travels and materializes beside the
+// link that reads it.
+func TestListedLinkReferentIsCapturedAndMaterialized(t *testing.T) {
+	root := admissionRepo(t)
+	appendIgnore(t, root, "app/.source.txt\n")
+	source := "package app\n"
+	writeAdmissionFile(t, root, "app/.source.txt", source)
+	writeAdmissionFile(t, root, "app/assets/payload.sql", "SELECT 1;\n")
+	if err := os.Symlink(".source.txt", filepath.Join(root, "app/embed.go")); err != nil {
+		t.Skipf("source-file symlinks unavailable: %v", err)
+	}
+	inputs := selectorPlan(t, root, listedInputs{"sel:build": {".source.txt", "assets/payload.sql"}})
+	files := inputs.Tasks[0].Files
+	if !slices.Contains(files, "app/.source.txt") || !slices.Contains(files, "app/assets/payload.sql") || !slices.Contains(files, "app/embed.go") {
+		t.Fatalf("collector omitted the link, its referent or a listed payload: %v", files)
+	}
+	admission, err := AdmitInputs(context.Background(), root, inputs)
+	if err != nil || !slices.Equal(admission.Bound, []string{"app/.source.txt"}) {
+		t.Fatalf("listed referent admission = %+v, %v", admission, err)
+	}
+	materialized := captureAndMaterialize(t, root, admission.Bound)
+	for rel, want := range map[string]string{"app/.source.txt": source, "app/embed.go": source, "app/assets/payload.sql": "SELECT 1;\n"} {
 		got, err := os.ReadFile(filepath.Join(materialized, rel))
 		if err != nil || string(got) != want {
 			t.Fatalf("materialized %s = %q, %v", rel, got, err)
@@ -123,261 +165,94 @@ func TestGoEmbedSourceLinkReferentIsCapturedAndMaterialized(t *testing.T) {
 	}
 }
 
-func TestGoEmbedSemanticInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T) {
-	write := func(t *testing.T, root, rel, contents string) {
-		t.Helper()
-		p := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	plan := func(t *testing.T, root string, outputs ...string) cachekey.PortablePlanInputs {
-		t.Helper()
-		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
-		if err != nil {
-			t.Fatal(err)
-		}
-		relative := func(paths []string) []string {
-			var result []string
-			for _, p := range paths {
-				rel, err := filepath.Rel(root, p)
-				if err != nil {
-					t.Fatal(err)
-				}
-				result = append(result, filepath.ToSlash(rel))
-			}
-			return result
-		}
-		return cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{
-			Key: "/app:build~describe", Files: relative(selection.Files), GoEmbedFiles: relative(selection.GoEmbed),
-		}}, Outputs: outputs}
-	}
+// A file a selector lists under a lifecycle root or a declared output travels
+// only when Git tracks it or nothing ignores it; otherwise the admission
+// refuses the task that requires it.
+func TestListedInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T) {
 	for _, test := range []struct {
-		name, source, payload, output, omitted string
-		link                                   bool
+		name, listed, output string
 	}{
-		{"ignored source referent", ".gen/source.txt", "assets/payload.sql", "", "app/.gen/source.txt", true},
-		{"ignored embedded payload", "embed.go", ".gen/payload.sql", "", "app/.gen/payload.sql", false},
-		{"ignored declared output", "embed.go", "conf/local.txt", "app/conf", "app/conf/local.txt", false},
+		{"ignored listed file", ".gen/payload.sql", ""},
+		{"ignored declared output", "conf/local.txt", "app/conf"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := admissionRepo(t)
-			src := "package app\nimport _ \"embed\"\n//go:embed " + test.payload + "\nvar payload string\n"
-			if test.link {
-				write(t, root, "app/"+test.source, src)
-				if err := os.Symlink(test.source, filepath.Join(root, "app/embed.go")); err != nil {
-					t.Skipf("source-file symlinks unavailable: %v", err)
-				}
-			} else {
-				write(t, root, "app/embed.go", src)
+			writeAdmissionFile(t, root, "app/embed.go", "package app\n")
+			if test.listed != "conf/local.txt" {
+				writeAdmissionFile(t, root, "app/"+test.listed, "SELECT 1;\n")
 			}
-			if test.payload != "conf/local.txt" {
-				write(t, root, "app/"+test.payload, "SELECT 1;\n")
-			}
-			inputs := plan(t, root, test.output)
-			if !slices.Contains(inputs.Tasks[0].GoEmbedFiles, test.omitted) {
-				t.Fatalf("collector lost semantic provenance for %s: %+v", test.omitted, inputs.Tasks[0])
+			inputs := selectorPlan(t, root, listedInputs{"sel:build": {test.listed}}, test.output)
+			omitted := "app/" + test.listed
+			if !slices.Contains(inputs.Tasks[0].SelectedFiles, omitted) {
+				t.Fatalf("collector lost the listing of %s: %+v", omitted, inputs.Tasks[0])
 			}
 			_, err := AdmitInputs(context.Background(), root, inputs)
-			if !errors.Is(err, ErrInadmissible) || !strings.Contains(err.Error(), test.omitted) || !strings.Contains(err.Error(), "/app:build~describe") {
-				t.Fatalf("ignored semantic input %s was admitted: %v", test.omitted, err)
+			if !errors.Is(err, ErrInadmissible) || !strings.Contains(err.Error(), omitted) || !strings.Contains(err.Error(), "/app:build~describe") {
+				t.Fatalf("ignored listed input %s was admitted: %v", omitted, err)
 			}
 		})
 	}
 	for _, test := range []struct {
-		name, payload, output string
-		tracked               bool
+		name, listed, output string
+		tracked              bool
 	}{
 		{"tracked lifecycle input", ".gen/payload.sql", "", true},
 		{"nonignored declared output", "generated/payload.sql", "app/generated", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := admissionRepo(t)
-			write(t, root, "app/embed.go", "package app\nimport _ \"embed\"\n//go:embed "+test.payload+"\nvar payload string\n")
-			write(t, root, "app/"+test.payload, "SELECT 1;\n")
+			writeAdmissionFile(t, root, "app/embed.go", "package app\n")
+			writeAdmissionFile(t, root, "app/"+test.listed, "SELECT 1;\n")
 			if test.tracked {
-				cmd := exec.Command("git", "-C", root, "add", "-f", "app/"+test.payload)
+				cmd := exec.Command("git", "-C", root, "add", "-f", "app/"+test.listed)
 				if out, err := cmd.CombinedOutput(); err != nil {
 					t.Fatalf("track lifecycle input: %v: %s", err, out)
 				}
 			}
-			inputs := plan(t, root, test.output)
+			inputs := selectorPlan(t, root, listedInputs{"sel:build": {test.listed}}, test.output)
 			admission, err := AdmitInputs(context.Background(), root, inputs)
 			if err != nil || len(admission.Bound) != 0 {
-				t.Fatalf("capturable semantic input was refused: %+v, %v", admission, err)
+				t.Fatalf("capturable listed input was refused: %+v, %v", admission, err)
 			}
-			sourceStore, err := runnersource.OpenStore(filepath.Join(t.TempDir(), "source-store"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = sourceStore.Close() })
-			snapshot, err := sourceStore.Capture(context.Background(), root, admission.Bound)
-			if err != nil {
-				t.Fatal(err)
-			}
-			want := "app/" + test.payload
-			found := false
-			for _, entry := range snapshot.Manifest.Entries {
-				found = found || entry.Path == want
-			}
-			if !found {
-				t.Fatalf("capturable semantic input %s absent from snapshot", want)
+			materialized := captureAndMaterialize(t, root, admission.Bound)
+			if _, err := os.Stat(filepath.Join(materialized, "app", filepath.FromSlash(test.listed))); err != nil {
+				t.Fatalf("capturable listed input %s absent from the snapshot: %v", test.listed, err)
 			}
 		})
 	}
 }
 
-func TestGoSourceAliasesSelectedByGoInputsCaptureTheirReferents(t *testing.T) {
-	for _, test := range []struct {
-		name, link, target string
-	}{
-		{"lexical out source", "app/out/p/source.go", "../../.source.txt"},
-		{"ordinary underscore source", "app/_fixtures/source.go", "../.source.txt"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			root := admissionRepo(t)
-			ignore, err := os.OpenFile(filepath.Join(root, ".gitignore"), os.O_APPEND|os.O_WRONLY, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := ignore.WriteString("app/.source.txt\napp/out/\n"); err != nil {
-				t.Fatal(err)
-			}
-			if err := ignore.Close(); err != nil {
-				t.Fatal(err)
-			}
-			source := "package app\nconst Value = 1\n"
-			if err := os.WriteFile(filepath.Join(root, "app/.source.txt"), []byte(source), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			link := filepath.Join(root, filepath.FromSlash(test.link))
-			if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Symlink(test.target, link); err != nil {
-				t.Skipf("source-file symlinks unavailable: %v", err)
-			}
-			selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
-			if err != nil {
-				t.Fatal(err)
-			}
-			var files, semantic []string
-			for _, paths := range []struct {
-				absolute []string
-				into     *[]string
-			}{{selection.Files, &files}, {selection.GoEmbed, &semantic}} {
-				for _, p := range paths.absolute {
-					rel, err := filepath.Rel(root, p)
-					if err != nil {
-						t.Fatal(err)
-					}
-					*paths.into = append(*paths.into, filepath.ToSlash(rel))
-				}
-			}
-			if !slices.Contains(files, test.link) || !slices.Contains(semantic, "app/.source.txt") {
-				t.Fatalf("source alias or referent omitted: files=%v semantic=%v", files, semantic)
-			}
-			inputs := cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{Key: "/app:build~describe", Files: files, GoEmbedFiles: semantic}}}
-			admission, err := AdmitInputs(context.Background(), root, inputs)
-			if err != nil || !slices.Contains(admission.Bound, "app/.source.txt") {
-				t.Fatalf("source alias admission = %+v, %v", admission, err)
-			}
-			sourceStore, err := runnersource.OpenStore(filepath.Join(t.TempDir(), "source-store"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = sourceStore.Close() })
-			snapshot, err := sourceStore.Capture(context.Background(), root, admission.Bound)
-			if err != nil {
-				t.Fatal(err)
-			}
-			materialized, err := sourceStore.Materialize(t.TempDir(), snapshot.Manifest)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got, err := os.ReadFile(filepath.Join(materialized, filepath.FromSlash(test.link))); err != nil || string(got) != source {
-				t.Fatalf("materialized source alias = %q, %v", got, err)
-			}
-		})
-	}
-}
-
-func TestGoSourceAliasUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing.T) {
+// A link a selector lists under an ignored lifecycle root is refused until Git
+// tracks it; its listed referent then binds and the link materializes.
+func TestListedLinkUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing.T) {
 	root := admissionRepo(t)
-	ignore, err := os.OpenFile(filepath.Join(root, ".gitignore"), os.O_APPEND|os.O_WRONLY, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ignore.WriteString("app/.source.txt\n"); err != nil {
-		t.Fatal(err)
-	}
-	if err := ignore.Close(); err != nil {
-		t.Fatal(err)
-	}
-	source := "package app\nconst Value = 1\n"
-	if err := os.WriteFile(filepath.Join(root, "app/.source.txt"), []byte(source), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	link := filepath.Join(root, "app/.gen/source.go")
-	if err := os.Symlink("../.source.txt", link); err != nil {
+	appendIgnore(t, root, "app/.source.txt\n")
+	source := "package app\n"
+	writeAdmissionFile(t, root, "app/.source.txt", source)
+	if err := os.Symlink("../.source.txt", filepath.Join(root, "app/.gen/source.go")); err != nil {
 		t.Skipf("source-file symlinks unavailable: %v", err)
 	}
-	plan := func() cachekey.PortablePlanInputs {
-		t.Helper()
-		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"}, store.GoEmbedExpander())
-		if err != nil {
-			t.Fatal(err)
-		}
-		relative := func(paths []string) []string {
-			var names []string
-			for _, p := range paths {
-				rel, err := filepath.Rel(root, p)
-				if err != nil {
-					t.Fatal(err)
-				}
-				names = append(names, filepath.ToSlash(rel))
-			}
-			return names
-		}
-		return cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{
-			Key: "/app:build~describe", Files: relative(selection.Files), GoEmbedFiles: relative(selection.GoEmbed),
-		}}}
-	}
-	inputs := plan()
+	expander := listedInputs{"sel:build": {".gen/source.go", ".source.txt"}}
+	inputs := selectorPlan(t, root, expander)
 	for _, name := range []string{"app/.gen/source.go", "app/.source.txt"} {
-		if !slices.Contains(inputs.Tasks[0].GoEmbedFiles, name) {
-			t.Fatalf("missing semantic source path %s: %+v", name, inputs.Tasks[0])
+		if !slices.Contains(inputs.Tasks[0].SelectedFiles, name) {
+			t.Fatalf("missing listed path %s: %+v", name, inputs.Tasks[0])
 		}
 	}
 	if _, err := AdmitInputs(context.Background(), root, inputs); !errors.Is(err, ErrInadmissible) || !strings.Contains(err.Error(), "app/.gen/source.go") {
-		t.Fatalf("ignored lifecycle source alias was admitted: %v", err)
+		t.Fatalf("ignored lifecycle link was admitted: %v", err)
 	}
 	cmd := exec.Command("git", "-C", root, "add", "-f", "app/.gen/source.go")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("track source alias: %v: %s", err, out)
+		t.Fatalf("track the link: %v: %s", err, out)
 	}
-	admission, err := AdmitInputs(context.Background(), root, plan())
+	admission, err := AdmitInputs(context.Background(), root, selectorPlan(t, root, expander))
 	if err != nil || !slices.Equal(admission.Bound, []string{"app/.source.txt"}) {
-		t.Fatalf("tracked lifecycle source alias admission = %+v, %v", admission, err)
+		t.Fatalf("tracked lifecycle link admission = %+v, %v", admission, err)
 	}
-	sourceStore, err := runnersource.OpenStore(filepath.Join(t.TempDir(), "source-store"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = sourceStore.Close() })
-	snapshot, err := sourceStore.Capture(context.Background(), root, admission.Bound)
-	if err != nil {
-		t.Fatal(err)
-	}
-	materialized, err := sourceStore.Materialize(t.TempDir(), snapshot.Manifest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	materialized := captureAndMaterialize(t, root, admission.Bound)
 	if got, err := os.ReadFile(filepath.Join(materialized, "app/.gen/source.go")); err != nil || string(got) != source {
-		t.Fatalf("tracked lifecycle source alias was not captured: %q, %v", got, err)
+		t.Fatalf("tracked lifecycle link was not captured: %q, %v", got, err)
 	}
 }
 

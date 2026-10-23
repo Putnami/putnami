@@ -139,7 +139,7 @@ func discoverDeclaredExtensions(req *Request) *internalextension.DiscoveryResult
 }
 
 // newRunCacheManager builds the run's one cache manager, honoring a
-// cache-verification store override.
+// cache-verification store override, with the run's input resolver.
 //
 // A tree state this run captured is git answering inside the workspace root,
 // so the manager starts out knowing Git manages the root: no execution key and
@@ -154,6 +154,9 @@ func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManag
 	cache := scheduler.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
 	if req.VersionSnapshot != nil && !req.Portable.frozen() {
 		cache.RecordManagedRoot(ws.Root)
+	}
+	if req.inputResolver != nil {
+		cache.SetInputResolver(req.inputResolver)
 	}
 	return cache
 }

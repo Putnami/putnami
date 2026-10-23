@@ -1456,7 +1456,7 @@
             "maxLength": 128,
             "not": { "pattern": "^git:" }
           },
-          "description": "Input selectors this extension expands through the input-resolve control call: the core asks `<executable> __putnami input-resolve` for the files a task input that names one of them reads. A selector name is `<scheme>:<name>`; the scheme `git` is reserved for the core's `git:` file pattern. The member takes no CLI contract rung: a core that does not read it ignores it."
+          "description": "Input selectors this extension expands through the input-resolve control call: the core asks `<executable> __putnami input-resolve` for the files a task input that names one of them reads. A selector name is `<scheme>:<name>`; the scheme `git` is reserved for the core's `git:` file pattern. A task file pattern that names a selector names one listed here. A manifest that lists or names a selector requires CLI contract 14."
         },
         "prepare": {
           "$ref": "#/$defs/runtimePrepare"

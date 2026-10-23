@@ -654,7 +654,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  35,
-		funcs:  316,
+		funcs:  313,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -888,7 +888,13 @@ var complexityCeilings = []complexityCeiling{
 			"each file it lists as exact bytes, and the expander lists the selected Go links " +
 			"with the collection's own pattern walk. Every key hashes the same bytes " +
 			"(input_expander_test.go pins a build and a test key). None reads, writes, " +
-			"addresses or evicts an entry",
+			"addresses or evicts an entry. " +
+			"LOWERED, from 35/316 to 35/313: the core expands no input selector. " +
+			"GoEmbedExpander with its ExpandInput, selectedGoLinks and relativeExpansion, " +
+			"ScanGoEmbedBound and ReachesGoSource are deleted, and the store imports no goembed. " +
+			"SetInputResolver and InputResolver carry the run's resolver, which asks the " +
+			"extension that lists a selector, and namesInputSelector keys a memoized digest by " +
+			"the expander's identity only when its patterns name a selector",
 	},
 	{
 		unit:   "output",

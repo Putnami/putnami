@@ -452,6 +452,12 @@ func ImpactedSelectionForBaselineWithTasks(
 		return ImpactedSelection{Baseline: resolved.Ref, BaselineSource: resolved.Source, DiffBase: diff.Base}, nil
 	}
 
+	// An index that expands input selectors asks each extension once for the
+	// projects the diff falls in, before the mapping reads them path by path.
+	if primer, ok := tasks.(interface{ PrimeChangedPaths(paths []string) }); ok {
+		primer.PrimeChangedPaths(diff.Files)
+	}
+
 	// The git diff is the only thing --impacted owns; everything after it — the
 	// file→project mapping, cross-project assets, and graph propagation — is the
 	// shared calculation in the model package, which the watch loop replans
