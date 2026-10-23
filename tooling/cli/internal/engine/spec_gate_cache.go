@@ -1,10 +1,13 @@
 package engine
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -21,18 +24,47 @@ import (
 //
 // internal/specgate is the policy half and stays there: it decides when to ask,
 // which projects may be asked, and what an answer means. Turning a project into
-// cache bytes needs the planner, the run's command params, its version lines and
-// its cache manager — four things this package already holds and that specgate's
-// package doc says it must not grow ("imports protocol types and the CLI's own
-// result plumbing only"). So the lookup lives here and travels as an interface.
+// cache bytes needs the planner, the run's command params, its version lines,
+// its cache manager and its remote cache — five things this package already
+// holds and that specgate's package doc says it must not grow ("imports protocol
+// types and the CLI's own result plumbing only"). So the lookup lives here and
+// travels as an interface.
 //
-// Nothing is materialized. The report is read IN PLACE out of the entry's
-// files/ directory: a gate that restored bytes into .putnami/out would leave a
-// project that never ran looking like it did, and the next session's collector
-// would read a stale artifact as a fresh one.
+// Nothing is materialized into the workspace. The report is read IN PLACE out of
+// the entry's files/ directory: a gate that restored bytes into .putnami/out
+// would leave a project that never ran looking like it did, and the next
+// session's collector would read a stale artifact as a fresh one. An entry only
+// the run's remote cache holds is fetched into the local store, never further,
+// and read there the same way.
 
-// cachedObservationRecovery answers specgate.ObservationRecovery from the local
-// task-owned cache.
+// Bounds of the remote lookups of one gate. A lease another process holds or a
+// provider that does not answer costs one lookup specGateRemoteLookupTimeout at
+// most, and every remote lookup of the gate together specGateRemoteBudget.
+const (
+	specGateRemoteLookupTimeout = 15 * time.Second
+	specGateRemoteBudget        = 45 * time.Second
+)
+
+// remoteTaskEntries is the one remote-cache operation the recovery needs
+// (remotecache.RemoteCache.FetchTaskEntry): fetch the task-owned entry at hash
+// into the local store, never into the workspace, and return it. ctx is the
+// run's context; within bounds the lookup itself. A miss is (nil, nil).
+type remoteTaskEntries interface {
+	FetchTaskEntry(ctx context.Context, within time.Duration, hash string,
+		job *scheduler.ScheduledJob, cm *store.CacheManager) (*store.TaskEntry, error)
+}
+
+// executionRemoteEntries is the remote cache the session executes with, as the
+// recovery reads it, or nil when the session reads none.
+func (req *Request) executionRemoteEntries() remoteTaskEntries {
+	if req == nil || req.executionRemote == nil {
+		return nil
+	}
+	return req.executionRemote
+}
+
+// cachedObservationRecovery answers specgate.ObservationRecovery from the
+// task-owned cache: the local store first, then the run's remote cache.
 type cachedObservationRecovery struct {
 	// req is held whole rather than copied field by field. A recovery lookup has
 	// to key EXACTLY as the run keyed: the same command params, the same disable
@@ -53,6 +85,23 @@ type cachedObservationRecovery struct {
 	versions  cachekey.RunVersions
 	entriesMu sync.Mutex
 	entries   map[string]*store.TaskEntry
+
+	// ctx is the run's context and remote resolves the run's remote cache at
+	// lookup time, because a run that is not hosted loads its remote cache after
+	// this source is built (readingRemote). A nil remote, or a nil answer, reads
+	// the local store only.
+	ctx    context.Context
+	remote func() remoteTaskEntries
+	// remoteLookup bounds one remote lookup and remoteBudget all of them.
+	remoteLookup time.Duration
+	remoteBudget time.Duration
+	// remoteMu guards remoteEnd, the end of the budget, set by the first
+	// remote lookup, and remoteMisses: each hash a remote lookup returned no
+	// entry for, with why the remote cache could not answer, or "" for a miss.
+	// A hash is asked at most once per gate.
+	remoteMu     sync.Mutex
+	remoteEnd    time.Time
+	remoteMisses map[string]string
 }
 
 // newCachedObservationRecovery builds the recovery source for one run, or nil
@@ -76,6 +125,29 @@ func newCachedObservationRecovery(req *Request, ws *workspace.Workspace,
 		source.disabled = "this run has no cache store"
 	}
 	return source
+}
+
+// readingRemote makes the source ask, on a local miss, the remote cache remote
+// resolves to at lookup time, under the run's context ctx. A source without it
+// reads the local store only: the read-only verification bridge
+// (VerifyCachedVerificationReport) never calls it.
+func (source *cachedObservationRecovery) readingRemote(ctx context.Context,
+	remote func() remoteTaskEntries) *cachedObservationRecovery {
+	if source == nil || ctx == nil || remote == nil {
+		return source
+	}
+	source.ctx, source.remote = ctx, remote
+	source.remoteLookup, source.remoteBudget = specGateRemoteLookupTimeout, specGateRemoteBudget
+	return source
+}
+
+// runObservationRecovery is the recovery source of a run's spec gate: the
+// run's cache manager, then, on a local miss, the remote cache the session
+// records when its execution starts (Request.executionRemote), asked under the
+// run's context ctx.
+func runObservationRecovery(ctx context.Context, req *Request, ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription, cache *store.CacheManager) *cachedObservationRecovery {
+	return newCachedObservationRecovery(req, ws, extensions, cache).readingRemote(ctx, req.executionRemoteEntries)
 }
 
 // RecoverReports keys one plan of the loaded verification commands over the
@@ -147,8 +219,11 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 			continue // the task is not cacheable, so it can never be recovered
 		}
 		outcome.keyed++
-		entry, err := source.cache.LookupTaskEntry(hash)
-		if err != nil || entry == nil {
+		entry, failure := source.lookupTaskEntry(hash, job)
+		if entry == nil {
+			if outcome.remoteFailure == "" {
+				outcome.remoteFailure = failure
+			}
 			continue
 		}
 		outcome.entries++
@@ -183,6 +258,10 @@ type candidateOutcome struct {
 	reportTasks int
 	keyed       int
 	entries     int
+	// remoteFailure says why the run's remote cache could not answer for a
+	// keyed report task that has no entry, or is empty when it answered or
+	// was not asked.
+	remoteFailure string
 }
 
 // unconsultedReason decides whether a candidate that produced no report was
@@ -198,6 +277,9 @@ type candidateOutcome struct {
 //     and observed nothing". Reading that as "unreachable" would excuse every
 //     genuine gap in a project that simply has no bound test yet, which is
 //     exactly the regression the gate exists to catch.
+//
+// A report task whose remote lookup failed or ran out of time is unconsulted
+// too, and its reason says so rather than claim the entry does not exist.
 func (outcome *candidateOutcome) unconsultedReason() (string, bool) {
 	switch {
 	case outcome.reportTasks == 0:
@@ -205,10 +287,74 @@ func (outcome *candidateOutcome) unconsultedReason() (string, bool) {
 	case outcome.keyed < outcome.reportTasks:
 		return "not selected, and the test task that would write its verification report is not cacheable, " +
 			"so no observation can be recovered", true
+	case outcome.entries < outcome.keyed && outcome.remoteFailure != "":
+		return "not selected, and " + outcome.remoteFailure, true
 	case outcome.entries < outcome.keyed:
 		return "not selected, and the test task that writes its verification report has no cache entry for these inputs", true
 	default:
 		return "", false
+	}
+}
+
+// lookupTaskEntry returns the entry at hash of a candidate's report task: the
+// local store's, else the one the run's remote cache publishes into the local
+// store. failure says why the remote cache could not answer, and is empty for
+// an entry, a miss, and a run that reads no remote cache.
+func (source *cachedObservationRecovery) lookupTaskEntry(hash string, job *scheduler.ScheduledJob) (*store.TaskEntry, string) {
+	if entry, err := source.cache.LookupTaskEntry(hash); err == nil && entry != nil {
+		return entry, ""
+	}
+	if source.remote == nil {
+		return nil, ""
+	}
+	remote := source.remote()
+	if remote == nil {
+		return nil, ""
+	}
+	source.remoteMu.Lock()
+	failure, asked := source.remoteMisses[hash]
+	if source.remoteEnd.IsZero() {
+		source.remoteEnd = time.Now().Add(source.remoteBudget)
+	}
+	within := min(source.remoteLookup, time.Until(source.remoteEnd))
+	source.remoteMu.Unlock()
+	if asked {
+		return nil, failure
+	}
+
+	var entry *store.TaskEntry
+	var err error
+	switch {
+	case source.ctx.Err() != nil:
+		err = source.ctx.Err()
+	case within <= 0:
+		err = context.DeadlineExceeded
+	default:
+		entry, err = remote.FetchTaskEntry(source.ctx, within, hash, job, source.cache)
+	}
+	if entry != nil {
+		return entry, ""
+	}
+	failure = remoteLookupFailure(err)
+	source.remoteMu.Lock()
+	if source.remoteMisses == nil {
+		source.remoteMisses = make(map[string]string)
+	}
+	source.remoteMisses[hash] = failure
+	source.remoteMu.Unlock()
+	return nil, failure
+}
+
+// remoteLookupFailure renders why a remote lookup returned no entry, completing
+// "not selected, and ...", or "" for a miss.
+func remoteLookupFailure(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, context.DeadlineExceeded):
+		return "the remote cache did not answer in time for the test task that writes its verification report"
+	default:
+		return "the remote cache lookup for the test task that writes its verification report failed: " + err.Error()
 	}
 }
 

@@ -299,6 +299,29 @@ func (r *RemoteCache) ensureProvider(ctx context.Context, ws *workspace.Workspac
 // with Ready=false: the run builds locally and never starts it again.
 var errProviderNotReady = errors.New("cache provider is not ready")
 
+// errProviderClosed is why a closed provider cannot answer.
+var errProviderClosed = errors.New("cache provider session is closed")
+
+// unavailable says why ensureProvider returned no session: the provider's
+// start or initialize failure, or its closed session. It is nil for a nil
+// provider and for one that answered initialize not ready, the unconfigured
+// default: such a run reads no remote cache, which is not a failure.
+func (p *providerRemote) unavailable() error {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	switch {
+	case errors.Is(p.initErr, errProviderNotReady):
+		return nil
+	case p.initErr != nil:
+		return p.initErr
+	default:
+		return errProviderClosed
+	}
+}
+
 // providerMode is the materialization mode the provider resolved, which it
 // returns only with the cache.CapabilityProviderConfiguration echo, else
 // cache.ModeFull.

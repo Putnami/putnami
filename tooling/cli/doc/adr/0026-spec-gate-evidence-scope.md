@@ -5,6 +5,9 @@
   [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md)
   (proposed): a producer is a task that declares the file, under a command of
   the verification or criteria kind, whatever the command is called.
+- **Amended**: 2026-10-23, §1, §2, §4 and §7: on a local miss, the gate
+  reads a report task's entry from the remote cache the run executes with,
+  within a time bound, and fetches it into the local store only.
 - **Scope**: `@putnami/cli` spec gate (`internal/specgate`, the observation
   recovery in `internal/engine`) and the verification record of
   `protocols/features`
@@ -25,7 +28,8 @@ that regressed nothing.
 
 A `test~test` cache entry holds the project's captured
 `putnami-feature-verification.json` as a declared output. When the in-session
-join leaves a requirement unresolved, the gate reads that entry. This adds no
+join leaves a requirement unresolved, the gate reads that entry from the local
+store, else from the remote cache the run executes with. This adds no
 trust assumption: `restoreReservedDeclaredArtifactEvents` already restores the
 same artifact on a warm hit for a selected project.
 
@@ -59,8 +63,9 @@ bounded by fan-in (31 at most here), not by depth.
   silent.
 - **Silence is an answer.** An entry whose report output is recorded empty ran
   for these inputs and observed nothing. Only a candidate with no cache entry,
-  an uncacheable test task, or `--no-cache` is unconsulted. Only the task that
-  declares the report is asked; other `test` steps are ignored.
+  an uncacheable test task, a remote lookup that failed or ran out of time, or
+  `--no-cache` is unconsulted. Only the task that declares the report is asked,
+  and the remote cache only on a local miss; other `test` steps are ignored.
 - **An exhausted scope blocks.** When the candidate set is empty, or every
   candidate answered and none reported the check, the requirement stays
   `missing` and blocks: no test proves it. The group carries a
@@ -75,8 +80,9 @@ store.
 
 ### 4. Nothing is restored into the working tree
 
-The report is read in place from the entry's `files/` directory. A file under
-`.putnami/out` would make a project that never ran look like it did. A
+The report is read in place from the entry's `files/` directory. An entry only
+the remote cache holds is fetched into the local store, never further. A file
+under `.putnami/out` would make a project that never ran look like it did. A
 restored observation must still name a regular file of the project that
 published the entry. The report reference records the digest of the bytes
 read and is marked `restored`, so an auditor can tell produced evidence from
@@ -120,8 +126,9 @@ reader.
 `internal/specgate` is the policy half: when to ask, which projects may be
 asked, what an answer means. The engine owns the cache half behind the
 `specgate.ObservationRecovery` interface, reusing the run's planner, params,
-and `store.CacheManager`. It keys one `test` plan over the whole candidate set:
-a cache key mixes declared inputs and upstream keys, never the selection.
+`store.CacheManager`, and remote cache. It keys one `test` plan over the
+whole candidate set: a cache key mixes declared inputs and upstream keys, never
+the selection.
 
 ## Rejected alternatives
 

@@ -68,12 +68,70 @@ func (r *RemoteCache) RestoreTaskEntry(
 	if r == nil || cm == nil || hash == "" {
 		return nil, jobmodel.ReuseNone
 	}
+	entry, reuse, _ := r.restoreTaskEntry(ctx, hash, job, cm, true)
+	return entry, reuse
+}
 
+// FetchTaskEntry fetches the task-owned entry at hash for a task this run did
+// not plan, and publishes it into the local store for a reader of the store:
+// the spec gate reads an unplanned attester's verification report in place
+// from it. It never writes the workspace.
+//
+// It shares RestoreTaskEntry's lease, provider restore, trust policy and local
+// publication. No planned job consumes the entry, so it counts no task reuse
+// (no provider hit, no restore, no time saved): the run's cache stats gain only
+// the bytes it fetched and the time it spent materializing them. An untrusted
+// hit is a miss and warms nothing.
+//
+// When this call is the first operation that needs the provider, the provider
+// starts under ctx, as it does for any operation of the run: its process lives
+// as long as the context it starts under. within bounds the rest, the wait on
+// a lease another process holds and the provider round trip, so neither keeps
+// the caller longer than that.
+//
+// It returns (nil, nil) for a provider miss, an untrusted hit, and a provider
+// that serves nothing by configuration. It returns an error when the provider
+// cannot answer in time or at all, or when its payload is not interpretable.
+func (r *RemoteCache) FetchTaskEntry(
+	ctx context.Context,
+	within time.Duration,
+	hash string,
+	job *jobmodel.ScheduledJob,
+	cm *store.CacheManager,
+) (*store.TaskEntry, error) {
+	if !r.IsProviderBacked() || cm == nil || hash == "" {
+		return nil, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if _, ok := r.ensureProvider(ctx, nil, cm); !ok {
+		return nil, r.provider.unavailable()
+	}
+	bounded, cancel := context.WithTimeout(ctx, within)
+	defer cancel()
+	entry, _, err := r.restoreTaskEntry(bounded, hash, job, cm, false)
+	return entry, err
+}
+
+// restoreTaskEntry is the provider restore of a task-owned entry that
+// RestoreTaskEntry and FetchTaskEntry share. planned says whether a planned
+// job consumes the entry: only then does an untrusted hit warm the CAS for the
+// task's execution, does a fetched hit count as a task reuse, and does a
+// failure log that the task builds locally. The error says why the provider
+// did not answer; a miss and an untrusted hit carry none.
+func (r *RemoteCache) restoreTaskEntry(
+	ctx context.Context,
+	hash string,
+	job *jobmodel.ScheduledJob,
+	cm *store.CacheManager,
+	planned bool,
+) (*store.TaskEntry, jobmodel.ReuseKind, error) {
 	// Claim the machine-global task-owned address before the network round trip,
 	// exactly as the legacy path claims the action key: sibling worktrees then
 	// wait for the resulting local entry instead of each asking their provider
-	// session to download the same blobs. Expiry, timeout, cancellation and store
-	// errors all fall through to the direct provider call below.
+	// session to download the same blobs. Expiry, timeout and store errors all
+	// fall through to the direct provider call below.
 	winner, release := cm.TryClaimTaskEntry(hash, remoteRestoreEstimatedCost(job))
 	if winner {
 		defer release()
@@ -85,25 +143,37 @@ func (r *RemoteCache) RestoreTaskEntry(
 			// a provider hit: the owner's own run already accounts for whatever it
 			// did. (The legacy path attributes this case to the remote instead;
 			// keeping that would put a local execution in the provider hit column.)
-			return entry, jobmodel.ReuseCoalesced
+			return entry, jobmodel.ReuseCoalesced, nil
 		}
+	}
+	// A caller whose context ended asks the provider nothing: the request would
+	// still reach it, and it would download an entry nobody reads.
+	if err := ctx.Err(); err != nil {
+		return nil, jobmodel.ReuseNone, err
 	}
 
 	sess, ok := r.ensureProvider(ctx, nil, cm)
 	if !ok {
-		return nil, jobmodel.ReuseNone
+		return nil, jobmodel.ReuseNone, r.provider.unavailable()
 	}
 	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: store.RemoteTaskEntryKey(hash)})
 	if err != nil {
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
-		slog.Warn("remote cache: provider restore failed; building locally",
-			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return nil, jobmodel.ReuseNone
+		if planned {
+			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
+			slog.Warn("remote cache: provider restore failed; building locally",
+				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
+		}
+		return nil, jobmodel.ReuseNone, err
 	}
 	if restore.Status != cache.RestoreHit || restore.Result == nil || restore.Manifest == nil {
-		return nil, jobmodel.ReuseNone
+		return nil, jobmodel.ReuseNone, nil
 	}
 	if !r.Trust.Accepts(restore.Channel) {
+		if !planned {
+			// No job of this run executes the task, so there is no execution for
+			// the hint's bytes to warm.
+			return nil, jobmodel.ReuseNone, nil
+		}
 		// A hint (or a channel-less legacy hit) is useful as bytes but not as
 		// evidence: verify and admit its blobs into the CAS, then report a miss so
 		// the scheduler executes the task. No entry is published, so neither this
@@ -117,12 +187,12 @@ func (r *RemoteCache) RestoreTaskEntry(
 			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 			slog.Warn("remote cache: provider hint prefetch failed; building locally",
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-			return nil, jobmodel.ReuseNone
+			return nil, jobmodel.ReuseNone, err
 		}
 		r.stats.RecordFetch(ManifestBytes(restore.Manifest))
 		r.stats.RecordMaterialize(start, time.Now())
 		r.stats.RecordHintWarm()
-		return nil, jobmodel.ReuseNone
+		return nil, jobmodel.ReuseNone, nil
 	}
 	// No source-mutation rejection here, unlike the legacy remote path — but for
 	// a different reason than "no such entry exists". A v3 source rewriter DOES
@@ -144,13 +214,22 @@ func (r *RemoteCache) RestoreTaskEntry(
 		// the descriptor is a MISS, never a partial restore. Debug level — the
 		// rejection self-heals by rebuilding, and per-key noise helps only when
 		// actively tracing a rebuild loop.
-		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
-		slog.Debug("remote cache: task-owned hit is not interpretable; building locally",
-			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return nil, jobmodel.ReuseNone
+		if planned {
+			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
+			slog.Debug("remote cache: task-owned hit is not interpretable; building locally",
+				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
+		}
+		return nil, jobmodel.ReuseNone, err
 	}
-	r.recordTaskRestoredHit(hash, entry, ManifestBytes(restore.Manifest), materializeStart, time.Now())
-	return entry, jobmodel.ReuseRemoteCache
+	materializeEnd := time.Now()
+	if planned {
+		r.recordTaskRestoredHit(hash, entry, ManifestBytes(restore.Manifest), materializeStart, materializeEnd)
+	} else {
+		// A fetch for a reader of the store is transfer, not reuse.
+		r.stats.RecordFetch(ManifestBytes(restore.Manifest))
+		r.stats.RecordMaterialize(materializeStart, materializeEnd)
+	}
+	return entry, jobmodel.ReuseRemoteCache, nil
 }
 
 // recordTaskRestoredHit folds a task-owned provider hit into this run's cache

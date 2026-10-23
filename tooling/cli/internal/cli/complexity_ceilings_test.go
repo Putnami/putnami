@@ -85,8 +85,19 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  183,
-		why: "LOWERED 25/186→24/183 (cli/context-mcp-discovery, build-writes-no-workspace-map): " +
+		funcs:  188,
+		why: "RAISED 183→188 (cli/job-planning-execution, spec-gate-evidence-scope): an unplanned " +
+			"attester's report entry that only the run's remote cache holds resolves through that remote " +
+			"cache. spec_gate_cache.go holds readingRemote, which attaches the run's context and remote " +
+			"cache to the recovery source; runObservationRecovery, which builds the run's source with " +
+			"them; lookupTaskEntry, which asks the remote cache on a local miss under a per-lookup " +
+			"deadline and a gate-wide budget; remoteLookupFailure, which says why a " +
+			"lookup returned no entry; and Request.executionRemoteEntries, which resolves the remote cache " +
+			"at gate time, as a nil interface for a run without one. execute.go holds sessionRemoteCache, " +
+			"which selects the session's remote cache and records it on the request, so executeSession " +
+			"stays within its line limit. They add no stage, flag or store; " +
+			"files stay at 24. " +
+			"LOWERED 25/186→24/183 (cli/context-mcp-discovery, build-writes-no-workspace-map): " +
 			"context_map.go — the finalizer that refreshed the workspace map after a build session, its " +
 			"two stderr notices and the build-name check that gated it — is deleted. A build writes no " +
 			"map; resultsSucceeded, which the spec gate also uses, moves to spec_gate.go. " +

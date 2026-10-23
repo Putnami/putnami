@@ -17,8 +17,9 @@ import (
 
 // VerifyCachedVerificationReport corroborates a restored native observation
 // against the current plan of the loaded verification commands and the
-// task-owned cache entry it derives. It only reads evidence; it never executes
-// a test or materializes an output.
+// task-owned cache entry it derives. It only reads evidence from the local
+// store; it never asks a remote cache, executes a test or materializes an
+// output.
 // Command parameters not recorded by a session cannot be guessed here: an
 // entry keyed with nondefault parameters fails closed.
 func VerifyCachedVerificationReport(root string, report features.VerificationReportRef) ([]byte, error) {
