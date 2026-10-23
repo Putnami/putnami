@@ -26,9 +26,15 @@ name: Contributor CI (without credentials)
 
 # A draft pull request runs nothing: every proposal opens as a draft when work
 # starts, and its checkpoints need no gate. Marking it ready runs the job.
+#
+# `edited` is listed for one edit only: a change of the base branch. A new base
+# changes what the pull request proposes, so the head needs a new gate result.
+# A stacked pull request retargeted to main after its parent merges otherwise
+# has no result and cannot merge. A title or body edit runs nothing: the job's
+# `if` skips it, and the concurrency group below keeps it from cancelling a run.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
     inputs:
       scope:
@@ -44,14 +50,19 @@ permissions:
   # Pull the Postgres service image from this repository's GHCR mirror.
   packages: read
 
+# A title or body edit starts a workflow run whose job is skipped. That run takes
+# a group of its own, so it never cancels the gate running for the same ref.
 concurrency:
-  group: contributor-ci-${{ github.ref }}
+  group: contributor-ci-${{ (github.event.action == 'edited' && !github.event.changes.base) && format('edit-{0}', github.run_id) || github.ref }}
   cancel-in-progress: true
 
 jobs:
   gate:
     name: lint,test,build,validate without credentials
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: >-
+      github.event_name != 'pull_request' ||
+      (!github.event.pull_request.draft &&
+      (github.event.action != 'edited' || github.event.changes.base))
     runs-on: ubuntu-latest
     # A wide change fans out across the whole workspace (a CLI edit reaches ~79
     # projects), so this is a ceiling that fails loudly, not an expected
@@ -264,7 +275,8 @@ jobs:
       # message is the title, a blank line and the body. Title and body are
       # untrusted text, so they reach the script through env and never through
       # an expression inside it. The job does not run when only the title or
-      # the body is edited, so such an edit is checked at the next push.
+      # the body is edited, so such an edit is checked at the next push or
+      # base change.
       - name: Run the gate
         env:
           EVENT_NAME: ${{ github.event_name }}
