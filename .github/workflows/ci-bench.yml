@@ -15,13 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: oct01-test, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e, cmd: test, args: '--all --enforce-coverage' }
-          - { name: oct13-test, ref: 711d2a7004e8cfed139bf6c8fb90319c4f12656d, cmd: test, args: '--all --enforce-coverage' }
-          - { name: oct23-cli-verbose, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli --test-json' }
-          - { name: oct23-cli-compile-only, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: "--projects @putnami/cli --run ^$ --no-enforce-coverage" }
-          - { name: oct23-clidocs-verbose, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli-documents --test-json' }
-          - { name: oct23-goext-cloudext-verbose, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/go,@putnami/cloud-extension --test-json' }
-          - { name: oct01-cli-verbose, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e, cmd: test, args: '--projects @putnami/cli --test-json' }
+          - { name: oct23-cli-v, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli --test-verbose --no-enforce-coverage' }
+          - { name: oct01-cli-v, ref: f62604371da39d1acf1c67f8f2a10e3b6f1a856e, cmd: test, args: '--projects @putnami/cli --test-verbose --no-enforce-coverage' }
+          - { name: oct23-clidocs-v, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/cli-documents --test-verbose --no-enforce-coverage' }
+          - { name: oct23-goext-v, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: test, args: '--projects @putnami/go --test-verbose --no-enforce-coverage' }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -82,9 +79,10 @@ jobs:
           cp "$RUNNER_TEMP/vmstat.txt" "$RUNNER_TEMP/out/"
           find . -path ./node_modules -prune -o -name '*.json' -newer "$RUNNER_TEMP/vmstat.txt" -path '*test*' -print 2>/dev/null | head -50 > "$RUNNER_TEMP/out/newjson.txt"
           find . -path '*/.putnami/*' -name '*.jsonl' -newer go.work 2>/dev/null | head -50 >> "$RUNNER_TEMP/out/newjson.txt"
+          cp -r .putnami/sessions "$RUNNER_TEMP/out/" 2>/dev/null || true
           exit 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench2-${{ matrix.name }}
+          name: bench3-${{ matrix.name }}
           path: ${{ runner.temp }}/out
