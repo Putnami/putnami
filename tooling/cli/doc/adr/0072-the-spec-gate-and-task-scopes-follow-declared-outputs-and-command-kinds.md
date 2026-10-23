@@ -11,6 +11,9 @@
   decision 2 ("`validate` and `validate-workspace` stay never narrowed by
   name"). The rest of both holds.
 - **Decisions**: D-006 and D-021 of the root `decisions.json`
+- **Amended**: 2026-10-23, §6, the first consequence and the
+  `impact_scope_test.go` proof: a kept criteria job keeps the jobs it depends
+  on and no verification job the scope does not name.
 
 ## Context
 
@@ -73,9 +76,11 @@ The core still decided by command name:
    one row per project and command. A replay serves a session that names the
    command that recorded it, and the live view attaches it to that command.
    The strict reader accepts a row under any named command.
-6. **A task scope never narrows a criteria job**, and it keeps the
-   verification jobs that a kept projection producer of the same project
-   judges. The side-effect floor of ADR 0070 decision 1 is unchanged.
+6. **A task scope never narrows a criteria job**, and a kept criteria job
+   keeps the jobs it depends on and no other. It keeps no verification job the
+   scope does not name: the spec gate reads that job's report from its cache
+   entry, and a check no entry answers warns (ADR 0026 §5). The side-effect
+   floor of ADR 0070 decision 1 is unchanged.
 7. **A workspace that loads the first-party manifests and `@putnami/sdd`
    behaves as before.** With them and the `@putnami/dev` vocabulary, the
    verification commands are `test`, the criteria commands are `validate` and
@@ -104,8 +109,7 @@ Behavior changes only for a manifest whose command name and kind disagree:
 
 - A `test` command without the verification kind, because its manifest
   declares traits without `kind` or the workspace loads no vocabulary that
-  gives one, no longer carries the gate, recovery, coverage rows or replay,
-  and a task scope no longer keeps it for a judged projection.
+  gives one, no longer carries the gate, recovery, coverage rows or replay.
 - A `validate` or `validate-workspace` command without the criteria kind is
   narrowed by a task scope like any command, and is no projection producer.
 - A command of any name with the verification or criteria kind gains these
@@ -143,7 +147,8 @@ Behavior changes only for a manifest whose command name and kind disagree:
   `internal/output/live_test.go`: coverage recorded and replayed under
   `check`.
 - `internal/engine/impact_scope_test.go`: a criteria command of any name is
-  never narrowed, a `validate` without the kind is, and every first-party
-  command keeps what it kept.
+  never narrowed, a `validate` without the kind is, every first-party command
+  keeps what it kept, and a kept criteria job keeps no verification job the
+  scope does not name.
 - `internal/cli/e2e/specgate/spec_gate_matrix_test.go`: `criteria,check --all`
   verifies, blocks a contradicted check, and blocks again on the warm rerun.
