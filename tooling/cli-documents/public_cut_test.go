@@ -120,10 +120,24 @@ var publicCutTrackerRules = []publicCutRule{
 	},
 }
 
+// Two private names are flagged wherever they stand alone. The third is also
+// the name of the @putnami/cloud extension binary, so only a reference to its
+// repository is flagged: a GitHub URL under any owner, a clone URL ending in
+// .git, or a sibling checkout path such as ../<name>. The owner-qualified name
+// is publicCutPrivateRepositoryRules' match. The names are split so the
+// scanner stays self-safe.
 var publicCutPrivateNameRules = []publicCutRule{
 	{
 		name: "private-repository-name",
-		re:   regexp.MustCompile(`(?i)(?:^|[^\w@/.-])(putnami` + `-cloud|agents` + `-memory|found` + `ry)(?:[^\w-]|$)`),
+		re:   regexp.MustCompile(`(?i)(?:^|[^\w@/.-])(agents` + `-memory|found` + `ry)(?:[^\w-]|$)`),
+	},
+	{
+		name: "private-repository-name",
+		re: regexp.MustCompile(`(?i)(?:^|[^\w-])(` +
+			`(?:(?:https?|ssh)://|git@)?github[.]com[:/][\w.-]+/putnami` + `-cloud(?:[.]git)?` +
+			`|[\w.:/@~-]*putnami` + `-cloud[.]git` +
+			`|(?:[.][.]/)+putnami` + `-cloud` +
+			`)(?:[^\w-]|$)`),
 	},
 }
 
@@ -284,7 +298,6 @@ func TestPublicCutScannerDetectsTrackerReferencesAndPrivateNames(t *testing.T) {
 		{"Fixes " + hash + "12, relates to more", hash + "12"},
 		{"see golang/go" + hash + "22315", "golang/go" + hash + "22315"},
 		{"blocked on putnami" + hash + "2931", "putnami" + hash + "2931"},
-		{"the " + "putnami" + "-cloud workspace", "putnami" + "-cloud"},
 		{"cloned into " + "agents" + "-memory", "agents" + "-memory"},
 		{"a consumer named " + "found" + "ry", "found" + "ry"},
 	}
@@ -309,6 +322,52 @@ func TestPublicCutScannerDetectsTrackerReferencesAndPrivateNames(t *testing.T) {
 	for _, line := range clean {
 		if findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(line + "\n")}}); len(findings) != 0 {
 			t.Errorf("%q: a legitimate line was flagged: %+v", line, findings)
+		}
+	}
+}
+
+func TestPublicCutScannerFlagsThePrivateRepositoryNotTheBinaryName(t *testing.T) {
+	t.Parallel()
+	name := "putnami" + "-cloud"
+	owner := "Putnami"
+	host := "github" + ".com"
+	cases := []struct {
+		line string
+		rule string
+		want string
+	}{
+		{"owned by " + owner + "/" + name + " today", "private-repository-coordinate", "putnami/" + name},
+		{"see https://" + host + "/" + owner + "/" + name, "private-repository-coordinate", "https://" + host + "/putnami/" + name},
+		{"git clone https://" + host + "/" + owner + "/" + name + ".git", "private-repository-coordinate", "https://" + host + "/putnami/" + name + ".git"},
+		{"git clone git@" + host + ":" + owner + "/" + name + ".git", "private-repository-coordinate", "git@" + host + ":putnami/" + name + ".git"},
+		{"git clone git@" + host + ":" + owner + "/" + name, "private-repository-coordinate", "git@" + host + ":putnami/" + name},
+		{"a fork at https://" + host + "/someone/" + name + ".", "private-repository-name", "https://" + host + "/someone/" + name},
+		{"git clone git@" + host + ":someone/" + name + ".git", "private-repository-name", "git@" + host + ":someone/" + name + ".git"},
+		{"git clone ssh://git@git.example.com/team/" + name + ".git", "private-repository-name", "ssh://git@git.example.com/team/" + name + ".git"},
+		{"cd ../" + name + " && make", "private-repository-name", "../" + name},
+		{"read ../../" + name + "/README.md", "private-repository-name", "../../" + name},
+	}
+	for _, tc := range cases {
+		findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(tc.line + "\n")}})
+		if len(findings) != 1 || findings[0].category != publicCutPrivateRepository || findings[0].rule != tc.rule || findings[0].evidence != tc.want {
+			t.Errorf("%q: findings = %+v, want one %s finding with evidence %q", tc.line, findings, tc.rule, tc.want)
+		}
+	}
+
+	binaryNames := []string{
+		"the " + name + " binary",
+		`const reporterBinary = "` + name + `"`,
+		name + " credential-provider: ready",
+		`filepath.Join(root, ".putnami", "bin", "extensions", "` + name + `")`,
+		".putnami/bin/extensions/" + name,
+		"the archive's compiled/" + name + ", or compiled/" + name + ".exe on Windows",
+		"[`cmd/" + name + "`](../../cmd/" + name + ")",
+		"example.com/fork/" + name,
+		"archive-" + name + "-linux-x64.tar.gz",
+	}
+	for _, line := range binaryNames {
+		if findings := scanPublicCut([]publicCutFile{{path: "doc.md", data: []byte(line + "\n")}}); len(findings) != 0 {
+			t.Errorf("%q: the binary name was flagged as the private repository: %+v", line, findings)
 		}
 	}
 }
@@ -721,7 +780,7 @@ func scanPublicCutContent(path string, data []byte, skipDebtReferences, binary b
 	for index, rawLine := range bytes.Split(data, []byte{'\n'}) {
 		line := string(bytes.TrimSuffix(rawLine, []byte{'\r'}))
 		lineNumber := index + 1
-		var historySpans [][2]int
+		var historySpans, coordinateSpans [][2]int
 		lower := ""
 		if !skipDebtReferences {
 			lower = strings.ToLower(line)
@@ -742,6 +801,7 @@ func scanPublicCutContent(path string, data []byte, skipDebtReferences, binary b
 					if publicCutSpanOverlaps(span, historySpans) {
 						continue
 					}
+					coordinateSpans = append(coordinateSpans, [2]int{span[0], span[1]})
 					match := line[span[0]:span[1]]
 					findings = append(findings, publicCutFinding{
 						category: publicCutPrivateRepository, path: path, line: lineNumber, rule: rule.name,
@@ -775,7 +835,7 @@ func scanPublicCutContent(path string, data []byte, skipDebtReferences, binary b
 			}
 		}
 		if !skipDebtReferences && publicCutPrivateNamePossible(lower) {
-			for _, span := range publicCutMatchSpans(publicCutPrivateNameRules, line, historySpans) {
+			for _, span := range publicCutMatchSpans(publicCutPrivateNameRules, line, append(historySpans, coordinateSpans...)) {
 				findings = append(findings, publicCutFinding{
 					category: publicCutPrivateRepository, path: path, line: lineNumber, rule: span.rule,
 					evidence: strings.ToLower(line[span.start:span.end]), context: publicCutFindingContext(line, binary),
