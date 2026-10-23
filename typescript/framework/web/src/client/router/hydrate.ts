@@ -3,6 +3,7 @@ import { hydrateRoot } from 'react-dom/client';
 import { createBrowserRouter, matchRoutes, type RouteObject, RouterProvider, type RouterState } from 'react-router';
 import { ANONYMOUS_SECURITY_CONTEXT, type ClientSecurityContext } from '../../shared/security.types';
 import { SecurityContextProvider, setSecurityContext } from '../security/security-context';
+import { followFragmentSteps } from './fragment-steps';
 import { createNavigationTracker } from './navigation-tracking';
 import { setRouterRoutes } from './router-routes';
 import { restoreScrollAtRoot } from './scroll-restoration';
@@ -125,12 +126,16 @@ export async function hydratePage(containerId: string, routes: RouteObject[]) {
   if (routes[0]) {
     restoreScrollAtRoot(routes[0]);
   }
+  // A link to an in-page `#id`, and back or forward between entries that
+  // differ only by their fragment, keep the browser's scroll and the loaded data.
+  const fragmentSteps = followFragmentSteps(window, routes);
   setRouterRoutes(routes, basename);
 
   const router = createBrowserRouter(routes, {
     basename,
     hydrationData: window.__staticRouterHydrationData,
   });
+  fragmentSteps.attach(router);
 
   // Announce client-side route changes on the DOM so plugins can observe
   // navigation without patching the router. Priming the tracker with the

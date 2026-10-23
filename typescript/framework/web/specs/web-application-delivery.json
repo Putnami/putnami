@@ -25,7 +25,11 @@
     },
     {
       "id": "navigation-scroll",
-      "text": "After a client navigation, the hydrated app scrolls a new location to the top or to its hash target, restores the saved position on back and forward, keeps the position when the navigation asks to, and leaves the server markup unchanged."
+      "text": "After a client navigation, the hydrated app scrolls a new location to the top or to its hash target, keeps the browser's scroll to the target of a link to an in-page `#id`, restores the saved position on back and forward, keeps the position when the navigation asks to, and leaves the server markup unchanged."
+    },
+    {
+      "id": "fragment-history-steps",
+      "text": "A back or forward step that changes or drops only the fragment keeps the loaded data and runs no loader, unless a route's `shouldRevalidate` returns true; a submission or a `revalidate()` call still runs the loaders."
     },
     {
       "id": "redirect-outside-the-router",
