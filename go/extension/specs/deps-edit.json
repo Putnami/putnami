@@ -29,6 +29,10 @@
       "text": "A prune names each requirement to drop by the module path the go.mod in the target project's directory declares, not by the project's putnami.json name, and fails naming the target and the project when it cannot read one."
     },
     {
+      "id": "deps-dry-run-writes-no-file",
+      "text": "Under the param dry-run, true when the command runs with --dry-run, deps-edit makes each edit and its tidy on a copy of go.mod and go.sum, then logs each requirement and replace directive the edit adds, drops or changes in go.mod and the number of go.sum lines it adds and drops, and emits those lines as one summary the CLI always prints. It writes no file of the workspace."
+    },
+    {
       "id": "deps-add-resolves-a-workspace-member-from-the-tree",
       "text": "Bare add specs resolve uniquely declared governing go.work modules without registry access. Preserve a valid required version and existing replacements; otherwise use a major placeholder and relative member replacement. Explicit versions and nonmembers retain registry lookup. Reject malformed, missing, ambiguous and self members before Go runs. Read member go.mod identities only. Apply within the existing rollback transaction."
     }

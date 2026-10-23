@@ -120,6 +120,33 @@ func TestTextRendererFinishVisibleSummary(t *testing.T) {
 	}
 }
 
+// visibleDryRunPlan is the plan of deps add --dry-run, as the summary the job
+// marks always visible.
+const visibleDryRunPlan = "Planned edit of api/go.mod:\n  + require example.com/lib v0.3.0"
+
+func visibleDryRunPlanEvent() jobs.RawJobEvent {
+	return jobs.RawJobEvent{Type: jobs.EventTypeSummary, Data: map[string]any{"message": visibleDryRunPlan, "visibility": "always"}}
+}
+
+// A lifecycle run hides its success chrome but prints a summary the job marks
+// always visible: the plan of deps add --dry-run.
+func TestTextRendererLifecycleFinishPrintsAVisibleSummary(t *testing.T) {
+	var out, errOut bytes.Buffer
+	r := NewTextRenderer(&out, &errOut, TextRendererConfig{Lifecycle: true})
+	r.Start(nil)
+
+	plan := visibleDryRunPlan
+	summary := visibleDryRunPlanEvent()
+	r.Finish(map[string]*jobs.JobResult{"api:deps-edit": {
+		Status: "success",
+		Events: []jobs.RawJobEvent{summary},
+	}}, jobs.SessionOutcome{})
+
+	if output := errOut.String(); output != "\n"+plan+"\n" {
+		t.Errorf("lifecycle output = %q, want only the plan", output)
+	}
+}
+
 func TestTextRendererVerboseUsesLiveStyleRows(t *testing.T) {
 	initial := ColorsEnabled()
 	defer SetColorsEnabled(initial)

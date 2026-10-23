@@ -12,7 +12,9 @@ package depsedit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -103,6 +105,26 @@ func run(j *workspacejob.Job, params map[string]json.RawMessage, contextFile str
 	}
 	depsupgrade.SetupModuleEnv(j, opts)
 
+	// A dry run (the param dry-run) makes each edit on a copy of go.mod and
+	// go.sum and reports what would change, so it writes no file of the
+	// workspace and needs no snapshot. The plan is a summary the CLI always
+	// prints, since a deps command hides the job's logs.
+	if opts.DryRun {
+		var plan []string
+		for _, e := range edits {
+			lines, err := apply(j, action, e, true)
+			if err != nil {
+				j.Emit.Diagnostic("error", err.Error()+"; the dry run changed no file", "", 0)
+				return statusFailed
+			}
+			plan = append(plan, lines...)
+		}
+		plan = append(plan, "Dry run complete; no Go files were changed")
+		j.Emit.Log("info", plan[len(plan)-1])
+		j.Emit.SummaryWithData(strings.Join(plan, "\n"), map[string]any{"visibility": "always"})
+		return statusOK
+	}
+
 	var snapshot workspacejob.Snapshot
 	for _, e := range edits {
 		dir := filepath.Join(j.WorkspaceRoot, e.Path)
@@ -117,7 +139,7 @@ func run(j *workspacejob.Job, params map[string]json.RawMessage, contextFile str
 	// A SIGINT or a SIGTERM puts the files back too, then ends the job.
 	j.Trap().Arm(func() { _ = restore() })
 	for _, e := range edits {
-		if err := apply(j, action, e); err != nil {
+		if _, err := apply(j, action, e, false); err != nil {
 			message := err.Error() + "; every file the command edited is back as it was"
 			if restoreErr := restore(); restoreErr != nil {
 				message = err.Error() + "\n" + restoreErr.Error()
@@ -182,40 +204,223 @@ func refuseDropOnAdd(edits []edit) string {
 // the placeholder a workspace module keeps after its local `replace` is gone or
 // that only go.work satisfies, then fails the very add or remove that would
 // fix it.
-func apply(j *workspacejob.Job, action string, e edit) error {
+//
+// A dry run makes the same edit and the same tidy on a copy of go.mod and
+// go.sum (planEdit), logs what would change in them, and returns those lines.
+func apply(j *workspacejob.Job, action string, e edit, dryRun bool) ([]string, error) {
 	dir := filepath.Join(j.WorkspaceRoot, e.Path)
 	modules := e.Modules
 	if action == actionPrune {
 		var err error
 		if modules, err = prunedModules(j.WorkspaceRoot, e); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	verb := map[string]string{actionAdd: "Adding", actionRemove: "Removing", actionPrune: "Removing"}[action]
+	if dryRun {
+		verb = map[string]string{actionAdd: "Planning to add", actionRemove: "Planning to remove", actionPrune: "Planning to remove"}[action]
+	}
 	j.Emit.Log("info", fmt.Sprintf("%s %s in %s...", verb, strings.Join(modules, " "), e.Project))
 
-	args := []string{"-C", dir, "mod", "edit"}
+	var editArgs []string
 	if action == actionAdd {
 		edits, err := addEdits(j, dir, modules)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		args = append(args, edits...)
+		editArgs = edits
 	} else {
 		for _, m := range modules {
 			// A version the caller gave is not part of the requirement to drop.
 			path, _, _ := strings.Cut(m, "@")
-			args = append(args, "-droprequire="+path)
+			editArgs = append(editArgs, "-droprequire="+path)
 		}
+	}
+	if dryRun {
+		lines, err := planEdit(j, dir, e, editArgs)
+		if err != nil {
+			return nil, err
+		}
+		for _, line := range lines {
+			j.Emit.Log("info", line)
+		}
+		return lines, nil
+	}
+	if err := editModule(j, dir, "", editArgs); err != nil {
+		return nil, err
+	}
+	if err := tidyModule(j, dir, filepath.Join(dir, "go.mod")); err != nil {
+		return nil, fmt.Errorf("go mod tidy: %w", err)
+	}
+	j.Emit.Log("info", "✓ updated "+filepath.ToSlash(filepath.Join(e.Path, "go.mod")))
+	return nil, nil
+}
+
+// editModule runs `go mod edit` with editArgs on the go.mod of the module in
+// dir, or on modFile, a copy of it, when modFile is not empty.
+func editModule(j *workspacejob.Job, dir, modFile string, editArgs []string) error {
+	args := append([]string{"-C", dir, "mod", "edit"}, editArgs...)
+	if modFile != "" {
+		args = append(args, modFile)
 	}
 	if out, err := j.Combined(goWorkEnv(dir), j.GoBinary, args...); err != nil {
 		return fmt.Errorf("go mod edit: %w%s", err, workspacejob.OutputExcerpt(out))
 	}
-	if err := tidyModule(j, dir); err != nil {
-		return fmt.Errorf("go mod tidy: %w", err)
-	}
-	j.Emit.Log("info", "✓ updated "+filepath.ToSlash(filepath.Join(e.Path, "go.mod")))
 	return nil
+}
+
+// planEdit makes the edit of e, editArgs, and the tidy on a copy of the
+// go.mod and go.sum of the module in dir, then reports each requirement and
+// replace directive the edit adds, drops or changes in go.mod, and the lines
+// it changes in go.sum (planLines). It writes no file of the workspace.
+func planEdit(j *workspacejob.Job, dir string, e edit, editArgs []string) ([]string, error) {
+	scratch, err := os.MkdirTemp("", "putnami-deps-plan-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(scratch) }()
+	before, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		return nil, err
+	}
+	sumBefore, err := os.ReadFile(filepath.Join(dir, "go.sum"))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	copyMod := filepath.Join(scratch, "go.mod")
+	if err := os.WriteFile(copyMod, before, 0o600); err != nil {
+		return nil, err
+	}
+	if sumBefore != nil {
+		if err := os.WriteFile(filepath.Join(scratch, "go.sum"), sumBefore, 0o600); err != nil {
+			return nil, err
+		}
+	}
+	if err := editModule(j, dir, copyMod, editArgs); err != nil {
+		return nil, err
+	}
+	if err := tidyModule(j, dir, copyMod); err != nil {
+		return nil, fmt.Errorf("go mod tidy: %w", err)
+	}
+	after, err := os.ReadFile(copyMod)
+	if err != nil {
+		return nil, err
+	}
+	sumAfter, err := os.ReadFile(filepath.Join(scratch, "go.sum"))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	return planLines(filepath.ToSlash(e.Path)+"/go.mod", before, after, sumBefore, sumAfter)
+}
+
+// planLines states the changes from before to after, the go.mod at goMod:
+// one line per requirement or replace directive, then the number of go.sum
+// lines the edit adds and drops.
+func planLines(goMod string, before, after, sumBefore, sumAfter []byte) ([]string, error) {
+	changes, err := goModChanges(goMod, before, after)
+	if err != nil {
+		return nil, err
+	}
+	added, dropped := lineChanges(sumBefore, sumAfter)
+	if len(changes) == 0 && added == 0 && dropped == 0 {
+		return []string{"Planned edit: " + goMod + " and its go.sum would not change"}, nil
+	}
+	lines := make([]string, 0, len(changes)+2)
+	lines = append(lines, "Planned edit of "+goMod+":")
+	for _, change := range changes {
+		lines = append(lines, "  "+change)
+	}
+	if added > 0 || dropped > 0 {
+		lines = append(lines, fmt.Sprintf("  go.sum: %d line(s) added, %d removed", added, dropped))
+	}
+	return lines, nil
+}
+
+// goModChanges lists, sorted, each requirement and each replace directive
+// after adds (+), drops (-) or changes (~) from before. A requirement that
+// becomes or stops being indirect is a change.
+func goModChanges(name string, before, after []byte) ([]string, error) {
+	from, err := modfile.Parse(name, before, nil)
+	if err != nil {
+		return nil, err
+	}
+	to, err := modfile.Parse(name, after, nil)
+	if err != nil {
+		return nil, err
+	}
+	requirement := func(r *modfile.Require) string {
+		if r.Indirect {
+			return r.Mod.Version + " // indirect"
+		}
+		return r.Mod.Version
+	}
+	requires := func(file *modfile.File) map[string]string {
+		m := map[string]string{}
+		for _, r := range file.Require {
+			m[r.Mod.Path] = requirement(r)
+		}
+		return m
+	}
+	replaces := func(file *modfile.File) map[string]string {
+		m := map[string]string{}
+		for _, r := range file.Replace {
+			m[strings.TrimSpace(r.Old.Path+" "+r.Old.Version)] = strings.TrimSpace(r.New.Path + " " + r.New.Version)
+		}
+		return m
+	}
+	changes := mapChanges("require", " ", requires(from), requires(to))
+	return append(changes, mapChanges("replace", " => ", replaces(from), replaces(to))...), nil
+}
+
+// mapChanges lists, sorted by key, each entry of to that from lacks (+), each
+// entry of from that to lacks (-) and each entry whose value differs (~), as
+// "<sign> <kind> <key><sep><value>".
+func mapChanges(kind, sep string, from, to map[string]string) []string {
+	keys := make([]string, 0, len(from)+len(to))
+	for key := range from {
+		keys = append(keys, key)
+	}
+	for key := range to {
+		if _, ok := from[key]; !ok {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(keys)
+	var changes []string
+	for _, key := range keys {
+		old, hadOld := from[key]
+		value, hasNew := to[key]
+		switch {
+		case !hadOld:
+			changes = append(changes, "+ "+kind+" "+key+sep+value)
+		case !hasNew:
+			changes = append(changes, "- "+kind+" "+key+sep+old)
+		case old != value:
+			changes = append(changes, "~ "+kind+" "+key+sep+old+" -> "+value)
+		}
+	}
+	return changes
+}
+
+// lineChanges counts the lines after holds that before does not (added) and
+// the lines before holds that after does not (dropped), each line counted as
+// often as it repeats.
+func lineChanges(before, after []byte) (added, dropped int) {
+	count := map[string]int{}
+	for line := range strings.Lines(string(before)) {
+		count[strings.TrimRight(line, "\r\n")]++
+	}
+	for line := range strings.Lines(string(after)) {
+		count[strings.TrimRight(line, "\r\n")]--
+	}
+	for _, n := range count {
+		if n > 0 {
+			dropped += n
+		} else {
+			added -= n
+		}
+	}
+	return added, dropped
 }
 
 // prunedModules are the module paths the go.mod of each pruned project

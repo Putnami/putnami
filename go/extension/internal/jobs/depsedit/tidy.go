@@ -22,7 +22,8 @@ func goWorkEnv(dir string) []string {
 }
 
 // tidyModule runs `go mod tidy` on the Go module in dir as the workspace
-// build resolves it.
+// build resolves it, and writes the result to goModPath and the go.sum beside
+// it: the module's own go.mod, or the copy a dry run edits (planEdit).
 //
 // `go mod tidy` never reads go.work, so a requirement only a go.work replace
 // directive satisfies sends it to the module proxy: the v0.0.1 placeholder a
@@ -32,8 +33,8 @@ func goWorkEnv(dir string) []string {
 // go.work replace directive the module does not replace itself. go.mod and
 // go.sum take the tidied copy, without those directives, only when tidy
 // succeeds.
-func tidyModule(j *workspacejob.Job, dir string) error {
-	goModPath := filepath.Join(dir, "go.mod")
+func tidyModule(j *workspacejob.Job, dir, goModPath string) error {
+	goSumPath := filepath.Join(filepath.Dir(goModPath), "go.sum")
 	goMod, err := os.ReadFile(goModPath)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func tidyModule(j *workspacejob.Job, dir string) error {
 	if err := os.WriteFile(copyMod, copied, 0o600); err != nil {
 		return err
 	}
-	if sum, err := os.ReadFile(filepath.Join(dir, "go.sum")); err == nil {
+	if sum, err := os.ReadFile(goSumPath); err == nil {
 		if err := os.WriteFile(copySum, sum, 0o600); err != nil {
 			return err
 		}
@@ -82,7 +83,7 @@ func tidyModule(j *workspacejob.Job, dir string) error {
 	if err != nil {
 		return err
 	}
-	return writeFileKeepingMode(filepath.Join(dir, "go.sum"), sum)
+	return writeFileKeepingMode(goSumPath, sum)
 }
 
 // withGoWorkReplaces returns goMod with each replace directive of the go.work

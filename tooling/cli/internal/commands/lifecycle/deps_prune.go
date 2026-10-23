@@ -410,7 +410,7 @@ func pruneManifests(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	}
 	sort.Strings(editors)
 	for _, editor := range editors {
-		if err := runDepsEdit(ctx, wsRoot, editor, "prune", byEditor[editor], env); err != nil {
+		if err := runDepsEdit(ctx, wsRoot, editor, "prune", byEditor[editor], false, env); err != nil {
 			return err
 		}
 	}

@@ -377,10 +377,10 @@ func TestDepsAddAndRemoveRunTheDepsEditJobOfTheProject(t *testing.T) {
 	apiID := projectIDAt(t, root, "api")
 	recorder := &jobRecorder{outcome: WorkspaceJobOK}
 	env := LifecycleEnv{Out: &bytes.Buffer{}, RunJob: recorder.run}
-	if err := DepsAdd(context.Background(), root, []string{"example.com/x@v1.2.3"}, "", env); err != nil {
+	if err := DepsAdd(context.Background(), root, []string{"example.com/x@v1.2.3"}, "", false, env); err != nil {
 		t.Fatalf("deps add: %v", err)
 	}
-	if err := DepsRemove(context.Background(), root, []string{"example.com/y"}, "api", env); err != nil {
+	if err := DepsRemove(context.Background(), root, []string{"example.com/y"}, "api", false, env); err != nil {
 		t.Fatalf("deps remove: %v", err)
 	}
 	asked := recorder.asked()
@@ -398,13 +398,42 @@ func TestDepsAddAndRemoveRunTheDepsEditJobOfTheProject(t *testing.T) {
 	}
 
 	failing := LifecycleEnv{Out: &bytes.Buffer{}, RunJob: (&jobRecorder{outcome: WorkspaceJobFailed}).run}
-	if err := DepsAdd(context.Background(), root, []string{"example.com/x"}, "api", failing); err == nil ||
+	if err := DepsAdd(context.Background(), root, []string{"example.com/x"}, "api", false, failing); err == nil ||
 		!strings.Contains(err.Error(), "the deps-edit job of @acme/go failed") {
 		t.Fatalf("deps add with a failed job = %v, want the failure of the @acme/go job", err)
 	}
-	if err := DepsAdd(context.Background(), root, []string{"example.com/x"}, "web", env); err == nil ||
+	if err := DepsAdd(context.Background(), root, []string{"example.com/x"}, "web", false, env); err == nil ||
 		!strings.Contains(err.Error(), "cannot edit web") {
 		t.Fatalf("deps add for web = %v, want web refused", err)
+	}
+}
+
+// Under --dry-run, deps add and deps remove hand the deps-edit job the param
+// dry-run, true, beside the action and the edit, so the job writes no file.
+func TestDepsAddAndRemoveForwardDryRunToTheDepsEditJob(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "deps-edit-runs-in-the-project-extension",
+		"deps-add-and-remove-forward-dry-run-to-the-deps-edit-job")
+	root := editorWorkspace(t)
+	recorder := &jobRecorder{outcome: WorkspaceJobOK}
+	env := LifecycleEnv{Out: &bytes.Buffer{}, RunJob: recorder.run}
+	if err := DepsAdd(context.Background(), root, []string{"example.com/x@v1.2.3"}, "api", true, env); err != nil {
+		t.Fatalf("deps add --dry-run: %v", err)
+	}
+	if err := DepsRemove(context.Background(), root, []string{"example.com/y"}, "api", true, env); err != nil {
+		t.Fatalf("deps remove --dry-run: %v", err)
+	}
+	asked := recorder.asked()
+	if len(asked) != 2 {
+		t.Fatalf("deps --dry-run ran %d jobs, want one per command: %+v", len(asked), asked)
+	}
+	for i, want := range []struct {
+		action, module string
+	}{{"add", "example.com/x@v1.2.3"}, {"remove", "example.com/y"}} {
+		params := `{"action":"` + want.action + `","dry-run":true,"edits":[{"modules":["` + want.module + `"],"path":"api","project":"api"}]}`
+		if got := paramsJSON(t, asked[i]); got != params || !asked[i].DryRun {
+			t.Errorf("deps %s --dry-run params = %s (dry run %t), want %s (dry run)", want.action, got, asked[i].DryRun, params)
+		}
 	}
 }
 
@@ -421,7 +450,7 @@ func TestDepsAddRefusesTheVersionNoneBeforeAnyJob(t *testing.T) {
 		"":    "putnami deps remove example.com/lib",
 	} {
 		recorder := &jobRecorder{outcome: WorkspaceJobOK}
-		err := DepsAdd(context.Background(), root, []string{"example.com/lib@none", "example.com/other@v1.0.0"}, selector,
+		err := DepsAdd(context.Background(), root, []string{"example.com/lib@none", "example.com/other@v1.0.0"}, selector, false,
 			LifecycleEnv{Out: &bytes.Buffer{}, RunJob: recorder.run})
 		if code := protocolcli.ExitCodeForError(err); code != protocolcli.ExitUsage {
 			t.Fatalf("deps add example.com/lib@none = %v (exit %d), want a usage error", err, code)

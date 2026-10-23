@@ -240,6 +240,111 @@ func TestDepsEditAddAndRemoveEditAModuleThatRequiresAnUnservedVersion(t *testing
 	})
 }
 
+// Under the param dry-run, deps add and deps remove make the edit and the
+// tidy on a copy of go.mod and go.sum, report each requirement the edit
+// changes and the go.sum lines it changes, and leave every file of the
+// workspace as it was.
+func TestDepsEditDryRunReportsTheEditAndWritesNoFile(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/deps-edit", "deps-dry-run-writes-no-file",
+		"add-and-remove-under-dry-run-report-the-edit-and-write-no-file")
+	jobtest.RequireGo(t)
+	proxy := libProxy(t, map[string][]string{"example.com/lib": {"v0.3.0"}})
+	dryRunParams := func(t *testing.T, action string, e edit) string {
+		t.Helper()
+		data, err := json.Marshal(map[string]any{"action": action, "dry-run": true, "edits": []edit{e}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	// newWorkspace writes a go.work with the module api, which requires
+	// example.com/lib v0.0.0, and the go.sum line of an earlier dependency.
+	newWorkspace := func(t *testing.T, source string) string {
+		ws := jobtest.RealTempDir(t)
+		jobtest.WriteFile(t, ws, "go.work", "go 1.22\n\nuse ./api\n")
+		jobtest.WriteFile(t, ws, "api/main.go", source)
+		jobtest.WriteFile(t, ws, "api/go.mod", "module example.com/api\n\ngo 1.22\n\nrequire example.com/lib v0.0.0\n")
+		jobtest.WriteFile(t, ws, "api/go.sum", "example.com/old v1.0.0/go.mod h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n")
+		return ws
+	}
+	// visiblePlan requires one summary the CLI always prints, holding wants.
+	visiblePlan := func(t *testing.T, run *editRun, wants ...string) {
+		t.Helper()
+		var plans []string
+		for _, event := range run.rec.Events() {
+			if data, _ := event.Value.(map[string]any); event.Kind == "summary" && data["visibility"] == "always" {
+				plans = append(plans, event.Message)
+			}
+		}
+		if len(plans) != 1 {
+			t.Fatalf("the dry run emitted %d always-visible summaries, want 1:\n%s", len(plans), run.rec.Transcript())
+		}
+		for _, want := range wants {
+			if !strings.Contains(plans[0], want) {
+				t.Errorf("the plan does not say %q:\n%s", want, plans[0])
+			}
+		}
+	}
+	unchanged := func(t *testing.T, ws string) func() {
+		t.Helper()
+		files := []string{"go.work", "api/go.mod", "api/go.sum", "api/main.go"}
+		before := map[string]string{}
+		for _, file := range files {
+			before[file] = jobtest.ReadFile(t, filepath.Join(ws, file))
+		}
+		return func() {
+			t.Helper()
+			for _, file := range files {
+				if after := jobtest.ReadFile(t, filepath.Join(ws, file)); after != before[file] {
+					t.Errorf("the dry run changed %s:\nbefore:\n%s\nafter:\n%s", file, before[file], after)
+				}
+			}
+			if _, ok := jobtest.ReadOptional(t, filepath.Join(ws, "go.work.sum")); ok {
+				t.Error("the dry run wrote go.work.sum")
+			}
+		}
+	}
+
+	t.Run("add", func(t *testing.T) {
+		t.Parallel()
+		ws := newWorkspace(t, "package main\n\nimport \"example.com/lib\"\n\nfunc main() { _ = lib.Name }\n")
+		check := unchanged(t, ws)
+		run := runEdit(t, ws, dryRunParams(t, actionAdd, edit{Project: "api", Path: "api", Modules: []string{"example.com/lib@v0.3.0"}}), proxy)
+		run.requireStatus(t, statusOK)
+		run.requireTranscript(t,
+			"Planning to add example.com/lib@v0.3.0 in api...",
+			"Planned edit of api/go.mod:",
+			"~ require example.com/lib v0.0.0 -> v0.3.0",
+			"go.sum: 2 line(s) added, 1 removed",
+			"Dry run complete; no Go files were changed")
+		visiblePlan(t, run, "Planned edit of api/go.mod:", "~ require example.com/lib v0.0.0 -> v0.3.0", "no Go files were changed")
+		if run.rec.Contains("✓ updated") {
+			t.Errorf("the dry run says it updated a file:\n%s", run.rec.Transcript())
+		}
+		check()
+	})
+
+	t.Run("remove", func(t *testing.T) {
+		t.Parallel()
+		ws := newWorkspace(t, "package main\n\nfunc main() {}\n")
+		check := unchanged(t, ws)
+		run := runEdit(t, ws, dryRunParams(t, actionRemove, edit{Project: "api", Path: "api", Modules: []string{"example.com/lib"}}), proxy)
+		run.requireStatus(t, statusOK)
+		run.requireTranscript(t,
+			"Planning to remove example.com/lib in api...",
+			"Planned edit of api/go.mod:",
+			"- require example.com/lib v0.0.0",
+			"go.sum: 0 line(s) added, 1 removed",
+			"Dry run complete; no Go files were changed")
+		visiblePlan(t, run, "Planned edit of api/go.mod:", "- require example.com/lib v0.0.0")
+		if run.rec.Contains("✓ updated") {
+			t.Errorf("the dry run says it updated a file:\n%s", run.rec.Transcript())
+		}
+		check()
+	})
+}
+
 // A bare spec takes the latest version the proxy answers, unless go.mod
 // requires a newer one: `go get` never downgrades a module the way a plain
 // @latest would.

@@ -478,9 +478,9 @@ func cmdDeps(env *CommandEnv) error {
 	case "install", "":
 		return lifecycle.DepsInstall(env.Ctx, env.WsRoot, env.Cfg, env.Global.FilterTag, env.Global.ExcludeTag, lifecycleEnv(env))
 	case "add":
-		return lifecycle.DepsAdd(env.Ctx, env.WsRoot, env.Args, env.Global.Projects, lifecycleEnv(env))
+		return lifecycle.DepsAdd(env.Ctx, env.WsRoot, env.Args, env.Global.Projects, env.Global.DryRun, lifecycleEnv(env))
 	case "remove", "rm":
-		return lifecycle.DepsRemove(env.Ctx, env.WsRoot, env.Args, env.Global.Projects, lifecycleEnv(env))
+		return lifecycle.DepsRemove(env.Ctx, env.WsRoot, env.Args, env.Global.Projects, env.Global.DryRun, lifecycleEnv(env))
 	case "prune":
 		return lifecycle.DepsPrune(env.Ctx, env.WsRoot, env.Global.Projects, env.Global.DryRun, lifecycleEnv(env))
 	default:

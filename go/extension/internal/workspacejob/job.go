@@ -32,6 +32,10 @@ type Emitter interface {
 	PhaseEnd(name, status string)
 	Diagnostic(severity, message, file string, line int)
 	Metric(name string, value any, unit string)
+	// SummaryWithData emits a summary. With data {"visibility": "always"},
+	// the CLI prints it on a run that hides the job's logs, such as the plan
+	// of a dry run.
+	SummaryWithData(message string, data map[string]any)
 }
 
 // Job is one run of a lifecycle job: where it writes its events, the
