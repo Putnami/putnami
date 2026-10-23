@@ -2,9 +2,11 @@ package cachekey
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -30,10 +32,10 @@ type PortableTaskInputs struct {
 	// saying "I read these", which is what makes an ignored match among them a
 	// required input worth binding.
 	Files []string
-	// GoEmbedFiles is the subset of Files selected as raw semantic Go embed
-	// inputs. Admission must refuse a portable request if snapshot policy would
+	// SelectedFiles is the subset of Files an input selector's expansion
+	// lists. Admission must refuse a portable request if snapshot policy would
 	// omit one of these bytes, even when a lifecycle normally recreates it.
-	GoEmbedFiles []string
+	SelectedFiles []string
 	// FallbackFiles are the paths the key hashes only because the task
 	// declares NO file input at all: the whole non-hidden project tree the
 	// empty-pattern collector returns. That fallback is what the key does in
@@ -64,27 +66,29 @@ type PortablePlanInputs struct {
 // and never hashes anything. One call memoizes its collector results, so a
 // project tree is walked once for a pattern set however many jobs share it —
 // the same reason the key path memoizes through the CacheManager.
-// expander is the one the keys pass for their input selectors.
-func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, commandParams map[string]any, expander store.InputExpander) (PortablePlanInputs, error) {
+// resolver answers the input selectors the keys name, as a key's
+// JobInputExpander does.
+func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, commandParams map[string]any, resolver store.InputResolver) (PortablePlanInputs, error) {
 	inputs := PortablePlanInputs{Tasks: make([]PortableTaskInputs, 0, len(planned))}
 	if ws == nil {
 		return inputs, nil
+	}
+	if resolver != nil {
+		resolver.PrimeInputs(PlanInputQueries(ws, planned))
 	}
 	memo := keyFileMemo{}
 	for _, job := range planned {
 		if job == nil || job.JobDef == nil || job.Project == nil {
 			continue
 		}
-		if err := validateDeclaredGoEmbedSelectors(ws, job, commandParams); err != nil {
-			return PortablePlanInputs{}, err
-		}
 		files, workspaceFiles := KeyFilePatterns(ws, job, commandParams)
-		declared, fallback, goEmbed, err := portableKeyFiles(memo, ws, job, files, workspaceFiles, expander)
+		expander := JobInputExpander(ws, job, commandParams, resolver)
+		declared, fallback, selected, err := portableKeyFiles(memo, ws, job, files, workspaceFiles, expander)
 		if err != nil {
 			return PortablePlanInputs{}, err
 		}
 		inputs.Tasks = append(inputs.Tasks, PortableTaskInputs{
-			Key: job.Key(), Files: declared, GoEmbedFiles: goEmbed, FallbackFiles: fallback, Env: portableKeyEnv(ws, job),
+			Key: job.Key(), Files: declared, SelectedFiles: selected, FallbackFiles: fallback, Env: portableKeyEnv(ws, job),
 		})
 	}
 	inputs.Outputs = portableDeclaredOutputs(ws, planned)
@@ -95,17 +99,15 @@ func PortableInputs(ws *workspace.Workspace, planned []*jobmodel.ScheduledJob, c
 // root and the pattern set. It is per call and never process-global: the
 // worktree it describes is read at one instant, and a later call must see a
 // later tree. A NUL separator cannot appear in a path or in a manifest glob,
-// so two different pattern sets cannot share a key.
-// The key leaves the expander out: one call passes one expander.
+// so two different pattern sets cannot share a key. A pattern set that names
+// an input selector is keyed by the expander's identity too.
 type keyFileMemo map[string]store.KeyFileSelection
-
-func (m keyFileMemo) collect(root string, patterns []string, expander store.InputExpander) ([]string, error) {
-	selection, err := m.collectSelection(root, patterns, expander)
-	return selection.Files, err
-}
 
 func (m keyFileMemo) collectSelection(root string, patterns []string, expander store.InputExpander) (store.KeyFileSelection, error) {
 	key := root + "\x00" + strings.Join(patterns, "\x00")
+	if expander != nil && slices.ContainsFunc(patterns, extproto.NamesInputSelector) {
+		key += "\x00\x00" + expander.Identity()
+	}
 	if cached, found := m[key]; found {
 		return cached, nil
 	}
@@ -126,7 +128,7 @@ func (m keyFileMemo) collectSelection(root string, patterns []string, expander s
 // The fallback is deliberately independent of the RUN's cache bypass: whether
 // --no-cache was typed does not change what a task reads, and the bound set
 // travels inside the request's identity, which must not move with a flag.
-func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *jobmodel.ScheduledJob, files, workspaceFiles []string, expander store.InputExpander) (declared, fallback, goEmbed []string, resultErr error) {
+func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *jobmodel.ScheduledJob, files, workspaceFiles []string, expander store.InputExpander) (declared, fallback, selected []string, resultErr error) {
 	projectRoot := filepath.Join(ws.Root, job.Project.Path)
 	var absolute, fallbackAbsolute, semanticAbsolute []string
 	collect := func(root string, patterns []string, explicit bool) []string {
@@ -136,7 +138,7 @@ func portableKeyFiles(memo keyFileMemo, ws *workspace.Workspace, job *jobmodel.S
 		selection, err := memo.collectSelection(root, patterns, expander)
 		resultErr = err
 		if explicit {
-			semanticAbsolute = append(semanticAbsolute, selection.GoEmbed...)
+			semanticAbsolute = append(semanticAbsolute, selection.Selected...)
 		}
 		return selection.Files
 	}

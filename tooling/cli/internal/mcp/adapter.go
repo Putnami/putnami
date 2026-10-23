@@ -368,7 +368,7 @@ func (s *Server) toolWhyImpacted(ctx context.Context, args json.RawMessage) (any
 	// disagree about a pair or about its task scope. DependentPath, which used
 	// to answer here, has no extension-consumer edges and denied pairs
 	// `impacted` had selected.
-	reach := workspace.ImpactReachWithTasks(ws, from.ID, s.taskIndex(ws))
+	reach := workspace.ImpactReachWithTasks(ws, from.ID, s.taskIndex(ctx, ws))
 	steps := reach.Trace.PathTo(to.ID)
 	if len(steps) == 0 {
 		return s.graphAnswer(ws, map[string]any{
@@ -457,7 +457,7 @@ func (s *Server) toolImpacted(ctx context.Context, args json.RawMessage) (any, e
 		return nil, fmt.Errorf("load workspace: %w", err)
 	}
 	baseline := a.Baseline
-	selection, err := workspace.ImpactedSelectionForBaselineWithTasks(ws, baseline, s.taskIndex(ws))
+	selection, err := workspace.ImpactedSelectionForBaselineWithTasks(ws, baseline, s.taskIndex(ctx, ws))
 	if err != nil {
 		return nil, impactedError(baseline, err)
 	}

@@ -91,9 +91,10 @@ func (c AgentContentContribution) Packaged() bool {
 // for extensionDependencies that name a registry extension,
 // ReleaseBaselineInputContract for a task that declares the releaseBaseline
 // runtime input, GitInputModeContract (the same rung) for a task that declares
-// a `git:` file pattern, GoEmbedInputsContract for Go embed task
-// inputs/cache-key files, AgentContentContract for an agent-content
-// contribution, CurrentContract otherwise. The highest rung wins.
+// a `git:` file pattern, InputSelectorsContract for runtime.inputSelectors or a
+// task file pattern that names an input selector, AgentContentContract for an
+// agent-content contribution, CurrentContract otherwise. The highest rung
+// wins.
 //
 // It is the stamp a packager writes on a put archive. A manifest stamped below
 // it uses vocabulary its stamp does not cover; a manifest stamped at or above
@@ -127,9 +128,6 @@ func RequiredLoadContract(m *Manifest) int {
 		if declaresGitInput(task) {
 			required = max(required, protocolcli.GitInputModeContract)
 		}
-		if declaresGoEmbedSelector(task) {
-			required = max(required, protocolcli.GoEmbedInputsContract)
-		}
 		if declaresSourceBound(task) {
 			required = max(required, protocolcli.SourceBoundCacheContract)
 		}
@@ -149,6 +147,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// pinned archive, whatever origin the manifest loads from.
 	if DeclaresProvisionedToolchain(m) {
 		required = max(required, protocolcli.ProvisionedToolchainContract)
+	}
+	// A selector expands only in a reader that asks the extension for it,
+	// whatever origin the manifest loads from.
+	if declaresInputSelectors(m) {
+		required = max(required, protocolcli.InputSelectorsContract)
 	}
 	return required
 }
@@ -238,19 +241,6 @@ func declaresReleaseBaseline(task TaskDefinition) bool {
 		}
 	}
 	return task.Cache != nil && task.Cache.Key != nil && slices.Contains(task.Cache.Key.Runtime, RuntimeInputReleaseBaseline)
-}
-
-// declaresGoEmbedSelector reports whether a task names a Go embed selector in
-// an input port or its cache key's files.
-func declaresGoEmbedSelector(task TaskDefinition) bool {
-	isSelector := func(file string) bool { return file == "go-embed:build" || file == "go-embed:test" }
-	for _, input := range task.Inputs {
-		if slices.ContainsFunc(input.Files, isSelector) {
-			return true
-		}
-	}
-	return task.Cache != nil && task.Cache.Key != nil &&
-		(slices.ContainsFunc(task.Cache.Key.Files, isSelector) || slices.ContainsFunc(task.Cache.Key.ClosureFiles, isSelector))
 }
 
 // ValidateAgentContent checks the agent-content section. It is inert for a

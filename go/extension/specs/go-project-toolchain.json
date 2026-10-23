@@ -25,7 +25,11 @@
     },
     {
       "id": "embedded-source-cache-inputs",
-      "text": "The Go extension declares go-embed:build for buildable non-test source tasks and go-embed:test for tasks that read test sources. The Go module packager and the task-input resolver share one directive parser and target resolver, so assets that ship in a module are the same inputs the manifest declares for cache keys."
+      "text": "The Go extension declares go-embed:build for buildable non-test source tasks and go-embed:test for tasks that read test sources; go-embed:build reads no directive of a test source, so a file only a test embeds is a test input alone. The Go module packager and the task-input resolver share one directive parser and target resolver, so assets that ship in a module are the same inputs the manifest declares for cache keys."
+    },
+    {
+      "id": "go-generated-tree-sources",
+      "text": "A Go source task input excludes the .go files under a .gen tree, which another task writes during the run and no Go source task compiles, and the embed scan reads no directive there. A file under .gen that a //go:embed directive of a source names is listed, so its edit moves the key."
     },
     {
       "id": "pinned-lint-tools",

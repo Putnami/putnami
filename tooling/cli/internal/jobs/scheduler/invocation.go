@@ -334,7 +334,7 @@ func (rt *invocationRuntime) prune(
 			}
 		}
 		if movement == nil {
-			decided := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams}, planned)
+			decided := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cache.InputResolver()}, planned)
 			movement = &decided
 			byKey = cachekey.JobsByKey(planned)
 		}

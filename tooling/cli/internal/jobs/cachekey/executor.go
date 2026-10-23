@@ -724,63 +724,22 @@ func KeyFilePatterns(
 	return files, workspaceFiles
 }
 
-// Go embed selectors are extension capabilities, not user-supplied globs.
-// A project option or CLI filePatterns flag has no negotiated manifest stamp;
-// accepting one there would let an older CLI silently drop that input.
-func validateDeclaredGoEmbedSelectors(ws *workspace.Workspace, job *jobmodel.ScheduledJob, params map[string]any) error {
-	for _, patterns := range [][]string{ParamStrings(params, "filePatterns"), ProjectFilePatterns(ws, job)} {
-		for _, pattern := range patterns {
-			if strings.HasPrefix(pattern, "go-embed:") {
-				return fmt.Errorf("%w: selector %q requires an extension task input, not filePatterns", store.ErrInputSelector, pattern)
-			}
-		}
-	}
-	return nil
-}
-
-// ValidateUnkeyedGoEmbedInputs keeps required selector inputs fail-closed for
-// tasks without a cache identity. Keyed tasks validate these same declarations
-// through ComputeHashUsing; this path runs only when key computation is skipped.
-// expander is the one the job's key passes for its input selectors.
-func ValidateUnkeyedGoEmbedInputs(ws *workspace.Workspace, job *jobmodel.ScheduledJob, params map[string]any, expander store.InputExpander) error {
-	if err := validateDeclaredGoEmbedSelectors(ws, job, params); err != nil {
-		return err
-	}
-	files, workspaceFiles := KeyFilePatterns(ws, job, params)
-	hasSelector := func(patterns []string) bool {
-		for _, pattern := range patterns {
-			if strings.HasPrefix(pattern, "go-embed:") {
-				return true
-			}
-		}
-		return false
-	}
-	cache := store.NewCacheManager(nil)
-	validatePatterns := func(root string, patterns []string, scope store.ProjectConfigScope) error {
-		if !hasSelector(patterns) {
-			return nil
-		}
-		_, err := cache.HashFiles(root, patterns, expander, scope)
+// ValidateUnkeyedInputSelectors keeps the input selectors a task names
+// fail-closed for a task without a cache identity: it expands them as the key
+// would (JobInputExpander), and returns the error that would fail the key.
+// Keyed tasks validate the same declarations through ComputeHashUsing; this
+// path runs only when key computation is skipped.
+func ValidateUnkeyedInputSelectors(ws *workspace.Workspace, job *jobmodel.ScheduledJob, params map[string]any, resolver store.InputResolver) error {
+	files, _ := KeyFilePatterns(ws, job, params)
+	if slices.ContainsFunc(files, extproto.NamesInputSelector) {
+		expander := JobInputExpander(ws, job, params, resolver)
+		_, err := store.NewCacheManager(nil).HashFiles(filepath.Join(ws.Root, job.Project.Path), files, expander, JobConfigScope(ws, job))
 		if errors.Is(err, store.ErrInputSelector) {
-			return err
-		}
-		return nil
-	}
-	if err := validatePatterns(filepath.Join(ws.Root, job.Project.Path), files, JobConfigScope(ws, job)); err != nil {
-		return fmt.Errorf("validate unkeyed project inputs: %w", err)
-	}
-	if err := validatePatterns(ws.Root, workspaceFiles, store.ProjectConfigScope{Verbatim: true}); err != nil {
-		return fmt.Errorf("validate unkeyed workspace inputs: %w", err)
-	}
-	if hasSelector(closureKeyPatterns(job)) {
-		for _, member := range ProjectDependencyClosure(ws, job.Project) {
-			if err := validatePatterns(filepath.Join(ws.Root, member.Path), closureKeyPatterns(job), JobConfigScope(ws, job)); err != nil {
-				return fmt.Errorf("closure inputs for %s: %w", member.ID, err)
-			}
+			return fmt.Errorf("validate unkeyed project inputs: %w", err)
 		}
 	}
 	if job.InvocationProducer != nil {
-		if err := ValidateUnkeyedGoEmbedInputs(ws, job.InvocationProducer, params, expander); err != nil {
+		if err := ValidateUnkeyedInputSelectors(ws, job.InvocationProducer, params, resolver); err != nil {
 			return fmt.Errorf("invocation producer for %s: %w", job.Key(), err)
 		}
 	}
@@ -839,9 +798,6 @@ func ComputeJobCacheHashWith(
 	hashes map[string]string,
 	selection bool,
 ) (string, error) {
-	if err := validateDeclaredGoEmbedSelectors(ws, job, commandParams); err != nil {
-		return "", err
-	}
 	cacheParams := TaskCacheParamsWith(ws, job, commandParams, selection)
 
 	// Build cache key policy from task cache config
@@ -866,8 +822,9 @@ func ComputeJobCacheHashWith(
 	// reads only the layers this job's extension owns (see ProjectConfigScope).
 	policy.ConfigScope = JobConfigScope(ws, job)
 
-	// The store expands the input selectors the key patterns name.
-	policy.InputExpander = store.GoEmbedExpander()
+	// The store expands the input selectors the key patterns name through the
+	// extensions that list them (JobInputExpander).
+	policy.InputExpander = JobInputExpander(ws, job, commandParams, cache.InputResolver())
 
 	// Resolve cross-project generate assets as extra files for cache key
 	policy.ExtraFiles = append(policy.ExtraFiles, GenerateAssetFiles(ws, job)...)

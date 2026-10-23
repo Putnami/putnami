@@ -77,6 +77,11 @@ func jobRuntimeUse(
 		if ok && fieldsReferenceExtensionRuntime(task.Command, task.Cwd, task.Args, task.Env) {
 			return &extensionRuntimeUse{kind: "task", name: step.Task}
 		}
+		// The runtime answers the input-resolve call for the input selectors
+		// the task names, before its key is computed.
+		if ok && len(extensionproto.TaskSelectorInputs(task)) > 0 {
+			return &extensionRuntimeUse{kind: "task", name: step.Task}
+		}
 	}
 	return nil
 }

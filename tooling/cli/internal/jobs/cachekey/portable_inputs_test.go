@@ -44,7 +44,7 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 	unkeyed := job("unkeyed", false, extension.JobDefinition{TaskCachePolicy: &extension.TaskCachePolicy{Key: &extension.TaskCacheKey{Env: []string{"IGNORED"}}}})
 	unkeyedPatterned := job("unkeyed", false, extension.JobDefinition{FilePatterns: []string{"conf/*.yaml"}})
 
-	inputs, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned, wholeTree, unkeyed, unkeyedPatterned}, nil, store.GoEmbedExpander())
+	inputs, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned, wholeTree, unkeyed, unkeyedPatterned}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(root, "app", "conf")); err != nil {
 		t.Fatal(err)
 	}
-	remaining, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned}, nil, store.GoEmbedExpander())
+	remaining, err := PortableInputs(ws, []*jobmodel.ScheduledJob{patterned}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,24 +96,38 @@ func TestPortableInputsProjectTheKeyDeclarations(t *testing.T) {
 // One PortableInputs call walks a (root, pattern set) once: a tree that
 // changes between two collects inside the same call must answer with the
 // memoized set, which is the only observable proof the second walk did not
-// happen. A later call sees the later tree, because the memo is per call.
+// happen. A later call sees the later tree, because the memo is per call, and
+// a pattern set that names an input selector is walked once per expander.
 func TestPortableInputsMemoizesEachRootAndPatternSetOnce(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeProjectFile(t, root, "app", "src/main.go", "package main")
+	collect := func(memo keyFileMemo, expander store.InputExpander, patterns ...string) ([]string, error) {
+		selection, err := memo.collectSelection(filepath.Join(root, "app"), patterns, expander)
+		return selection.Files, err
+	}
 	memo := keyFileMemo{}
-	first, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}, store.GoEmbedExpander())
+	first, err := collect(memo, nil, "src/*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 	writeProjectFile(t, root, "app", "src/second.go", "package main")
-	if again, err := memo.collect(filepath.Join(root, "app"), []string{"src/*.go"}, store.GoEmbedExpander()); err != nil || len(again) != len(first) || len(again) != 1 {
+	if again, err := collect(memo, nil, "src/*.go"); err != nil || len(again) != len(first) || len(again) != 1 {
 		t.Fatalf("the second collect walked again: %v then %v", first, again)
 	}
-	if other, err := memo.collect(filepath.Join(root, "app"), []string{"src/**"}, store.GoEmbedExpander()); err != nil || len(other) != 2 {
+	if other, err := collect(memo, nil, "src/**"); err != nil || len(other) != 2 {
 		t.Fatalf("a different pattern set shared a memo entry: %v", other)
 	}
-	if fresh, err := (keyFileMemo{}).collect(filepath.Join(root, "app"), []string{"src/*.go"}, store.GoEmbedExpander()); err != nil || len(fresh) != 2 {
+	if fresh, err := collect(keyFileMemo{}, nil, "src/*.go"); err != nil || len(fresh) != 2 {
 		t.Fatalf("the memo outlived its call: %v", fresh)
+	}
+
+	listsMain := fixedExpander{expansion: store.InputExpansion{Files: []string{"src/main.go"}}}
+	listsSecond := fixedExpander{expansion: store.InputExpansion{Files: []string{"src/second.go"}}}
+	if listed, err := collect(memo, listsMain, "sel:build"); err != nil || len(listed) != 1 || !strings.HasSuffix(listed[0], "main.go") {
+		t.Fatalf("first expander's files = %v, %v", listed, err)
+	}
+	if listed, err := collect(memo, listsSecond, "sel:build"); err != nil || len(listed) != 1 || !strings.HasSuffix(listed[0], "second.go") {
+		t.Fatalf("two expanders shared a memo entry: %v, %v", listed, err)
 	}
 }

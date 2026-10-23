@@ -93,7 +93,7 @@ func taskIndexWorkspace(t *testing.T, config *wsproto.ProjectConfig) *Workspace 
 func newTaskIndexForTest(t *testing.T, config *wsproto.ProjectConfig) TaskImpactIndex {
 	t.Helper()
 	idx := NewTaskIndex(taskIndexWorkspace(t, config),
-		[]*extension.ExtensionDescription{taskIndexExtension()})
+		[]*extension.ExtensionDescription{taskIndexExtension()}, nil)
 	if idx == nil {
 		t.Fatal("NewTaskIndex returned nil for a workspace with one manifest")
 	}
@@ -269,7 +269,7 @@ func TestTaskIndex_TasksOfExtensionAreQualifiedByTheExtensionProject(t *testing.
 func TestTaskIndex_APinnedBuildIsQualifiedByTheProjectItReplaces(t *testing.T) {
 	ext := taskIndexExtension()
 	ext.RelPath, ext.PinnedOver = "", "go/extension"
-	idx := NewTaskIndex(taskIndexWorkspace(t, nil), []*extension.ExtensionDescription{ext})
+	idx := NewTaskIndex(taskIndexWorkspace(t, nil), []*extension.ExtensionDescription{ext}, nil)
 	if idx == nil {
 		t.Fatal("NewTaskIndex returned nil for a workspace with one pinned build")
 	}
@@ -283,7 +283,7 @@ func TestTaskIndex_APinnedBuildIsQualifiedByTheProjectItReplaces(t *testing.T) {
 // one: an index that answered "no task reads this" for every path would select
 // nothing at all.
 func TestNewTaskIndex_WithoutExtensionsIsANilInterface(t *testing.T) {
-	if idx := NewTaskIndex(taskIndexWorkspace(t, nil), nil); idx != nil {
+	if idx := NewTaskIndex(taskIndexWorkspace(t, nil), nil, nil); idx != nil {
 		t.Errorf("NewTaskIndex without extensions = %#v, want a nil interface", idx)
 	}
 }
@@ -314,7 +314,7 @@ func TestTaskIndex_AClosureReadTravelsToEveryDependent(t *testing.T) {
 func TestTaskIndex_ReadsAsExtensionRuntime(t *testing.T) {
 	ext := taskIndexExtension()
 	ext.Runtime = &extension.RuntimeDefinition{Prepare: &extproto.RuntimePrepare{Inputs: []string{"cmd/**", "tools/**"}}}
-	idx := NewTaskIndex(taskIndexWorkspace(t, nil), []*extension.ExtensionDescription{ext})
+	idx := NewTaskIndex(taskIndexWorkspace(t, nil), []*extension.ExtensionDescription{ext}, nil)
 	cases := map[string]bool{
 		"go/extension/tools/versions.json": true,
 		"go/extension/cmd/run.go":          true,

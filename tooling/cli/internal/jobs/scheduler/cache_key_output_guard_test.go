@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -42,8 +43,8 @@ import (
 //     manifest fixes, so the guard counts every output path as a candidate.
 //
 // It does not read these forms, which a manifest alone does not resolve:
-//   - a "go-embed:" selector, which resolves from Go sources and their embed
-//     directives;
+//   - an input selector, which the extension that lists it expands from the
+//     project's files;
 //   - a project's options filePatterns and the filePatterns flag, which no
 //     manifest declares;
 //   - the part of a "../" pattern that reaches another project's tree;
@@ -178,7 +179,7 @@ func TestKeyOutputGuardReadsKeysTheWayTheKeyCodeDoes(t *testing.T) {
 		{"a git pattern selects by its path grammar", "verify", []string{"git:.gen/schema/**"}, describeSchema, "git:.gen/schema/**"},
 		{"an exclusion applies to a git pattern", "verify", []string{"git:.gen/schema/**", "!.gen/**"}, describeSchema, ""},
 		{"a whole-repository git pattern reaches the output only through a wildcard", "verify", []string{"git:**"}, describeSchema, ""},
-		{"a go-embed selector is not read", "compile", []string{"go-embed:build"}, describeSchema, ""},
+		{"an input selector is not read", "compile", []string{"sel:build"}, describeSchema, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got []string
@@ -446,8 +447,8 @@ func keyOutputConflicts(t *testing.T, reader string, patterns []string, outputs 
 		switch {
 		case strings.HasPrefix(pattern, "!"):
 			exclusions = append(exclusions, pattern)
-		case strings.HasPrefix(pattern, "go-embed:"):
-			// Resolved from Go sources and embed directives; not read.
+		case extensionproto.NamesInputSelector(pattern):
+			// Expanded by the extension that lists it; not read.
 		default:
 			readable = append(readable, pattern)
 		}
@@ -550,7 +551,7 @@ func collectWitnesses(t *testing.T, reader string, patterns, witnesses []string)
 		for _, rel := range bucket {
 			writeTestFile(t, filepath.Join(dir, filepath.FromSlash(rel)), "")
 		}
-		files, err := store.CollectKeyFiles(dir, patterns, store.GoEmbedExpander())
+		files, err := store.CollectKeyFiles(dir, patterns, nil)
 		if err != nil {
 			t.Fatalf("%s: collect key files with %q: %v", reader, patterns, err)
 		}

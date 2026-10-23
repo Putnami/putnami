@@ -231,46 +231,27 @@ File hashing algorithm:
 
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
 
-An extension task may declare `go-embed:build` or `go-embed:test` in a
-`from: "project"` file input. The first reads non-test Go sources and their
-`//go:embed` directives; the second also reads test sources. Every lexical
-source and resolved payload contributes its relative path and exact bytes, including an
-ignored file or a payload named `*_test.go`. Source discovery excludes
-`testdata`, vendor, hidden, underscore-prefixed and nested-module
-trees; an explicitly named hidden payload is still read. The selector scans
-every potentially buildable source across platforms and custom tags, so an
-unresolved target in an alternate-platform file is an error even on the
-current host. It cannot serve a stale cache entry or silently omit a portable
-input. The selector belongs to a negotiated extension manifest; project or
-CLI `filePatterns` cannot introduce it. A `.go` source-file symlink is read if
-a relative link points directly to a regular file inside the same Go module; embed paths
-remain relative to the link's package directory. Its target is also hashed and
-bound as an input when Git ignores it. Absolute, broken, chained, escaping or irregular
-source links fail instead of omitting their payloads. Directory symlinks are
-not traversed, and symlinked embed targets remain invalid.
-When an ordinary declared `.go` glob already selects an alias in an excluded
-source directory, the selector also validates that alias and keys its regular
-referent bytes. This keeps a locally followed alias and a portable snapshot on
-the same input identity without scanning ignored Go source directories.
-Build constraints are read from actual leading Go comments: a `//go:build`
-line inside `/* ... */` does not exclude a source, and legacy `// +build`
-lines require the blank separator before the package clause. Plain `out`, `dist`
-and `node_modules` directory names do not hide a Go subpackage from the selector.
-For a portable run, an ignored embedded payload or source-link referent beneath
-`.gen`, `node_modules`, `.putnami` or a declared generated output is refused
-with its task and path: the source snapshot would omit those required bytes.
-Tracked and non-ignored inputs at those paths still travel normally.
+A `from: "project"` task input, or a task's `cache.key.files`, can name an
+input selector, `<scheme>:<name>`, that the extension declaring the task lists
+in `runtime.inputSelectors`; project or CLI `filePatterns` cannot name one.
+The core expands no selector itself. It asks the extension through the
+input-resolve call of
+[section 7 of the workspace protocol](../../../protocols/workspace/README.md#7-input-resolve-v1),
+keeps each answer while the digest of its basis holds, and hashes the relative
+path and exact bytes of every file the answer lists, an ignored file included.
+A failed call, a rejected or error answer, an unlisted selector, a listed file
+that cannot be read, or a selection that combines a selector with `git:`
+patterns Git cannot enumerate fails the task before cache restore or
+execution, including when caching is disabled; other cache errors keep the
+normal unkeyed fallback. A portable run binds each listed file and refuses one
+that Git ignores beneath `.gen`, `node_modules`, `.putnami` or a declared
+generated output, naming its task and path. Change impact and planned-write
+reach read the listed files and the paths the basis selects. The Go
+extension's `go-embed:build` and `go-embed:test` are described in
+[its build documentation](../../../go/extension/doc/build.md#input-resolution-for-goembed).
 
-Task grouping uses a fast, stateless ordinary-file existence probe. Go input
-selections are validated before restoring cached outputs or starting the task,
-including when caching is disabled. If a selection combines Go selectors with
-`git:` patterns and Git cannot enumerate its candidates, the task fails because
-those Go inputs cannot be validated. Cache errors unrelated to Go input
-selection retain the normal unkeyed fallback.
-
-If a Go selector requires a source, referent or embedded payload whose bytes
-cannot be read, the task fails. For other declared inputs, a selected file that
-cannot be read — a permission-restricted source, or a file
+For a declared input other than a listed file, a selected file that cannot be
+read — a permission-restricted source, or a file
 replaced mid-run by an editor's atomic save or a concurrent generator — still
 contributes its relative path plus an `__unreadable__` marker instead of its
 contents. Its key therefore differs both from the key for the same tree with the
@@ -467,7 +448,7 @@ the bytes it reads, whether or not it depends on that task:
 - an ordinary pattern reaches the directory named by its leading segments
   without a wildcard, so `src/**/*.ts` never reaches `.gen`, while `**/*.go`
   and an empty pattern list reach the whole project;
-- a Go embed selector reaches its project;
+- an input selector reaches its project;
 - a `git:` pattern that reaches a wildcard before any literal segment other
   than `..` reaches every path, because its wildcards also match `..`;
 - a generate asset reaches the paths it names.

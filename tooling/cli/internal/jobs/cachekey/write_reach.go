@@ -6,8 +6,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -41,16 +43,16 @@ func (w plannedWrite) withRegion() plannedWrite {
 // directory with one pattern set, kept to decide whether a planned write can
 // change it. Region bounds it the way store.FileInputRegion does. Reaches is
 // narrower: it is false when the patterns show that no file the write can
-// touch is selected, for an ordinary include and its exclusions, and for a Go
-// embed selector, whose sources and embed directives bound what it reads.
+// touch is selected, for an ordinary include and its exclusions, and for an
+// input selector, whose expansion's files and basis bound what it reads.
 //
-// The narrowing holds while the embed directives stay as they are scanned. A
-// caller that plans a write ReachesDirectives reports true for decides with
-// Widened instead. It also holds only for a write the digest reads under the
-// spelling it declares, and for files the digest does not read through a link:
-// a write that cannot be decided so reaches whatever the region says it
-// reaches. A write that meets the region only through a link on a root of
-// either is such a write.
+// The narrowing holds while every path the expansion's basis selects stays as
+// it is: a caller that plans a write ReachesBasis reports true for decides
+// with Widened instead. It also holds only for a write the digest
+// reads under the spelling it declares, and for files the digest does not read
+// through a link: a write that cannot be decided so reaches whatever the
+// region says it reaches. A write that meets the region only through a link on
+// a root of either is such a write.
 type fileSelection struct {
 	dir      string
 	region   store.InputRegion
@@ -60,32 +62,36 @@ type fileSelection struct {
 	// exclusion, which the digest applies to ordinary includes only.
 	includes []string
 	excludes []string
-	// embeds are the Go embed selectors.
-	embeds  []string
-	scanner *selectionScanner
+	// selectors are the input selectors, which expander expands.
+	selectors []string
+	expander  store.InputExpander
+	scanner   *selectionScanner
 }
 
-// selectionScanner builds fileSelections and scans the Go embed directives of
-// one directory, the links of one selection, the region of one include and the
+// selectionScanner builds fileSelections and reads the expansion of one input
+// selector, the links of one selection, the region of one pattern set and the
 // spelling of one path once. The zero value is ready to use, from one
 // goroutine.
 type selectionScanner struct {
-	embeds  map[embedScanKey]store.GoEmbedBound
-	links   map[string]bool
-	regions map[string]store.InputRegion
-	spelled map[string]bool
+	expansions map[string]expansionResult
+	links      map[string]bool
+	regions    map[string]store.InputRegion
+	spelled    map[string]bool
 }
 
-type embedScanKey struct {
-	dir      string
-	selector string
+// expansionResult is one input selector's expansion, or the error that fails
+// it.
+type expansionResult struct {
+	expansion store.InputExpansion
+	err       error
 }
 
-// Select returns the selection of patterns under dir. A pattern set with no
-// pattern, a Git candidate pattern, or a pattern that is not in clean slash
+// Select returns the selection of patterns under dir, whose input selectors
+// expander expands. A pattern set with no pattern, a Git candidate pattern, an
+// exclusion that names a selector, or a pattern that is not in clean slash
 // form is bounded by its region alone.
-func (s *selectionScanner) Select(dir string, patterns []string) fileSelection {
-	selection := fileSelection{dir: dir, region: store.FileInputRegion(dir, patterns), patterns: patterns, scanner: s}
+func (s *selectionScanner) Select(dir string, patterns []string, expander store.InputExpander) fileSelection {
+	selection := fileSelection{dir: dir, region: store.FileInputRegion(dir, patterns), patterns: patterns, expander: expander, scanner: s}
 	if len(patterns) == 0 {
 		return selection
 	}
@@ -95,12 +101,15 @@ func (s *selectionScanner) Select(dir string, patterns []string) fileSelection {
 			return selection
 		}
 	}
+	if slices.ContainsFunc(excludes, extproto.NamesInputSelector) {
+		return selection
+	}
 	for _, pattern := range includes {
 		if _, git := wsproto.GitFilePattern(pattern); git {
 			return selection
 		}
-		if strings.HasPrefix(pattern, "go-embed:") {
-			selection.embeds = append(selection.embeds, pattern)
+		if extproto.NamesInputSelector(pattern) {
+			selection.selectors = append(selection.selectors, pattern)
 		} else {
 			selection.includes = append(selection.includes, pattern)
 		}
@@ -144,30 +153,76 @@ func (s fileSelection) Reaches(w plannedWrite) bool {
 			return true
 		}
 	}
-	for _, selector := range s.embeds {
-		bound := s.scanner.embed(s.dir, selector)
-		if !bound.Bounded || store.ReachesGoSource(rel, w.Tree) || bound.Assets.Overlaps(written) {
+	for _, selector := range s.selectors {
+		result := s.scanner.expand(s.dir, selector, s.expander)
+		if result.err != nil || s.expansionReaches(result.expansion, rel, w, written) {
 			return true
 		}
 	}
-	return !s.scanner.spelledOnDisk(s.dir, rel) || s.scanner.selectsThroughLink(s.dir, s.patterns)
+	return !s.scanner.spelledOnDisk(s.dir, rel) || s.scanner.selectsThroughLink(s.dir, s.patterns, s.expander)
 }
 
-// ReachesDirectives reports whether w can change the Go sources an embed
-// selector of the selection reads its directives from, or which sources it
-// reads: the bound Reaches takes for that selector.
-func (s fileSelection) ReachesDirectives(w plannedWrite) bool {
+// ReachesBasis reports whether w can change the expansion of an input selector
+// of the selection: a path a content or listing set of its basis selects, or
+// any path when the selector does not expand. Reaches holds for the expansion
+// as it stands, so a caller widens such a selection.
+func (s fileSelection) ReachesBasis(w plannedWrite) bool {
 	written := w.Region()
-	if !s.bounded || len(s.embeds) == 0 || !s.region.Overlaps(written) {
+	if !s.bounded || len(s.selectors) == 0 || !s.region.Overlaps(written) {
 		return false
 	}
 	rel, inside := s.relative(w.Path)
-	return !inside || !s.region.OverlapsAsSpelled(written) || store.ReachesGoSource(rel, w.Tree) || !s.scanner.spelledOnDisk(s.dir, rel)
+	if !inside || !s.region.OverlapsAsSpelled(written) || !s.scanner.spelledOnDisk(s.dir, rel) {
+		return true
+	}
+	for _, selector := range s.selectors {
+		result := s.scanner.expand(s.dir, selector, s.expander)
+		if result.err != nil || s.setsReach(result.expansion.Basis.Content, rel, w, written) ||
+			s.setsReach(result.expansion.Basis.Listing, rel, w, written) {
+			return true
+		}
+	}
+	return false
 }
 
-// ReachesDirectivesIn is ReachesDirectives for a write bounded by region alone.
-func (s fileSelection) ReachesDirectivesIn(region store.InputRegion) bool {
-	return s.bounded && len(s.embeds) > 0 && s.region.Overlaps(region)
+// ReachesBasisIn is ReachesBasis for a write bounded by region alone.
+func (s fileSelection) ReachesBasisIn(region store.InputRegion) bool {
+	return s.bounded && len(s.selectors) > 0 && s.region.Overlaps(region)
+}
+
+// expansionReaches reports whether w, at rel with region written, can touch a
+// file the expansion lists or a path a set of its basis selects.
+func (s fileSelection) expansionReaches(expansion store.InputExpansion, rel string, w plannedWrite, written store.InputRegion) bool {
+	for _, file := range expansion.Files {
+		if file == rel || (w.Tree && strings.HasPrefix(file, rel+"/")) {
+			return true
+		}
+	}
+	return s.setsReach(expansion.Basis.Content, rel, w, written) || s.setsReach(expansion.Basis.Listing, rel, w, written)
+}
+
+// setsReach reports whether w, at rel with region written, can create, change
+// or delete a path one of sets selects: rel itself, a directory above it the
+// write may create, or, for a tree, a path under rel the set's region holds
+// and its exclusions do not remove, as the basis digest walks it.
+func (s fileSelection) setsReach(sets [][]string, rel string, w plannedWrite, written store.InputRegion) bool {
+	for _, set := range sets {
+		if wsproto.SelectsPath(rel, set) {
+			return true
+		}
+		for parent := path.Dir(rel); parent != "."; parent = path.Dir(parent) {
+			if wsproto.SelectsPath(parent, set) {
+				return true
+			}
+		}
+		if !w.Tree {
+			continue
+		}
+		if _, excludes := wsproto.SplitFilePatterns(set); !wsproto.ExcludesTree(rel, excludes) && s.scanner.patternRegion(s.dir, set).Overlaps(written) {
+			return true
+		}
+	}
+	return false
 }
 
 // includeReaches reports whether w, whose region is written, can touch a file
@@ -273,12 +328,15 @@ func segmentsSpelledOnDisk(dir, rel string) bool {
 }
 
 // selectsThroughLink memoizes store.SelectsThroughLink for one selection.
-func (s *selectionScanner) selectsThroughLink(dir string, patterns []string) bool {
+func (s *selectionScanner) selectsThroughLink(dir string, patterns []string, expander store.InputExpander) bool {
 	key := dir + "\x00" + strings.Join(patterns, "\x00")
+	if expander != nil {
+		key += "\x00\x00" + expander.Identity()
+	}
 	if linked, ok := s.links[key]; ok {
 		return linked
 	}
-	linked := store.SelectsThroughLink(dir, patterns, store.GoEmbedExpander())
+	linked := store.SelectsThroughLink(dir, patterns, expander)
 	if s.links == nil {
 		s.links = make(map[string]bool)
 	}
@@ -288,11 +346,16 @@ func (s *selectionScanner) selectsThroughLink(dir string, patterns []string) boo
 
 // includeRegion memoizes store.FileInputRegion for one ordinary include of dir.
 func (s *selectionScanner) includeRegion(dir, include string) store.InputRegion {
-	key := dir + "\x00" + include
+	return s.patternRegion(dir, []string{include})
+}
+
+// patternRegion memoizes store.FileInputRegion for one pattern set of dir.
+func (s *selectionScanner) patternRegion(dir string, patterns []string) store.InputRegion {
+	key := dir + "\x00" + strings.Join(patterns, "\x00")
 	if region, ok := s.regions[key]; ok {
 		return region
 	}
-	region := store.FileInputRegion(dir, []string{include})
+	region := store.FileInputRegion(dir, patterns)
 	if s.regions == nil {
 		s.regions = make(map[string]store.InputRegion)
 	}
@@ -300,16 +363,22 @@ func (s *selectionScanner) includeRegion(dir, include string) store.InputRegion 
 	return region
 }
 
-// embed returns the bound of one Go embed selector of dir.
-func (s *selectionScanner) embed(dir, selector string) store.GoEmbedBound {
-	key := embedScanKey{dir: dir, selector: selector}
-	if bound, ok := s.embeds[key]; ok {
-		return bound
+// expand returns the expansion of one input selector of dir by expander, or
+// the error that fails it: a selection without an expander fails every
+// selector.
+func (s *selectionScanner) expand(dir, selector string, expander store.InputExpander) expansionResult {
+	if expander == nil {
+		return expansionResult{err: store.ErrInputSelector}
 	}
-	bound := store.ScanGoEmbedBound(dir, selector)
-	if s.embeds == nil {
-		s.embeds = make(map[embedScanKey]store.GoEmbedBound)
+	key := dir + "\x00" + selector + "\x00" + expander.Identity()
+	if result, ok := s.expansions[key]; ok {
+		return result
 	}
-	s.embeds[key] = bound
-	return bound
+	expansion, err := expander.ExpandInput(dir, selector)
+	result := expansionResult{expansion: expansion, err: err}
+	if s.expansions == nil {
+		s.expansions = make(map[string]expansionResult)
+	}
+	s.expansions[key] = result
+	return result
 }

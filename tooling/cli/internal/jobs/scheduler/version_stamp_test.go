@@ -134,7 +134,7 @@ func assertStampCarries(t *testing.T, leg, projectRoot, key string, want any) {
 func stampKeyInput(t *testing.T, ws *workspace.Workspace, projectPath string) string {
 	t.Helper()
 	cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
-	digest, err := cm.HashFiles(filepath.Join(ws.Root, projectPath), []string{versionStampRelPath}, store.GoEmbedExpander(), store.ProjectConfigScope{})
+	digest, err := cm.HashFiles(filepath.Join(ws.Root, projectPath), []string{versionStampRelPath}, nil, store.ProjectConfigScope{})
 	if err != nil {
 		t.Fatalf("hash build stamp: %v", err)
 	}

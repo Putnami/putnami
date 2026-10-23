@@ -258,9 +258,16 @@ Each entry is a selector name, `<scheme>:<name>`
 not `git`, which the core's `git:` file pattern reserves. An entry is listed
 once, at most 16 entries; normalization sorts the list. Validation reports
 `invalid-value`, `duplicate-value` or `limit-exceeded` at
-`runtime.inputSelectors`. The member adds no CLI contract rung: a core that
-does not read it ignores it, and expands `go-embed:build` and `go-embed:test`
-itself.
+`runtime.inputSelectors`.
+
+A task file pattern whose scheme is not `git` names a selector. It must be an
+include of a `from: "project"` input or of `cache.key.files`, and name a
+selector the same manifest lists; validation reports `invalid-value` at the
+pattern otherwise. A project's `filePatterns` and the CLI's `--filePatterns`
+never name one. A manifest that lists or names a selector requires CLI
+contract 14 from every origin: a manifest stamped below it is refused, and
+its remedy is a build stamped 14 (`putnami extensions update`). The core
+expands no selector itself.
 
 Core asks for an expansion with the reserved control call
 `<runtime> __putnami input-resolve`, with the working directory set to the

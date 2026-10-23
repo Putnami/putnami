@@ -525,6 +525,9 @@ func (s *Scheduler) prepareRun() {
 // prepareScheduling resolves learned execution tuning and performs every setup
 // step that must precede cache-key computation.
 func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
+	// One input-resolve call per extension answers every input selector the
+	// plan's keys read, before the batch guard below reads the first one.
+	cachekey.PrimePlanInputs(s.ws, s.planned, s.cache)
 	s.taskStats = loadTaskStats(s.ws.Root)
 	applyTaskTuning(s.planned, s.taskStats)
 	applyCriticalPathTuning(s.planned)

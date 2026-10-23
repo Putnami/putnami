@@ -80,8 +80,10 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		// The task index is built from the extensions this run loaded, so the
 		// selection reads the same task input declarations the cache keys on
 		// (ADR 0044). A run that loaded none keeps the project-level mapping.
+		// The run's resolver answers the input selectors of the changed
+		// projects; a nil resolver's matcher selects every path.
 		selection, err := workspace.ImpactedSelectionForBaselineWithTasks(
-			ws, req.Global.Baseline, workspace.NewTaskIndex(ws, extensions))
+			ws, req.Global.Baseline, workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()))
 		switch {
 		case err != nil && impactedFailureEndsRun(req, ws.Root, err):
 			return nil, ExitError

@@ -16,9 +16,12 @@ Building the manifest through this package moves that verdict to the extension's
 | COMMITTED DRIFT | A drift policy rides only on a durable, non-sensitive file or directory under the project or workspace root; a `pathFrom` output carries it under the project root only | `invalid-output-drift`, `invalid-enum` |
 
 The rules themselves live in `protocols/extension` and are the same ones the planner applies, so the SDK and the CLI cannot drift apart.
-This includes Go embed selectors: `go-embed:build` and `go-embed:test` are
-valid in project task inputs, while unknown selectors and workspace or closure
-origins fail during `Builder.Build`, before a manifest is emitted.
+This includes input selectors: a selector the manifest lists in
+`runtime.inputSelectors` (`Builder.Runtime`) is valid as an include of a
+project task input or of `cache.key.files`, while an unlisted selector, an
+exclusion of one, and workspace or closure origins fail during `Builder.Build`,
+before a manifest is emitted. A manifest that lists or names a selector is
+stamped contract 14.
 
 ## Usage
 

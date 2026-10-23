@@ -230,6 +230,9 @@ func (l *treeKeyedLane) keys(
 	}
 	preserveMatchingVersionFiles(l.ws, planned, l.versions, buildTime)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(l.ws.Root, ".putnami", "store")))
+	// The fixture's Go sources embed nothing, so the Go extension's answers
+	// list no file.
+	cache.SetInputResolver(listedInputs(store.InputExpansion{}))
 	keys, err := cachekey.PrecomputeKeys(l.ws, planned, params, l.versions, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)

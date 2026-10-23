@@ -329,6 +329,39 @@ could go stale under an unchanged digest:
 - a byte outside ASCII in the literal prefix of an input pattern: the basis
   cannot list the Unicode spellings a file system resolves it to
 
+### What the selectors read
+
+The task inputs name `go-embed:build` beside `**/*.go` and `!**/*_test.go`,
+and `go-embed:test` beside `**/*.go`, each with `!**/.gen/**`. The core hashes
+the relative path and exact bytes of every file the answer lists, an ignored
+file and a payload named `*_test.go` included, so an edit to an embedded asset
+moves the key even when no Go source changes.
+
+- `go-embed:build` reads no directive of a `_test.go` source, and
+  `go-embed:test` reads them, so a file only a test embeds is a test input
+  alone.
+- The scan reads every source that could build on any platform or with any
+  custom tag, so a directive that matches nothing in an alternate-platform
+  source is an error on every host.
+- Build constraints are read from leading Go comments only: a `//go:build`
+  line inside `/* ... */` does not exclude a source, and a legacy
+  `// +build` line needs the blank line before the package clause.
+- The Go files under `.gen`, which another task writes during the run, are no
+  source input and their directives are not read. A file under `.gen` that a
+  directive names is listed.
+- Plain `out`, `dist` and `node_modules` directory names do not hide a Go
+  subpackage from the scan.
+- A `.go` source link is read when its relative target is a regular file in
+  the same Go module; its directives resolve against the link's package
+  directory. An absolute, broken, chained, escaping or irregular source link
+  makes the input an error. The scan does not traverse a directory link, and
+  a directive that names a link is an error.
+
+A portable run binds each listed file. It refuses, naming the task and the
+path, a listed file that Git ignores beneath `.gen`, `node_modules`,
+`.putnami` or a declared generated output: the source snapshot would omit
+those bytes.
+
 ## Execution Flow
 
 1. **Tidy** (unless `--skip-deps`):

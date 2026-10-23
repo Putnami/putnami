@@ -159,11 +159,7 @@
     },
     {
       "id": "go-embed-cache-inputs",
-      "text": "For a negotiated Go embed task input, cache keys include exact embedded asset paths and bytes even when no Go source changes; build selectors omit directives in test sources, while test selectors include them. Deleted or unsafe targets fail before cache reuse or portable admission, and asset-only changes cannot restore an older described migration bundle. Change impact attributes a deleted embedded target to its owning task."
-    },
-    {
-      "id": "go-generated-tree-sources",
-      "text": "A Go source task key ignores the .go files under a .gen tree, which another task writes during the run and no Go source task compiles. A file under .gen still moves the key when a go:embed directive names it."
+      "text": "A task input that names an input selector keys the exact bytes of every file the extension that lists the selector answers through __putnami input-resolve, so an edit to a listed file moves the key and its dependents' keys and an older entry cannot restore. A failed call, a rejected or error answer, or an unlisted selector fails the task before cache restore or execution; portable admission fails on a deleted listed file. Change impact reads the listed files and the paths the answer's basis selects."
     },
     {
       "id": "clientgen-key-reads-no-run-written-tree",
@@ -195,7 +191,7 @@
     },
     {
       "id": "planned-write-reach",
-      "text": "Before any task runs, a planned write moves a key only when it can reach a file the key selects: not when the key's exclusions cover the written tree, its patterns do not match the written file, or, for a Go embed selector, the write lies beside every Go source and embedded path while no planned write changes those sources. A path a task reports is written anywhere under its declared within bound, or its whole root without one. A write the key may read under another name reaches it."
+      "text": "Before any task runs, a planned write moves a key only when it can reach a file the key selects: not when the key's exclusions cover the written tree, its patterns do not match the written file, or, for an input selector, the write reaches neither a file the answer lists nor a path its basis selects, and no other planned write reaches that basis. A path a task reports is written anywhere under its declared within bound, or its whole root without one. A write the key may read under another name reaches it."
     },
     {
       "id": "job-context-names-member-types",
@@ -294,6 +290,7 @@
     "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",
     "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md",
     "tooling/cli/doc/adr/0075-an-interactive-command-knows-the-directory-it-was-typed-in.md",
-    "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md"
+    "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
+    "tooling/cli/doc/adr/0078-the-core-asks-extensions-to-expand-their-input-selectors.md"
   ]
 }

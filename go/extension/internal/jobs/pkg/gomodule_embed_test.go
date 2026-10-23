@@ -11,6 +11,7 @@ import (
 
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -44,6 +45,33 @@ func TestGoBuildAndTestTaskInputsDeclareRespectiveEmbedSelectors(t *testing.T) {
 	}
 	if buildTasks < 4 || testTasks == 0 {
 		t.Fatalf("unexpected task coverage: %d build, %d test", buildTasks, testTasks)
+	}
+}
+
+// Every source input that names a Go selector excludes the .go files under
+// .gen, which another task writes during the run and no Go source task
+// compiles.
+func TestGoSourceInputsExcludeTheGeneratedTree(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-generated-tree-sources", "go-source-inputs-exclude-the-generated-tree")
+	manifest, err := extproto.LoadManifest(filepath.Join(findRepoRoot(t), "go", "extension", "putnami.extension.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	named := 0
+	for name, task := range manifest.Tasks {
+		for _, input := range extproto.TaskSelectorInputs(task) {
+			named++
+			if wsproto.SelectsPath(".gen/clientgen/go/client.gen.go", input.Patterns) ||
+				wsproto.SelectsPath("internal/.gen/client.gen.go", input.Patterns) {
+				t.Errorf("%s: the input that names %s selects a .go file under .gen: %v", name, input.Selector, input.Patterns)
+			}
+			if !wsproto.SelectsPath("internal/server.go", input.Patterns) {
+				t.Errorf("%s: the input that names %s selects no Go source: %v", name, input.Selector, input.Patterns)
+			}
+		}
+	}
+	if named == 0 {
+		t.Fatal("no task names a Go selector")
 	}
 }
 

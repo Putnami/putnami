@@ -11,10 +11,12 @@ import (
 )
 
 // KeyInputs reads the file inputs of a plan's cache keys under one
-// invocation's command parameters.
+// invocation's command parameters, with the resolver the keys expand their
+// input selectors through.
 type KeyInputs struct {
 	Workspace     *workspace.Workspace
 	CommandParams map[string]any
+	Resolver      store.InputResolver
 }
 
 // reads returns the selection of every file a job's cache key reads: its
@@ -28,13 +30,14 @@ func (k KeyInputs) reads(job *jobmodel.ScheduledJob, scanner *selectionScanner) 
 		return nil
 	}
 	files, workspaceFiles := KeyFilePatterns(k.Workspace, job, k.CommandParams)
-	reads := []fileSelection{scanner.Select(filepath.Join(k.Workspace.Root, job.Project.Path), files)}
+	expander := JobInputExpander(k.Workspace, job, k.CommandParams, k.Resolver)
+	reads := []fileSelection{scanner.Select(filepath.Join(k.Workspace.Root, job.Project.Path), files, expander)}
 	if len(workspaceFiles) > 0 {
-		reads = append(reads, scanner.Select(k.Workspace.Root, workspaceFiles))
+		reads = append(reads, scanner.Select(k.Workspace.Root, workspaceFiles, nil))
 	}
 	if patterns := closureKeyPatterns(job); len(patterns) > 0 {
 		for _, root := range ProjectClosureRoots(k.Workspace, job.Project) {
-			reads = append(reads, scanner.Select(root, patterns))
+			reads = append(reads, scanner.Select(root, patterns, nil))
 		}
 	}
 	if assets := GenerateAssetFiles(k.Workspace, job); len(assets) > 0 {
@@ -85,29 +88,30 @@ func reachedBy(reads []fileSelection, writes plannedWrites) bool {
 	return false
 }
 
-// widenedFor returns reads with every selection whose embed directives one of
-// writes can change bounded by its region alone: its narrower bound holds only
-// while the directives stay as they were scanned.
+// widenedFor returns reads with every selection one of whose input selectors
+// computed its expansion from a basis one of writes can reach bounded by its
+// region alone: its narrower bound holds only while every path that basis
+// selects, through a content or a listing set, stays as it is.
 func widenedFor(reads []fileSelection, writes []plannedWrites) []fileSelection {
 	widened := make([]fileSelection, len(reads))
 	for i, read := range reads {
 		widened[i] = read
-		if directivesReached(read, writes) {
+		if basisReached(read, writes) {
 			widened[i] = read.Widened()
 		}
 	}
 	return widened
 }
 
-func directivesReached(read fileSelection, writes []plannedWrites) bool {
+func basisReached(read fileSelection, writes []plannedWrites) bool {
 	for _, write := range writes {
 		for _, output := range write.outputs {
-			if read.ReachesDirectives(output) {
+			if read.ReachesBasis(output) {
 				return true
 			}
 		}
 		for _, region := range write.rewritten {
-			if read.ReachesDirectivesIn(region) {
+			if read.ReachesBasisIn(region) {
 				return true
 			}
 		}
@@ -204,7 +208,7 @@ type KeyMovement struct {
 }
 
 // PlanKeyMovement decides KeyMovement for planned, from the declarations and
-// the Go embed directives of the tree as it stands. A writer counts whatever
+// the expansions of their input selectors in the tree as it stands. A writer counts whatever
 // its place in the schedule, and when one of its writes can reach a file the
 // key selects (fileSelection), so a job is reported moving whenever it
 // cannot be shown not to be.

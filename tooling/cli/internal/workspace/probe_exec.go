@@ -54,8 +54,9 @@ type ExecProbeProvider struct {
 	// declared" have different remedies.
 	Resolve func() (string, error)
 	// Args is the argv tail. Empty means the reserved control invocation of
-	// the exchange: wsproto.ProbeControlArgs for Probe and
-	// wsproto.ToolchainResolveControlArgs for ResolveToolchains.
+	// the exchange: wsproto.ProbeControlArgs for Probe,
+	// wsproto.ToolchainResolveControlArgs for ResolveToolchains and
+	// wsproto.InputResolveControlArgs for ResolveInputs.
 	Args []string
 	// Dir is the process working directory. It must be the workspace root:
 	// every path in the exchange is repo-relative, so a provider that resolves
@@ -150,6 +151,49 @@ func (p *ExecProbeProvider) ResolveToolchains(request wsproto.ToolchainResolveRe
 			"toolchain-resolve answer rejected by the v%d contract", wsproto.ToolchainResolveProtocolVersion)
 		failure.Diagnostics = diag.Errors(diags)
 		return wsproto.ToolchainResolveResult{}, failure
+	}
+	return *result, nil
+}
+
+// ResolveInputs asks the provider to expand input selectors: it spawns the
+// provider with the input-resolve control invocation
+// (wsproto.InputResolveControlArgs) when Args is empty, writes one request,
+// and reads one result. The executable, its preparation, the repository-code
+// record, the timeout and the failure classes are Probe's.
+//
+// The result is returned only once it passes its own validation and the check
+// against the request (wsproto.ValidateInputResolveAnswer). Any other answer
+// is a ProbeFailureInvalidResult failure carrying the diagnostics.
+func (p *ExecProbeProvider) ResolveInputs(request wsproto.InputResolveRequest) (wsproto.InputResolveResult, error) {
+	executable, err := p.executable()
+	if err != nil {
+		return wsproto.InputResolveResult{}, err
+	}
+
+	var payload bytes.Buffer
+	if err := wsproto.EncodeInputResolveRequest(&payload, request); err != nil {
+		return wsproto.InputResolveResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension, "%v", err)
+	}
+	stdout, stderr, err := p.exchange(executable, wsproto.InputResolveControlArgs(), &payload, "input-resolve", "input-resolve of ")
+	if err != nil {
+		return wsproto.InputResolveResult{}, err
+	}
+
+	data, err := wsproto.DecodeInputResolveDocument(stdout)
+	if err != nil {
+		return wsproto.InputResolveResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension,
+			"%v%s", err, formatProviderStderr(stderr))
+	}
+
+	result, diags := wsproto.ParseAndValidateInputResolveResult(data)
+	if result != nil && !diag.HasErrors(diags) {
+		diags = append(diags, wsproto.ValidateInputResolveAnswer(&request, result)...)
+	}
+	if result == nil || diag.HasErrors(diags) {
+		failure := wsproto.NewProbeFailure(wsproto.ProbeFailureInvalidResult, p.Extension,
+			"input-resolve answer rejected by the v%d contract", wsproto.InputResolveProtocolVersion)
+		failure.Diagnostics = diag.Errors(diags)
+		return wsproto.InputResolveResult{}, failure
 	}
 	return *result, nil
 }

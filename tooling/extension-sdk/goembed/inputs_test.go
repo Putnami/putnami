@@ -21,7 +21,7 @@ func put(t *testing.T, root, rel, contents string) {
 	}
 }
 
-func TestResolveSelectorsAndDeletedPaths(t *testing.T) {
+func TestResolveBindsDirectiveAssetsAndRefusesADeletedOne(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "go-embed-source-inputs", "directives-bind-build-and-test-assets")
 	root := t.TempDir()
 	put(t, root, "p/embed.go", "package p\nimport _ \"embed\"\n//go:embed \"assets/report one.json\" all:assets/config\nvar x []byte\n")
@@ -45,10 +45,6 @@ func TestResolveSelectorsAndDeletedPaths(t *testing.T) {
 	}
 	if err := os.Remove(filepath.Join(root, "p/assets/report one.json")); err != nil {
 		t.Fatal(err)
-	}
-	selected, err := SelectsPath(root, "p/assets/report one.json", false)
-	if err != nil || !selected {
-		t.Fatalf("deleted path selection = %v, %v", selected, err)
 	}
 	if _, err := Resolve(root, false); err == nil || !strings.Contains(err.Error(), "matched no files") {
 		t.Fatalf("missing target was accepted: %v", err)
@@ -118,12 +114,6 @@ func TestResolveInputsIncludesLexicalGoSourcesWithoutDirectives(t *testing.T) {
 	if err != nil || !slices.Contains(testInputs, filepath.Join(root, "out/p/source_test.go")) {
 		t.Fatalf("test selector omitted lexical test source: %v, %v", testInputs, err)
 	}
-	if err := os.Remove(filepath.Join(root, "out/p/source.go")); err != nil {
-		t.Fatal(err)
-	}
-	if selected, err := SelectsPath(root, "out/p/source.go", false); err != nil || !selected {
-		t.Fatalf("deleted lexical Go source selected = %v, %v", selected, err)
-	}
 }
 
 func TestResolveRejectsUnsafeAndIgnoresGeneratedSource(t *testing.T) {
@@ -191,17 +181,8 @@ func TestResolveSourceFileSymlinkUsesLexicalPackagePath(t *testing.T) {
 	if err != nil || !slices.Equal(allInputs, []string{filepath.Join(root, "p/.source/directives.txt"), filepath.Join(root, "p/embed.go"), filepath.Join(root, "p/payload.sql")}) {
 		t.Fatalf("source-link portable inputs = %v, %v", allInputs, err)
 	}
-	if selected, err := SelectsPath(root, "p/.source/directives.txt", false); err != nil || !selected {
-		t.Fatalf("source-link target path selection = %v, %v", selected, err)
-	}
-	if selected, err := SelectsPath(root, "p/payload.sql", false); err != nil || !selected {
-		t.Fatalf("source-link path selection = %v, %v", selected, err)
-	}
 	if err := os.Remove(filepath.Join(root, "p/payload.sql")); err != nil {
 		t.Fatal(err)
-	}
-	if selected, err := SelectsPath(root, "p/payload.sql", false); err != nil || !selected {
-		t.Fatalf("source-link deleted path selection = %v, %v", selected, err)
 	}
 	if _, err := Resolve(root, false); err == nil || !strings.Contains(err.Error(), "matched no files") {
 		t.Fatalf("deleted source-link target was accepted: %v", err)

@@ -54,7 +54,7 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 		hasInputs, err := store.HasMatchingFiles(
 			filepath.Join(s.ws.Root, job.Project.Path),
 			job.JobDef.FilePatterns,
-			store.GoEmbedExpander(),
+			cachekey.JobInputExpander(s.ws, job, s.commandParams, s.cache.InputResolver()),
 		)
 		if err != nil || !hasInputs {
 			return "", 0

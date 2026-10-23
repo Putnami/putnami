@@ -296,6 +296,8 @@ func TestGoWorkspaceModuleFilesMoveRealTaskCacheKey(t *testing.T) {
 	hashFor := func() string {
 		t.Helper()
 		cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
+		// The Go extension's answer for go-embed:test lists no file here.
+		cache.SetInputResolver(listingResolver(nil))
 		hash, err := ComputeJobCacheHash(ws, job, nil, nil, cache, nil)
 		if err != nil {
 			t.Fatalf("compute Go test cache key: %v", err)

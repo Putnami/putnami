@@ -32,7 +32,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
-	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
@@ -204,7 +203,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}
-		inputs, err := cachekey.PortableInputs(ws, planned, req.CommandParams, store.GoEmbedExpander())
+		inputs, err := cachekey.PortableInputs(ws, planned, req.CommandParams, req.inputResolver)
 		if err == nil {
 			err = runnerprovider.VerifyAdmission(req.WorkspaceRoot, req.Portable.Request.Source.Bound, inputs)
 		}
@@ -223,7 +222,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitUsage, Plan: planned}, true
 	}
-	inputs, err := cachekey.PortableInputs(ws, planned, req.CommandParams, store.GoEmbedExpander())
+	inputs, err := cachekey.PortableInputs(ws, planned, req.CommandParams, req.inputResolver)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitError, Plan: planned}, true

@@ -330,6 +330,7 @@ func (p *clientgenPlan) job(t *testing.T, name string) *jobmodel.ScheduledJob {
 func (p *clientgenPlan) startKeys(t *testing.T, after func(job *jobmodel.ScheduledJob, keys map[string]string)) map[string]string {
 	t.Helper()
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(p.ws.Root, ".putnami", "start")))
+	cache.SetInputResolver(noListedFiles{})
 	byKey, indegree, dependents := cachekey.FunctionalDegrees(p.planned)
 	var ready []string
 	for _, job := range p.planned {
@@ -366,6 +367,7 @@ func (p *clientgenPlan) startKeys(t *testing.T, after func(job *jobmodel.Schedul
 func (p *clientgenPlan) precomputedKeys(t *testing.T) map[string]string {
 	t.Helper()
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(p.ws.Root, ".putnami", "precompute")))
+	cache.SetInputResolver(noListedFiles{})
 	keys, err := cachekey.PrecomputeKeys(p.ws, p.planned, nil, nil, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
@@ -446,3 +448,13 @@ func TestClientgenStartKeyEqualsThePrecomputedKeyWhenDescribeWrites(t *testing.T
 		}
 	}
 }
+
+// noListedFiles answers every input selector with no file: the provider's Go
+// sources embed nothing, so the Go extension's answers list none.
+type noListedFiles struct{}
+
+func (noListedFiles) ResolveInput(store.InputQuery) (store.InputExpansion, error) {
+	return store.InputExpansion{}, nil
+}
+
+func (noListedFiles) PrimeInputs([]store.InputQuery) {}

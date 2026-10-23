@@ -54,11 +54,11 @@ the author's-eye version, with the CLI-side behavior, is
 | Invocation-scoped sensitive outputs | `declares.outputs` (`scope: "invocation"`, `sensitive`), `runOn: "finally"` + `finalizes` | `dbtestenv` is the reference implementation — provisioning, the non-secret lease, orphan reaping after `SIGKILL`, and the `sensitive` binding artifact a consumer reads with `BindingFrom` |
 
 The `goembed` package supplies the shared Go directive parser and target
-resolver used by Go module packaging and the CLI's `go-embed:build` /
-`go-embed:test` task input selectors. It scans potentially buildable source
+resolver used by Go module packaging and by the Go extension's answer for its
+`go-embed:build` / `go-embed:test` input selectors. It scans potentially buildable source
 files across platforms, resolves quoted, directory and `all:` patterns to
-regular assets, and rejects missing, unsafe or cross-module targets. Callers
-hash lexical sources, source referents and assets as raw bytes; the package itself has no cache or job side
+regular assets, and rejects missing, unsafe or cross-module targets. The CLI
+hashes the lexical sources, source referents and assets the answer lists as raw bytes; the package itself has no cache or job side
 effects. A symlinked `.go` source is read when a relative link points directly to a regular
 file inside the same Go module. Its directives resolve from the link's package
 directory. The source target is also a task input, so an ignored target travels

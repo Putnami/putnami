@@ -101,6 +101,7 @@ func PrecomputeKeys(
 	if err != nil {
 		return nil, err
 	}
+	PrimePlanInputs(ws, planned, cache)
 
 	keys := make(map[string]string, len(planned))
 	for _, job := range order {
@@ -166,6 +167,7 @@ func SelectionFingerprints(
 	if err != nil {
 		return nil, err
 	}
+	PrimePlanInputs(ws, planned, cache)
 	keys := make(map[string]string, len(planned))
 	for _, job := range order {
 		if !IsCacheEnabled(job, CacheBypass{}) {

@@ -849,7 +849,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 ) (string, *JobResult, func()) {
 	noop := func() {}
 	if s.cache == nil {
-		if err := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams, store.GoEmbedExpander()); err != nil {
+		if err := cachekey.ValidateUnkeyedInputSelectors(s.ws, job, s.commandParams, s.cache.InputResolver()); err != nil {
 			s.renderer.JobStart(job)
 			return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
 		}
@@ -884,7 +884,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 	// serving anything.
 	if !cacheEnabled {
 		if !CanUseCache(job) {
-			if err := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams, store.GoEmbedExpander()); err != nil {
+			if err := cachekey.ValidateUnkeyedInputSelectors(s.ws, job, s.commandParams, s.cache.InputResolver()); err != nil {
 				s.renderer.JobStart(job)
 				return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
 			}
@@ -893,7 +893,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 		hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 		if err != nil {
 			if !errors.Is(err, store.ErrInputSelector) {
-				if semanticErr := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams, store.GoEmbedExpander()); semanticErr != nil {
+				if semanticErr := cachekey.ValidateUnkeyedInputSelectors(s.ws, job, s.commandParams, s.cache.InputResolver()); semanticErr != nil {
 					err = semanticErr
 				}
 			}

@@ -2,104 +2,84 @@ package store
 
 import (
 	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"slices"
 
-	"go.putnami.dev/sdk/extension/goembed"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // ErrInputSelector identifies an invalid input selection: a selector no
-// expander answers, a failed expansion, or a file it names that cannot be
-// read. A scheduler must fail such a task before cache restoration or
-// execution; an unrelated cache-store failure may still fall back to
-// execution.
+// expander answers, a failed or rejected expansion, an expansion that is an
+// error, or a file it lists that cannot be read. A scheduler must fail such a
+// task before cache restoration or execution; an unrelated cache-store failure
+// may still fall back to execution.
 var ErrInputSelector = errors.New("invalid input selector")
 
-// InputExpansion lists what an input selector names in one directory when the
-// expander answers.
+// InputExpansion is what an input selector reads in one directory: the
+// extension's answer to the workspace protocol's input-resolve call.
 type InputExpansion struct {
-	// Files are sorted, unique, clean slash paths relative to the directory.
+	// Files are every file the selector reads now: sorted, unique, clean
+	// slash paths relative to the directory. The key hashes their exact
+	// bytes.
 	Files []string
+	// Basis is what Files were computed from, as pattern sets relative to the
+	// directory. Files stay exact while wsproto.InputBasisDigest of the
+	// directory under Basis is unchanged.
+	Basis wsproto.InputBasis
 }
 
-// InputExpander expands an input selector for a directory. patterns are the
-// other patterns of the pattern set that names the selector, includes and
-// exclusions, without selector names. An error wraps ErrInputSelector.
-//
-// A CacheManager memoizes a digest by directory, patterns and config scope,
-// not by expander, so every caller of one manager passes expanders that
-// expand a selector alike.
+// InputExpander expands the input selectors that one job's file patterns
+// name. An expander knows the job's task inputs, so it knows the other
+// patterns of the input that names each selector.
 type InputExpander interface {
-	ExpandInput(dir, selector string, patterns []string) (InputExpansion, error)
+	// ExpandInput lists what selector reads in dir. An error wraps
+	// ErrInputSelector.
+	ExpandInput(dir, selector string) (InputExpansion, error)
+	// Identity names what the expander answers: two expanders with one
+	// identity expand every selector in every directory alike. A
+	// CacheManager memoizes a digest by directory, patterns, config scope and
+	// this identity.
+	Identity() string
 }
 
-// GoEmbedExpander returns the expander that expands the go-embed selectors in
-// this process, with the SDK package goembed.
-func GoEmbedExpander() InputExpander { return goEmbedExpander{} }
-
-type goEmbedExpander struct{}
-
-// ExpandInput lists what a go-embed selector reads in dir: the Go sources, the
-// files their embed directives name and the referents of source links
-// (goembed.ResolveInputs, which reads test sources for goembed.TestSelector),
-// and every .go link patterns select with its referent. A glob can select a
-// link in a directory the source scan skips, so the scan alone misses it.
-func (goEmbedExpander) ExpandInput(dir, selector string, patterns []string) (InputExpansion, error) {
-	if !goembed.IsSelector(selector) {
-		return InputExpansion{}, fmt.Errorf("%w: unsupported selector %q", ErrInputSelector, selector)
-	}
-	links, err := selectedGoLinks(dir, patterns)
-	if err != nil {
-		return InputExpansion{}, fmt.Errorf("%w: selected Go source: %w", ErrInputSelector, err)
-	}
-	targets, err := goembed.ResolveInputs(dir, selector == goembed.TestSelector)
-	if err != nil {
-		return InputExpansion{}, fmt.Errorf("%w: resolve %s inputs: %w", ErrInputSelector, selector, err)
-	}
-	return relativeExpansion(dir, append(links, targets...))
+// InputQuery is one input selector to expand: a selector a task input of one
+// project names, with the input's other patterns.
+type InputQuery struct {
+	// Extension is the name of the extension that declares the task, which
+	// lists the selector in its runtime.inputSelectors.
+	Extension string
+	// Dir is the absolute project directory.
+	Dir string
+	// Selector is the selector name.
+	Selector string
+	// Patterns are the other file patterns of the task input that names the
+	// selector, as declared.
+	Patterns []string
 }
 
-// selectedGoLinks returns every .go symbolic link patterns select under dir,
-// each followed by its referent (goembed.SourceReferent), as absolute paths.
-// A selected link the source policy refuses is an error.
-func selectedGoLinks(dir string, patterns []string) ([]string, error) {
-	selected, err := collectPatternFiles(dir, patterns, true)
-	if err != nil {
-		return nil, err
-	}
-	var links []string
-	for _, file := range selected {
-		if filepath.Ext(file.path) != ".go" {
-			continue
-		}
-		info, err := os.Lstat(file.path)
-		if err != nil {
-			return nil, err
-		}
-		if info.Mode()&os.ModeSymlink == 0 {
-			continue
-		}
-		referent, err := goembed.SourceReferent(dir, file.path)
-		if err != nil {
-			return nil, fmt.Errorf("%w: resolve selected Go source link %s: %w", ErrInputSelector, file.path, err)
-		}
-		links = append(links, file.path, referent)
-	}
-	return links, nil
+// InputResolver answers input queries through the extensions that list the
+// selectors. A run's CacheManager carries one (SetInputResolver).
+type InputResolver interface {
+	// ResolveInput answers one query. An error wraps ErrInputSelector.
+	ResolveInput(query InputQuery) (InputExpansion, error)
+	// PrimeInputs asks each extension once for every query it keeps no
+	// answer for. It reports nothing: ResolveInput reports a failure for the
+	// input that reads it.
+	PrimeInputs(queries []InputQuery)
 }
 
-// relativeExpansion lists paths, each at or under dir, relative to dir.
-func relativeExpansion(dir string, paths []string) (InputExpansion, error) {
-	files := make([]string, 0, len(paths))
-	for _, p := range paths {
-		rel, err := filepath.Rel(dir, p)
-		if err != nil {
-			return InputExpansion{}, fmt.Errorf("%w: %s is not under %s: %w", ErrInputSelector, p, dir, err)
-		}
-		files = append(files, filepath.ToSlash(rel))
+// SetInputResolver attaches the resolver the run's keys expand input
+// selectors with. A manager without one fails every selector.
+func (cm *CacheManager) SetInputResolver(resolver InputResolver) {
+	cm.inputResolverMu.Lock()
+	defer cm.inputResolverMu.Unlock()
+	cm.inputResolver = resolver
+}
+
+// InputResolver returns the resolver SetInputResolver attached, or nil.
+func (cm *CacheManager) InputResolver() InputResolver {
+	if cm == nil {
+		return nil
 	}
-	slices.Sort(files)
-	return InputExpansion{Files: slices.Compact(files)}, nil
+	cm.inputResolverMu.Lock()
+	defer cm.inputResolverMu.Unlock()
+	return cm.inputResolver
 }

@@ -9,16 +9,16 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
-	"go.putnami.dev/sdk/extension/goembed"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -68,7 +68,9 @@ type fileEntry struct {
 	// empty for an untracked one. A host that does not store the executable
 	// bit reads it from here (gitCandidateDigest).
 	indexMode string
-	rawEmbed  bool
+	// exact is set on a file an input selector expanded to. The key hashes
+	// its exact bytes, and a file that cannot be read is an invalid selection.
+	exact bool
 	// sweptByGlob is set when a pattern whose last segment is a glob selected
 	// the file (`**/*.json`, `*.json`, `doc/**`). Such a pattern selects files by
 	// type or by directory, so the task reads what it selects as text, and a
@@ -134,10 +136,10 @@ func globDoubleStar(dir, pattern string) []string {
 //     cache keys that do not use "**" or "!" are unchanged.
 //   - A pattern whose last segment is a glob marks the files it selects as
 //     sweptByGlob. A file two patterns select keeps the mark if either sets it.
-//   - An input selector include ("go-embed:build") selects the files expander
-//     lists for it in dir, given the other patterns of the set, and marks them
-//     rawEmbed: the key hashes their exact bytes. A file a pattern selects too
-//     keeps the mark.
+//   - A pattern with a scheme other than "git:" names an input selector
+//     (extensionproto.NamesInputSelector). It selects the files expander lists
+//     for it in dir and marks them exact: the key hashes their exact bytes. A
+//     file a pattern selects too keeps the mark.
 func collectFiles(dir string, patterns []string, expander InputExpander) ([]fileEntry, error) {
 	dir, err := gitInputDirectory(dir, patterns)
 	if err != nil {
@@ -154,15 +156,15 @@ func collectFiles(dir string, patterns []string, expander InputExpander) ([]file
 	if err != nil {
 		return nil, err
 	}
-	files, err := collectPatternFiles(dir, others, false)
+	files, err := collectPatternFiles(dir, others)
 	if err != nil {
 		if len(selectors) > 0 {
-			return nil, fmt.Errorf("%w: go input selection unavailable: %w", ErrInputSelector, err)
+			return nil, fmt.Errorf("%w: input selection unavailable: %w", ErrInputSelector, err)
 		}
 		return nil, err
 	}
 	for _, selector := range selectors {
-		files, err = appendSelectorFiles(dir, files, expander, selector, others)
+		files, err = appendSelectorFiles(dir, files, expander, selector)
 		if err != nil {
 			return nil, err
 		}
@@ -170,29 +172,38 @@ func collectFiles(dir string, patterns []string, expander InputExpander) ([]file
 	return sortedUniqueFileEntries(files), nil
 }
 
-// splitInputSelectors separates the input selector includes of patterns from
-// the other patterns, includes and exclusions, both in declaration order. A
-// go-embed include that names no supported selector is an invalid selection.
+// namesInputSelector reports whether a pattern of patterns names an input
+// selector.
+func namesInputSelector(patterns []string) bool {
+	for _, pattern := range patterns {
+		if extensionproto.NamesInputSelector(pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// splitInputSelectors separates the input selectors patterns name, each once,
+// from the other patterns, includes and exclusions, both in declaration order.
+// An exclusion that names a selector is an invalid selection: a selector
+// names files to read.
 func splitInputSelectors(patterns []string) (selectors, others []string, err error) {
 	for _, pattern := range patterns {
 		switch {
-		case goembed.IsSelector(pattern):
-			selectors = append(selectors, pattern)
-		case strings.HasPrefix(pattern, "go-embed:"):
-			return nil, nil, fmt.Errorf("%w: unsupported selector %q", ErrInputSelector, pattern)
-		default:
+		case !extensionproto.NamesInputSelector(pattern):
 			others = append(others, pattern)
+		case strings.HasPrefix(pattern, "!"):
+			return nil, nil, fmt.Errorf("%w: exclusion %q names a selector", ErrInputSelector, pattern)
+		case !slices.Contains(selectors, pattern):
+			selectors = append(selectors, pattern)
 		}
 	}
 	return selectors, others, nil
 }
 
 // collectPatternFiles returns, unsorted, the files the ordinary and Git
-// candidate includes of patterns select under dir, less the exclusions. With
-// goLinks, an ordinary include also selects a .go symbolic link whose target
-// is missing or a directory, so a Go source link that cannot be read reaches
-// its validator instead of leaving the selection.
-func collectPatternFiles(dir string, patterns []string, goLinks bool) ([]fileEntry, error) {
+// candidate includes of patterns select under dir, less the exclusions.
+func collectPatternFiles(dir string, patterns []string) ([]fileEntry, error) {
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
 	var ordinaryPatterns, gitPatterns []string
 	for _, pattern := range includes {
@@ -202,7 +213,7 @@ func collectPatternFiles(dir string, patterns []string, goLinks bool) ([]fileEnt
 			ordinaryPatterns = append(ordinaryPatterns, pattern)
 		}
 	}
-	files := collectOrdinaryFiles(dir, ordinaryPatterns, excludes, goLinks)
+	files := collectOrdinaryFiles(dir, ordinaryPatterns, excludes)
 	if len(gitPatterns) > 0 {
 		candidates, err := collectGitFiles(dir, gitPatterns, excludes)
 		if err != nil {
@@ -214,13 +225,13 @@ func collectPatternFiles(dir string, patterns []string, goLinks bool) ([]fileEnt
 }
 
 // appendSelectorFiles appends the files expander lists for selector in dir,
-// each marked rawEmbed. A missing expander, a failed expansion and a listed
-// file that cannot be stated are each an invalid selection.
-func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string, others []string) ([]fileEntry, error) {
+// each marked exact. A missing expander, a failed expansion and a listed file
+// that cannot be stated are each an invalid selection.
+func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string) ([]fileEntry, error) {
 	if expander == nil {
 		return nil, fmt.Errorf("%w: no expander for selector %q", ErrInputSelector, selector)
 	}
-	expansion, err := expander.ExpandInput(dir, selector, others)
+	expansion, err := expander.ExpandInput(dir, selector)
 	if err != nil {
 		if !errors.Is(err, ErrInputSelector) {
 			err = fmt.Errorf("%w: expand %s: %w", ErrInputSelector, selector, err)
@@ -233,7 +244,7 @@ func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, 
 		if err != nil {
 			return nil, fmt.Errorf("%w: stat resolved input %s: %w", ErrInputSelector, target, err)
 		}
-		files = append(files, fileEntry{path: target, info: info, rawEmbed: true})
+		files = append(files, fileEntry{path: target, info: info, exact: true})
 	}
 	return files, nil
 }
@@ -260,7 +271,7 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 	return files, err
 }
 
-func collectOrdinaryFiles(dir string, patterns, excludes []string, goLinks bool) []fileEntry {
+func collectOrdinaryFiles(dir string, patterns, excludes []string) []fileEntry {
 	var files []fileEntry
 	for _, pattern := range patterns {
 		slashed := filepath.ToSlash(pattern)
@@ -272,7 +283,7 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string, goLinks bool)
 			matches, _ = filepath.Glob(filepath.Join(dir, pattern))
 		}
 		for _, match := range matches {
-			file, ok := ordinaryFileEntry(dir, match, excludes, goLinks, sweptByGlob)
+			file, ok := ordinaryFileEntry(dir, match, excludes, sweptByGlob)
 			if ok {
 				files = append(files, file)
 			}
@@ -283,28 +294,11 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string, goLinks bool)
 
 // ordinaryFileEntry stats one match of an ordinary pattern, following links.
 // A match that cannot be stated, a directory, and a match an exclusion names
-// are not selected. With goLinks, a .go symbolic link whose target is missing
-// or a directory is selected with its own stat, so its validator rejects it.
-func ordinaryFileEntry(dir, path string, excludes []string, goLinks, sweptByGlob bool) (fileEntry, bool) {
+// are not selected.
+func ordinaryFileEntry(dir, path string, excludes []string, sweptByGlob bool) (fileEntry, bool) {
 	info, err := os.Stat(path)
-	if err != nil {
-		if !goLinks || filepath.Ext(path) != ".go" {
-			return fileEntry{}, false
-		}
-		info, err = os.Lstat(path)
-		if err != nil || info.Mode()&os.ModeSymlink == 0 {
-			return fileEntry{}, false
-		}
-	}
-	if info.IsDir() {
-		if !goLinks || filepath.Ext(path) != ".go" {
-			return fileEntry{}, false
-		}
-		linkInfo, linkErr := os.Lstat(path)
-		if linkErr != nil || linkInfo.Mode()&os.ModeSymlink == 0 {
-			return fileEntry{}, false
-		}
-		info = linkInfo
+	if err != nil || info.IsDir() {
+		return fileEntry{}, false
 	}
 	if len(excludes) > 0 {
 		rel, _ := filepath.Rel(dir, path)
@@ -313,55 +307,6 @@ func ordinaryFileEntry(dir, path string, excludes []string, goLinks, sweptByGlob
 		}
 	}
 	return fileEntry{path: path, info: info, sweptByGlob: sweptByGlob}, true
-}
-
-// GoEmbedBound is what a Go embed selector of one directory reads beyond its
-// Go sources: the static prefix of every embed directive, scanned from the
-// sources as they stand. A selector this store does not know, whose
-// directives cannot be read, or whose sources include a link, is not Bounded.
-type GoEmbedBound struct {
-	Bounded bool
-	Assets  InputRegion
-}
-
-// ScanGoEmbedBound scans the embed directives selector reads under dir.
-func ScanGoEmbedBound(dir, selector string) GoEmbedBound {
-	if !goembed.IsSelector(selector) {
-		return GoEmbedBound{}
-	}
-	directives, links, err := goembed.DirectivesAndLinks(dir, selector == goembed.TestSelector)
-	if err != nil || len(links) > 0 {
-		return GoEmbedBound{}
-	}
-	var roots []string
-	for source, patterns := range directives {
-		pkg := filepath.Join(dir, filepath.FromSlash(path.Dir(source)))
-		for _, pattern := range patterns {
-			prefix, err := goembed.StaticPrefix(pattern)
-			if err != nil {
-				return GoEmbedBound{}
-			}
-			roots = append(roots, filepath.Join(pkg, filepath.FromSlash(prefix)))
-		}
-	}
-	return GoEmbedBound{Bounded: true, Assets: PathsRegion(roots)}
-}
-
-// ReachesGoSource reports whether a write at rel, a slash path relative to a
-// Go embed selector's directory, can change a Go source the selector reads,
-// or which sources it reads: a .go file, or for a tree anything, outside every
-// path the source scan skips. A go.mod anywhere counts too: one opens or
-// closes a nested module, and one above an embedded file rejects it. Both
-// names compare without case, because a case-insensitive filesystem finds a
-// go.mod by either spelling.
-func ReachesGoSource(rel string, tree bool) bool {
-	if !tree && strings.EqualFold(path.Base(rel), "go.mod") {
-		return true
-	}
-	if goembed.IgnoresSource(rel) {
-		return false
-	}
-	return tree || strings.EqualFold(path.Ext(rel), ".go")
 }
 
 // SelectsThroughLink reports whether a file patterns select under dir is read
@@ -403,7 +348,7 @@ func sortedUniqueFileEntries(files []fileEntry) []fileEntry {
 				j++
 				files[j] = files[i]
 			} else {
-				rawEmbed := files[j].rawEmbed || files[i].rawEmbed
+				exact := files[j].exact || files[i].exact
 				if files[i].gitCandidate {
 					// Raw Git bytes win over a normal pattern's semantic digest,
 					// independent of declaration and sort order.
@@ -412,7 +357,7 @@ func sortedUniqueFileEntries(files []fileEntry) []fileEntry {
 					// A raw reading wins over a decoded one the same way.
 					files[j].sweptByGlob = true
 				}
-				files[j].rawEmbed = rawEmbed
+				files[j].exact = exact
 			}
 		}
 		files = files[:j+1]
@@ -466,10 +411,8 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 		}
 		resolved, err := dirlink.Resolve(absolute)
 		if err != nil {
-			for _, selected := range patterns {
-				if goembed.IsSelector(selected) {
-					return "", fmt.Errorf("%w: go input selection unavailable: %w", ErrInputSelector, err)
-				}
+			if namesInputSelector(patterns) {
+				return "", fmt.Errorf("%w: input selection unavailable: %w", ErrInputSelector, err)
 			}
 		}
 		return resolved, err
@@ -603,9 +546,9 @@ func gitCandidateDigest(file fileEntry, buf []byte, statsExecBit bool) []byte {
 // portable admission without expanding a selector under a second policy.
 type KeyFileSelection struct {
 	Files []string
-	// GoEmbed is the subset of Files an input selector expanded to, whose
+	// Selected is the subset of Files an input selector expanded to, whose
 	// exact bytes the key hashes.
-	GoEmbed []string
+	Selected []string
 }
 
 // CollectKeyFileSelection returns the key's paths and the subset an input
@@ -618,8 +561,8 @@ func CollectKeyFileSelection(dir string, patterns []string, expander InputExpand
 	selection := KeyFileSelection{Files: make([]string, 0, len(files))}
 	for _, file := range files {
 		selection.Files = append(selection.Files, file.path)
-		if file.rawEmbed {
-			selection.GoEmbed = append(selection.GoEmbed, file.path)
+		if file.exact {
+			selection.Selected = append(selection.Selected, file.path)
 		}
 	}
 	return selection, nil
@@ -686,25 +629,18 @@ func SelectsPath(rel string, patterns []string) bool {
 // an empty root into a non-empty group could hide that project's failure.
 // expander expands the input selectors patterns name.
 func HasMatchingFiles(dir string, patterns []string, expander InputExpander) (bool, error) {
-	hasGoEmbed := false
 	for _, pattern := range patterns {
-		_, gitCandidate := wsproto.GitFilePattern(pattern)
-		if gitCandidate {
+		if _, gitCandidate := wsproto.GitFilePattern(pattern); gitCandidate {
 			files, err := collectFiles(dir, patterns, expander)
 			return len(files) > 0, err
 		}
-		if strings.HasPrefix(pattern, "go-embed:") {
-			if !goembed.IsSelector(pattern) {
-				return false, fmt.Errorf("%w: unsupported selector %q", ErrInputSelector, pattern)
-			}
-			hasGoEmbed = true
-		}
 	}
+	hasSelector := namesInputSelector(patterns)
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
-	if hasGoEmbed {
+	if hasSelector {
 		ordinary := includes[:0:0]
 		for _, pattern := range includes {
-			if !goembed.IsSelector(pattern) {
+			if !extensionproto.NamesInputSelector(pattern) {
 				ordinary = append(ordinary, pattern)
 			}
 		}
@@ -752,7 +688,7 @@ func HasMatchingFiles(dir string, patterns []string, expander InputExpander) (bo
 	if err != nil {
 		return false, err
 	}
-	if hasGoEmbed && !matched {
+	if hasSelector && !matched {
 		files, collectErr := collectFiles(dir, patterns, expander)
 		return len(files) > 0, collectErr
 	}
@@ -796,8 +732,8 @@ const globMetacharacters = `*?[\`
 // also covers a file a write may add there later:
 //   - no pattern selects the whole tree under dir;
 //   - an exclusion only removes files, so it narrows nothing;
-//   - a Go embed selector resolves sources, embedded assets and source-link
-//     referents, none of which may leave dir;
+//   - an input selector lists files inside dir, which an extension's answer
+//     cannot leave;
 //   - an ordinary pattern selects under its static prefix, the leading
 //     segments that hold no glob metacharacter, resolved the way the collector
 //     joins it to dir: before its first "**" for a recursive pattern, and as a
@@ -959,7 +895,7 @@ func patternRoot(dir, pattern string) (string, bool) {
 	if inner, git := wsproto.GitFilePattern(pattern); git {
 		return gitPatternRoot(dir, inner)
 	}
-	if strings.HasPrefix(pattern, "go-embed:") {
+	if extensionproto.NamesInputSelector(pattern) {
 		return dir, true
 	}
 	if before, _, recursive := strings.Cut(filepath.ToSlash(pattern), "**"); recursive {
@@ -1131,7 +1067,7 @@ func hashFiles(dir string, patterns []string, expander InputExpander, scope Proj
 
 	digests := hashFileContents(files, scope, projectDir)
 	for i, file := range files {
-		if file.rawEmbed && digests[i] == nil {
+		if file.exact && digests[i] == nil {
 			return "", fmt.Errorf("%w: cannot read %s", ErrInputSelector, file.path)
 		}
 	}
@@ -1199,7 +1135,7 @@ func hashFileContents(files []fileEntry, scope ProjectConfigScope, projectDir st
 			defer wg.Done()
 			buf := make([]byte, 128*1024)
 			for i := range indexes {
-				if files[i].rawEmbed {
+				if files[i].exact {
 					file, err := os.Open(files[i].path)
 					if err != nil {
 						continue

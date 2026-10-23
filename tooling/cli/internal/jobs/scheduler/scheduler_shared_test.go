@@ -94,33 +94,52 @@ func sharedRuntimeCache(t *testing.T) *store.CacheManager {
 	return store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
 }
 
-func TestGoEmbedInvalidInputFailsBeforeTaskExecutionAcrossCacheModes(t *testing.T) {
+// selectorRuntimeCache is sharedRuntimeCache with resolver attached, as a
+// run's cache manager carries the run's input resolver.
+func selectorRuntimeCache(t *testing.T, resolver store.InputResolver) *store.CacheManager {
+	t.Helper()
+	cache := sharedRuntimeCache(t)
+	cache.SetInputResolver(resolver)
+	return cache
+}
+
+// A selector whose answer lists a missing file, or whose answer is an error,
+// fails its task before the task opens, in every cache mode; a run without a
+// resolver fails it alike.
+func TestSelectorInvalidInputFailsBeforeTaskExecutionAcrossCacheModes(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "a-failed-selector-fails-the-task-before-execution")
 	requireShell(t)
+	missing := listedInputs(store.InputExpansion{Files: []string{"missing.txt"}})
+	failing := &stubInputResolver{answer: func(store.InputQuery) (store.InputExpansion, error) {
+		return store.InputExpansion{}, errors.New("embed pattern missing.txt: no matching files")
+	}}
 	for _, tc := range []struct {
 		name      string
+		resolver  store.InputResolver
 		withCache bool
 		bypass    bool
 		cacheable bool
+		want      string
 	}{
-		{name: "declared cache", withCache: true, cacheable: true},
-		{name: "cache bypass", withCache: true, bypass: true, cacheable: true},
-		{name: "nil cache", cacheable: true},
-		{name: "uncacheable task", withCache: true},
+		{name: "declared cache", resolver: missing, withCache: true, cacheable: true, want: "missing.txt"},
+		{name: "cache bypass", resolver: missing, withCache: true, bypass: true, cacheable: true, want: "missing.txt"},
+		{name: "uncacheable task", resolver: missing, withCache: true, want: "missing.txt"},
+		{name: "an error answer", resolver: failing, withCache: true, cacheable: true, want: "no matching files"},
+		{name: "an uncacheable error answer", resolver: failing, withCache: true, want: "no matching files"},
+		{name: "nil cache", cacheable: true, want: "no resolver expands selector"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logPath := filepath.Join(t.TempDir(), "invocations")
 			ws, planned := sharedRuntimeFixture(t, logPath, "0")
-			job := planned[0]
-			job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
+			job := nameSelectorInput(planned[0], "**/*.go", "sel:build")
 			job.JobDef.Cache = tc.cacheable
-			writeTestFile(t, filepath.Join(ws.Root, "app", "embed.go"), "package main\nimport _ \"embed\"\n//go:embed missing.txt\nvar text string\n")
 			var cache *store.CacheManager
 			if tc.withCache {
-				cache = sharedRuntimeCache(t)
+				cache = selectorRuntimeCache(t, tc.resolver)
 			}
 			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)
 			row := result.Results[job.Key()]
-			if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "missing.txt") {
+			if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, tc.want) {
 				t.Fatalf("invalid input must fail before task opens: %+v", row)
 			}
 			if got := invocationCount(t, logPath); got != 0 {
@@ -130,54 +149,27 @@ func TestGoEmbedInvalidInputFailsBeforeTaskExecutionAcrossCacheModes(t *testing.
 	}
 }
 
-func TestGoEmbedUnsafeAliasFailsBeforeTaskExecution(t *testing.T) {
+// An uncacheable task whose selector expands executes once.
+func TestSelectorValidUncacheableTaskExecutes(t *testing.T) {
 	requireShell(t)
 	logPath := filepath.Join(t.TempDir(), "invocations")
 	ws, planned := sharedRuntimeFixture(t, logPath, "0")
-	job := planned[0]
-	job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
-	writeTestFile(t, filepath.Join(ws.Root, "outside.src"), "package main\n")
-	if err := os.Symlink("../outside.src", filepath.Join(ws.Root, "app", "alias.go")); err != nil {
-		t.Skipf("source symlink unavailable: %v", err)
+	job := nameSelectorInput(planned[0], "**/*.go", "sel:build")
+	job.JobDef.Cache = false
+	writeTestFile(t, filepath.Join(ws.Root, "app", "payload.txt"), "valid")
+	cache := selectorRuntimeCache(t, listedInputs(store.InputExpansion{Files: []string{"payload.txt"}}))
+	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache)
+	if !result.Success || result.Results[job.Key()] == nil || result.Results[job.Key()].Status != "success" {
+		t.Fatalf("valid uncacheable selector: %+v", result.Results[job.Key()])
 	}
-	if matched, err := store.HasMatchingFiles(filepath.Join(ws.Root, "app"), job.JobDef.FilePatterns, store.GoEmbedExpander()); err != nil || !matched {
-		t.Fatalf("ordinary batch probe should reach task-opening alias validation: matched=%v err=%v", matched, err)
-	}
-	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, sharedRuntimeCache(t))
-	row := result.Results[job.Key()]
-	if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "alias.go") {
-		t.Fatalf("escaping source alias must fail before execution: %+v", row)
-	}
-	if got := invocationCount(t, logPath); got != 0 {
-		t.Fatalf("unsafe alias spawned %d subprocesses", got)
+	if got := invocationCount(t, logPath); got != 1 {
+		t.Fatalf("valid uncacheable task spawned %d subprocesses", got)
 	}
 }
 
-func TestGoEmbedValidUncacheableTaskExecutes(t *testing.T) {
-	requireShell(t)
-	for _, withCache := range []bool{false, true} {
-		logPath := filepath.Join(t.TempDir(), "invocations")
-		ws, planned := sharedRuntimeFixture(t, logPath, "0")
-		job := planned[0]
-		job.JobDef.Cache = false
-		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
-		writeTestFile(t, filepath.Join(ws.Root, "app", "embed.go"), "package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
-		writeTestFile(t, filepath.Join(ws.Root, "app", "payload.txt"), "valid")
-		var cache *store.CacheManager
-		if withCache {
-			cache = sharedRuntimeCache(t)
-		}
-		result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache)
-		if !result.Success || result.Results[job.Key()] == nil || result.Results[job.Key()].Status != "success" {
-			t.Fatalf("valid uncacheable selector with cache=%v: %+v", withCache, result.Results[job.Key()])
-		}
-		if got := invocationCount(t, logPath); got != 1 {
-			t.Fatalf("valid uncacheable task spawned %d subprocesses", got)
-		}
-	}
-}
-
-func TestMixedGitGoInputUnavailableFailsAcrossCacheModes(t *testing.T) {
+// A Git candidate pattern beside a selector, outside a Git repository, fails
+// the task closed in every cache mode instead of keying a partial selection.
+func TestMixedGitSelectorInputUnavailableFailsAcrossCacheModes(t *testing.T) {
 	requireShell(t)
 	for _, tc := range []struct {
 		name      string
@@ -193,16 +185,15 @@ func TestMixedGitGoInputUnavailableFailsAcrossCacheModes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logPath := filepath.Join(t.TempDir(), "invocations")
 			ws, planned := sharedRuntimeFixture(t, logPath, "0")
-			job := planned[0]
-			job.JobDef.FilePatterns = []string{"git:**", "**/*.go", "go-embed:build"}
+			job := nameSelectorInput(planned[0], "git:**", "**/*.go", "sel:build")
 			job.JobDef.Cache = tc.cacheable
 			var cache *store.CacheManager
 			if tc.withCache {
-				cache = sharedRuntimeCache(t)
+				cache = selectorRuntimeCache(t, listedInputs(store.InputExpansion{}))
 			}
 			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)
 			row := result.Results[job.Key()]
-			if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "go input selection unavailable") {
+			if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "input selection unavailable") {
 				t.Fatalf("unknown Git candidate inventory must fail closed: %+v", row)
 			}
 			if got := invocationCount(t, logPath); got != 0 {
@@ -212,7 +203,10 @@ func TestMixedGitGoInputUnavailableFailsAcrossCacheModes(t *testing.T) {
 	}
 }
 
-func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
+// A generic key error of the producer a consumer reads cannot hide the
+// consumer's own failed selector: the consumer fails before its hooks and its
+// task. A consumer whose selector expands keeps the generic fallback.
+func TestGenericProducerKeyErrorCannotHideConsumerSelectorFailure(t *testing.T) {
 	requireShell(t)
 	for _, tc := range []struct {
 		name    string
@@ -228,9 +222,7 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 			logPath := filepath.Join(t.TempDir(), "invocations")
 			hookLog := filepath.Join(t.TempDir(), "hooks")
 			ws, planned := sharedRuntimeFixture(t, logPath, "0")
-			consumer := planned[0]
-			consumer.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
-			writeTestFile(t, filepath.Join(ws.Root, "app", "embed.go"), "package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
+			consumer := nameSelectorInput(planned[0], "**/*.go", "sel:build")
 			if !tc.missing {
 				writeTestFile(t, filepath.Join(ws.Root, "app", "payload.txt"), "valid")
 			}
@@ -243,15 +235,15 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 			consumer.Extension.Hooks = &extension.ManifestHooks{PreBuild: &extension.HookDefinition{
 				Kind: "command", Command: hookPath,
 			}}
-			cache := sharedRuntimeCache(t)
+			cache := selectorRuntimeCache(t, listedInputs(store.InputExpansion{Files: []string{"payload.txt"}}))
 			if _, err := cachekey.ComputeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrInputSelector) || !strings.Contains(err.Error(), "resolve Git input repository") {
-				t.Fatalf("fixture must fail generically in producer before consumer Go hashing: %v", err)
+				t.Fatalf("fixture must fail generically in producer before consumer selector hashing: %v", err)
 			}
 			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)
 			row := result.Results[consumer.Key()]
 			if tc.missing {
 				if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "payload.txt") {
-					t.Fatalf("generic producer error hid invalid consumer Go input: %+v", row)
+					t.Fatalf("generic producer error hid the consumer's failed selector: %+v", row)
 				}
 				if got := invocationCount(t, logPath); got != 0 {
 					t.Fatalf("invalid consumer spawned %d tasks", got)
@@ -262,7 +254,7 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 				return
 			}
 			if !result.Success || row == nil || row.Status != "success" {
-				t.Fatalf("valid Go input lost generic cache fallback: %+v", row)
+				t.Fatalf("valid selector lost generic cache fallback: %+v", row)
 			}
 			if got := invocationCount(t, logPath); got != 1 {
 				t.Fatalf("valid fallback spawned %d tasks", got)
@@ -274,14 +266,14 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 	}
 }
 
-func TestGoEmbedMissingAssetCannotRestoreOwnedOutput(t *testing.T) {
+// A listed file that is gone fails the task instead of restoring the output
+// an earlier run stored for it.
+func TestSelectorMissingListedFileCannotRestoreOwnedOutput(t *testing.T) {
 	requireShell(t)
 	logPath := filepath.Join(t.TempDir(), "invocations")
 	ws, planned := sharedRuntimeFixture(t, logPath, "0")
 	job := planned[0]
-	job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
 	project := filepath.Join(ws.Root, "app")
-	writeTestFile(t, filepath.Join(project, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed payload.txt\nvar payload string\n")
 	asset := filepath.Join(project, "payload.txt")
 	writeTestFile(t, asset, "A")
 	output := filepath.Join(project, ".gen", "bundle.txt")
@@ -293,8 +285,14 @@ func TestGoEmbedMissingAssetCannotRestoreOwnedOutput(t *testing.T) {
 	job.Extension.Tasks["probe-describe"] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
 		"bundle": dirDeclaration(extension.OutputRootProject, ".gen", false),
 	}}}
+	nameSelectorInput(job, "**/*.go", "sel:build")
+	resolver := listedInputs(store.InputExpansion{Files: []string{"payload.txt"}})
 	storeRoot := filepath.Join(t.TempDir(), "store")
-	cache := func() *store.CacheManager { return store.NewCacheManager(store.NewLocalStore(storeRoot)) }
+	cache := func() *store.CacheManager {
+		manager := store.NewCacheManager(store.NewLocalStore(storeRoot))
+		manager.SetInputResolver(resolver)
+		return manager
+	}
 	if seed := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache()); !seed.Success {
 		t.Fatalf("seed failed: %+v", seed.Results)
 	}
@@ -310,7 +308,7 @@ func TestGoEmbedMissingAssetCannotRestoreOwnedOutput(t *testing.T) {
 	result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache())
 	row := result.Results[job.Key()]
 	if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "payload.txt") {
-		t.Fatalf("missing embedded asset must reject restore and execution: %+v", row)
+		t.Fatalf("a missing listed file must reject restore and execution: %+v", row)
 	}
 	if got := invocationCount(t, logPath); got != 1 {
 		t.Fatalf("invalid run spawned task, invocations=%d", got)
@@ -320,7 +318,10 @@ func TestGoEmbedMissingAssetCannotRestoreOwnedOutput(t *testing.T) {
 	}
 }
 
-func TestGoEmbedUserSelectorFailsBeforeTaskExecutionWithoutCache(t *testing.T) {
+// A selector a --filePatterns flag names fails its task before execution,
+// with or without a cache: only a task input of the manifest that lists a
+// selector names it.
+func TestSelectorInFilePatternsFailsBeforeTaskExecution(t *testing.T) {
 	requireShell(t)
 	for _, withCache := range []bool{false, true} {
 		logPath := filepath.Join(t.TempDir(), "invocations")
@@ -329,9 +330,9 @@ func TestGoEmbedUserSelectorFailsBeforeTaskExecutionWithoutCache(t *testing.T) {
 		job.JobDef.Cache = false
 		var cache *store.CacheManager
 		if withCache {
-			cache = sharedRuntimeCache(t)
+			cache = selectorRuntimeCache(t, listedInputs(store.InputExpansion{}))
 		}
-		params := extension.ParamMap{"filePatterns": []any{"go-embed:build"}}
+		params := extension.ParamMap{"filePatterns": []any{"sel:build"}}
 		result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1}, cache, params)
 		row := result.Results[job.Key()]
 		if result.Success || row == nil || row.Status != string(TaskStatusFailed) || row.Error == nil || !strings.Contains(row.Error.Message, "requires an extension task input") {
@@ -386,13 +387,15 @@ func requireShell(t *testing.T) {
 	}
 }
 
-func TestGoEmbedMixedBuildTestKeepsEditedOwnedOutput(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "go-describe-cached-old-bundle-cannot-restore-after-embedded-asset-edit")
+// Two shared jobs whose selector lists one file never restore the output
+// stored for its old bytes after an edit: both execute on the edit, and a warm
+// run restores the output of the new bytes.
+func TestSelectorMixedBuildTestKeepsEditedOwnedOutput(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-embed-cache-inputs", "an-old-entry-cannot-restore-after-a-listed-file-edit")
 	requireShell(t)
 	logPath := filepath.Join(t.TempDir(), "invocations")
 	ws, planned := sharedRuntimeFixture(t, logPath, "0")
 	project := filepath.Join(ws.Root, "app")
-	writeTestFile(t, filepath.Join(project, "embed.go"), "package main\nimport _ \"embed\"\n//go:embed migration.sql\nvar migration string\n")
 	asset := filepath.Join(project, "migration.sql")
 	writeTestFile(t, asset, "SELECT 'A';\n")
 	writeExecutable(t, filepath.Join(ws.Root, "describe.sh"),
@@ -400,17 +403,20 @@ func TestGoEmbedMixedBuildTestKeepsEditedOwnedOutput(t *testing.T) {
 			"printf 'run:%s\\n' \"$PUTNAMI_JOB_NAME\" >> "+shellQuote(logPath)+"\n"+
 			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"success\"}}'\n")
 	for _, job := range planned {
-		job.JobDef.FilePatterns = []string{"**/*.go", "go-embed:build"}
 		job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Deterministic: true}
 		job.Extension.Tasks["probe-describe"] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
 			"bundle": dirDeclaration(extension.OutputRootProject, ".gen", false),
 		}}}
+		nameSelectorInput(job, "**/*.go", "sel:build")
 	}
+	resolver := listedInputs(store.InputExpansion{Files: []string{"migration.sql"}})
 	storeRoot := filepath.Join(t.TempDir(), "store")
 	cache := func() *store.CacheManager {
 		// The on-disk entries persist across invocations; only the per-run
-		// file-hash memo is new after the asset changes.
-		return store.NewCacheManager(store.NewLocalStore(storeRoot))
+		// file-hash memo is new after the listed file changes.
+		manager := store.NewCacheManager(store.NewLocalStore(storeRoot))
+		manager.SetInputResolver(resolver)
+		return manager
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

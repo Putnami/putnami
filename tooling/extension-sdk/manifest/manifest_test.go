@@ -103,25 +103,30 @@ func TestBuild_ValidManifest(t *testing.T) {
 	}
 }
 
-func TestBuild_GoEmbedSelectorsMatchLoaderValidation(t *testing.T) {
-	build := func(origin, selector string) (*proto.Manifest, error) {
-		return New("sample/go-embed", "1.0.0").
+func TestBuild_InputSelectorsMatchLoaderValidation(t *testing.T) {
+	build := func(origin, selector string, listed ...string) (*proto.Manifest, error) {
+		return New("sample/selectors", "1.0.0").
+			Runtime(proto.RuntimeDefinition{Executable: "bin/sample", InputSelectors: listed}).
 			Command("build", proto.CommandDefinition{Run: []proto.PipelineStep{{ID: "build", Task: "build"}}}).
 			Task("build", proto.TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]proto.TaskInputPort{
-				"sources": {From: origin, Files: []string{"**/*.go", selector}},
+				"sources": {From: origin, Files: []string{"src/**", selector}},
 			}}).Build()
 	}
-	if _, err := build(proto.TaskInputFromProject, "go-embed:build"); err != nil {
+	built, err := build(proto.TaskInputFromProject, "sel:build", "sel:build")
+	if err != nil {
 		t.Fatalf("valid project selector rejected: %v", err)
+	}
+	if built.CLIContract != protocolcli.InputSelectorsContract {
+		t.Errorf("cliContract = %d, want the input-selectors contract %d", built.CLIContract, protocolcli.InputSelectorsContract)
 	}
 	for _, test := range []struct {
 		name, origin, selector, want string
 	}{
-		{"workspace", proto.TaskInputFromWorkspace, "go-embed:test", "only valid in project task inputs"},
-		{"unknown", proto.TaskInputFromProject, "go-embed:unknown", "unsupported go embed selector"},
+		{"workspace", proto.TaskInputFromWorkspace, "sel:build", "only valid in a project task input"},
+		{"unlisted", proto.TaskInputFromProject, "sel:test", "not listed in runtime.inputSelectors"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := build(test.origin, test.selector); err == nil || !strings.Contains(err.Error(), test.want) {
+			if _, err := build(test.origin, test.selector, "sel:build"); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("builder accepted %s selector: %v", test.name, err)
 			}
 		})

@@ -235,10 +235,19 @@ candidate names no path, so a reader below 13 would not know where the
 executable is, and it provisions nothing, so it refuses the stamp. The floor
 binds a manifest wherever it loads from. Only a manifest whose runtime
 toolchain declares the candidate is stamped 13.
-Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
-extension's project task inputs. A reader limited to contract 5 refuses that
-manifest before interpreting its inputs; unrelated manifests retain their
-existing required stamp.
+Contract `14` (`InputSelectorsContract`) is for the input selectors an
+extension expands: `runtime.inputSelectors`, and a task file pattern that
+names one. From 14 on, the CLI asks the extension that declares a task for the
+files each selector reads, through the workspace protocol's input-resolve
+call, and expands no selector itself. A reader below 14 would expand a
+selector by another rule or not at all, so it refuses the stamp. The floor
+binds a manifest wherever it loads from. Only a manifest that lists or names a
+selector is stamped 14. The rung retires rung 6: a manifest stamped below 14
+that names a selector is refused, and its remedy is a build stamped 14
+(`putnami extensions update`).
+Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
+extension's project task inputs, which the CLI expanded itself. Contract 14
+retires that meaning; the number stays taken.
 Contract `4` adds dependent-owned `sessionPrerequisites`: their same-session
 command expansion, selection and parameter projection, and functional gate
 edges are semantic. A contract-3 CLI has no representation for that field, so
