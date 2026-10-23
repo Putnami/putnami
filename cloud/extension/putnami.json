@@ -38,6 +38,11 @@
       "verification": {
         "specs": "enforce"
       }
+    },
+    "test": {
+      "filePatterns": [
+        "git:bin/**"
+      ]
     }
   }
 }
