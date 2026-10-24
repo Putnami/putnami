@@ -1894,8 +1894,7 @@
             "kind": "acceptance",
             "checks": [
               "generated-bootstrap-routes-to-live-mcp-guidance",
-              "stale-or-absent-context-is-reported-for-fallback",
-              "the-default-gate-is-lint-test-build-whatever-the-extensions-declare"
+              "stale-or-absent-context-is-reported-for-fallback"
             ]
           }
         },
@@ -2316,7 +2315,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "guidance-follows-blocking-commands"
+              "guidance-follows-blocking-commands",
+              "the-gate-keeps-the-documents-order",
+              "an-unusable-document-falls-back-to-the-default-documents-commands",
+              "cache-verify-runs-the-gate"
             ]
           }
         }

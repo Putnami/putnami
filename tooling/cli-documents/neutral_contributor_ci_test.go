@@ -152,14 +152,16 @@ func TestNeutralContributorRecipeMatchesRepositoryCIJob(t *testing.T) {
 		}
 		authored = append(authored, command.Name)
 	}
-	sort.Strings(authored)
-	if strings.Join(authored, ",") != strings.Join(documented, ",") {
-		t.Fatalf("%s commands = %v, documented contributor gate = %v; the two declarations of one gate disagree", ciproto.Filename, authored, documented)
+	sortedAuthored := append([]string(nil), authored...)
+	sort.Strings(sortedAuthored)
+	if strings.Join(sortedAuthored, ",") != strings.Join(documented, ",") {
+		t.Fatalf("%s commands = %v, documented contributor gate = %v; the two declarations of one gate disagree", ciproto.Filename, sortedAuthored, documented)
 	}
+	// The generated guidance lists the document's commands in the document's
+	// order, so the gate is compared as authored, before any sort.
 	gate := strings.Split(agentctx.GateTasks(repoRoot), ",")
-	sort.Strings(gate)
-	if strings.Join(gate, ",") != strings.Join(documented, ",") {
-		t.Fatalf("workspace gate = %v, documented contributor gate = %v; the two declarations of one gate disagree", gate, documented)
+	if strings.Join(gate, ",") != strings.Join(authored, ",") {
+		t.Fatalf("workspace gate = %v, %s commands in order = %v; the generated guidance must follow the document's order", gate, ciproto.Filename, authored)
 	}
 	for _, task := range gate {
 		if !containsNeutralTask(documented, task) {

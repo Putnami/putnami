@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -79,19 +80,30 @@ func TestCacheVerifyRunnerKeepsTheWarningsOfTheFirstRunOnly(t *testing.T) {
 }
 
 // TestCacheVerifyRunsTheWorkspaceGate pins that cache verify runs the
-// workspace's gate, read from its CI document, and no command list of the
-// core's own.
+// workspace's gate in the order of its CI document, and no command list of the
+// core's own. Without a usable document it runs the blocking commands of the
+// protocol's default CI document.
 func TestCacheVerifyRunsTheWorkspaceGate(t *testing.T) {
+	spectest.Proves(t, "cli/ci-document", "commands-not-gate", "cache-verify-runs-the-gate")
 	t.Parallel()
 	bare := t.TempDir()
-	if got, want := cacheVerifyCommands(bare), strings.Split(agentctx.GateTasks(bare), ","); !reflect.DeepEqual(got, want) {
-		t.Errorf("commands without a CI document = %v, want the gate %v", got, want)
+	var defaults []string
+	for _, command := range ciproto.DefaultDocument().Commands {
+		if command.Blocking() {
+			defaults = append(defaults, command.Name)
+		}
+	}
+	if got := cacheVerifyCommands(bare); !reflect.DeepEqual(got, defaults) {
+		t.Errorf("commands without a CI document = %v, want the default document's %v", got, defaults)
 	}
 	gated := t.TempDir()
-	if err := os.WriteFile(filepath.Join(gated, ciproto.Filename), []byte(`{"version":3,"commands":["check","lint"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(gated, ciproto.Filename), []byte(`{"version":3,"commands":["test","check",{"name":"audit","failOnError":false},"lint"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := cacheVerifyCommands(gated), []string{"lint", "check"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("commands = %v, want the CI document's gate %v", got, want)
+	if got, want := cacheVerifyCommands(gated), []string{"test", "check", "lint"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("commands = %v, want the CI document's blocking commands in its order %v", got, want)
+	}
+	if got, want := cacheVerifyCommands(gated), strings.Split(agentctx.GateTasks(gated), ","); !reflect.DeepEqual(got, want) {
+		t.Errorf("commands = %v, want the generated guidance gate %v", got, want)
 	}
 }
