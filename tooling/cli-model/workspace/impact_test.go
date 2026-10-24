@@ -872,7 +872,7 @@ func TestTraceChangeImpact_TaskScopedProjectsFormALattice(t *testing.T) {
 	}
 	for id, want := range map[string]ImpactEdge{
 		"/apps/api":     {From: "/libs/core", Kind: ImpactEdgeDependency},
-		"/apps/cli":     {From: "/tools/lint", Kind: ImpactEdgeExtensionConsumer},
+		"/apps/cli":     {From: "/tools/lint", Kind: ImpactEdgeExtensionConsumer, Via: "libs/core/core.go", Cause: ImpactCauseRuntimeInput},
 		"/apps/web":     {From: "/libs/mid", Kind: ImpactEdgeDependency},
 		"/apps/web-e2e": {From: "/apps/web", Kind: ImpactEdgeDependency},
 	} {
@@ -894,18 +894,29 @@ func TestTraceChangeImpact_TaskScopedProjectsFormALattice(t *testing.T) {
 		t.Errorf("scopes = %v, want none", plain.Trace.Scopes)
 	}
 
-	// why_impacted answers from the same propagation: the same reach and the
-	// same scope for every pair, with no diff to read.
+	// why_impacted answers from the same propagation: the same reach, the
+	// same scope and the same edge for every pair, with no diff to read. Only
+	// the diff names the changed file an edge rests on.
 	reach := ImpactReach(ws, "/libs/core")
 	if got := ownerProjectIDs(reach.Projects); !slices.Equal(got, want) {
 		t.Errorf("ImpactReach selected %v, want the diff's %v", got, want)
 	}
-	if !reflect.DeepEqual(reach.Trace.Scopes, wantScopes) || !reflect.DeepEqual(reach.Trace.Edges, r.Trace.Edges) {
+	if !reflect.DeepEqual(reach.Trace.Scopes, wantScopes) || !reflect.DeepEqual(reach.Trace.Edges, edgesNamingNoFile(r.Trace.Edges)) {
 		t.Errorf("ImpactReach scopes %v edges %v, want the diff's %v %v", reach.Trace.Scopes, reach.Trace.Edges, wantScopes, r.Trace.Edges)
 	}
 	if got := ImpactReach(ws, "/nowhere"); got.Projects != nil || got.Trace.Edges != nil {
 		t.Errorf("ImpactReach of an unknown project = %+v, want empty", got)
 	}
+}
+
+// edgesNamingNoFile is a trace's edges without the changed file each rests on:
+// the edges ImpactReach records for a change to a project as a whole.
+func edgesNamingNoFile(edges map[string]ImpactEdge) map[string]ImpactEdge {
+	stripped := make(map[string]ImpactEdge, len(edges))
+	for id, edge := range edges {
+		stripped[id] = ImpactEdge{From: edge.From, Kind: edge.Kind}
+	}
+	return stripped
 }
 
 func TestProjectsForChangedFiles_RelativeExtensionPathSelectsConsumerWithoutSchedulingEdge(t *testing.T) {
@@ -1238,9 +1249,11 @@ func TestTraceChangeImpact_EdgesNameDependencyAndExtensionConsumer(t *testing.T)
 	if got, want := r.Trace.Edges["/go/extension"], (ImpactEdge{From: "/tooling/extension-sdk", Kind: ImpactEdgeDependency}); got != want {
 		t.Errorf("edge into /go/extension = %+v, want %+v", got, want)
 	}
-	// The first full extension the walk processes names the edge; the scope
-	// lists every extension that reached the consumer.
-	if got, want := r.Trace.Edges["/apps/web"], (ImpactEdge{From: "/go/extension", Kind: ImpactEdgeExtensionConsumer}); got != want {
+	// The first full extension the walk processes names the edge, and the
+	// changed file the walk traced it to; the scope lists every extension that
+	// reached the consumer.
+	if got, want := r.Trace.Edges["/apps/web"], (ImpactEdge{From: "/go/extension", Kind: ImpactEdgeExtensionConsumer,
+		Via: "tooling/extension-sdk/sdk.go", Cause: ImpactCauseRuntimeInput}); got != want {
 		t.Errorf("edge into /apps/web = %+v, want %+v", got, want)
 	}
 	if got, want := r.Trace.ScopeOf("/apps/web"), []string{"/go/extension", "/python/extension", "/typescript/extension"}; !slices.Equal(got, want) {
@@ -1249,7 +1262,9 @@ func TestTraceChangeImpact_EdgesNameDependencyAndExtensionConsumer(t *testing.T)
 
 	r = TraceChangeImpact(ws, []string{"go/extension/putnami.extension.json"}, ChangeImpactOptions{})
 
-	if got, want := r.Trace.Edges["/apps/web"], (ImpactEdge{From: "/go/extension", Kind: ImpactEdgeExtensionConsumer}); got != want {
+	// Without a task index every change of an extension moves its runtime.
+	if got, want := r.Trace.Edges["/apps/web"], (ImpactEdge{From: "/go/extension", Kind: ImpactEdgeExtensionConsumer,
+		Via: "go/extension/putnami.extension.json", Cause: ImpactCauseRuntimeInput}); got != want {
 		t.Errorf("edge into /apps/web = %+v, want %+v", got, want)
 	}
 	wantPath := []ImpactStep{
@@ -1452,7 +1467,8 @@ func TestTraceChangeImpact_ParentIsStableAcrossRuns(t *testing.T) {
 	changed := []string{"typescript/extension/putnami.extension.json", "python/extension/putnami.extension.json"}
 
 	first := TraceChangeImpact(ws, changed, ChangeImpactOptions{}).Trace.Edges
-	if got, want := first["/apps/web"], (ImpactEdge{From: "/typescript/extension", Kind: ImpactEdgeExtensionConsumer}); got != want {
+	if got, want := first["/apps/web"], (ImpactEdge{From: "/typescript/extension", Kind: ImpactEdgeExtensionConsumer,
+		Via: "typescript/extension/putnami.extension.json", Cause: ImpactCauseRuntimeInput}); got != want {
 		t.Fatalf("edge into /apps/web = %+v, want the first seed in project order %+v", got, want)
 	}
 	for i := 0; i < 20; i++ {
@@ -1593,10 +1609,12 @@ func TestTraceChangeImpact_AProviderContractChangeReachesItsClients(t *testing.T
 	wantEdges := map[string]ImpactEdge{
 		"/services/api/clients/sdk": {From: "/services/api", Kind: ImpactEdgeContract,
 			Via: "services/api/schema/openapi.json", ContractSHA256: providerChainDigest},
-		"/tools/cli":   {From: "/services/api/clients/sdk", Kind: ImpactEdgeDependency},
-		"/apps/admin":  {From: "/services/api", Kind: ImpactEdgeDependency},
-		"/apps/web":    {From: "/tools/cli", Kind: ImpactEdgeExtensionConsumer},
-		"/libs/shared": {From: "/tools/cli", Kind: ImpactEdgeExtensionConsumer},
+		"/tools/cli":  {From: "/services/api/clients/sdk", Kind: ImpactEdgeDependency},
+		"/apps/admin": {From: "/services/api", Kind: ImpactEdgeDependency},
+		"/apps/web": {From: "/tools/cli", Kind: ImpactEdgeExtensionConsumer,
+			Via: "services/api/schema/openapi.json", Cause: ImpactCauseRuntimeInput},
+		"/libs/shared": {From: "/tools/cli", Kind: ImpactEdgeExtensionConsumer,
+			Via: "services/api/schema/openapi.json", Cause: ImpactCauseRuntimeInput},
 	}
 	if !reflect.DeepEqual(r.Trace.Edges, wantEdges) {
 		t.Errorf("edges = %+v, want %+v", r.Trace.Edges, wantEdges)

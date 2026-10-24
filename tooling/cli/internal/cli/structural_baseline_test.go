@@ -590,7 +590,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        911,
+		want:        912,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -650,7 +650,8 @@ var structuralPins = []structuralPin{
 			"Another change raises 894→895 = 256 production + 639 test for jobs.keyInputs, itemized on the production pin above; tests add none. " +
 			"A later change raises 895→911 = 256 production + 655 test for the sixteen test lines of jobs.RawJobEvent.RecordPayload, itemized on the test pin above; production stays at its ceiling. " +
 			"A later change raises 911→912 for the ONE --no-watch serve fixture line itemized on the test pin above. " +
-			"A later change lowers 912→911 for the fxObj line the test pin above names; production adds none",
+			"A later change lowers 912→911 for the fxObj line the test pin above names; production adds none. " +
+			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

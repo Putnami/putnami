@@ -5,6 +5,9 @@
   runtime and its callers
 - **Follows**: [ADR 0005](0005-the-contributor-executable-serves-the-change-noun.md),
   whose last consequence fixes the shape this command takes
+- **Amended**: 2026-10-23, decision 2: with no open proposal on the branch,
+  a proposal merged at the current head ends the run with exit 0 and nothing
+  published, and a closed proposal or one merged at another head fails it
 
 ## Context
 
@@ -41,8 +44,11 @@ the command runs no local gate. The manifest keeps `cliContract` 5.
 parser, the publication flow, the policy and text rules, and the Git
 operations with their read-only allowlist and their two writes, `commit` and
 `push`. It prints the same result and exits with the same code: 2 for a usage
-error, 1 for a failure and 0 for a published proposal. A failure prints
-`change finalize: <error>` on stderr.
+error, 1 for a failure and 0 for a published proposal. With no open proposal
+on the branch, a proposal merged at the current head also exits 0, with
+nothing seeded, pushed or written, and a closed proposal or one merged at
+another head is a failure. A failure prints `change finalize: <error>` on
+stderr.
 
 The output mode comes from `params.output` in the job context putnami hands
 the executable. `json`, `jsonl` and `cloud-logging` print the result document

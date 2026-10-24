@@ -500,6 +500,7 @@ func impactedReasons(selection workspace.ImpactedSelection) []impactedReason {
 			reason.Kind = string(edge.Kind)
 			reason.Via = edge.Via
 			reason.ContractSHA256 = edge.ContractSHA256
+			reason.Cause = string(edge.Cause)
 		}
 		reason.TaskScope = selection.Trace.ScopeOf(p.ID)
 		reasons = append(reasons, reason)
@@ -550,13 +551,18 @@ type impactedReason struct {
 	// Kind is present on propagated projects: dependency, contract or
 	// extension-consumer.
 	Kind string `json:"kind,omitempty"`
-	// Via is present on a project a contract edge reached: the provider's
-	// committed contract that changed, which is the only reason a contract
-	// edge fires.
+	// Via is present on a project an edge reached over a changed file. On a
+	// contract edge it is the provider's committed contract that changed,
+	// which is the only reason a contract edge fires. On an
+	// extension-consumer edge Cause says what it is.
 	Via string `json:"via,omitempty"`
-	// ContractSHA256 is present beside Via: the sha256 of that contract in the
-	// tree the selection read.
+	// ContractSHA256 is present beside a contract edge's Via: the sha256 of
+	// that contract in the tree the selection read.
 	ContractSHA256 string `json:"contractSha256,omitempty"`
+	// Cause is present beside an extension-consumer edge's Via: runtime-input
+	// when the edge carries every task of the extension, task-declaration
+	// when it carries the tasks a change of its manifest moved.
+	Cause string `json:"cause,omitempty"`
 	// TaskScope is present on a task-scoped project: the tasks of it the
 	// change reaches — `<command>~<step>` — and nothing else of it. Absent on
 	// a project that runs every task.

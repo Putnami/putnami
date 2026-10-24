@@ -4,6 +4,10 @@
 - **Scope**: `@putnami/cli` (`putnami install` lock write, `--impacted`
   selection and trace, `impacted` / `why_impacted` MCP tools),
   `@putnami/cli-model` (`workspace` extension-consumer edge)
+- **Amended**: 2026-10-23, §3: the edge carries every task of the extension
+  when its runtime moved and names the runtime input; a change confined to
+  the task and step declarations of the extension's own manifest carries the
+  steps it moved and names the manifest.
 
 ## Context
 
@@ -50,18 +54,40 @@ This is Bazel's rule: a changed toolchain invalidates the actions that invoke
 it, not the packages next to them.
 
 - The extension-consumer edge fires from an in-workspace extension whose
-  binary the change rebuilt: the extension is fully impacted, or the tasks it
-  runs reach a dependent's task across a `^` reference
-  ([ADR 0044](0044-selection-is-task-level.md)). One implementation byte
-  re-runs the extension's tasks on every consumer; a `_test.go` of the
-  extension re-runs only its own tests.
-- The edge selects each consumer for that extension's tasks only. The scope
-  entry is qualified by the extension project's id, because two extensions
-  routinely declare the same `<command>~<step>` (ADR 0044 owns the spelling
-  and the plan narrowing).
+  runtime the change moved: the extension is fully impacted, or the tasks
+  that read the changed files reach a dependent's task across a `^`
+  reference ([ADR 0044](0044-selection-is-task-level.md)). It carries every
+  task the extension declares, and the trace names the runtime input, the
+  changed file the walk traced the runtime to: `runtime input
+  tooling/extension-sdk/registrycred/install.go` for a module the
+  extension's `go.mod` replaces. One implementation byte re-runs every task of
+  the extension on every consumer; a `_test.go` of the extension re-runs only
+  its own tests.
+- A change to the extension's own `putnami.extension.json` moves no runtime
+  when it edits only task and step declarations. The selection reads the
+  manifest the diff's base records, compares each task's contract digest
+  (`TaskContractDigest`) on both sides, and the edge carries the steps whose
+  declaration moved: a step added, removed or edited, a step whose task's
+  digest differs or whose task exists on one side only, the steps a
+  dependent's `^` reference reaches from them, and the steps that depend on
+  those inside a project. The trace names `task declaration
+  <manifest>`. A change that moves no step carries nothing, and the edge does
+  not fire.
+- Any other manifest difference keeps the extension fully impacted, and its
+  consumers run every task: hooks, the runtime block, a command's own
+  members, the vocabulary, the version. So does a base that records no
+  manifest or records one that does not parse, and a pinned build that
+  replaces the manifest. When a runtime change and a confined manifest change
+  of one extension reach the same consumer, the consumer runs every task and
+  the trace names the runtime input.
+- The edge selects each consumer for the tasks it carries, of that extension
+  only. The scope entry is qualified by the extension project's id, because
+  two extensions routinely declare the same `<command>~<step>` (ADR 0044 owns
+  the spelling and the plan narrowing).
 - `impacted` and `why_impacted` read the one propagation `--impacted` runs,
   so they cannot disagree on a project or its scope. `why_impacted` runs it
-  from the one project it is asked about.
+  from the one project it is asked about, with no changed file, so its
+  consumer edges name no runtime input and carry every task.
 - A portable execution request freezes the task scopes with the projects, so
   the executing engine plans the graph the submitter proved.
 
@@ -94,9 +120,12 @@ identity, so it reaches the live JSONL stream and the session's
 
 ## Consequences
 
-- A change to an in-workspace extension runs, on every project under it, that
-  extension's jobs and their predecessors, and nothing else. Consumer cache
-  keys still include the extension's implementation digest.
+- A change to an in-workspace extension's runtime runs, on every project
+  under it, that extension's jobs and their predecessors, and nothing else. A
+  change confined to its task and step declarations runs the jobs of the
+  steps it moved and their predecessors. Consumer cache keys still include
+  the extension's implementation digest and each task's contract digest, so
+  a job the selection leaves out keeps a key its inputs still match.
 - A lock recorded on one platform stays one-platform through a CI install
   until the next requested change or `putnami extensions update`.
 - A path in `uncommittedFiles` on a CI runner is a file the run wrote before

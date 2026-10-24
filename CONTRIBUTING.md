@@ -204,13 +204,15 @@ packaged, published, or released by that run. Preview the exact DAG with
 `putnami deploy --all --plan`; it must plan without overlapping outputs.
 
 Beside it, [`.github/workflows/contributor-ci.yml`](.github/workflows/contributor-ci.yml)
-runs the documented contributor path on every pull request, on a GitHub-hosted
-runner that reads no secret and empties every Putnami credential variable before
-starting. It complements Putnami CI — the merge decision rests on Putnami CI;
+runs the documented contributor path on every pull request that is not a
+draft, on a GitHub-hosted runner that reads no secret and empties every Putnami
+credential variable before starting. It complements Putnami CI — the merge decision rests on Putnami CI;
 a red Contributor CI (without credentials) check means the credential-free path
 broke and is worth fixing on its own. It is scoped by `--impacted`, so a documentation-only pull request
 selects zero projects and passes having run nothing; the job summary prints the
-selected project and job counts so that case is visible.
+selected project and job counts so that case is visible. It runs when a pull
+request opens, reopens, receives a push, leaves draft, or changes its base
+branch. A title or body edit runs nothing.
 
 The job publishes one service container: a `postgres:17-alpine` on port 6432,
 pulled from this repository's GitHub Container Registry (GHCR) with the run's

@@ -158,6 +158,37 @@ func TestTheCommandPrintsTheResultInTheOutputMode(t *testing.T) {
 	}
 }
 
+// TestTheCommandReportsAMergedProposalAndExitsZero pins the output for a
+// branch whose proposal is merged: both forms name the proposal, and stderr
+// says nothing was published.
+func TestTheCommandReportsAMergedProposalAndExitsZero(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "a-settled-proposal-of-the-branch-opens-no-replacement")
+	for _, output := range []string{"json", "text"} {
+		t.Run(output, func(t *testing.T) {
+			t.Parallel()
+			contextFile := writeContext(t, map[string]any{"output": output}, map[string]any{"mode": "all", "scoped": false, "projects": []string{}})
+			command, h, stdout, stderr, args := draftCommand(t, contextFile)
+			h.provider.settled = []collab.Proposal{settledProposal(collab.ProposalStateMerged, "7", "0123456789012345678901234567890123456789")}
+			if code := command.Run(context.Background(), args); code != 0 || h.provider.upserts != 0 ||
+				stderr.String() != "change finalize: proposal github:acme/app/7 is already merged; nothing was published\n" {
+				t.Fatalf("exit %d, upserts %d, stderr %q", code, h.provider.upserts, stderr)
+			}
+			if output == "json" {
+				var result Result
+				if err := json.Unmarshal(stdout.Bytes(), &result); err != nil || result.State != collab.ProposalStateMerged || result.ProposalRef.ID != "7" {
+					t.Errorf("stdout %q", stdout)
+				}
+				return
+			}
+			want := `PROPOSAL_REF={"source":"github:acme/app","id":"7"}` + "\nPROPOSAL_URL=https://github.com/acme/app/pull/7\nPROPOSAL_STATE=merged\n"
+			if stdout.String() != want {
+				t.Errorf("stdout %q, want %q", stdout, want)
+			}
+		})
+	}
+}
+
 // TestTheCommandExitCodes pins exit 2 for a usage error, which reaches no
 // provider, exit 1 for a failure and for a context it cannot read, and the
 // message prefix of each.

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,9 @@ type finalizerProvider struct {
 	upserts, transitions, reviews, statusReads int
 	findReads                                  int
 	findHeadCommits                            []string
+	findStates                                 [][]collab.ProposalState
+	settled                                    []collab.Proposal
+	findPageSize                               int
 	findExisting                               bool
 	rejectRevision                             bool
 	upsertRevision                             string
@@ -115,10 +119,28 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		var request collab.ProposalFindInput
 		_ = json.Unmarshal(input, &request)
 		p.findHeadCommits = append(p.findHeadCommits, request.Change.HeadCommit)
-		if !p.findExisting {
-			return answer(collab.ProposalListResult{Items: nil})
+		p.findStates = append(p.findStates, request.States)
+		var items []collab.Proposal
+		if p.findExisting {
+			items = append(items, p.proposal)
 		}
-		return answer(collab.ProposalListResult{Items: []collab.Proposal{p.proposal}})
+		items = append(items, p.settled...)
+		if len(request.States) > 0 {
+			items = slices.DeleteFunc(items, func(item collab.Proposal) bool { return !slices.Contains(request.States, item.State) })
+		}
+		page, next := 0, ""
+		if request.Page != nil && request.Page.Cursor != "" {
+			page, _ = strconv.Atoi(request.Page.Cursor)
+		}
+		if p.findPageSize > 0 {
+			start := min(page*p.findPageSize, len(items))
+			end := min(start+p.findPageSize, len(items))
+			if end < len(items) {
+				next = strconv.Itoa(page + 1)
+			}
+			items = items[start:end]
+		}
+		return answer(collab.ProposalListResult{Items: items, Page: collab.Page{Next: next}})
 	case "proposals.upsert":
 		p.upserts++
 		var request collab.ProposalUpsertInput
@@ -308,6 +330,109 @@ func TestPostPushHeadChangeWithoutNewRevisionStopsBeforeUpsert(t *testing.T) {
 	git.pushHook = func() { provider.proposal.Change.HeadCommit = git.head }
 	if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 0 || provider.findReads != 2 {
 		t.Fatalf("head moved without a new revision: err=%v upserts=%d finds=%d", err, provider.upserts, provider.findReads)
+	}
+}
+
+func settledProposal(state collab.ProposalState, id, head string) collab.Proposal {
+	return collab.Proposal{
+		Ref: collab.Ref{Source: "github:acme/app", ID: id}, Revision: "settled-" + id, URL: "https://github.com/acme/app/pull/" + id,
+		Change: collab.Change{Repository: "acme/app", Base: "main", Head: "topic", HeadCommit: head},
+		Title:  "fix: publish native proposal", State: state, ProviderState: string(state),
+	}
+}
+
+// TestASettledProposalOfTheBranchOpensNoReplacement pins the lookup of every
+// state: a merged proposal at HEAD is reported and nothing is written, and a
+// closed one, or a merged one at another head, fails and names itself.
+func TestASettledProposalOfTheBranchOpensNoReplacement(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "a-settled-proposal-of-the-branch-opens-no-replacement")
+	for _, test := range []struct {
+		name    string
+		draft   bool
+		settled func(head string) []collab.Proposal
+		want    collab.Ref // the reported proposal, or the zero Ref for a failure
+		errHas  []string
+	}{
+		{name: "merged at HEAD", settled: func(head string) []collab.Proposal {
+			return []collab.Proposal{settledProposal(collab.ProposalStateMerged, "7", head)}
+		}, want: collab.Ref{Source: "github:acme/app", ID: "7"}},
+		{name: "merged at HEAD, draft run", draft: true, settled: func(head string) []collab.Proposal {
+			return []collab.Proposal{settledProposal(collab.ProposalStateMerged, "7", head)}
+		}, want: collab.Ref{Source: "github:acme/app", ID: "7"}},
+		{name: "closed earlier, merged at HEAD later", settled: func(head string) []collab.Proposal {
+			return []collab.Proposal{settledProposal(collab.ProposalStateClosed, "5", "old"), settledProposal(collab.ProposalStateMerged, "7", head)}
+		}, want: collab.Ref{Source: "github:acme/app", ID: "7"}},
+		{name: "closed", settled: func(head string) []collab.Proposal {
+			return []collab.Proposal{settledProposal(collab.ProposalStateClosed, "5", head)}
+		}, errHas: []string{"closed github:acme/app/5 (https://github.com/acme/app/pull/5)", "opens no replacement"}},
+		{name: "merged at another head", settled: func(string) []collab.Proposal {
+			return []collab.Proposal{settledProposal(collab.ProposalStateMerged, "7", "before-reuse")}
+		}, errHas: []string{"merged github:acme/app/7 (https://github.com/acme/app/pull/7) at before-reuse", "opens no replacement"}},
+		{name: "closed and merged at another head", settled: func(string) []collab.Proposal {
+			return []collab.Proposal{settledProposal(collab.ProposalStateClosed, "5", "x"), settledProposal(collab.ProposalStateMerged, "7", "y")}
+		}, errHas: []string{"closed github:acme/app/5", "merged github:acme/app/7"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			f, git, provider, opts := finalizerFixture(t)
+			opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
+			if test.draft {
+				opts.Draft, opts.VerificationFile, opts.TaskSource, opts.TaskID = true, "", "", ""
+				git.ahead = false
+			}
+			provider.settled = test.settled(git.head)
+			result, err := f.Run(context.Background(), opts)
+			if provider.upserts != 0 || provider.transitions != 0 || git.pushes != 0 || git.seeds != 0 || provider.reviews != 0 {
+				t.Fatalf("a settled proposal reached a write: upserts=%d transitions=%d pushes=%d seeds=%d reviews=%d",
+					provider.upserts, provider.transitions, git.pushes, git.seeds, provider.reviews)
+			}
+			if len(provider.findStates) != 1 || len(provider.findStates[0]) != 0 {
+				t.Fatalf("the lookup restricted the states it read: %v", provider.findStates)
+			}
+			if test.want != (collab.Ref{}) {
+				if err != nil || result.ProposalRef != test.want || result.State != collab.ProposalStateMerged || result.HeadSHA != git.head ||
+					result.ProposalURL != "https://github.com/acme/app/pull/"+test.want.ID {
+					t.Fatalf("merged proposal was not reported: result=%+v err=%v", result, err)
+				}
+				return
+			}
+			for _, want := range test.errHas {
+				if err == nil || !strings.Contains(err.Error(), want) {
+					t.Fatalf("error %v does not name %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+// TestAnOpenProposalWinsOverSettledOnesAcrossPages pins that the open or draft
+// proposal of the branch is the one to update, whatever settled proposals
+// precede it, and that the lookup follows every page.
+func TestAnOpenProposalWinsOverSettledOnesAcrossPages(t *testing.T) {
+	t.Parallel()
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Draft, opts.VerificationFile = true, ""
+	existingDraftProposal(provider, "prior-head")
+	provider.settled = []collab.Proposal{settledProposal(collab.ProposalStateClosed, "5", "a"), settledProposal(collab.ProposalStateMerged, "6", git.head)}
+	provider.findPageSize = 1
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || result.State != collab.ProposalStateDraft || provider.upserts != 1 || provider.upsertRevision != "before-push" || git.pushes != 1 {
+		t.Fatalf("the open proposal was not updated: result=%+v err=%v upserts=%d revision=%q pushes=%d",
+			result, err, provider.upserts, provider.upsertRevision, git.pushes)
+	}
+}
+
+// TestAMergedProposalOnALaterPageIsFound pins that a settled proposal beyond
+// the first page still stops the run.
+func TestAMergedProposalOnALaterPageIsFound(t *testing.T) {
+	t.Parallel()
+	f, git, provider, opts := finalizerFixture(t)
+	provider.settled = []collab.Proposal{settledProposal(collab.ProposalStateClosed, "4", "a"), settledProposal(collab.ProposalStateClosed, "5", "b"),
+		settledProposal(collab.ProposalStateMerged, "6", git.head)}
+	provider.findPageSize = 1
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || result.ProposalRef.ID != "6" || result.State != collab.ProposalStateMerged || provider.findReads != 3 || provider.upserts != 0 || git.pushes != 0 {
+		t.Fatalf("the merged proposal on page 3 was missed: result=%+v err=%v finds=%d upserts=%d pushes=%d", result, err, provider.findReads, provider.upserts, git.pushes)
 	}
 }
 

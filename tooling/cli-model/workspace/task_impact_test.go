@@ -23,6 +23,10 @@ type fakeTaskIndex struct {
 	extensionTasks map[string][]string
 	// runtime holds the "<projectID>|<path>" pairs an extension's runtime reads.
 	runtime map[string]bool
+	// manifest maps "<projectID>|<path>" to the tasks a change of that
+	// extension manifest moved, when the change stays inside task and step
+	// declarations. A pair absent from the map is a change that does not.
+	manifest map[string][]string
 }
 
 func (f fakeTaskIndex) ReadsAsExtensionRuntime(projectID, path string) bool {
@@ -51,6 +55,11 @@ func (f fakeTaskIndex) TasksReachedFrom(tasks []string) []string {
 
 func (f fakeTaskIndex) TasksOfExtension(extensionProjectID string) []string {
 	return f.extensionTasks[extensionProjectID]
+}
+
+func (f fakeTaskIndex) TasksOfManifestChange(extensionProjectID, path string) ([]string, bool) {
+	tasks, confined := f.manifest[extensionProjectID+"|"+path]
+	return tasks, confined
 }
 
 // taskImpactWorkspace is a library, two importers and one importer of an
@@ -217,9 +226,9 @@ func TestTraceChangeImpact_ScopesTakeTheUnionAndFullDominates(t *testing.T) {
 	}
 }
 
-// An in-workspace extension's own manifest is not the input of any task — it
-// IS the task declaration — so it keeps the extension full and re-runs the
-// extension's tasks on every consumer, exactly as an implementation change
+// A change to an in-workspace extension's own manifest that the index does not
+// confine to task and step declarations keeps the extension full and re-runs
+// the extension's tasks on every consumer, exactly as an implementation change
 // does. A test file inside the extension rebuilds no binary and reaches no
 // consumer at all.
 func TestTraceChangeImpact_ExtensionConsumerEdgeFiresOnlyWhenTheBinaryMoved(t *testing.T) {
@@ -328,6 +337,9 @@ func TestTraceChangeImpact_APackageDependencyExtensionManifestKeepsItsProjectFul
 		reading:      map[string][]string{"/ts/web|ts/web/putnami.extension.json": {"lint~check"}},
 		reached:      map[string][]string{"build~generate": {"build~generate"}},
 		everyReached: []string{"build~generate"},
+		// The change is confined to one task declaration, which no consumer
+		// edge can carry: no `extensions` list names the project.
+		manifest: map[string][]string{"/ts/web|ts/web/putnami.extension.json": {"/ts/web#lint~check"}},
 	}
 
 	r := TraceChangeImpact(ws, []string{"ts/web/putnami.extension.json"}, ChangeImpactOptions{Tasks: index})
