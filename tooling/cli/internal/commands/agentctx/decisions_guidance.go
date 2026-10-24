@@ -22,11 +22,13 @@ const decisionsPlaceholder = "{{DECISIONS}}"
 // surfaces carry them:
 //
 //   - The generated block names the decisions.json files in one line and lists
-//     no decision. A decision added later never regenerates AGENTS.md or
-//     CLAUDE.md.
-//   - The MCP server lists the root decisions in its initialize instructions
-//     and in the putnami://workspace/guidance resource, from the one renderer
-//     below (SettledDecisions).
+//     no decision. The line appears with a registry's first decision and goes
+//     with its last, so those two changes regenerate AGENTS.md and CLAUDE.md;
+//     every other decision change leaves them as they were.
+//   - The MCP server lists the root decisions in the putnami://workspace/guidance
+//     resource (SettledDecisions), and as id and statement in its initialize
+//     instructions, as many as fit the client's limit (SettledDecisionLines).
+//     Both read the one registry.
 //   - A project's decisions are returned by `putnami.context` for that project,
 //     so an agent orienting on it reads them and an agent working elsewhere
 //     does not pay for them. The list only names where each project registry
@@ -111,6 +113,24 @@ func decisionsGuidanceForWorkspace(wsRoot string) string {
 func SettledDecisions(wsRoot string) string {
 	workspace.InvalidateLoadCache(wsRoot)
 	return settledDecisionList(wsRoot)
+}
+
+// SettledDecisionLines renders the root registry's decisions as one compact
+// line each, "- D-001 — statement", in canonical order. The MCP initialize
+// instructions use them, because the client cuts the instructions at a fixed
+// length: the date and the enforcement of each decision stay in the resource
+// SettledDecisions renders. It returns nil when the root registry is absent,
+// unusable or empty.
+func SettledDecisionLines(wsRoot string) []string {
+	root := readDecisionRegistry(wsRoot, "")
+	if root == nil {
+		return nil
+	}
+	lines := make([]string, 0, len(root.Decisions))
+	for _, decision := range root.Decisions {
+		lines = append(lines, "- "+decision.ID+" — "+decision.Statement)
+	}
+	return lines
 }
 
 func settledDecisionList(wsRoot string) string {

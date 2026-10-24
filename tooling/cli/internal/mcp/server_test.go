@@ -1064,29 +1064,43 @@ func TestLargeFrameUnderCapIsAccepted(t *testing.T) {
 }
 
 // The settled decisions sit after the routing preamble and before the first
-// extension guide. They do not count against the guidance budget: an oversized
-// guide is still omitted, and the decisions stay whole. A server with no
-// decisions adds no heading.
+// extension guide: a heading, a pointer to the guidance resource, then one
+// compact line per decision. They do not count against the guide budget: an
+// oversized guide is still omitted, and the decisions stay whole. A server with
+// no decisions adds no heading.
 func TestInitializeListsTheSettledDecisionsBetweenThePreambleAndTheGuides(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "live-extension-guidance", "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides")
 	t.Parallel()
-	const decisions = "- D-001 — serverless workloads scale to zero (settled 2026-09-03, `validate` enforces it)\n- D-002 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)\n"
+	decisions := []string{
+		"- D-001 — serverless workloads scale to zero",
+		"- D-002 — every pull request names what it deletes",
+	}
 	const guide = "# Cloud bytes\n"
-	build := func(settled func() string, content string) *Server {
+	build := func(settled func() []string, content string) *Server {
 		return NewServer(Options{
 			WorkspaceRoot: t.TempDir(), ServerVersion: "test",
-			SettledDecisions:  settled,
-			ExtensionGuidance: []ExtensionGuidance{{Name: "@putnami/cloud", Version: "1.0.0", Content: content}},
+			SettledDecisionLines: settled,
+			ExtensionGuidance:    []ExtensionGuidance{{Name: "@putnami/cloud", Version: "1.0.0", Content: content}},
 		})
 	}
+	listed := func() []string { return decisions }
 
-	srv := build(func() string { return decisions }, guide)
+	srv := build(listed, guide)
 	instructions := srv.initializeInstructions()
 	preamble := strings.Index(instructions, "Exact guidance follows.")
-	list := strings.Index(instructions, strings.TrimSuffix(decisions, "\n"))
+	heading := strings.Index(instructions, settledDecisionsHeading)
+	pointer := strings.Index(instructions, settledDecisionsPointer)
+	first := strings.Index(instructions, decisions[0])
+	second := strings.Index(instructions, decisions[1])
 	extension := strings.Index(instructions, "--- exact extension guidance: @putnami/cloud@1.0.0 ---")
-	if preamble < 0 || list < 0 || extension < 0 || preamble >= list || list >= extension {
-		t.Fatalf("want the preamble, the decisions, then the guide; got offsets %d, %d, %d:\n%s", preamble, list, extension, instructions)
+	if preamble < 0 || heading < preamble || pointer < heading || first < pointer || second < first || extension < second {
+		t.Fatalf("want the preamble, the heading, the pointer, both decisions in order, then the guide; got offsets %d, %d, %d, %d, %d, %d:\n%s", preamble, heading, pointer, first, second, extension, instructions)
+	}
+	if !strings.Contains(settledDecisionsPointer, workspaceGuidanceURI) {
+		t.Fatalf("the pointer does not name %s: %q", workspaceGuidanceURI, settledDecisionsPointer)
+	}
+	if strings.Contains(instructions, "left out") || strings.Contains(instructions, "more settled decisions") {
+		t.Fatalf("the instructions report an omission with every decision listed:\n%s", instructions)
 	}
 	if !strings.HasPrefix(instructions, srv.initializeRoutingPreamble()) {
 		t.Fatalf("the instructions do not start with the routing preamble:\n%s", instructions)
@@ -1098,18 +1112,68 @@ func TestInitializeListsTheSettledDecisionsBetweenThePreambleAndTheGuides(t *tes
 	// The decisions are outside the guide budget: a guide that fills it is
 	// still carried whole, and an oversized one is still omitted.
 	full := strings.Repeat("x", maxInitializeGuidanceBytes)
-	if got := build(func() string { return decisions }, full).initializeInstructions(); !strings.Contains(got, decisions[:len(decisions)-1]) || !strings.Contains(got, full) {
+	if got := build(listed, full).initializeInstructions(); !strings.Contains(got, decisions[1]) || !strings.Contains(got, full) {
 		t.Fatalf("a guide that fills the budget lost the decisions or its own bytes (%d bytes)", len(got))
 	}
 	over := strings.Repeat("x", maxInitializeGuidanceBytes+1)
-	got := build(func() string { return decisions }, over).initializeInstructions()
-	if !strings.Contains(got, decisions[:len(decisions)-1]) || strings.Contains(got, over) || !strings.Contains(got, "exact extension guidance omitted") {
+	got := build(listed, over).initializeInstructions()
+	if !strings.Contains(got, decisions[1]) || strings.Contains(got, over) || !strings.Contains(got, "exact extension guidance omitted") {
 		t.Fatalf("an oversized guide changed how the decisions are carried (%d bytes)", len(got))
 	}
 
-	for name, settled := range map[string]func() string{"no closure": nil, "no decision": func() string { return "" }} {
+	for name, settled := range map[string]func() []string{"no closure": nil, "no decision": func() []string { return nil }} {
 		if got := build(settled, guide).initializeInstructions(); strings.Contains(got, "settled decisions") {
 			t.Errorf("%s: the instructions carry a decisions heading:\n%s", name, got)
+		}
+	}
+}
+
+// A registry too large for the client's limit renders the leading decisions
+// that fit whole, in canonical order, then one line that counts the others and
+// names the resource. The preamble, the heading, the pointer, the decisions and
+// that line together stay within maxClientInstructionUnits. The test fails when
+// the server ignores the limit, because 120 lines of about 90 units need far
+// more than 4,096.
+func TestInitializeFitsTheSettledDecisionsToTheClientLimit(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "instructions-decision-budget", "an-oversized-registry-renders-whole-leading-lines-and-an-omission-line")
+	t.Parallel()
+	const total = 120
+	lines := make([]string, 0, total)
+	for i := 1; i <= total; i++ {
+		// A multi-byte dash and an astral character: units are UTF-16 code
+		// units, not bytes and not runes.
+		lines = append(lines, fmt.Sprintf("- D-%03d — %s \U0001F512", i, strings.Repeat("statement ", 8)))
+	}
+	for name, root := range map[string]string{"short root": t.TempDir(), "long root": "/" + strings.Repeat("long-worktree/", 40)} {
+		srv := NewServer(Options{
+			WorkspaceRoot: root, ServerVersion: "test",
+			SettledDecisionLines: func() []string { return lines },
+		})
+		instructions := srv.initializeInstructions()
+		if units := clientInstructionUnits(instructions); units > maxClientInstructionUnits {
+			t.Fatalf("%s: the instructions are %d UTF-16 units, over the limit of %d", name, units, maxClientInstructionUnits)
+		}
+		listed := 0
+		for i, line := range lines {
+			if !strings.Contains(instructions, line+"\n") && !strings.HasSuffix(instructions, line) {
+				continue
+			}
+			if i != listed {
+				t.Fatalf("%s: line %d is listed after a gap at %d", name, i, listed)
+			}
+			listed++
+		}
+		if listed == 0 || listed == total {
+			t.Fatalf("%s: %d of %d decisions listed, want some and not all:\n%s", name, listed, total, instructions)
+		}
+		omission := omittedDecisionsLine(total - listed)[1:]
+		if !strings.HasSuffix(instructions, omission) || !strings.Contains(omission, workspaceGuidanceURI) {
+			t.Fatalf("%s: the instructions do not end with the omission line %q:\n%s", name, omission, instructions)
+		}
+		// One more decision would not have fit.
+		over := instructions[:len(instructions)-len(omission)] + lines[listed] + "\n" + omittedDecisionsLine(total - listed - 1)[1:]
+		if clientInstructionUnits(over) <= maxClientInstructionUnits {
+			t.Fatalf("%s: decision %d fits but was left out", name, listed+1)
 		}
 	}
 }

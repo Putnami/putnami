@@ -54,7 +54,7 @@
     },
     {
       "id": "live-extension-guidance",
-      "text": "MCP initialization identifies its bound workspace and gives a self-contained active-worktree, Intelligence, freshness and fallback rule, then the settled root decisions, then exact locked AI.md. Decisions are never truncated; a bounded guide total names rather than truncates an oversized guide. A session on another worktree uses the local CLI. Versioned resources return exact guidance or unavailable without latest; language extensions own dependency documentation."
+      "text": "MCP initialization identifies its bound workspace and gives a self-contained active-worktree, Intelligence, freshness and fallback rule, then the settled root decisions, then exact locked AI.md within a bounded total size that names rather than truncates an oversized guide. A session on another worktree uses the local CLI. Versioned resources return exact guidance or unavailable without latest; language extensions own dependency documentation."
     },
     {
       "id": "host-session-launcher",
@@ -74,7 +74,11 @@
     },
     {
       "id": "settled-decisions-guidance",
-      "text": "The generated block names the decisions.json files in one line and lists no decision, so a new decision regenerates no file. The MCP initialize instructions and the guidance resource list the root decisions, then name each project decisions.json with its count, from one reader. Nothing is truncated."
+      "text": "The generated block names the decisions.json files in one line and lists no decision: only a registry's first decision, or removal of its last, changes it. The guidance resource lists the root decisions in full, with date and enforcement, then each project registry with its count. Nothing is truncated."
+    },
+    {
+      "id": "instructions-decision-budget",
+      "text": "The initialize instructions before the extension guides, the routing preamble, a pointer to putnami://workspace/guidance and the root decisions as id and statement, stay within 4,096 UTF-16 code units, the Claude Code limit. A decision line never splits. Decisions that do not fit give way to one line that counts them and names the resource."
     },
     {
       "id": "agent-context-languages",
@@ -86,6 +90,7 @@
     "tooling/cli/doc/adr/0013-sdd-as-a-standalone-extension.md",
     "tooling/cli/doc/adr/0022-analysis-prepares-only-locked-read-surfaces.md",
     "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md",
+    "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
     "tooling/cli/doc/adr/0055-repository-rules-live-in-agents-constraints.md",
     "tooling/cli/doc/adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md"
   ]

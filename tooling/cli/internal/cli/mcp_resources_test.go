@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
@@ -184,8 +185,30 @@ func TestMCPGuidanceResourceHoldsTheBlockBodyAndTheDecisions(t *testing.T) {
 	}
 }
 
+// instructionsOf initializes the real server over root and returns its
+// instructions.
+func instructionsOf(t *testing.T, root string) string {
+	t.Helper()
+	responses := serveResourceRequests(t, root, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
+	var result struct {
+		Instructions string `json:"instructions"`
+	}
+	if err := json.Unmarshal(responses[1].Result, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result.Instructions
+}
+
+// utf16Units counts the UTF-16 code units of text, the unit in which Claude
+// Code cuts the instructions.
+func utf16Units(text string) int {
+	return len(utf16.Encode([]rune(text)))
+}
+
 // The real server lists the settled root decisions in its initialize
-// instructions, after the routing preamble, and never repeats the block.
+// instructions, after the routing preamble, as a pointer to the guidance
+// resource and one compact line per decision. It never repeats the block, and
+// it names no project registry or project decision, which the resource holds.
 func TestMCPInitializeInstructionsListTheSettledDecisions(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "live-extension-guidance", "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides")
@@ -206,23 +229,68 @@ func TestMCPInitializeInstructionsListTheSettledDecisions(t *testing.T) {
 	}
 	workspace.InvalidateLoadCache(root)
 
-	responses := serveResourceRequests(t, root, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
-	var result struct {
-		Instructions string `json:"instructions"`
-	}
-	if err := json.Unmarshal(responses[1].Result, &result); err != nil {
-		t.Fatal(err)
-	}
+	instructions := instructionsOf(t, root)
 	for _, want := range []string{
-		"--- settled decisions ---\n\n- D-001 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)",
-		"- Project decisions, returned by `putnami.context` with their project: `packages/app/decisions.json` (2).",
+		"--- settled decisions ---\n\nComplete list, with each decision's date and enforcement and the project registries: resource putnami://workspace/guidance\n- D-001 — every pull request names what it deletes",
 	} {
-		if !strings.Contains(result.Instructions, want) {
-			t.Errorf("instructions are missing %q:\n%s", want, result.Instructions)
+		if !strings.Contains(instructions, want) {
+			t.Errorf("instructions are missing %q:\n%s", want, instructions)
 		}
 	}
-	if strings.Contains(result.Instructions, "D-002") || strings.Contains(result.Instructions, "This is a Putnami workspace.") {
-		t.Errorf("instructions carry a project decision or repeat the block:\n%s", result.Instructions)
+	for _, banned := range []string{"D-002", "This is a Putnami workspace.", "review-only", "packages/app/decisions.json", "settled 2026"} {
+		if strings.Contains(instructions, banned) {
+			t.Errorf("instructions carry %q:\n%s", banned, instructions)
+		}
+	}
+}
+
+// This repository's own instructions, preamble and decisions together, fit the
+// 4,096 UTF-16 units Claude Code keeps, with every root decision listed whole.
+// The test logs the measured length. It fails when a new decision no longer
+// fits, which is the moment to shorten a statement or to move the list out of
+// the instructions.
+func TestMCPInstructionsOfThisRepositoryFitTheClientLimit(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "instructions-decision-budget", "this-repositorys-decisions-fit-the-instructions-budget")
+	repository, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := os.ReadFile(filepath.Join(repository, "decisions.json"))
+	if err != nil {
+		t.Skipf("no repository decisions.json: %v", err)
+	}
+	root := t.TempDir()
+	for rel, content := range map[string]string{
+		"putnami.workspace.json":    `{"name":"fixture","includes":["packages/app"]}`,
+		"packages/app/putnami.json": `{"name":"app","type":"application"}`,
+		"decisions.json":            string(registry),
+	} {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lines := agentctx.SettledDecisionLines(root)
+	instructions := instructionsOf(t, root)
+	units := utf16Units(instructions)
+	t.Logf("instructions of a workspace with this repository's %d root decisions: %d UTF-16 units of %d", len(lines), units, 4096)
+	if len(lines) == 0 {
+		t.Fatal("the repository registry yields no decision")
+	}
+	if strings.Contains(instructions, "more settled decisions are not listed") {
+		t.Fatalf("the instructions leave out decisions (%d units); shorten the statements or move the list:\n%s", units, instructions)
+	}
+	for _, line := range lines {
+		if !strings.Contains(instructions, line) {
+			t.Errorf("the instructions do not list %q", line)
+		}
+	}
+	if units > 4096 {
+		t.Fatalf("the instructions are %d UTF-16 units, over the 4096 Claude Code keeps", units)
 	}
 }
 

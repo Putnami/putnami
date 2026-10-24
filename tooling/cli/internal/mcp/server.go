@@ -188,13 +188,15 @@ type Options struct {
 	// above. When nil, the putnami://workspace/guidance resource is left out of
 	// the list.
 	WorkspaceGuidance func(ctx context.Context) string
-	// SettledDecisions returns the settled root decisions of this workspace as
-	// a Markdown list, rendered by the same reader as WorkspaceGuidance, or ""
-	// when it has none. The server places it in the initialize instructions
-	// after the routing preamble and before the extension guides (guidance.go).
-	// The CLI shell injects it for the same reason as the closures above. When
-	// nil, the instructions carry no decision.
-	SettledDecisions func() string
+	// SettledDecisionLines returns the settled root decisions of this
+	// workspace, one compact line each ("- D-001 — statement") in canonical
+	// order, read from the same registry as WorkspaceGuidance. It returns none
+	// when the workspace has no decision. The server places as many as fit the
+	// client's limit in the initialize instructions, after the routing preamble
+	// and before the extension guides (guidance.go). The CLI shell injects it
+	// for the same reason as the closures above. When nil, the instructions
+	// carry no decision.
+	SettledDecisionLines func() []string
 	// ReloadExtensions selects the workspace's extensions: the Config,
 	// ExtensionGuidance, GuidanceIssues, PreparedExtensions and
 	// UnavailableExtensions the server serves. The CLI shell injects it for

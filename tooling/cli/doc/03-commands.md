@@ -904,9 +904,12 @@ never writes `.mcp.json`: `init`, `install` and `upgrade` register the MCP
 server, and `putnami mcp install` repairs the registration. See [`mcp`](#mcp).
 
 The block holds the rules and the gate line. It names the `decisions.json` files
-in one line and lists no decision, so a new decision changes neither file. The
-MCP server lists the root decisions in its `initialize` instructions and in the
-`putnami://workspace/guidance` resource.
+in one line and lists no decision. The line appears with a registry's first
+decision and goes with its last, and those two changes regenerate the block; any
+other decision change leaves both files as they were. The MCP server lists the
+root decisions in full in the `putnami://workspace/guidance` resource, and as id
+and statement, as many as fit Claude Code's 4,096-character limit, in its
+`initialize` instructions.
 
 #### `context pack`
 

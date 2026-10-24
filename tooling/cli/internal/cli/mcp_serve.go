@@ -146,10 +146,10 @@ func newMCPServerWithContext(ctx context.Context, wsRoot, version string) *mcp.S
 		WorkspaceGuidance: func(context.Context) string {
 			return agentctx.WorkspaceGuidanceBody(wsRoot)
 		},
-		// The initialize instructions list the settled root decisions, which
-		// the generated block only names.
-		SettledDecisions: func() string {
-			return agentctx.SettledDecisions(wsRoot)
+		// The initialize instructions list as many settled root decisions as
+		// fit the client's limit, which the generated block only names.
+		SettledDecisionLines: func() []string {
+			return agentctx.SettledDecisionLines(wsRoot)
 		},
 		// The selection an EXTENSION-contributed tool receives on its request.
 		// It is the same resolver, through the same seam, for the

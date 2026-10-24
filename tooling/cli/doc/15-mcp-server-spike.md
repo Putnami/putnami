@@ -101,17 +101,35 @@ list. Listing prepares no workspace graph.
 | `putnami://projects/<id>/context` | One project's `agent_context` answer. `<id>` is the canonical project id escaped as one path segment, for example `%2Ftooling%2Fcli` | the `agent_context` builder |
 
 The server also returns instructions when a client sends `initialize`. They
-hold, in order, a short routing preamble, the settled root decisions (the
-`decisions.json` at the workspace root, then a pointer to each project
-registry), and the `AI.md` of each locked extension. The instructions never
-repeat the `AGENTS.md` block, because Claude Code reads both. The decisions are
-outside the 128 KiB guide budget and are never truncated. Claude Code puts the
-instructions in the system prompt at session start. Codex 0.162 does not put
-them in the model's context at start: it shows them only inside a tool-search
-result. The server builds the instructions once, at `initialize`, so a decision
-added later reaches the session through the change notice below and the
-`putnami://workspace/guidance` resource, which lists the current decisions on
-every read.
+hold, in order:
+
+1. a short routing preamble;
+2. the settled root decisions: a heading, one line that points at
+   `putnami://workspace/guidance` for the complete list (each decision's date
+   and enforcement, and the project registries), then one `- D-001 — statement`
+   line per decision in canonical order;
+3. the `AI.md` of each locked extension.
+
+The instructions never repeat the `AGENTS.md` block, because Claude Code reads
+both.
+
+Claude Code puts the instructions in the system prompt at session start, and
+cuts them at 4,096 UTF-16 code units (set by
+`CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH`; measured on 2.1.308 and 2.1.310). It
+keeps the first part, so the preamble and the decisions come first and share
+that limit. When every decision does not fit, the server lists the leading
+decisions that fit whole, never cutting a line, then one line that counts the
+decisions left out and names the resource. The extension guides follow the
+decisions and sit past the cut when the decisions fill the limit. The 128 KiB
+guide budget covers the guides alone. This repository's preamble and 24
+decisions come to 3,782 units with a 61-character root path, so all 24 fit.
+Codex 0.162 does not put the instructions in the model's context at start: it
+shows them only inside a tool-search result.
+
+The server builds the instructions once, at `initialize`, so a decision added
+later reaches the session through the change notice below and the
+`putnami://workspace/guidance` resource, which lists the current decisions in
+full on every read.
 
 The server notices a change of the agent context between two requests. No file
 watcher runs. Before it answers a `tools/call` or a `resources/read`, it hashes

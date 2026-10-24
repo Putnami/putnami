@@ -40,9 +40,11 @@ Each decision reaches an agent where it binds:
 
 - `putnami context generate` names the `decisions.json` files in one line of the
   `AGENTS.md` guidance block and lists no decision;
-- the MCP server lists every root decision in its `initialize` instructions and
-  in the `putnami://workspace/guidance` resource, and names each project
-  registry with its decision count there;
+- the MCP server lists every root decision, with its date and enforcement, in
+  the `putnami://workspace/guidance` resource, and names each project registry
+  with its decision count there. Its `initialize` instructions list as many root
+  decisions as id and statement as fit Claude Code's 4,096-character limit, and
+  point at the resource;
 - the `putnami.context` MCP tool returns a project's own decisions with that
   project.
 
@@ -90,7 +92,7 @@ The boundaries:
 - Changing a settled value means editing its registry in the same pull request,
   which puts the re-decision in the diff.
 - An agent on one project reads the root decisions and that project's, not
-  every project's. The guidance still names every project registry.
+  every project's. The guidance resource still names every project registry.
 - A check with a wide glob costs an uncached worktree walk on every
   `validate-workspace`.
 - The generated guidance block differs per workspace; its begin marker carries

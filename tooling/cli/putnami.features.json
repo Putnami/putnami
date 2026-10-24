@@ -602,6 +602,21 @@
           }
         },
         {
+          "id": "instructions-decision-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "this-repositorys-decisions-fit-the-instructions-budget",
+              "an-oversized-registry-renders-whole-leading-lines-and-an-omission-line",
+              "the-instruction-lines-are-compact-and-in-canonical-order"
+            ]
+          }
+        },
+        {
           "id": "agent-context-languages",
           "stage": "coded",
           "evidenceKinds": [

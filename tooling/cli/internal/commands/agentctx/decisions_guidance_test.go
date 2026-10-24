@@ -3,6 +3,7 @@ package agentctx
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -68,6 +69,26 @@ func TestSettledDecisionsRendersEveryDecision(t *testing.T) {
 	}
 	if !strings.HasSuffix(rendered, "\n") {
 		t.Fatalf("rendered decisions do not end with a newline:\n%q", rendered)
+	}
+}
+
+// TestSettledDecisionLinesAreCompactAndCanonical pins the instructions half:
+// one "- id — statement" line per root decision, in canonical order, with no
+// date or enforcement and no project registry, and nothing without a usable
+// registry.
+func TestSettledDecisionLinesAreCompactAndCanonical(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "instructions-decision-budget", "the-instruction-lines-are-compact-and-in-canonical-order")
+	dir := t.TempDir()
+	if lines := SettledDecisionLines(dir); lines != nil {
+		t.Fatalf("a workspace without a registry got %q", lines)
+	}
+	writeDecisions(t, dir, seededDecisions)
+	want := []string{
+		"- D-001 — serverless workloads scale to zero",
+		"- D-002 — every pull request names what it deletes",
+	}
+	if got := SettledDecisionLines(dir); !reflect.DeepEqual(got, want) {
+		t.Fatalf("SettledDecisionLines = %q, want %q", got, want)
 	}
 }
 
@@ -152,16 +173,38 @@ func TestWriteAgentEntrypointsNamesTheDecisionFiles(t *testing.T) {
 	if strings.Contains(agent, "D-001") || strings.Contains(agent, "D-002") {
 		t.Errorf("generated AGENTS.md lists a decision:\n%s", agent)
 	}
-	// A decision added later changes no byte of the entrypoint.
-	writeDecisions(t, dir, strings.Replace(seededDecisions, `"id": "D-002"`, `"id": "D-003"`, 1))
-	// A second run over its own output changes nothing: the derivation is a
-	// pure function of the committed registry's presence.
+	// A decision added to a registry that already holds one changes no byte of
+	// the entrypoint.
+	writeDecisions(t, dir, strings.Replace(seededDecisions, `"decisions": [`, `"decisions": [
+    {"id": "D-003", "statement": "a third decision", "settled": "2026-09-04", "settledBy": "fdumay", "reviewOnly": true},`, 1))
+	if lines := SettledDecisionLines(dir); len(lines) != 3 {
+		t.Fatalf("the registry holds %d decisions, want 3", len(lines))
+	}
 	before := agent
 	if err := WriteAgentEntrypoints(dir); err != nil {
 		t.Fatalf("second WriteAgentEntrypoints: %v", err)
 	}
 	if after := readGuidance(t, dir, agentEntrypointPath); after != before {
-		t.Fatalf("a changed decision rewrote the entrypoint:\n%s\n%s", before, after)
+		t.Fatalf("an added decision rewrote the entrypoint:\n%s\n%s", before, after)
+	}
+
+	// The registry's last decision going away removes the line, and its first
+	// decision coming back restores it: those two changes regenerate the block.
+	if err := os.Remove(filepath.Join(dir, featureproto.DecisionsFilename)); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteAgentEntrypoints(dir); err != nil {
+		t.Fatalf("third WriteAgentEntrypoints: %v", err)
+	}
+	if without := readGuidance(t, dir, agentEntrypointPath); without == before || strings.Contains(without, "Settled decisions are recorded") {
+		t.Fatalf("removing the registry left the line in the block:\n%s", without)
+	}
+	writeDecisions(t, dir, seededDecisions)
+	if err := WriteAgentEntrypoints(dir); err != nil {
+		t.Fatalf("fourth WriteAgentEntrypoints: %v", err)
+	}
+	if again := readGuidance(t, dir, agentEntrypointPath); again != before {
+		t.Fatalf("the first decision did not restore the line:\n%s", again)
 	}
 }
 

@@ -590,10 +590,11 @@ convention all produce `features.invalid_decision_registry`. An **absent**
 proves every registry as the `decisions-validate` step of `validate-workspace`.
 `putnami context generate` names the `decisions.json` files in one line of the
 workspace's `AGENTS.md` guidance block and lists no decision. The MCP server
-lists every root entry in its `initialize` instructions and in the
-`putnami://workspace/guidance` resource, and names each project registry there;
-the `putnami.context` MCP tool returns a project's own decisions with that
-project.
+lists every root entry, with its date and enforcement, in the
+`putnami://workspace/guidance` resource, and names each project registry there.
+Its `initialize` instructions list as many root entries as fit the client's
+limit, as id and statement. The `putnami.context` MCP tool returns a project's
+own decisions with that project.
 
 The reasoning is recorded in
 [`tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md`](../../tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md).
