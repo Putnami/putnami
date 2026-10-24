@@ -44,9 +44,11 @@ import (
 // server reloads its extension selection, guides and tools through
 // Options.ReloadExtensions, then writes notifications/tools/list_changed and
 // notifications/resources/list_changed, in that order, before the response of
-// the request that noticed the change. The tools count as built from each
-// input as it was before the build, so an edit that lands during the build is
-// loaded by the next request.
+// the request that noticed the change. The server also selects through
+// Options.ReloadExtensions while it starts, after its first read of the
+// inputs. The tools count as built from each input as it was before the
+// build, so an edit that lands during the start or a reload is loaded by the
+// next request.
 
 const (
 	workspaceConfigInput = wsproto.WorkspaceConfigFilename
@@ -142,12 +144,16 @@ type contextNotice struct {
 	to   contextSnapshot
 }
 
-// startTools registers the tools the session starts with and records the
-// inputs it starts from. The tools count as built from the inputs read before
-// the build, so an edit that lands during the build is loaded by the first
-// request.
-func (s *Server) startTools() {
+// startTools selects the extensions through ReloadExtensions when the server
+// has it, registers the tools the session starts with, and records the inputs
+// it starts from. It reads the inputs first, and the selection and the tools
+// count as built from that read, so an edit that lands during the start is
+// loaded by the first request.
+func (s *Server) startTools(ctx context.Context) {
 	before := s.readContextInputs()
+	if s.opts.ReloadExtensions != nil {
+		s.selectExtensions(ctx)
+	}
 	s.rebuildTools()
 	after := s.readContextInputs()
 	s.contextMu.Lock()
@@ -446,16 +452,23 @@ func (s *Server) observeContext(ctx context.Context, describe bool) contextNotic
 // returns the snapshot the new tools count as built from: before, the inputs
 // read before the reload, joined by the inputs the reload started to track.
 func (s *Server) reloadExtensions(ctx context.Context, before contextSnapshot) contextSnapshot {
-	workspace.InvalidateLoadCache(s.opts.WorkspaceRoot)
-	selection := s.opts.ReloadExtensions(ctx)
-	s.selectionMu.Lock()
-	s.selection = selection
-	s.selectionMu.Unlock()
+	s.selectExtensions(ctx)
 	s.rebuildTools()
 	after := s.readContextInputs()
 	s.notify(notificationToolsListChanged)
 	s.notify(notificationResourcesListChanged)
 	return builtFrom(before, after)
+}
+
+// selectExtensions replaces the extension selection with the one
+// ReloadExtensions makes. It drops the cached workspace load first, so the
+// selection and the tools follow the current project set.
+func (s *Server) selectExtensions(ctx context.Context) {
+	workspace.InvalidateLoadCache(s.opts.WorkspaceRoot)
+	selection := s.opts.ReloadExtensions(ctx)
+	s.selectionMu.Lock()
+	s.selection = selection
+	s.selectionMu.Unlock()
 }
 
 // withNotice appends the notice to a tool result as its last text block, and

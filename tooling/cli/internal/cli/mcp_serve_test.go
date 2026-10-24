@@ -73,14 +73,12 @@ func TestNewMCPServerPreparesAndConsumesExactLockedGuidance(t *testing.T) {
 	if err := lockfile.WriteLockFile(root, lf); err != nil {
 		t.Fatal(err)
 	}
-	// Discovery may load the workspace while constructing the server. Keep its
-	// authored root minimal; exact guidance comes from the supplied config and
-	// lock, not a generated file.
+	// The server reads this configuration while it starts. Keep it minimal;
+	// exact guidance comes from it and the lock, not a generated file.
 	if err := os.WriteFile(filepath.Join(root, wsproto.WorkspaceConfigFilename), []byte(`{"extensions":{"@putnami/cloud":"stable"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: map[string]string{name: "stable"}}}
-	srv := newMCPServerWithContext(context.Background(), root, cfg, "test")
+	srv := newMCPServerWithContext(context.Background(), root, "test")
 
 	var out bytes.Buffer
 	request := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}` + "\n"
@@ -142,7 +140,7 @@ exit 2
 
 	workspace.InvalidateLoadCache(root)
 	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
-	srv := newMCPServerWithContext(context.Background(), root, wsproto.Load(root), "test")
+	srv := newMCPServerWithContext(context.Background(), root, "test")
 	if _, err := os.Stat(workspace.SnapshotPath(root)); !os.IsNotExist(err) {
 		t.Fatalf("constructing the server eagerly created an index: %v", err)
 	}
@@ -191,8 +189,8 @@ exit 2
 func TestColdMCPRetriesAfterExactProviderBecomesAvailable(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/workspace-initialization", "graph-readiness", "cold-mcp-prepares-the-provider-index-without-install")
-	root, cfg := coldRegistryProviderWorkspace(t)
-	srv := newMCPServerWithContext(context.Background(), root, cfg, "test")
+	root := coldRegistryProviderWorkspace(t)
+	srv := newMCPServerWithContext(context.Background(), root, "test")
 
 	first := callMCPListProjects(t, srv)
 	if !first.IsError ||
@@ -217,9 +215,9 @@ func TestColdMCPRetriesAfterExactProviderBecomesAvailable(t *testing.T) {
 
 func TestColdMCPRetriesAfterExactProviderDiscoveryIsRepaired(t *testing.T) {
 	t.Parallel()
-	root, cfg := coldRegistryProviderWorkspace(t)
+	root := coldRegistryProviderWorkspace(t)
 	writeLockedMCPProvider(t, root, 999)
-	srv := newMCPServerWithContext(context.Background(), root, cfg, "test")
+	srv := newMCPServerWithContext(context.Background(), root, "test")
 
 	first := callMCPListProjects(t, srv)
 	if !first.IsError || !mcpToolResultContains(first, "workspace provider discovery is incomplete") {
@@ -236,7 +234,7 @@ func TestColdMCPRetriesAfterExactProviderDiscoveryIsRepaired(t *testing.T) {
 	}
 }
 
-func coldRegistryProviderWorkspace(t *testing.T) (string, *wsproto.Config) {
+func coldRegistryProviderWorkspace(t *testing.T) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("shell provider fixture")
@@ -254,7 +252,7 @@ func coldRegistryProviderWorkspace(t *testing.T) (string, *wsproto.Config) {
 	}
 	workspace.InvalidateLoadCache(root)
 	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
-	return root, wsproto.Load(root)
+	return root
 }
 
 func writeLockedMCPProvider(t *testing.T, root string, cliContract int) {

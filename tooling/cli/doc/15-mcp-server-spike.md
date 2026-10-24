@@ -131,9 +131,10 @@ version, or a path manifest), or the `includes` or `options.collaboration`
 changed, the server loads the workspace again and reloads its extension
 selection, guides and tools. It then writes `notifications/tools/list_changed`
 and `notifications/resources/list_changed`, in that order, before the response
-of the request that noticed the change. The tools count as built from the
-inputs as they were before the reload, so an edit that lands during it is
-loaded by the next request. A call to a tool the reload removed returns an
+of the request that noticed the change. The server makes its start selection
+the same way, after its first read of the inputs. The tools count as built
+from the inputs as they were before the start or the reload, so an edit that
+lands during either is loaded by the next request. A call to a tool the reload removed returns an
 error tool result that says to list the tools again and carries the notice. A
 name the server never registered stays an invalid-params error. A project's own
 `putnami.json` is not an input: a change there reloads nothing. `initialize`

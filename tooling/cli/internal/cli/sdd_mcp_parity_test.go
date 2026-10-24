@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -86,7 +85,7 @@ func TestSDDMCPToolsMatchTheRecordedCoreTools(t *testing.T) {
 	t.Parallel()
 	limitParityConcurrency(t)
 	root := mcpParityWorkspace(t)
-	srv := newMCPServer(root, wsproto.Load(root), "test")
+	srv := newMCPServer(root, "test")
 
 	for _, tool := range mcpParityCases() {
 		t.Run(tool.name, func(t *testing.T) {
@@ -297,7 +296,7 @@ func TestSDDMCPToolsAreAdvertisedAndAcceptedByTheValidator(t *testing.T) {
 	t.Parallel()
 	limitParityConcurrency(t)
 	root := mcpParityWorkspace(t)
-	srv := newMCPServer(root, wsproto.Load(root), "test")
+	srv := newMCPServer(root, "test")
 
 	advertised := map[string]advertisedTool{}
 	for _, tool := range listParityTools(t, srv) {
@@ -376,7 +375,7 @@ func TestSDDMCPToolsAnswerFromTheWorkspaceOnTheWire(t *testing.T) {
 	t.Parallel()
 	limitParityConcurrency(t)
 	root := mcpParityWorkspace(t)
-	srv := newMCPServer(root, wsproto.Load(root), "test")
+	srv := newMCPServer(root, "test")
 
 	blocks, isError := callParityTool(t, srv, "sdd.list_features", "")
 	if isError {

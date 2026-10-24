@@ -36,6 +36,7 @@ const (
 	checkEditDuringReloadLoads     = "an-edit-during-a-reload-is-loaded-by-the-next-request"
 	checkRemovedToolSaysListAgain  = "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again"
 	checkNothingWrittenAfterServe  = "nothing-is-written-after-the-session-ends"
+	checkEditDuringStartLoads      = "an-edit-while-the-server-starts-is-loaded"
 )
 
 const contextDecisionsOne = `{
@@ -119,23 +120,30 @@ func newContextFixture(t *testing.T) contextFixture {
 
 // server builds a server over the fixture with the guidance builder injected
 // and the reload closure the CLI shell injects: the configuration read again.
+// The server selects through the closure once while it starts; reloads counts
+// the calls after that.
 func (f contextFixture) server(t *testing.T, reloads *int) *Server {
 	t.Helper()
-	return NewServer(Options{
+	calls := 0
+	srv := NewServer(Options{
 		WorkspaceRoot:     f.dir,
-		Config:            wsproto.Load(f.dir),
 		ServerVersion:     "test",
 		WorkspaceGuidance: func(context.Context) string { return testGuidanceBody },
 		AgentContext: func(_ context.Context, selector string) (any, error) {
 			return map[string]string{"project": selector}, nil
 		},
 		ReloadExtensions: func(context.Context) ExtensionSelection {
-			if reloads != nil {
+			calls++
+			if reloads != nil && calls > 1 {
 				*reloads++
 			}
 			return ExtensionSelection{Config: wsproto.Load(f.dir)}
 		},
 	})
+	if calls != 1 {
+		t.Fatalf("the server selected %d times while it started, want 1", calls)
+	}
+	return srv
 }
 
 // sessionLine is one line a session writes: a notification names its method,
@@ -514,7 +522,6 @@ func TestTheListsAfterAReloadFollowTheNewExtensionSet(t *testing.T) {
 	guides := []ExtensionGuidance(nil)
 	srv := NewServer(Options{
 		WorkspaceRoot: f.dir,
-		Config:        wsproto.Load(f.dir),
 		ServerVersion: "test",
 		ReloadExtensions: func(context.Context) ExtensionSelection {
 			return ExtensionSelection{Config: wsproto.Load(f.dir), ExtensionGuidance: guides}
@@ -759,17 +766,16 @@ func TestAnEditDuringAReloadIsLoadedByTheNextRequest(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, contextFeature, contextRequirement, checkEditDuringReloadLoads)
 	f := newContextFixture(t)
-	reloads := 0
+	selections := 0
 	srv := NewServer(Options{
 		WorkspaceRoot: f.dir,
-		Config:        wsproto.Load(f.dir),
 		ServerVersion: "test",
 		ReloadExtensions: func(context.Context) ExtensionSelection {
-			reloads++
+			selections++
 			selection := ExtensionSelection{Config: wsproto.Load(f.dir)}
-			if reloads == 1 {
-				// The workspace disables the extension after the reload read
-				// the configuration, so the first reload still registers its
+			if selections == 2 {
+				// The workspace disables the extension after the first reload
+				// read the configuration, so that reload still registers its
 				// tools.
 				f.write(t, "putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib"],"extensions":["/extensions/notes"],"disable":{"extensions":["@putnami/notes"]}}`)
 			}
@@ -779,13 +785,52 @@ func TestAnEditDuringAReloadIsLoadedByTheNextRequest(t *testing.T) {
 
 	f.write(t, "extensions/notes/putnami.extension.json", pathExtensionManifest(f.tool, "notes.read", "notes.write"))
 	lines := contextSession(t, srv, listProjectsCall(1), listProjectsCall(2))
-	if reloads != 2 {
+	if reloads := selections - 1; reloads != 2 {
 		t.Fatalf("reloads = %d, want 2: the second request loads the edit the first reload missed", reloads)
 	}
 	if _, ok, _ := srv.lookupTool("notes.read"); ok {
 		t.Error("the tools of the extension the workspace disabled are still registered")
 	}
 	want := []string{notificationToolsListChanged, notificationResourcesListChanged, "response 1", notificationToolsListChanged, notificationResourcesListChanged, "response 2"}
+	if got := methodsOf(lines); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("lines = %v, want %v", got, want)
+	}
+}
+
+// The server reads the inputs before it makes its start selection, and the
+// tools count as built from that read. An edit that lands during the start
+// selection is therefore loaded by the first request.
+func TestAnEditWhileTheServerStartsIsLoadedByTheFirstRequest(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkEditDuringStartLoads)
+	f := newContextFixture(t)
+	selections := 0
+	srv := NewServer(Options{
+		WorkspaceRoot: f.dir,
+		ServerVersion: "test",
+		ReloadExtensions: func(context.Context) ExtensionSelection {
+			selections++
+			selection := ExtensionSelection{Config: wsproto.Load(f.dir)}
+			if selections == 1 {
+				// The workspace disables the extension after the start
+				// selection read the configuration.
+				f.write(t, "putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib"],"extensions":["/extensions/notes"],"disable":{"extensions":["@putnami/notes"]}}`)
+			}
+			return selection
+		},
+	})
+	if _, ok, _ := srv.lookupTool("notes.read"); !ok || selections != 1 {
+		t.Fatalf("after the start, selections = %d and notes.read registered = %v, want 1 and true", selections, ok)
+	}
+
+	lines := contextSession(t, srv, listProjectsCall(1))
+	if selections != 2 {
+		t.Fatalf("selections = %d, want 2: the first request loads the edit the start selection missed", selections)
+	}
+	if _, ok, _ := srv.lookupTool("notes.read"); ok {
+		t.Error("the tools of the extension the workspace disabled are still registered")
+	}
+	want := []string{notificationToolsListChanged, notificationResourcesListChanged, "response 1"}
 	if got := methodsOf(lines); strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("lines = %v, want %v", got, want)
 	}

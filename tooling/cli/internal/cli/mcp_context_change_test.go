@@ -38,22 +38,9 @@ func TestMCPReloadsAnExtensionTheWorkspaceAddsBetweenRequests(t *testing.T) {
 	write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app"]}`)
 	write("packages/app/putnami.json", `{"name":"app","type":"application"}`)
 	workspace.InvalidateLoadCache(root)
-	srv := newMCPServer(root, wsproto.Load(root), "test")
+	srv := newMCPServer(root, "test")
 
-	program := fixtureproc.Write(t, filepath.Join(root, "extensions", "notes", "bin", "notes"), fixtureproc.Program{Stdout: `{"content":[{"type":"text","text":"notes"}]}`})
-	write("extensions/notes/putnami.extension.json", `{
-  "name":"@putnami/notes",
-  "cliContract": 4,
-  "commands":{"notes-support":{"run":[{"id":"noop","task":"noop"}]}},
-  "tasks":{"noop":{"kind":"command","command":"true"}},
-  "tools":{"notes.read":{
-    "description":"Read the notes.",
-    "inputSchema":{"type":"object","properties":{},"additionalProperties":false},
-    "annotations":{"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false},
-    "_meta":{"putnami.dev/contract":{"access":"read","readOnly":true,"supportsDryRun":false}},
-    "command":"{extensionRoot}/bin/`+filepath.Base(program)+`"
-  }}
-}`)
+	writeNotesExtension(t, root)
 	write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app"],"extensions":["/extensions/notes"]}`)
 	workspace.InvalidateLoadCache(root)
 
@@ -110,6 +97,85 @@ func TestMCPReloadsAnExtensionTheWorkspaceAddsBetweenRequests(t *testing.T) {
 	}
 }
 
+// An edit that lands while the command starts, after it loaded the workspace
+// configuration and before the server read the inputs it tracks, is served
+// from the first request: the server selects its extensions after that read.
+// The edit is not a change of the session, so nothing reloads or announces
+// it.
+func TestMCPServesAnExtensionTheWorkspaceAddsWhileTheCommandStarts(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-context-change-notice", "an-edit-while-the-server-starts-is-loaded")
+	root := t.TempDir()
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app"]}`)
+	write("packages/app/putnami.json", `{"name":"app","type":"application"}`)
+	workspace.InvalidateLoadCache(root)
+	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
+	cfg := wsproto.Load(root)
+	// The session-start reconcile runs after the command loaded cfg and before
+	// the server starts, so the edit it makes lands in that window.
+	reconcile := func(context.Context, string, *wsproto.Config) error {
+		writeNotesExtension(t, root)
+		write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app"],"extensions":["/extensions/notes"]}`)
+		return nil
+	}
+
+	requests := strings.Join([]string{
+		`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"notes.read","arguments":{}}}`,
+	}, "\n") + "\n"
+	var out, stderr bytes.Buffer
+	if err := serveMCPSession(context.Background(), root, cfg, "test", reconcile, strings.NewReader(requests), &out, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `"name":"notes.read"`) {
+		t.Fatalf("session = %s, want a tools/list that lists notes.read, with no notification", out.String())
+	}
+	var call struct {
+		Result struct {
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &call); err != nil || len(call.Result.Content) != 1 || call.Result.Content[0].Text != "notes" {
+		t.Errorf("notes.read = %s, want the tool's answer alone", lines[1])
+	}
+}
+
+// writeNotesExtension writes the extension extensions/notes, loaded by path,
+// whose tool notes.read answers "notes".
+func writeNotesExtension(t *testing.T, root string) {
+	t.Helper()
+	program := fixtureproc.Write(t, filepath.Join(root, "extensions", "notes", "bin", "notes"), fixtureproc.Program{Stdout: `{"content":[{"type":"text","text":"notes"}]}`})
+	manifest := `{
+  "name":"@putnami/notes",
+  "cliContract": 4,
+  "commands":{"notes-support":{"run":[{"id":"noop","task":"noop"}]}},
+  "tasks":{"noop":{"kind":"command","command":"true"}},
+  "tools":{"notes.read":{
+    "description":"Read the notes.",
+    "inputSchema":{"type":"object","properties":{},"additionalProperties":false},
+    "annotations":{"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false},
+    "_meta":{"putnami.dev/contract":{"access":"read","readOnly":true,"supportsDryRun":false}},
+    "command":"{extensionRoot}/bin/` + filepath.Base(program) + `"
+  }}
+}`
+	if err := os.WriteFile(filepath.Join(root, "extensions", "notes", "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 const (
 	coldDecisionsOne = `{"protocolVersion":1,"decisions":[{"id":"D-001","statement":"every pull request names what it deletes","settled":"2026-09-03","settledBy":"fdumay","reviewOnly":true}]}`
 	coldDecisionsTwo = `{"protocolVersion":1,"decisions":[{"id":"D-001","statement":"every pull request names what it deletes","settled":"2026-09-03","settledBy":"fdumay","reviewOnly":true},{"id":"D-002","statement":"every GitHub artifact is written in English","settled":"2026-09-11","settledBy":"fdumay","reviewOnly":true}]}`
@@ -119,9 +185,12 @@ const (
 // and the first tool call prepares it. The index appearing changes no
 // decision: no tool result reports the decisions of a provider-described
 // project as added, and a later edit to them is reported.
+//
+// The test proves no check. The loader takes the projects from the includes,
+// and the index only names them, so this session finds no project late. It
+// guards the fresh-worktree path.
 func TestMCPReportsNoDecisionAddedWhenTheIndexAppears(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-context-change-notice", "a-project-a-load-finds-later-joins-without-a-notice")
 	if runtime.GOOS == "windows" {
 		t.Skip("shell provider fixture")
 	}
@@ -159,7 +228,7 @@ exit 2
 `, runtime.GOOS, runtime.GOARCH), "__putnami", "runtime-info")
 	workspace.InvalidateLoadCache(root)
 	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
-	srv := newMCPServerWithContext(context.Background(), root, wsproto.Load(root), "test")
+	srv := newMCPServerWithContext(context.Background(), root, "test")
 	if _, err := os.Stat(workspace.SnapshotPath(root)); !os.IsNotExist(err) {
 		t.Fatalf("the fixture is not a fresh worktree: an index exists: %v", err)
 	}
