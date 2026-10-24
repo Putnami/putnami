@@ -61,6 +61,14 @@
       "text": "The installer registers a missing user-scoped stable Putnami launcher through the supported Claude Code and Codex CLIs, recognizes its own definition by meaning rather than host formatting, migrates a registration it wrote earlier, preserves a customized human definition, and can be declined outright. The launcher resolves the active host workspace before lock-pinned relaunch and consumes its configured variable, storing no repository cwd; host policy, precedence, and trust remain authoritative."
     },
     {
+      "id": "mcp-workspace-resources",
+      "text": "The MCP server lists and serves the workspace guidance, the workspace map, and each project's agent context as resources. Each resource has a concrete URI. The server renders each one on every read with the builder its tool or command uses: putnami://workspace/guidance returns the Putnami block body that context generate writes, putnami://workspace/map and putnami://workspace/map/<section> return the workspace_map answer, and putnami://projects/<id>/context returns the agent_context answer, with the canonical project id escaped as one path segment. Listing resources prepares no workspace graph. A resource whose builder is not available is left out of the list, and a read of an unknown URI fails with invalid params."
+    },
+    {
+      "id": "mcp-protocol-version",
+      "text": "The MCP server and the putnamiw relay speak protocol versions 2024-11-05, 2025-03-26, 2025-06-18 and 2025-11-25. An initialize request for one of them gets that version back. A request for any other version, or for none, gets 2025-11-25. Neither echoes a version it does not speak. Both answer server/discover with method not found."
+    },
+    {
       "id": "agent-context-languages",
       "text": "A project's languages in an agent-context document come from the workspace providers, not from file names. Each language that a loaded extension's manifest declares counts for every project the workspace index records that extension's probe as claiming. The languages are sorted and listed once. A project no declaring provider claims reports none."
     }

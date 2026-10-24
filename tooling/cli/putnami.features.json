@@ -516,6 +516,33 @@
           }
         },
         {
+          "id": "mcp-workspace-resources",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-server-lists-and-reads-the-guidance-map-and-project-resources"
+            ]
+          }
+        },
+        {
+          "id": "mcp-protocol-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "initialize-answers-with-a-version-the-server-speaks",
+              "the-relay-answers-initialize-with-a-version-it-speaks"
+            ]
+          }
+        },
+        {
           "id": "agent-context-languages",
           "stage": "coded",
           "evidenceKinds": [

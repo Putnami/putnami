@@ -294,6 +294,50 @@ func TestPutnamiwMCP_ColdStartAnswersWhileTheCLIBuilds(t *testing.T) {
 		"a-cold-mcp-start-answers-initialize-and-hands-the-session-to-the-built-server")
 }
 
+// The wrapper answers initialize with a version it speaks: a supported version
+// echoes, and any other version, or none, gets 2025-11-25. It answers
+// server/discover, which Claude Code sends first, with method not found.
+func TestPutnamiwMCP_InitializeAnswersWithAVersionTheRelaySpeaks(t *testing.T) {
+	cases := []struct{ name, params, want string }{
+		{"2024-11-05", `{"protocolVersion":"2024-11-05"}`, "2024-11-05"},
+		{"2025-03-26", `{"protocolVersion":"2025-03-26"}`, "2025-03-26"},
+		{"2025-06-18", `{"protocolVersion":"2025-06-18"}`, "2025-06-18"},
+		{"2025-11-25", `{"protocolVersion":"2025-11-25"}`, "2025-11-25"},
+		{"a newer revision", `{"protocolVersion":"2026-07-28"}`, "2025-11-25"},
+		{"an unknown version", `{"protocolVersion":"latest"}`, "2025-11-25"},
+		{"no version", `{}`, "2025-11-25"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, _, baseEnv := gitSourceRepo(t)
+			env, gate, _, tmp := mcpEnv(t, baseEnv)
+			if err := os.WriteFile(envValue(env, "GO_BUILD_FAIL"), nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			s := startMCP(t, repo, env)
+			s.send(`{"jsonrpc":"2.0","id":1,"method":"server/discover"}`)
+			if reply := s.next(); reply.ID != float64(1) || reply.Error.Code != -32601 {
+				t.Fatalf("server/discover = %+v, want method not found for id 1", reply)
+			}
+			s.send(`{"jsonrpc":"2.0","id":2,"method":"initialize","params":` + tc.params + `}`)
+			reply := s.next()
+			if reply.ID != float64(2) || reply.Result.ServerInfo.Version != "preparing" {
+				t.Fatalf("initialize reply = %+v, want the preparing server's answer for id 2", reply)
+			}
+			if got := reply.Result.ProtocolVersion; got != tc.want {
+				t.Errorf("protocolVersion = %q, want %q", got, tc.want)
+			}
+			if err := os.WriteFile(gate, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			s.wait(false)
+			assertEmptyDir(t, tmp)
+			spectest.Proves(t, "cli/context-mcp-discovery", "mcp-protocol-version",
+				"the-relay-answers-initialize-with-a-version-it-speaks")
+		})
+	}
+}
+
 // A build that fails on the cold path ends the session: stdout closes with the
 // client's stdin still open, and the build error reaches stderr.
 func TestPutnamiwMCP_FailedBuildEndsTheSession(t *testing.T) {

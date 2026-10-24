@@ -141,6 +141,11 @@ func newMCPServerWithContext(ctx context.Context, wsRoot string, cfg *wsproto.Co
 		WorkspaceMap: func(_ context.Context, section, sel string) (any, error) {
 			return agentctx.BuildWorkspaceMapResult(wsRoot, section, sel)
 		},
+		// The guidance resource renders the block body on each read, from the
+		// same function `context generate` writes it with.
+		WorkspaceGuidance: func(context.Context) string {
+			return agentctx.WorkspaceGuidanceBody(wsRoot)
+		},
 		// The selection an EXTENSION-contributed tool receives on its request.
 		// It is the same resolver, through the same seam, for the
 		// same reason: an extension has no workspace loader and must never grow

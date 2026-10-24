@@ -139,6 +139,15 @@ func guidanceBody(gate, decisions string) string {
 	return applyDecisions(applyGate(guidanceBlockTemplate, gate), decisions)
 }
 
+// WorkspaceGuidanceBody returns the body of the Putnami guidance block as
+// `putnami context generate` renders it now for the workspace: the rules, the
+// gate line read from putnami.ci.json, and the settled decisions. It reads the
+// same two documents as writeAgentEntrypoints and fills the same template, so
+// the MCP guidance resource and the committed block cannot drift.
+func WorkspaceGuidanceBody(wsRoot string) string {
+	return guidanceBody(gateTasksForWorkspace(wsRoot), decisionsGuidanceForWorkspace(wsRoot))
+}
+
 // wrapGuidanceBlock delimits body and stamps the begin marker with the digest
 // of body, the exact bytes between the two marker lines.
 func wrapGuidanceBlock(body string) string {

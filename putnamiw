@@ -1390,9 +1390,14 @@ mcp_relay_while_preparing() {
     mcp_frame_fields "$line"
     case "$MCP_METHOD" in
       initialize)
-        version="2025-06-18"
+        # The versions the CLI's MCP server speaks (internal/mcp/protocol.go).
+        # A requested version outside the list, or none, gets the newest one;
+        # the relay never echoes a version it does not speak.
+        version="2025-11-25"
         if [[ $line =~ $version_re ]]; then
-          version="${BASH_REMATCH[1]}"
+          case "${BASH_REMATCH[1]}" in
+            2024-11-05 | 2025-03-26 | 2025-06-18 | 2025-11-25) version="${BASH_REMATCH[1]}" ;;
+          esac
         fi
         if [ -n "$MCP_ID" ]; then
           mcp_reply "$MCP_ID" "{\"protocolVersion\":\"$version\",\"capabilities\":{\"tools\":{\"listChanged\":true},\"resources\":{\"subscribe\":false,\"listChanged\":true}},\"serverInfo\":{\"name\":\"putnami\",\"version\":\"preparing\"},\"instructions\":\"$instructions\"}"
