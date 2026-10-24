@@ -3,10 +3,12 @@ package composecmd
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/compose"
@@ -75,13 +77,14 @@ func TestWriteStatus_StructuredAndHuman(t *testing.T) {
 		Isolation: compose.IsolationDatabase,
 	}
 	var structured bytes.Buffer
-	if err := writeStatus(&structured, "jsonl", status); err != nil {
+	if err := writeStatus(&structured, "jsonl", status, nil); err != nil {
 		t.Fatalf("writeStatus jsonl: %v", err)
 	}
 	var envelope struct {
-		Command string         `json:"command"`
-		Status  string         `json:"status"`
-		Data    compose.Status `json:"data"`
+		Command           string                         `json:"command"`
+		Status            string                         `json:"status"`
+		Data              compose.Status                 `json:"data"`
+		WorkspaceWarnings []protocolcli.WorkspaceWarning `json:"workspaceWarnings"`
 	}
 	if err := json.Unmarshal(structured.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode envelope: %v\n%s", err, structured.String())
@@ -92,9 +95,35 @@ func TestWriteStatus_StructuredAndHuman(t *testing.T) {
 	if strings.Count(structured.String(), "\n") != 1 {
 		t.Errorf("a jsonl document spans more than one line: %q", structured.String())
 	}
+	if envelope.WorkspaceWarnings != nil || strings.Contains(structured.String(), "workspaceWarnings") {
+		t.Errorf("an envelope without warnings carries the member: %q", structured.String())
+	}
+
+	// A status written with warnings carries them in the envelope, and the
+	// human output does not change.
+	warnings := []protocolcli.WorkspaceWarning{{Code: "workspace.jobs_ignored", Message: "project /apps/web declares jobs"}}
+	var warned bytes.Buffer
+	if err := writeStatus(&warned, "json", status, warnings); err != nil {
+		t.Fatalf("writeStatus json with warnings: %v", err)
+	}
+	var warnedEnvelope struct {
+		WorkspaceWarnings []protocolcli.WorkspaceWarning `json:"workspaceWarnings"`
+	}
+	if err := json.Unmarshal(warned.Bytes(), &warnedEnvelope); err != nil {
+		t.Fatalf("decode envelope: %v\n%s", err, warned.String())
+	}
+	if !reflect.DeepEqual(warnedEnvelope.WorkspaceWarnings, warnings) {
+		t.Errorf("workspaceWarnings = %+v, want %+v", warnedEnvelope.WorkspaceWarnings, warnings)
+	}
+	var plain, withWarnings bytes.Buffer
+	_ = writeStatus(&plain, "", status, nil)
+	_ = writeStatus(&withWarnings, "", status, warnings)
+	if plain.String() != withWarnings.String() {
+		t.Errorf("warnings changed the human output: %q vs %q", withWarnings.String(), plain.String())
+	}
 
 	var human bytes.Buffer
-	if err := writeStatus(&human, "", status); err != nil {
+	if err := writeStatus(&human, "", status, nil); err != nil {
 		t.Fatalf("writeStatus text: %v", err)
 	}
 	if !strings.Contains(human.String(), "/apps/web  http://127.0.0.1:3000  ready in 412ms  (clients, database)") {
@@ -102,7 +131,7 @@ func TestWriteStatus_StructuredAndHuman(t *testing.T) {
 	}
 	status.Cleanup = &compose.CleanupReport{State: compose.CleanupPartial, Leftovers: []string{"database compose_x"}}
 	human.Reset()
-	if err := writeStatus(&human, "", status); err != nil {
+	if err := writeStatus(&human, "", status, nil); err != nil {
 		t.Fatalf("writeStatus text exit: %v", err)
 	}
 	if !strings.Contains(human.String(), "cleanup partial") || !strings.Contains(human.String(), "left behind: database compose_x") {

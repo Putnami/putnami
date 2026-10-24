@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"io"
 	"os"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -39,12 +40,17 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 	}
 	ApplyEnvOverrides(&req.Global, req.Config)
 
-	// Surface workspace warnings (e.g., name divergence, malformed
-	// package.json/go.mod). These are always shown — silently swallowed
-	// parse errors lead to "my project isn't listed" with zero diagnostic.
-	// Quiet mode still hides them so scripts can stay clean.
-	if !req.Global.Quiet {
-		workspace.NewWarningReport(os.Stderr).Report(ws)
+	// Workspace warnings (e.g., name divergence, malformed package.json/go.mod)
+	// go to stderr unless the run is quiet, and to every result envelope the
+	// run writes, quiet or not.
+	var warningOut io.Writer = os.Stderr
+	if req.Global.Quiet {
+		warningOut = nil
+	}
+	req.workspaceWarnings = workspace.NewWarningReport(warningOut)
+	req.workspaceWarnings.Report(ws)
+	if req.latestWarnings != nil {
+		req.latestWarnings.Store(req.workspaceWarnings)
 	}
 
 	projectPaths := make([]string, len(ws.Projects))

@@ -511,7 +511,7 @@ func printPlan(w io.Writer, planned []*scheduler.ScheduledJob, selected []*works
 // renderer or session because no task executed and no session artifact exists.
 func renderPlan(req *Request, planned []*scheduler.ScheduledJob, selected []*workspace.Project) int {
 	written, err := output.WritePreviewPlan(
-		req.stdout(), req.Global.Output, strings.Join(req.Commands, ","), planned,
+		req.stdout(), req.Global.Output, strings.Join(req.Commands, ","), planned, req.workspaceWarnings.Envelope(),
 	)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: render plan: %v\n", err)

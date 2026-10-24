@@ -16,7 +16,7 @@ func TestWritePreviewPlan_EmptyPlanRemainsTyped(t *testing.T) {
 	for _, format := range []string{"json", "jsonl"} {
 		t.Run(format, func(t *testing.T) {
 			var stdout bytes.Buffer
-			written, err := WritePreviewPlan(&stdout, format, "build", nil)
+			written, err := WritePreviewPlan(&stdout, format, "build", nil, nil)
 			if err != nil {
 				t.Fatalf("WritePreviewPlan: %v", err)
 			}

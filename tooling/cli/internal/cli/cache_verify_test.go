@@ -11,6 +11,7 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	ciproto "go.putnami.dev/protocol/ci"
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -30,7 +31,7 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 			requests = append(requests, request)
 			return engine.SessionResult{ExitCode: engine.ExitSuccess, Projects: []*workspace.Project{project},
 				Plan: []*jobs.ScheduledJob{job}, Results: map[string]*jobs.JobResult{}}, nil
-		})
+		}, nil)
 
 	// The runner keeps its own copy of the commands it was built with.
 	commands[0] = "format"
@@ -52,6 +53,28 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 	if requests[0].Global.Plan || requests[0].CacheVerification == nil ||
 		requests[0].CacheVerification.StoreRoot != "/isolated-store" {
 		t.Fatalf("execution request = %#v, want isolated cache verification", requests[0])
+	}
+}
+
+// TestCacheVerifyRunnerKeepsTheWarningsOfTheFirstRunOnly holds the runner to
+// one copy of the workspace warnings: the three runs load the same HEAD, so
+// each warning appears once in the cache verify envelope.
+func TestCacheVerifyRunnerKeepsTheWarningsOfTheFirstRunOnly(t *testing.T) {
+	t.Parallel()
+	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
+	report := workspace.NewWarningReport(nil)
+	runner := newCacheVerifyRunner(nil, GlobalFlags{}, []string{"lint"},
+		func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
+			return engine.SessionResult{ExitCode: engine.ExitSuccess, WorkspaceWarnings: []workspace.Warning{warning}}, nil
+		}, report)
+	for _, label := range []string{"first live run", "second live run", "cache-hit run"} {
+		if _, err := runner(context.Background(), "/staged", "/isolated-store"); err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+	}
+	want := []protocolcli.WorkspaceWarning{{Code: string(warning.Code), Message: warning.Message}}
+	if got := report.Envelope(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the report holds %+v, want the first run's warning once: %+v", got, want)
 	}
 }
 

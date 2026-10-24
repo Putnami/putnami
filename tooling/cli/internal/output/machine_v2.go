@@ -31,6 +31,11 @@ type machineV2Renderer struct {
 	// stream selects --output=jsonl (one record per line) over --output=json
 	// (one aggregated object at Finish).
 	stream bool
+	// workspaceWarnings returns the run's workspace load warnings when the
+	// aggregated envelope is written: a watch session builds this renderer
+	// once, so the envelope of each iteration reads the warnings of that
+	// iteration's own load. Nil means none.
+	workspaceWarnings func() []protocolcli.WorkspaceWarning
 
 	start     time.Time
 	planned   []*jobs.ScheduledJob
@@ -75,7 +80,12 @@ func newMachineV2RendererMode(out io.Writer, command string, stream bool, mode s
 // JSON output mode. It returns false for human/cloud modes so the caller can
 // retain its existing presentation. Neither document contains a run or a
 // machineOutput artifact: planning succeeded, but no session executed.
-func WritePreviewPlan(w io.Writer, mode, command string, planned []*jobs.ScheduledJob) (bool, error) {
+//
+// The JSON document carries warnings, the run's workspace load warnings, in
+// workspaceWarnings. The JSONL plan:end record has no such member.
+func WritePreviewPlan(w io.Writer, mode, command string, planned []*jobs.ScheduledJob,
+	warnings []protocolcli.WorkspaceWarning,
+) (bool, error) {
 	plan := machine.PlanSummary(planned)
 	var (
 		document []byte
@@ -84,11 +94,12 @@ func WritePreviewPlan(w io.Writer, mode, command string, planned []*jobs.Schedul
 	switch protocolcli.OutputMode(mode) {
 	case protocolcli.OutputJSON:
 		document, err = sanitizedMachineDocument(protocolcli.ResultV2{
-			ProtocolVersion: protocolcli.ResultProtocolVersion,
-			Command:         command,
-			Status:          protocolcli.StatusSuccess,
-			ExitCode:        protocolcli.ExitSuccess,
-			Plan:            &plan,
+			ProtocolVersion:   protocolcli.ResultProtocolVersion,
+			Command:           command,
+			Status:            protocolcli.StatusSuccess,
+			ExitCode:          protocolcli.ExitSuccess,
+			Plan:              &plan,
+			WorkspaceWarnings: warnings,
 		})
 	case protocolcli.OutputJSONL:
 		document, err = sanitizedMachineRecord(protocolcli.SessionStreamRecord{
@@ -258,47 +269,42 @@ func (r *machineV2Renderer) Finish(results map[string]*jobs.JobResult, outcome j
 	}
 	durationMs := duration.Milliseconds()
 	r.mu.Lock()
-	bounded := r.bounded && r.artifactErr == nil
-	if !bounded {
+	if r.bounded && r.artifactErr == nil {
+		final := protocolcli.BoundedSessionEndRecord{
+			ProtocolVersion: protocolcli.ResultProtocolVersion,
+			Record:          protocolcli.RecordSessionEnd,
+			Time:            time.Now().UTC().Format(time.RFC3339Nano),
+			Run:             run.StreamSummary(durationMs),
+			MachineOutput:   r.state.summary(r.sessionID),
+		}
+		line, err := sanitizedMachineRecord(final)
+		if err == nil {
+			r.appendArtifactLocked(line)
+			if r.artifactErr != nil {
+				r.bounded = false
+				if r.stream {
+					r.writeLegacyFinalLocked(run, durationMs)
+				}
+			} else if r.stream {
+				r.writeLocked(line)
+			}
+		}
+	} else {
 		r.bounded = false
 		if r.stream {
 			r.writeLegacyFinalLocked(run, durationMs)
-		}
-		r.mu.Unlock()
-		if r.stream {
-			return
-		}
-		document, err := sanitizedMachineDocument(run.Envelope(r.command, durationMs))
-		if err == nil {
-			r.write(document)
-		}
-		return
-	}
-	final := protocolcli.BoundedSessionEndRecord{
-		ProtocolVersion: protocolcli.ResultProtocolVersion,
-		Record:          protocolcli.RecordSessionEnd,
-		Time:            time.Now().UTC().Format(time.RFC3339Nano),
-		Run:             run.StreamSummary(durationMs),
-		MachineOutput:   r.state.summary(r.sessionID),
-	}
-	line, err := sanitizedMachineRecord(final)
-	if err == nil {
-		r.appendArtifactLocked(line)
-		if r.artifactErr != nil {
-			r.bounded = false
-			if r.stream {
-				r.writeLegacyFinalLocked(run, durationMs)
-			}
-		} else if r.stream {
-			r.writeLocked(line)
 		}
 	}
 	r.mu.Unlock()
 	if r.stream {
 		return
 	}
-	document, err := sanitizedMachineDocument(run.Envelope(r.command, durationMs))
-	if err == nil {
+	// The aggregated envelope carries the run's workspace load warnings.
+	envelope := run.Envelope(r.command, durationMs)
+	if r.workspaceWarnings != nil {
+		envelope.WorkspaceWarnings = r.workspaceWarnings()
+	}
+	if document, err := sanitizedMachineDocument(envelope); err == nil {
 		r.write(document)
 	}
 }

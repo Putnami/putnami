@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"reflect"
+	"sync/atomic"
 	"testing"
 
 	"go.putnami.dev/cli/model/jobs"
@@ -186,6 +187,7 @@ func TestWatchIterationRequest_ForwardsTheRunsIdentity(t *testing.T) {
 	outer := outerWatchRequest()
 	outer.ExecutesUnderDryRun = true
 	outer.VersionSnapshot = &git.VersionInfo{Full: "1.2.3"}
+	outer.latestWarnings = &atomic.Pointer[workspace.WarningReport]{}
 	planExtensions := []*extension.ExtensionDescription{{Name: "@putnami/one"}}
 
 	iteration := watchIterationRequest(outer, planExtensions, watchTestProjects(), false)
@@ -207,6 +209,10 @@ func TestWatchIterationRequest_ForwardsTheRunsIdentity(t *testing.T) {
 	// "-<dirtyhash>" stamp, and the stamp is part of every cache key.
 	if iteration.VersionSnapshot != outer.VersionSnapshot {
 		t.Error("iteration recaptures the version stamp instead of forwarding the run's")
+	}
+	// The session's renderer reads the load of the latest iteration through it.
+	if iteration.latestWarnings != outer.latestWarnings {
+		t.Error("iteration does not share the session's latest-load cell; its envelope would keep the first load's warnings")
 	}
 	if !iteration.ExecutesUnderDryRun {
 		t.Error("iteration dropped ExecutesUnderDryRun; an alias's --dry-run iterations would preview forever")

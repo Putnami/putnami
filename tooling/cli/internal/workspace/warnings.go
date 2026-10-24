@@ -3,6 +3,7 @@ package workspace
 import (
 	"io"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -36,10 +37,36 @@ func (r *WarningReport) Report(ws *Workspace) {
 	}
 }
 
+// Keep keeps warnings, in order, and writes nothing: their producer already
+// wrote them, or was quiet. A caller whose engine run loaded the workspace
+// hands the run's warnings to the report of its command this way. A nil report
+// does nothing.
+func (r *WarningReport) Keep(warnings []Warning) {
+	if r == nil {
+		return
+	}
+	r.reported = append(r.reported, warnings...)
+}
+
 // Warnings returns every reported warning, in order. A nil report has none.
 func (r *WarningReport) Warnings() []Warning {
 	if r == nil {
 		return nil
 	}
 	return r.reported
+}
+
+// Envelope returns every reported warning in its result envelope shape, in
+// order, or nil when the report holds none: the envelope's workspaceWarnings
+// member is absent then, never an empty array.
+func (r *WarningReport) Envelope() []protocolcli.WorkspaceWarning {
+	reported := r.Warnings()
+	if len(reported) == 0 {
+		return nil
+	}
+	warnings := make([]protocolcli.WorkspaceWarning, len(reported))
+	for i, warning := range reported {
+		warnings[i] = protocolcli.WorkspaceWarning{Code: string(warning.Code), Message: warning.Message}
+	}
+	return warnings
 }

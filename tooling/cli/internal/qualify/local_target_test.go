@@ -660,6 +660,26 @@ func TestQualifyLocal_CancelMidSmokeIsCanceledAndCleaned(t *testing.T) {
 	fixture.assertStopped(t, "app")
 }
 
+// TestNewLocalTarget_ForwardsQuietAndTheWarningReportToTheComposition holds the
+// target to composing with the caller's --quiet and the report that receives
+// the workspace warnings of the composition's preparation.
+func TestNewLocalTarget_ForwardsQuietAndTheWarningReportToTheComposition(t *testing.T) {
+	t.Setenv("APP_ENV", "")
+	fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureServe})
+	report := workspace.NewWarningReport(nil)
+	target, err := NewLocalTarget(LocalOptions{
+		WorkspaceRoot: fixture.root, Project: fixture.project(t, "app"), Quiet: true, Warnings: report,
+	})
+	if err != nil {
+		t.Fatalf("NewLocalTarget: %v", err)
+	}
+	options := target.(*localTarget).options
+	if !options.Quiet || options.Warnings != report {
+		t.Fatalf("composition options = quiet %v, warnings %p; want quiet and the caller's report %p",
+			options.Quiet, options.Warnings, report)
+	}
+}
+
 func TestNewLocalTarget_RefusesAWorktreeItCannotFingerprint(t *testing.T) {
 	root := t.TempDir()
 	// Never let discovery climb into a repository that happens to hold the

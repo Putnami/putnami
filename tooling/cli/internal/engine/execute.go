@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
@@ -71,6 +72,12 @@ func executionRenderer(
 		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
 		// The live view orders its command columns by the merged vocabulary.
 		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
+		WorkspaceWarnings: func() []protocolcli.WorkspaceWarning {
+			if req.latestWarnings != nil {
+				return req.latestWarnings.Load().Envelope()
+			}
+			return req.workspaceWarnings.Envelope()
+		},
 	})
 }
 
@@ -262,6 +269,10 @@ func (e *Engine) executeSession(
 	// Engine.Run (watch.go), so nothing below this point is watch's lifecycle —
 	// the iteration builds its own cache manager, scheduler config and session.
 	if req.Global.Watch {
+		// The renderer below lives as long as the session: its envelope reads
+		// the load of the latest iteration (Request.latestWarnings).
+		req.latestWarnings = &atomic.Pointer[workspace.WarningReport]{}
+		req.latestWarnings.Store(req.workspaceWarnings)
 		return e.runWatch(ctx, req, ws, selectedProjects, planExtensions,
 			executionRenderer(req, sessStore, extensions, sink, isServeMode, isRunMode), isServeMode)
 	}

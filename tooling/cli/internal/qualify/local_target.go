@@ -33,6 +33,12 @@ type LocalOptions struct {
 	// Preparation renders the engine run that prepares the serve pipelines;
 	// nil reports only failures, on stderr.
 	Preparation jobs.Renderer
+	// Quiet keeps the preparation's engine run from writing the workspace load
+	// warnings on stderr.
+	Quiet bool
+	// Warnings receives the workspace load warnings of that engine run; nil
+	// keeps none.
+	Warnings *workspace.WarningReport
 }
 
 // localTarget is a workload composed on this machine. It runs production-mode
@@ -83,6 +89,8 @@ func NewLocalTarget(opts LocalOptions) (Target, error) {
 			ReadyTimeout:  opts.ReadyTimeout,
 			Output:        opts.Output,
 			Preparation:   opts.Preparation,
+			Quiet:         opts.Quiet,
+			Warnings:      opts.Warnings,
 		},
 		project: opts.Project.ID,
 		root:    opts.WorkspaceRoot,

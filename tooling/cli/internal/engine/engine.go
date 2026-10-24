@@ -45,8 +45,8 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"sync/atomic"
 
-	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -63,6 +63,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
 	"go.putnami.dev/tooling/cli/internal/specgate"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // Exit codes. The taxonomy is owned by go.putnami.dev/protocol/cli; these
@@ -431,6 +432,23 @@ type Request struct {
 	// UNEXPORTED for the same reason preparation is: Engine.Run reads it
 	// itself, and nothing an adapter can set replaces it.
 	ancestry *AncestrySnapshot
+	// workspaceWarnings is the report of the warnings the run's workspace load
+	// found: every result envelope the run writes carries them in
+	// workspaceWarnings, under --quiet too, and the run returns them on
+	// SessionResult.WorkspaceWarnings. Nil until the run loads the workspace.
+	//
+	// UNEXPORTED for the same reason preparation is: the engine sets it when
+	// it loads the workspace, and nothing an adapter can set replaces it.
+	workspaceWarnings *workspace.WarningReport
+	// latestWarnings holds the report of the latest workspace load of a watch
+	// session. The session builds its renderer once, from the outer run: its
+	// --output=json envelope reads the report of the iteration that ends, so a
+	// warning the user fixed during the session leaves the next envelope. Nil
+	// outside a watch session.
+	//
+	// UNEXPORTED for the same reason preparation is: the watch session sets it,
+	// and nothing an adapter can set replaces it.
+	latestWarnings *atomic.Pointer[workspace.WarningReport]
 	// Stdout receives the notices the ENGINE itself prints on the human stdout
 	// stream: "No impacted projects found", "No projects matched", "No jobs
 	// matched", the --plan table, the auto-selection line, and a blocked
@@ -551,6 +569,12 @@ type SessionResult struct {
 	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
 	// did not start, one per selected project that has one, in plan order.
 	Withheld []*scheduler.ScheduledJob
+	// WorkspaceWarnings are the warnings the run's workspace load reported, in
+	// order. Nil when the load reported none, or when the run ended before it
+	// loaded the workspace. The engine already wrote them to stderr unless the
+	// run was quiet: a command that writes its own result envelope carries them
+	// in workspaceWarnings.
+	WorkspaceWarnings []workspace.Warning
 	// ancestry is the snapshot the run read before its first hook, or nil
 	// (Request.ancestry).
 	ancestry *AncestrySnapshot
@@ -656,6 +680,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	}
 
 	result, runErr := e.run(ctx, req, sink)
+	// Every return path of the run, after the workspace load or before it,
+	// carries what the load reported.
+	result.WorkspaceWarnings = req.workspaceWarnings.Warnings()
 	// A workspace-install run starts without a pinned toolchain it may install
 	// itself, so runtime synchronization logs that at debug level only. Once
 	// the run ended, however it ended, say whether the toolchain is there: a

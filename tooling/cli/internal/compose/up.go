@@ -59,6 +59,12 @@ type Options struct {
 	// Preparation renders the engine run that prepares the serve pipelines.
 	// Nil reports only failures, on stderr.
 	Preparation jobs.Renderer
+	// Quiet keeps the preparation's engine run from writing the workspace load
+	// warnings on stderr: the caller's --quiet.
+	Quiet bool
+	// Warnings receives the workspace load warnings of the preparation's engine
+	// run, whether it succeeded or not. Nil keeps none.
+	Warnings *workspace.WarningReport
 }
 
 // CleanupReport is what a composition's teardown left behind.
@@ -535,6 +541,14 @@ func planDraft(opts Options, deps upDeps, ws *workspace.Workspace, target *works
 // through the engine without their serve steps, and returns the steps it
 // withheld (engine.Request WithholdServeSteps).
 func enginePrepare(ctx context.Context, opts Options, projectIDs, serveCommands []string) (*preparation, error) {
+	return prepareThrough(ctx, engine.New().Run, opts, projectIDs, serveCommands)
+}
+
+// engineRun is the engine run enginePrepare acts through, replaceable in tests.
+type engineRun func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error)
+
+// prepareThrough is enginePrepare over run.
+func prepareThrough(ctx context.Context, run engineRun, opts Options, projectIDs, serveCommands []string) (*preparation, error) {
 	cfg := opts.Config
 	if cfg == nil {
 		cfg = wsproto.Load(opts.WorkspaceRoot)
@@ -543,17 +557,19 @@ func enginePrepare(ctx context.Context, opts Options, projectIDs, serveCommands 
 	if sink == nil {
 		sink = output.NewTextRenderer(io.Discard, os.Stderr, output.TextRendererConfig{Quiet: true})
 	}
-	result, err := engine.New().Run(ctx, engine.Request{
+	result, err := run(ctx, engine.Request{
 		WorkspaceRoot:      opts.WorkspaceRoot,
 		Config:             cfg,
 		Commands:           serveCommands,
-		Global:             engine.GlobalFlags{Projects: strings.Join(projectIDs, ",")},
+		Global:             engine.GlobalFlags{Projects: strings.Join(projectIDs, ","), Quiet: opts.Quiet},
 		WithholdServeSteps: true,
 		Preflight:          doctor.DoctorPreflight,
 		Stdout:             io.Discard,
 		// The returned error becomes the composition's failure, which the caller reports.
 		ErrorOut: io.Discard,
 	}, sink)
+	// A failed preparation reports the warnings of its load too.
+	opts.Warnings.Keep(result.WorkspaceWarnings)
 	if err != nil {
 		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, err.Error())
 	}

@@ -122,7 +122,7 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 				t.Fatalf("ErrorOut = %v, want io.Discard: the dispatcher reports the returned error", request.ErrorOut)
 			}
 			return engine.SessionResult{ExitCode: engine.ExitError}, nil
-		})
+		}, nil)
 	commands[0] = "lint"
 
 	result, err := planner(context.Background(), impactPlanTestBase, false)
@@ -140,7 +140,7 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 	failing := newImpactPlanPlanner(root, &wsproto.Config{}, []string{"lint"},
 		func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
 			return engine.SessionResult{}, engineErr
-		})
+		}, nil)
 	if _, err := failing(context.Background(), impactPlanTestBase, true); err == nil || err.Error() != "plan lint: engine refused the plan" || !errors.Is(err, engineErr) {
 		t.Fatalf("error = %v, want the engine error naming lint", err)
 	}
@@ -153,12 +153,35 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 				t.Fatalf("sink = %T, no-cache = %v; want no sink and --no-cache passed through", sink, request.Global.NoCache)
 			}
 			return engine.SessionResult{ExitCode: engine.ExitSuccess, Projects: []*workspace.Project{project}, Plan: planned}, nil
-		})
+		}, nil)
 	result, err = complete(context.Background(), impactPlanTestBase, true)
 	if err != nil || !result.Complete || !reflect.DeepEqual(result.Commands, []string{"test"}) {
 		t.Fatalf("result = %+v, %v; want a complete plan of test", result, err)
 	}
 	if !reflect.DeepEqual(result.Projects, []*workspace.Project{project}) || !reflect.DeepEqual(result.Jobs, planned) {
 		t.Fatalf("result projects = %v, jobs = %v; want the engine's plan", result.Projects, result.Jobs)
+	}
+}
+
+// TestImpactPlanPlannerKeepsTheWarningsOfItsEngineRun holds the planner to the
+// workspace warnings of its engine run: the run is quiet and loads the
+// workspace itself, so the planner hands them to the command's report, whether
+// the run succeeded or returned an error.
+func TestImpactPlanPlannerKeepsTheWarningsOfItsEngineRun(t *testing.T) {
+	t.Parallel()
+	root := structuredOutputWorkspace(t)
+	workspace.InvalidateLoadCache(root)
+	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
+	for _, runErr := range []error{nil, errors.New("engine refused the plan")} {
+		report := workspace.NewWarningReport(nil)
+		planner := newImpactPlanPlanner(root, &wsproto.Config{}, []string{"test"},
+			func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
+				return engine.SessionResult{ExitCode: engine.ExitSuccess, WorkspaceWarnings: []workspace.Warning{warning}}, runErr
+			}, report)
+		_, _ = planner(context.Background(), impactPlanTestBase, false)
+		want := []protocolcli.WorkspaceWarning{{Code: string(warning.Code), Message: warning.Message}}
+		if got := report.Envelope(); !reflect.DeepEqual(got, want) {
+			t.Fatalf("run error %v: the report holds %+v, want %+v", runErr, got, want)
+		}
 	}
 }
