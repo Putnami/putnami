@@ -133,8 +133,11 @@ exposes the workspace as typed tools instead of shell exploration:
 | **Intent** | `sdd.list_features` · `sdd.feature_context` · `sdd.list_specs` · `sdd.spec_context` | What was this built for, what were the non-goals, what did the team agree to |
 | **Execute** | `run_jobs` · `get_diagnostics` | Run lint / test / build, then read every failure as `file:line:col` with severity and code |
 
-Plus the `workspace://context` resource, so a client that prefers resources over
-tool calls gets the same facts.
+Plus resources, so a client that prefers resources over tool calls gets the same
+facts: `workspace://context`, `putnami://workspace/guidance` (the rules block of
+`AGENTS.md`), `putnami://workspace/map` and `putnami://workspace/map/<section>`
+(what `workspace_map` returns), and `putnami://projects/<id>/context` (what
+`agent_context` returns for one project).
 
 ### Every graph answer says what it was derived from
 

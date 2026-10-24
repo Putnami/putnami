@@ -170,6 +170,36 @@ func TestDecisionsGuidanceNamesProjectRegistries(t *testing.T) {
 	}
 }
 
+// TestWorkspaceGuidanceBodyFollowsTheCurrentProjectSet pins the long-lived MCP
+// reader: a project added to the workspace after the first render, with the
+// workspace load memo still warm, is named by the next render. Editing the
+// decisions of a project the memo already holds would pass without the memo
+// being dropped, so the test adds a new project to includes.
+func TestWorkspaceGuidanceBodyFollowsTheCurrentProjectSet(t *testing.T) {
+	root := makeLoadableFixture(t)
+	writeDecisions(t, root, seededDecisions)
+	if first := WorkspaceGuidanceBody(root); strings.Contains(first, "Project decisions") {
+		t.Fatalf("no project registry exists yet:\n%s", first)
+	}
+
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("putnami.workspace.json", `{"name":"fixture","includes":["svc/app","svc/lib","svc/extra"]}`)
+	write("svc/extra/putnami.json", `{"name":"example/extra"}`)
+	writeDecisions(t, filepath.Join(root, "svc", "extra"), projectDecisionsRegistry)
+	if second := WorkspaceGuidanceBody(root); !strings.Contains(second, "`svc/extra/decisions.json` (1)") {
+		t.Fatalf("the project added after the first render is not named:\n%s", second)
+	}
+}
+
 // TestAgentContextReturnsTheProjectDecisions is the other half: the agent
 // orienting on a project receives that project's decisions, and only those.
 func TestAgentContextReturnsTheProjectDecisions(t *testing.T) {

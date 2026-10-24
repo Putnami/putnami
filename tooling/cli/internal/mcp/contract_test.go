@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -18,7 +19,14 @@ type contractSnapshot struct {
 func TestContractMatchesToolingBaseline(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-description", "the-access-contract-matches-the-baseline")
-	srv := NewServer(Options{ServerVersion: "test"})
+	// The guidance and map builders are stubs, so the baseline pins the
+	// resources they add (name, description, MIME type). AgentContext stays
+	// nil: its resources depend on the projects of a workspace.
+	srv := NewServer(Options{
+		ServerVersion:     "test",
+		WorkspaceGuidance: func(context.Context) string { return "" },
+		WorkspaceMap:      func(context.Context, string, string) (any, error) { return nil, nil },
+	})
 	snapshot := contractSnapshot{
 		Tools:     srv.toolDefs(),
 		Resources: srv.resourceDefs(),

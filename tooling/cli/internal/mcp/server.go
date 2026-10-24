@@ -181,6 +181,11 @@ type Options struct {
 	// and optional project. When nil, the workspace_map tool reports itself
 	// unavailable.
 	WorkspaceMap func(ctx context.Context, section, projectSelector string) (any, error)
+	// WorkspaceGuidance returns the Putnami guidance block body as `putnami
+	// context generate` renders it now for this workspace, decisions included.
+	// The CLI shell injects it for the same reason as the closures above. When
+	// nil, the putnami://workspace/guidance resource is left out of the list.
+	WorkspaceGuidance func(ctx context.Context) string
 	// ResolveSelection turns an already-id-resolved narrowing into the wire
 	// block a manifest-declared tool that declares `workspaceSelection`
 	// receives. It is injected for the same reason the closures above are:
@@ -480,12 +485,8 @@ func (s *Server) handleInitialize(msg *rpcMessage) *rpcResponse {
 	if s.opts.PropagateAgentIdentity {
 		useragent.SetAgentIdentity(identity)
 	}
-	version := p.ProtocolVersion
-	if version == "" {
-		version = defaultProtocolVersion
-	}
 	return s.ok(msg.ID, initializeResult{
-		ProtocolVersion: version,
+		ProtocolVersion: negotiateProtocolVersion(p.ProtocolVersion),
 		Capabilities: serverCaps{
 			Tools:     &toolsCapability{ListChanged: false},
 			Resources: &resourcesCapability{Subscribe: false, ListChanged: false},

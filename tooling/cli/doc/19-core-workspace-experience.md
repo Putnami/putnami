@@ -64,8 +64,9 @@ public API. Filesystem, process, network, and terminal behavior remains in
 
 ## MCP routing and access
 
-The core MCP server exposes eleven tools and one `workspace://context`
-resource. Tool annotations are contractual: read-only methods do not execute
+The core MCP server exposes eleven tools, the `workspace://context` resource,
+and the guidance, workspace map and project context resources under
+`putnami://`. Tool annotations are contractual: read-only methods do not execute
 jobs, and `run_jobs` is the only mutating method.
 
 | Outcome | MCP methods | Feature and spec | Access and protection |

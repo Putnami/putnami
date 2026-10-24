@@ -42,8 +42,16 @@ concurrency and output boundaries.
 `putnami mcp` starts a single-session JSON-RPC 2.0 server on stdin/stdout
 (the MCP "stdio" transport: one JSON object per newline-delimited line). It
 implements the MCP lifecycle (`initialize`, `notifications/initialized`,
-`ping`), tools (`tools/list`, `tools/call`), and one workspace resource
+`ping`), tools (`tools/list`, `tools/call`), and workspace resources
 (`resources/list`, `resources/read`).
+
+`initialize` answers with the protocol version the client requests when the
+server speaks it: `2024-11-05`, `2025-03-26`, `2025-06-18` or `2025-11-25`. It
+answers any other requested version, and a missing one, with `2025-11-25`, and
+never echoes a version it does not speak. The `./putnamiw mcp` relay that
+answers `initialize` while the CLI builds follows the same rule. Both answer
+`server/discover` with "method not found", which is how Claude Code falls back
+to `initialize`.
 
 One inbound frame is capped at **4 MiB** including its terminating newline
 (`maxFrameBytes` in `internal/mcp/server.go`). The framing carries no length
@@ -79,11 +87,18 @@ Every tool advertises read-only/mutating metadata through MCP annotations and
 a `putnami.dev/contract` `_meta` block. The only mutating tool is `run_jobs`,
 which is marked as mutating `workspace`/`cache` and supports `dryRun`.
 
-The resource surface is intentionally narrow:
+The resource surface is intentionally narrow. The server lists each resource by
+a concrete URI, not a resource template, and renders it on every
+`resources/read`. A resource whose builder is not injected is left out of the
+list. Listing prepares no workspace graph.
 
 | Resource | Purpose | Adapts |
 |----------|---------|--------|
 | `workspace://context` | Live workspace layout, graph, topological order, publish channels, warnings, and pinned lockfile versions | `workspace.Load` + `putnami.lock.json` |
+| `putnami://extension-guidance/AI.md?name=…&version=…` | Exact `AI.md` bytes of one lock-pinned extension, or an explicit unavailable status | lock-pinned extension artifacts |
+| `putnami://workspace/guidance` | The Putnami block body of `AGENTS.md`, decisions included | `agentctx.WorkspaceGuidanceBody` |
+| `putnami://workspace/map`, `putnami://workspace/map/<section>` | The `workspace_map` answer for section `all`, or for `projects`, `dependencies`, `intercalls`, `apis`, `config-keys`, `schemas` or `docs` | the `workspace_map` builder |
+| `putnami://projects/<id>/context` | One project's `agent_context` answer. `<id>` is the canonical project id escaped as one path segment, for example `%2Ftooling%2Fcli` | the `agent_context` builder |
 
 `run_jobs` reuses the exact CLI building blocks (`extension.DiscoverExtensions`
 → project selection → `planner.Plan` → `scheduler.RunPlan`) with

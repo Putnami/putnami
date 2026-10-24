@@ -1217,7 +1217,16 @@ workspace orientation map in memory on every call — independent of whether
 a few KB instead of the full map. It also exposes
 `workspace://context` as a
 read-only resource for live workspace graph/layout/channel/version context plus
-dependency-first topological project order. The server exits with the session.
+dependency-first topological project order. Three more resource families render
+on every read with the builders the tools and `context generate` use:
+`putnami://workspace/guidance` (the Putnami block body of `AGENTS.md`),
+`putnami://workspace/map` and `putnami://workspace/map/<section>` (the
+`workspace_map` answer), and `putnami://projects/<id>/context` (the
+`agent_context` answer, with the project id escaped as one path segment, for
+example `putnami://projects/%2Ftooling%2Fcli/context`). `initialize` answers
+with the requested protocol version when it is `2024-11-05`, `2025-03-26`,
+`2025-06-18` or `2025-11-25`, and with `2025-11-25` otherwise. The server exits
+with the session.
 
 Before it answers the first request, the server brings the workspace's agent
 workflows to the version `putnami.lock.json` pins. A host starts the server when

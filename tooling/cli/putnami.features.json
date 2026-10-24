@@ -516,6 +516,40 @@
           }
         },
         {
+          "id": "mcp-workspace-resources",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-server-lists-each-workspace-resource-by-a-concrete-uri",
+              "the-guidance-resource-renders-the-block-body-on-every-read",
+              "a-map-or-project-resource-returns-its-tools-bytes",
+              "listing-resources-prepares-no-workspace-graph",
+              "an-unknown-or-unavailable-resource-is-invalid-params",
+              "project-resources-follow-the-current-project-set"
+            ]
+          }
+        },
+        {
+          "id": "mcp-protocol-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "initialize-answers-with-a-version-the-server-speaks",
+              "the-relay-answers-initialize-with-a-version-it-speaks",
+              "the-relay-and-the-server-speak-the-same-versions",
+              "server-discover-is-method-not-found"
+            ]
+          }
+        },
+        {
           "id": "agent-context-languages",
           "stage": "coded",
           "evidenceKinds": [
