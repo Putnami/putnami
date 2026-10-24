@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"io"
+	"slices"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -23,29 +24,44 @@ func NewWarningReport(w io.Writer) *WarningReport {
 	return &WarningReport{w: w}
 }
 
-// Report writes and keeps each warning Load recorded on ws, in order. A nil
-// report or a nil ws does nothing.
+// Report writes and keeps each warning Load recorded on ws, in order, except a
+// warning the report already holds: it holds each warning once. A nil report or
+// a nil ws does nothing.
 func (r *WarningReport) Report(ws *Workspace) {
 	if r == nil || ws == nil {
 		return
 	}
 	for _, warning := range ws.Warnings {
+		if !r.add(warning) {
+			continue
+		}
 		if r.w != nil {
 			iox.Fprintf(r.w, "putnami: warning: %s\n", warning.Message)
 		}
-		r.reported = append(r.reported, warning)
 	}
 }
 
-// Keep keeps warnings, in order, and writes nothing: their producer already
-// wrote them, or was quiet. A caller whose engine run loaded the workspace
-// hands the run's warnings to the report of its command this way. A nil report
-// does nothing.
+// Keep keeps warnings, in order, except a warning the report already holds,
+// and writes nothing: their producer already wrote them, or was quiet. A caller
+// whose engine run loaded the workspace hands the run's warnings to the report
+// of its command this way. A nil report does nothing.
 func (r *WarningReport) Keep(warnings []Warning) {
 	if r == nil {
 		return
 	}
-	r.reported = append(r.reported, warnings...)
+	for _, warning := range warnings {
+		r.add(warning)
+	}
+}
+
+// add keeps warning unless the report already holds it, and reports whether it
+// kept it.
+func (r *WarningReport) add(warning Warning) bool {
+	if slices.Contains(r.reported, warning) {
+		return false
+	}
+	r.reported = append(r.reported, warning)
+	return true
 }
 
 // Warnings returns every reported warning, in order. A nil report has none.

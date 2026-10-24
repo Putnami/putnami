@@ -271,6 +271,12 @@ type Request struct {
 	// injected environment out of every cache key: the steps that DO run here
 	// never see it.
 	WithholdServeSteps bool
+	// WarningReport is the report the run's workspace load reports its
+	// warnings into: a caller that reported a load of its own passes its
+	// report, which writes and keeps each warning once, on the caller's writer.
+	// Nil makes a report on stderr, which writes nothing under --quiet. A
+	// report belongs to one command and serves one run at a time.
+	WarningReport *workspace.WarningReport
 	// watchIteration marks this request as ONE iteration of an outer watch/serve
 	// loop. It suppresses the serve force-watch rule in execute(): the outer loop
 	// already owns the replan policy, and without this marker a serve iteration
@@ -436,9 +442,10 @@ type Request struct {
 	// found: every result envelope the run writes carries them in
 	// workspaceWarnings, under --quiet too, and the run returns them on
 	// SessionResult.WorkspaceWarnings. Nil until the run loads the workspace.
+	// The load sets it to WarningReport when the caller passes one.
 	//
 	// UNEXPORTED for the same reason preparation is: the engine sets it when
-	// it loads the workspace, and nothing an adapter can set replaces it.
+	// it loads the workspace.
 	workspaceWarnings *workspace.WarningReport
 	// latestWarnings holds the report of the latest workspace load of a watch
 	// session. The session builds its renderer once, from the outer run: its
@@ -569,11 +576,12 @@ type SessionResult struct {
 	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
 	// did not start, one per selected project that has one, in plan order.
 	Withheld []*scheduler.ScheduledJob
-	// WorkspaceWarnings are the warnings the run's workspace load reported, in
-	// order. Nil when the load reported none, or when the run ended before it
-	// loaded the workspace. The engine already wrote them to stderr unless the
-	// run was quiet: a command that writes its own result envelope carries them
-	// in workspaceWarnings.
+	// WorkspaceWarnings are every warning the run's report holds, in order:
+	// those the caller's Request.WarningReport already held, then the new ones
+	// of the run's workspace load. Nil when there are none, or when the run
+	// ended before it loaded the workspace. The run's report already wrote
+	// them: a command that writes its own result envelope carries them in
+	// workspaceWarnings.
 	WorkspaceWarnings []workspace.Warning
 	// ancestry is the snapshot the run read before its first hook, or nil
 	// (Request.ancestry).

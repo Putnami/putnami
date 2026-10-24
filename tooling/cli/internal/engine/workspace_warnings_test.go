@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -106,5 +107,35 @@ func TestLoadWorkspaceAndExtensions_PublishesTheLoadToAWatchSession(t *testing.T
 	}
 	if got := req.latestWarnings.Load(); got == nil || got != req.workspaceWarnings || len(got.Warnings()) != 1 {
 		t.Fatalf("latest load = %+v, want the request's report with the ignored-jobs warning", got)
+	}
+}
+
+// TestLoadWorkspaceAndExtensions_ReportsIntoTheCallersReport holds a load to
+// reporting into Request.WarningReport when the caller passes one: a warning
+// the caller already reported is neither written again nor kept twice.
+func TestLoadWorkspaceAndExtensions_ReportsIntoTheCallersReport(t *testing.T) {
+	root := rootWithoutRepository(t)
+	cfg := warnedWorkspace(t, root)
+	ws, err := workspace.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	report := workspace.NewWarningReport(&out)
+	report.Report(ws)
+	written := out.String()
+
+	req := &Request{WorkspaceRoot: root, Config: cfg, Commands: []string{"build"}, WarningReport: report}
+	if _, _, code := loadWorkspaceAndExtensions(req); code != ExitSuccess {
+		t.Fatalf("load exit code = %d", code)
+	}
+	if req.workspaceWarnings != report {
+		t.Fatal("the load made its own report instead of the caller's")
+	}
+	if got := report.Warnings(); len(got) != 1 || got[0].Code != workspace.WarningCodeJobsIgnored {
+		t.Fatalf("the caller's report holds %+v, want the one ignored-jobs warning", got)
+	}
+	if out.String() != written {
+		t.Fatalf("the load wrote the warning again: %q", out.String())
 	}
 }
