@@ -15,10 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: ab-cli, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'put-cli-race put-cli-norace raw-cli-race raw-cli-norace' }
-          - { name: ab-cli-rev, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'raw-cli-norace raw-cli-race put-cli-norace put-cli-race' }
-          - { name: ab-all, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'put-all-cov put-all-nocov' }
-          - { name: ab-all-rev, kind: ab, ref: cc79a82f592261bbc0af8b6ea7946c1f02b82c72, cmd: ab, args: 'put-all-nocov put-all-cov' }
+          - { name: s2-a, kind: ab, ref: 0b3216bfe3d8be25251f0f185602fe26ea28ae6d, cmd: ab, args: 'inst-old-1 inst-new-1 inst-new-2 inst-old-2 put-cli-old put-cli-new' }
+          - { name: s2-b, kind: ab, ref: 0b3216bfe3d8be25251f0f185602fe26ea28ae6d, cmd: ab, args: 'put-cli-new put-cli-old inst-new-1 inst-old-1 inst-old-2 inst-new-2' }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -80,6 +78,7 @@ jobs:
         env:
           CMD: ${{ matrix.cmd }}
           ARGS: ${{ matrix.args }}
+          BASE_REF: 0c249fbb9131326cb274b1eeb41c7856c4a94b31
         run: |
           set +e
           vmstat -t 5 > "$RUNNER_TEMP/vmstat.txt" &
@@ -108,5 +107,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench6-${{ matrix.name }}
+          name: bench7-${{ matrix.name }}
           path: ${{ runner.temp }}/out

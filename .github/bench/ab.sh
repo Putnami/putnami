@@ -16,7 +16,17 @@ for step in "$@"; do
     raw-cli-norace)  cmd=(bash -c 'cd tooling/cli && GOCACHE="$RUNNER_TEMP/gocache-run" go test ./...') ;;
     put-all-cov)     cmd=(./putnamiw test --all) ;;
     put-all-nocov)   cmd=(./putnamiw test --all --no-coverage) ;;
+    inst-*)          cmd=(bash -c 'cd tooling/cli && GOCACHE="$RUNNER_TEMP/gocache-run" go test -count=1 -v ./internal/installscript/') ;;
+    put-cli-*)       cmd=(./putnamiw test --projects @putnami/cli) ;;
   esac
+  # A step named *-old* runs the smoke scripts of BASE_REF; every other step runs the checked-out ones.
+  git checkout -q -- tooling/cli/scripts
+  case "$step" in
+    *-old*) for f in smoke-check-release.sh smoke-first-use.sh; do git show "$BASE_REF:tooling/cli/scripts/$f" > "tooling/cli/scripts/$f"; done ;;
+  esac
+  # ./putnamiw keys its CLI build on tooling/, so each script variant builds its CLI here, outside the timing.
+  ./putnamiw --version >/dev/null 2>&1
+  echo "$step procs=$(ls -d /proc/[0-9]* | wc -l) scripts=$(git diff --stat -- tooling/cli/scripts | tail -1)" >> "$out/procs.txt"
   /usr/bin/time -v -o "$out/$step/time.txt" "${cmd[@]}" > "$out/$step/run.log" 2>&1
   kill $SP
   sort -u "$out/$step/gotest-args.txt" -o "$out/$step/gotest-args.txt"
