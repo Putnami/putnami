@@ -38,6 +38,21 @@ proposals provider manages.
 A ready publication takes exactly one of `--verification-file` and `--gate ci`.
 `--proof <text>` adds the local proof to the verification comment.
 
+## Existing proposals
+
+Before it seeds, pushes or writes, the command reads the branch's proposals in
+every state, following every page of the answer.
+
+- **An open or draft proposal** is the one to update, whatever merged or
+  closed proposals the branch also has.
+- **A merged proposal at the current head**, with no open one, means the work
+  is delivered. The command reports the proposal, exits 0, and seeds, pushes,
+  writes and transitions nothing.
+- **A closed proposal, or a merged one at another head**, with no open one,
+  fails the run and names each such proposal. The command opens no
+  replacement. Reopen the closed proposal, or publish the new commits from
+  another branch.
+
 ## Tasks and partial delivery
 
 `--task-source` and `--task-id` name the task the proposal delivers, and go
@@ -77,17 +92,18 @@ proposal has a URL. With `--output=json`, `jsonl` or `cloud-logging`, it
 prints the result document on one line instead: the proposal reference and
 URL, the head commit, the proposal state, the gate, whether the labels and
 assignees read back, and for a hosted workflow, its digest, ready units and
-receipt.
+receipt. For a proposal already merged, the state is `merged`, the text output
+adds `PROPOSAL_STATE=merged`, and stderr says that nothing was published.
 
-It exits 0 when the proposal is published, 1 when the run fails, and 2 for a
-usage error. A failure prints `change finalize: <error>` on stderr. `Ctrl-C`
-stops the run, and putnami exits 130. The run has a 90-minute deadline: when
-it passes, the run fails with `context canceled`, a proposal that waits for
-hosted checks stays open and ready, and running the command again resumes the
-wait. A provider write whose outcome is unknown stops the run with the
-provider's reconcile hint, and the command never retries it. The command takes
-no project selection, and refuses `--projects`, `--all`, `--impacted`,
-`--baseline`, `--tag`, `--exclude-tag` and `--exclude`.
+It exits 0 when the proposal is published or already merged, 1 when the run
+fails, and 2 for a usage error. A failure prints `change finalize: <error>` on
+stderr. `Ctrl-C` stops the run, and putnami exits 130. The run has a 90-minute
+deadline: when it passes, the run fails with `context canceled`, a proposal
+that waits for hosted checks stays open and ready, and running the command
+again resumes the wait. A provider write whose outcome is unknown stops the
+run with the provider's reconcile hint, and the command never retries it. The
+command takes no project selection, and refuses `--projects`, `--all`,
+`--impacted`, `--baseline`, `--tag`, `--exclude-tag` and `--exclude`.
 
 ## Launch
 

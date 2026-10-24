@@ -330,67 +330,122 @@ func (f Finalizer) prepareBinding(ctx context.Context, c *publicationCandidate) 
 	return err
 }
 
-func (f Finalizer) seedAndFind(ctx context.Context, c *publicationCandidate) error {
+// seedAndFind looks up the branch's proposals before it seeds or pushes. A
+// result answers the run without a write: the branch's proposal is already
+// merged. An error stops the run when the branch's proposal is closed or
+// merged at another head.
+func (f Finalizer) seedAndFind(ctx context.Context, c *publicationCandidate) (*Result, error) {
+	c.change = collab.Change{Base: c.opts.Base, Head: c.opts.Branch, HeadCommit: c.head}
+	existing, settled, err := f.findProposal(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil && len(settled) > 0 {
+		return settledOutcome(c, settled)
+	}
 	ahead, err := f.Git.Ahead(c.base)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if c.opts.Draft && !ahead {
 		if err := f.Git.Seed(c.opts.Title); err != nil {
-			return err
+			return nil, err
 		}
 		c.head, err = f.Git.Head()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		seeded, err := f.Git.CommitMessages(c.base)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(seeded) != 1 || !seeded[0].Empty || seeded[0].Text != c.opts.Title {
-			return errors.New("draft seed changed beyond its title-only empty commit")
+			return nil, errors.New("draft seed changed beyond its title-only empty commit")
 		}
+		c.change.HeadCommit = c.head
 		ahead = true
 	}
 	if !ahead {
-		return errors.New("branch has no commit ahead of base")
-	}
-	c.change = collab.Change{Base: c.opts.Base, Head: c.opts.Branch, HeadCommit: c.head}
-	existing, err := f.findProposal(ctx, c)
-	if err != nil {
-		return err
+		return nil, errors.New("branch has no commit ahead of base")
 	}
 	c.existingProposal = existing
 	if existing == nil || !precondition(c.proposalCaps, collab.OperationUpsert) {
-		return nil
+		return nil, nil
 	}
 	c.expectedRevision = existing.Revision
 	if c.expectedRevision == "" {
-		return errors.New("existing proposal lacks revision for upsert precondition")
+		return nil, errors.New("existing proposal lacks revision for upsert precondition")
 	}
-	return nil
+	return nil, nil
 }
 
-func (f Finalizer) findProposal(ctx context.Context, c *publicationCandidate) (*collab.Proposal, error) {
-	var existing collab.ProposalListResult
-	if err := f.call(ctx, collab.ContractProposals, collab.OperationFind, collab.ProposalFindInput{Change: c.change, States: []collab.ProposalState{collab.ProposalStateDraft, collab.ProposalStateOpen}}, &existing); err != nil {
-		return nil, err
+// settledOutcome decides a branch that has merged or closed proposals and no
+// open one. A merged proposal at the current head means the work is already
+// delivered. Any other settled proposal stops the run: opening a replacement
+// would publish the same change again or work its reviewers already refused.
+func settledOutcome(c *publicationCandidate, settled []collab.Proposal) (*Result, error) {
+	for _, proposal := range settled {
+		if proposal.State == collab.ProposalStateMerged && proposal.Change.HeadCommit == c.head {
+			return &Result{ProposalRef: proposal.Ref, ProposalURL: proposal.URL, HeadSHA: c.head, State: proposal.State}, nil
+		}
 	}
-	if existing.Page.Next != "" {
-		return nil, errors.New("proposals.find returned another page; exact proposal identity is ambiguous")
+	names := make([]string, 0, len(settled))
+	for _, proposal := range settled {
+		name := fmt.Sprintf("%s %s/%s", proposal.State, proposal.Ref.Source, proposal.Ref.ID)
+		if proposal.URL != "" {
+			name += " (" + proposal.URL + ")"
+		}
+		if proposal.State == collab.ProposalStateMerged {
+			name += " at " + proposal.Change.HeadCommit
+		}
+		names = append(names, name)
 	}
-	if len(existing.Items) > 1 {
-		return nil, errors.New("multiple open proposals for the same base/head")
+	return nil, fmt.Errorf("branch %q has no open proposal and already has %s, while HEAD is %s; finalize opens no replacement: reopen the closed proposal, or publish the new commits from another branch",
+		c.opts.Branch, boundedList(names), c.head)
+}
+
+// maxFindPages bounds the pages of one proposals.find traversal.
+const maxFindPages = 10
+
+// findProposal reads every proposal of the change in every state. It returns
+// the one open or draft proposal, if any, and the merged and closed ones.
+func (f Finalizer) findProposal(ctx context.Context, c *publicationCandidate) (*collab.Proposal, []collab.Proposal, error) {
+	var found []collab.Proposal
+	var page *collab.PageRequest
+	for pages := 0; ; pages++ {
+		var result collab.ProposalListResult
+		if err := f.call(ctx, collab.ContractProposals, collab.OperationFind, collab.ProposalFindInput{Change: c.change, Page: page}, &result); err != nil {
+			return nil, nil, err
+		}
+		found = append(found, result.Items...)
+		if result.Page.Next == "" {
+			break
+		}
+		if pages+1 == maxFindPages {
+			return nil, nil, errors.New("proposals.find returned too many pages; exact proposal identity is ambiguous")
+		}
+		page = &collab.PageRequest{Cursor: result.Page.Next}
 	}
-	if len(existing.Items) == 0 {
-		return nil, nil
+	var open *collab.Proposal
+	var settled []collab.Proposal
+	for i, proposal := range found {
+		if proposal.Ref.Source == "" || proposal.Ref.ID == "" || proposal.Change.Repository == "" ||
+			proposal.Change.Base != c.opts.Base || proposal.Change.Head != c.opts.Branch {
+			return nil, nil, errors.New("proposals.find returned an incomplete or different proposal identity/base/head")
+		}
+		switch proposal.State {
+		case collab.ProposalStateOpen, collab.ProposalStateDraft:
+			if open != nil {
+				return nil, nil, errors.New("multiple open proposals for the same base/head")
+			}
+			open = &found[i]
+		case collab.ProposalStateMerged, collab.ProposalStateClosed:
+			settled = append(settled, proposal)
+		default:
+			return nil, nil, fmt.Errorf("proposals.find returned state %q", proposal.State)
+		}
 	}
-	proposal := existing.Items[0]
-	if proposal.Ref.Source == "" || proposal.Ref.ID == "" || proposal.Change.Repository == "" ||
-		proposal.Change.Base != c.opts.Base || proposal.Change.Head != c.opts.Branch {
-		return nil, errors.New("proposals.find returned an incomplete or different proposal identity/base/head")
-	}
-	return &proposal, nil
+	return open, settled, nil
 }
 
 func sameMembers(a, b []string) bool {
@@ -414,7 +469,7 @@ func sameProposalExceptHead(before, after collab.Proposal) bool {
 }
 
 func (f Finalizer) refreshAfterPush(ctx context.Context, c *publicationCandidate) error {
-	current, err := f.findProposal(ctx, c)
+	current, _, err := f.findProposal(ctx, c)
 	if err != nil {
 		return err
 	}

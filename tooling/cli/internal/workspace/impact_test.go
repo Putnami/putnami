@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The evidence renders as one line that names the paths and says why they
@@ -57,7 +59,8 @@ func traceFixtureSelection() ImpactedSelection {
 			Edges: map[string]ImpactEdge{
 				"/go/extension":         {From: "/tooling/extension-sdk", Kind: ImpactEdgeDependency},
 				"/typescript/extension": {From: "/tooling/extension-sdk", Kind: ImpactEdgeDependency},
-				"/apps/web":             {From: "/go/extension", Kind: ImpactEdgeExtensionConsumer},
+				"/apps/web": {From: "/go/extension", Kind: ImpactEdgeExtensionConsumer,
+					Via: "tooling/extension-sdk/sdk.go", Cause: ImpactCauseRuntimeInput},
 			},
 			Scopes: map[string][]string{"/apps/web": {"/go/extension", "/typescript/extension"}},
 		},
@@ -76,7 +79,7 @@ func TestImpactedSelection_TraceExplanation_RendersHeaderSeedsThenEdges(t *testi
 		"    .agents/skills/fix/SKILL.md → /tooling/cli  [declared-input ../../.agents/skills/** !**/*.snap]",
 		"    /go/extension ← /tooling/extension-sdk  [dependency]",
 		"    /typescript/extension ← /tooling/extension-sdk  [dependency]",
-		"    /apps/web ← /go/extension  [extension-consumer; tasks /go/extension, /typescript/extension]",
+		"    /apps/web ← /go/extension  [extension-consumer runtime input tooling/extension-sdk/sdk.go; tasks /go/extension, /typescript/extension]",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("explanation:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -127,6 +130,51 @@ func TestImpactedSelection_TraceExplanation_CapsSeedsAndEdges(t *testing.T) {
 		if strings.Contains(line, "seed6/") || strings.Contains(line, "/edge12 ") {
 			t.Errorf("line %q names an entry past the cap", line)
 		}
+	}
+}
+
+// An extension-consumer edge names what it carries and the changed file it
+// rests on, in the block and in the record: every task for the file the walk
+// traced the extension's runtime to, or the moved tasks for a manifest change
+// confined to task and step declarations.
+func TestImpactedSelection_AConsumerEdgeNamesWhatItCarries(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "the-trace-names-the-runtime-input")
+	s := ImpactedSelection{
+		Projects:     []*Project{{ID: "/go/extension"}, {ID: "/apps/web"}, {ID: "/apps/svc"}},
+		ChangedFiles: []string{"go/extension/putnami.extension.json"},
+		Trace: ImpactTrace{
+			Seeds: map[string][]ImpactSeed{"/go/extension": {{File: "go/extension/putnami.extension.json", Kind: ImpactSeedPathOwner, Via: "go/extension"}}},
+			Edges: map[string]ImpactEdge{
+				"/apps/web": {From: "/go/extension", Kind: ImpactEdgeExtensionConsumer,
+					Via: "tooling/extension-sdk/registrycred/install.go", Cause: ImpactCauseRuntimeInput},
+				"/apps/svc": {From: "/go/extension", Kind: ImpactEdgeExtensionConsumer,
+					Via: "go/extension/putnami.extension.json", Cause: ImpactCauseTaskDeclaration},
+			},
+			Scopes: map[string][]string{
+				"/apps/web": {"/go/extension#build~describe"},
+				"/apps/svc": {"/go/extension#lint~golangci-lint"},
+			},
+		},
+	}
+
+	got := s.TraceExplanation()
+	want := []string{
+		"    /apps/web ← /go/extension  [extension-consumer runtime input tooling/extension-sdk/registrycred/install.go; tasks /go/extension#build~describe]",
+		"    /apps/svc ← /go/extension  [extension-consumer task declaration go/extension/putnami.extension.json; tasks /go/extension#lint~golangci-lint]",
+	}
+	if len(got) != 4 || strings.Join(got[2:], "\n") != strings.Join(want, "\n") {
+		t.Errorf("explanation:\n%s\nwant edge lines:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	encoded, err := json.Marshal(s.TraceRecord().Edges)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `[{"project":"/apps/web","from":"/go/extension","kind":"extension-consumer",` +
+		`"via":"tooling/extension-sdk/registrycred/install.go","cause":"runtime-input"},` +
+		`{"project":"/apps/svc","from":"/go/extension","kind":"extension-consumer",` +
+		`"via":"go/extension/putnami.extension.json","cause":"task-declaration"}]`; string(encoded) != want {
+		t.Errorf("record edges = %s, want %s", encoded, want)
 	}
 }
 

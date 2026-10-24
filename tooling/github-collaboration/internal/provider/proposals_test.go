@@ -193,6 +193,61 @@ func TestAFindAtAPushedHeadCommitWaitsForThePullRequest(t *testing.T) {
 	}
 }
 
+// TestAFindReadsTheMergedAndClosedProposalsOfABranch pins that a find without
+// states answers a branch's merged and closed pull requests beside its open
+// one, and that a state filter selects among them.
+func TestAFindReadsTheMergedAndClosedProposalsOfABranch(t *testing.T) {
+	h := newHarness(t)
+	h.provider.HeadLagPause = func(context.Context, int) error { return nil }
+	h.proposals = `{"repository":"acme/app","allowMerge":true}`
+	h.fake.moveBranch("topic-c", strings.Repeat("e", 40))
+	var created collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-c"},"title":"first"}`, &created)
+	merged := created.Proposal
+	n := number(t, merged.Ref)
+	h.fake.mu.Lock()
+	sha := h.fake.pulls[n].sha
+	h.fake.mu.Unlock()
+	var result collab.ProposalResult
+	h.ok("proposals", "merge", `{"ref":`+refJSON(merged.Ref)+`,"expectedHeadCommit":"`+sha+`","method":"squash"}`, &result)
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-c"},"title":"second"}`, &created)
+	closed := created.Proposal
+	h.fake.mu.Lock()
+	h.fake.issues[number(t, closed.Ref)].state = "closed"
+	h.fake.mu.Unlock()
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-c"},"title":"third"}`, &created)
+	open := created.Proposal
+
+	states := func(arguments string) []collab.Ref {
+		t.Helper()
+		var found collab.ProposalListResult
+		h.ok("proposals", "find", `{"change":{"base":"main","head":"topic-c"}`+arguments+`}`, &found)
+		refs := make([]collab.Ref, 0, len(found.Items))
+		for _, item := range found.Items {
+			refs = append(refs, item.Ref)
+		}
+		return refs
+	}
+	if got := states(""); !slices.Equal(got, []collab.Ref{merged.Ref, closed.Ref, open.Ref}) {
+		t.Fatalf("a find without states answered %v", got)
+	}
+	if got := states(`,"states":["merged"]`); !slices.Equal(got, []collab.Ref{merged.Ref}) {
+		t.Fatalf("merged: %v", got)
+	}
+	if got := states(`,"states":["closed"]`); !slices.Equal(got, []collab.Ref{closed.Ref}) {
+		t.Fatalf("closed: %v", got)
+	}
+	if got := states(`,"states":["merged","closed"]`); !slices.Equal(got, []collab.Ref{merged.Ref, closed.Ref}) {
+		t.Fatalf("merged and closed: %v", got)
+	}
+	var found collab.ProposalListResult
+	h.ok("proposals", "find", `{"change":{"base":"main","head":"topic-c"}}`, &found)
+	if found.Items[0].State != collab.ProposalStateMerged || found.Items[0].Change.HeadCommit != sha[:7] && found.Items[0].Change.HeadCommit != sha ||
+		found.Items[1].State != collab.ProposalStateClosed || found.Items[2].State != collab.ProposalStateOpen {
+		t.Fatalf("states of the answered proposals: %+v", found.Items)
+	}
+}
+
 func TestAnotherRepositoryIsRefused(t *testing.T) {
 	spectest.Proves(t, feature, "exact-proposal-identity", "another-repository-is-refused")
 	h := newHarness(t)

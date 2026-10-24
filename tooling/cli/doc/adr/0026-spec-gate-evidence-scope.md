@@ -8,6 +8,8 @@
 - **Amended**: 2026-10-23, §1, §2, §4 and §7: on a local miss, the gate
   reads a report task's entry from the remote cache the run executes with,
   within a time bound, and fetches it into the local store only.
+- **Amended**: 2026-10-23, §5: a narrowed run with no cache to read warns on
+  every unresolved check, and this repository's contributor CI is such a run.
 - **Scope**: `@putnami/cli` spec gate (`internal/specgate`, the observation
   recovery in `internal/engine`) and the verification record of
   `protocols/features`
@@ -103,9 +105,20 @@ warns, naming the unconsulted projects and why.
 
 The cost: in a run with an unreachable candidate, a requirement that has no
 test is warned instead of blocked. In every warm or non-narrowed run the
-unconsulted set is empty and the gate keeps full strength. Under `--no-cache`
-with a narrowed selection every unresolved check warns; that combination is
-too rare to justify a second mechanism with its own failure modes.
+unconsulted set is empty and the gate keeps full strength. A narrowed run with
+no cache to read, under `--no-cache` or with an empty store and the remote
+cache off, warns on every unresolved check.
+
+This repository's contributor CI is such a run: it starts from an empty store
+and turns the remote cache off. A task scope keeps a project's criteria jobs
+and drops the tests it does not name
+([ADR 0044](0044-selection-is-task-level.md) §5). So when a change reaches a
+project only for its criteria jobs, contributor CI runs none of that
+project's tests. Each of its requirements that no planned test answers
+resolves to `unobserved` and warns: contributor CI neither verifies it nor
+blocks it, whether the test that proves it passes, fails, or does not exist.
+Putnami CI reads the remote cache, so it judges the report an earlier run
+with the same inputs recorded.
 
 When the session's own work failed or was canceled, both scope messages
 (unconsulted and exhausted) are silenced by the guard that suppresses the
