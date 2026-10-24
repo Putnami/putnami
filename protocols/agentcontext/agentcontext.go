@@ -16,8 +16,8 @@
 //     embedded content;
 //   - representativeSources — ordered path + line-range entries with a selection
 //     reason and a token estimate; ranges only, never file content;
-//   - tests — an OPTIONAL section referencing conformance packs by id, the test
-//     policy, and fixture digests, or a machine-readable absence reason;
+//   - tests — an OPTIONAL section referencing conformance packs by id and
+//     fixture digests, or a machine-readable absence reason;
 //   - docs — adjacent documentation paths with a checked/unchecked relationship
 //     status;
 //   - config — a config-schema reference and refs-only operational hints;
@@ -42,24 +42,14 @@
 package agentcontext
 
 // ProtocolVersion is the current agent-context protocol version: the version
-// every producer stamps and the JSON schema pins. Bumped whenever a
-// backwards-incompatible change to the document shape, the overrides shape, an
-// enum, or the diagnostic taxonomy lands.
-const ProtocolVersion = 1
+// every producer stamps and the JSON schema pins, for the document and the
+// overrides file alike. Bumped whenever a backwards-incompatible change to the
+// document shape, the overrides shape, an enum, or the diagnostic taxonomy
+// lands. Version 2 deletes tests.policy.
+const ProtocolVersion = 2
 
-// Canonical filenames and paths used by the protocol.
+// Canonical paths used by the protocol.
 const (
-	// DocumentFilename is the per-project agent-context document file name.
-	DocumentFilename = "agent-context.json"
-
-	// DocumentEmitDir is the build-output directory a producer writes the
-	// document to. It is the .gen/ ROOT (not .gen/schema/), so the codegen
-	// committer never promotes it into the tracked tree: the document embeds the
-	// workspace revision and content digests and would churn every commit, so it
-	// stays ephemeral and gitignored. Determinism is pinned at a fixed tree by
-	// tests, not by committing the artifact.
-	DocumentEmitDir = ".gen"
-
 	// OverridesPath is the workspace-relative path of the optional, author-owned
 	// overrides file in a consuming project's tracked tree. It is strict-parsed
 	// and reviewed like any other source; it narrows deterministic selection
@@ -132,30 +122,6 @@ var ValidDocRelationships = map[DocRelationship]bool{
 	DocRelationshipUnchecked: true,
 }
 
-// TestPolicy names how the test tooling behaves for a project. The three values
-// mirror go.putnami.dev/protocol/database TestMode (auto/require/skip) so the
-// two contracts agree on the same strings; they are frozen once merged and
-// adding a value requires a ProtocolVersion bump.
-type TestPolicy string
-
-// TestPolicy values, mirroring database TestMode.
-const (
-	// TestPolicyAuto allows local/dev convenience provisioning when no usable
-	// binding/provider exists.
-	TestPolicyAuto TestPolicy = "auto"
-	// TestPolicyRequire fails loudly when no usable binding/provider exists.
-	TestPolicyRequire TestPolicy = "require"
-	// TestPolicySkip skips the tests when no usable binding/provider exists.
-	TestPolicySkip TestPolicy = "skip"
-)
-
-// ValidTestPolicies enumerates the canonical test policies.
-var ValidTestPolicies = map[TestPolicy]bool{
-	TestPolicyAuto:    true,
-	TestPolicyRequire: true,
-	TestPolicySkip:    true,
-}
-
 // AbsenceReason is the machine-readable reason a tests section carries no packs.
 // The enum is closed: adding a reason requires a ProtocolVersion bump.
 type AbsenceReason string
@@ -187,7 +153,7 @@ type TokenMethod string
 // TokenMethod values.
 const (
 	// TokenMethodBytesDiv4 estimates tokens as ceil(bytes/4) over the referenced
-	// byte range — the dependency-free heuristic v1 uses.
+	// byte range — the dependency-free heuristic the protocol uses.
 	TokenMethodBytesDiv4 TokenMethod = "bytes/4"
 )
 
@@ -323,13 +289,13 @@ type PackRef struct {
 }
 
 // TestsSection is the OPTIONAL tests section. When it lists packs it names the
-// test policy and referenced fixture digests; when it lists none it MUST carry a
+// referenced fixture digests; when it lists none it MUST carry a
 // machine-readable AbsenceReason so a consumer never has to guess why tests are
 // missing. A producer fills it from committed conformance-pack metadata alone,
 // so a project with no applicable pack states that fact instead of omitting it.
+// How the test jobs provision infrastructure is a setting of those jobs, not a
+// fact of this document.
 type TestsSection struct {
-	// Policy names how the test tooling behaves for the project (see TestPolicy).
-	Policy TestPolicy `json:"policy"`
 	// Packs lists the referenced conformance packs; empty requires AbsenceReason.
 	Packs []PackRef `json:"packs,omitempty"`
 	// FixtureDigests references test-fixture artifacts by path + digest.
@@ -378,8 +344,9 @@ type Provenance struct {
 	AggregationMethod AggregationMethod `json:"aggregationMethod"`
 }
 
-// Document is the per-project agent-context artifact. A producer writes it to
-// "<project>/.gen/agent-context.json" (ephemeral; see DocumentEmitDir).
+// Document is the per-project agent-context document. A producer builds it in
+// memory and serves it: the CLI prints it (`putnami context pack`) and the MCP
+// `agent_context` tool returns it. No producer writes it to a file.
 //
 // Field order is deliberate: it is the canonical serialization order every
 // producer must reproduce byte-for-byte.

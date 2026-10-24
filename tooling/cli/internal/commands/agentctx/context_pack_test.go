@@ -1,16 +1,24 @@
 package agentctx
 
 import (
+	"encoding/json"
+	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 
 	agentcontext "go.putnami.dev/protocol/agentcontext"
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -324,15 +332,15 @@ func TestBuildCompositionRoots_GoConventionMain(t *testing.T) {
 
 // TestSelectContextProjects_MissingProjectValue asserts a --project flag with no
 // value is a usage error, not the flag-absent "all projects" default — so
-// `context pack --project --check` (or a trailing --project) reports invalid
-// usage instead of silently checking/writing every project.
+// `context pack --project --output=json` (or a trailing --project) reports
+// invalid usage instead of silently printing every project.
 func TestSelectContextProjects_MissingProjectValue(t *testing.T) {
 	ws, _ := buildFixtureWorkspace(t)
 
 	for _, args := range [][]string{
-		{"--project", "--check"}, // value slot is another flag
-		{"--project"},            // trailing, no value
-		{"--project="},           // empty inline value
+		{"--project", "--output=json"}, // value slot is another flag
+		{"--project"},                  // trailing, no value
+		{"--project="},                 // empty inline value
 	} {
 		got, err := selectContextProjects(ws, args)
 		if err == nil {
@@ -345,12 +353,89 @@ func TestSelectContextProjects_MissingProjectValue(t *testing.T) {
 	}
 
 	// An absent flag still targets every project; a real value targets exactly one.
-	if all, err := selectContextProjects(ws, []string{"--check"}); err != nil || len(all) == 0 {
-		t.Errorf("selectContextProjects([--check]) = (%d, %v); want all projects, no error", len(all), err)
+	if all, err := selectContextProjects(ws, nil); err != nil || len(all) == 0 {
+		t.Errorf("selectContextProjects(nil) = (%d, %v); want all projects, no error", len(all), err)
 	}
 	if one, err := selectContextProjects(ws, []string{"--project", "/svc/app"}); err != nil || len(one) != 1 {
 		t.Errorf("selectContextProjects([--project /svc/app]) = (%d, %v); want exactly one project", len(one), err)
 	}
+}
+
+// printContextPack runs `context pack` over root and returns what it printed.
+func printContextPack(t *testing.T, root string, args []string, output string) string {
+	t.Helper()
+	out, err := iox.CaptureStdout(func() error { return ContextPackCommand(root, args, output, fixtureVersion) })
+	if err != nil {
+		t.Fatalf("context pack %v --output=%q: %v", args, output, err)
+	}
+	return out
+}
+
+// printedPackIDs decodes a structured `context pack` result and returns the id
+// of each document it carries, in printed order.
+func printedPackIDs(t *testing.T, out string) []string {
+	t.Helper()
+	var envelope struct {
+		Command string            `json:"command"`
+		Status  string            `json:"status"`
+		Data    ContextPackReport `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &envelope); err != nil {
+		t.Fatalf("decode the result envelope: %v\n%s", err, out)
+	}
+	if envelope.Command != "context pack" || envelope.Status != "success" {
+		t.Fatalf("envelope = %s / %s, want a context pack success", envelope.Command, envelope.Status)
+	}
+	ids := make([]string, 0, len(envelope.Data.Documents))
+	for _, document := range envelope.Data.Documents {
+		ids = append(ids, document.Identity.ID)
+	}
+	return ids
+}
+
+// TestContextPackCommand_PrintsTheDocumentsAndWritesNothing pins the pack
+// surface: --output=json returns every project's document as data, --project
+// narrows it to one, the default prints the document itself, an unknown
+// selector prints nothing, and no run writes a file.
+func TestContextPackCommand_PrintsTheDocumentsAndWritesNothing(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "context-pack-prints-the-documents-and-writes-nothing")
+	root := makeLoadableFixture(t)
+	before := treeOutsideState(t, root)
+
+	if got := printedPackIDs(t, printContextPack(t, root, nil, "jsonl")); !slices.Equal(got, []string{"/svc/app", "/svc/lib"}) {
+		t.Errorf("context pack --output=json printed %v, want every project", got)
+	}
+	for selector, want := range map[string]string{"/svc/app": "/svc/app", "example/lib": "/svc/lib"} {
+		got := printedPackIDs(t, printContextPack(t, root, []string{"--project", selector}, "jsonl"))
+		if !slices.Equal(got, []string{want}) {
+			t.Errorf("context pack --project %s printed %v, want only %s", selector, got, want)
+		}
+	}
+
+	human := printContextPack(t, root, []string{"--project", "/svc/app"}, "")
+	var document agentcontext.Document
+	if err := json.Unmarshal([]byte(human), &document); err != nil {
+		t.Fatalf("the default output is not one agent-context document: %v\n%s", err, human)
+	}
+	if document.Identity.ID != "/svc/app" || document.ProtocolVersion != agentcontext.ProtocolVersion {
+		t.Errorf("printed document = %s at v%d, want /svc/app at v%d",
+			document.Identity.ID, document.ProtocolVersion, agentcontext.ProtocolVersion)
+	}
+
+	out, err := iox.CaptureStdout(func() error {
+		return ContextPackCommand(root, []string{"--project", "/svc/nope"}, "jsonl", fixtureVersion)
+	})
+	if err == nil || !errors.Is(err, cmderr.ErrNotFound) {
+		t.Errorf("unknown selector error = %v, want ErrNotFound", err)
+	}
+	if out != "" {
+		t.Errorf("a refused pack printed %q", out)
+	}
+
+	if after := treeOutsideState(t, root); !maps.Equal(after, before) {
+		t.Errorf("context pack changed the workspace tree:\nbefore %v\nafter  %v", before, after)
+	}
+	assertNoMapState(t, root)
 }
 
 // TestCanonicalDocumentBytes_FailsClosedOnUnflaggedSensitive asserts the emit
@@ -396,64 +481,6 @@ func TestCanonicalDocumentBytes_FailsClosedOnUnflaggedSensitive(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("safety report %+v missing an unredacted_sensitive violation", report.Violations)
-	}
-}
-
-// TestContextCheck_FreshThenDrift asserts the freshness gate: right after pack,
-// check is clean (exit 0); mutating a referenced artifact (so its digest, and
-// thus the aggregated document, changes) makes check report drift and return the
-// exit-2 error with the drift report populated.
-func TestContextCheck_FreshThenDrift(t *testing.T) {
-	ws, app := buildFixtureWorkspace(t)
-	lib := ws.ProjectByID("/svc/lib")
-	projects := []*workspace.Project{app, lib}
-
-	// Before packing, every document is missing → drift.
-	pre, preErr := ContextCheck(ws, projects, nil, fixtureRevision, fixtureVersion)
-	if preErr == nil || pre.Outcome != ContextOutcomeDrift {
-		t.Fatalf("pre-pack check should drift as missing, got outcome=%q err=%v", pre.Outcome, preErr)
-	}
-
-	if _, err := ContextPack(ws, projects, nil, fixtureRevision, fixtureVersion); err != nil {
-		t.Fatalf("ContextPack: %v", err)
-	}
-
-	// The written document exists at the protocol's emit path.
-	docPath := filepath.Join(ws.Root, "svc", "app", agentcontext.DocumentEmitDir, agentcontext.DocumentFilename)
-	if _, err := os.Stat(docPath); err != nil {
-		t.Fatalf("pack did not write %s: %v", docPath, err)
-	}
-
-	// Freshly packed → clean, exit 0.
-	clean, cleanErr := ContextCheck(ws, projects, nil, fixtureRevision, fixtureVersion)
-	if cleanErr != nil {
-		t.Fatalf("post-pack check returned error: %v", cleanErr)
-	}
-	if clean.Outcome != ContextOutcomeClean || len(clean.Drift) != 0 {
-		t.Fatalf("post-pack check = %+v, want clean with no drift", clean)
-	}
-
-	// Mutate a referenced artifact so the fresh aggregation no longer matches.
-	capPath := filepath.Join(ws.Root, "svc", "app", "schema", "capabilities.json")
-	if err := os.WriteFile(capPath, []byte(`{"protocolVersion":1,"changed":true}`+"\n"), 0o644); err != nil {
-		t.Fatalf("mutate capabilities: %v", err)
-	}
-
-	drift, driftErr := ContextCheck(ws, projects, nil, fixtureRevision, fixtureVersion)
-	if driftErr == nil {
-		t.Fatal("check should fail after a referenced artifact changed")
-	}
-	if drift.Outcome != ContextOutcomeDrift {
-		t.Fatalf("outcome = %q, want %q", drift.Outcome, ContextOutcomeDrift)
-	}
-	if protocolcli.ExitCodeForError(driftErr) != protocolcli.ExitUsage {
-		t.Fatalf("drift exit code = %d, want %d", protocolcli.ExitCodeForError(driftErr), protocolcli.ExitUsage)
-	}
-	if len(drift.Drift) != 1 || drift.Drift[0].Project != "/svc/app" || drift.Drift[0].Reason != "stale" {
-		t.Fatalf("drift = %+v, want a single stale /svc/app entry", drift.Drift)
-	}
-	if data, ok := shared.ResultData(driftErr).(ContextCheckReport); !ok || data.Outcome != ContextOutcomeDrift {
-		t.Fatalf("drift error does not carry the report as ResultData: %#v", shared.ResultData(driftErr))
 	}
 }
 
@@ -651,7 +678,7 @@ func TestBuildDocument_OverridesApplied(t *testing.T) {
 	// An auto doc to remove.
 	write("svc/app/README.md", "# App\n\nStart at main.go.\n")
 	write("svc/app/schema/agent-context.overrides.json", `{
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "addSources": [
     {"path": "svc/app/override_src.go", "startLine": 1, "endLine": 10, "why": "override", "tokens": {"estimated": 5, "method": "bytes/4"}}
   ],
@@ -729,9 +756,8 @@ const conformanceCapabilitiesManifest = `{
 // "app" declares a datasource capability and its library dependency "lib" OWNS a
 // conformance pack (a stable id, matching capabilityKinds, and a committed corpus).
 // withOptIn controls whether app ships a *_test.go referencing a conformance
-// runner token; policy, when non-empty, is written into options.test.infra. It
-// returns the loaded workspace and the app project.
-func buildConformanceFixture(t *testing.T, withOptIn bool, policy string) (*workspace.Workspace, *workspace.Project) {
+// runner token. It returns the loaded workspace and the app project.
+func buildConformanceFixture(t *testing.T, withOptIn bool) (*workspace.Workspace, *workspace.Project) {
 	t.Helper()
 	root := t.TempDir()
 	write := func(rel, content string) {
@@ -762,9 +788,6 @@ func buildConformanceFixture(t *testing.T, withOptIn bool, policy string) (*work
 	write("svc/lib/conformance/manifest.json", `{"cases":["c1","c2"]}`+"\n")
 
 	cfg := &wsproto.Config{}
-	if policy != "" {
-		cfg.Options = map[string]map[string]any{"test": {"infra": policy}}
-	}
 	app := &workspace.Project{
 		ID: "/svc/app", Name: "example/app", Path: "svc/app", Type: "application",
 		Config: &wsproto.ProjectConfig{Main: "main.go"}, Dependencies: []string{"example/lib"},
@@ -777,10 +800,10 @@ func buildConformanceFixture(t *testing.T, withOptIn bool, policy string) (*work
 // TestBuildTestsSection_Populated pins the populated tests path: a project that
 // declares a matching capability, whose dependency ships a conformance pack the
 // project has opted into, gets that pack referenced by id/kinds/languages, its
-// corpus referenced by path + sha256 digest, an empty absence reason, the default
-// auto policy — and the document stays byte-stable and round-trips clean.
+// corpus referenced by path + sha256 digest, and an empty absence reason — and the
+// document stays byte-stable and round-trips clean.
 func TestBuildTestsSection_Populated(t *testing.T) {
-	ws, app := buildConformanceFixture(t, true, "")
+	ws, app := buildConformanceFixture(t, true)
 
 	doc, opts, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
@@ -789,9 +812,6 @@ func TestBuildTestsSection_Populated(t *testing.T) {
 	tests := doc.Tests
 	if tests == nil {
 		t.Fatal("document has no tests section")
-	}
-	if tests.Policy != agentcontext.TestPolicyAuto {
-		t.Errorf("policy = %q, want %q", tests.Policy, agentcontext.TestPolicyAuto)
 	}
 	if tests.AbsenceReason != "" {
 		t.Errorf("absenceReason = %q, want empty (packs are present)", tests.AbsenceReason)
@@ -855,40 +875,12 @@ func TestBuildTestsSection_Populated(t *testing.T) {
 	}
 }
 
-// TestBuildTestsSection_PolicyIsConfigNotCI asserts the DETERMINISM-CRITICAL policy
-// source: the policy is derived ONLY from committed config (options.test.infra),
-// never from the CI environment — so the artifact is byte-identical in CI and
-// locally at a fixed tree. With CI set but no config the policy is still auto (not
-// the require the RUNTIME policy would pick under CI — dbtestenv.ResolveMode in
-// the extension SDK); with a committed require it flows through.
-func TestBuildTestsSection_PolicyIsConfigNotCI(t *testing.T) {
-	t.Setenv("CI", "1")
-
-	wsAuto, appAuto := buildConformanceFixture(t, true, "")
-	docAuto, _, err := BuildDocument(wsAuto, appAuto, nil, fixtureRevision, fixtureVersion)
-	if err != nil {
-		t.Fatalf("BuildDocument(auto): %v", err)
-	}
-	if docAuto.Tests.Policy != agentcontext.TestPolicyAuto {
-		t.Errorf("policy = %q, want auto (the CI env var must not influence it)", docAuto.Tests.Policy)
-	}
-
-	wsReq, appReq := buildConformanceFixture(t, true, "require")
-	docReq, _, err := BuildDocument(wsReq, appReq, nil, fixtureRevision, fixtureVersion)
-	if err != nil {
-		t.Fatalf("BuildDocument(require): %v", err)
-	}
-	if docReq.Tests.Policy != agentcontext.TestPolicyRequire {
-		t.Errorf("policy = %q, want require (from committed options.test.infra)", docReq.Tests.Policy)
-	}
-}
-
 // TestBuildTestsSection_ApplicableButUnopted asserts a pack that matches the
 // project's declared kinds but that no committed test source references is NOT
 // selected: packs and fixture digests stay empty and the absence reason is
 // no-packs (the project declares kinds, so it is a supported project type).
 func TestBuildTestsSection_ApplicableButUnopted(t *testing.T) {
-	ws, app := buildConformanceFixture(t, false, "")
+	ws, app := buildConformanceFixture(t, false)
 
 	doc, _, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
@@ -910,7 +902,7 @@ func TestBuildTestsSection_ApplicableButUnopted(t *testing.T) {
 // capability kinds gets the unsupported-project-type absence reason — even when it
 // OWNS a conformance pack — because it has nothing to conformance-certify.
 func TestBuildTestsSection_NoCapabilities(t *testing.T) {
-	ws, _ := buildConformanceFixture(t, true, "")
+	ws, _ := buildConformanceFixture(t, true)
 	lib := ws.ProjectByID("/svc/lib")
 	if lib == nil {
 		t.Fatal("fixture lib project missing")
@@ -929,9 +921,6 @@ func TestBuildTestsSection_NoCapabilities(t *testing.T) {
 	}
 	if tests.AbsenceReason != agentcontext.AbsenceReasonUnsupportedProjectType {
 		t.Errorf("absenceReason = %q, want %q", tests.AbsenceReason, agentcontext.AbsenceReasonUnsupportedProjectType)
-	}
-	if tests.Policy != agentcontext.TestPolicyAuto {
-		t.Errorf("policy = %q, want auto", tests.Policy)
 	}
 }
 

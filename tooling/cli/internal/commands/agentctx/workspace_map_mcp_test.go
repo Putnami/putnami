@@ -8,106 +8,108 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
+
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/mapgen"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// TestBuildWorkspaceMapResult_FullDocumentMatchesTheCLIRender is the verification
-// criterion the tool exists to satisfy: the unscoped document served over MCP is
-// byte-identical to what `putnami context map` writes, so an agent and a human
-// can never be looking at two different maps. It also pins that the answer comes
-// from the working tree, not from the file: the map is served before any build
-// has written one.
-func TestBuildWorkspaceMapResult_FullDocumentMatchesTheCLIRender(t *testing.T) {
+// TestBuildWorkspaceMapResult_ServesTheWorkingTreeAndWritesNothing pins that the
+// answer comes from the working tree, reads no map file, and writes nothing: no
+// fragment, no document, no state directory.
+func TestBuildWorkspaceMapResult_ServesTheWorkingTreeAndWritesNothing(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "mcp-rebuilds-the-same-projection-in-memory")
 	root := mapCommandWorkspace(t)
+	before := treeOutsideState(t, root)
 
-	cold, err := BuildWorkspaceMapResult(root, "", "")
-	if err != nil {
-		t.Fatalf("workspace_map on a cold workspace: %v", err)
-	}
-	if cold.DiskArtifact.Present || cold.DiskArtifact.Fresh {
-		t.Errorf("no build has run here, yet the artifact reports %+v", cold.DiskArtifact)
-	}
-	if len(cold.Document.Projects) != 2 {
-		t.Fatalf("cold document carries %d projects, want 2", len(cold.Document.Projects))
-	}
-	if cold.Provenance.FragmentsBuilt != 2 || cold.Provenance.FragmentsReused != 0 {
-		t.Errorf("provenance = %+v, want a cold reduce that built every fragment", cold.Provenance)
-	}
-
-	if err := ContextMapCommand(root, ContextMapOptions{}); err != nil {
-		t.Fatalf("context map: %v", err)
-	}
-	written, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(mapgen.JSONPath)))
-	if err != nil {
-		t.Fatalf("read map: %v", err)
-	}
-
-	warm, err := BuildWorkspaceMapResult(root, MapSectionAll, "")
+	result, err := BuildWorkspaceMapResult(root, "", "", nil)
 	if err != nil {
 		t.Fatalf("workspace_map: %v", err)
 	}
-	served, err := mapgen.RenderJSON(warm.Document)
-	if err != nil {
-		t.Fatalf("RenderJSON: %v", err)
+	if len(result.Document.Projects) != 2 {
+		t.Fatalf("document carries %d projects, want 2", len(result.Document.Projects))
 	}
-	if string(served) != string(written) {
-		t.Errorf("the served document is not byte-identical to the CLI render:\n--- CLI:\n%s\n--- MCP:\n%s",
-			written, served)
+	if result.Provenance.Section != MapSectionAll || result.Provenance.Project != "" {
+		t.Errorf("provenance scope = %+v, want the unscoped default", result.Provenance)
 	}
-	if !warm.DiskArtifact.Present || !warm.DiskArtifact.Fresh {
-		t.Errorf("the artifact the CLI just wrote is reported %+v", warm.DiskArtifact)
+	if result.Provenance.SchemaVersion != mapgen.SchemaVersion || result.Provenance.Workspace != "example" {
+		t.Errorf("provenance = %+v, want the workspace name and schema version", result.Provenance)
 	}
-	if warm.DiskArtifact.Path != mapgen.JSONPath {
-		t.Errorf("artifact path = %q, want %q", warm.DiskArtifact.Path, mapgen.JSONPath)
-	}
-	if warm.Provenance.FragmentsReused != 2 || warm.Provenance.FragmentsBuilt != 0 {
-		t.Errorf("provenance = %+v, want a warm reduce that reused every fragment", warm.Provenance)
-	}
-	if warm.Provenance.Section != MapSectionAll || warm.Provenance.Project != "" {
-		t.Errorf("provenance scope = %+v, want the unscoped default", warm.Provenance)
-	}
-	if warm.Provenance.SchemaVersion != mapgen.SchemaVersion || warm.Provenance.Workspace != "example" {
-		t.Errorf("provenance = %+v, want the workspace name and schema version", warm.Provenance)
-	}
-}
 
-// TestBuildWorkspaceMapResult_StaleArtifactIsReportedNotServed pins the
-// separation the whole design rests on: an out-of-date file on disk changes the
-// artifact STATUS, never the served document.
-func TestBuildWorkspaceMapResult_StaleArtifactIsReportedNotServed(t *testing.T) {
-	root := mapCommandWorkspace(t)
-	if err := ContextMapCommand(root, ContextMapOptions{}); err != nil {
-		t.Fatalf("context map: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash("svc/lib/README.md")),
 		[]byte("# Lib\n\nA shared library.\n"), 0o644); err != nil {
 		t.Fatalf("edit lib README: %v", err)
 	}
-
-	result, err := BuildWorkspaceMapResult(root, "", "")
+	edited, err := BuildWorkspaceMapResult(root, "", "", nil)
 	if err != nil {
-		t.Fatalf("workspace_map: %v", err)
+		t.Fatalf("workspace_map after an edit: %v", err)
 	}
-	if !result.DiskArtifact.Present || result.DiskArtifact.Fresh {
-		t.Errorf("artifact = %+v, want present but stale", result.DiskArtifact)
-	}
-	served, err := mapgen.RenderJSON(result.Document)
-	if err != nil {
-		t.Fatalf("RenderJSON: %v", err)
-	}
-	if !strings.Contains(string(served), "A shared library.") {
+	if !strings.Contains(string(renderForSize(t, edited.Document)), "A shared library.") {
 		t.Error("the served document did not reflect the working tree")
 	}
-	onDisk, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(mapgen.JSONPath)))
+
+	assertNoMapState(t, root)
+	after := treeOutsideState(t, root)
+	delete(after, "svc/lib/README.md")
+	delete(before, "svc/lib/README.md")
+	if !reflect.DeepEqual(before, after) {
+		t.Errorf("workspace_map changed the workspace tree:\nbefore: %v\nafter:  %v", before, after)
+	}
+}
+
+// TestBuildWorkspaceMapResult_ReusesSessionFragmentsUntilTheirInputsChange pins
+// the session cache the MCP server holds: a warm call reuses every fragment, an
+// edit rebuilds only the edited project's, a new session starts cold, and the
+// cache never changes a byte of the answer.
+func TestBuildWorkspaceMapResult_ReusesSessionFragmentsUntilTheirInputsChange(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "mcp-reuses-a-fragment-until-its-inputs-change")
+	root := mapCommandWorkspace(t)
+	session := mapgen.NewFragmentCache()
+
+	cold, err := BuildWorkspaceMapResult(root, "", "", session)
 	if err != nil {
-		t.Fatalf("read map: %v", err)
+		t.Fatalf("workspace_map cold: %v", err)
 	}
-	if strings.Contains(string(onDisk), "A shared library.") {
-		t.Error("a read-only tool rewrote the on-disk map")
+	if cold.Provenance.FragmentsBuilt != 2 || cold.Provenance.FragmentsReused != 0 {
+		t.Errorf("cold provenance = %+v, want every fragment built", cold.Provenance)
 	}
+	warm, err := BuildWorkspaceMapResult(root, MapSectionAPIs, "example/api", session)
+	if err != nil {
+		t.Fatalf("workspace_map warm: %v", err)
+	}
+	if warm.Provenance.FragmentsBuilt != 0 || warm.Provenance.FragmentsReused != 2 {
+		t.Errorf("warm provenance = %+v, want every fragment reused, whatever the scope", warm.Provenance)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash("svc/lib/README.md")),
+		[]byte("# Lib\n\nA shared library.\n"), 0o644); err != nil {
+		t.Fatalf("edit lib README: %v", err)
+	}
+	edited, err := BuildWorkspaceMapResult(root, "", "", session)
+	if err != nil {
+		t.Fatalf("workspace_map after an edit: %v", err)
+	}
+	if edited.Provenance.FragmentsBuilt != 1 || edited.Provenance.FragmentsReused != 1 {
+		t.Errorf("provenance after an edit = %+v, want only the edited project rebuilt", edited.Provenance)
+	}
+	uncached, err := BuildWorkspaceMapResult(root, "", "", nil)
+	if err != nil {
+		t.Fatalf("workspace_map without a cache: %v", err)
+	}
+	if string(renderForSize(t, edited.Document)) != string(renderForSize(t, uncached.Document)) {
+		t.Error("the session cache changed the served document")
+	}
+
+	other, err := BuildWorkspaceMapResult(root, "", "", mapgen.NewFragmentCache())
+	if err != nil {
+		t.Fatalf("workspace_map in a new session: %v", err)
+	}
+	if other.Provenance.FragmentsBuilt != 2 || other.Provenance.FragmentsReused != 0 {
+		t.Errorf("a new session's provenance = %+v, want a cold build: fragments are not shared across sessions", other.Provenance)
+	}
+	assertNoMapState(t, root)
 }
 
 // TestBuildWorkspaceMapResult_ScopingReturnsStrictSubsets is the other half of
@@ -115,7 +117,7 @@ func TestBuildWorkspaceMapResult_StaleArtifactIsReportedNotServed(t *testing.T) 
 // fields from the full document and never adds, renames, or rewrites one.
 func TestBuildWorkspaceMapResult_ScopingReturnsStrictSubsets(t *testing.T) {
 	root := mapCommandWorkspace(t)
-	full, err := BuildWorkspaceMapResult(root, MapSectionAll, "")
+	full, err := BuildWorkspaceMapResult(root, MapSectionAll, "", nil)
 	if err != nil {
 		t.Fatalf("workspace_map (all): %v", err)
 	}
@@ -124,7 +126,7 @@ func TestBuildWorkspaceMapResult_ScopingReturnsStrictSubsets(t *testing.T) {
 
 	for _, section := range MapSections {
 		t.Run(section, func(t *testing.T) {
-			scoped, err := BuildWorkspaceMapResult(root, section, "")
+			scoped, err := BuildWorkspaceMapResult(root, section, "", nil)
 			if err != nil {
 				t.Fatalf("workspace_map (%s): %v", section, err)
 			}
@@ -157,7 +159,7 @@ func TestBuildWorkspaceMapResult_ScopingReturnsStrictSubsets(t *testing.T) {
 	// keeps every live project because existing IS the answer there.
 	byName := map[string]int{}
 	for _, section := range []string{MapSectionProjects, MapSectionAPIs, MapSectionConfigKeys, MapSectionDependencies} {
-		scoped, err := BuildWorkspaceMapResult(root, section, "")
+		scoped, err := BuildWorkspaceMapResult(root, section, "", nil)
 		if err != nil {
 			t.Fatalf("workspace_map (%s): %v", section, err)
 		}
@@ -177,7 +179,7 @@ func TestBuildWorkspaceMapResult_ScopingReturnsStrictSubsets(t *testing.T) {
 	}
 
 	// docs is the workspace-scoped section: no project entries at all.
-	docs, err := BuildWorkspaceMapResult(root, MapSectionDocs, "")
+	docs, err := BuildWorkspaceMapResult(root, MapSectionDocs, "", nil)
 	if err != nil {
 		t.Fatalf("workspace_map (docs): %v", err)
 	}
@@ -191,7 +193,7 @@ func TestBuildWorkspaceMapResult_ScopingReturnsStrictSubsets(t *testing.T) {
 // still there so the fragment describes itself.
 func TestBuildWorkspaceMapResult_ProjectFilterNarrowsToOneEntry(t *testing.T) {
 	root := mapCommandWorkspace(t)
-	full, err := BuildWorkspaceMapResult(root, MapSectionAll, "")
+	full, err := BuildWorkspaceMapResult(root, MapSectionAll, "", nil)
 	if err != nil {
 		t.Fatalf("workspace_map (all): %v", err)
 	}
@@ -200,7 +202,7 @@ func TestBuildWorkspaceMapResult_ProjectFilterNarrowsToOneEntry(t *testing.T) {
 	// Selectable by name and by id — the same selector vocabulary every other
 	// project-scoped tool accepts.
 	for _, selector := range []string{"example/api", "/svc/api"} {
-		scoped, err := BuildWorkspaceMapResult(root, MapSectionAll, selector)
+		scoped, err := BuildWorkspaceMapResult(root, MapSectionAll, selector, nil)
 		if err != nil {
 			t.Fatalf("workspace_map (%s): %v", selector, err)
 		}
@@ -217,7 +219,7 @@ func TestBuildWorkspaceMapResult_ProjectFilterNarrowsToOneEntry(t *testing.T) {
 	}
 
 	// Section and project compose: one project, one section.
-	scoped, err := BuildWorkspaceMapResult(root, MapSectionAPIs, "example/api")
+	scoped, err := BuildWorkspaceMapResult(root, MapSectionAPIs, "example/api", nil)
 	if err != nil {
 		t.Fatalf("workspace_map (apis, example/api): %v", err)
 	}
@@ -237,7 +239,7 @@ func TestBuildWorkspaceMapResult_ProjectFilterNarrowsToOneEntry(t *testing.T) {
 func TestBuildWorkspaceMapResult_RejectsUnknownInputs(t *testing.T) {
 	root := mapCommandWorkspace(t)
 
-	_, err := BuildWorkspaceMapResult(root, "endpoints", "")
+	_, err := BuildWorkspaceMapResult(root, "endpoints", "", nil)
 	if err == nil || !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("unknown section error = %v, want ErrInvalidConfig", err)
 	}
@@ -247,7 +249,7 @@ func TestBuildWorkspaceMapResult_RejectsUnknownInputs(t *testing.T) {
 		}
 	}
 
-	_, err = BuildWorkspaceMapResult(root, "", "example/nope")
+	_, err = BuildWorkspaceMapResult(root, "", "example/nope", nil)
 	if err == nil || !errors.Is(err, cmderr.ErrNotFound) {
 		t.Fatalf("unknown project error = %v, want ErrNotFound", err)
 	}
@@ -266,7 +268,7 @@ func TestBuildWorkspaceMapResult_RefusesADegradedIdentity(t *testing.T) {
 	}
 	workspace.InvalidateLoadCache(root)
 
-	_, err := BuildWorkspaceMapResult(root, "", "")
+	_, err := BuildWorkspaceMapResult(root, "", "", nil)
 	if err == nil || !errors.Is(err, protocolcli.ErrInvalidConfig) {
 		t.Fatalf("error = %v, want ErrInvalidConfig", err)
 	}

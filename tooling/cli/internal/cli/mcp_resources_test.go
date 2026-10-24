@@ -180,3 +180,100 @@ func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 		t.Errorf("after a decision was added, the guidance resource differs from the block body\nresource:\n%s\nblock:\n%s", got, rewritten)
 	}
 }
+
+// TestMCPContextAnswersCarryNoDiskArtifact runs the real server over the
+// workspace_map and agent_context tools and their resources. Each answer
+// carries the document built in memory and no diskArtifact member, and the
+// session writes no map, fragment or agent-context file.
+func TestMCPContextAnswersCarryNoDiskArtifact(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "mcp-rebuilds-the-same-projection-in-memory")
+	root := t.TempDir()
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app"]}`)
+	write("packages/app/putnami.json", `{"name":"app","type":"application"}`)
+	write("packages/app/README.md", "# App\n\nServes the fixture.\n")
+	workspace.InvalidateLoadCache(root)
+	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
+
+	responses := serveResourceRequests(t, root,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"workspace_map","arguments":{}}}`,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"agent_context","arguments":{"project":"app"}}}`,
+		`{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"putnami://workspace/map"}}`,
+		`{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"putnami://projects/%2Fpackages%2Fapp/context"}}`)
+
+	answers := map[string]string{}
+	for id, tool := range map[int]string{1: "workspace_map", 2: "agent_context"} {
+		var result struct {
+			IsError bool `json:"isError"`
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		}
+		if responses[id].Error != nil {
+			t.Fatalf("%s: %+v", tool, responses[id].Error)
+		}
+		if err := json.Unmarshal(responses[id].Result, &result); err != nil || result.IsError || len(result.Content) == 0 {
+			t.Fatalf("%s result = %s (decode error %v)", tool, responses[id].Result, err)
+		}
+		answers[tool] = result.Content[0].Text
+	}
+	for id, uri := range map[int]string{3: "putnami://workspace/map", 4: "putnami://projects/%2Fpackages%2Fapp/context"} {
+		var result struct {
+			Contents []struct {
+				Text string `json:"text"`
+			} `json:"contents"`
+		}
+		if responses[id].Error != nil {
+			t.Fatalf("%s: %+v", uri, responses[id].Error)
+		}
+		if err := json.Unmarshal(responses[id].Result, &result); err != nil || len(result.Contents) != 1 {
+			t.Fatalf("%s result = %s (decode error %v)", uri, responses[id].Result, err)
+		}
+		answers[uri] = result.Contents[0].Text
+	}
+
+	for label, text := range answers {
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(text), &members); err != nil {
+			t.Fatalf("%s answer is not a JSON object: %v\n%s", label, err, text)
+		}
+		if _, present := members["document"]; !present {
+			t.Errorf("%s answer carries no document: %s", label, text)
+		}
+		if _, present := members["diskArtifact"]; present {
+			t.Errorf("%s answer still carries diskArtifact: %s", label, text)
+		}
+	}
+
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		switch {
+		case d.IsDir() && (rel == ".putnami/context-map" || d.Name() == ".gen"):
+			t.Errorf("the MCP session created the directory %s", rel)
+		case !d.IsDir() && (d.Name() == "repo-map.json" || d.Name() == "repo-map.md" ||
+			d.Name() == "map-fragment.json" || d.Name() == "agent-context.json"):
+			t.Errorf("the MCP session wrote %s", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -45,7 +45,7 @@ func (s *Server) registerTools() {
 
 	s.register(readOnlyTool(Tool{
 		Name:        commandmeta.MCPToolAgentContext,
-		Description: "Return one project's deterministic agent-context document built in-memory from committed facts, plus explicit artifact status and any native product-feature summaries from its optional build design graph. Use it to orient in a project without enumerating files by hand.",
+		Description: "Return one project's deterministic agent-context document built in-memory from committed facts, plus the status of its optional build design graph and any native product-feature summaries from it. Use it to orient in a project without enumerating files by hand.",
 		InputSchema: schemaObject(`"project":{"type":"string","description":"Project id or name"}`, []string{"project"}),
 	}), s.toolAgentContext)
 

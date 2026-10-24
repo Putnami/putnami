@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "identity": {
     "id": "/go/samples/task-api",
     "name": "go.putnami.dev/examples/task-api",
@@ -81,7 +81,6 @@
     }
   ],
   "tests": {
-    "policy": "require",
     "packs": [
       {
         "id": "putnami.transaction.conformance",

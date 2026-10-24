@@ -2,6 +2,7 @@ package agentcontext
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -37,7 +38,7 @@ func validDocument() *Document {
 }
 
 func TestParseDocument_UnknownField(t *testing.T) {
-	d, diags := ParseDocument([]byte(`{"protocolVersion":1,"bogus":true}`))
+	d, diags := ParseDocument([]byte(`{"protocolVersion":2,"bogus":true}`))
 	if d != nil {
 		t.Error("document should be nil on parse error")
 	}
@@ -57,7 +58,7 @@ func TestParseDocument_InvalidJSON(t *testing.T) {
 }
 
 func TestParseOverrides_UnknownField(t *testing.T) {
-	o, diags := ParseOverrides([]byte(`{"protocolVersion":1,"bogus":true}`))
+	o, diags := ParseOverrides([]byte(`{"protocolVersion":2,"bogus":true}`))
 	if o != nil {
 		t.Error("overrides file should be nil on parse error")
 	}
@@ -171,10 +172,9 @@ func TestValidateDocument_TestsSection(t *testing.T) {
 		tests *TestsSection
 		code  string
 	}{
-		{"invalidPolicy", &TestsSection{Policy: "always", AbsenceReason: AbsenceReasonNoPacks}, ErrorCodeInvalidTestPolicy},
-		{"emptyNoReason", &TestsSection{Policy: TestPolicySkip}, ErrorCodeMissingAbsenceReason},
-		{"emptyBadReason", &TestsSection{Policy: TestPolicySkip, AbsenceReason: "dunno"}, ErrorCodeInvalidAbsenceReason},
-		{"packsWithReason", &TestsSection{Policy: TestPolicyRequire, Packs: []PackRef{{ID: "p"}}, AbsenceReason: AbsenceReasonNoPacks}, ErrorCodeInvalidAbsenceReason},
+		{"emptyNoReason", &TestsSection{}, ErrorCodeMissingAbsenceReason},
+		{"emptyBadReason", &TestsSection{AbsenceReason: "dunno"}, ErrorCodeInvalidAbsenceReason},
+		{"packsWithReason", &TestsSection{Packs: []PackRef{{ID: "p"}}, AbsenceReason: AbsenceReasonNoPacks}, ErrorCodeInvalidAbsenceReason},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -197,7 +197,7 @@ func TestValidateDocument_TestsSectionAbsentIsValid(t *testing.T) {
 
 func TestValidateDocument_TestsSectionEmptyWithReasonIsValid(t *testing.T) {
 	d := validDocument()
-	d.Tests = &TestsSection{Policy: TestPolicySkip, AbsenceReason: AbsenceReasonNotCollected}
+	d.Tests = &TestsSection{AbsenceReason: AbsenceReasonNotCollected}
 	if diag.HasErrors(ValidateDocument(d)) {
 		t.Errorf("an empty tests section with an absence reason must validate clean: %v", ValidateDocument(d))
 	}
@@ -223,7 +223,7 @@ func TestValidateOverrides_Fields(t *testing.T) {
 		mutate func(*OverridesFile)
 		code   string
 	}{
-		{"badVersion", func(o *OverridesFile) { o.ProtocolVersion = 2 }, ErrorCodeInvalidProtocolVersion},
+		{"badVersion", func(o *OverridesFile) { o.ProtocolVersion = 1 }, ErrorCodeInvalidProtocolVersion},
 		{"badAddSource", func(o *OverridesFile) {
 			o.AddSources = []SourceRange{{Path: "a.go", StartLine: 0, EndLine: 0, Why: SourceReasonOverride, Tokens: TokenEstimate{Method: TokenMethodBytesDiv4}}}
 		}, ErrorCodeInvalidRange},
@@ -423,9 +423,48 @@ func TestParseDocument_TrailingDataRejected(t *testing.T) {
 // "packs":[{}] must not validate despite the section being non-empty.
 func TestValidateTests_PackMissingIDRejected(t *testing.T) {
 	d := validDocument()
-	d.Tests = &TestsSection{Policy: TestPolicyAuto, Packs: []PackRef{{}}}
+	d.Tests = &TestsSection{Packs: []PackRef{{}}}
 	if !findCode(ValidateDocument(d), ErrorCodeInvalidPack) {
 		t.Errorf("a pack entry without an id must fail with %s", ErrorCodeInvalidPack)
+	}
+}
+
+// TestTestsSection_PolicyIsUnknown pins that protocol 2 has no tests.policy:
+// the strict parser rejects the member as an unknown field, and the schema
+// closes the tests section without declaring it.
+func TestTestsSection_PolicyIsUnknown(t *testing.T) {
+	data := []byte(`{"protocolVersion":2,"identity":{"id":"/a","name":"a","path":"a"},` +
+		`"tests":{"policy":"auto","absenceReason":"no-packs"},` +
+		`"provenance":{"workspaceRevision":"deadbeef","generator":{"name":"putnami","version":"0.1.0"},"aggregationMethod":"by-reference"}}`)
+	d, diags := ParseDocument(data)
+	if d != nil || !findCode(diags, ErrorCodeUnknownField) {
+		t.Errorf("tests.policy must fail strict parsing with %s, got document %v and %v", ErrorCodeUnknownField, d != nil, diags)
+	}
+
+	raw, err := os.ReadFile(agentContextSchemaPath)
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	var schema struct {
+		Defs struct {
+			TestsSection struct {
+				AdditionalProperties *bool                      `json:"additionalProperties"`
+				Properties           map[string]json.RawMessage `json:"properties"`
+			} `json:"testsSection"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("parse schema: %v", err)
+	}
+	section := schema.Defs.TestsSection
+	if section.AdditionalProperties == nil || *section.AdditionalProperties {
+		t.Errorf("$defs.testsSection must set additionalProperties to false")
+	}
+	if _, ok := section.Properties["policy"]; ok {
+		t.Errorf("$defs.testsSection must not declare policy")
+	}
+	if len(section.Properties) == 0 {
+		t.Errorf("$defs.testsSection declares no properties; the schema shape changed")
 	}
 }
 
@@ -443,7 +482,6 @@ func TestDiagnosticTaxonomy_Membership(t *testing.T) {
 		ErrorCodeInvalidRootKind,
 		ErrorCodeInvalidSourceReason,
 		ErrorCodeInvalidDocRelationship,
-		ErrorCodeInvalidTestPolicy,
 		ErrorCodeInvalidAbsenceReason,
 		ErrorCodeMissingAbsenceReason,
 		ErrorCodeInvalidPack,
@@ -468,24 +506,8 @@ func TestDiagnosticTaxonomy_Membership(t *testing.T) {
 	}
 }
 
-// TestTestPolicy_MirrorsDatabaseTestMode pins the three policy strings to the
-// database TestMode values they mirror; if database renames one, this fails so
-// the two contracts never silently diverge.
-func TestTestPolicy_MirrorsDatabaseTestMode(t *testing.T) {
-	if TestPolicyAuto != "auto" || TestPolicyRequire != "require" || TestPolicySkip != "skip" {
-		t.Errorf("TestPolicy values must mirror database TestMode strings auto/require/skip, got %q/%q/%q",
-			TestPolicyAuto, TestPolicyRequire, TestPolicySkip)
-	}
-}
-
-// TestConstants pins the canonical filenames and paths tooling depends on.
+// TestConstants pins the canonical path tooling depends on.
 func TestConstants(t *testing.T) {
-	if DocumentFilename != "agent-context.json" {
-		t.Errorf("DocumentFilename = %q", DocumentFilename)
-	}
-	if DocumentEmitDir != ".gen" {
-		t.Errorf("DocumentEmitDir = %q, want .gen (ephemeral, never promoted)", DocumentEmitDir)
-	}
 	if OverridesPath != "schema/agent-context.overrides.json" {
 		t.Errorf("OverridesPath = %q", OverridesPath)
 	}

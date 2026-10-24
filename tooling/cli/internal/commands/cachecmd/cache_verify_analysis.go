@@ -16,7 +16,6 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
-	agentcontext "go.putnami.dev/protocol/agentcontext"
 	cache "go.putnami.dev/protocol/cache"
 	extensionproto "go.putnami.dev/protocol/extension"
 	infra "go.putnami.dev/protocol/infra"
@@ -569,7 +568,6 @@ func classify(item string, contracts []cachekey.VerificationContract, opts overr
 		}
 	}
 	if item == path.Join(".gen", "version.json") ||
-		item == path.Join(agentcontext.DocumentEmitDir, agentcontext.DocumentFilename) ||
 		strings.HasPrefix(item, path.Join(infra.AggregatedManifestDir, infra.PerProjectManifestDir)+"/") {
 		return ClassEphemeral
 	}

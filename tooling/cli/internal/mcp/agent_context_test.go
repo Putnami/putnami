@@ -21,8 +21,8 @@ func TestToolAgentContextInjectedClosure(t *testing.T) {
 		AgentContext: func(_ context.Context, sel string) (any, error) {
 			gotSelector = sel
 			return map[string]any{
-				"document":     map[string]any{"id": sel},
-				"diskArtifact": map[string]any{"present": true, "fresh": false},
+				"document":       map[string]any{"id": sel},
+				"designArtifact": map[string]any{"present": true, "compatibility": "v1"},
 			}, nil
 		},
 	})
@@ -42,9 +42,9 @@ func TestToolAgentContextInjectedClosure(t *testing.T) {
 	if doc["id"] != "app" {
 		t.Errorf("document = %v, want id=app", decoded["document"])
 	}
-	disk, _ := decoded["diskArtifact"].(map[string]any)
-	if disk["present"] != true || disk["fresh"] != false {
-		t.Errorf("diskArtifact = %v, want present=true fresh=false", disk)
+	design, _ := decoded["designArtifact"].(map[string]any)
+	if design["present"] != true || design["compatibility"] != "v1" {
+		t.Errorf("designArtifact = %v, want present=true compatibility=v1", design)
 	}
 }
 

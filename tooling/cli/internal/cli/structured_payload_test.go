@@ -29,13 +29,16 @@ func TestStructuredPayloadIsAnArrayWhenEmpty(t *testing.T) {
 	}
 }
 
-// TestContextPackAcceptsStructuredOutput holds the catalog entry that lets
-// `context pack --output=json` reach its structured renderer.
-func TestContextPackAcceptsStructuredOutput(t *testing.T) {
+// TestContextCommandsAcceptStructuredOutput holds the catalog entries that let
+// `context pack --output=json` and `context map --output=json` reach their
+// structured renderers.
+func TestContextCommandsAcceptStructuredOutput(t *testing.T) {
 	t.Parallel()
-	for _, output := range []string{"json", "jsonl"} {
-		if _, rejected := rejectStructuredIfUnsupported(output, "context", "pack"); rejected {
-			t.Errorf("context pack --output=%s is rejected", output)
+	for _, sub := range []string{"pack", "map"} {
+		for _, output := range []string{"json", "jsonl"} {
+			if _, rejected := rejectStructuredIfUnsupported(output, "context", sub); rejected {
+				t.Errorf("context %s --output=%s is rejected", sub, output)
+			}
 		}
 	}
 }
