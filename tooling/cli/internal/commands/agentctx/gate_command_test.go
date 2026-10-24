@@ -45,16 +45,23 @@ func commandEntries(names ...string) []ciproto.CommandEntry {
 	return entries
 }
 
-// A workspace with no CI document must receive exactly the line it received
-// before the gate became derived. This is the only place the generic value is
-// pinned as a literal, and it is the byte guard against a derivation that
-// quietly rewrites every consumer workspace's guidance.
+// defaultGate is the line the protocol's default CI document yields: its
+// blocking commands in its order. The test derives it rather than pinning a
+// literal, so the core names no command here either.
+func defaultGate() string {
+	return strings.Join(gateCommandNames(ciproto.DefaultDocument()), ",")
+}
+
+// A workspace without a usable document receives the blocking commands of the
+// protocol's default CI document, in that document's order.
 func TestGateTasksFallsBackWithoutCIDocument(t *testing.T) {
-	if got := gateTasksForWorkspace(t.TempDir()); got != "lint,test,build" {
-		t.Fatalf("gate without a CI document = %q, want %q", got, "lint,test,build")
+	spectest.Proves(t, "cli/ci-document", "commands-not-gate", "an-unusable-document-falls-back-to-the-default-documents-commands")
+	want := []string{"lint", "test", "build"}
+	if got := gateCommandNames(ciproto.DefaultDocument()); !reflect.DeepEqual(got, want) {
+		t.Fatalf("default document commands = %v, want %v; update the documents that quote the fallback", got, want)
 	}
-	if defaultGateTasks != "lint,test,build" {
-		t.Fatalf("defaultGateTasks = %q, want the historical generic gate", defaultGateTasks)
+	if got := gateTasksForWorkspace(t.TempDir()); got != defaultGate() {
+		t.Fatalf("gate without a CI document = %q, want %q", got, defaultGate())
 	}
 }
 
@@ -110,12 +117,12 @@ func writeWorkspaceExtensions(t *testing.T, dir string, extensions ...string) {
 	}
 }
 
-// A workspace without a usable CI document is told lint, test and build,
-// whatever its extensions declare: the gate reads no extension, so it does not
+// A workspace without a usable CI document is told the default document's
+// blocking commands, whatever its extensions declare: the gate reads no extension, so it does not
 // change with what a machine installed or with the host a regeneration runs
 // on. A workspace whose gate runs more says so in its CI document.
 func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "the-default-gate-is-lint-test-build-whatever-the-extensions-declare")
+	spectest.Proves(t, "cli/ci-document", "commands-not-gate", "an-unusable-document-falls-back-to-the-default-documents-commands")
 	t.Parallel()
 	validate := extensionManifest(t, "@example/checks", "validate")
 	cases := []struct {
@@ -141,11 +148,11 @@ func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
 			for path, manifest := range tc.manifests {
 				writeExtension(t, dir, path, manifest)
 			}
-			if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
-				t.Fatalf("gate = %q, want %q", got, defaultGateTasks)
+			if got := gateTasksForWorkspace(dir); got != defaultGate() {
+				t.Fatalf("gate = %q, want %q", got, defaultGate())
 			}
-			if got := GateTasks(dir); got != defaultGateTasks {
-				t.Fatalf("GateTasks = %q, want the same derivation %q", got, defaultGateTasks)
+			if got := GateTasks(dir); got != defaultGate() {
+				t.Fatalf("GateTasks = %q, want the same derivation %q", got, defaultGate())
 			}
 		})
 	}
@@ -162,8 +169,8 @@ func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, "checks", "putnami.json"), []byte(`{"name":"checks"}`), 0o644); err != nil {
 			t.Fatalf("write project config: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
-			t.Fatalf("gate = %q, want %q", got, defaultGateTasks)
+		if got := gateTasksForWorkspace(dir); got != defaultGate() {
+			t.Fatalf("gate = %q, want %q", got, defaultGate())
 		}
 	})
 
@@ -173,15 +180,15 @@ func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
 		t.Parallel()
 		withValidate := t.TempDir()
 		writeCIDocument(t, withValidate, "build", "lint", "test", "validate")
-		if got := gateTasksForWorkspace(withValidate); got != "lint,test,build,validate" {
-			t.Fatalf("gate = %q, want the document's lint,test,build,validate", got)
+		if got := gateTasksForWorkspace(withValidate); got != "build,lint,test,validate" {
+			t.Fatalf("gate = %q, want the document's build,lint,test,validate", got)
 		}
 		trio := t.TempDir()
 		writeWorkspaceExtensions(t, trio, "/checks")
 		writeExtension(t, trio, "/checks", validate)
 		writeCIDocument(t, trio, "build", "lint", "test")
-		if got := gateTasksForWorkspace(trio); got != defaultGateTasks {
-			t.Fatalf("gate = %q, want the document's %q", got, defaultGateTasks)
+		if got := gateTasksForWorkspace(trio); got != "build,lint,test" {
+			t.Fatalf("gate = %q, want the document's build,lint,test", got)
 		}
 	})
 
@@ -195,8 +202,8 @@ func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), []byte(`{"version":3,"commands":[]}`), 0o644); err != nil {
 			t.Fatalf("write document: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
-			t.Fatalf("gate = %q, want %q", got, defaultGateTasks)
+		if got := gateTasksForWorkspace(dir); got != defaultGate() {
+			t.Fatalf("gate = %q, want %q", got, defaultGate())
 		}
 	})
 }
@@ -217,8 +224,8 @@ func TestGateTasksFallsBackForUnusableDocuments(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), []byte(body), 0o644); err != nil {
 				t.Fatalf("write document: %v", err)
 			}
-			if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
-				t.Fatalf("gate = %q, want the fallback %q", got, defaultGateTasks)
+			if got := gateTasksForWorkspace(dir); got != defaultGate() {
+				t.Fatalf("gate = %q, want the fallback %q", got, defaultGate())
 			}
 		})
 	}
@@ -228,8 +235,8 @@ func TestGateTasksFallsBackForUnusableDocuments(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), []byte(`{"version":3,"commands":[]}`), 0o644); err != nil {
 			t.Fatalf("write document: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
-			t.Fatalf("gate = %q, want the fallback %q for an empty command list", got, defaultGateTasks)
+		if got := gateTasksForWorkspace(dir); got != defaultGate() {
+			t.Fatalf("gate = %q, want the fallback %q for an empty command list", got, defaultGate())
 		}
 	})
 
@@ -242,36 +249,72 @@ func TestGateTasksFallsBackForUnusableDocuments(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), []byte(body), 0o644); err != nil {
 			t.Fatalf("write document: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != defaultGateTasks {
-			t.Fatalf("gate = %q, want the fallback %q", got, defaultGateTasks)
+		if got := gateTasksForWorkspace(dir); got != defaultGate() {
+			t.Fatalf("gate = %q, want the fallback %q", got, defaultGate())
 		}
 	})
 
-	t.Run("no command at all", func(t *testing.T) {
-		if got := orderGateTasks(nil); got != "" {
-			t.Fatalf("gate = %q, want empty so the caller falls back", got)
+	t.Run("only blank command names", func(t *testing.T) {
+		if got := gateCommandNames(ciproto.Document{Commands: commandEntries(" ", "")}); len(got) != 0 {
+			t.Fatalf("gate commands = %v, want none so the caller falls back", got)
 		}
 	})
 }
 
-// The derived gate names every task the document declares, in the canonical
-// order, whatever order the document was authored in.
-func TestGateTasksDerivesFromDocumentGate(t *testing.T) {
-	dir := t.TempDir()
-	writeCIDocument(t, dir, "validate-workspace", "build", "validate", "test", "lint")
-
-	const want = "lint,test,build,validate,validate-workspace"
-	if got := gateTasksForWorkspace(dir); got != want {
-		t.Fatalf("derived gate = %q, want %q", got, want)
+// The derived gate names every blocking command the document declares, in the
+// document's order.
+func TestGateTasksKeepsTheDocumentsOrder(t *testing.T) {
+	spectest.Proves(t, "cli/ci-document", "commands-not-gate", "the-gate-keeps-the-documents-order")
+	cases := []struct {
+		name     string
+		commands []string
+		want     string
+	}{
+		{"test lint build stays test lint build", []string{"test", "lint", "build"}, "test,lint,build"},
+		{"build first", []string{"validate-workspace", "build", "validate", "test", "lint"}, "validate-workspace,build,validate,test,lint"},
+		{"the conventional order", []string{"lint", "test", "build", "validate"}, "lint,test,build,validate"},
+		{"one command", []string{"check"}, "check"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeCIDocument(t, dir, tc.commands...)
+			if got := gateTasksForWorkspace(dir); got != tc.want {
+				t.Fatalf("derived gate = %q, want %q", got, tc.want)
+			}
+			if got := GateTasks(dir); got != tc.want {
+				t.Fatalf("GateTasks = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
-// A gate that declares only the conventional trio must render the same string
-// as the fallback, so adopting the protocol's default CI document does not
-// churn the generated guidance.
+// Blank names are skipped, and a name that repeats counts once, so a
+// hand-edited document cannot emit an empty or repeated command.
+func TestGateCommandNamesSkipsBlankAndRepeatedNames(t *testing.T) {
+	document := ciproto.Document{Commands: commandEntries("lint", " ", "", "lint", " test ", "build")}
+	if got, want := gateCommandNames(document), []string{"lint", "test", "build"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("gate commands = %v, want %v", got, want)
+	}
+	if got := gateCommandNames(ciproto.Document{}); len(got) != 0 {
+		t.Fatalf("gate commands of an empty document = %v, want none", got)
+	}
+}
+
+// A document that declares the default document's commands renders the same
+// string as the fallback, so adopting the protocol's default CI document does
+// not churn the generated guidance.
 func TestGateTasksForDefaultDocumentMatchesFallback(t *testing.T) {
-	if got := orderGateTasks(blockingCommandNames(ciproto.DefaultDocument())); got != defaultGateTasks {
-		t.Fatalf("gate for the scaffolded document = %q, want %q", got, defaultGateTasks)
+	dir := t.TempDir()
+	data, err := json.Marshal(ciproto.DefaultDocument())
+	if err != nil {
+		t.Fatalf("marshal default document: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), data, 0o644); err != nil {
+		t.Fatalf("write default document: %v", err)
+	}
+	if got, want := gateTasksForWorkspace(dir), gateTasksForWorkspace(t.TempDir()); got != want {
+		t.Fatalf("gate for the default document = %q, want the fallback %q", got, want)
 	}
 }
 
@@ -285,34 +328,8 @@ func TestGateTasksKeepsBlockingCommandsOnly(t *testing.T) {
 		{Name: "audit", FailOnError: &advisory},
 		{Name: "test"},
 	}}
-	if got := blockingCommandNames(document); !reflect.DeepEqual(got, []string{"lint", "test"}) {
+	if got := gateCommandNames(document); !reflect.DeepEqual(got, []string{"lint", "test"}) {
 		t.Fatalf("blocking commands = %v, want [lint test]", got)
-	}
-	if got := orderGateTasks(blockingCommandNames(document)); got != "lint,test" {
-		t.Fatalf("gate = %q, want %q", got, "lint,test")
-	}
-}
-
-// orderGateTasks owns the ordering contract, so pin it directly.
-func TestOrderGateTasks(t *testing.T) {
-	cases := []struct {
-		name  string
-		tasks []string
-		want  string
-	}{
-		{"canonical prefix is reordered", []string{"build", "lint", "test"}, "lint,test,build"},
-		{"tail is sorted", []string{"validate-workspace", "test", "audit", "lint", "build", "validate"}, "lint,test,build,audit,validate,validate-workspace"},
-		{"missing prefix members are skipped", []string{"validate", "build"}, "build,validate"},
-		{"duplicates collapse", []string{"lint", "lint", "build"}, "lint,build"},
-		{"blank entries are dropped", []string{"lint", " ", ""}, "lint"},
-		{"no task yields no command", nil, ""},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := orderGateTasks(tc.tasks); got != tc.want {
-				t.Fatalf("orderGateTasks(%v) = %q, want %q", tc.tasks, got, tc.want)
-			}
-		})
 	}
 }
 
@@ -326,7 +343,7 @@ func TestGeneratedGuidanceCarriesDerivedGateAtEverySite(t *testing.T) {
 		t.Fatalf("WriteAgentEntrypoints: %v", err)
 	}
 
-	const gate = "lint,test,build,validate,validate-workspace"
+	const gate = "build,lint,test,validate,validate-workspace"
 	wantPerFile := map[string][]string{
 		// CLAUDE.md imports AGENTS.md, so the block — and its gate — is
 		// stated once, in AGENTS.md.
@@ -349,8 +366,8 @@ func TestGeneratedGuidanceCarriesDerivedGateAtEverySite(t *testing.T) {
 		}
 		// A hardcoded remnant reads as the fallback followed by a flag, which
 		// the derived line never produces because it continues with `,validate`.
-		if strings.Contains(body, "putnami "+defaultGateTasks+" -") || strings.Contains(body, "putnami "+defaultGateTasks+"`") {
-			t.Errorf("%s still names the hardcoded gate %q", path, defaultGateTasks)
+		if strings.Contains(body, "putnami "+defaultGate()+" -") || strings.Contains(body, "putnami "+defaultGate()+"`") {
+			t.Errorf("%s still names the hardcoded gate %q", path, defaultGate())
 		}
 	}
 }
@@ -365,11 +382,11 @@ func TestWriteAgentEntrypointsIsIdempotent(t *testing.T) {
 	}{
 		"CI document": {func(t *testing.T, dir string) {
 			writeCIDocument(t, dir, "build", "lint", "test", "validate")
-		}, "lint,test,build,validate"},
+		}, "build,lint,test,validate"},
 		"extensions without a CI document": {func(t *testing.T, dir string) {
 			writeWorkspaceExtensions(t, dir, "/checks")
 			writeExtension(t, dir, "/checks", extensionManifest(t, "@example/checks", "validate"))
-		}, defaultGateTasks},
+		}, defaultGate()},
 	}
 	for name, fixture := range fixtures {
 		t.Run(name, func(t *testing.T) {
@@ -534,8 +551,8 @@ func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
 func TestGeneratedGuidanceMatchesRepositoryCIDocument(t *testing.T) {
 	root := repositoryRootForAIContext(t)
 	gate := gateTasksForWorkspace(root)
-	if gate == defaultGateTasks {
-		t.Fatalf("this workspace derives only %q, so the check is vacuous; its CI document declares the validate task", gate)
+	if gate == defaultGate() {
+		t.Fatalf("this workspace derives only the default %q, so the check is vacuous; its CI document declares the validate task", gate)
 	}
 	if exported := GateTasks(root); exported != gate {
 		t.Fatalf("GateTasks(%s) = %q, want %q", root, exported, gate)
