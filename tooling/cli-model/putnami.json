@@ -17,9 +17,6 @@
     "test": {
       "coverage-threshold": 80
     },
-    "@putnami/go:test": {
-      "race": true
-    },
     "sdd": {
       "verification": {
         "specs": "enforce"

@@ -83,9 +83,6 @@
       "install": ".putnami/bin/putnami-go-dev",
       "version-var": "go.putnami.dev/tooling/cli/internal/cli.Version"
     },
-    "@putnami/go:test": {
-      "race": true
-    },
     "@putnami/go:validate": {
       "command-surface": "command-surface.json"
     },
