@@ -96,9 +96,22 @@ list. Listing prepares no workspace graph.
 |----------|---------|--------|
 | `workspace://context` | Live workspace layout, graph, topological order, publish channels, warnings, and pinned lockfile versions | `workspace.Load` + `putnami.lock.json` |
 | `putnami://extension-guidance/AI.md?name=…&version=…` | Exact `AI.md` bytes of one lock-pinned extension, or an explicit unavailable status | lock-pinned extension artifacts |
-| `putnami://workspace/guidance` | The Putnami block body of `AGENTS.md`, decisions included | `agentctx.WorkspaceGuidanceBody` |
+| `putnami://workspace/guidance` | The Putnami block body of `AGENTS.md`, then the settled decisions | `agentctx.WorkspaceGuidanceBody` |
 | `putnami://workspace/map`, `putnami://workspace/map/<section>` | The `workspace_map` answer for section `all`, or for `projects`, `dependencies`, `intercalls`, `apis`, `config-keys`, `schemas` or `docs` | the `workspace_map` builder |
 | `putnami://projects/<id>/context` | One project's `agent_context` answer. `<id>` is the canonical project id escaped as one path segment, for example `%2Ftooling%2Fcli` | the `agent_context` builder |
+
+The server also returns instructions when a client sends `initialize`. They
+hold, in order, a short routing preamble, the settled root decisions (the
+`decisions.json` at the workspace root, then a pointer to each project
+registry), and the `AI.md` of each locked extension. The instructions never
+repeat the `AGENTS.md` block, because Claude Code reads both. The decisions are
+outside the 128 KiB guide budget and are never truncated. Claude Code puts the
+instructions in the system prompt at session start. Codex 0.162 does not put
+them in the model's context at start: it shows them only inside a tool-search
+result. The server builds the instructions once, at `initialize`, so a decision
+added later reaches the session through the change notice below and the
+`putnami://workspace/guidance` resource, which lists the current decisions on
+every read.
 
 The server notices a change of the agent context between two requests. No file
 watcher runs. Before it answers a `tools/call` or a `resources/read`, it hashes

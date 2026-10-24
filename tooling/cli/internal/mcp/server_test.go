@@ -1063,6 +1063,57 @@ func TestLargeFrameUnderCapIsAccepted(t *testing.T) {
 	resultOf(t, resps[0])
 }
 
+// The settled decisions sit after the routing preamble and before the first
+// extension guide. They do not count against the guidance budget: an oversized
+// guide is still omitted, and the decisions stay whole. A server with no
+// decisions adds no heading.
+func TestInitializeListsTheSettledDecisionsBetweenThePreambleAndTheGuides(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "live-extension-guidance", "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides")
+	t.Parallel()
+	const decisions = "- D-001 — serverless workloads scale to zero (settled 2026-09-03, `validate` enforces it)\n- D-002 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)\n"
+	const guide = "# Cloud bytes\n"
+	build := func(settled func() string, content string) *Server {
+		return NewServer(Options{
+			WorkspaceRoot: t.TempDir(), ServerVersion: "test",
+			SettledDecisions:  settled,
+			ExtensionGuidance: []ExtensionGuidance{{Name: "@putnami/cloud", Version: "1.0.0", Content: content}},
+		})
+	}
+
+	srv := build(func() string { return decisions }, guide)
+	instructions := srv.initializeInstructions()
+	preamble := strings.Index(instructions, "Exact guidance follows.")
+	list := strings.Index(instructions, strings.TrimSuffix(decisions, "\n"))
+	extension := strings.Index(instructions, "--- exact extension guidance: @putnami/cloud@1.0.0 ---")
+	if preamble < 0 || list < 0 || extension < 0 || preamble >= list || list >= extension {
+		t.Fatalf("want the preamble, the decisions, then the guide; got offsets %d, %d, %d:\n%s", preamble, list, extension, instructions)
+	}
+	if !strings.HasPrefix(instructions, srv.initializeRoutingPreamble()) {
+		t.Fatalf("the instructions do not start with the routing preamble:\n%s", instructions)
+	}
+	if strings.Contains(instructions, "This is a Putnami workspace.") {
+		t.Fatalf("the instructions repeat the AGENTS.md block:\n%s", instructions)
+	}
+
+	// The decisions are outside the guide budget: a guide that fills it is
+	// still carried whole, and an oversized one is still omitted.
+	full := strings.Repeat("x", maxInitializeGuidanceBytes)
+	if got := build(func() string { return decisions }, full).initializeInstructions(); !strings.Contains(got, decisions[:len(decisions)-1]) || !strings.Contains(got, full) {
+		t.Fatalf("a guide that fills the budget lost the decisions or its own bytes (%d bytes)", len(got))
+	}
+	over := strings.Repeat("x", maxInitializeGuidanceBytes+1)
+	got := build(func() string { return decisions }, over).initializeInstructions()
+	if !strings.Contains(got, decisions[:len(decisions)-1]) || strings.Contains(got, over) || !strings.Contains(got, "exact extension guidance omitted") {
+		t.Fatalf("an oversized guide changed how the decisions are carried (%d bytes)", len(got))
+	}
+
+	for name, settled := range map[string]func() string{"no closure": nil, "no decision": func() string { return "" }} {
+		if got := build(settled, guide).initializeInstructions(); strings.Contains(got, "settled decisions") {
+			t.Errorf("%s: the instructions carry a decisions heading:\n%s", name, got)
+		}
+	}
+}
+
 func TestInitializeBoundsTotalGuidanceAndPointsAtTheResource(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "live-extension-guidance", "initialize-instructions-are-bounded-across-every-extension")
 	t.Parallel()

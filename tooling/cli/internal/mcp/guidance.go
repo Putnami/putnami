@@ -25,17 +25,47 @@ type GuidanceIssue struct {
 	Reason  string
 }
 
-// initializeRoutingPreambleFormat is deliberately compact. Codex consumes the
-// leading 512 instruction bytes, so the active-worktree guard, automatic tool
-// choice, freshness check and one-turn fallback cannot depend on the larger
-// extension guide that follows.
-// maxInitializeGuidanceBytes bounds the guidance appended to initialize across
-// every prepared extension. Each AI.md is already capped at 1 MiB on read, but
-// instructions land in the host's system prompt, so the number that governs
-// context cost is the total rather than the per-file limit. Today's extension
-// guides are 4-13 KB; this leaves an order of magnitude of headroom while
-// keeping one oversized guide from consuming a session's whole window. The
-// exact bytes of anything omitted stay available as a resource.
+// The initialize instructions have this layout, in order:
+//
+//  1. the routing preamble: the active-worktree guard, automatic tool choice,
+//     freshness check and one-turn fallback, self-contained so no later part is
+//     needed to follow it;
+//  2. the settled root decisions, when Options.SettledDecisions gives any;
+//  3. each extension's AI.md, up to maxInitializeGuidanceBytes in all.
+//
+// Which host reads which part, measured on Claude Code 2.1.308 and Codex 0.162
+// on 23 October 2026: Claude Code puts the instructions into the system prompt
+// at session start. Codex 0.162 does not put them into the model's context at
+// start. It shows them whole, and only inside a tool-search result, so a Codex
+// model reads the decisions after its first tool search, not at session start.
+// The AGENTS.md block, which every host reads from disk, is the one text that
+// reaches a model at start with or without MCP.
+//
+// The instructions never repeat that block. Claude Code reads both, so the
+// rules and the gate line stay in the block alone, and the instructions add
+// what the block no longer carries: the decisions.
+//
+// The server builds the instructions when a client sends initialize, and sends
+// them once. A decision changed later does not alter the instructions of that
+// session. The change notice that ends the next tool result names it and points
+// at the putnami://workspace/guidance resource, which lists the current
+// decisions on every read.
+
+// maxInitializeGuidanceBytes bounds the extension guidance appended to
+// initialize across every prepared extension. Each AI.md is already capped at
+// 1 MiB on read, but instructions land in the host's system prompt, so the
+// number that governs context cost is the total rather than the per-file
+// limit. Today's extension guides are 4-13 KB; this leaves an order of
+// magnitude of headroom while keeping one oversized guide from consuming a
+// session's whole window. The exact bytes of anything omitted stay available as
+// a resource.
+//
+// The settled decisions do not count against this budget and are never
+// omitted. They come first, and a decision registry is bounded by its protocol
+// (256 entries of at most 256 statement bytes). Counting them would let a long
+// registry push an extension guide out of the instructions, and omitting one
+// would hide a settled decision, which is the silent re-decision the registry
+// exists to prevent. This repository's 24 decisions take about 4.7 KB.
 const maxInitializeGuidanceBytes = 128 * 1024
 
 const initializeRoutingPreambleFormat = "MCP root=%s. Match active worktree/cwd before analysis/resume/subagents; mismatch => local Putnami CLI, not MCP. Structure: one advertised Intelligence tool; no workspace arg. Trust freshness=indexed only + revisions covering checkout. Stale/refused => local fallback this turn; no second tool. APIs: putnami.go_docs/typescript_docs. Exact guidance follows."
@@ -53,6 +83,15 @@ func initializeWorkspaceIdentity(root string) string {
 	return fmt.Sprintf("sha256:%x", sum)
 }
 
+// settledDecisions is the rendered list of settled root decisions, without a
+// trailing newline, or "" when the server has none to give.
+func (s *Server) settledDecisions() string {
+	if s.opts.SettledDecisions == nil {
+		return ""
+	}
+	return strings.TrimRight(s.opts.SettledDecisions(), "\n")
+}
+
 func (s *Server) initializeInstructions() string {
 	guidance := append([]ExtensionGuidance(nil), s.currentSelection().ExtensionGuidance...)
 	sort.SliceStable(guidance, func(i, j int) bool {
@@ -67,6 +106,10 @@ func (s *Server) initializeInstructions() string {
 	if quoted := fmt.Sprintf("%q", s.opts.WorkspaceRoot); quoted != initializeWorkspaceIdentity(s.opts.WorkspaceRoot) {
 		b.WriteString("\n\nFull MCP root for the hash above; compare this path: ")
 		b.WriteString(quoted)
+	}
+	if decisions := s.settledDecisions(); decisions != "" {
+		b.WriteString("\n\n--- settled decisions ---\n\n")
+		b.WriteString(decisions)
 	}
 	budget := maxInitializeGuidanceBytes
 	for _, guide := range guidance {

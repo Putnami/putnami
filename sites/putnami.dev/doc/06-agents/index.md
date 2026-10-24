@@ -131,7 +131,7 @@ exposes the workspace as typed tools instead of shell exploration:
 
 Plus resources, so a client that prefers resources over tool calls gets the same
 facts: `workspace://context`, `putnami://workspace/guidance` (the rules block of
-`AGENTS.md`), `putnami://workspace/map` and `putnami://workspace/map/<section>`
+`AGENTS.md`, then the settled decisions), `putnami://workspace/map` and `putnami://workspace/map/<section>`
 (what `workspace_map` returns), and `putnami://projects/<id>/context` (what
 `agent_context` returns for one project).
 

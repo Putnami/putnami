@@ -9,7 +9,6 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 const (
@@ -49,9 +48,9 @@ func writeAgentEntrypoints(wsRoot string, force bool) (guidanceWriteReport, erro
 	// owns one delimited block inside each; every other byte belongs to whoever
 	// wrote it.
 	gate := gateTasksForWorkspace(wsRoot)
-	// The workspace's settled decisions travel with the gate: both are derived
-	// from committed documents, both are read once, and both are guidance about
-	// THIS workspace rather than a hardcoded sentence.
+	// The line that names the decisions.json files travels with the gate: both
+	// are derived from committed documents, both are read once, and both are
+	// guidance about THIS workspace rather than a hardcoded sentence.
 	decisions := decisionsGuidanceForWorkspace(wsRoot)
 
 	files := make([]managedGuidanceFile, 0, 2)
@@ -123,9 +122,11 @@ const guidanceBlockTemplate = "This is a Putnami workspace.\n" +
 	"- Your first code-discovery step in any task is a Putnami MCP call, not grep, rg, find, or `git show`: `putnami.search` to locate code, `putnami.context` to orient on a project, `putnami.impact` for \"what breaks if I change X\". In Claude Code these are `mcp__putnami__putnami_search`, `mcp__putnami__putnami_context`, and `mcp__putnami__putnami_impact`; load them with ToolSearch `putnami` if they are deferred. Do this even when you already know a keyword, a commit, or a file name. Use grep only for literal text, or after the tool answers stale or unavailable. If the MCP root differs from your worktree, use the local CLI.\n" +
 	"- Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami. To customize one, copy it under another name; edited managed files are preserved and reported, never overwritten.\n" +
 	"- Read `.agents/constraints.md` when it exists.\n" +
-	// The settled decisions of THIS workspace, or nothing at all. A workspace
-	// with no decisions.json renders no line here, so its block stays exactly
-	// the block it had before the decisions registry existed.
+	// One line that names the decisions.json files of THIS workspace, or
+	// nothing at all. A workspace with no decisions.json renders no line here,
+	// so its block stays exactly the block it had before the decisions registry
+	// existed. The decisions themselves are not in the block: the MCP server
+	// lists them.
 	decisionsPlaceholder
 
 // guidanceBlock is the delimited block for a workspace's gate and decisions.
@@ -140,19 +141,29 @@ func guidanceBody(gate, decisions string) string {
 	return applyDecisions(applyGate(guidanceBlockTemplate, gate), decisions)
 }
 
-// WorkspaceGuidanceBody returns the body of the Putnami guidance block as
-// `putnami context generate` renders it now for the workspace: the rules, the
-// gate line read from putnami.ci.json, and the settled decisions. It reads the
-// same two documents as writeAgentEntrypoints and fills the same template, so
-// the MCP guidance resource always equals the block `context generate` would
-// write now. The committed block can differ until the next `context generate`.
+// WorkspaceGuidanceBody returns what the putnami://workspace/guidance resource
+// serves: the body of the Putnami guidance block as `putnami context generate`
+// renders it now for the workspace (the rules, the gate line read from
+// putnami.ci.json, and the line that names the decisions.json files), then the
+// settled decisions under their own heading. The block holds no decision, so
+// the resource is where a change notice "D-xxx added" points at a list that
+// shows it.
 //
-// It drops the workspace load memo first, as the other MCP builders do, so the
-// project-decision index of a long-lived server follows the current project set.
+// It reads the same documents as writeAgentEntrypoints and fills the same
+// template, so the block part always equals the block `context generate` would
+// write now. The committed block can differ until the next `context generate`.
+// It drops the workspace load memo first, through SettledDecisions.
 func WorkspaceGuidanceBody(wsRoot string) string {
-	workspace.InvalidateLoadCache(wsRoot)
-	return guidanceBody(gateTasksForWorkspace(wsRoot), decisionsGuidanceForWorkspace(wsRoot))
+	list := SettledDecisions(wsRoot)
+	body := guidanceBody(gateTasksForWorkspace(wsRoot), decisionsGuidanceForWorkspace(wsRoot))
+	if list == "" {
+		return body
+	}
+	return body + "\n" + settledDecisionsHeading + "\n\n" + list
 }
+
+// settledDecisionsHeading starts the decision list in the guidance resource.
+const settledDecisionsHeading = "## Settled decisions"
 
 // wrapGuidanceBlock delimits body and stamps the begin marker with the digest
 // of body, the exact bytes between the two marker lines.

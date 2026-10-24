@@ -135,7 +135,8 @@ type Options struct {
 	// ExtensionGuidance carries exact AI.md bytes read from lock-pinned
 	// extension artifacts before the server was constructed. The bytes are
 	// exposed verbatim as versioned resources and appended to initialize
-	// instructions after a short, self-contained Putnami routing preamble.
+	// instructions after a short, self-contained Putnami routing preamble and
+	// the settled decisions.
 	ExtensionGuidance []ExtensionGuidance
 	// GuidanceIssues records declared guidance that bounded read preparation
 	// could not make available. It is surfaced as an explicit resource status;
@@ -182,10 +183,18 @@ type Options struct {
 	// unavailable.
 	WorkspaceMap func(ctx context.Context, section, projectSelector string) (any, error)
 	// WorkspaceGuidance returns the Putnami guidance block body as `putnami
-	// context generate` renders it now for this workspace, decisions included.
-	// The CLI shell injects it for the same reason as the closures above. When
-	// nil, the putnami://workspace/guidance resource is left out of the list.
+	// context generate` renders it now for this workspace, then the settled
+	// decisions. The CLI shell injects it for the same reason as the closures
+	// above. When nil, the putnami://workspace/guidance resource is left out of
+	// the list.
 	WorkspaceGuidance func(ctx context.Context) string
+	// SettledDecisions returns the settled root decisions of this workspace as
+	// a Markdown list, rendered by the same reader as WorkspaceGuidance, or ""
+	// when it has none. The server places it in the initialize instructions
+	// after the routing preamble and before the extension guides (guidance.go).
+	// The CLI shell injects it for the same reason as the closures above. When
+	// nil, the instructions carry no decision.
+	SettledDecisions func() string
 	// ReloadExtensions selects the workspace's extensions: the Config,
 	// ExtensionGuidance, GuidanceIssues, PreparedExtensions and
 	// UnavailableExtensions the server serves. The CLI shell injects it for

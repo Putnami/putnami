@@ -70,11 +70,11 @@ func guidanceBlockBody(t *testing.T, agentsMD string) string {
 	return agentsMD[bodyStart : bodyStart+bodyEnd]
 }
 
-// The guidance resource of the real server equals the block body that
-// `context generate` writes, decisions and gate line included. A decision added
-// between two reads shows in the second read, which equals the block that the
-// next `context generate` writes.
-func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
+// The guidance resource of the real server holds the block body that `context
+// generate` writes, then the settled decisions. The block lists no decision, so
+// a decision added between two reads changes the resource and leaves the block
+// that the next `context generate` writes as it was.
+func TestMCPGuidanceResourceHoldsTheBlockBodyAndTheDecisions(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", "the-guidance-resource-renders-the-block-body-on-every-read")
 	root := t.TempDir()
@@ -101,9 +101,12 @@ func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	written := guidanceBlockBody(t, string(agents))
-	if !strings.Contains(written, "D-001 — every pull request names what it deletes") {
-		t.Fatalf("the written block carries no decision:\n%s", written)
+	if !strings.Contains(written, "Settled decisions are recorded in `decisions.json` files") || strings.Contains(written, "D-001") {
+		t.Fatalf("the written block must name the decision files and list no decision:\n%s", written)
 	}
+	const heading = "\n## Settled decisions\n\n"
+	const first = "- D-001 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)\n"
+	const second = "- D-002 — every GitHub artifact is written in English (settled 2026-09-11, review-only, held by a human reviewer)\n"
 
 	read := func() string {
 		t.Helper()
@@ -161,8 +164,8 @@ func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 		return result.Contents[0].Text
 	}
 
-	if got := read(); got != written {
-		t.Errorf("guidance resource differs from the written block body\nresource:\n%s\nblock:\n%s", got, written)
+	if got, want := read(), written+heading+first; got != want {
+		t.Errorf("guidance resource differs from the block body and the decisions\nresource:\n%s\nwant:\n%s", got, want)
 	}
 
 	write("decisions.json", resourcesWiringDecisionsTwo)
@@ -173,12 +176,53 @@ func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rewritten := guidanceBlockBody(t, string(agents))
-	if rewritten == written || !strings.Contains(rewritten, "D-002 — every GitHub artifact is written in English") {
-		t.Fatalf("the rewritten block does not carry the added decision:\n%s", rewritten)
+	if rewritten := guidanceBlockBody(t, string(agents)); rewritten != written {
+		t.Fatalf("a decision added after the first write changed the block:\n%s", rewritten)
 	}
-	if got := read(); got != rewritten {
-		t.Errorf("after a decision was added, the guidance resource differs from the block body\nresource:\n%s\nblock:\n%s", got, rewritten)
+	if got, want := read(), written+heading+first+second; got != want {
+		t.Errorf("after a decision was added, the guidance resource differs\nresource:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// The real server lists the settled root decisions in its initialize
+// instructions, after the routing preamble, and never repeats the block.
+func TestMCPInitializeInstructionsListTheSettledDecisions(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "live-extension-guidance", "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides")
+	root := t.TempDir()
+	for rel, content := range map[string]string{
+		"putnami.workspace.json":      `{"name":"fixture","includes":["packages/app"]}`,
+		"packages/app/putnami.json":   `{"name":"app","type":"application"}`,
+		"decisions.json":              resourcesWiringDecisions,
+		"packages/app/decisions.json": resourcesWiringDecisionsTwo,
+	} {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	workspace.InvalidateLoadCache(root)
+
+	responses := serveResourceRequests(t, root, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
+	var result struct {
+		Instructions string `json:"instructions"`
+	}
+	if err := json.Unmarshal(responses[1].Result, &result); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"--- settled decisions ---\n\n- D-001 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)",
+		"- Project decisions, returned by `putnami.context` with their project: `packages/app/decisions.json` (2).",
+	} {
+		if !strings.Contains(result.Instructions, want) {
+			t.Errorf("instructions are missing %q:\n%s", want, result.Instructions)
+		}
+	}
+	if strings.Contains(result.Instructions, "D-002") || strings.Contains(result.Instructions, "This is a Putnami workspace.") {
+		t.Errorf("instructions carry a project decision or repeat the block:\n%s", result.Instructions)
 	}
 }
 

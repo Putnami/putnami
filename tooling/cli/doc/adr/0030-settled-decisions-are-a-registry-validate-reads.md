@@ -38,8 +38,11 @@ naming the decision: id, statement, settled date, and the registry to edit.
 
 Each decision reaches an agent where it binds:
 
-- `putnami context generate` renders every root decision into the `AGENTS.md`
-  guidance block and names each project registry with its decision count;
+- `putnami context generate` names the `decisions.json` files in one line of the
+  `AGENTS.md` guidance block and lists no decision;
+- the MCP server lists every root decision in its `initialize` instructions and
+  in the `putnami://workspace/guidance` resource, and names each project
+  registry with its decision count there;
 - the `putnami.context` MCP tool returns a project's own decisions with that
   project.
 
