@@ -253,12 +253,6 @@ func TestGateTasksFallsBackForUnusableDocuments(t *testing.T) {
 			t.Fatalf("gate = %q, want the fallback %q", got, defaultGate())
 		}
 	})
-
-	t.Run("only blank command names", func(t *testing.T) {
-		if got := gateCommandNames(ciproto.Document{Commands: commandEntries(" ", "")}); len(got) != 0 {
-			t.Fatalf("gate commands = %v, want none so the caller falls back", got)
-		}
-	})
 }
 
 // The derived gate names every blocking command the document declares, in the
@@ -286,18 +280,6 @@ func TestGateTasksKeepsTheDocumentsOrder(t *testing.T) {
 				t.Fatalf("GateTasks = %q, want %q", got, tc.want)
 			}
 		})
-	}
-}
-
-// Blank names are skipped, and a name that repeats counts once, so a
-// hand-edited document cannot emit an empty or repeated command.
-func TestGateCommandNamesSkipsBlankAndRepeatedNames(t *testing.T) {
-	document := ciproto.Document{Commands: commandEntries("lint", " ", "", "lint", " test ", "build")}
-	if got, want := gateCommandNames(document), []string{"lint", "test", "build"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("gate commands = %v, want %v", got, want)
-	}
-	if got := gateCommandNames(ciproto.Document{}); len(got) != 0 {
-		t.Fatalf("gate commands of an empty document = %v, want none", got)
 	}
 }
 

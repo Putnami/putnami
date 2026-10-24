@@ -22,8 +22,8 @@ import (
 // cannot change them.
 //
 // A workspace without a usable document (missing, unparseable, or with no
-// blocking command) gets the blocking commands of ciproto.DefaultDocument,
-// the default the CI runner applies. The protocol owns those names; the core
+// blocking command) gets the blocking commands of ciproto.DefaultDocument, the
+// protocol's default CI document. The protocol owns those names; the core
 // names no command. The fallback reads no extension, so the guidance is a
 // function of the committed tree alone: it does not change with the
 // extensions installed on a machine or with the host a regeneration runs on.
@@ -49,21 +49,14 @@ func readCIDocument(wsRoot string) ciproto.Document {
 }
 
 // gateCommandNames returns the names of the commands whose failure fails the
-// run, in the document's own order. A name that repeats counts once, and a
-// blank name is skipped, so a hand-edited document cannot emit `lint,lint`.
+// run, in the document's own order. ciproto.Parse rejects blank and repeated
+// names, so the list needs no cleaning.
 func gateCommandNames(document ciproto.Document) []string {
 	names := make([]string, 0, len(document.Commands))
-	seen := make(map[string]struct{}, len(document.Commands))
 	for _, command := range document.Commands {
-		name := strings.TrimSpace(command.Name)
-		if name == "" || !command.Blocking() {
-			continue
+		if command.Blocking() {
+			names = append(names, command.Name)
 		}
-		if _, duplicate := seen[name]; duplicate {
-			continue
-		}
-		seen[name] = struct{}{}
-		names = append(names, name)
 	}
 	return names
 }
