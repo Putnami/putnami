@@ -111,8 +111,8 @@ in-process equivalent. Do not delete them as recursion.
 
 - The surface goldens (`surface_golden_test.go`, `testdata/surface/`) and the
   parse-acceptance table pin help, man, Markdown, structured help, completion
-  and valid invocations. They run in-process only: the suite runs with
-  `race: true`, where one subprocess re-exec costs about 1 s.
+  and valid invocations. They run in-process only: one subprocess re-exec
+  per golden would add its start-up cost to every golden.
 - Invalid input is a usage error (exit 2): an unknown flag for the command, a
   value flag without a value, a bad `--retry`, an unknown `--max-parallel`
   mode. Validation tests pin it, not the goldens.

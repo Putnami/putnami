@@ -24,9 +24,6 @@
         "git:**"
       ]
     },
-    "@putnami/go:test": {
-      "race": true
-    },
     "sdd": {
       "verification": {
         "specs": "enforce"

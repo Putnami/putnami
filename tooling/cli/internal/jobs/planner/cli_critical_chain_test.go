@@ -59,8 +59,10 @@ func assertCLIValidationPolicy(t *testing.T) {
 	if projectConfig == nil {
 		t.Fatal("tooling/cli/putnami.json did not load")
 	}
-	if got := projectConfig.Options["@putnami/go:test"]["race"]; got != true {
-		t.Fatalf("default CLI test race = %#v, want true", got)
+	// The race detector doubled the suite's cost and found no product race,
+	// so the default validation runs without it.
+	if got, configured := projectConfig.Options["@putnami/go:test"]["race"]; configured {
+		t.Fatalf("default CLI test race = %#v, want it unset", got)
 	}
 	if got := projectConfig.Options["test"]["coverage-threshold"]; got != float64(80) {
 		t.Fatalf("default CLI coverage threshold = %#v, want 80", got)

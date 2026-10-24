@@ -109,7 +109,8 @@ func (s *AttemptStore) Write(record *AttemptRecord) error {
 		return fmt.Errorf("attempt record needs a valid submission key")
 	}
 	record.Version = AttemptRecordVersion
-	record.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	// Nanoseconds order two submissions made within one second.
+	record.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	if record.SubmittedAt == "" {
 		record.SubmittedAt = record.UpdatedAt
 	}
@@ -172,13 +173,21 @@ func (s *AttemptStore) List() ([]*AttemptRecord, error) {
 		}
 		records = append(records, record)
 	}
+	// Instants, not strings: RFC 3339 with trimmed fractional seconds does
+	// not sort as text, and older records carry whole seconds.
 	sort.Slice(records, func(i, j int) bool {
-		if records[i].SubmittedAt != records[j].SubmittedAt {
-			return records[i].SubmittedAt > records[j].SubmittedAt
+		left, right := submittedAt(records[i]), submittedAt(records[j])
+		if !left.Equal(right) {
+			return left.After(right)
 		}
 		return records[i].Submission > records[j].Submission
 	})
 	return records, nil
+}
+
+func submittedAt(record *AttemptRecord) time.Time {
+	instant, _ := time.Parse(time.RFC3339Nano, record.SubmittedAt)
+	return instant
 }
 
 // Find resolves a reference: an attempt reference the provider issued, or the

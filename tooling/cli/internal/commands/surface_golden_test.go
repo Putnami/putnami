@@ -21,8 +21,8 @@ import (
 // bytes.
 //
 // Hard constraint (epic decision R8): IN-PROCESS ONLY. CompletionBash/Zsh/Fish
-// all take an io.Writer, so no golden here spawns the built binary — the suite
-// runs with race: true where one re-exec costs ≈1s.
+// all take an io.Writer, so no golden here spawns the built binary and pays
+// its start-up cost.
 //
 // Every golden renders with wsRoot == "" so no workspace, extension, or
 // template discovery leaks machine state into the pinned bytes. Workspace-
