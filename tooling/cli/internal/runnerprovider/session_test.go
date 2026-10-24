@@ -444,3 +444,30 @@ func TestAttemptStoreResolvesReferencesAndPendingWork(t *testing.T) {
 		t.Fatalf("prune kept %v: the unimported verdict and the newest imported record must survive", kept)
 	}
 }
+
+// Two submissions within one second still list newest first, and a record
+// written with whole seconds sorts by its instant beside a fractional one.
+func TestAttemptStoreListsSubmissionsNewestFirstWithinOneSecond(t *testing.T) {
+	t.Parallel()
+	store := NewAttemptStore(t.TempDir())
+	for _, record := range []*AttemptRecord{
+		{Submission: strings.Repeat("f", 32), Attempt: "whole-second", SubmittedAt: "2026-09-16T10:15:05Z", State: runner.StateCompleted},
+		{Submission: strings.Repeat("e", 32), Attempt: "later", SubmittedAt: "2026-09-16T10:15:05.9Z", State: runner.StateCompleted},
+		{Submission: strings.Repeat("d", 32), Attempt: "earlier", SubmittedAt: "2026-09-16T10:15:05.1Z", State: runner.StateCompleted},
+	} {
+		if err := store.Write(record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	records, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for _, record := range records {
+		order = append(order, record.Attempt)
+	}
+	if got := strings.Join(order, ","); got != "later,earlier,whole-second" {
+		t.Fatalf("listed %s, want later,earlier,whole-second", got)
+	}
+}
