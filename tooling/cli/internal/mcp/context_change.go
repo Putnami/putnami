@@ -146,20 +146,21 @@ type contextNotice struct {
 
 // startTools selects the extensions through ReloadExtensions when the server
 // has it, registers the tools the session starts with, and records the inputs
-// it starts from. It reads the inputs first, and the selection and the tools
-// count as built from that read, so an edit that lands during the start is
-// loaded by the first request.
+// it starts from. It reads the inputs first. The selection, the tools and the
+// initialize instructions count as built from that read, and the session as
+// told about it, so an edit that lands during the start is loaded and
+// reported by the first request.
 func (s *Server) startTools(ctx context.Context) {
 	before := s.readContextInputs()
 	if s.opts.ReloadExtensions != nil {
 		s.selectExtensions(ctx)
 	}
 	s.rebuildTools()
-	after := s.readContextInputs()
+	built := builtFrom(before, s.readContextInputs())
 	s.contextMu.Lock()
 	defer s.contextMu.Unlock()
-	s.changes.reported = after
-	s.changes.loaded = builtFrom(before, after)
+	s.changes.reported = built
+	s.changes.loaded = built
 	s.changes.joining = nil
 }
 

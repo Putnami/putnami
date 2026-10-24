@@ -798,8 +798,9 @@ func TestAnEditDuringAReloadIsLoadedByTheNextRequest(t *testing.T) {
 }
 
 // The server reads the inputs before it makes its start selection, and the
-// tools count as built from that read. An edit that lands during the start
-// selection is therefore loaded by the first request.
+// tools and the session count as built from and told about that read. An
+// edit that lands during the start selection is therefore loaded by the first
+// request, and its tool result reports it.
 func TestAnEditWhileTheServerStartsIsLoadedByTheFirstRequest(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, contextFeature, contextRequirement, checkEditDuringStartLoads)
@@ -833,6 +834,19 @@ func TestAnEditWhileTheServerStartsIsLoadedByTheFirstRequest(t *testing.T) {
 	want := []string{notificationToolsListChanged, notificationResourcesListChanged, "response 1"}
 	if got := methodsOf(lines); strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("lines = %v, want %v", got, want)
+	}
+	texts := toolCallTexts(t, lines, 1)
+	if len(texts) < 2 {
+		t.Fatalf("the first tool result carries no notice of the edit made during the start: %q", texts)
+	}
+	notice := texts[len(texts)-1]
+	for _, line := range []string{
+		"- @putnami/notes disabled.",
+		"- Putnami reloaded its extension tools and guides; list the tools again.",
+	} {
+		if !strings.Contains(notice, line) {
+			t.Errorf("notice lacks %q:\n%s", line, notice)
+		}
 	}
 }
 
