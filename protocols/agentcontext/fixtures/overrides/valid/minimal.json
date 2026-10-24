@@ -1,4 +1,4 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
-  "protocolVersion": 1
+  "protocolVersion": 2
 }

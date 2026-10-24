@@ -110,8 +110,7 @@ _putnami_flags_for() {
         'cli use') printf '%s\n' '--global' ;;
         'compose') printf '%s\n' '--no-watch --port --ready-timeout' ;;
         'context generate') printf '%s\n' '--force' ;;
-        'context map') printf '%s\n' '--print' ;;
-        'context pack') printf '%s\n' '--check --project' ;;
+        'context pack') printf '%s\n' '--project' ;;
         'doctor') printf '%s\n' '--machine --profile --project' ;;
         'extensions install') printf '%s\n' '--dest --latest --platform --user' ;;
         'extensions list') printf '%s\n' '--user' ;;

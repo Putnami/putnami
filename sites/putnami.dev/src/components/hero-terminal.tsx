@@ -59,7 +59,7 @@ const SCRIPT: Step[] = [
   { action: 'pause', ms: 400 },
   {
     action: 'print',
-    text: '  \u2713 webapp/.gen/agent-context.json  by reference \u00B7 0 file contents',
+    text: '  \u2713 webapp agent context  by reference \u00B7 0 file contents \u00B7 nothing written',
     style: 'success',
   },
   { action: 'print', text: '' },

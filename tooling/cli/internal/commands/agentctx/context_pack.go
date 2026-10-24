@@ -1,24 +1,19 @@
-// Package agentctx: agent-context pack + freshness gate.
+// Package agentctx: agent-context pack.
 //
 // `putnami context pack` deterministically aggregates each targeted project's
 // already-committed facts into an agentcontext.Document (protocols/agentcontext)
-// and writes it, atomically and in canonical bytes, to
-// "<project>/.gen/agent-context.json". Aggregation is strictly BY REFERENCE:
-// capabilities, contracts, infra, migrations, and the config schema travel as a
-// path plus a sha256 content digest, never as embedded content.
+// and prints it. It writes no file: `--output=json` returns the documents as
+// data, and the MCP agent_context tool builds the same document in memory.
+// Aggregation is strictly BY REFERENCE: capabilities, contracts, infra,
+// migrations, and the config schema travel as a path plus a sha256 content
+// digest, never as embedded content.
 //
-// `putnami context pack --check` regenerates every document in memory and diffs
-// it byte-for-byte against the on-disk artifact; a missing or differing document
-// is drift (exit 2). The artifact is ephemeral/gitignored, so --check is a
-// freshness gate: it drifts after any tree change (or a new workspace revision),
-// telling the user to re-run `context pack`.
-//
-// Redaction is fail-closed. Every emit — pack and check alike — runs
-// agentcontext.ValidatePublishSafety before any bytes are produced. The
+// Redaction is fail-closed. Every build — the command and the MCP tool alike —
+// runs agentcontext.ValidatePublishSafety before a document is returned. The
 // SensitivePaths set is derived from the FACTS (an infra requirements manifest
 // declaring a secret-kind requirement marks its path sensitive), independently
 // of the document's own flags, so forgetting to flag a referenced sensitive path
-// makes the gate fail and the document is never written and never passes --check.
+// makes the gate fail and the document is never printed or served.
 //
 // The document emits identity, compositionRoots, capabilities/contracts/infra/
 // migrations, config.schemaRef, and provenance; plus
@@ -27,9 +22,8 @@
 // content), adjacent docs (checked/unchecked by a text-walk), and author
 // overrides at <project>/schema/agent-context.overrides.json. The tests
 // section is populated for every project by aggregating the committed
-// conformance-pack metadata — applicable-and-opted-in packs, an
-// environment-independent policy, and fixture digests, or a machine-readable
-// absence reason (see context_tests.go).
+// conformance-pack metadata — applicable-and-opted-in packs and fixture
+// digests, or a machine-readable absence reason (see context_tests.go).
 package agentctx
 
 import (
@@ -45,7 +39,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 
@@ -81,49 +74,9 @@ const (
 
 // ContextPackReport is the machine-readable result of `context pack`.
 type ContextPackReport struct {
-	// Projects lists the documents written, in emit (sorted-by-id) order.
-	Projects []ContextPackArtifact `json:"projects"`
-}
-
-// ContextPackArtifact records one agent-context document written to disk.
-type ContextPackArtifact struct {
-	// Project is the workspace project id the document describes.
-	Project string `json:"project"`
-	// Path is the workspace-relative path of the written document.
-	Path string `json:"path"`
-}
-
-// The two verdicts `context pack --check` reports.
-//
-// They were read from internal/commands/sdd's contract-drift vocabulary until
-// a later change moved that vertical into the @putnami/sdd extension. The strings
-// are unchanged, so no consumer sees a different byte; what changed is that a
-// freshness check on agent-context documents no longer depends on the SDD
-// surface being compiled into the CLI to name its own answer.
-const (
-	ContextOutcomeClean = "clean"
-	ContextOutcomeDrift = "drift"
-)
-
-// ContextCheckReport is the machine-readable result of `context pack --check`.
-type ContextCheckReport struct {
-	// Outcome is ContextOutcomeClean or ContextOutcomeDrift.
-	Outcome string `json:"outcome"`
-	// Checked is the number of documents compared.
-	Checked int `json:"checked"`
-	// Drift lists documents whose on-disk bytes differ from a fresh emit, in
-	// emit order.
-	Drift []ContextDriftArtifact `json:"drift,omitempty"`
-}
-
-// ContextDriftArtifact records one document that no longer matches a fresh emit.
-type ContextDriftArtifact struct {
-	// Project is the workspace project id the document describes.
-	Project string `json:"project"`
-	// Path is the workspace-relative path of the drifted document.
-	Path string `json:"path"`
-	// Reason is "stale" (bytes differ) or "missing" (never written).
-	Reason string `json:"reason"`
+	// Documents holds one gate-passed document per selected project, in
+	// project-id order. It is empty, never null, when no project is selected.
+	Documents []*agentcontext.Document `json:"documents"`
 }
 
 // ContextSafetyReport is the machine-readable payload of a publish-safety
@@ -969,8 +922,8 @@ func wsRel(projPath, rel string) string {
 // indentation plus a trailing newline (byte-identical to the protocol's own
 // canonical form). A structural failure or a publish-safety violation is an
 // exit-2 classified error and NO bytes are produced, so an invalid or unsafe
-// document is never written and never passes --check. label is the project id
-// recorded in the failure report.
+// document is never printed or served. label is the project id recorded in the
+// failure report.
 func canonicalDocumentBytes(doc *agentcontext.Document, opts agentcontext.PublishSafetyOptions, label string) ([]byte, error) {
 	if diags := agentcontext.ValidateDocument(doc); diag.HasErrors(diags) {
 		return nil, contextDocumentError(label, "is invalid", diags)
@@ -1001,100 +954,43 @@ func contextDocumentError(label, what string, diags []diag.Diagnostic) error {
 	return shared.WithResultData(protocolcli.Classify(errors.New(msg), protocolcli.ErrInvalidConfig), report)
 }
 
-// buildPackedDocument builds, gates, and serializes one project's document,
-// returning the document, its workspace-relative target path, and the canonical
-// bytes. It is the single build+gate path context pack (write), context check
-// (compare), and the MCP agent_context tool (freshness) all share, so none of
-// them can disagree about what "current" means. A gate failure returns the same
-// exit-2 classified error for every caller — no unsafe or invalid document is
-// ever produced.
-func buildPackedDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (*agentcontext.Document, string, []byte, error) {
+// buildPackedDocument builds one project's document and runs it through the
+// gates its canonical serialization applies. It is the single build+gate path
+// `context pack` and the MCP agent_context tool share, so the two can never
+// disagree about the document. A gate failure returns the same exit-2
+// classified error for every caller — no unsafe or invalid document is ever
+// returned.
+func buildPackedDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (*agentcontext.Document, error) {
 	doc, opts, err := BuildDocument(ws, p, languages, revision, cliVersion)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, err
 	}
-	data, err := canonicalDocumentBytes(doc, opts, p.ID)
-	if err != nil {
-		return nil, "", nil, err
+	if _, err := canonicalDocumentBytes(doc, opts, p.ID); err != nil {
+		return nil, err
 	}
-	rel := filepath.ToSlash(filepath.Join(p.Path, agentcontext.DocumentEmitDir, agentcontext.DocumentFilename))
-	return doc, rel, data, nil
+	return doc, nil
 }
 
-// packDocument builds, gates, and serializes one project's document, returning
-// the workspace-relative target path and the canonical bytes. It is the single
-// emit path both pack (which writes it) and check (which compares it) call, so
-// the two can never disagree about what "current" means.
-func packDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (string, []byte, error) {
-	_, rel, data, err := buildPackedDocument(ws, p, languages, revision, cliVersion)
-	return rel, data, err
-}
-
-// ContextPack aggregates and atomically writes an agent-context document for
-// each targeted project. Every emit runs the fail-closed publish-safety gate;
-// an unsafe document aborts the run (exit 2) before any file is touched for it.
+// ContextPack builds and gates an agent-context document for each targeted
+// project, in memory. It writes nothing. Every build runs the fail-closed
+// publish-safety gate; an unsafe document aborts the run (exit 2) and no
+// document is returned.
 func ContextPack(ws *workspace.Workspace, projects []*workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (ContextPackReport, error) {
-	var report ContextPackReport
+	report := ContextPackReport{Documents: make([]*agentcontext.Document, 0, len(projects))}
 	for _, p := range projects {
-		rel, data, err := packDocument(ws, p, languages, revision, cliVersion)
+		doc, err := buildPackedDocument(ws, p, languages, revision, cliVersion)
 		if err != nil {
 			return ContextPackReport{}, err
 		}
-		if err := shared.AtomicWriteFile(filepath.Join(ws.Root, filepath.FromSlash(rel)), data); err != nil {
-			return ContextPackReport{}, err
-		}
-		report.Projects = append(report.Projects, ContextPackArtifact{Project: p.ID, Path: rel})
+		report.Documents = append(report.Documents, doc)
 	}
 	return report, nil
 }
 
-// ContextCheck regenerates each targeted document in memory and diffs it
-// byte-for-byte against the on-disk artifact. A missing or differing document is
-// drift. It writes nothing and returns an exit-2 error on drift (with the report
-// attached for the failure envelope); a publish-safety failure surfaces as its
-// own exit-2 error, so an unsafe document can never pass the freshness gate.
-func ContextCheck(ws *workspace.Workspace, projects []*workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (ContextCheckReport, error) {
-	report := ContextCheckReport{Outcome: ContextOutcomeClean, Checked: len(projects)}
-	for _, p := range projects {
-		rel, want, err := packDocument(ws, p, languages, revision, cliVersion)
-		if err != nil {
-			return ContextCheckReport{}, err
-		}
-		got, err := os.ReadFile(filepath.Join(ws.Root, filepath.FromSlash(rel)))
-		if err != nil {
-			if os.IsNotExist(err) {
-				report.Drift = append(report.Drift, ContextDriftArtifact{Project: p.ID, Path: rel, Reason: "missing"})
-				continue
-			}
-			return ContextCheckReport{}, fmt.Errorf("read agent-context document %s: %w", rel, err)
-		}
-		if !bytes.Equal(got, want) {
-			report.Drift = append(report.Drift, ContextDriftArtifact{Project: p.ID, Path: rel, Reason: "stale"})
-		}
-	}
-	if len(report.Drift) > 0 {
-		report.Outcome = ContextOutcomeDrift
-	}
-	return report, contextCheckError(report)
-}
-
-// contextCheckError maps a drifted report to an exit-2 configuration error with
-// the report attached for the structured failure envelope. A clean report is a
-// nil error (exit 0).
-func contextCheckError(r ContextCheckReport) error {
-	if r.Outcome == ContextOutcomeDrift {
-		err := protocolcli.Classify(
-			fmt.Errorf("context check found %d drifted agent-context document(s); run `putnami context pack`", len(r.Drift)),
-			protocolcli.ErrInvalidConfig)
-		return shared.WithResultData(err, r)
-	}
-	return nil
-}
-
-// ContextPackCommand is the `putnami context pack [--project <id|name>] [--check]`
-// entrypoint: it resolves the target projects, resolves the workspace revision,
-// and either writes (pack) or diffs (check) their documents. cliVersion is the
-// running CLI version, stamped into every document's provenance.
+// ContextPackCommand is the `putnami context pack [--project <id|name>]`
+// entrypoint: it resolves the target projects and the workspace revision,
+// builds their documents, and prints them. It writes no file. cliVersion is
+// the running CLI version, stamped into every document's provenance.
 func ContextPackCommand(wsRoot string, args []string, outputFormat, cliVersion string) error {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
@@ -1108,13 +1004,7 @@ func ContextPackCommand(wsRoot string, args []string, outputFormat, cliVersion s
 	if err != nil {
 		return err
 	}
-	revision := resolveWorkspaceRevision(wsRoot)
-
-	if hasCheckFlag(args) {
-		report, checkErr := ContextCheck(ws, projects, languages, revision, cliVersion)
-		return renderContextCheck(outputFormat, report, checkErr)
-	}
-	report, err := ContextPack(ws, projects, languages, revision, cliVersion)
+	report, err := ContextPack(ws, projects, languages, resolveWorkspaceRevision(wsRoot), cliVersion)
 	if err != nil {
 		return err
 	}
@@ -1153,9 +1043,9 @@ func declaredProjectLanguages(ws *workspace.Workspace) (workspace.ProjectLanguag
 
 // selectContextProjects resolves the projects to operate on. With no --project
 // flag, every workspace project is targeted (sorted by id for a deterministic
-// emit order); with --project, only the resolved project is. A --project flag
-// with a missing value is a usage error (not the flag-absent "all projects"
-// default), so `context pack --project --check` never silently packs everything.
+// order); with --project, only the resolved project is. A --project flag with a
+// missing value is a usage error (not the flag-absent "all projects" default),
+// so `context pack --project` never silently packs everything.
 func selectContextProjects(ws *workspace.Workspace, args []string) ([]*workspace.Project, error) {
 	selector, err := shared.ParseProjectFlag(args)
 	if err != nil {
@@ -1173,16 +1063,10 @@ func selectContextProjects(ws *workspace.Workspace, args []string) ([]*workspace
 	return []*workspace.Project{proj}, nil
 }
 
-// hasCheckFlag reports whether --check is present in args.
-func hasCheckFlag(args []string) bool {
-	return slices.Contains(args, "--check")
-}
-
 // resolveWorkspaceRevision returns the workspace revision recorded in provenance:
 // the HEAD commit sha when git can resolve it, or "unknown" otherwise (no
-// commits, or not a git checkout). The value is stable across a fixed tree, so
-// --check drifts precisely when the revision changes — the intended freshness
-// signal — while still working outside a repository.
+// commits, or not a git checkout). The value is stable across a fixed tree and
+// still resolves outside a repository.
 func resolveWorkspaceRevision(wsRoot string) string {
 	out, err := exec.Command("git", "-C", wsRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
@@ -1195,43 +1079,23 @@ func resolveWorkspaceRevision(wsRoot string) string {
 	return rev
 }
 
-// renderContextPack writes the pack result: a success v2 envelope in
-// structured mode, or a human summary of the documents written otherwise.
+// renderContextPack prints the pack result: a success v2 envelope whose data
+// holds the documents in structured mode, or each document in its canonical
+// JSON form otherwise.
 func renderContextPack(outputFormat string, report ContextPackReport) error {
 	if protocolcli.OutputMode(outputFormat).IsStructured() {
 		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
 			protocolcli.NewResultV2("context pack", report, nil))
 		return err
 	}
-	iox.Fprintf(os.Stdout, "\n  Packed %d agent-context document(s):\n", len(report.Projects))
-	for _, a := range report.Projects {
-		iox.Fprintf(os.Stdout, "    %s → %s\n", a.Project, a.Path)
-	}
-	iox.Fprintln(os.Stdout)
-	return nil
-}
-
-// renderContextCheck writes the check result. In structured mode it emits the
-// success v2 envelope on a clean report and emits nothing on drift (the
-// dispatcher writes the failure envelope with the report attached via
-// WithResultData). In human mode it prints a summary either way. checkErr is
-// returned unchanged so the dispatcher maps the process exit code.
-func renderContextCheck(outputFormat string, report ContextCheckReport, checkErr error) error {
-	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		if checkErr == nil {
-			_, _ = protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
-				protocolcli.NewResultV2("context pack --check", report, nil))
+	for _, doc := range report.Documents {
+		data, err := json.MarshalIndent(doc, "", "  ")
+		if err != nil {
+			return fmt.Errorf("serialize agent-context document: %w", err)
 		}
-		return checkErr
+		if _, err := iox.Stdout().Write(append(data, '\n')); err != nil {
+			return err
+		}
 	}
-	if report.Outcome == ContextOutcomeClean {
-		iox.Fprintf(os.Stdout, "\n  Agent-context documents are fresh (%d checked, no drift).\n\n", report.Checked)
-		return checkErr
-	}
-	iox.Fprintf(os.Stdout, "\n  Agent-context documents are stale (%d drifted); run `putnami context pack`:\n", len(report.Drift))
-	for _, d := range report.Drift {
-		iox.Fprintf(os.Stdout, "    drift: %s (%s)\n", d.Path, d.Reason)
-	}
-	iox.Fprintln(os.Stdout)
-	return checkErr
+	return nil
 }

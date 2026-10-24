@@ -105,11 +105,42 @@ func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 	if err := validateStructuredFlags("context", "uncataloged", []string{"--check"}); err != nil {
 		t.Errorf("an unknown catalog path must stay lenient: %v", err)
 	}
-	if err := validateStructuredFlags("context", "pack", []string{"--project", "web", "--check"}); err != nil {
-		t.Errorf("context pack declares --project and --check: %v", err)
+	if err := validateStructuredFlags("context", "pack", []string{"--project", "web"}); err != nil {
+		t.Errorf("context pack declares --project: %v", err)
 	}
 	if err := validateStructuredFlags("cloud", "deploy", []string{"--env", "prod"}); err != nil {
 		t.Errorf("an extension group is not a built-in path: %v", err)
+	}
+}
+
+// TestValidateStructuredFlags_RejectsTheDeletedContextFlags pins that the
+// context commands lost their writers without a transition: `context pack
+// --check` and every spelling of `context map --print` are unknown flags,
+// while the global selection and output flags stay accepted.
+func TestValidateStructuredFlags_RejectsTheDeletedContextFlags(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "the-check-flag-is-unknown")
+	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "the-print-flag-is-unknown")
+	t.Parallel()
+	for _, tc := range []struct {
+		sub  string
+		args []string
+		flag string
+	}{
+		{sub: "pack", args: []string{"--check"}, flag: "--check"},
+		{sub: "pack", args: []string{"--project", "web", "--check"}, flag: "--check"},
+		{sub: "map", args: []string{"--print"}, flag: "--print"},
+		{sub: "map", args: []string{"--print=json"}, flag: "--print"},
+		{sub: "map", args: []string{"--print", "json"}, flag: "--print"},
+	} {
+		err := validateStructuredFlags("context", tc.sub, tc.args)
+		if err == nil || !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), tc.flag) {
+			t.Errorf("context %s %v = %v, want a usage error naming %s", tc.sub, tc.args, err, tc.flag)
+		}
+	}
+	for _, args := range [][]string{{"--projects", "web,api"}, {"--impacted"}, {"--output=json"}} {
+		if err := validateStructuredFlags("context", "map", args); err != nil {
+			t.Errorf("context map %v is rejected: %v", args, err)
+		}
 	}
 }
 

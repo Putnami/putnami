@@ -67,7 +67,6 @@ func sampleDocument() *Document {
 			},
 		},
 		Tests: &TestsSection{
-			Policy: TestPolicyRequire,
 			Packs: []PackRef{
 				{ID: "putnami.transaction.conformance", CapabilityKinds: []string{"datasource"}, Languages: []string{"go", "typescript"}},
 			},

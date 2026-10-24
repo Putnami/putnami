@@ -22,9 +22,6 @@ const AbsentDigest = "absent"
 // Fragment is one project's map contribution plus the provenance needed to
 // validate it: the digest of the inputs it was computed from.
 type Fragment struct {
-	// FragmentVersion is the shape version (FragmentVersion). A mismatch makes
-	// the fragment unusable regardless of its digest.
-	FragmentVersion int `json:"fragmentVersion"`
 	// Inputs records what this fragment was computed from.
 	Inputs FragmentInputs `json:"inputs"`
 	// Project is the project-scoped half of a map entry.
@@ -84,11 +81,6 @@ type FragmentProject struct {
 	Schemas []string `json:"schemas,omitempty"`
 }
 
-// FragmentPath returns the workspace-relative path of a project's fragment.
-func FragmentPath(projectPath string) string {
-	return path3(FragmentDir, filepath.ToSlash(projectPath), FragmentFilename)
-}
-
 // path3 joins slash-formed path segments without touching the OS separator.
 func path3(parts ...string) string {
 	kept := make([]string, 0, len(parts))
@@ -105,7 +97,7 @@ func path3(parts ...string) string {
 // simply missing from the content map), and the schema listing.
 //
 // Reading is unconditional even when the caller only wants to VALIDATE a
-// persisted fragment: a digest that is not computed from the bytes on disk is
+// cached fragment: a digest that is not computed from the bytes on disk is
 // not a digest. What validation saves is the parsing and scanning — the openapi
 // walk, the JSON-Schema flatten, the README scan — not the reads.
 func readInputs(projDir string) (FragmentInputs, map[string][]byte, []string, error) {
@@ -312,40 +304,28 @@ func assembleFragment(p *workspace.Project, view identityView, inputs FragmentIn
 		project.ConfigKeys = keys
 	}
 
-	return &Fragment{FragmentVersion: FragmentVersion, Inputs: inputs, Project: project}, nil
+	return &Fragment{Inputs: inputs, Project: project}, nil
 }
 
-// CanonicalFragment serializes a fragment to its on-disk bytes: two-space
-// indented JSON with a trailing newline, the same canonical form the other
-// committed CLI artifacts use.
-func CanonicalFragment(f *Fragment) ([]byte, error) {
-	data, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("serialize map fragment: %w", err)
-	}
-	return append(data, '\n'), nil
-}
-
-// ResolveFragment returns the fragment for p and whether it was REUSED from disk.
+// ResolveFragment returns the fragment for p and whether it was REUSED from
+// cache. A nil cache builds every fragment.
 //
-// A persisted fragment is reused only when it parses, carries the current
-// FragmentVersion, and its recorded inputs digest still equals the digest of the
-// inputs on disk right now. Anything else — missing, unreadable, malformed, old
-// version, stale digest — rebuilds in memory. Drift is therefore not something
-// the caller can observe after the fact: a fragment that does not match its
-// inputs is never used.
+// A cached fragment is reused only when its recorded inputs digest equals the
+// digest of the inputs on disk right now. Anything else — no entry, a stale
+// digest — rebuilds the fragment and stores it in the cache. Drift is therefore
+// not something the caller can observe after the fact: a fragment that does
+// not match its inputs is never used.
 //
 // The digest is computed and compared BEFORE any parsing happens: a hit costs
 // the input reads and the hash, never the README summary, OpenAPI, or config
 // schema parse — which is what makes the warm path O(changed) instead of
 // O(projects).
-func ResolveFragment(wsRoot string, p *workspace.Project) (*Fragment, bool, error) {
+func ResolveFragment(wsRoot string, p *workspace.Project, cache *FragmentCache) (*Fragment, bool, error) {
 	inputs, contents, schemas, view, err := digestFragmentInputs(wsRoot, p)
 	if err != nil {
 		return nil, false, err
 	}
-	stored := readStoredFragment(filepath.Join(wsRoot, filepath.FromSlash(FragmentPath(p.Path))))
-	if stored != nil && stored.FragmentVersion == FragmentVersion &&
+	if stored := cache.lookup(p.ID); stored != nil &&
 		stored.Inputs.Digest != "" && stored.Inputs.Digest == inputs.Digest {
 		return stored, true, nil
 	}
@@ -353,24 +333,8 @@ func ResolveFragment(wsRoot string, p *workspace.Project) (*Fragment, bool, erro
 	if err != nil {
 		return nil, false, err
 	}
+	cache.store(p.ID, fresh)
 	return fresh, false, nil
-}
-
-// readStoredFragment reads and parses a persisted fragment, or returns nil.
-//
-// It deliberately reports NO error: a fragment is a cache, so a missing,
-// unreadable, or malformed entry is a miss to be recomputed, never a condition
-// that fails the build that happened to notice it.
-func readStoredFragment(abs string) *Fragment {
-	data, err := os.ReadFile(abs)
-	if err != nil {
-		return nil
-	}
-	var f Fragment
-	if err := json.Unmarshal(data, &f); err != nil {
-		return nil
-	}
-	return &f
 }
 
 // digestBytes returns the canonical "sha256:<64hex>" content address of data.

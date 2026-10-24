@@ -14,7 +14,7 @@ import (
 //   - ("", usage error) when --project is present but its value is MISSING —
 //     trailing, followed by another flag, or an empty "--project=". A missing
 //     value must never silently collapse to the flag-absent default (e.g.
-//     "context pack --project --check" would otherwise target every project),
+//     "context pack --project --output=json" would otherwise print every project),
 //     so it is a usage error, not "".
 func ParseProjectFlag(args []string) (string, error) {
 	missing := func() (string, error) {

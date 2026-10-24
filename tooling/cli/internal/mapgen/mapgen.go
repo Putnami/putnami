@@ -1,23 +1,21 @@
-// Package mapgen builds the workspace orientation map
-// (.putnami/context-map/repo-map.json and repo-map.md) from artifacts that
-// already exist on disk, as a MAP-REDUCE so that a selection-scoped run still
-// renders the complete map.
+// Package mapgen builds the workspace orientation map in memory from artifacts
+// that already exist on disk, as a MAP-REDUCE. It writes nothing: `putnami
+// context map` prints the map, and the MCP `workspace_map` tool serves it.
 //
-// The map is EPHEMERAL, CLI-owned state: it is a pure projection of
-// committed inputs, so committing the projection bought nothing and cost a
-// permanent merge hotspot, a drift class, and a CI gate. It is refreshed as a
-// side effect of `putnami build`, served fresh-at-call-time through the MCP
-// `workspace_map` tool, and never version-controlled.
+// The map is a pure projection of committed inputs, so storing it bought
+// nothing and cost a drift class: every reader rebuilds it from the working
+// tree.
 //
 // The map stage produces one FRAGMENT per project, computed from PROJECT-SCOPED
 // inputs only — putnami.json, schema/openapi.json, schema/config.jsonschema.json,
 // README.md — plus the workspace-resolved identity of that project (its id,
 // path, name, type, tags, extensions, and declared dependency names). Every
 // fragment records an INPUTS DIGEST over exactly those inputs, absent files
-// included as a typed absence, so a persisted fragment can be VALIDATED instead
-// of trusted: the reduce reuses an on-disk fragment only when its recorded
-// digest still matches the inputs on disk, and otherwise rebuilds it in memory.
-// That is what keeps the miss path O(changed) while the output stays complete.
+// included as a typed absence, so a fragment held in a FragmentCache can be
+// VALIDATED instead of trusted: a long-lived process reuses a cached fragment
+// only when its recorded digest still matches the inputs on disk, and otherwise
+// rebuilds it. That is what keeps a warm MCP call O(changed) while the output
+// stays complete.
 //
 // The reduce stage takes the LIVE project set (enumerated from the workspace
 // manifest), the fragments, and the genuinely global inputs (the workspace name
@@ -36,71 +34,28 @@
 //
 // Determinism is the point, so nothing here may leak an ambient value into the
 // bytes: no timestamps, no absolute paths, no map iteration order, and no CLI
-// version stamp. It is what makes an unchanged tree cost one digest sweep and
-// zero writes, and what lets the MCP tool's in-memory render be byte-compared
-// against the on-disk one. Every collection is sorted on a total key before it
-// is emitted.
+// version stamp. It is what makes the printed map and the MCP answer the same
+// bytes at a fixed tree. Every collection is sorted on a total key before it is
+// emitted.
 package mapgen
 
-// FragmentDir is the workspace-relative directory that holds ALL of this
-// feature's state — the per-project fragments and the two rendered documents.
-// FragmentFilename is each fragment's file name; a project's fragment lives at
-// "<FragmentDir>/<project path>/<FragmentFilename>".
-//
-// Deliberately NOT <project>/.gen/: the Go and TypeScript extensions both
-// declare the whole project-rooted .gen subtree as a task-owned DIRECTORY OUTPUT
-// (see their putnami.extension.json "declares.outputs.gen"), which the scheduler
-// captures wholesale into that task's cache entry. A file written there by
-// anything else would ride into the entry and make the cached blob depend on
-// whether a map generation happened to run first — the exact
-// non-determinism-in-a-cache-key class this feature exists to remove. This state
-// is a cache, so it lives under the workspace's own gitignored .putnami
-// directory, outside every project tree and every declared output.
-const (
-	FragmentDir      = ".putnami/context-map"
-	FragmentFilename = "map-fragment.json"
-)
-
-// Emitted document paths, workspace-relative and slash-formed. They sit beside
-// the fragments because they are the same kind of thing: derived,
-// gitignored, CLI-owned state that `putnami context map` writes and no commit carries.
-const (
-	// JSONPath is the machine-readable map.
-	JSONPath = FragmentDir + "/repo-map.json"
-	// MarkdownPath is the human/agent-readable rendering of the same data.
-	MarkdownPath = FragmentDir + "/repo-map.md"
-)
-
 // SchemaVersion is the shape version of the map document. It is a CONSTANT, not
-// a build stamp: bumping it is a deliberate format change that regenerates every
-// map. The document is also served over MCP (`workspace_map`), so
-// the version is a wire contract a consumer may branch on — which is exactly why
-// a CLI release must never move it.
+// a build stamp: bumping it is a deliberate format change. The document is
+// served over MCP (`workspace_map`) and printed by `putnami context map
+// --output=json`, so the version is a wire contract a consumer may branch on —
+// which is exactly why a CLI release must never move it.
 const SchemaVersion = 1
 
-// FragmentVersion is the shape version of a persisted fragment. A fragment
-// written by an older version is discarded rather than trusted, so a change to
-// what a fragment records cannot be masked by a matching inputs digest.
-//
-// Version 2: a fragment now also lists the project's committed schema
-// artifacts, which added a fifth input (the schema/ directory LISTING). A
-// version-1 fragment records neither, and its digest was computed over four
-// inputs — so it must be discarded rather than trusted, which is exactly what
-// this constant buys.
-const FragmentVersion = 2
-
-// GeneratedBy names the producer in the emitted documents. Version-free on
-// purpose (see SchemaVersion).
+// GeneratedBy names the producer in the document. Version-free on purpose (see
+// SchemaVersion).
 const GeneratedBy = "putnami context map"
 
-// Regenerate is the command a reader runs to refresh the map by hand; the MCP
-// tool renders it without needing the file at all.
+// Regenerate is the command a reader runs to print the map again.
 const Regenerate = "putnami context map"
 
 // ProjectInputFiles are the four project-scoped FILE inputs a fragment is
 // computed from, in the canonical (sorted) order the inputs digest hashes them.
-// Any change to this list changes every fragment's digest, which is why
-// FragmentVersion sits next to it.
+// Any change to this list changes every fragment's digest.
 var ProjectInputFiles = []string{
 	"README.md",
 	"putnami.json",
@@ -121,8 +76,8 @@ const SchemaDir = "schema"
 // it distinct from any file path the listing could ever contain.
 const SchemaDirInput = SchemaDir + "/"
 
-// RepoMap is the reduced orientation map — the document rendered to JSONPath
-// and MarkdownPath, and served verbatim by the MCP `workspace_map` tool.
+// RepoMap is the reduced orientation map — the document `putnami context map`
+// prints, as JSON or Markdown, and the MCP `workspace_map` tool serves.
 type RepoMap struct {
 	// SchemaVersion is the document shape version (SchemaVersion).
 	SchemaVersion int `json:"schemaVersion"`
