@@ -210,7 +210,7 @@
       "description": "The author-owned schema/agent-context.overrides.json that narrows deterministic selection.",
       "properties": {
         "$schema": { "type": "string", "description": "JSON Schema reference." },
-        "protocolVersion": { "type": "integer", "const": 2, "description": "Current agent-context protocol version." },
+        "protocolVersion": { "type": "integer", "const": 1, "description": "Current overrides-file protocol version, versioned apart from the document." },
         "addSources": { "type": "array", "items": { "$ref": "#/$defs/sourceRange" }, "description": "Representative-source ranges to add." },
         "removeSources": { "type": "array", "items": { "$ref": "#/$defs/relativePath" }, "description": "Source paths to drop from the selection." },
         "addDocs": { "type": "array", "items": { "$ref": "#/$defs/docRef" }, "description": "Documentation references to add." },

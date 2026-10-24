@@ -41,12 +41,18 @@
 // serialization is json.MarshalIndent(v, "", "  ")+"\n".
 package agentcontext
 
-// ProtocolVersion is the current agent-context protocol version: the version
-// every producer stamps and the JSON schema pins, for the document and the
-// overrides file alike. Bumped whenever a backwards-incompatible change to the
-// document shape, the overrides shape, an enum, or the diagnostic taxonomy
-// lands. Version 2 deletes tests.policy.
+// ProtocolVersion is the current version of the agent-context document: the
+// version every producer stamps and the JSON schema pins for the document.
+// Bumped whenever a backwards-incompatible change to the document shape, an
+// enum it uses, or the diagnostic taxonomy lands. Version 2 deletes
+// tests.policy.
 const ProtocolVersion = 2
+
+// OverridesProtocolVersion is the current version of the author-owned overrides
+// file, versioned apart from the document so that a change to the document
+// shape leaves every committed overrides file readable. Bumped only when the
+// overrides shape, or an enum it uses, changes incompatibly.
+const OverridesProtocolVersion = 1
 
 // Canonical paths used by the protocol.
 const (
@@ -389,7 +395,8 @@ type Document struct {
 type OverridesFile struct {
 	// Schema is the optional URI of the JSON schema describing this file.
 	Schema string `json:"$schema,omitempty"`
-	// ProtocolVersion selects the agent-context wire-contract version.
+	// ProtocolVersion selects the overrides-file wire-contract version,
+	// OverridesProtocolVersion.
 	ProtocolVersion int `json:"protocolVersion"`
 	// AddSources lists representative-source ranges to add to the selection.
 	AddSources []SourceRange `json:"addSources,omitempty"`

@@ -52,6 +52,7 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 		// the real document by TestGeneratedGuidanceMatchesRepositoryCIDocument.
 		"`putnami " + defaultGate() + " --impacted --enforce-coverage`",
 		"While iterating, select the projects you changed with `--projects <a>,<b>`",
+		"Use grep only for literal text, or after the tool answers stale or unavailable.",
 		"If the MCP root differs from your worktree, use the local CLI.",
 		"Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami.",
 		"Read `.agents/constraints.md` when it exists.",
@@ -64,27 +65,6 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 	// small enough to read at the top of an entrypoint the user owns.
 	if len(agent) > 2048 {
 		t.Fatalf("generated AGENTS.md is %d bytes, want at most 2048", len(agent))
-	}
-}
-
-// TestGeneratedGuidanceStatesTheFallbackForAStaleOrAbsentAnswer pins where an
-// agent learns to leave MCP: no file holds a copy of the context that could go
-// stale, so the generated block itself names the local fallback for a stale or
-// unavailable answer and for an MCP bound to another worktree.
-func TestGeneratedGuidanceStatesTheFallbackForAStaleOrAbsentAnswer(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "stale-or-absent-context-is-reported-for-fallback")
-	dir := t.TempDir()
-	if err := WriteAgentEntrypoints(dir); err != nil {
-		t.Fatalf("WriteAgentEntrypoints: %v", err)
-	}
-	agent := readGuidance(t, dir, agentEntrypointPath)
-	for _, want := range []string{
-		"Use grep only for literal text, or after the tool answers stale or unavailable.",
-		"If the MCP root differs from your worktree, use the local CLI.",
-	} {
-		if !strings.Contains(agent, want) {
-			t.Errorf("AGENTS.md does not state the fallback %q", want)
-		}
 	}
 }
 

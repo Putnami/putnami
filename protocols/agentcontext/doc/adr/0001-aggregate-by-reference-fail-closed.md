@@ -1,9 +1,9 @@
 # ADR 0001 — Aggregate by reference, and fail closed before the document leaves the workspace
 
 - **Status**: accepted
-- **Amended**: 2026-10-24, decisions 2 and 5, with protocol version 2: no
-  producer writes the document to a file, and the tests section carries no
-  test policy.
+- **Amended**: 2026-10-24, decisions 2, 4 and 5, with document protocol
+  version 2: no producer writes the document to a file, the tests section
+  carries no test policy, and the overrides file keeps its own version, 1.
 - **Scope**: `go.putnami.dev/protocol/agentcontext` (`protocols/agentcontext`)
 
 ## Context
@@ -38,10 +38,14 @@ consumes it.
 4. **Author overrides are narrow.** `<project>/schema/agent-context.overrides.json`
    may add or remove representative-source and doc entries and force-flag a path
    as sensitive. Nothing else: identity, capabilities, contracts, and
-   provenance are framework-owned facts.
+   provenance are framework-owned facts. The file has its own exact version,
+   `OverridesProtocolVersion`, apart from the document's: a change to the
+   document shape must not break a file whose shape did not change.
 5. **Every enum is closed and the version is exact.** `RootKind`,
    `SourceReason`, `DocRelationship`, `AbsenceReason`, `TokenMethod`, and
-   `AggregationMethod` change only with a `ProtocolVersion` bump. A tests
+   `AggregationMethod` change only with a `ProtocolVersion` bump, and a change
+   to `SourceReason`, `DocRelationship` or `TokenMethod`, which the overrides
+   file also uses, bumps `OverridesProtocolVersion` too. A tests
    section with no packs must carry an `absenceReason`. The tests section names
    packs and fixtures only: how test infrastructure is provisioned is a setting
    of the test jobs, so version 2 deletes `tests.policy`.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
-  "protocolVersion": 2,
+  "protocolVersion": 1,
   "addDocs": [
     { "path": "docs/internal.md", "relationship": "unknown" }
   ]

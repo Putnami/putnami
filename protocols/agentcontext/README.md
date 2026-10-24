@@ -87,7 +87,9 @@ A `nil` document fails the gate, so it never passes vacuously.
 author-owned **OverridesFile** (`OverridesPath`). It is deliberately narrow: it
 only adds/removes representative-source and doc entries and force-flags paths as
 sensitive. It never overrides identity, capabilities, or provenance — those are
-framework-owned facts.
+framework-owned facts. It carries its own version, `OverridesProtocolVersion`,
+apart from the document's, so a change to the document shape leaves a committed
+overrides file readable.
 
 ## Using it
 
@@ -144,13 +146,15 @@ exercised directly in `strict_test.go` because the gate takes caller options.
 ### Versioning
 
 `version_test.go` asserts [`schemas/agent-context.json`](schemas/agent-context.json)
-pins exactly `ProtocolVersion` for both the `document` and `overridesFile`
-shapes.
+pins exactly `ProtocolVersion` for the `document` shape and exactly
+`OverridesProtocolVersion` for the `overridesFile` shape.
 
-**Compatibility.** `ProtocolVersion` is the exact integer `2`, for the document
-and the overrides file alike; readers accept no other token and reject unknown
-fields. Version 2 deletes `tests.policy`, so a version 1 document or overrides
-file is rejected. Every enum listed above is closed, so adding a
+**Compatibility.** `ProtocolVersion`, the document version, is the exact integer
+`2`. `OverridesProtocolVersion`, the overrides-file version, is the exact
+integer `1`. Readers accept no other token for either shape and reject unknown
+fields. Document version 2 deletes `tests.policy`, so a version 1 document is
+rejected. The overrides shape did not change, so it stays at version 1 and every
+existing overrides file still reads. Every enum listed above is closed, so adding a
 composition-root kind, a selection reason, an absence reason, or a token method
 is a version bump rather than an additive edit. No producer stores the document,
 so a bump migrates producers and consumers only: there is no stored document to

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-agent-context.json",
-  "protocolVersion": 2,
+  "protocolVersion": 1,
   "addSources": [
     { "path": "go/samples/library/lib.go", "startLine": 1, "endLine": 10, "why": "handpicked", "tokens": { "estimated": 40, "method": "bytes/4" } }
   ]

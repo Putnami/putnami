@@ -58,7 +58,7 @@ func TestParseDocument_InvalidJSON(t *testing.T) {
 }
 
 func TestParseOverrides_UnknownField(t *testing.T) {
-	o, diags := ParseOverrides([]byte(`{"protocolVersion":2,"bogus":true}`))
+	o, diags := ParseOverrides([]byte(`{"protocolVersion":1,"bogus":true}`))
 	if o != nil {
 		t.Error("overrides file should be nil on parse error")
 	}
@@ -223,7 +223,8 @@ func TestValidateOverrides_Fields(t *testing.T) {
 		mutate func(*OverridesFile)
 		code   string
 	}{
-		{"badVersion", func(o *OverridesFile) { o.ProtocolVersion = 1 }, ErrorCodeInvalidProtocolVersion},
+		// The document's version is not the overrides file's.
+		{"badVersion", func(o *OverridesFile) { o.ProtocolVersion = ProtocolVersion }, ErrorCodeInvalidProtocolVersion},
 		{"badAddSource", func(o *OverridesFile) {
 			o.AddSources = []SourceRange{{Path: "a.go", StartLine: 0, EndLine: 0, Why: SourceReasonOverride, Tokens: TokenEstimate{Method: TokenMethodBytesDiv4}}}
 		}, ErrorCodeInvalidRange},
@@ -234,7 +235,7 @@ func TestValidateOverrides_Fields(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			o := &OverridesFile{ProtocolVersion: ProtocolVersion}
+			o := &OverridesFile{ProtocolVersion: OverridesProtocolVersion}
 			tc.mutate(o)
 			if !findCode(ValidateOverrides(o), tc.code) {
 				t.Errorf("want %s, got %v", tc.code, ValidateOverrides(o))

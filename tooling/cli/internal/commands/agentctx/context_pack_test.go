@@ -678,7 +678,7 @@ func TestBuildDocument_OverridesApplied(t *testing.T) {
 	// An auto doc to remove.
 	write("svc/app/README.md", "# App\n\nStart at main.go.\n")
 	write("svc/app/schema/agent-context.overrides.json", `{
-  "protocolVersion": 2,
+  "protocolVersion": 1,
   "addSources": [
     {"path": "svc/app/override_src.go", "startLine": 1, "endLine": 10, "why": "override", "tokens": {"estimated": 5, "method": "bytes/4"}}
   ],

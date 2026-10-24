@@ -158,7 +158,7 @@ func ValidateDocument(d *Document) []diag.Diagnostic {
 	}
 
 	var diags []diag.Diagnostic
-	diags = append(diags, validateProtocolVersion(d.ProtocolVersion)...)
+	diags = append(diags, validateProtocolVersion(d.ProtocolVersion, ProtocolVersion)...)
 	diags = append(diags, validateIdentity(d.Identity)...)
 
 	for i, r := range d.CompositionRoots {
@@ -400,11 +400,12 @@ func isWorkspaceRelative(p string) bool {
 	return true
 }
 
-// validateProtocolVersion checks that v is the supported protocol version.
-func validateProtocolVersion(v int) []diag.Diagnostic {
-	if v != ProtocolVersion {
+// validateProtocolVersion checks that v is want, the one version the parser
+// supports for the shape being validated.
+func validateProtocolVersion(v, want int) []diag.Diagnostic {
+	if v != want {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion",
-			"protocolVersion %d is not supported by this parser (want %d)", v, ProtocolVersion)}
+			"protocolVersion %d is not supported by this parser (want %d)", v, want)}
 	}
 	return nil
 }
@@ -417,7 +418,7 @@ func ValidateOverrides(o *OverridesFile) []diag.Diagnostic {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "overrides file is nil")}
 	}
 	var diags []diag.Diagnostic
-	diags = append(diags, validateProtocolVersion(o.ProtocolVersion)...)
+	diags = append(diags, validateProtocolVersion(o.ProtocolVersion, OverridesProtocolVersion)...)
 	for i, s := range o.AddSources {
 		diags = append(diags, validateSourceRange(fmt.Sprintf("addSources[%d]", i), s)...)
 	}
