@@ -134,12 +134,13 @@ and `notifications/resources/list_changed`, in that order, before the response
 of the request that noticed the change. The server makes its start selection
 the same way, after its first read of the inputs. The tools count as built
 from the inputs as they were before the start or the reload, so an edit that
-lands during either is loaded by the next request. A call to a tool the reload removed returns an
-error tool result that says to list the tools again and carries the notice. A
-name the server never registered stays an invalid-params error. A project's own
-`putnami.json` is not an input: a change there reloads nothing. `initialize`
-declares `listChanged: true` for tools and resources, and the server writes
-nothing after its session ends.
+lands during either is loaded by the next request, and the next tool result
+reports it. A call to a tool the reload removed returns an error tool result
+that says to list the tools again and carries the notice. A name the server
+never registered stays an invalid-params error. A project's own `putnami.json`
+is not an input: a change there reloads nothing. `initialize` declares
+`listChanged: true` for tools and resources, and the server writes nothing
+after its session ends.
 
 `run_jobs` reuses the exact CLI building blocks (`extension.DiscoverExtensions`
 → project selection → `planner.Plan` → `scheduler.RunPlan`) with
