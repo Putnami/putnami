@@ -1471,7 +1471,8 @@ worktree is created.
 ### Cache Determinism Verification
 
 `putnami cache verify` audits the plan of the workspace's gate tasks (the
-blocking commands of `putnami.ci.json`, or `lint,test,build`) using the
+blocking commands of `putnami.ci.json` in its order, or those of the CI
+protocol's default document, `lint,test,build`) using the
 ordinary engine, scheduler, cache-key builder, capture, and restore paths. It
 does not define a second cache protocol and does not alter cache keys. The
 command requires a clean worktree, creates three detached temporary worktrees,
