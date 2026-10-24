@@ -160,11 +160,22 @@ func (s *Server) registerResult(def Tool, handler toolResultHandler) {
 
 // toolDefs returns the advertised tool definitions in registration order.
 func (s *Server) toolDefs() []Tool {
+	s.registryMu.RLock()
+	defer s.registryMu.RUnlock()
 	defs := make([]Tool, len(s.tools))
 	for i, t := range s.tools {
 		defs[i] = t.def
 	}
 	return defs
+}
+
+// lookupTool returns the registered tool of that name. removed reports a
+// tool that is not registered because a reload in this session removed it.
+func (s *Server) lookupTool(name string) (entry toolEntry, ok, removed bool) {
+	s.registryMu.RLock()
+	defer s.registryMu.RUnlock()
+	entry, ok = s.byName[name]
+	return entry, ok, !ok && s.removedTools[name]
 }
 
 // handleToolsCall dispatches a tools/call request to the named tool.
@@ -175,7 +186,15 @@ func (s *Server) handleToolsCall(ctx context.Context, msg *rpcMessage) *rpcRespo
 			return s.fail(msg.ID, codeInvalidParams, "invalid params: "+err.Error())
 		}
 	}
-	entry, ok := s.byName[p.Name]
+	entry, ok, removed := s.lookupTool(p.Name)
+	if removed {
+		// A tool result, unlike a JSON-RPC error, reaches the model and carries
+		// the notice of the change that removed the tool.
+		return s.ok(msg.ID, callToolResult{
+			Content: []toolContent{{Type: "text", Text: "The tool " + p.Name + " was removed when Putnami reloaded its extensions. List the tools again."}},
+			IsError: true,
+		})
+	}
 	if !ok {
 		return s.fail(msg.ID, codeInvalidParams, "unknown tool: "+p.Name)
 	}

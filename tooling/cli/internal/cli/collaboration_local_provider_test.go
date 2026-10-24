@@ -92,7 +92,7 @@ func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 	}
 
 	// MCP reads the same store, through the same binding.
-	srv := newMCPServer(root, wsproto.Load(root), "collaboration-test")
+	srv := newMCPServer(root, "collaboration-test")
 	tools := map[string]bool{}
 	for _, tool := range listParityTools(t, srv) {
 		tools[tool.Name] = true

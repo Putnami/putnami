@@ -550,6 +550,33 @@
           }
         },
         {
+          "id": "mcp-context-change-notice",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-digest-covers-each-guidance-input",
+              "the-notice-names-each-change-and-what-to-read",
+              "the-next-tool-result-reports-a-change-once",
+              "nothing-changed-adds-no-notice",
+              "a-resource-read-leaves-the-notice-for-the-next-tool-result",
+              "an-extension-set-change-reloads-and-notifies-before-the-response",
+              "the-lists-after-a-reload-follow-the-new-extension-set",
+              "the-capabilities-declare-list-changed",
+              "concurrent-requests-report-a-change-once-without-a-data-race",
+              "a-project-a-load-finds-later-joins-without-a-notice",
+              "an-includes-or-collaboration-change-reloads-and-notifies",
+              "an-edit-during-a-reload-is-loaded-by-the-next-request",
+              "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again",
+              "nothing-is-written-after-the-session-ends",
+              "an-edit-while-the-server-starts-is-loaded"
+            ]
+          }
+        },
+        {
           "id": "agent-context-languages",
           "stage": "coded",
           "evidenceKinds": [

@@ -56,11 +56,13 @@ func (s *Server) discoverExtensions() (*extension.DiscoveryResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.noteWorkspaceLoad(ws)
 	projectPaths := make([]string, len(ws.Projects))
 	for i, p := range ws.Projects {
 		projectPaths[i] = p.Path
 	}
-	cfg := s.opts.Config
+	selection := s.currentSelection()
+	cfg := selection.Config
 	if cfg == nil {
 		cfg = wsproto.Load(s.opts.WorkspaceRoot)
 	}
@@ -68,7 +70,7 @@ func (s *Server) discoverExtensions() (*extension.DiscoveryResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	discovered.Extensions = extension.SelectPreparedExtensions(discovered.Extensions, s.opts.PreparedExtensions)
+	discovered.Extensions = extension.SelectPreparedExtensions(discovered.Extensions, selection.PreparedExtensions)
 	return discovered, nil
 }
 
@@ -89,15 +91,19 @@ func (s *Server) taskIndex(ctx context.Context, ws *workspace.Workspace) workspa
 	return workspace.NewTaskIndex(ws, discovered.Extensions, resolver.Matcher())
 }
 
-// registerExtensionTools discovers manifest-declared tools once, when the MCP
-// server starts. It only reads manifests: extension processes stay lazy and are
-// spawned on their first tools/call. Discovery and every candidate failure are
-// isolated so a bad extension can never prevent the core server from starting.
+// registerExtensionTools discovers manifest-declared tools when the MCP server
+// starts and after each reload. It only reads manifests: extension processes
+// stay lazy and are spawned on their first tools/call. Discovery and every
+// candidate failure are isolated so a bad extension can never prevent the core
+// server from starting. It records the extensions loaded by path, whose
+// manifests and guides are context inputs.
 func (s *Server) registerExtensionTools() {
 	discovered, err := s.discoverExtensions()
 	if err != nil {
+		s.notePathExtensions(nil)
 		return
 	}
+	s.notePathExtensions(discovered.Extensions)
 	// An extension that did not load exposes no tools, and an agent has no way
 	// to ask why a tool is absent. Since the require-v3 flip, the common cause is
 	// a below-contract extension whose skip Reason already names the remedy, so
@@ -115,8 +121,8 @@ func (s *Server) registerExtensionTools() {
 // registration reads it now: run_jobs is routed through engine.Run, which reads
 // the same config itself rather than being handed it.
 func (s *Server) disabled() (jobsList, extsList []string) {
-	if s.opts.Config != nil && s.opts.Config.Disable != nil {
-		return s.opts.Config.Disable.Jobs, s.opts.Config.Disable.Extensions
+	if cfg := s.currentSelection().Config; cfg != nil && cfg.Disable != nil {
+		return cfg.Disable.Jobs, cfg.Disable.Extensions
 	}
 	return nil, nil
 }
@@ -126,11 +132,12 @@ func (s *Server) disabled() (jobsList, extsList []string) {
 // from the exact lock.
 func (s *Server) unavailableExtensions() map[string]bool {
 	_, disabledExtensions := s.disabled()
-	unavailable := make(map[string]bool, len(disabledExtensions)+len(s.opts.UnavailableExtensions))
+	unprepared := s.currentSelection().UnavailableExtensions
+	unavailable := make(map[string]bool, len(disabledExtensions)+len(unprepared))
 	for _, name := range disabledExtensions {
 		unavailable[name] = true
 	}
-	for _, name := range s.opts.UnavailableExtensions {
+	for _, name := range unprepared {
 		unavailable[name] = true
 	}
 	return unavailable

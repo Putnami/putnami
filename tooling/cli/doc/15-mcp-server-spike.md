@@ -100,6 +100,48 @@ list. Listing prepares no workspace graph.
 | `putnami://workspace/map`, `putnami://workspace/map/<section>` | The `workspace_map` answer for section `all`, or for `projects`, `dependencies`, `intercalls`, `apis`, `config-keys`, `schemas` or `docs` | the `workspace_map` builder |
 | `putnami://projects/<id>/context` | One project's `agent_context` answer. `<id>` is the canonical project id escaped as one path segment, for example `%2Ftooling%2Fcli` | the `agent_context` builder |
 
+The server notices a change of the agent context between two requests. No file
+watcher runs. Before it answers a `tools/call` or a `resources/read`, it hashes
+`putnami.workspace.json`, `putnami.lock.json`, `putnami.ci.json`, the manifest
+and `AI.md` of each extension loaded by path, and the `decisions.json` files its
+last workspace load found (`internal/mcp/context_change.go`). When the digest
+differs from the one the session last heard about, the next tool result ends
+with one more text block. It names each change and what to read:
+
+```text
+Putnami notice: the workspace context changed.
+- D-025 added; putnami.ci.json changed. Read putnami://workspace/guidance
+- @putnami/go 0.3.1 installed, replacing 0.3.0. Read putnami://extension-guidance/AI.md?name=%40putnami%2Fgo&version=0.3.1
+- Putnami reloaded its extension tools and guides; list the tools again.
+```
+
+A change is reported once. A `resources/read` notices it but carries no notice,
+because a resource has no free-text slot, so the next tool result reports it. A
+tool result is the one place the notice reaches the model: neither Claude Code
+nor Codex shows a notification to it. A line points at a resource only when the
+server lists it and the resource shows the change. Otherwise it points at the
+changed file: `putnami.lock.json` for an extension installed without a listed
+guide, and `putnami.workspace.json` for a version constraint or an option. The
+`decisions.json` of a project a workspace load finds for the first time, after
+a load that failed or a change to the `includes` for example, joins the
+baseline as it is, so only a later edit to it is reported.
+
+When the extensions changed (an extension added, removed or disabled, a locked
+version, or a path manifest), or the `includes` or `options.collaboration`
+changed, the server loads the workspace again and reloads its extension
+selection, guides and tools. It then writes `notifications/tools/list_changed`
+and `notifications/resources/list_changed`, in that order, before the response
+of the request that noticed the change. The server makes its start selection
+the same way, after its first read of the inputs. The tools count as built
+from the inputs as they were before the start or the reload, so an edit that
+lands during either is loaded by the next request, and the next tool result
+reports it. A call to a tool the reload removed returns an error tool result
+that says to list the tools again and carries the notice. A name the server
+never registered stays an invalid-params error. A project's own `putnami.json`
+is not an input: a change there reloads nothing. `initialize` declares
+`listChanged: true` for tools and resources, and the server writes nothing
+after its session ends.
+
 `run_jobs` reuses the exact CLI building blocks (`extension.DiscoverExtensions`
 → project selection → `planner.Plan` → `scheduler.RunPlan`) with
 a **no-op renderer**, so job output never touches stdout (the JSON-RPC channel)
@@ -187,8 +229,9 @@ that principle for a protocol that is, for our purposes, small and stable:
 
 - The stdio transport is newline-delimited JSON-RPC 2.0 — a `bufio.Reader`
   loop and `encoding/json`. No framing library needed.
-- We use a narrow slice of MCP: lifecycle, tools, and one read-only resource.
-  We do not need prompts, sampling, roots, streaming, or notifications-out.
+- We use a narrow slice of MCP: lifecycle, tools, and read-only resources.
+  We do not need prompts, sampling, roots, or streaming; the only
+  notifications out are the two list-changed ones.
 - The hand-rolled surface remains fully unit-testable without a live client
   (see `server_test.go` and `contract_test.go`).
 
