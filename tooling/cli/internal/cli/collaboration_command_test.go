@@ -221,7 +221,7 @@ func TestCollaborationCommand_TheCLIAndMCPReturnTheSameEnvelope(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-mcp-return-the-same-envelope")
 	root := collabCommandWorkspace(t, collabCommandBindings, nil)
-	srv := newMCPServer(root, wsproto.Load(root), "collaboration-test")
+	srv := newMCPServer(root, "collaboration-test")
 	cases := []struct {
 		contract, operation, input string
 		outcome                    collab.Outcome
@@ -304,7 +304,7 @@ func TestCollaborationCommand_AnUnpreparedLockedProviderIsUnavailableOnBothEntry
 	if exts := collabCommandExtensions(t, root); len(exts) != 1 || exts[0].Version != "0.0.1" {
 		t.Fatalf("discovery = %+v, want the stale 0.0.1 behind the stable link", exts)
 	}
-	srv := newMCPServer(root, wsproto.Load(root), "collaboration-test")
+	srv := newMCPServer(root, "collaboration-test")
 	for _, tc := range []struct{ contract, operation, input string }{
 		{"tasks", "find", `{}`},
 		{"tasks", "create", `{"title":"t","idempotencyKey":"k1"}`},

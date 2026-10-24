@@ -572,7 +572,8 @@
               "an-includes-or-collaboration-change-reloads-and-notifies",
               "an-edit-during-a-reload-is-loaded-by-the-next-request",
               "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again",
-              "nothing-is-written-after-the-session-ends"
+              "nothing-is-written-after-the-session-ends",
+              "an-edit-while-the-server-starts-is-loaded"
             ]
           }
         },

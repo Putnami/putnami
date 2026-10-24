@@ -186,13 +186,16 @@ type Options struct {
 	// The CLI shell injects it for the same reason as the closures above. When
 	// nil, the putnami://workspace/guidance resource is left out of the list.
 	WorkspaceGuidance func(ctx context.Context) string
-	// ReloadExtensions selects the workspace's extensions again, the way the
-	// CLI shell selected Config, ExtensionGuidance, GuidanceIssues,
-	// PreparedExtensions and UnavailableExtensions at start. The CLI shell
-	// injects it for the same reason as the closures above. The server calls it
-	// when the extension set changed between two requests, then rebuilds its
-	// tools and sends the two list-changed notifications (context_change.go).
-	// When nil, the server keeps the selection it started with.
+	// ReloadExtensions selects the workspace's extensions: the Config,
+	// ExtensionGuidance, GuidanceIssues, PreparedExtensions and
+	// UnavailableExtensions the server serves. The CLI shell injects it for
+	// the same reason as the closures above. The server calls it while it
+	// starts, after its first read of the context inputs, so it never starts
+	// from a selection older than what it records, and the five Options fields
+	// of those names are then not used. It calls it again when the extension
+	// set changed between two requests, then rebuilds its tools and sends the
+	// two list-changed notifications (context_change.go). When nil, the server
+	// keeps the selection the five Options fields give.
 	ReloadExtensions func(ctx context.Context) ExtensionSelection
 	// ResolveSelection turns an already-id-resolved narrowing into the wire
 	// block a manifest-declared tool that declares `workspaceSelection`
@@ -220,8 +223,8 @@ type Options struct {
 
 // ExtensionSelection is the part of the server's state that follows the
 // workspace's extension set. Its fields mean what the Options fields of the
-// same names mean. The server starts from Options and replaces the selection
-// whole after ReloadExtensions.
+// same names mean. The server starts from ReloadExtensions when it has it,
+// else from Options, and replaces the selection whole after each reload.
 type ExtensionSelection struct {
 	Config                *wsproto.Config
 	ExtensionGuidance     []ExtensionGuidance
@@ -293,9 +296,15 @@ type Server struct {
 	notices bytes.Buffer
 }
 
-// NewServer builds a Server with the standard tool set registered, and reads
-// the context inputs the session starts from.
+// NewServer is NewServerWithContext with a background context.
 func NewServer(opts Options) *Server {
+	return NewServerWithContext(context.Background(), opts)
+}
+
+// NewServerWithContext builds a Server with the standard tool set registered,
+// and reads the context inputs the session starts from. ctx bounds the start
+// selection through Options.ReloadExtensions.
+func NewServerWithContext(ctx context.Context, opts Options) *Server {
 	s := &Server{opts: opts, selection: ExtensionSelection{
 		Config:                opts.Config,
 		ExtensionGuidance:     opts.ExtensionGuidance,
@@ -303,7 +312,7 @@ func NewServer(opts Options) *Server {
 		PreparedExtensions:    opts.PreparedExtensions,
 		UnavailableExtensions: opts.UnavailableExtensions,
 	}}
-	s.startTools()
+	s.startTools(ctx)
 	return s
 }
 
