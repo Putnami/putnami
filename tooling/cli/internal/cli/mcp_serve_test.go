@@ -314,8 +314,20 @@ func callMCPListProjects(t *testing.T, srv interface {
 	if err := srv.Serve(context.Background(), strings.NewReader(request), &stdout); err != nil {
 		t.Fatal(err)
 	}
+	// A server that reloaded its extensions for a changed lock announces its
+	// new lists before the response, so the response is the last line.
+	lines := bytes.Split(bytes.TrimSpace(stdout.Bytes()), []byte("\n"))
+	for _, line := range lines[:len(lines)-1] {
+		var notification struct {
+			Method string `json:"method"`
+			ID     *int   `json:"id"`
+		}
+		if err := json.Unmarshal(line, &notification); err != nil || notification.ID != nil || !strings.HasSuffix(notification.Method, "/list_changed") {
+			t.Fatalf("line before the list_projects response is not a list-changed notification: %q", line)
+		}
+	}
 	var frame testJSONRPCEnvelope
-	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &frame); err != nil {
+	if err := json.Unmarshal(lines[len(lines)-1], &frame); err != nil {
 		t.Fatalf("decode JSON-RPC response: %v", err)
 	}
 	if frame.JSONRPC != "2.0" || frame.ID != 1 || frame.Error != nil || len(frame.Result) == 0 {

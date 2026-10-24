@@ -120,6 +120,7 @@ func (s *Server) listedProjects() []*workspace.Project {
 	if err != nil {
 		return nil
 	}
+	s.noteWorkspaceLoad(ws)
 	projects := append([]*workspace.Project(nil), ws.Projects...)
 	sort.Slice(projects, func(i, j int) bool { return projects[i].Path < projects[j].Path })
 	return projects
@@ -247,9 +248,10 @@ type guidanceResource struct {
 }
 
 func (s *Server) guidanceResources() []guidanceResource {
-	entries := make([]guidanceResource, 0, len(s.opts.ExtensionGuidance)+len(s.opts.GuidanceIssues))
-	available := make(map[string]bool, len(s.opts.ExtensionGuidance))
-	for _, guide := range s.opts.ExtensionGuidance {
+	selection := s.currentSelection()
+	entries := make([]guidanceResource, 0, len(selection.ExtensionGuidance)+len(selection.GuidanceIssues))
+	available := make(map[string]bool, len(selection.ExtensionGuidance))
+	for _, guide := range selection.ExtensionGuidance {
 		if guide.Name == "" || guide.Version == "" || guide.Content == "" {
 			continue
 		}
@@ -264,7 +266,7 @@ func (s *Server) guidanceResources() []guidanceResource {
 			content: guide.Content,
 		})
 	}
-	for _, issue := range s.opts.GuidanceIssues {
+	for _, issue := range selection.GuidanceIssues {
 		if issue.Name == "" || available[issue.Name+"\x00"+issue.Version] {
 			continue
 		}
