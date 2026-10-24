@@ -62,7 +62,7 @@
     },
     {
       "id": "mcp-workspace-resources",
-      "text": "The MCP server lists and serves the workspace guidance, the workspace map, and each project's agent context as resources. Each resource has a concrete URI. The server renders each one on every read with the builder its tool or command uses: putnami://workspace/guidance returns the Putnami block body that context generate writes, putnami://workspace/map and putnami://workspace/map/<section> return the workspace_map answer, and putnami://projects/<id>/context returns the agent_context answer, with the canonical project id escaped as one path segment. Listing resources prepares no workspace graph. A resource whose builder is not available is left out of the list, and a read of an unknown URI fails with invalid params."
+      "text": "The MCP server serves resources with concrete URIs, each rendered on every read by its tool's builder: putnami://workspace/guidance holds the block body context generate writes, putnami://workspace/map and putnami://workspace/map/<section> the workspace_map answer, putnami://projects/<id>/context the agent_context answer for the escaped canonical id. Listing prepares no workspace graph and follows the current project set. An unknown URI, or one whose builder is absent, fails with invalid params."
     },
     {
       "id": "mcp-protocol-version",
