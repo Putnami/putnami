@@ -6,7 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,9 +20,16 @@ import (
 )
 
 const (
-	testGuidanceBody = "This is a Putnami workspace.\n- Rule one.\n"
-	checkResources   = "the-server-lists-and-reads-the-guidance-map-and-project-resources"
-	checkNegotiation = "initialize-answers-with-a-version-the-server-speaks"
+	testGuidanceBody              = "This is a Putnami workspace.\n- Rule one.\n"
+	checkListsConcreteURIs        = "the-server-lists-each-workspace-resource-by-a-concrete-uri"
+	checkGuidanceRendersEachRead  = "the-guidance-resource-renders-the-block-body-on-every-read"
+	checkResourceReturnsToolBytes = "a-map-or-project-resource-returns-its-tools-bytes"
+	checkListingPreparesNoGraph   = "listing-resources-prepares-no-workspace-graph"
+	checkUnknownIsInvalidParams   = "an-unknown-or-unavailable-resource-is-invalid-params"
+	checkResourcesFollowWorkspace = "project-resources-follow-the-current-project-set"
+	checkNegotiation              = "initialize-answers-with-a-version-the-server-speaks"
+	checkDiscover                 = "server-discover-is-method-not-found"
+	checkRelayListMatchesServer   = "the-relay-and-the-server-speak-the-same-versions"
 )
 
 // resourceServer builds a server over the shared fixture with the three
@@ -141,7 +152,7 @@ func assertCode(t *testing.T, what string, reply testReply, code int) {
 
 func TestResourcesListIncludesTheWorkspaceResources(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkListsConcreteURIs)
 	uris := listedURIs(t, resourceServer(t))
 	want := []string{
 		workspaceContextURI,
@@ -164,7 +175,7 @@ func TestResourcesListIncludesTheWorkspaceResources(t *testing.T) {
 
 func TestWorkspaceMapSectionsMatchTheToolSchema(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkListsConcreteURIs)
 	var enum []string
 	for _, tool := range newFixtureServer(t).toolDefs() {
 		if tool.Name != "workspace_map" {
@@ -190,7 +201,7 @@ func TestWorkspaceMapSectionsMatchTheToolSchema(t *testing.T) {
 
 func TestGuidanceResourceReturnsTheInjectedBody(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkGuidanceRendersEachRead)
 	text, mime := readResourceText(t, resourceServer(t), workspaceGuidanceURI)
 	if text != testGuidanceBody || mime != "text/markdown" {
 		t.Errorf("guidance = (%q, %q), want the injected body as text/markdown", text, mime)
@@ -199,7 +210,7 @@ func TestGuidanceResourceReturnsTheInjectedBody(t *testing.T) {
 
 func TestGuidanceResourceRendersOnEveryRead(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkGuidanceRendersEachRead)
 	dir := fixtureWorkspace(t)
 	reads := 0
 	srv := NewServer(Options{
@@ -218,7 +229,7 @@ func TestGuidanceResourceRendersOnEveryRead(t *testing.T) {
 
 func TestMapResourcesReturnTheToolBytes(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResourceReturnsToolBytes)
 	srv := resourceServer(t)
 	cases := map[string]map[string]string{
 		"putnami://workspace/map": {"section": "all"},
@@ -239,7 +250,7 @@ func TestMapResourcesReturnTheToolBytes(t *testing.T) {
 
 func TestProjectContextResourceReturnsTheToolBytes(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResourceReturnsToolBytes)
 	srv := resourceServer(t)
 	for _, id := range []string{"/packages/app", "/packages/lib"} {
 		text, _ := readResourceText(t, srv, projectContextURI(id))
@@ -251,7 +262,7 @@ func TestProjectContextResourceReturnsTheToolBytes(t *testing.T) {
 
 func TestProjectContextURIEscapesTheCanonicalID(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkListsConcreteURIs)
 	for _, id := range []string{"/packages/app", "/a b/c%d", "/tooling/cli"} {
 		uri := projectContextURI(id)
 		if strings.Contains(strings.TrimSuffix(strings.TrimPrefix(uri, projectContextPrefix), projectContextSuffix), "/") {
@@ -268,7 +279,7 @@ func TestProjectContextURIEscapesTheCanonicalID(t *testing.T) {
 
 func TestUnknownWorkspaceResourcesFailWithInvalidParams(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkUnknownIsInvalidParams)
 	srv := resourceServer(t)
 	for _, uri := range []string{
 		"putnami://workspace/map/endpoints",
@@ -287,7 +298,7 @@ func TestUnknownWorkspaceResourcesFailWithInvalidParams(t *testing.T) {
 // fails like any unknown URI. The list never offers what a read refuses.
 func TestNilBuildersLeaveTheirResourcesOut(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkUnknownIsInvalidParams)
 	srv := newFixtureServer(t)
 	if uris := listedURIs(t, srv); !reflect.DeepEqual(uris, []string{workspaceContextURI}) {
 		t.Errorf("resources/list = %v, want only %s", uris, workspaceContextURI)
@@ -299,7 +310,7 @@ func TestNilBuildersLeaveTheirResourcesOut(t *testing.T) {
 
 func TestMapResourceReportsBuilderFailureAsAnInternalError(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResourceReturnsToolBytes)
 	dir := fixtureWorkspace(t)
 	srv := NewServer(Options{
 		WorkspaceRoot: dir,
@@ -316,7 +327,7 @@ func TestMapResourceReportsBuilderFailureAsAnInternalError(t *testing.T) {
 
 func TestListingResourcesPreparesNoWorkspaceView(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResources)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkListingPreparesNoGraph)
 	dir := fixtureWorkspace(t)
 	prepared := 0
 	srv := NewServer(Options{
@@ -383,6 +394,79 @@ func TestDefaultProtocolVersionIsTheNewestSupported(t *testing.T) {
 // to initialize on "method not found". The server keeps answering that way.
 func TestServerDiscoverIsMethodNotFound(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-protocol-version", checkNegotiation)
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-protocol-version", checkDiscover)
 	assertCode(t, "server/discover", call(t, newFixtureServer(t), "server/discover", nil), codeMethodNotFound)
+}
+
+// The server is long-lived. A project added to or removed from the workspace
+// after the first request changes the list and the read, as it changes the
+// agent_context tool, without a change to the recorded index file.
+func TestProjectResourcesFollowTheCurrentProjectSet(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResourcesFollowWorkspace)
+	dir := fixtureWorkspace(t)
+	srv := NewServer(Options{
+		WorkspaceRoot: dir,
+		AgentContext: func(_ context.Context, selector string) (any, error) {
+			return struct {
+				Project string `json:"project"`
+			}{Project: selector}, nil
+		},
+	})
+	added := projectContextURI("/packages/extra")
+	if uris := listedURIs(t, srv); slices.Contains(uris, added) {
+		t.Fatalf("resources/list = %v, want no extra project yet", uris)
+	}
+
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib","packages/extra"]}`)
+	write("packages/extra/putnami.json", `{"name":"extra","type":"library"}`)
+	if uris := listedURIs(t, srv); !slices.Contains(uris, added) {
+		t.Fatalf("resources/list = %v, want the added project listed", uris)
+	}
+	if reply := call(t, srv, "resources/read", testURIParams{URI: added}); reply.Error != nil {
+		t.Errorf("read of the added project = %+v, want its context", reply)
+	}
+
+	write("putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/extra"]}`)
+	removed := projectContextURI("/packages/lib")
+	if uris := listedURIs(t, srv); slices.Contains(uris, removed) {
+		t.Fatalf("resources/list = %v, want the removed project gone", uris)
+	}
+	assertCode(t, "read of the removed project", call(t, srv, "resources/read", testURIParams{URI: removed}), codeInvalidParams)
+}
+
+// The putnamiw relay answers initialize while the CLI builds, then hands the
+// replayed initialize to this server. The two lists must agree, or the client
+// meets a version the relay never told it. The test reads the relay's list and
+// its fallback from the script.
+func TestRelayVersionListMatchesTheServer(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-protocol-version", checkRelayListMatchesServer)
+	script, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "putnamiw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const date = `\d{4}-\d{2}-\d{2}`
+	listLine := regexp.MustCompile(`(?m)^\s*(` + date + `(?: \| ` + date + `)*)\) version=`).FindSubmatch(script)
+	if listLine == nil {
+		t.Fatal("putnamiw has no supported-version case line in mcp_relay_while_preparing")
+	}
+	relay := strings.Split(string(listLine[1]), " | ")
+	if !reflect.DeepEqual(relay, supportedProtocolVersions) {
+		t.Errorf("putnamiw supports %v, the server supports %v", relay, supportedProtocolVersions)
+	}
+	fallback := regexp.MustCompile(`(?m)^\s*version="(` + date + `)"$`).FindSubmatch(script)
+	if fallback == nil || string(fallback[1]) != defaultProtocolVersion {
+		t.Errorf("putnamiw falls back to %q, want %q", fallback, defaultProtocolVersion)
+	}
 }

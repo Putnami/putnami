@@ -334,6 +334,8 @@ func TestPutnamiwMCP_InitializeAnswersWithAVersionTheRelaySpeaks(t *testing.T) {
 			assertEmptyDir(t, tmp)
 			spectest.Proves(t, "cli/context-mcp-discovery", "mcp-protocol-version",
 				"the-relay-answers-initialize-with-a-version-it-speaks")
+			spectest.Proves(t, "cli/context-mcp-discovery", "mcp-protocol-version",
+				"server-discover-is-method-not-found")
 		})
 	}
 }

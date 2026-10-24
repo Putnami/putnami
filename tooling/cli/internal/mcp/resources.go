@@ -107,11 +107,15 @@ func (s *Server) resourceDefs() []Resource {
 	return resources
 }
 
-// listedProjects reads the workspace's projects for the resource list. It
-// calls workspace.Load directly and skips PrepareWorkspaceView, so listing never
-// waits on graph preparation. A workspace that does not load lists no projects;
-// the read of a project resource reports the load failure.
+// listedProjects reads the workspace's projects for the resource list and for
+// the project check of a read. It skips PrepareWorkspaceView, so it never
+// waits on graph preparation. It drops the load memo first, as the builders
+// do: the server is long-lived, and a project added to or removed from the
+// workspace after the first request must change the list and the check the
+// way it changes the agent_context tool. A workspace that does not load lists
+// no projects; the read of a project resource reports the load failure.
 func (s *Server) listedProjects() []*workspace.Project {
+	workspace.InvalidateLoadCache(s.opts.WorkspaceRoot)
 	ws, err := workspace.Load(s.opts.WorkspaceRoot)
 	if err != nil {
 		return nil

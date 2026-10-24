@@ -24,6 +24,15 @@ const resourcesWiringDecisions = `{
   ]
 }`
 
+const resourcesWiringDecisionsTwo = `{
+  "$schema": "https://putnami.dev/schemas/putnami-decisions.json",
+  "protocolVersion": 1,
+  "decisions": [
+    {"id": "D-001", "statement": "every pull request names what it deletes", "settled": "2026-09-03", "settledBy": "fdumay", "reviewOnly": true},
+    {"id": "D-002", "statement": "every GitHub artifact is written in English", "settled": "2026-09-11", "settledBy": "fdumay", "reviewOnly": true}
+  ]
+}`
+
 // serveResourceRequests runs the real server, as production wires it, over the
 // requests and returns the decoded responses by id.
 func serveResourceRequests(t *testing.T, root string, requests ...string) map[int]testJSONRPCEnvelope {
@@ -62,11 +71,12 @@ func guidanceBlockBody(t *testing.T, agentsMD string) string {
 }
 
 // The guidance resource of the real server equals the block body that
-// `context generate` writes, decisions and gate line included, and it follows
-// the workspace's documents on the next read.
+// `context generate` writes, decisions and gate line included. A decision added
+// between two reads shows in the second read, which equals the block that the
+// next `context generate` writes.
 func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", "the-server-lists-and-reads-the-guidance-map-and-project-resources")
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", "the-guidance-resource-renders-the-block-body-on-every-read")
 	root := t.TempDir()
 	write := func(rel, content string) {
 		t.Helper()
@@ -95,7 +105,7 @@ func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 		t.Fatalf("the written block carries no decision:\n%s", written)
 	}
 
-	read := func(id int) string {
+	read := func() string {
 		t.Helper()
 		responses := serveResourceRequests(t, root,
 			`{"jsonrpc":"2.0","id":1,"method":"resources/list"}`,
@@ -151,7 +161,23 @@ func TestMCPGuidanceResourceEqualsTheBlockContextGenerateWrites(t *testing.T) {
 		return result.Contents[0].Text
 	}
 
-	if got := read(2); got != written {
+	if got := read(); got != written {
 		t.Errorf("guidance resource differs from the written block body\nresource:\n%s\nblock:\n%s", got, written)
+	}
+
+	write("decisions.json", resourcesWiringDecisionsTwo)
+	if err := agentctx.WriteAgentEntrypoints(root); err != nil {
+		t.Fatal(err)
+	}
+	agents, err = os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewritten := guidanceBlockBody(t, string(agents))
+	if rewritten == written || !strings.Contains(rewritten, "D-002 — every GitHub artifact is written in English") {
+		t.Fatalf("the rewritten block does not carry the added decision:\n%s", rewritten)
+	}
+	if got := read(); got != rewritten {
+		t.Errorf("after a decision was added, the guidance resource differs from the block body\nresource:\n%s\nblock:\n%s", got, rewritten)
 	}
 }

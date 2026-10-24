@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 const (
@@ -143,8 +144,13 @@ func guidanceBody(gate, decisions string) string {
 // `putnami context generate` renders it now for the workspace: the rules, the
 // gate line read from putnami.ci.json, and the settled decisions. It reads the
 // same two documents as writeAgentEntrypoints and fills the same template, so
-// the MCP guidance resource and the committed block cannot drift.
+// the MCP guidance resource always equals the block `context generate` would
+// write now. The committed block can differ until the next `context generate`.
+//
+// It drops the workspace load memo first, as the other MCP builders do, so the
+// project-decision index of a long-lived server follows the current project set.
 func WorkspaceGuidanceBody(wsRoot string) string {
+	workspace.InvalidateLoadCache(wsRoot)
 	return guidanceBody(gateTasksForWorkspace(wsRoot), decisionsGuidanceForWorkspace(wsRoot))
 }
 

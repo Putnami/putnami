@@ -374,6 +374,60 @@
       "name": "Putnami workspace context",
       "description": "Live workspace graph, layout, publish channels, and pinned versions derived from the same workspace load path as the CLI.",
       "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/guidance",
+      "name": "Putnami workspace guidance",
+      "description": "The Putnami guidance block of AGENTS.md as `putnami context generate` renders it now: the rules, the gate line, and the settled decisions.",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "putnami://workspace/map",
+      "name": "Putnami workspace map",
+      "description": "The whole workspace map, as the workspace_map tool returns it for section all.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/projects",
+      "name": "Putnami workspace map: projects",
+      "description": "The projects section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/dependencies",
+      "name": "Putnami workspace map: dependencies",
+      "description": "The dependencies section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/intercalls",
+      "name": "Putnami workspace map: intercalls",
+      "description": "The intercalls section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/apis",
+      "name": "Putnami workspace map: apis",
+      "description": "The apis section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/config-keys",
+      "name": "Putnami workspace map: config-keys",
+      "description": "The config-keys section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/schemas",
+      "name": "Putnami workspace map: schemas",
+      "description": "The schemas section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "putnami://workspace/map/docs",
+      "name": "Putnami workspace map: docs",
+      "description": "The docs section of the workspace map, as the workspace_map tool returns it.",
+      "mimeType": "application/json"
     }
   ]
 }
