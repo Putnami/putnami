@@ -42,3 +42,27 @@ func TestWarningReportKeepWritesNothingAndKeepsInOrder(t *testing.T) {
 		t.Fatal("a nil report kept a warning")
 	}
 }
+
+// TestWarningReportHoldsEachWarningOnce holds Report and Keep to skipping a
+// warning the report already holds: two loads of one workspace report and
+// write each warning once.
+func TestWarningReportHoldsEachWarningOnce(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	report := NewWarningReport(&out)
+	first := Warning{Code: WarningCodeJobsIgnored, Message: "first"}
+	second := Warning{Code: WarningCodeNameDivergence, Message: "second"}
+	ws := &Workspace{Warnings: []Warning{first}}
+
+	report.Report(ws)
+	report.Report(ws)
+	report.Keep([]Warning{first, second, second})
+	report.Report(&Workspace{Warnings: []Warning{second}})
+
+	if got := report.Warnings(); !reflect.DeepEqual(got, []Warning{first, second}) {
+		t.Fatalf("Warnings = %+v, want each warning once, in order", got)
+	}
+	if want := "putnami: warning: first\n"; out.String() != want {
+		t.Fatalf("written = %q, want %q", out.String(), want)
+	}
+}

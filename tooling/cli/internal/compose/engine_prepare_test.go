@@ -48,11 +48,11 @@ func TestEnginePrepare_ReturnsAnEngineRefusalWithoutPrintingIt(t *testing.T) {
 	}
 }
 
-// TestPrepareThrough_KeepsTheWarningsOfItsEngineRun holds the preparation run
-// to the caller's --quiet, and to handing the warnings its workspace load
-// reported to Options.Warnings, whether the preparation succeeded, the run
+// TestPrepareThrough_ReportsTheWarningsOfItsEngineRun holds the preparation
+// run to the caller's --quiet, and to reporting the warnings of its workspace
+// load into Options.Warnings, whether the preparation succeeded, the run
 // failed, or the engine returned an error.
-func TestPrepareThrough_KeepsTheWarningsOfItsEngineRun(t *testing.T) {
+func TestPrepareThrough_ReportsTheWarningsOfItsEngineRun(t *testing.T) {
 	t.Parallel()
 	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
 	for _, tc := range []struct {
@@ -79,12 +79,12 @@ func TestPrepareThrough_KeepsTheWarningsOfItsEngineRun(t *testing.T) {
 				var request engine.Request
 				run := func(_ context.Context, r engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
 					request = r
+					r.WarningReport.Keep([]workspace.Warning{warning})
 					result := tc.result
 					if tc.success {
 						result.Workspace = workspace.NewWorkspace(root, &wsproto.Config{}, nil)
 						result.Withheld = []*jobs.ScheduledJob{{}}
 					}
-					result.WorkspaceWarnings = []workspace.Warning{warning}
 					return result, tc.err
 				}
 				_, err := prepareThrough(context.Background(), run, opts, []string{"/app"}, []string{"serve"})
@@ -93,6 +93,9 @@ func TestPrepareThrough_KeepsTheWarningsOfItsEngineRun(t *testing.T) {
 				}
 				if request.Global.Quiet != quiet {
 					t.Fatalf("request Quiet = %v, want the caller's %v", request.Global.Quiet, quiet)
+				}
+				if request.WarningReport != report {
+					t.Fatal("the preparation run does not report into the caller's report")
 				}
 				got := report.Warnings()
 				if len(got) != 1 || got[0] != warning {

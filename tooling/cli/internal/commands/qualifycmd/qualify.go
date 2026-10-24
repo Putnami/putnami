@@ -59,11 +59,11 @@ type Options struct {
 	// stderr, in text output. Structured output never carries them: the verdict
 	// is the record.
 	Verbose bool
-	// Quiet keeps a local composition's preparation from writing the workspace
-	// load warnings on stderr.
+	// Quiet is the caller's --quiet, which a local composition's preparation
+	// takes.
 	Quiet bool
-	// Warnings receives the workspace load warnings of a local composition's
-	// preparation; nil keeps none.
+	// Warnings reports the workspace load warnings of the command's own load
+	// and of a local composition's preparation, each once; nil reports none.
 	Warnings *workspace.WarningReport
 }
 
@@ -87,6 +87,7 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
+	opts.Warnings.Report(ws)
 	project := shared.ResolveProjectSelector(ws, opts.Selector)
 	if project == nil {
 		return cmderr.NotFoundf("project not found: %s", opts.Selector)

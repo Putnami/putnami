@@ -271,6 +271,11 @@ type Request struct {
 	// injected environment out of every cache key: the steps that DO run here
 	// never see it.
 	WithholdServeSteps bool
+	// WarningReport is the report the run's workspace load reports its
+	// warnings into: a caller that reported a load of its own passes its
+	// report, which writes and keeps each warning once. Nil makes a report on
+	// stderr, which writes nothing under --quiet.
+	WarningReport *workspace.WarningReport
 	// watchIteration marks this request as ONE iteration of an outer watch/serve
 	// loop. It suppresses the serve force-watch rule in execute(): the outer loop
 	// already owns the replan policy, and without this marker a serve iteration
