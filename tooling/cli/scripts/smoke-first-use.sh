@@ -397,10 +397,11 @@ list_processes() {
 # forks once for each process of the machine, on every probe of a stop.
 list_directories() {
   if readlink /proc/self/cwd >/dev/null 2>&1; then
-    # POSIX ls -l prints a link as "... /proc/<pid>/cwd -> <directory>", and
-    # leaves out the arrow for a link it cannot read.
-    ls -ld /proc/[0-9]*/cwd 2>/dev/null |
-      awk '{
+    # ls -l prints a link as "... /proc/<pid>/cwd -> <directory>"; GNU and
+    # busybox leave out the arrow for a link they cannot read. Literal quoting
+    # and the C locale keep each directory byte for byte.
+    QUOTING_STYLE=literal LC_ALL=C ls -ld /proc/[0-9]*/cwd 2>/dev/null |
+      LC_ALL=C awk '{
         start = index($0, " /proc/")
         if (start == 0) next
         rest = substr($0, start + 7)
