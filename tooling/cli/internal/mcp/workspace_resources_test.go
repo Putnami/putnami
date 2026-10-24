@@ -310,7 +310,6 @@ func TestNilBuildersLeaveTheirResourcesOut(t *testing.T) {
 
 func TestMapResourceReportsBuilderFailureAsAnInternalError(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-workspace-resources", checkResourceReturnsToolBytes)
 	dir := fixtureWorkspace(t)
 	srv := NewServer(Options{
 		WorkspaceRoot: dir,

@@ -62,7 +62,7 @@
     },
     {
       "id": "mcp-workspace-resources",
-      "text": "The MCP server serves resources with concrete URIs, each rendered on every read by its tool's builder: putnami://workspace/guidance holds the block body context generate writes, putnami://workspace/map and putnami://workspace/map/<section> the workspace_map answer, putnami://projects/<id>/context the agent_context answer for the escaped canonical id. Listing prepares no workspace graph and follows the current project set. An unknown URI, or one whose builder is absent, fails with invalid params."
+      "text": "The MCP server lists resources by concrete URI and renders each on every read with its tool's or command's builder: putnami://workspace/guidance holds the block body context generate writes, putnami://workspace/map and putnami://workspace/map/<section> the workspace_map answer, putnami://projects/<id>/context the agent_context answer (escaped canonical id). Listing prepares no workspace graph, follows the current project set, and omits a resource with no builder. An unlisted URI fails with invalid params."
     },
     {
       "id": "mcp-protocol-version",
