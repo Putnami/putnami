@@ -37,6 +37,7 @@
         "../../putnami.workspace.json",
         "../../putnami.lock.json",
         "../../putnami.ci.json",
+        "../../putnamiw",
         "../../protocols/ci/fixtures/change-plan/**",
         "../../protocols/ci/fixtures/impact-plan/**",
         "../../go/framework/config/*.go",
