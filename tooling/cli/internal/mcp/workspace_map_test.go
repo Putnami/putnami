@@ -17,23 +17,18 @@ import (
 // engine — see internal/commands/workspace_map_mcp.go). Stating it as a TYPE
 // rather than a nested map keeps the fixture's shape checked by the compiler.
 type fakeWorkspaceMap struct {
-	Document     fakeMapDocument `json:"document"`
-	DiskArtifact fakeMapArtifact `json:"diskArtifact"`
-	Provenance   fakeMapScope    `json:"provenance"`
+	Document   fakeMapDocument `json:"document"`
+	Provenance fakeMapScope    `json:"provenance"`
 }
 
 type fakeMapDocument struct {
 	Workspace string `json:"workspace"`
 }
 
-type fakeMapArtifact struct {
-	Present bool `json:"present"`
-	Fresh   bool `json:"fresh"`
-}
-
 type fakeMapScope struct {
-	Section string `json:"section"`
-	Project string `json:"project"`
+	Section         string `json:"section"`
+	Project         string `json:"project"`
+	FragmentsReused int    `json:"fragmentsReused"`
 }
 
 // callWorkspaceMap issues one tools/call for workspace_map, omitting the
@@ -72,9 +67,8 @@ func TestToolWorkspaceMapInjectedClosure(t *testing.T) {
 	srv := workspaceMapServer(t, func(_ context.Context, section, project string) (any, error) {
 		gotSection, gotProject = section, project
 		return fakeWorkspaceMap{
-			Document:     fakeMapDocument{Workspace: "fixture"},
-			DiskArtifact: fakeMapArtifact{Present: true, Fresh: true},
-			Provenance:   fakeMapScope{Section: section, Project: project},
+			Document:   fakeMapDocument{Workspace: "fixture"},
+			Provenance: fakeMapScope{Section: section, Project: project, FragmentsReused: 3},
 		}, nil
 	})
 
@@ -92,7 +86,7 @@ func TestToolWorkspaceMapInjectedClosure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-encode tool result: %v", err)
 	}
-	for _, want := range []string{`"workspace":"fixture"`, `"present":true`, `"fresh":true`, `"section":"apis"`, `"project":"app"`} {
+	for _, want := range []string{`"workspace":"fixture"`, `"fragmentsReused":3`, `"section":"apis"`, `"project":"app"`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("tool result does not carry %s: %s", want, data)
 		}

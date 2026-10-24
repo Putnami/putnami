@@ -32,8 +32,8 @@ func TestProtocolVersion_SchemaMatches(t *testing.T) {
 // TestProtocolVersion_Pinned pins the constant so a bump is a deliberate,
 // reviewed change rather than an accident.
 func TestProtocolVersion_Pinned(t *testing.T) {
-	if ProtocolVersion != 1 {
-		t.Fatalf("ProtocolVersion = %d, want 1 (a bump must be deliberate and update the schema + fixtures)", ProtocolVersion)
+	if ProtocolVersion != 2 {
+		t.Fatalf("ProtocolVersion = %d, want 2 (a bump must be deliberate and update the schema + fixtures)", ProtocolVersion)
 	}
 }
 

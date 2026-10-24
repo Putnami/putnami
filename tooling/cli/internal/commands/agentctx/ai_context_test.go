@@ -67,6 +67,27 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 	}
 }
 
+// TestGeneratedGuidanceStatesTheFallbackForAStaleOrAbsentAnswer pins where an
+// agent learns to leave MCP: no file holds a copy of the context that could go
+// stale, so the generated block itself names the local fallback for a stale or
+// unavailable answer and for an MCP bound to another worktree.
+func TestGeneratedGuidanceStatesTheFallbackForAStaleOrAbsentAnswer(t *testing.T) {
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "stale-or-absent-context-is-reported-for-fallback")
+	dir := t.TempDir()
+	if err := WriteAgentEntrypoints(dir); err != nil {
+		t.Fatalf("WriteAgentEntrypoints: %v", err)
+	}
+	agent := readGuidance(t, dir, agentEntrypointPath)
+	for _, want := range []string{
+		"Use grep only for literal text, or after the tool answers stale or unavailable.",
+		"If the MCP root differs from your worktree, use the local CLI.",
+	} {
+		if !strings.Contains(agent, want) {
+			t.Errorf("AGENTS.md does not state the fallback %q", want)
+		}
+	}
+}
+
 // repositoryRootForAIContext walks up from this source file to the directory
 // holding putnami.workspace.json so repository-parity checks use the real
 // generated entrypoints and CI declaration.

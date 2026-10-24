@@ -146,7 +146,7 @@ func sortEntries(entries []ProjectEntry) {
 
 // LiveProjects returns the workspace's project set in canonical (path, id)
 // order — the "live set" the reduce enumerates. Callers use it so the reduce and
-// the fragment refresh agree on what a project is.
+// the fragment resolution agree on what a project is.
 func LiveProjects(ws *workspace.Workspace) []*workspace.Project {
 	live := make([]*workspace.Project, 0, len(ws.Projects))
 	live = append(live, ws.Projects...)

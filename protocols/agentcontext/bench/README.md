@@ -24,8 +24,8 @@ only the specific source **ranges** it actually needs.
 
 `K` is the count of **distinct** workspace-relative file paths the manifest
 references. Structural counts (`K`, graph deps `D`, composition roots) are stable
-across commits; the digests and workspace revision embedded in the artifact are
-not, and are deliberately not part of this table.
+across commits; the digests and workspace revision embedded in the document
+are not, and are deliberately not part of this table.
 
 ## Reproduce
 
@@ -34,15 +34,14 @@ bash protocols/agentcontext/bench/orient-bench.sh
 ```
 
 The script locates the repo root from its own path, runs
-`putnami context pack --project <id>` for a fixed, ordered list of Go + TS
-samples (`unit-of-work-proof`, `task-api`, `capabilities-proof`, `06-database`,
-`14-capabilities`), parses each emitted `<project>/.gen/agent-context.json` with
-`python3` (not `jq`), and prints the table below. It is deterministic in output
-order and exits 0 on success.
+`putnami context pack --project <id> --output=json` for a fixed, ordered list of
+Go + TS samples (`unit-of-work-proof`, `task-api`, `capabilities-proof`,
+`06-database`, `14-capabilities`), reads each document from the result's
+`data.documents` with `python3` (not `jq`), and prints the table below. It is
+deterministic in output order and exits 0 on success.
 
-The emitted `.gen/agent-context.json` artifacts are **ephemeral and gitignored**
-— they are never committed (verify with
-`git check-ignore <project>/.gen/agent-context.json`).
+`context pack` prints the documents and writes no file, so the benchmark leaves
+the workspace unchanged.
 
 ## Results (structural)
 
@@ -68,7 +67,7 @@ The full sample set the script prints:
 `capabilities-proof` looks under-populated (K = 1, no composition roots), and
 that is **correct behavior, not a bug**. Its capabilities are
 describe-generated: there is no committed `schema/capabilities.json`. The
-agent-context artifact aggregates only **committed** facts by reference, so with
+agent-context document aggregates only **committed** facts by reference, so with
 nothing committed to point at, a sparse manifest is the honest result. An agent
 still gets the identity + dependency graph in one call and learns, from the
 `unsupported-project-type` tests absence reason, that there are no conformance

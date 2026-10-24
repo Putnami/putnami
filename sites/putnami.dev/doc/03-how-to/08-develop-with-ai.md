@@ -172,23 +172,16 @@ When an assistant (Claude, Codex, or any MCP-aware tool) needs to understand a s
 
 ```bash
 putnami context pack --project <project-id>
+putnami context pack --output=json
 ```
 
-`context pack` aggregates one project's facts **by reference** into `<project>/.gen/agent-context.json`: identity and dependency graph, composition roots (application main, describe entrypoint), capability/contract/infra/migration references (path + digest), representative source **ranges** (never file content), a tests section (conformance packs or a machine-readable absence reason), adjacent docs, and a config-schema reference. Omit `--project` to pack every selected project.
+`context pack` aggregates one project's facts **by reference** and prints the document: identity and dependency graph, composition roots (application main, describe entrypoint), capability/contract/infra/migration references (path + digest), representative source **ranges** (never file content), a tests section (conformance packs or a machine-readable absence reason), adjacent docs, and a config-schema reference. Omit `--project` to print every project's document. `--output=json` returns the documents as data.
 
-The artifact is **ephemeral**: it lives under `.gen/` (gitignored, never committed) because it embeds content digests and the workspace revision and would churn on every commit. Regenerate it on demand — do not check it in.
-
-### `putnami context pack --check`
-
-```bash
-putnami context pack --check
-```
-
-`--check` is a freshness gate: it verifies the on-disk artifact matches what the aggregator would produce now and **exits 2 on drift** (for example after you change a referenced source or a manifest) without rewriting anything. Use it in a pre-flight or CI step to catch a stale context.
+It writes no file. The document embeds content digests and the workspace revision, so a stored copy would churn on every commit and go stale behind the code. Every run builds it again from the working tree.
 
 ### The `agent_context` MCP tool
 
-The Putnami MCP server exposes a read-only `agent_context` tool. An agent calls it to get a single project's identity, composition roots, contracts, representative sources, and tests in **one structured response** — including on-disk freshness — instead of listing directories and reading files one by one. It complements `describe_project`: `describe_project` answers "what commands/tasks/dependencies does this project have", while `agent_context` answers "how is this project composed and where should I read first".
+The Putnami MCP server exposes a read-only `agent_context` tool. An agent calls it to get a single project's identity, composition roots, contracts, representative sources, and tests in **one structured response**, built from the working tree on every call, instead of listing directories and reading files one by one. It complements `describe_project`: `describe_project` answers "what commands/tasks/dependencies does this project have", while `agent_context` answers "how is this project composed and where should I read first".
 
 The MCP server advertises these tools at initialization, so an agent connected to your workspace already knows they exist.
 

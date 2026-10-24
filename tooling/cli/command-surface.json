@@ -290,21 +290,12 @@
     },
     {
       "path": "context map",
-      "flags": [
-        {
-          "long": "--print",
-          "type": "bool"
-        }
-      ],
+      "flags": [],
       "positionals": []
     },
     {
       "path": "context pack",
       "flags": [
-        {
-          "long": "--check",
-          "type": "bool"
-        },
         {
           "long": "--project",
           "type": "value"

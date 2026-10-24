@@ -889,11 +889,10 @@ Manage assistant guidance.
 
 ```bash
 putnami context generate            # Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md
-putnami context map                 # Refresh .putnami/context-map/repo-map.{json,md}
-putnami context map --print         # Render the map to stdout (markdown); write nothing
-putnami context map --print=json    # Same, as JSON
-putnami context pack                # Write each project's .gen/agent-context.json
-putnami context pack --check        # Re-derive them, write nothing, fail on drift
+putnami context map                 # Print the workspace orientation map as Markdown
+putnami context map --output=json   # Print the map document, the one the MCP serves
+putnami context pack                # Print each project's agent-context document
+putnami context pack --output=json  # Return the documents as data
 ```
 
 `context generate` writes the guidance block and the agent content of the
@@ -903,11 +902,10 @@ server, and `putnami mcp install` repairs the registration. See [`mcp`](#mcp).
 
 #### `context pack`
 
-`context pack` writes one deterministic agent-context document per project to
-`<project>/.gen/agent-context.json`; `--project <selector>` limits it to one
-project. `--check` re-derives every document, writes nothing, and exits non-zero
-when one drifted. Both accept `--output=json`. The MCP `agent_context` tool builds
-the same document in memory. The document contract is
+`context pack` builds one deterministic agent-context document per project in
+memory and prints it. It writes no file. `--output=json` returns the documents
+as data, and `--project <selector>` narrows them to one project. The MCP
+`agent_context` tool returns the same document. The document contract is
 `go.putnami.dev/protocol/agentcontext`.
 
 A project's `identity.languages` are the `language` members of the workspace
@@ -920,59 +918,45 @@ Run `putnami projects sync` to refresh the claims.
 
 #### `context map`
 
-`context map` renders the workspace orientation map — every project with its
+`context map` prints the workspace orientation map: every project with its
 path, tags, dependency edges, endpoint table, config keys, and README summary,
-plus the workspace `docs/` index — into
-`.putnami/context-map/repo-map.json` and `.putnami/context-map/repo-map.md`.
+plus the workspace `docs/` index. It prints Markdown by default. With
+`--output=json` it returns the map document as data, the same document the MCP
+`workspace_map` tool returns. It writes no file.
 
-The map is **ephemeral, gitignored, CLI-owned state**, never committed.
-It is a pure projection of committed inputs, so committing the projection bought
-nothing and cost a permanent merge hotspot (one flat sorted list, so parallel
-branches collide), a drift class, and a CI gate. A build writes no map. The MCP
-`workspace_map` tool serves it fresh, and `context map` writes it on demand, so
-nothing can go stale in a review.
+The map is a pure projection of committed inputs, so nothing stores it and
+nothing can go stale. A build writes no map. It is byte-deterministic on an
+unchanged tree: entries are sorted by project path, and the document carries no
+timestamp, no absolute path, and no CLI version.
 
-It is byte-deterministic on an unchanged tree: entries are sorted by project
-path, and the documents carry no timestamp, no absolute path, and no CLI version.
-A repeat run over an unchanged tree therefore costs one digest sweep and writes
-nothing.
+Rendering is a map-reduce in memory:
 
-Generation is a map-reduce:
+- **map**: one fragment per project, computed from that project's own
+  `putnami.json`, `schema/openapi.json`, `schema/config.jsonschema.json`,
+  `README.md` and `schema/` listing, with a digest of exactly those inputs.
+- **reduce**: the *live* project set from the workspace manifest plus the
+  fragments. A project the workspace no longer contains contributes nothing,
+  so deletions and renames need no diffing.
 
-- **map** — one fragment per project, computed from that project's own
-  `putnami.json`, `schema/openapi.json`, `schema/config.jsonschema.json`, and
-  `README.md`, cached under `.putnami/context-map/<project>/map-fragment.json`
-  with a digest of exactly those inputs.
-- **reduce** — the *live* project set from the workspace manifest plus the
-  fragments. A cached fragment is reused only when its recorded inputs digest
-  still matches the files on disk, so a selection-scoped run stays cheap while
-  the rendered map is always complete. A project the workspace no longer
-  contains simply contributes nothing — deletions and renames need no diffing —
-  and the previous map is never an input to the new one.
-
-`--projects <list>` and `--impacted` scope which fragments are *refreshed*, never
-which projects the map renders. `--print[=json|md]` runs the same reduce entirely
-in memory, writes nothing at all (no fragments, no documents), and emits the
-document on stdout — `--output` is already the run report's shape, which is why
-the flag is spelled `--print`. `--output=jsonl` emits the machine-readable run
-report.
+`--projects <list>` and `--impacted` narrow the projects the map prints. The
+reduce still runs over every project, so a printed entry keeps every dependency
+edge, and the workspace `docs/` index stays.
 
 A project's dependency edges and language identity come from the merged provider
 view (`.putnami/workspace-index.json`, which is not committed). On a clone that
 has none, every project would resolve from authored config alone and the map
-would render without provider-derived edges — a confident wrong answer — so in a
+would render without provider-derived edges, a confident wrong answer. So in a
 workspace that declares extensions, `context map` refuses and points at
 `putnami projects sync`.
 
 ##### Serving it to agents
 
 The MCP `workspace_map` tool (see [`mcp`](#mcp)) renders the same document on
-every call from the working tree, so an agent never depends on whether
-`context map` ran. It takes `section` (`projects`, `dependencies`,
-`intercalls`, `apis`, `config-keys`, `schemas`, `docs`, `all`) and an optional
-`project`, and reports whether the on-disk artifact is present and matches the
-fresh render. A missing or outdated file is reported as such; only `context map`
-rewrites it.
+every call from the working tree. It takes `section` (`projects`,
+`dependencies`, `intercalls`, `apis`, `config-keys`, `schemas`, `docs`, `all`)
+and an optional `project`. Within one MCP session it keeps each project's
+fragment in memory and reuses it while the fragment's inputs digest is
+unchanged, so a repeat call rebuilds only the projects that changed.
 
 ### `doctor`
 
@@ -1219,9 +1203,7 @@ The core server exposes eleven tools: ten read-heavy workspace tools
 `find_owner`, `why_impacted`, `topo_sort`, `impacted`, `get_diagnostics`) plus
 `run_jobs`, whose `dryRun` mode returns the planned DAG without executing
 subprocesses. `workspace_map` renders the whole
-workspace orientation map in memory on every call — independent of whether
-`putnami context map` ever wrote the ephemeral
-`.putnami/context-map/repo-map.json` — and takes
+workspace orientation map in memory on every call and takes
 `section` (`projects`, `dependencies`, `intercalls`, `apis`, `config-keys`,
 `schemas`, `docs`, `all`) plus an optional `project`, so a scoped question costs
 a few KB instead of the full map. It also exposes
