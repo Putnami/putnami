@@ -54,7 +54,7 @@ func initializeWorkspaceIdentity(root string) string {
 }
 
 func (s *Server) initializeInstructions() string {
-	guidance := append([]ExtensionGuidance(nil), s.opts.ExtensionGuidance...)
+	guidance := append([]ExtensionGuidance(nil), s.currentSelection().ExtensionGuidance...)
 	sort.SliceStable(guidance, func(i, j int) bool {
 		if guidance[i].Name == guidance[j].Name {
 			return guidance[i].Version < guidance[j].Version

@@ -139,6 +139,12 @@ facts: `workspace://context`, `putnami://workspace/guidance` (the rules block of
 (what `workspace_map` returns), and `putnami://projects/<id>/context` (what
 `agent_context` returns for one project).
 
+When the guidance changes during a session, for example a decision is added or
+an extension is installed, the next Putnami tool result ends with a short
+notice that names the change and the resource to read. When the extensions
+change, the server also announces its new tool list, which Claude Code fetches
+without a reconnect.
+
 ### Every graph answer says what it was derived from
 
 Project identity and dependency edges belong to the language extensions. The CLI

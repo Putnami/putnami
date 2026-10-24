@@ -186,6 +186,14 @@ type Options struct {
 	// The CLI shell injects it for the same reason as the closures above. When
 	// nil, the putnami://workspace/guidance resource is left out of the list.
 	WorkspaceGuidance func(ctx context.Context) string
+	// ReloadExtensions selects the workspace's extensions again, the way the
+	// CLI shell selected Config, ExtensionGuidance, GuidanceIssues,
+	// PreparedExtensions and UnavailableExtensions at start. The CLI shell
+	// injects it for the same reason as the closures above. The server calls it
+	// when the extension set changed between two requests, then rebuilds its
+	// tools and sends the two list-changed notifications (context_change.go).
+	// When nil, the server keeps the selection it started with.
+	ReloadExtensions func(ctx context.Context) ExtensionSelection
 	// ResolveSelection turns an already-id-resolved narrowing into the wire
 	// block a manifest-declared tool that declares `workspaceSelection`
 	// receives. It is injected for the same reason the closures above are:
@@ -210,16 +218,46 @@ type Options struct {
 	Preflight engine.PreflightGate
 }
 
+// ExtensionSelection is the part of the server's state that follows the
+// workspace's extension set. Its fields mean what the Options fields of the
+// same names mean. The server starts from Options and replaces the selection
+// whole after ReloadExtensions.
+type ExtensionSelection struct {
+	Config                *wsproto.Config
+	ExtensionGuidance     []ExtensionGuidance
+	GuidanceIssues        []GuidanceIssue
+	PreparedExtensions    map[string]string
+	UnavailableExtensions []string
+}
+
 // Server is a single-session MCP server. One Server handles one stdio
 // connection; construct a fresh one per `putnami mcp` invocation.
 type Server struct {
-	opts   Options
-	tools  []toolEntry
-	byName map[string]toolEntry
+	opts Options
 
-	// out serializes all writes to the client; the read loop is single
-	// goroutine but tool handlers could one day emit notifications, so the
-	// writer is mutex-guarded from the start.
+	// registryMu guards tools and byName. A rebuild holds it for writing while
+	// it registers the whole set again, so a reader sees the old set or the new
+	// one, never part of one. Registration code runs under that write lock and
+	// reads the two fields directly.
+	registryMu sync.RWMutex
+	tools      []toolEntry
+	byName     map[string]toolEntry
+
+	// selectionMu guards selection, which a reload replaces whole.
+	selectionMu sync.RWMutex
+	selection   ExtensionSelection
+
+	// observeMu serializes the context check of a request, reload included
+	// (context_change.go). contextMu guards changes, the state that check
+	// reads and writes. Lock order: observeMu, registryMu, selectionMu,
+	// contextMu; none is taken while a later one is held.
+	observeMu sync.Mutex
+	contextMu sync.Mutex
+	changes   contextState
+
+	// out serializes all writes to the client. The read loop is one goroutine;
+	// the context check writes notifications on it, before the response of
+	// the request that triggered them.
 	out     *bufio.Writer
 	writeMu sync.Mutex
 
@@ -250,12 +288,38 @@ type Server struct {
 	notices bytes.Buffer
 }
 
-// NewServer builds a Server with the standard tool set registered.
+// NewServer builds a Server with the standard tool set registered, and reads
+// the context inputs the session starts from.
 func NewServer(opts Options) *Server {
-	s := &Server{opts: opts, byName: make(map[string]toolEntry)}
+	s := &Server{opts: opts, selection: ExtensionSelection{
+		Config:                opts.Config,
+		ExtensionGuidance:     opts.ExtensionGuidance,
+		GuidanceIssues:        opts.GuidanceIssues,
+		PreparedExtensions:    opts.PreparedExtensions,
+		UnavailableExtensions: opts.UnavailableExtensions,
+	}}
+	s.rebuildTools()
+	s.startContextTracking()
+	return s
+}
+
+// currentSelection returns the extension selection the tools and guides follow
+// now.
+func (s *Server) currentSelection() ExtensionSelection {
+	s.selectionMu.RLock()
+	defer s.selectionMu.RUnlock()
+	return s.selection
+}
+
+// rebuildTools registers the core and extension tools again, from the current
+// selection.
+func (s *Server) rebuildTools() {
+	s.registryMu.Lock()
+	defer s.registryMu.Unlock()
+	s.tools = nil
+	s.byName = make(map[string]toolEntry)
 	s.registerTools()
 	s.registerExtensionTools()
-	return s
 }
 
 // loadWorkspace attempts to prepare graph facts before loading them. A failed
@@ -271,7 +335,11 @@ func (s *Server) loadWorkspace(ctx context.Context) (*workspace.Workspace, error
 	s.preparationMu.Lock()
 	s.preparationErr = preparationErr
 	s.preparationMu.Unlock()
-	return workspace.Load(s.opts.WorkspaceRoot)
+	ws, err := workspace.Load(s.opts.WorkspaceRoot)
+	if err == nil {
+		s.noteWorkspaceLoad(ws)
+	}
+	return ws, err
 }
 
 func (s *Server) recordedView(ws *workspace.Workspace) (workspace.RecordedView, error) {
@@ -299,8 +367,14 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 	useragent.ClearAgentIdentity()
 	defer useragent.ClearAgentIdentity()
 
+	s.writeMu.Lock()
 	s.out = bufio.NewWriter(out)
-	defer func() { _ = s.out.Flush() }()
+	s.writeMu.Unlock()
+	defer func() {
+		s.writeMu.Lock()
+		_ = s.out.Flush()
+		s.writeMu.Unlock()
+	}()
 
 	frames := make(chan inboundFrame)
 	readErr := make(chan error, 1)
@@ -457,10 +531,15 @@ func (s *Server) dispatch(ctx context.Context, msg *rpcMessage) *rpcResponse {
 	case "tools/list":
 		return s.ok(msg.ID, toolsListResult{Tools: s.toolDefs()})
 	case "tools/call":
-		return s.handleToolsCall(ctx, msg)
+		notice := s.observeContext(ctx, true)
+		return s.withNotice(s.handleToolsCall(ctx, msg), notice)
 	case "resources/list":
 		return s.ok(msg.ID, resourcesListResult{Resources: s.resourceDefs()})
 	case "resources/read":
+		// A read notices a change and reloads for it, but leaves the notice
+		// pending: a resource has no free-text slot, so the next tool result
+		// carries it.
+		s.observeContext(ctx, false)
 		return s.handleResourcesRead(ctx, msg)
 	default:
 		// Every other notification (no id) is ignored per JSON-RPC, including
@@ -488,8 +567,8 @@ func (s *Server) handleInitialize(msg *rpcMessage) *rpcResponse {
 	return s.ok(msg.ID, initializeResult{
 		ProtocolVersion: negotiateProtocolVersion(p.ProtocolVersion),
 		Capabilities: serverCaps{
-			Tools:     &toolsCapability{ListChanged: false},
-			Resources: &resourcesCapability{Subscribe: false, ListChanged: false},
+			Tools:     &toolsCapability{ListChanged: true},
+			Resources: &resourcesCapability{Subscribe: false, ListChanged: true},
 		},
 		ServerInfo:   serverInfo{Name: serverName, Version: s.opts.ServerVersion},
 		Instructions: s.initializeInstructions(),
@@ -506,8 +585,8 @@ func (s *Server) fail(id json.RawMessage, code int, msg string) *rpcResponse {
 	return &rpcResponse{JSONRPC: jsonRPCVersion, ID: id, Error: &rpcError{Code: code, Message: msg}}
 }
 
-// write serializes one message as a single newline-delimited line and flushes,
-// so the client can read it immediately.
+// write serializes one response as a single newline-delimited line and
+// flushes, so the client can read it immediately.
 func (s *Server) write(resp *rpcResponse) {
 	data, err := json.Marshal(resp)
 	if err != nil {
@@ -519,8 +598,22 @@ func (s *Server) write(resp *rpcResponse) {
 			Error:   &rpcError{Code: codeInternalError, Message: "encode response failed"},
 		})
 	}
+	s.writeLine(data)
+}
+
+// notify writes one notification. Before the first Serve there is no client,
+// and it writes nothing.
+func (s *Server) notify(method string) {
+	data, _ := json.Marshal(rpcNotification{JSONRPC: jsonRPCVersion, Method: method})
+	s.writeLine(data)
+}
+
+func (s *Server) writeLine(data []byte) {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
+	if s.out == nil {
+		return
+	}
 	_, _ = s.out.Write(data)
 	_ = s.out.WriteByte('\n')
 	_ = s.out.Flush()

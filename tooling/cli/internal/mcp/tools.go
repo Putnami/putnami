@@ -160,11 +160,21 @@ func (s *Server) registerResult(def Tool, handler toolResultHandler) {
 
 // toolDefs returns the advertised tool definitions in registration order.
 func (s *Server) toolDefs() []Tool {
+	s.registryMu.RLock()
+	defer s.registryMu.RUnlock()
 	defs := make([]Tool, len(s.tools))
 	for i, t := range s.tools {
 		defs[i] = t.def
 	}
 	return defs
+}
+
+// lookupTool returns the registered tool of that name.
+func (s *Server) lookupTool(name string) (toolEntry, bool) {
+	s.registryMu.RLock()
+	defer s.registryMu.RUnlock()
+	entry, ok := s.byName[name]
+	return entry, ok
 }
 
 // handleToolsCall dispatches a tools/call request to the named tool.
@@ -175,7 +185,7 @@ func (s *Server) handleToolsCall(ctx context.Context, msg *rpcMessage) *rpcRespo
 			return s.fail(msg.ID, codeInvalidParams, "invalid params: "+err.Error())
 		}
 	}
-	entry, ok := s.byName[p.Name]
+	entry, ok := s.lookupTool(p.Name)
 	if !ok {
 		return s.fail(msg.ID, codeInvalidParams, "unknown tool: "+p.Name)
 	}
