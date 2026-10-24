@@ -118,12 +118,27 @@ Putnami notice: the workspace context changed.
 A change is reported once. A `resources/read` notices it but carries no notice,
 because a resource has no free-text slot, so the next tool result reports it. A
 tool result is the one place the notice reaches the model: neither Claude Code
-nor Codex shows a notification to it. When the extension set changed (an
-extension added, removed or disabled, a locked version, or a path manifest), the
-server reloads its extension selection, guides and tools, then writes
-`notifications/tools/list_changed` and `notifications/resources/list_changed`,
-in that order, before the response of the request that noticed the change.
-`initialize` declares `listChanged: true` for tools and resources.
+nor Codex shows a notification to it. A line points at a resource only when the
+server lists it and the resource shows the change. Otherwise it points at the
+changed file: `putnami.lock.json` for an extension installed without a listed
+guide, and `putnami.workspace.json` for a version constraint or an option. The
+`decisions.json` of a project a workspace load finds for the first time, after
+a load that failed or a change to the `includes` for example, joins the
+baseline as it is, so only a later edit to it is reported.
+
+When the extensions changed (an extension added, removed or disabled, a locked
+version, or a path manifest), or the `includes` or `options.collaboration`
+changed, the server loads the workspace again and reloads its extension
+selection, guides and tools. It then writes `notifications/tools/list_changed`
+and `notifications/resources/list_changed`, in that order, before the response
+of the request that noticed the change. The tools count as built from the
+inputs as they were before the reload, so an edit that lands during it is
+loaded by the next request. A call to a tool the reload removed returns an
+error tool result that says to list the tools again and carries the notice. A
+name the server never registered stays an invalid-params error. A project's own
+`putnami.json` is not an input: a change there reloads nothing. `initialize`
+declares `listChanged: true` for tools and resources, and the server writes
+nothing after its session ends.
 
 `run_jobs` reuses the exact CLI building blocks (`extension.DiscoverExtensions`
 → project selection → `planner.Plan` → `scheduler.RunPlan`) with

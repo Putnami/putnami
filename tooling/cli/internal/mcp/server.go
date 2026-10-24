@@ -242,6 +242,10 @@ type Server struct {
 	registryMu sync.RWMutex
 	tools      []toolEntry
 	byName     map[string]toolEntry
+	// removedTools names the tools a reload in this session removed, so a
+	// call to one says so instead of failing as an unknown tool. registryMu
+	// guards it too.
+	removedTools map[string]bool
 
 	// selectionMu guards selection, which a reload replaces whole.
 	selectionMu sync.RWMutex
@@ -257,7 +261,8 @@ type Server struct {
 
 	// out serializes all writes to the client. The read loop is one goroutine;
 	// the context check writes notifications on it, before the response of
-	// the request that triggered them.
+	// the request that triggered them. out is nil outside Serve, so nothing is
+	// written before a session starts or after it ends.
 	out     *bufio.Writer
 	writeMu sync.Mutex
 
@@ -298,8 +303,7 @@ func NewServer(opts Options) *Server {
 		PreparedExtensions:    opts.PreparedExtensions,
 		UnavailableExtensions: opts.UnavailableExtensions,
 	}}
-	s.rebuildTools()
-	s.startContextTracking()
+	s.startTools()
 	return s
 }
 
@@ -312,14 +316,26 @@ func (s *Server) currentSelection() ExtensionSelection {
 }
 
 // rebuildTools registers the core and extension tools again, from the current
-// selection.
+// selection, and records each tool the new set no longer holds as removed.
 func (s *Server) rebuildTools() {
 	s.registryMu.Lock()
 	defer s.registryMu.Unlock()
+	previous := s.byName
 	s.tools = nil
 	s.byName = make(map[string]toolEntry)
 	s.registerTools()
 	s.registerExtensionTools()
+	for name := range previous {
+		if _, kept := s.byName[name]; !kept {
+			if s.removedTools == nil {
+				s.removedTools = make(map[string]bool)
+			}
+			s.removedTools[name] = true
+		}
+	}
+	for name := range s.byName {
+		delete(s.removedTools, name)
+	}
 }
 
 // loadWorkspace attempts to prepare graph facts before loading them. A failed
@@ -373,6 +389,7 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 	defer func() {
 		s.writeMu.Lock()
 		_ = s.out.Flush()
+		s.out = nil
 		s.writeMu.Unlock()
 	}()
 
@@ -601,8 +618,8 @@ func (s *Server) write(resp *rpcResponse) {
 	s.writeLine(data)
 }
 
-// notify writes one notification. Before the first Serve there is no client,
-// and it writes nothing.
+// notify writes one notification. Outside Serve there is no client, and it
+// writes nothing.
 func (s *Server) notify(method string) {
 	data, _ := json.Marshal(rpcNotification{JSONRPC: jsonRPCVersion, Method: method})
 	s.writeLine(data)
