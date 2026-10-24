@@ -66,8 +66,10 @@ The boundaries:
   An entry carries exactly one of a check or `reviewOnly`.
 - **No verification-mode knob.** A written, dated decision is held or
   re-decided; it is not adopted gradually like an architecture graph.
-- **Nothing is truncated.** The protocol bounds a registry to 256 entries, so
-  what an agent reads stays finite without hiding a settled decision.
+- **Nothing is hidden.** The protocol bounds a registry to 256 entries, so
+  the guidance and the project context render it whole. A shorter listing,
+  such as the MCP instructions, counts the decisions it leaves out and names
+  the resource that holds them all.
 - **An ADR is justification only.** The registry carries the enforceable
   statement and the ADR explains why. Neither restates the other.
 

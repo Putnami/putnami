@@ -610,7 +610,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "this-repositorys-decisions-fit-the-instructions-budget",
               "an-oversized-registry-renders-whole-leading-lines-and-an-omission-line",
               "the-instruction-lines-are-compact-and-in-canonical-order"
             ]

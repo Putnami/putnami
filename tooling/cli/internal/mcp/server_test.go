@@ -1099,7 +1099,7 @@ func TestInitializeListsTheSettledDecisionsBetweenThePreambleAndTheGuides(t *tes
 	if !strings.Contains(settledDecisionsPointer, workspaceGuidanceURI) {
 		t.Fatalf("the pointer does not name %s: %q", workspaceGuidanceURI, settledDecisionsPointer)
 	}
-	if strings.Contains(instructions, "left out") || strings.Contains(instructions, "more settled decisions") {
+	if strings.Contains(instructions, "left out") || strings.Contains(instructions, "more settled decision") {
 		t.Fatalf("the instructions report an omission with every decision listed:\n%s", instructions)
 	}
 	if !strings.HasPrefix(instructions, srv.initializeRoutingPreamble()) {
@@ -1174,6 +1174,19 @@ func TestInitializeFitsTheSettledDecisionsToTheClientLimit(t *testing.T) {
 		over := instructions[:len(instructions)-len(omission)] + lines[listed] + "\n" + omittedDecisionsLine(total - listed - 1)[1:]
 		if clientInstructionUnits(over) <= maxClientInstructionUnits {
 			t.Fatalf("%s: decision %d fits but was left out", name, listed+1)
+		}
+	}
+}
+
+// The omission line agrees in number with the count it states.
+func TestOmittedDecisionsLineAgreesWithItsCount(t *testing.T) {
+	t.Parallel()
+	for omitted, want := range map[int]string{
+		1: "- ... 1 more settled decision is not listed here; read it at " + workspaceGuidanceURI,
+		2: "- ... 2 more settled decisions are not listed here; read them at " + workspaceGuidanceURI,
+	} {
+		if got := omittedDecisionsLine(omitted)[1:]; got != want {
+			t.Errorf("omittedDecisionsLine(%d) = %q, want %q", omitted, got, want)
 		}
 	}
 }

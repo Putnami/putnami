@@ -169,6 +169,9 @@ func (s *Server) settledDecisionsSection(head string) string {
 // omittedDecisionsLine counts the decisions the instructions leave out, with
 // its leading newline.
 func omittedDecisionsLine(omitted int) string {
+	if omitted == 1 {
+		return fmt.Sprintf("\n- ... 1 more settled decision is not listed here; read it at %s", workspaceGuidanceURI)
+	}
 	return fmt.Sprintf("\n- ... %d more settled decisions are not listed here; read them at %s", omitted, workspaceGuidanceURI)
 }
 
