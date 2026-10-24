@@ -59,6 +59,12 @@ type Options struct {
 	// stderr, in text output. Structured output never carries them: the verdict
 	// is the record.
 	Verbose bool
+	// Quiet keeps a local composition's preparation from writing the workspace
+	// load warnings on stderr.
+	Quiet bool
+	// Warnings receives the workspace load warnings of a local composition's
+	// preparation; nil keeps none.
+	Warnings *workspace.WarningReport
 }
 
 // VerdictError is the failure of a verdict that is not passed. It carries the
@@ -159,6 +165,8 @@ func newTarget(opts Options, project *workspace.Project, structured bool) (quali
 		ReadyTimeout:  opts.ReadyTimeout,
 		Output:        serveLogs,
 		Preparation:   preparation,
+		Quiet:         opts.Quiet,
+		Warnings:      opts.Warnings,
 	})
 }
 

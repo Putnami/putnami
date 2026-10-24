@@ -147,6 +147,7 @@ func watchIterationRequest(
 		// `putnami <group> serve --dry-run --watch` into a plan preview.
 		ExecutesUnderDryRun: req.ExecutesUnderDryRun,
 		watchIteration:      true,
+		latestWarnings:      req.latestWarnings,
 		VersionSnapshot:     req.VersionSnapshot,
 		Preflight:           req.Preflight,
 		Stdout:              io.Discard,

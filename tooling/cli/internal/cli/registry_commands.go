@@ -96,7 +96,7 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if err != nil {
 		return err
 	}
-	planner := newImpactPlanPlanner(env.WsRoot, env.Cfg, commands, engine.New().Run)
+	planner := newImpactPlanPlanner(env.WsRoot, env.Cfg, commands, engine.New().Run, env.WorkspaceWarnings())
 	document, err := ci.EmitImpactPlan(env.Ctx, env.WsRoot, ci.PlanOptions{
 		Base:       parsed.value("--base"),
 		Head:       parsed.value("--head"),
@@ -139,8 +139,12 @@ type engineRun func(context.Context, engine.Request, engine.EventSink) (engine.S
 // newImpactPlanPlanner maps the immutable base revision of impact-plan onto the
 // ordinary impacted engine plan for commands. The CLI owns this adapter:
 // commands receives only its typed result and cannot form an engine cycle. The
-// result and every error it returns name commands, the list it planned.
-func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string, run engineRun) ci.Planner {
+// result and every error it returns name commands, the list it planned. The
+// engine run is quiet and loads the workspace itself: the planner keeps the
+// warnings of that load in warnings, so the impact-plan envelope carries them.
+func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string, run engineRun,
+	warnings *workspace.WarningReport,
+) ci.Planner {
 	planned := append([]string(nil), commands...)
 	gate := strings.Join(planned, ",")
 	return func(ctx context.Context, baseSHA string, noCache bool) (ci.PlannerResult, error) {
@@ -159,6 +163,8 @@ func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string,
 			// The dispatcher reports the error returned below, once.
 			ErrorOut: io.Discard,
 		}, nil)
+		// A failed run reports the warnings of its load too.
+		warnings.Keep(result.WorkspaceWarnings)
 		if err != nil {
 			return ci.PlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)
 		}
@@ -523,7 +529,7 @@ func cmdCache(env *CommandEnv) error {
 		}
 		commands := cacheVerifyCommands(env.WsRoot)
 		return cachecmd.CacheVerifyCommand(env.Ctx, env.WsRoot, commands,
-			env.OutputFormat, newCacheVerifyRunner(env.Cfg, env.Global, commands, engine.New().Run))
+			env.OutputFormat, newCacheVerifyRunner(env.Cfg, env.Global, commands, engine.New().Run, env.WorkspaceWarnings()))
 	default:
 		return usageErrorf("unknown subcommand: cache %s\n  Available: clean, gc, verify", env.Sub)
 	}
@@ -539,14 +545,18 @@ func cacheVerifyCommands(wsRoot string) []string {
 // newCacheVerifyRunner is the CLI-owned adapter from the cache verifier onto
 // Engine.Run for commands. The checker observes the real plan, keys,
 // scheduler, capture, and restore paths without becoming a second execution
-// composition.
+// composition. The three runs load the same HEAD, so the runner keeps the
+// workspace warnings of the first run only in warnings: the cache verify
+// envelope lists each warning once.
 func newCacheVerifyRunner(
 	cfg *wsproto.Config,
 	global GlobalFlags,
 	commands []string,
 	run engineRun,
+	warnings *workspace.WarningReport,
 ) cachecmd.CacheVerifyRunner {
 	commands = append([]string(nil), commands...)
+	keptWarnings := false
 	return func(ctx context.Context, workspaceRoot, storeRoot string) (cachecmd.CacheVerifyEngineResult, error) {
 		flags := global
 		flags.Plan = false
@@ -586,6 +596,10 @@ func newCacheVerifyRunner(
 		}
 		request.CacheVerification = &engine.CacheVerificationRequest{StoreRoot: storeRoot}
 		result, err := run(ctx, request, output.NewPassthroughRenderer())
+		if !keptWarnings {
+			keptWarnings = true
+			warnings.Keep(result.WorkspaceWarnings)
+		}
 		return cachecmd.CacheVerifyEngineResult{
 			ExitCode: result.ExitCode,
 			Plan:     result.Plan,
@@ -799,6 +813,8 @@ func cmdQualify(env *CommandEnv) error {
 		OutputFormat:   env.OutputFormat,
 		Config:         env.Cfg,
 		Verbose:        env.Global.Verbose || env.Global.Debug,
+		Quiet:          env.Global.Quiet,
+		Warnings:       env.WorkspaceWarnings(),
 	})
 }
 

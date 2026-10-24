@@ -265,8 +265,10 @@ fill the member. `completion` and `projects tag` take no `--output=json`, so
 their warnings stay on stderr. A command that runs jobs fills the member in
 its `--output=json` envelope, for the run's verdict and for a plan-only
 preview, and in the `doctor` envelope of a blocked production preflight in
-either structured mode. The `--output=jsonl` session stream of a run writes no
-result envelope, so there its load warnings are on stderr only.
+either structured mode. A command that runs jobs inside its own result, such as
+`qualify --target local`, `cache verify` and `impact-plan`, fills the member
+with the warnings of its job run. The `--output=jsonl` session stream of a run
+writes no result envelope, so there its load warnings are on stderr only.
 
 ### Test case records
 

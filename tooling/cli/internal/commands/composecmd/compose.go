@@ -111,6 +111,7 @@ func Run(req Request) error {
 		ReadyTimeout:  readyTimeout,
 		Output:        serveRenderer(req, stdout, stderr, structured),
 		Preparation:   preparationRenderer(req, stderr),
+		Quiet:         req.Quiet,
 	})
 	if err != nil {
 		writeDetail(stderr, err, structured)

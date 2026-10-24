@@ -73,10 +73,14 @@ func TestJobRunEnvelopeCarriesWorkspaceLoadWarnings(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 			root := jobWorkspace(t, true)
-			for _, args := range [][]string{
-				{"build", "--projects", "example"},
-				{"build", "--projects", "example", "--plan"},
+			for _, tc := range []struct {
+				args []string
+				plan bool
+			}{
+				{[]string{"build", "--projects", "example"}, false},
+				{[]string{"build", "--projects", "example", "--plan"}, true},
 			} {
+				args := append([]string{}, tc.args...)
 				args = append(args, "--output=json")
 				if quiet {
 					args = append(args, "--quiet")
@@ -86,8 +90,11 @@ func TestJobRunEnvelopeCarriesWorkspaceLoadWarnings(t *testing.T) {
 					if code != protocolcli.ExitSuccess {
 						t.Fatalf("exit code = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 					}
-					if envelope.Run == nil && envelope.Plan == nil {
-						t.Fatalf("the envelope reports neither a run nor a plan:\n%s", stdout)
+					if tc.plan && (envelope.Plan == nil || envelope.Run != nil) {
+						t.Fatalf("--plan must write the plan-only envelope (plan set, no run):\n%s", stdout)
+					}
+					if !tc.plan && envelope.Run == nil {
+						t.Fatalf("a plain run must write a run envelope:\n%s", stdout)
 					}
 					assertJobsIgnoredWarning(t, envelope)
 					warning := envelope.WorkspaceWarnings[0].Message

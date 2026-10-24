@@ -31,9 +31,11 @@ type machineV2Renderer struct {
 	// stream selects --output=jsonl (one record per line) over --output=json
 	// (one aggregated object at Finish).
 	stream bool
-	// workspaceWarnings are the run's workspace load warnings, which the
-	// aggregated envelope carries in workspaceWarnings.
-	workspaceWarnings []protocolcli.WorkspaceWarning
+	// workspaceWarnings returns the run's workspace load warnings when the
+	// aggregated envelope is written: a watch session builds this renderer
+	// once, so the envelope of each iteration reads the warnings of that
+	// iteration's own load. Nil means none.
+	workspaceWarnings func() []protocolcli.WorkspaceWarning
 
 	start     time.Time
 	planned   []*jobs.ScheduledJob
@@ -299,7 +301,9 @@ func (r *machineV2Renderer) Finish(results map[string]*jobs.JobResult, outcome j
 	}
 	// The aggregated envelope carries the run's workspace load warnings.
 	envelope := run.Envelope(r.command, durationMs)
-	envelope.WorkspaceWarnings = r.workspaceWarnings
+	if r.workspaceWarnings != nil {
+		envelope.WorkspaceWarnings = r.workspaceWarnings()
+	}
 	if document, err := sanitizedMachineDocument(envelope); err == nil {
 		r.write(document)
 	}

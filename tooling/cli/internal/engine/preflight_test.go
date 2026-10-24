@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -202,17 +203,19 @@ func TestRenderProductionPreflightFailure_StructuredCarriesReport(t *testing.T) 
 		t.Fatal("fixture must block under production")
 	}
 
+	warnings := []protocolcli.WorkspaceWarning{{Code: "workspace.jobs_ignored", Message: "project /app declares jobs"}}
 	var buf strings.Builder
-	renderProductionPreflightFailure(&buf, io.Discard, "jsonl", report, gateErr, nil)
+	renderProductionPreflightFailure(&buf, io.Discard, "jsonl", report, gateErr, warnings)
 	out := buf.String()
 	if n := strings.Count(strings.TrimSpace(out), "\n"); n != 0 {
 		t.Fatalf("structured render must be a single JSONL line, got %d newlines:\n%s", n, out)
 	}
 	var env struct {
-		Command  string        `json:"command"`
-		Status   string        `json:"status"`
-		ExitCode int           `json:"exitCode"`
-		Data     doctor.Report `json:"data"`
+		Command           string                         `json:"command"`
+		Status            string                         `json:"status"`
+		ExitCode          int                            `json:"exitCode"`
+		Data              doctor.Report                  `json:"data"`
+		WorkspaceWarnings []protocolcli.WorkspaceWarning `json:"workspaceWarnings"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &env); err != nil {
 		t.Fatalf("parse envelope: %v\noutput: %s", err, out)
@@ -222,6 +225,9 @@ func TestRenderProductionPreflightFailure_StructuredCarriesReport(t *testing.T) 
 	}
 	if env.Data.Summary.Findings != report.Summary.Findings || env.Data.Summary.Critical < 1 {
 		t.Fatalf("envelope data must carry the report with the critical finding: %+v", env.Data)
+	}
+	if !reflect.DeepEqual(env.WorkspaceWarnings, warnings) {
+		t.Fatalf("workspaceWarnings = %+v, want the load warnings %+v", env.WorkspaceWarnings, warnings)
 	}
 }
 

@@ -69,7 +69,7 @@ func runProductionPreflight(req *Request, selectedProjects []*workspace.Project)
 	}
 	if req.Preflight == nil {
 		report := doctor.Report{Profile: doctor.ProfileProduction}
-		renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, errNoPreflightGate, req.workspaceWarnings)
+		renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, errNoPreflightGate, req.workspaceWarnings.Envelope())
 		return protocolcli.ExitCodeForError(errNoPreflightGate), true
 	}
 
@@ -80,7 +80,7 @@ func runProductionPreflight(req *Request, selectedProjects []*workspace.Project)
 		// execution proceed.
 		return ExitSuccess, false
 	}
-	renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, gateErr, req.workspaceWarnings)
+	renderProductionPreflightFailure(req.stdout(), os.Stderr, req.Global.Output, report, gateErr, req.workspaceWarnings.Envelope())
 	return protocolcli.ExitCodeForError(gateErr), true
 }
 

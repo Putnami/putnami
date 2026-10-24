@@ -34,10 +34,11 @@ type Config struct {
 	// The live renderer orders its command columns by it; the verbs it does
 	// not name follow in the renderer's fallback order.
 	VerbOrder []string
-	// WorkspaceWarnings are the warnings the run's workspace load reported.
-	// The --output=json envelope carries them in workspaceWarnings; no other
-	// renderer reads them.
-	WorkspaceWarnings []protocolcli.WorkspaceWarning
+	// WorkspaceWarnings returns the warnings the run's workspace load
+	// reported, when the --output=json envelope is written; the envelope
+	// carries them in workspaceWarnings. No other renderer reads it. Nil means
+	// none.
+	WorkspaceWarnings func() []protocolcli.WorkspaceWarning
 
 	// Out and Err are the streams the selected renderer writes to. Nil means
 	// os.Stdout / os.Stderr, which is every terminal-shaped caller.

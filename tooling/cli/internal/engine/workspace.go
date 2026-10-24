@@ -47,9 +47,11 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 	if req.Global.Quiet {
 		warningOut = nil
 	}
-	warnings := workspace.NewWarningReport(warningOut)
-	warnings.Report(ws)
-	req.workspaceWarnings = warnings.Envelope()
+	req.workspaceWarnings = workspace.NewWarningReport(warningOut)
+	req.workspaceWarnings.Report(ws)
+	if req.latestWarnings != nil {
+		req.latestWarnings.Store(req.workspaceWarnings)
+	}
 
 	projectPaths := make([]string, len(ws.Projects))
 	for i, p := range ws.Projects {

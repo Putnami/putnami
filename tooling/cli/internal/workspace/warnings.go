@@ -37,6 +37,17 @@ func (r *WarningReport) Report(ws *Workspace) {
 	}
 }
 
+// Keep keeps warnings, in order, and writes nothing: their producer already
+// wrote them, or was quiet. A caller whose engine run loaded the workspace
+// hands the run's warnings to the report of its command this way. A nil report
+// does nothing.
+func (r *WarningReport) Keep(warnings []Warning) {
+	if r == nil {
+		return
+	}
+	r.reported = append(r.reported, warnings...)
+}
+
 // Warnings returns every reported warning, in order. A nil report has none.
 func (r *WarningReport) Warnings() []Warning {
 	if r == nil {
