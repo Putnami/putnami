@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	ciproto "go.putnami.dev/protocol/ci"
+	collab "go.putnami.dev/protocol/collaboration"
 	featureproto "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -34,10 +36,17 @@ import (
 // because a resource has no free-text slot. A tools/call that ends in a
 // JSON-RPC error leaves it pending too.
 //
-// When the extension set changed, the server reloads its extension selection,
-// guides and tools through Options.ReloadExtensions, then writes
-// notifications/tools/list_changed and notifications/resources/list_changed,
-// in that order, before the response of the request that noticed the change.
+// The decision registry of a project a workspace load finds for the first
+// time, after a load that failed or a change to the includes for example,
+// joins the baseline as it is: only a later change to it is reported.
+//
+// When the extension set, the includes or options.collaboration changed, the
+// server reloads its extension selection, guides and tools through
+// Options.ReloadExtensions, then writes notifications/tools/list_changed and
+// notifications/resources/list_changed, in that order, before the response of
+// the request that noticed the change. The tools count as built from each
+// input as it was before the build, so an edit that lands during the build is
+// loaded by the next request.
 
 const (
 	workspaceConfigInput = wsproto.WorkspaceConfigFilename
@@ -84,10 +93,12 @@ type contextInput struct {
 // contextSnapshot is the content of the inputs at one moment. files holds the
 // present inputs by slash-separated path, workspace-relative inside the
 // workspace. An absent input has no entry, so an input that leaves the input
-// set and an input that is deleted read the same.
+// set and an input that is deleted read the same. checked holds every path
+// the read looked at, present or not.
 type contextSnapshot struct {
-	files  map[string]contextInput
-	digest [sha256.Size]byte
+	files   map[string]contextInput
+	checked map[string]bool
+	digest  [sha256.Size]byte
 }
 
 // pathExtension is an extension loaded by path. label is its directory,
@@ -100,8 +111,9 @@ type pathExtension struct {
 
 // decisionFile is a project decision registry the last workspace load found.
 type decisionFile struct {
-	path      string
-	projectID string
+	path        string
+	projectPath string
+	projectID   string
 }
 
 // contextState is the change-tracking state contextMu guards.
@@ -113,6 +125,13 @@ type contextState struct {
 	loaded         contextSnapshot
 	pathExtensions []pathExtension
 	decisionFiles  []decisionFile
+	// seenProjects holds the path of each project a workspace load found in
+	// this session.
+	seenProjects map[string]bool
+	// joining holds the decision registries of projects a workspace load
+	// found for the first time, as the load found them. The next context
+	// check adds each to both baselines.
+	joining map[string]contextInput
 }
 
 // contextNotice is a notice a tool result may carry: its text, the digest it
@@ -123,27 +142,59 @@ type contextNotice struct {
 	to   contextSnapshot
 }
 
-// startContextTracking reads the inputs the session starts from.
-func (s *Server) startContextTracking() {
-	snapshot := s.readContextInputs()
+// startTools registers the tools the session starts with and records the
+// inputs it starts from. The tools count as built from the inputs read before
+// the build, so an edit that lands during the build is loaded by the first
+// request.
+func (s *Server) startTools() {
+	before := s.readContextInputs()
+	s.rebuildTools()
+	after := s.readContextInputs()
 	s.contextMu.Lock()
 	defer s.contextMu.Unlock()
-	s.changes.reported = snapshot
-	s.changes.loaded = snapshot
+	s.changes.reported = after
+	s.changes.loaded = builtFrom(before, after)
+	s.changes.joining = nil
+}
+
+// builtFrom is the snapshot tools built between two reads count as built
+// from: each input the first read checked as it was then, and each input only
+// the second read checked, which the build started to track, as it was then.
+func builtFrom(before, after contextSnapshot) contextSnapshot {
+	built := contextSnapshot{files: make(map[string]contextInput), checked: after.checked}
+	for key := range after.checked {
+		source := after
+		if before.checked[key] {
+			source = before
+		}
+		if input, ok := source.files[key]; ok {
+			built.files[key] = input
+		}
+	}
+	built.digest = snapshotDigest(built.files)
+	return built
 }
 
 // noteWorkspaceLoad records the project decision registries a workspace load
 // finds. The root registry is always an input, so it is not recorded here.
+//
+// A project the session sees for the first time, after a load that failed or
+// a change to the includes for example, brings its registry as it is: the
+// registry is hashed as found, to join the baselines at the next context
+// check, so its decisions do not read as added. A registry a known project
+// gains is a change, and the next tool result reports it.
 func (s *Server) noteWorkspaceLoad(ws *workspace.Workspace) {
 	if ws == nil || s.opts.WorkspaceRoot == "" {
 		return
 	}
 	var found []decisionFile
+	var projects []string
 	seen := make(map[string]bool)
 	for _, project := range ws.Projects {
 		if project == nil {
 			continue
 		}
+		projects = append(projects, filepath.ToSlash(project.Path))
 		registry := featureproto.DecisionRegistryPath(filepath.ToSlash(project.Path))
 		if registry == featureproto.DecisionsFilename || seen[registry] {
 			continue
@@ -153,12 +204,71 @@ func (s *Server) noteWorkspaceLoad(ws *workspace.Workspace) {
 			continue
 		}
 		seen[registry] = true
-		found = append(found, decisionFile{path: registry, projectID: project.ID})
+		found = append(found, decisionFile{path: registry, projectPath: filepath.ToSlash(project.Path), projectID: project.ID})
 	}
 	sort.Slice(found, func(i, j int) bool { return found[i].path < found[j].path })
 	s.contextMu.Lock()
+	known := make(map[string]bool, len(s.changes.seenProjects))
+	for project := range s.changes.seenProjects {
+		known[project] = true
+	}
+	s.contextMu.Unlock()
+	joined := make(map[string]contextInput)
+	var buf []byte
+	for _, registry := range found {
+		if known[registry.projectPath] {
+			continue
+		}
+		if buf == nil {
+			buf = make([]byte, hashBufferBytes)
+		}
+		if sum, data, ok := hashContextInput(filepath.Join(s.opts.WorkspaceRoot, filepath.FromSlash(registry.path)), true, buf); ok {
+			joined[registry.path] = contextInput{kind: inputDecisions, owner: registry.projectID, sum: sum, data: data}
+		}
+	}
+	s.contextMu.Lock()
 	defer s.contextMu.Unlock()
 	s.changes.decisionFiles = found
+	if s.changes.seenProjects == nil {
+		s.changes.seenProjects = make(map[string]bool)
+	}
+	for _, project := range projects {
+		s.changes.seenProjects[project] = true
+	}
+	for key, input := range joined {
+		if s.changes.joining == nil {
+			s.changes.joining = make(map[string]contextInput)
+		}
+		s.changes.joining[key] = input
+	}
+}
+
+// joinFoundRegistries adds each registry a workspace load found for the first
+// time to both baselines, unless a baseline already holds it.
+func (s *Server) joinFoundRegistries() {
+	s.contextMu.Lock()
+	defer s.contextMu.Unlock()
+	if len(s.changes.joining) == 0 {
+		return
+	}
+	s.changes.reported = withInputs(s.changes.reported, s.changes.joining)
+	s.changes.loaded = withInputs(s.changes.loaded, s.changes.joining)
+	s.changes.joining = nil
+}
+
+// withInputs returns a copy of the snapshot with each input it lacks added.
+// It never changes the snapshot it is given, which a notice may hold.
+func withInputs(snapshot contextSnapshot, inputs map[string]contextInput) contextSnapshot {
+	files := make(map[string]contextInput, len(snapshot.files)+len(inputs))
+	for key, input := range snapshot.files {
+		files[key] = input
+	}
+	for key, input := range inputs {
+		if _, held := files[key]; !held {
+			files[key] = input
+		}
+	}
+	return contextSnapshot{files: files, checked: snapshot.checked, digest: snapshotDigest(files)}
 }
 
 // notePathExtensions records the extensions loaded by path: the discovered
@@ -211,7 +321,7 @@ func (s *Server) notePathExtensions(exts []*extension.ExtensionDescription) {
 // readContextInputs reads and hashes every input. A server without a
 // workspace root has none.
 func (s *Server) readContextInputs() contextSnapshot {
-	snapshot := contextSnapshot{files: make(map[string]contextInput)}
+	snapshot := contextSnapshot{files: make(map[string]contextInput), checked: make(map[string]bool)}
 	root := s.opts.WorkspaceRoot
 	if root == "" {
 		snapshot.digest = snapshotDigest(snapshot.files)
@@ -224,6 +334,7 @@ func (s *Server) readContextInputs() contextSnapshot {
 
 	buf := make([]byte, hashBufferBytes)
 	add := func(key, file string, kind contextInputKind, owner string, retain bool) {
+		snapshot.checked[key] = true
 		sum, data, ok := hashContextInput(file, retain, buf)
 		if ok {
 			snapshot.files[key] = contextInput{kind: kind, owner: owner, sum: sum, data: data}
@@ -302,19 +413,23 @@ func (s *Server) observeContext(ctx context.Context, describe bool) contextNotic
 	}
 	s.observeMu.Lock()
 	defer s.observeMu.Unlock()
+	s.joinFoundRegistries()
 	current := s.readContextInputs()
 	s.contextMu.Lock()
-	loaded, reported := s.changes.loaded, s.changes.reported
+	loaded := s.changes.loaded
 	s.contextMu.Unlock()
 	if current.digest != loaded.digest {
 		if s.opts.ReloadExtensions != nil && extensionSetKey(loaded) != extensionSetKey(current) {
-			s.reloadExtensions(ctx)
-			current = s.readContextInputs()
+			current = s.reloadExtensions(ctx, current)
+			s.joinFoundRegistries()
 		}
 		s.contextMu.Lock()
 		s.changes.loaded = current
 		s.contextMu.Unlock()
 	}
+	s.contextMu.Lock()
+	reported := s.changes.reported
+	s.contextMu.Unlock()
 	if !describe || current.digest == reported.digest {
 		return contextNotice{}
 	}
@@ -326,16 +441,21 @@ func (s *Server) observeContext(ctx context.Context, describe bool) contextNotic
 	}
 }
 
-// reloadExtensions replaces the extension selection, rebuilds the tools, and
-// tells the client that both lists changed.
-func (s *Server) reloadExtensions(ctx context.Context) {
+// reloadExtensions replaces the extension selection, rebuilds the tools from
+// the current project set, and tells the client that both lists changed. It
+// returns the snapshot the new tools count as built from: before, the inputs
+// read before the reload, joined by the inputs the reload started to track.
+func (s *Server) reloadExtensions(ctx context.Context, before contextSnapshot) contextSnapshot {
+	workspace.InvalidateLoadCache(s.opts.WorkspaceRoot)
 	selection := s.opts.ReloadExtensions(ctx)
 	s.selectionMu.Lock()
 	s.selection = selection
 	s.selectionMu.Unlock()
 	s.rebuildTools()
+	after := s.readContextInputs()
 	s.notify(notificationToolsListChanged)
 	s.notify(notificationResourcesListChanged)
+	return builtFrom(before, after)
 }
 
 // withNotice appends the notice to a tool result as its last text block, and
@@ -365,25 +485,42 @@ func (s *Server) withNotice(resp *rpcResponse, notice contextNotice) *rpcRespons
 }
 
 // noticeTargets names what a notice may point at: a resource only when this
-// server lists it.
+// server lists it. guides holds the URIs of the extension guides listed now.
 type noticeTargets struct {
 	guidance       bool
 	projectContext bool
 	reload         bool
+	guides         map[string]bool
 }
 
 func (s *Server) noticeTargets() noticeTargets {
+	guides := make(map[string]bool)
+	for _, entry := range s.guidanceResources() {
+		guides[entry.resource.URI] = true
+	}
 	return noticeTargets{
 		guidance:       s.opts.WorkspaceGuidance != nil,
 		projectContext: s.opts.AgentContext != nil,
 		reload:         s.opts.ReloadExtensions != nil,
+		guides:         guides,
 	}
 }
 
-// extensionSetKey identifies the extension set of a snapshot: the declared
-// extensions and their constraints, the disabled extensions, the locked
-// version and manifest hash of each extension, and the manifest of each
-// extension loaded by path. An input that does not parse counts by its hash.
+// guideOr returns the guide URI of an extension version when the server lists
+// it, and file otherwise.
+func (t noticeTargets) guideOr(name, version, file string) string {
+	if uri := extensionGuidanceURI(name, version); t.guides[uri] {
+		return uri
+	}
+	return file
+}
+
+// extensionSetKey identifies what the tools are built from in a snapshot: the
+// declared extensions and their constraints, the disabled extensions, the
+// includes, which decide the projects loaded as extensions, the
+// options.collaboration binding, the locked version and manifest hash of each
+// extension, and the manifest of each extension loaded by path. An input that
+// does not parse counts by its hash.
 func extensionSetKey(snapshot contextSnapshot) string {
 	var parts []string
 	if input, ok := snapshot.files[workspaceConfigInput]; ok {
@@ -394,6 +531,7 @@ func extensionSetKey(snapshot contextSnapshot) string {
 			for _, name := range sortedKeys(declared.disabled) {
 				parts = append(parts, "disabled "+name)
 			}
+			parts = append(parts, "includes "+strings.Join(declared.includes, "\x00"), "collaboration "+declared.collaboration)
 		} else {
 			parts = append(parts, "workspace "+hex.EncodeToString(input.sum[:]))
 		}
@@ -415,10 +553,13 @@ func extensionSetKey(snapshot contextSnapshot) string {
 	return strings.Join(parts, "\n")
 }
 
-// workspaceExtensions is the extension part of putnami.workspace.json.
+// workspaceExtensions is the part of putnami.workspace.json the tools are
+// built from. collaboration is the options.collaboration value, compacted.
 type workspaceExtensions struct {
-	refs     map[string]string
-	disabled map[string]bool
+	refs          map[string]string
+	disabled      map[string]bool
+	includes      []string
+	collaboration string
 }
 
 func parseWorkspaceExtensions(input contextInput) (workspaceExtensions, bool) {
@@ -426,13 +567,22 @@ func parseWorkspaceExtensions(input contextInput) (workspaceExtensions, bool) {
 		return workspaceExtensions{}, false
 	}
 	var document struct {
-		Extensions wsproto.ExtensionsConfig `json:"extensions"`
-		Disable    *wsproto.DisableConfig   `json:"disable"`
+		Extensions wsproto.ExtensionsConfig   `json:"extensions"`
+		Disable    *wsproto.DisableConfig     `json:"disable"`
+		Includes   []string                   `json:"includes"`
+		Options    map[string]json.RawMessage `json:"options"`
 	}
 	if err := json.Unmarshal(input.data, &document); err != nil {
 		return workspaceExtensions{}, false
 	}
-	declared := workspaceExtensions{refs: document.Extensions.List, disabled: make(map[string]bool)}
+	declared := workspaceExtensions{refs: document.Extensions.List, disabled: make(map[string]bool), includes: document.Includes}
+	if binding := document.Options[collab.BindingOptionNamespace]; len(binding) > 0 {
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, binding); err != nil {
+			return workspaceExtensions{}, false
+		}
+		declared.collaboration = compact.String()
+	}
 	if declared.refs == nil {
 		declared.refs = make(map[string]string)
 	}
@@ -477,7 +627,8 @@ type contextChange struct {
 
 // describeContextChanges lists what changed between two snapshots, in a fixed
 // order: the workspace guidance, the project decisions, the extensions, then
-// the rest of the workspace configuration and lock.
+// the rest of the workspace configuration and lock. A change points at a
+// resource only when that resource shows it, and else at the changed file.
 func describeContextChanges(from, to contextSnapshot, targets noticeTargets) []contextChange {
 	guidanceRead := func(file string) string {
 		if targets.guidance {
@@ -502,16 +653,16 @@ func describeContextChanges(from, to contextSnapshot, targets noticeTargets) []c
 	}
 
 	mentioned := make(map[string]bool)
-	lockChanges := lockedExtensionChanges(from, to, mentioned)
+	lockChanges := lockedExtensionChanges(from, to, targets, mentioned)
 	changes = append(changes, lockChanges...)
 	changes = append(changes, pathExtensionChanges(from, to, mentioned)...)
-	workspaceChanges, declaredDiffers := declaredExtensionChanges(from, to, mentioned)
+	workspaceChanges, declaredDiffers := declaredExtensionChanges(from, to, targets, mentioned)
 	changes = append(changes, workspaceChanges...)
 	if inputChanged(from, to, workspaceConfigInput) && !declaredDiffers {
-		changes = append(changes, contextChange{text: workspaceConfigInput + " changed", read: workspaceContextURI})
+		changes = append(changes, contextChange{text: workspaceConfigInput + " changed", read: workspaceConfigInput})
 	}
 	if inputChanged(from, to, lockInput) && len(lockChanges) == 0 {
-		changes = append(changes, contextChange{text: lockInput + " changed", read: workspaceContextURI})
+		changes = append(changes, contextChange{text: lockInput + " changed", read: lockInput})
 	}
 	return changes
 }
@@ -589,8 +740,9 @@ func parseDecisions(snapshot contextSnapshot, key string) (map[string]string, bo
 }
 
 // lockedExtensionChanges names each extension the lock installed, replaced or
-// removed. It records each name it mentions.
-func lockedExtensionChanges(from, to contextSnapshot, mentioned map[string]bool) []contextChange {
+// removed, and points at its guide when the server lists it, else at the
+// lock. It records each name it mentions.
+func lockedExtensionChanges(from, to contextSnapshot, targets noticeTargets, mentioned map[string]bool) []contextChange {
 	if !inputChanged(from, to, lockInput) {
 		return nil
 	}
@@ -605,16 +757,16 @@ func lockedExtensionChanges(from, to contextSnapshot, mentioned map[string]bool)
 		current, inAfter := after[name]
 		switch {
 		case !inBefore:
-			changes = append(changes, contextChange{text: nameAtVersion(name, current.Version) + " installed", read: extensionGuidanceURI(name, current.Version)})
+			changes = append(changes, contextChange{text: nameAtVersion(name, current.Version) + " installed", read: targets.guideOr(name, current.Version, lockInput)})
 		case !inAfter:
 			changes = append(changes, contextChange{text: name + " removed"})
 		case old.Version != current.Version:
 			changes = append(changes, contextChange{
 				text: nameAtVersion(name, current.Version) + " installed, replacing " + old.Version,
-				read: extensionGuidanceURI(name, current.Version),
+				read: targets.guideOr(name, current.Version, lockInput),
 			})
 		case old.ManifestHash != current.ManifestHash:
-			changes = append(changes, contextChange{text: nameAtVersion(name, current.Version) + " installed again with another manifest", read: extensionGuidanceURI(name, current.Version)})
+			changes = append(changes, contextChange{text: nameAtVersion(name, current.Version) + " installed again with another manifest", read: targets.guideOr(name, current.Version, lockInput)})
 		default:
 			continue
 		}
@@ -694,7 +846,7 @@ func pathExtensionChanges(from, to contextSnapshot, mentioned map[string]bool) [
 // declared, dropped, disabled or enabled, except one a lock or path line
 // already named. differs reports whether the declared extensions changed at
 // all, named or not.
-func declaredExtensionChanges(from, to contextSnapshot, mentioned map[string]bool) (changes []contextChange, differs bool) {
+func declaredExtensionChanges(from, to contextSnapshot, targets noticeTargets, mentioned map[string]bool) (changes []contextChange, differs bool) {
 	if !inputChanged(from, to, workspaceConfigInput) {
 		return nil, false
 	}
@@ -716,15 +868,11 @@ func declaredExtensionChanges(from, to contextSnapshot, mentioned map[string]boo
 		}
 		switch {
 		case !inBefore:
-			read := ""
-			if entry, ok := locked[ref]; ok {
-				read = extensionGuidanceURI(ref, entry.Version)
-			}
-			changes = append(changes, contextChange{text: ref + " added to the workspace extensions", read: read})
+			changes = append(changes, contextChange{text: ref + " added to the workspace extensions", read: targets.guideOr(ref, locked[ref].Version, workspaceConfigInput)})
 		case !inAfter:
 			changes = append(changes, contextChange{text: ref + " removed from the workspace extensions"})
 		case old != current:
-			changes = append(changes, contextChange{text: "the " + ref + " version constraint changed", read: workspaceContextURI})
+			changes = append(changes, contextChange{text: "the " + ref + " version constraint changed", read: workspaceConfigInput})
 		}
 	}
 	for _, name := range sortedKeys(mergeKeys(before.disabled, after.disabled)) {

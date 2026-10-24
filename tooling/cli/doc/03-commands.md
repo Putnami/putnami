@@ -1239,10 +1239,11 @@ with the session.
 
 Before it answers a tool call or a resource read, the server hashes
 `putnami.workspace.json`, `putnami.lock.json`, `putnami.ci.json`, the manifest
-and `AI.md` of each extension loaded by path, and the `decisions.json` files it
-found. After a change, the next tool result ends with one more text block that
-names the change, for example `D-025 added` or `@putnami/go 0.3.1 installed`,
-and the resource to read. Each change is reported once. When the extension set
+and `AI.md` of each extension loaded by path, and the `decisions.json` files its
+last workspace load found. After a change, the next tool result ends with one
+more text block that names the change, for example `D-025 added` or
+`@putnami/go 0.3.1 installed`, and the resource or file to read. Each change is
+reported once. When the extensions, `includes` or `options.collaboration`
 changed, the server reloads its extension guides and tools and sends
 `notifications/tools/list_changed` and `notifications/resources/list_changed`.
 

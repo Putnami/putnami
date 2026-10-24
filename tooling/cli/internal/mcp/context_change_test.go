@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -30,6 +31,11 @@ const (
 	checkListsFollowReload         = "the-lists-after-a-reload-follow-the-new-extension-set"
 	checkCapabilitiesListChanged   = "the-capabilities-declare-list-changed"
 	checkConcurrentReportsOnceSafe = "concurrent-requests-report-a-change-once-without-a-data-race"
+	checkFoundProjectJoinsSilently = "a-project-a-load-finds-later-joins-without-a-notice"
+	checkIncludesAndBindingReload  = "an-includes-or-collaboration-change-reloads-and-notifies"
+	checkEditDuringReloadLoads     = "an-edit-during-a-reload-is-loaded-by-the-next-request"
+	checkRemovedToolSaysListAgain  = "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again"
+	checkNothingWrittenAfterServe  = "nothing-is-written-after-the-session-ends"
 )
 
 const contextDecisionsOne = `{
@@ -66,9 +72,15 @@ func (f contextFixture) write(t *testing.T, rel, content string) {
 	}
 }
 
-// pathExtensionManifest declares one read-only tool per name, each running
-// command.
+// pathExtensionManifest declares the @putnami/notes extension with one
+// read-only tool per name, each running command.
 func pathExtensionManifest(command string, tools ...string) string {
+	return namedExtensionManifest("@putnami/notes", command, tools...)
+}
+
+// namedExtensionManifest declares an extension with one read-only tool per
+// name, each running command.
+func namedExtensionManifest(extensionName, command string, tools ...string) string {
 	declared := make([]string, 0, len(tools))
 	for _, name := range tools {
 		declared = append(declared, fmt.Sprintf(`%q:{
@@ -80,9 +92,9 @@ func pathExtensionManifest(command string, tools ...string) string {
   }`, name, name, command))
 	}
 	return `{
-  "name":"@putnami/notes",
+  "name":` + strconv.Quote(extensionName) + `,
   "cliContract": 4,
-  "commands":{"notes-support":{"run":[{"id":"noop","task":"noop"}]}},
+  "commands":{"` + strings.TrimPrefix(extensionName, "@putnami/") + `-support":{"run":[{"id":"noop","task":"noop"}]}},
   "tasks":{"noop":{"kind":"command","command":"true"}},
   "tools":{` + strings.Join(declared, ",") + `}
 }`
@@ -145,6 +157,7 @@ type sessionLine struct {
 			URI string `json:"uri"`
 		} `json:"resources"`
 		Capabilities serverCaps `json:"capabilities"`
+		IsError      bool       `json:"isError"`
 	} `json:"result"`
 	Error *rpcError `json:"error"`
 }
@@ -289,7 +302,8 @@ func TestContextNoticeNamesEachChangeAndWhatToRead(t *testing.T) {
 		"extensions/notes/putnami.extension.json": hashed(inputExtensionManifest, "extensions/notes", "m2"),
 		"extensions/notes/AI.md":                  hashed(inputExtensionGuide, "extensions/notes", "g2"),
 	})
-	targets := noticeTargets{guidance: true, projectContext: true, reload: true}
+	goGuide := extensionGuidanceURI("@putnami/go", "0.3.1")
+	targets := noticeTargets{guidance: true, projectContext: true, reload: true, guides: map[string]bool{goGuide: true}}
 	got := renderContextNotice(describeContextChanges(from, to, targets), reloadedBetween(from, to, targets))
 	want := strings.Join([]string{
 		"Putnami notice: the workspace context changed.",
@@ -321,7 +335,10 @@ func TestContextNoticeNamesEachChangeAndWhatToRead(t *testing.T) {
 		t.Errorf("a server that cannot reload claims a reload:\n%s", bare)
 	}
 
-	// A change the notice cannot name in detail still names its file.
+	// A change no listed resource shows points at its file: a change the
+	// notice cannot name in detail, a version constraint, and an extension
+	// the lock installs without a listed guide, such as a dependency of a
+	// declared extension.
 	only := func(key string, input contextInput) contextSnapshot {
 		return snapshot(map[string]contextInput{key: input})
 	}
@@ -330,13 +347,17 @@ func TestContextNoticeNamesEachChangeAndWhatToRead(t *testing.T) {
 		want     string
 	}{
 		{only("putnami.workspace.json", retained(inputWorkspaceConfig, "", `{"quiet":true}`)), only("putnami.workspace.json", retained(inputWorkspaceConfig, "", `{"quiet":false}`)),
-			"- putnami.workspace.json changed. Read workspace://context"},
+			"- putnami.workspace.json changed. Read putnami.workspace.json"},
+		{only("putnami.workspace.json", retained(inputWorkspaceConfig, "", `{"extensions":{"@putnami/go":"^0.3"}}`)), only("putnami.workspace.json", retained(inputWorkspaceConfig, "", `{"extensions":{"@putnami/go":"^0.4"}}`)),
+			"- the @putnami/go version constraint changed. Read putnami.workspace.json"},
 		{only("putnami.lock.json", retained(inputLock, "", `{"cli":{"version":"1"}}`)), only("putnami.lock.json", retained(inputLock, "", `{"cli":{"version":"2"}}`)),
-			"- putnami.lock.json changed. Read workspace://context"},
+			"- putnami.lock.json changed. Read putnami.lock.json"},
 		{only("decisions.json", retained(inputDecisions, "", contextDecisionsOne)), only("decisions.json", retained(inputDecisions, "", "{not json")),
 			"- decisions.json changed. Read putnami://workspace/guidance"},
 		{snapshot(map[string]contextInput{}), only("putnami.lock.json", retained(inputLock, "", `{"extensions":{"@putnami/go":{"version":"0.3.1"}}}`)),
-			"- @putnami/go 0.3.1 installed. Read putnami://extension-guidance/AI.md?name=%40putnami%2Fgo&version=0.3.1"},
+			"- @putnami/go 0.3.1 installed. Read " + goGuide},
+		{snapshot(map[string]contextInput{}), only("putnami.lock.json", retained(inputLock, "", `{"extensions":{"@putnami/dev":{"version":"0.3.1"}}}`)),
+			"- @putnami/dev 0.3.1 installed. Read putnami.lock.json"},
 	} {
 		notice := renderContextNotice(describeContextChanges(tc.from, tc.to, targets), false)
 		if !strings.HasSuffix(notice, "\n"+tc.want) {
@@ -575,11 +596,8 @@ func TestConcurrentRequestsReportAChangeOnceWithoutADataRace(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, contextFeature, contextRequirement, checkConcurrentReportsOnceSafe)
 	f := newContextFixture(t)
-	srv := f.server(t, nil)
-	var out bytes.Buffer
-	if err := srv.Serve(context.Background(), strings.NewReader(""), &out); err != nil {
-		t.Fatal(err)
-	}
+	reloads := 0
+	srv := f.server(t, &reloads)
 
 	done := make(chan struct{})
 	var readers sync.WaitGroup
@@ -594,7 +612,7 @@ func TestConcurrentRequestsReportAChangeOnceWithoutADataRace(t *testing.T) {
 				default:
 				}
 				_ = srv.toolDefs()
-				_, _ = srv.lookupTool("notes.read")
+				_, _, _ = srv.lookupTool("notes.read")
 				_ = srv.guidanceResources()
 				_ = srv.initializeInstructions()
 				_ = srv.currentSelection()
@@ -629,11 +647,206 @@ func TestConcurrentRequestsReportAChangeOnceWithoutADataRace(t *testing.T) {
 	close(done)
 	readers.Wait()
 
-	if _, ok := srv.lookupTool("notes.extra2"); !ok {
+	if _, ok, _ := srv.lookupTool("notes.extra2"); !ok {
 		t.Error("the last manifest's tools are not registered")
 	}
-	if got := strings.Count(out.String(), notificationToolsListChanged); got != 3 {
-		t.Errorf("tools/list_changed sent %d times, want once per reload (3)", got)
+	if reloads != 3 {
+		t.Errorf("reloads = %d, want one per changed manifest (3)", reloads)
+	}
+}
+
+// A project the session sees for the first time brings its decisions.json as
+// it is. Here the workspace does not load when the server starts, because two
+// projects share a name, so the start tracks no project registry. Once the
+// name is fixed, a tool call loads the workspace and finds the registry. No
+// tool result reports its decisions as added, and a later edit to it is
+// reported.
+func TestAProjectAWorkspaceLoadFindsLaterJoinsWithoutANotice(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkFoundProjectJoinsSilently)
+	f := newContextFixture(t)
+	const appProject = `{"name":"app","type":"application","dependencies":["lib"]}`
+	f.write(t, "packages/app/putnami.json", `{"name":"lib","type":"application"}`)
+	workspace.InvalidateLoadCache(f.dir)
+	if _, err := workspace.Load(f.dir); err == nil {
+		t.Fatal("the workspace loads with two projects named lib")
+	}
+	srv := f.server(t, nil)
+
+	f.write(t, "packages/app/putnami.json", appProject)
+	workspace.InvalidateLoadCache(f.dir)
+	lines := contextSession(t, srv, listProjectsCall(1), listProjectsCall(2))
+	for _, id := range []int{1, 2} {
+		if texts := toolCallTexts(t, lines, id); len(texts) != 1 {
+			t.Errorf("tool result %d reports the registry of a project the load found as a change: %q", id, texts)
+		}
+	}
+
+	f.write(t, "packages/lib/decisions.json", contextDecisionsTwo)
+	lines = contextSession(t, srv, listProjectsCall(3))
+	if texts := toolCallTexts(t, lines, 3); len(texts) != 2 || !strings.Contains(texts[1], "- D-002 added in packages/lib/decisions.json.") {
+		t.Errorf("the edit to packages/lib/decisions.json is not reported: %q", texts)
+	}
+}
+
+// Only the registry of a project the session sees for the first time joins
+// the baseline without a notice. A decisions.json that a known project gains
+// is a change: the workspace load of one tool call records it, and the next
+// tool result reports it.
+func TestADecisionRegistryAKnownProjectGainsIsReported(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkFoundProjectJoinsSilently)
+	f := newContextFixture(t)
+	srv := f.server(t, nil)
+
+	f.write(t, "packages/app/decisions.json", contextDecisionsOne)
+	lines := contextSession(t, srv, listProjectsCall(1), listProjectsCall(2))
+	if texts := toolCallTexts(t, lines, 1); len(texts) != 1 {
+		t.Errorf("the first tool result reports a registry no load has found yet: %q", texts)
+	}
+	if texts := toolCallTexts(t, lines, 2); len(texts) != 2 || !strings.Contains(texts[1], "- D-001 added in packages/app/decisions.json. Read putnami://projects/") {
+		t.Errorf("the decisions.json packages/app gained is not reported: %q", texts)
+	}
+}
+
+// A change to the includes or to options.collaboration changes the tools
+// without changing an extension entry, so it reloads too: an included project
+// that holds an extension manifest loads as an extension, and a collaboration
+// binding registers the routed tools. The reload loads the workspace again,
+// so it sees the new project set.
+func TestAnIncludesOrCollaborationChangeReloadsAndNotifies(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkIncludesAndBindingReload)
+	f := newContextFixture(t)
+	reloads := 0
+	srv := f.server(t, &reloads)
+	listed := func(lines []sessionLine, name string) bool {
+		for _, tool := range lines[len(lines)-1].Result.Tools {
+			if tool.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+	want := strings.Join([]string{notificationToolsListChanged, notificationResourcesListChanged, "response 1", "response 2"}, ",")
+
+	drafts := fixtureproc.Write(t, filepath.Join(f.dir, "tools", "drafts", "bin", "drafts"), fixtureproc.Program{Stdout: toolResult("drafts")})
+	f.write(t, "tools/drafts/putnami.json", `{"name":"drafts","type":"library"}`)
+	f.write(t, "tools/drafts/putnami.extension.json", namedExtensionManifest("@putnami/drafts", "{extensionRoot}/bin/"+filepath.Base(drafts), "drafts.read"))
+	f.write(t, "putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib","tools/drafts"],"extensions":["/extensions/notes"]}`)
+	lines := contextSession(t, srv, listProjectsCall(1), req(2, "tools/list", nil))
+	if got := strings.Join(methodsOf(lines), ","); got != want {
+		t.Errorf("after an includes change, lines = %s, want %s", got, want)
+	}
+	if reloads != 1 || !listed(lines, "drafts.read") {
+		t.Errorf("after an includes change, reloads = %d and drafts.read listed = %v, want 1 and true", reloads, listed(lines, "drafts.read"))
+	}
+
+	f.write(t, "putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib","tools/drafts"],"extensions":["/extensions/notes"],"options":{"collaboration":{"tasks":{"provider":"@acme/github","version":1}}}}`)
+	lines = contextSession(t, srv, listProjectsCall(1), req(2, "tools/list", nil))
+	if got := strings.Join(methodsOf(lines), ","); got != want {
+		t.Errorf("after a collaboration binding change, lines = %s, want %s", got, want)
+	}
+	if reloads != 2 || !listed(lines, "tasks.capabilities") {
+		t.Errorf("after a collaboration binding change, reloads = %d and tasks.capabilities listed = %v, want 2 and true", reloads, listed(lines, "tasks.capabilities"))
+	}
+}
+
+// The tools count as built from the inputs as they were before the reload
+// read them. An edit that lands while a reload runs is therefore loaded by
+// the next request, not taken as already loaded.
+func TestAnEditDuringAReloadIsLoadedByTheNextRequest(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkEditDuringReloadLoads)
+	f := newContextFixture(t)
+	reloads := 0
+	srv := NewServer(Options{
+		WorkspaceRoot: f.dir,
+		Config:        wsproto.Load(f.dir),
+		ServerVersion: "test",
+		ReloadExtensions: func(context.Context) ExtensionSelection {
+			reloads++
+			selection := ExtensionSelection{Config: wsproto.Load(f.dir)}
+			if reloads == 1 {
+				// The workspace disables the extension after the reload read
+				// the configuration, so the first reload still registers its
+				// tools.
+				f.write(t, "putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib"],"extensions":["/extensions/notes"],"disable":{"extensions":["@putnami/notes"]}}`)
+			}
+			return selection
+		},
+	})
+
+	f.write(t, "extensions/notes/putnami.extension.json", pathExtensionManifest(f.tool, "notes.read", "notes.write"))
+	lines := contextSession(t, srv, listProjectsCall(1), listProjectsCall(2))
+	if reloads != 2 {
+		t.Fatalf("reloads = %d, want 2: the second request loads the edit the first reload missed", reloads)
+	}
+	if _, ok, _ := srv.lookupTool("notes.read"); ok {
+		t.Error("the tools of the extension the workspace disabled are still registered")
+	}
+	want := []string{notificationToolsListChanged, notificationResourcesListChanged, "response 1", notificationToolsListChanged, notificationResourcesListChanged, "response 2"}
+	if got := methodsOf(lines); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("lines = %v, want %v", got, want)
+	}
+}
+
+// A call to a tool that a reload in this session removed gets a tool result
+// that says so and carries the notice, because a JSON-RPC error reaches no
+// model. A name the server never registered stays an invalid-params error.
+func TestACallToAToolAReloadRemovedSaysToListTheToolsAgain(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkRemovedToolSaysListAgain)
+	f := newContextFixture(t)
+	srv := f.server(t, nil)
+
+	f.write(t, "putnami.workspace.json", `{"name":"fixture","includes":["packages/app","packages/lib"]}`)
+	lines := contextSession(t, srv,
+		req(1, "tools/call", testToolCall{Name: "notes.read", Arguments: map[string]string{}}),
+		req(2, "tools/call", testToolCall{Name: "notes.never", Arguments: map[string]string{}}))
+	var removed, unknown sessionLine
+	for _, line := range lines {
+		switch {
+		case line.ID != nil && *line.ID == 1:
+			removed = line
+		case line.ID != nil && *line.ID == 2:
+			unknown = line
+		}
+	}
+	if removed.Error != nil || !removed.Result.IsError || len(removed.Result.Content) != 2 {
+		t.Fatalf("call to the removed tool = %+v, want an error tool result with the notice", removed)
+	}
+	if text := removed.Result.Content[0].Text; text != "The tool notes.read was removed when Putnami reloaded its extensions. List the tools again." {
+		t.Errorf("removed tool text = %q", text)
+	}
+	if notice := removed.Result.Content[1].Text; !strings.Contains(notice, "- extension extensions/notes no longer loads.") {
+		t.Errorf("the removed tool's result carries no notice of the change:\n%s", notice)
+	}
+	if unknown.Error == nil || unknown.Error.Code != codeInvalidParams {
+		t.Errorf("call to a tool never registered = %+v, want an invalid-params error", unknown)
+	}
+}
+
+// Once Serve returns, the server writes nothing, even when a later context
+// check reloads.
+func TestNothingIsWrittenAfterTheSessionEnds(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, contextFeature, contextRequirement, checkNothingWrittenAfterServe)
+	f := newContextFixture(t)
+	reloads := 0
+	srv := f.server(t, &reloads)
+	var out bytes.Buffer
+	if err := srv.Serve(context.Background(), strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+
+	f.write(t, "extensions/notes/putnami.extension.json", pathExtensionManifest(f.tool, "notes.read", "notes.write"))
+	srv.observeContext(context.Background(), true)
+	if reloads != 1 {
+		t.Fatalf("reloads = %d, want 1", reloads)
+	}
+	if out.Len() != 0 {
+		t.Errorf("the server wrote after its session ended: %q", out.String())
 	}
 }
 

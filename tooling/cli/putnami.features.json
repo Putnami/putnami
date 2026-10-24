@@ -567,7 +567,12 @@
               "an-extension-set-change-reloads-and-notifies-before-the-response",
               "the-lists-after-a-reload-follow-the-new-extension-set",
               "the-capabilities-declare-list-changed",
-              "concurrent-requests-report-a-change-once-without-a-data-race"
+              "concurrent-requests-report-a-change-once-without-a-data-race",
+              "a-project-a-load-finds-later-joins-without-a-notice",
+              "an-includes-or-collaboration-change-reloads-and-notifies",
+              "an-edit-during-a-reload-is-loaded-by-the-next-request",
+              "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again",
+              "nothing-is-written-after-the-session-ends"
             ]
           }
         },

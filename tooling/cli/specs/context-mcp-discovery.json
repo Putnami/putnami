@@ -70,7 +70,7 @@
     },
     {
       "id": "mcp-context-change-notice",
-      "text": "Before it answers a tools/call or resources/read, the MCP server hashes putnami.workspace.json, putnami.lock.json, putnami.ci.json, each path extension's manifest and AI.md, and the decisions.json files its last workspace load found. After a change, the next tool result ends with one text block that names the change and what to read, once per change. A changed extension set reloads guides and tools, then sends tools/list_changed and resources/list_changed before the response."
+      "text": "Before it answers a tools/call or resources/read, the MCP server hashes putnami.workspace.json, putnami.lock.json, putnami.ci.json, each path extension's manifest and AI.md, and the decisions.json files its last workspace load found. The next tool result ends with one text block naming each change once and a listed resource or file to read. A change to the extensions, includes or options.collaboration reloads guides and tools, then sends tools/list_changed and resources/list_changed before the response."
     },
     {
       "id": "agent-context-languages",
