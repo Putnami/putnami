@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -54,12 +56,14 @@ func TestPrepareThrough_KeepsTheWarningsOfItsEngineRun(t *testing.T) {
 	t.Parallel()
 	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
 	for _, tc := range []struct {
-		name   string
-		result engine.SessionResult
-		err    error
+		name    string
+		result  engine.SessionResult
+		err     error
+		success bool
 	}{
-		{"a failed run", engine.SessionResult{ExitCode: engine.ExitError}, nil},
-		{"an engine error", engine.SessionResult{ExitCode: engine.ExitError}, errors.New("refused")},
+		{"a successful preparation", engine.SessionResult{ExitCode: engine.ExitSuccess}, nil, true},
+		{"a failed run", engine.SessionResult{ExitCode: engine.ExitError}, nil, false},
+		{"an engine error", engine.SessionResult{ExitCode: engine.ExitError}, errors.New("refused"), false},
 	} {
 		for _, quiet := range []bool{false, true} {
 			name := tc.name
@@ -68,18 +72,24 @@ func TestPrepareThrough_KeepsTheWarningsOfItsEngineRun(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				report := workspace.NewWarningReport(nil)
+				root := t.TempDir()
 				opts := Options{
-					WorkspaceRoot: t.TempDir(), Target: &workspace.Project{ID: "/app"}, Quiet: quiet, Warnings: report,
+					WorkspaceRoot: root, Target: &workspace.Project{ID: "/app"}, Quiet: quiet, Warnings: report,
 				}
 				var request engine.Request
 				run := func(_ context.Context, r engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
 					request = r
 					result := tc.result
+					if tc.success {
+						result.Workspace = workspace.NewWorkspace(root, &wsproto.Config{}, nil)
+						result.Withheld = []*jobs.ScheduledJob{{}}
+					}
 					result.WorkspaceWarnings = []workspace.Warning{warning}
 					return result, tc.err
 				}
-				if _, err := prepareThrough(context.Background(), run, opts, []string{"/app"}, []string{"serve"}); err == nil {
-					t.Fatal("prepareThrough succeeded, want the failure of the run")
+				_, err := prepareThrough(context.Background(), run, opts, []string{"/app"}, []string{"serve"})
+				if tc.success != (err == nil) {
+					t.Fatalf("prepareThrough error = %v, want success = %v", err, tc.success)
 				}
 				if request.Global.Quiet != quiet {
 					t.Fatalf("request Quiet = %v, want the caller's %v", request.Global.Quiet, quiet)

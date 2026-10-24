@@ -251,11 +251,11 @@ warning.
 A command that runs jobs (`build`, `test`, `lint`, `validate`, `run`, …) puts
 the load warnings in `workspaceWarnings` of its `--output=json` envelope too,
 under `--quiet` as well: the run's envelope and the plan-only envelope of
-`--plan` and `--dry-run`. `qualify --target local`, `cache verify` and
-`impact-plan` run jobs inside their own result and carry them too. The `doctor`
-envelope of a blocked production preflight carries them in either structured
-mode. The `--output=jsonl` session stream of a run carries no result envelope,
-so there the warnings are on stderr only.
+`--plan` and `--dry-run`. `compose`, `qualify --target local`, `cache verify`
+and `impact-plan` run jobs inside their own result and carry them too. The
+`doctor` envelope of a blocked production preflight carries them in either
+structured mode. The `--output=jsonl` session stream of a run carries no result
+envelope, so there the warnings are on stderr only.
 
 `projects create <name> --template <template>` renders the template and lists
 the project in the workspace config. It then runs the `project-setup` job of

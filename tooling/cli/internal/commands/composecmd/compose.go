@@ -56,6 +56,10 @@ type Request struct {
 	Verbose      bool
 	Quiet        bool
 	NoColor      bool
+	// Warnings is the report the workspace load warnings of the preparation
+	// are kept in; both status envelopes carry them in workspaceWarnings. Nil
+	// keeps none.
+	Warnings *workspace.WarningReport
 
 	// Stdout and Stderr default to the process streams.
 	Stdout io.Writer
@@ -112,13 +116,14 @@ func Run(req Request) error {
 		Output:        serveRenderer(req, stdout, stderr, structured),
 		Preparation:   preparationRenderer(req, stderr),
 		Quiet:         req.Quiet,
+		Warnings:      req.Warnings,
 	})
 	if err != nil {
 		writeDetail(stderr, err, structured)
 		return failure(err)
 	}
 
-	if err := writeStatus(stdout, req.OutputFormat, comp.Status()); err != nil {
+	if err := writeStatus(stdout, req.OutputFormat, comp.Status(), req.Warnings.Envelope()); err != nil {
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 	}
 
@@ -144,7 +149,7 @@ func Run(req Request) error {
 		// document, so a caller reads the cleanup either way.
 		return shared.WithResultData(runErr, status)
 	}
-	if err := writeStatus(stdout, req.OutputFormat, status); err != nil {
+	if err := writeStatus(stdout, req.OutputFormat, status, req.Warnings.Envelope()); err != nil {
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 	}
 	return runErr
@@ -256,14 +261,17 @@ func preparationRenderer(req Request, stderr io.Writer) jobs.Renderer {
 }
 
 // writeStatus prints a composition document: the result envelope in a
-// structured mode, a short member table otherwise.
-func writeStatus(w io.Writer, format string, status compose.Status) error {
+// structured mode, a short member table otherwise. The envelope carries
+// warnings, the workspace load warnings, in workspaceWarnings.
+func writeStatus(w io.Writer, format string, status compose.Status, warnings []protocolcli.WorkspaceWarning) error {
 	if output.StructuredOutput(format) {
 		mode := protocolcli.OutputMode(format)
 		if !mode.IsStructured() {
 			mode = protocolcli.OutputJSONL
 		}
-		_, err := protocolcli.WriteResultV2(w, mode, protocolcli.NewResultV2(CommandPath, status, nil))
+		result := protocolcli.NewResultV2(CommandPath, status, nil)
+		result.WorkspaceWarnings = warnings
+		_, err := protocolcli.WriteResultV2(w, mode, result)
 		return err
 	}
 	if status.Cleanup == nil {

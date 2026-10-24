@@ -776,6 +776,7 @@ func cmdCompose(env *CommandEnv) error {
 		Verbose:       env.Global.Verbose || env.Global.Debug,
 		Quiet:         env.Global.Quiet,
 		NoColor:       env.Global.Color != nil && !*env.Global.Color,
+		Warnings:      env.WorkspaceWarnings(),
 	})
 }
 
