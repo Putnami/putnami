@@ -576,11 +576,12 @@ type SessionResult struct {
 	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
 	// did not start, one per selected project that has one, in plan order.
 	Withheld []*scheduler.ScheduledJob
-	// WorkspaceWarnings are the warnings the run's workspace load reported, in
-	// order, after those the caller's Request.WarningReport already held. Nil
-	// when there are none, or when the run ended before it loaded the
-	// workspace. The run's report already wrote them: a command that writes its
-	// own result envelope carries them in workspaceWarnings.
+	// WorkspaceWarnings are every warning the run's report holds, in order:
+	// those the caller's Request.WarningReport already held, then the new ones
+	// of the run's workspace load. Nil when there are none, or when the run
+	// ended before it loaded the workspace. The run's report already wrote
+	// them: a command that writes its own result envelope carries them in
+	// workspaceWarnings.
 	WorkspaceWarnings []workspace.Warning
 	// ancestry is the snapshot the run read before its first hook, or nil
 	// (Request.ancestry).
