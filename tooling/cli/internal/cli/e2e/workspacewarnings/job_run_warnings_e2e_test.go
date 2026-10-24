@@ -150,4 +150,13 @@ func TestComposeEnvelopeCarriesTheWarningsOfItsOwnLoad(t *testing.T) {
 	if strings.Contains(stderr, "putnami: warning: ") {
 		t.Errorf("--quiet wrote the warning to stderr:\n%s", stderr)
 	}
+
+	clean := jobWorkspace(t, false)
+	code, _, stdout, stderr = run(t, clean, "compose", "missing", "--output=json")
+	if code != protocolcli.ExitUsage {
+		t.Fatalf("clean workspace exit code = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "workspaceWarnings") || strings.Contains(stderr, "putnami: warning: ") {
+		t.Errorf("a load with no warning reported one:\nstdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
 }
