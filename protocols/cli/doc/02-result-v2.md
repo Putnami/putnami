@@ -267,8 +267,11 @@ its `--output=json` envelope, for the run's verdict and for a plan-only
 preview, and in the `doctor` envelope of a blocked production preflight in
 either structured mode. A command that runs jobs inside its own result, such as
 `compose`, `qualify --target local`, `cache verify` and `impact-plan`, fills the
-member with the warnings of its job run. The `--output=jsonl` session stream of
-a run writes no result envelope, so there its load warnings are on stderr only.
+member with the warnings of its job run. `compose` and every `qualify` form,
+`--target <url>` and `--print-contract` included, also fill it with the
+warnings of the load they perform before any job runs. A warning that two loads
+of one command report appears once. The `--output=jsonl` session stream of a
+run writes no result envelope, so there its load warnings are on stderr only.
 
 ### Test case records
 

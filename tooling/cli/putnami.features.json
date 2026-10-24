@@ -160,7 +160,8 @@
               "listing-and-description-serve-the-loaded-graph",
               "identities-and-dependencies-come-from-discovery",
               "load-warnings-reach-stderr-and-the-result-envelope",
-              "a-job-run-envelope-carries-the-load-warnings"
+              "a-job-run-envelope-carries-the-load-warnings",
+              "a-command-reports-the-warnings-of-its-own-load-once"
             ]
           }
         },

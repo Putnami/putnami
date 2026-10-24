@@ -43,11 +43,14 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 	// Workspace warnings (e.g., name divergence, malformed package.json/go.mod)
 	// go to stderr unless the run is quiet, and to every result envelope the
 	// run writes, quiet or not.
-	var warningOut io.Writer = os.Stderr
-	if req.Global.Quiet {
-		warningOut = nil
+	req.workspaceWarnings = req.WarningReport
+	if req.workspaceWarnings == nil {
+		var warningOut io.Writer = os.Stderr
+		if req.Global.Quiet {
+			warningOut = nil
+		}
+		req.workspaceWarnings = workspace.NewWarningReport(warningOut)
 	}
-	req.workspaceWarnings = workspace.NewWarningReport(warningOut)
 	req.workspaceWarnings.Report(ws)
 	if req.latestWarnings != nil {
 		req.latestWarnings.Store(req.workspaceWarnings)

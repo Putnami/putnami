@@ -18,6 +18,7 @@ import (
 	qualifyproto "go.putnami.dev/protocol/qualify"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 const qualifyTestSHA = "3cc91b658a1e0f7d2c4b9e8f6a5d3c2b1a0f9e8d"
@@ -250,6 +251,43 @@ func TestCmdQualify_URLTargetVerdictDrivesTheExitCode(t *testing.T) {
 			code, text := runQualify(t, root, tc.args...)
 			if code != ExitError || !strings.Contains(text, "verdict: "+string(tc.state)+" ") {
 				t.Errorf("human: exit %d\n%s", code, text)
+			}
+		})
+	}
+}
+
+// TestCmdQualify_EnvelopeCarriesTheWarningsOfItsWorkspaceLoad holds the
+// contract envelope of --print-contract and the verdict envelope of a URL
+// target, passed or not, to carrying the warnings of the command's workspace
+// load, and to omitting the member when the load warns of nothing.
+func TestCmdQualify_EnvelopeCarriesTheWarningsOfItsWorkspaceLoad(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "project-inventory", "a-command-reports-the-warnings-of-its-own-load-once")
+	root := qualifyWorkspace(t)
+	server := qualifyDeployment(t)
+	invocations := map[string][]string{
+		"print-contract":     {"/app", "--print-contract", "--output=json"},
+		"passed url target":  {"/app", "--target", server.URL, "--expect-sha", qualifyTestSHA[:9], "--output=json"},
+		"failing url target": {"/app", "--target", server.URL, "--expect-sha", "deadbeef0", "--output=json"},
+	}
+	for name, args := range invocations {
+		if _, out := runQualify(t, root, args...); strings.Contains(out, "workspaceWarnings") {
+			t.Errorf("%s: a load with no warning reported one:\n%s", name, out)
+		}
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "app", "putnami.json"), []byte(`{"name":"example","jobs":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	workspace.InvalidateLoadCache(root)
+	for name, args := range invocations {
+		t.Run(name, func(t *testing.T) {
+			_, out := runQualify(t, root, args...)
+			envelope := decodeEnvelope(t, out)
+			if envelope.Data == nil {
+				t.Fatalf("the envelope lost its data:\n%s", out)
+			}
+			if len(envelope.WorkspaceWarnings) != 1 || envelope.WorkspaceWarnings[0].Code != string(workspace.WarningCodeJobsIgnored) {
+				t.Fatalf("workspaceWarnings = %+v, want the one ignored-jobs warning", envelope.WorkspaceWarnings)
 			}
 		})
 	}

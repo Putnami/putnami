@@ -59,11 +59,11 @@ type Options struct {
 	// Preparation renders the engine run that prepares the serve pipelines.
 	// Nil reports only failures, on stderr.
 	Preparation jobs.Renderer
-	// Quiet keeps the preparation's engine run from writing the workspace load
-	// warnings on stderr: the caller's --quiet.
+	// Quiet is the caller's --quiet, which the preparation's engine run takes.
 	Quiet bool
-	// Warnings receives the workspace load warnings of the preparation's engine
-	// run, whether it succeeded or not. Nil keeps none.
+	// Warnings is the report the preparation's engine run reports the warnings
+	// of its workspace load into, whether it succeeded or not. Nil makes the
+	// run write them on stderr, unless Quiet, and keeps none.
 	Warnings *workspace.WarningReport
 }
 
@@ -563,13 +563,12 @@ func prepareThrough(ctx context.Context, run engineRun, opts Options, projectIDs
 		Commands:           serveCommands,
 		Global:             engine.GlobalFlags{Projects: strings.Join(projectIDs, ","), Quiet: opts.Quiet},
 		WithholdServeSteps: true,
+		WarningReport:      opts.Warnings,
 		Preflight:          doctor.DoctorPreflight,
 		Stdout:             io.Discard,
 		// The returned error becomes the composition's failure, which the caller reports.
 		ErrorOut: io.Discard,
 	}, sink)
-	// A failed preparation reports the warnings of its load too.
-	opts.Warnings.Keep(result.WorkspaceWarnings)
 	if err != nil {
 		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, err.Error())
 	}

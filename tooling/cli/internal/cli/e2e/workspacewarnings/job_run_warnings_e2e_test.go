@@ -121,3 +121,33 @@ func TestJobRunEnvelopeCarriesWorkspaceLoadWarnings(t *testing.T) {
 		}
 	})
 }
+
+// TestComposeEnvelopeCarriesTheWarningsOfItsOwnLoad holds compose to reporting
+// the warnings of the workspace load it performs before it plans its members:
+// a compose that fails before any engine run still carries them in its
+// envelope and writes them on stderr, once.
+func TestComposeEnvelopeCarriesTheWarningsOfItsOwnLoad(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "project-inventory", "a-command-reports-the-warnings-of-its-own-load-once")
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("DO_NOT_TRACK", "1")
+	root := jobWorkspace(t, true)
+
+	code, envelope, stdout, stderr := run(t, root, "compose", "missing", "--output=json")
+	if code != protocolcli.ExitUsage || envelope.Status != protocolcli.StatusFailure {
+		t.Fatalf("exit code = %d, status %q, want a usage failure\nstdout:\n%s\nstderr:\n%s", code, envelope.Status, stdout, stderr)
+	}
+	assertJobsIgnoredWarning(t, envelope)
+	line := "putnami: warning: " + envelope.WorkspaceWarnings[0].Message
+	if count := strings.Count(stderr, line); count != 1 {
+		t.Errorf("stderr carries the warning %d times, want once:\n%s", count, stderr)
+	}
+
+	code, envelope, stdout, stderr = run(t, root, "compose", "missing", "--output=json", "--quiet")
+	if code != protocolcli.ExitUsage {
+		t.Fatalf("--quiet exit code = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	assertJobsIgnoredWarning(t, envelope)
+	if strings.Contains(stderr, "putnami: warning: ") {
+		t.Errorf("--quiet wrote the warning to stderr:\n%s", stderr)
+	}
+}
