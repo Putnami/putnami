@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -37,7 +36,7 @@ const resourcesWiringDecisionsTwo = `{
 // requests and returns the decoded responses by id.
 func serveResourceRequests(t *testing.T, root string, requests ...string) map[int]testJSONRPCEnvelope {
 	t.Helper()
-	srv := newMCPServer(root, wsproto.Load(root), "test")
+	srv := newMCPServer(root, "test")
 	var out bytes.Buffer
 	if err := srv.Serve(context.Background(), strings.NewReader(strings.Join(requests, "\n")+"\n"), &out); err != nil {
 		t.Fatal(err)

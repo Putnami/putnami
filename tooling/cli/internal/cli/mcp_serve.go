@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	extproto "go.putnami.dev/protocol/extension"
@@ -55,7 +56,7 @@ type agentWorkflowReconciler func(ctx context.Context, wsRoot string, cfg *wspro
 // then serve — without replacing process-wide state.
 func serveMCPSession(ctx context.Context, wsRoot string, cfg *wsproto.Config, version string, reconcile agentWorkflowReconciler, in io.Reader, out, stderr io.Writer) error {
 	reconcileAgentWorkflowsAtSessionStart(ctx, wsRoot, cfg, reconcile, stderr)
-	return newMCPServerWithContext(ctx, wsRoot, cfg, version).Serve(ctx, in, out)
+	return newMCPServerWithContext(ctx, wsRoot, version).Serve(ctx, in, out)
 }
 
 // agentWorkflowReconcileTimeout bounds the session-start reconcile. The pass is
@@ -90,40 +91,33 @@ func reconcileAgentWorkflowsAtSessionStart(ctx context.Context, wsRoot string, c
 // instead of stdio. A test that rebuilt this Options literal would be asserting
 // against its own copy of the wiring, which is exactly the drift an extraction
 // must not hide.
-func newMCPServer(wsRoot string, cfg *wsproto.Config, version string) *mcp.Server {
-	return newMCPServerWithContext(context.Background(), wsRoot, cfg, version)
+func newMCPServer(wsRoot, version string) *mcp.Server {
+	return newMCPServerWithContext(context.Background(), wsRoot, version)
 }
 
-func newMCPServerWithContext(ctx context.Context, wsRoot string, cfg *wsproto.Config, version string) *mcp.Server {
-	prepared := lifecycle.PrepareReadOnly(ctx, wsRoot, cfg)
-	guidance := make([]mcp.ExtensionGuidance, 0, len(prepared.Extensions))
-	issues := make([]mcp.GuidanceIssue, 0, len(prepared.Issues))
-	preparedRoots, unavailable := preparedExtensionSelection(prepared)
-	for _, item := range prepared.Extensions {
-		content, err := agentctx.ReadExtensionGuidance(item.Root)
-		switch {
-		case err != nil:
-			issues = append(issues, mcp.GuidanceIssue{Name: item.Name, Version: item.Version, Reason: "read exact AI.md: " + err.Error()})
-		case content == "":
-			issues = append(issues, mcp.GuidanceIssue{Name: item.Name, Version: item.Version, Reason: "the exact extension artifact does not contain AI.md"})
-		default:
-			guidance = append(guidance, mcp.ExtensionGuidance{Name: item.Name, Version: item.Version, Content: content})
-		}
-	}
-	for _, issue := range prepared.Issues {
-		issues = append(issues, mcp.GuidanceIssue{Name: issue.Name, Version: issue.Version, Reason: issue.Reason})
-	}
+// newMCPServerWithContext takes no workspace configuration: the server reads
+// it while it starts, after its first read of the inputs it tracks, so an
+// edit made while the command started is not lost.
+func newMCPServerWithContext(ctx context.Context, wsRoot, version string) *mcp.Server {
+	// current is the configuration of the latest selection. Each selection
+	// replaces it, so graph preparation reads the extensions the server
+	// serves.
+	var current atomic.Pointer[wsproto.Config]
 
-	return mcp.NewServer(mcp.Options{
-		WorkspaceRoot:         wsRoot,
-		Config:                cfg,
-		ServerVersion:         version,
-		ExtensionGuidance:     guidance,
-		GuidanceIssues:        issues,
-		PreparedExtensions:    preparedRoots,
-		UnavailableExtensions: unavailable,
+	return mcp.NewServerWithContext(ctx, mcp.Options{
+		WorkspaceRoot: wsRoot,
+		ServerVersion: version,
 		PrepareWorkspaceView: func(callCtx context.Context) error {
-			return prepareMCPWorkspaceView(callCtx, wsRoot, cfg)
+			return prepareMCPWorkspaceView(callCtx, wsRoot, current.Load())
+		},
+		// The server selects through this function while it starts, after its
+		// first read of the inputs it tracks, and again when the extension set
+		// changed between two requests. Each call reads the workspace
+		// configuration again.
+		ReloadExtensions: func(callCtx context.Context) mcp.ExtensionSelection {
+			reloaded := wsproto.Load(wsRoot)
+			current.Store(reloaded)
+			return mcpExtensionSelection(callCtx, wsRoot, reloaded)
 		},
 		PropagateAgentIdentity: mcpAgentIdentityEnabled(os.Getenv(mcp.AgentIdentityEnabledEnv)),
 		AgentModel:             os.Getenv(mcp.AgentModelEnv),
@@ -163,6 +157,37 @@ func newMCPServerWithContext(ctx context.Context, wsRoot string, cfg *wsproto.Co
 		// subtree.
 		Preflight: doctor.DoctorPreflight,
 	})
+}
+
+// mcpExtensionSelection prepares the lock-pinned extensions of cfg for reads
+// and reads the exact AI.md of each one: the selection the MCP server starts
+// from, and the one it reloads to.
+func mcpExtensionSelection(ctx context.Context, wsRoot string, cfg *wsproto.Config) mcp.ExtensionSelection {
+	prepared := lifecycle.PrepareReadOnly(ctx, wsRoot, cfg)
+	guidance := make([]mcp.ExtensionGuidance, 0, len(prepared.Extensions))
+	issues := make([]mcp.GuidanceIssue, 0, len(prepared.Issues))
+	preparedRoots, unavailable := preparedExtensionSelection(prepared)
+	for _, item := range prepared.Extensions {
+		content, err := agentctx.ReadExtensionGuidance(item.Root)
+		switch {
+		case err != nil:
+			issues = append(issues, mcp.GuidanceIssue{Name: item.Name, Version: item.Version, Reason: "read exact AI.md: " + err.Error()})
+		case content == "":
+			issues = append(issues, mcp.GuidanceIssue{Name: item.Name, Version: item.Version, Reason: "the exact extension artifact does not contain AI.md"})
+		default:
+			guidance = append(guidance, mcp.ExtensionGuidance{Name: item.Name, Version: item.Version, Content: content})
+		}
+	}
+	for _, issue := range prepared.Issues {
+		issues = append(issues, mcp.GuidanceIssue{Name: issue.Name, Version: issue.Version, Reason: issue.Reason})
+	}
+	return mcp.ExtensionSelection{
+		Config:                cfg,
+		ExtensionGuidance:     guidance,
+		GuidanceIssues:        issues,
+		PreparedExtensions:    preparedRoots,
+		UnavailableExtensions: unavailable,
+	}
 }
 
 // preparedExtensionSelection turns one read-preparation pass into the

@@ -72,6 +72,20 @@ type rpcResponse struct {
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
+// rpcNotification is a message the server sends without an id. The client
+// answers none.
+type rpcNotification struct {
+	JSONRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
+}
+
+// The list-changed notifications the server sends after it reloads its
+// extensions.
+const (
+	notificationToolsListChanged     = "notifications/tools/list_changed"
+	notificationResourcesListChanged = "notifications/resources/list_changed"
+)
+
 // --- MCP lifecycle types ---
 
 type initializeParams struct {
