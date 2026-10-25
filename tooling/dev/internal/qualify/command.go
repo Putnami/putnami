@@ -51,8 +51,15 @@ type Request struct {
 	// Executable is the putnami CLI a local target's members' serve runs
 	// start.
 	Executable string
-	Stdout     io.Writer
-	Stderr     io.Writer
+	// Verbose, Quiet and NoColor are the invocation's --verbose, --quiet and
+	// --no-color. A verbose human run shows a local target's serve logs and
+	// preparation output on stderr; any other run reports only a failed
+	// preparation there.
+	Verbose bool
+	Quiet   bool
+	NoColor bool
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // invocation is one parsed `putnami qualify` invocation.
@@ -239,12 +246,24 @@ func newTarget(req Request, inv invocation, project *compose.Project) (Target, e
 		}
 		return target, nil
 	}
-	return NewLocalTarget(LocalOptions{
+	options := LocalOptions{
 		Workspace:    req.Workspace,
 		Project:      project,
 		ReadyTimeout: inv.readyTimeout,
 		Executable:   req.Executable,
-	})
+		Quiet:        req.Quiet,
+		NoColor:      structuredMode(req.Output) || req.NoColor,
+	}
+	// stdout is the verdict, so the composition writes on stderr only. A
+	// verbose human run sees what each member's serve run renders; any other
+	// run sees only the output of a preparation that failed, which says why the
+	// verdict is composition_failed.
+	if req.Verbose && !structuredMode(req.Output) {
+		options.Logs, options.Verbose = req.Stderr, true
+	} else {
+		options.Failures = req.Stderr
+	}
+	return NewLocalTarget(options)
 }
 
 // validate refuses an invocation that cannot run before any file is read.
@@ -287,7 +306,12 @@ type output struct {
 
 // structured reports whether the mode writes documents rather than text.
 func (o output) structured() bool {
-	return o.mode.IsStructured() || o.mode == protocolcli.OutputCloudLogging
+	return structuredMode(o.mode)
+}
+
+// structuredMode reports whether mode writes documents rather than text.
+func structuredMode(mode protocolcli.OutputMode) bool {
+	return mode.IsStructured() || mode == protocolcli.OutputCloudLogging
 }
 
 // document writes a successful run's document. In json and jsonl it is the

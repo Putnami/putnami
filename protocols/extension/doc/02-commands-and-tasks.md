@@ -277,7 +277,12 @@ the caller's directory, and its job context carries a `userScope` member that
 names that directory; see the job context protocol
 (`protocols/job/README.md`). Every interactive launch, inside a workspace or
 outside one, also carries `invocationDir`, the directory the user typed the
-command in, which a command resolves its relative path arguments against.
+command in, which a command resolves its relative path arguments against. The
+CLI consumes the output globals before the subcommand is reached, so the
+launch carries the ones the user typed as job context params: `verbose` for
+`--verbose` or `--debug`, `quiet` for `--quiet`, and `color`, `false` for
+`--no-color` and `true` for `--color`. Each is absent when not typed, beside
+`output`, the resolved output mode. A planned job's params carry none of them.
 Inside a workspace, `workspace` changes nothing: the workspace's own pin of the
 extension runs.
 
@@ -321,8 +326,13 @@ reads `library`. A command that acts on deployable workloads reads `type` there
 and does not classify projects itself. Inside `workspaceProjects`, whose
 producer resolves every classification, an entry without `type` comes from a
 CLI that predates the member: a command that acts on workloads declines rather
-than reading it as `application`. The job context protocol
-(`protocols/job/README.md`) defines the member.
+than reading it as `application`. Each entry also carries the project's
+resolved `runsWith`: the list its `putnami.json` authors, else the one its
+provider reported, such as the `putnami.runsWith` of a TypeScript
+`package.json`. A command that composes a workload with the workloads it runs
+with reads `runsWith` there, not from `config`, which holds only the authored
+list. An entry without `runsWith` runs with nothing. The job context protocol
+(`protocols/job/README.md`) defines both members.
 
 ## Tasks
 

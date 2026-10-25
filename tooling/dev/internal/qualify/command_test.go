@@ -266,3 +266,78 @@ func TestRun_AnInvalidInventoryIsAConfigurationError(t *testing.T) {
 		t.Errorf("exit %d, stdout %q, stderr %q (%v)", code, stdout, stderr, err)
 	}
 }
+
+// Only a verbose human run shows a local target's serve logs on stderr, where
+// they cannot mix with the verdict on stdout. A run without --verbose, and a
+// structured run whatever was typed, keeps stderr for a failed preparation and
+// the verdict error.
+func TestRun_QualifyShowsTheServeLogsOnlyInAVerboseHumanRun(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", "each-member-is-an-ordinary-serve-run",
+		"qualify-shows-the-serve-logs-only-in-a-verbose-human-run")
+	const serveLog = "[/app] fixture app starting in serve"
+	for _, tc := range []struct {
+		name    string
+		mode    protocolcli.OutputMode
+		verbose bool
+		shown   bool
+	}{
+		{name: "verbose text", verbose: true, shown: true},
+		{name: "text"},
+		{name: "verbose json", mode: protocolcli.OutputJSON, verbose: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureServe, routes: goldenRoutes()})
+			var stdout, stderr bytes.Buffer
+			code := Run(Request{
+				Ctx: t.Context(), Workspace: fixture.ws, Args: []string{"app", "--target", "local"}, Output: tc.mode,
+				Executable: fixture.executable, Verbose: tc.verbose, Stdout: &stdout, Stderr: &stderr,
+			})
+			if code != protocolcli.ExitSuccess {
+				t.Fatalf("exit %d\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+			}
+			if shown := strings.Contains(stderr.String(), serveLog); shown != tc.shown {
+				t.Errorf("stderr shows the serve log %t, want %t:\n%s", shown, tc.shown, stderr.String())
+			}
+			if strings.Contains(stdout.String(), serveLog) {
+				t.Errorf("stdout carries the serve log:\n%s", stdout.String())
+			}
+			fixture.assertStopped(t, "app")
+		})
+	}
+}
+
+// A member whose serve run fails before its serve step starts says why on
+// qualify's stderr in every output mode, once: a verbose human run passes the
+// whole serve log through, and any other run writes only what the failed run
+// rendered. stdout stays the verdict.
+func TestRun_QualifyReportsAFailedPreparationOnStderr(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", "each-member-is-an-ordinary-serve-run",
+		"qualify-reports-a-failed-preparation-on-stderr")
+	for _, tc := range []struct {
+		name    string
+		mode    protocolcli.OutputMode
+		verbose bool
+	}{
+		{name: "text"},
+		{name: "verbose text", verbose: true},
+		{name: "json", mode: protocolcli.OutputJSON},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newLocalFixture(t, localMember{name: "app", mode: fixturePrepareFails, routes: goldenRoutes()})
+			var stdout, stderr bytes.Buffer
+			code := Run(Request{
+				Ctx: t.Context(), Workspace: fixture.ws, Args: []string{"app", "--target", "local"}, Output: tc.mode,
+				Executable: fixture.executable, Verbose: tc.verbose, Stdout: &stdout, Stderr: &stderr,
+			})
+			if code != 1 {
+				t.Fatalf("exit %d, want 1\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+			}
+			if count := strings.Count(stderr.String(), fakeCLIPrepareFailure); count != 1 {
+				t.Errorf("stderr reports the failed preparation %d times, want once:\n%s", count, stderr.String())
+			}
+			if strings.Contains(stdout.String(), fakeCLIPrepareFailure) {
+				t.Errorf("stdout carries the preparation output:\n%s", stdout.String())
+			}
+		})
+	}
+}

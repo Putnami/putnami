@@ -294,6 +294,7 @@ func (a *App) runExtensionStructuredCommand(
 		if parsed.Global.Baseline != "" {
 			commandParams["baseline"] = parsed.Global.Baseline
 		}
+		addOutputGlobalParams(commandParams, &parsed.Global)
 		ctx, err = scheduler.GrantReleaseSetProviderJob(ctx, job)
 		if err != nil {
 			iox.Fprintf(stderr, "putnami: %v\n", err)
@@ -448,9 +449,31 @@ func runInteractiveExtensionCommand(
 	return interactiveExitCode(result, commandPath, deadline, stderr)
 }
 
+// addOutputGlobalParams adds the output globals the user typed to the params
+// of an interactive subcommand. An interactive subcommand renders its own
+// output, and the host consumes the tokens, so the job context is the only
+// place the subcommand reads them: `verbose` (also set by --debug), `quiet`,
+// and `color`, false for --no-color and true for --color. Each is absent when
+// not typed. The planned path never calls it, so no planned task's cache key
+// moves for an output flag.
+func addOutputGlobalParams(params map[string]any, global *GlobalFlags) {
+	if global.Verbose {
+		params["verbose"] = true
+	}
+	if global.Quiet {
+		params["quiet"] = true
+	}
+	if global.Color != nil {
+		params["color"] = *global.Color
+	}
+}
+
 // interactiveExitCode maps the result of an interactive run to the process exit
 // code, and says on stderr what the child did not say itself.
 //
+//   - A canceled run exits ExitSignalReceived: after a terminal signal, the
+//     child died by the signal or putnami killed it. A child that exited by
+//     itself after the signal is no canceled run: it keeps its own code.
 //   - A run that passed its deadline exits ExitError whatever code the child
 //     returned: putnami ended it, and a child that ended from SIGTERM has no
 //     code of its own.

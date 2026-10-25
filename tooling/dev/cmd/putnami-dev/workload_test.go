@@ -194,3 +194,44 @@ func quote(t *testing.T, s string) string {
 	}
 	return strings.TrimSpace(string(data))
 }
+
+// TestRunWorkloadReadsTheOutputFlagsFromTheJobContext pins that a compose or
+// qualify launch takes --verbose (or --debug), --quiet and --no-color from the
+// job context params putnami writes for them: putnami consumes the tokens as
+// its own flags, so the context is the only place the command reads them.
+// Each is off when the context does not carry it.
+func TestRunWorkloadReadsTheOutputFlagsFromTheJobContext(t *testing.T) {
+	t.Setenv(wire.SocketEnv, "")
+	t.Setenv(wire.TokenEnv, "")
+	spectest.Proves(t, workloadFeature, "the-dev-extension-runs-compose-and-qualify", "the-executable-reads-the-output-flags-from-the-job-context")
+	root := t.TempDir()
+	t.Setenv(cliExecutableEnv, filepath.Join(root, "bin", "putnami"))
+	member := `"workspaceRoot":` + quote(t, root) + `,"workspaceProjects":[{"id":"/app","name":"app","path":"app","type":"application"}]`
+	for _, tc := range []struct {
+		name                    string
+		params                  string
+		verbose, quiet, noColor bool
+	}{
+		{name: "none typed", params: `{}`},
+		{name: "verbose", params: `{"verbose":true}`, verbose: true},
+		{name: "quiet without color", params: `{"quiet":true,"color":false}`, quiet: true, noColor: true},
+		{name: "color", params: `{"color":true}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			contextFile := writeLaunchContext(t, `{`+member+`,"params":`+tc.params+`}`)
+			var launched workloadLaunch
+			var stdout, stderr bytes.Buffer
+			code := runWorkload("compose", []string{"app"}, contextFile, &stdout, &stderr, func(launch workloadLaunch) int {
+				launched = launch
+				return 0
+			})
+			if code != 0 {
+				t.Fatalf("exit %d; stderr %q", code, stderr.String())
+			}
+			if launched.verbose != tc.verbose || launched.quiet != tc.quiet || launched.noColor != tc.noColor {
+				t.Errorf("launch verbose %t quiet %t noColor %t, want %t %t %t",
+					launched.verbose, launched.quiet, launched.noColor, tc.verbose, tc.quiet, tc.noColor)
+			}
+		})
+	}
+}

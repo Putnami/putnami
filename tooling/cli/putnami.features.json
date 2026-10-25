@@ -1299,7 +1299,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "each-workspace-member-names-its-resolved-type"
+              "each-workspace-member-names-its-resolved-type",
+              "each-workspace-member-names-its-resolved-runs-with"
             ]
           }
         },
@@ -1504,7 +1505,8 @@
               "the-context-conforms-to-the-job-protocol",
               "a-planned-job-carries-none",
               "an-inherited-value-is-stripped",
-              "outside-a-workspace-it-equals-the-caller-directory"
+              "outside-a-workspace-it-equals-the-caller-directory",
+              "the-context-carries-the-typed-output-globals"
             ]
           }
         },
@@ -1536,7 +1538,9 @@
             "kind": "acceptance",
             "checks": [
               "the-cli-waits-for-an-interactive-child-after-a-terminal-signal",
-              "a-second-signal-kills-the-interactive-child-at-once"
+              "a-second-signal-kills-the-interactive-child-at-once",
+              "a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code",
+              "a-child-that-dies-by-the-signal-or-is-killed-is-interrupted"
             ]
           }
         },

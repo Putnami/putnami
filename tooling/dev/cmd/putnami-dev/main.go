@@ -11,8 +11,9 @@
 // It answers the runtime handshake, serves the version, compose and qualify
 // commands, and refuses every other invocation. putnami launches each command
 // as an interactive subcommand in the workspace root and appends
-// --putnamiContext <file>; the command reads the output mode, --dry-run and
-// the workspace membership from that job context. compose and qualify start
+// --putnamiContext <file>; the command reads the output mode, --dry-run, the
+// output flags (--verbose, --quiet, --no-color) and the workspace membership
+// from that job context. compose and qualify start
 // each member of a composition as a serve run of the putnami executable that
 // launched them, which putnami names in PUTNAMI_CLI_EXECUTABLE. The
 // development verbs the manifest declares run in the language extensions,
@@ -77,14 +78,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runWorkload(compose.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
 			return compose.Run(compose.Request{
 				Ctx: context.Background(), Workspace: launch.workspace, Args: launch.args, Output: launch.output,
-				Executable: launch.executable, Stdout: stdout, Stderr: stderr,
+				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
+				Stdout: stdout, Stderr: stderr,
 			})
 		})
 	case len(args) >= 2 && args[0] == "qualify" && args[1] == "run":
 		return runWorkload(qualify.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
 			return qualify.Run(qualify.Request{
 				Ctx: context.Background(), Workspace: launch.workspace, Args: launch.args, Output: launch.output,
-				Executable: launch.executable, Stdout: stdout, Stderr: stderr,
+				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
+				Stdout: stdout, Stderr: stderr,
 			})
 		})
 	}
@@ -103,6 +106,11 @@ type workloadLaunch struct {
 	args []string
 	// output is the output mode putnami resolved.
 	output protocolcli.OutputMode
+	// verbose, quiet and noColor are the --verbose (or --debug), --quiet and
+	// --no-color the user typed, which putnami consumed as its own flags.
+	verbose bool
+	quiet   bool
+	noColor bool
 	// workspace is the workspace membership the job context carries.
 	workspace *compose.Workspace
 	// executable is the absolute path of the putnami executable.
@@ -125,7 +133,13 @@ func runWorkload(command string, args []string, contextFile string, stdout, stde
 		fmt.Fprintf(stderr, "putnami: %s: %v\n", command, err) //nolint:gosec // G705: stderr is a terminal or a log, never an HTTP response
 		return protocolcli.ExitFailure
 	}
-	launch := workloadLaunch{args: args, output: protocolcli.OutputMode(launchContext.Params.String("output"))}
+	launch := workloadLaunch{
+		args:    args,
+		output:  protocolcli.OutputMode(launchContext.Params.String("output")),
+		verbose: launchContext.Params.Bool("verbose", false),
+		quiet:   launchContext.Params.Bool("quiet", false),
+		noColor: !launchContext.Params.Bool("color", true),
+	}
 	launch.workspace, launch.executable, err = readWorkloadLaunch(command, launchContext)
 	if err != nil {
 		return resultv2.Emit(stdout, stderr, launch.output, command, "", nil, err)

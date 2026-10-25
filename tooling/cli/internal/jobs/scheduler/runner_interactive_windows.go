@@ -3,7 +3,11 @@
 package scheduler
 
 import (
+	"os"
 	"os/exec"
+	"sync/atomic"
+	"syscall"
+	"time"
 
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/abort"
@@ -24,10 +28,17 @@ import (
 // tree once the root exited ends every process the job left behind and returns
 // once they exited, so no process of the job outlives the run. startJob starts
 // it: it calls its argument, which starts the tree, or fails.
-func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) error {
+//
+// forced reports that the tree was killed: a second signal, or a cancel the
+// tree outlived by the stop budget. A Windows exit status names no signal, so
+// the runner remembers its own kills.
+func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (forced bool, err error) {
 	tree := proctree.New(cmd)
 	waitDone := make(chan struct{})
+	var killed atomic.Bool
+	var canceledAt atomic.Int64
 	cmd.Cancel = func() error {
+		canceledAt.Store(time.Now().UnixNano())
 		err := tree.Terminate()
 		go forceKillProcessGroupAfter(waitDone, tree, interactiveStopBudget)
 		return err
@@ -35,14 +46,37 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) erro
 	cmd.WaitDelay = interactiveStopBudget
 
 	if err := startJob(tree.Start); err != nil {
-		return err
+		return false, err
 	}
 	defer func() { _ = tree.Close() }()
-	release := abort.HoldInteractive(func() { _ = tree.Kill() })
+	release := abort.HoldInteractive(func() {
+		killed.Store(true)
+		_ = tree.Kill()
+	})
 	defer release()
-	err := cmd.Wait()
+	err = cmd.Wait()
 	close(waitDone)
-	return err
+	// The budget's kill ends a tree that still ran once the budget passed, so
+	// a wait that outlasted the budget after the cancel ended in that kill.
+	if at := canceledAt.Load(); at != 0 && time.Since(time.Unix(0, at)) >= interactiveStopBudget {
+		killed.Store(true)
+	}
+	return killed.Load(), err
+}
+
+// statusControlCExit is the exit code of a Windows process that a console
+// control event ended (STATUS_CONTROL_C_EXIT).
+const statusControlCExit = 0xC000013A
+
+// exitedOnItsOwn reports whether the child ended by its own exit after a
+// terminal signal: the runner killed no process of its tree, and the console
+// control event of the cancel did not end it.
+func exitedOnItsOwn(state *os.ProcessState, forced bool) bool {
+	if state == nil || forced {
+		return false
+	}
+	status, ok := state.Sys().(syscall.WaitStatus)
+	return ok && status.ExitCode != statusControlCExit
 }
 
 // endedByInterrupt reports whether the child ended from an interrupt. Windows

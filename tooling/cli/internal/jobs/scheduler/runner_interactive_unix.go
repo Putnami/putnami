@@ -4,16 +4,19 @@ package scheduler
 
 import (
 	"errors"
+	"os"
 	"os/exec"
+	"sync/atomic"
 	"syscall"
 
 	"go.putnami.dev/tooling/cli/internal/abort"
 )
 
 // runInteractive runs cmd, an interactive job that shares the CLI's terminal,
-// and returns what cmd.Run returns. startJob starts it: it calls its argument,
-// which starts cmd, or fails.
-func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) error {
+// and returns what cmd.Run returns. forced reports that a second signal killed
+// the child. startJob starts it: it calls its argument, which starts cmd, or
+// fails.
+func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (forced bool, err error) {
 	// Do NOT place the child in its own process group (no Setpgid). An
 	// interactive extension inherits the real terminal via os.Stdin, and only
 	// the controlling terminal's foreground process group may read from it. The
@@ -37,12 +40,25 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) erro
 	cmd.WaitDelay = interactiveStopBudget
 
 	if err := startJob(cmd.Start); err != nil {
-		return err
+		return false, err
 	}
 	// A second signal to the CLI kills the child at once.
-	release := abort.HoldInteractive(func() { _ = cmd.Process.Kill() })
-	defer release()
-	return cmd.Wait()
+	var killed atomic.Bool
+	release := abort.HoldInteractive(func() {
+		killed.Store(true)
+		_ = cmd.Process.Kill()
+	})
+	err = cmd.Wait()
+	release()
+	return killed.Load(), err
+}
+
+// exitedOnItsOwn reports whether the child ended by its own exit after a
+// terminal signal: it exited rather than died by a signal, and no second signal
+// killed it. Every stop this process sends is a signal, so a child that died by
+// one died by the terminal signal or was killed at the stop budget.
+func exitedOnItsOwn(state *os.ProcessState, forced bool) bool {
+	return state != nil && state.Exited() && !forced
 }
 
 // endedByInterrupt reports whether the child ended from SIGINT. A terminal

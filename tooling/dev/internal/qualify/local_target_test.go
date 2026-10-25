@@ -58,6 +58,9 @@ const (
 	// fixtureNeedsLocalSecret refuses to start without conf/.secrets.<env>.yaml,
 	// as an application whose startup requires a secret does.
 	fixtureNeedsLocalSecret = "needs-local-secret"
+	// fixturePrepareFails is a member whose serve run fails its generate step
+	// before the serve step starts; the fake CLI writes fakeCLIPrepareFailure.
+	fixturePrepareFails = "prepare-fails"
 )
 
 func TestMain(m *testing.M) {

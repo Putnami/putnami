@@ -17,13 +17,13 @@
 // command, so it cannot record them again: it answers that the command moved
 // to @putnami/dev, and the comparison then fails.
 //
-// # What differs, by decision
+// # Nothing differs
 //
-// A recording is compared after this substitution, and only this one: a
-// composition stopped by a signal exits 130 where the core exited 0, because
-// the core reports every interactive command it canceled as interrupted
-// (devWorkloadCase.signal). The extension writes each error with the
-// "putnami: " prefix the core wrote, so stderr is compared verbatim.
+// A recording is compared as it was recorded. A composition stopped by a
+// signal exits 0, as the core's did: the CLI keeps the exit code of an
+// interactive command that exited by itself after the signal. The extension
+// writes each error with the "putnami: " prefix the core wrote, so stderr is
+// compared verbatim.
 //
 // Both sides normalize what depends on the moment a case runs: the
 // composition id, ports, durations, timestamps, the worktree fingerprint and
@@ -71,9 +71,6 @@ type devWorkloadCase struct {
 	// stopWhen, when set, is the stdout the run must print before the case
 	// sends it SIGTERM: a composition runs until it is stopped.
 	stopWhen *regexp.Regexp
-	// signal marks a case the signal stopped: the core exited 0, the
-	// extension's dispatch exits 130.
-	signal bool
 	// logs marks a case whose stderr is the members' serve logs.
 	logs bool
 	// wantExit is the exit code the extension must return. It is stated so a
@@ -110,19 +107,19 @@ func devWorkloadCases() []devWorkloadCase {
 		{name: "compose unknown runsWith", args: fixed("compose", "app", "--output=jsonl"), before: unknownRunsWith, wantExit: 1},
 		{
 			name: "compose jsonl", args: fixed("compose", "app", "--port", "0", "--no-watch", "--ready-timeout", "60s", "--output=jsonl"),
-			stopWhen: startDocument, signal: true, logs: true, wantExit: 130,
+			stopWhen: startDocument, logs: true, wantExit: 0,
 		},
 		{
 			name: "compose by id with an inline port", args: fixed("compose", "/app", "--port=0", "--no-watch", "--output=jsonl"),
-			stopWhen: startDocument, signal: true, logs: true, wantExit: 130,
+			stopWhen: startDocument, logs: true, wantExit: 0,
 		},
 		{
 			name: "compose watch false", args: fixed("compose", "app", "--port", "0", "--watch=false", "--output=jsonl"),
-			stopWhen: startDocument, signal: true, logs: true, wantExit: 130,
+			stopWhen: startDocument, logs: true, wantExit: 0,
 		},
 		{
 			name: "compose text", args: fixed("compose", "app", "--port", "0", "--no-watch"),
-			stopWhen: startTable, signal: true, logs: true, wantExit: 130,
+			stopWhen: startTable, logs: true, wantExit: 0,
 		},
 		{
 			name: "compose member exited", args: fixed("compose", "app", "--port", "0", "--no-watch", "--output=jsonl"),
@@ -176,7 +173,7 @@ func devWorkloadCases() []devWorkloadCase {
 
 // TestDevWorkloadCommandsMatchTheRecordedCore is the acceptance: same
 // fixture, same arguments, the same exit code, stdout and stderr the core's
-// built-in commands produced, with the documented substitution.
+// built-in commands produced.
 func TestDevWorkloadCommandsMatchTheRecordedCore(t *testing.T) {
 	t.Parallel()
 	requireFixtureTools(t)
@@ -190,7 +187,7 @@ func TestDevWorkloadCommandsMatchTheRecordedCore(t *testing.T) {
 			got := runCase(t, cli, root, tc)
 			want := expectedAnswer(t, tc)
 			if got.exit != want.exit {
-				t.Errorf("exit code: extension %d, recorded core %d after the substitution", got.exit, want.exit)
+				t.Errorf("exit code: extension %d, recorded core %d", got.exit, want.exit)
 			}
 			for _, part := range []struct{ name, got, want string }{
 				{"stdout", got.stdout, want.stdout},
@@ -204,19 +201,12 @@ func TestDevWorkloadCommandsMatchTheRecordedCore(t *testing.T) {
 	}
 }
 
-// expectedAnswer is the recorded answer of tc with the documented
-// substitution applied.
+// expectedAnswer is the recorded answer of tc.
 func expectedAnswer(t *testing.T, tc devWorkloadCase) answer {
 	t.Helper()
 	recorded := readAnswer(t, filepath.Join(recordingDir(), paritySlug(tc.name)+".txt"))
-	if tc.signal {
-		if recorded.exit != 0 {
-			t.Fatalf("the case is marked as stopped by a signal the core exited 0 for, but the recording exits %d", recorded.exit)
-		}
-		recorded.exit = 130
-	}
 	if recorded.exit != tc.wantExit {
-		t.Errorf("the recording exits %d after the substitution, but the case claims %d", recorded.exit, tc.wantExit)
+		t.Errorf("the recording exits %d, but the case claims %d", recorded.exit, tc.wantExit)
 	}
 	return recorded
 }

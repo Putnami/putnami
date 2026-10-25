@@ -199,7 +199,7 @@
     },
     {
       "id": "job-context-names-member-types",
-      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects, and each entry names the project's resolved type: the type its putnami.json authors, else the type its provider reported, else application. An entry without a type comes from a CLI that predates the member. selectedProjects and dependencyClosure carry no type."
+      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects, and each entry names the project's resolved type: the type its putnami.json authors, else the type its provider reported, else application. An entry without a type comes from a CLI that predates the member. Each entry also names the projects it runs with: the runsWith list its putnami.json authors, else the one its provider reported; an entry without runsWith runs with nothing. selectedProjects and dependencyClosure carry neither."
     },
     {
       "id": "extension-command-host-rpc",
@@ -247,7 +247,7 @@
     },
     {
       "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
-      "text": "An interactive extension subcommand launch, in a workspace or outside one, carries the absolute directory the user typed the command in, as the job context's invocationDir and PUTNAMI_INVOCATION_DIR. The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace and, outside one, the value equals the caller directory. A planned job carries neither, so no cache key depends on it, and an inherited value is dropped."
+      "text": "An interactive extension subcommand launch, in a workspace or outside one, carries the absolute directory the user typed the command in, as the job context's invocationDir and PUTNAMI_INVOCATION_DIR. The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace and, outside one, the value equals the caller directory. A planned job carries neither, so no cache key depends on it, and an inherited value is dropped. The launch also carries the output globals the user typed, as job context params: verbose for --verbose or --debug, quiet for --quiet, and color, false for --no-color and true for --color; a planned job's params carry none of them."
     },
     {
       "id": "a-group-default-takes-positionals",
@@ -255,7 +255,7 @@
     },
     {
       "id": "an-interactive-command-stops-on-its-own-terms",
-      "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit on its own, and kills it only after that budget; the shutdown bound of the CLI covers the budget. A second signal kills the child at once and exits."
+      "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit on its own, and kills it only after that budget; the shutdown bound of the CLI covers the budget. A second signal kills the child at once and exits. A child that exits by itself after the signal keeps its own exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
     },
     {
       "id": "project-setup-runs-in-the-project-extension",

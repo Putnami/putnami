@@ -138,6 +138,8 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		// a v1 consumer report a completeness gap a v2 consumer suppresses.
 		// `type` splits a workload from a library: a v1 consumer reads every
 		// reference as unclassified and acts on a library a v2 consumer skips.
+		// `runsWith` splits a composition: a v1 consumer composes a workload
+		// alone that a v2 consumer composes with its providers.
 		for i, project := range ctx.SelectedProjects {
 			for _, member := range []struct {
 				name  string
@@ -168,6 +170,11 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 				diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField,
 					fmt.Sprintf("selectedProjects[%d].extensions", i),
 					"selectedProjects[].extensions requires protocolVersion %d", ProtocolVersion2))
+			}
+			if project.RunsWith != nil {
+				diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField,
+					fmt.Sprintf("selectedProjects[%d].runsWith", i),
+					"selectedProjects[].runsWith requires protocolVersion %d", ProtocolVersion2))
 			}
 		}
 	case ProtocolVersion2:

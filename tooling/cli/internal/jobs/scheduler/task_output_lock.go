@@ -687,8 +687,8 @@ func (h *outputLockHold) serveStarted() {
 }
 
 // releaseServeOutputLocks releases the serve keys of the hold ctx carries.
-// runJob calls it once the process of a step that runs under withServeStep
-// started; under any other context it changes nothing.
+// serveStepStarted calls it once the process of a step that runs under
+// withServeStep started; under any other context it changes nothing.
 func releaseServeOutputLocks(ctx context.Context) {
 	if serving, _ := ctx.Value(serveStepKey{}).(bool); !serving {
 		return

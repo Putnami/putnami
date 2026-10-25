@@ -1090,7 +1090,10 @@ context carries `userScope.callerDir`, and the environment carries
 Any interactive launch, in a workspace or not, also carries `invocationDir` and
 `PUTNAMI_INVOCATION_DIR`, the directory the command was typed in; an extension
 resolves a relative path argument against it with `context.ResolvePath` of the
-SDK.
+SDK. It also carries the output globals the user typed, which the CLI consumes
+before the extension is reached, as job context params: `verbose` for
+`--verbose` or `--debug`, `quiet` for `--quiet`, and `color`, `false` for
+`--no-color` and `true` for `--color`, each absent when not typed.
 
 Inside a workspace the workspace's own pins are the only ones, so a workspace
 that pins version A of an extension runs A even when the user scope pins B.

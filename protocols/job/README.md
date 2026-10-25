@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config`, `ProjectRef.extensions` and `ProjectRef.type` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -274,7 +274,7 @@ consumer would ignore exactly the members a v2 consumer would trust.
 ## Project references
 
 `selectedProjects[]`, `project.dependencyClosure[]` and `workspaceProjects[]`
-share one shape. Beyond `id`, `name`, `path` and `fullPath`, seven optional
+share one shape. Beyond `id`, `name`, `path` and `fullPath`, eight optional
 members carry facts the orchestrator already owns, so a task never re-derives
 them:
 
@@ -363,7 +363,22 @@ them:
   `project.type` keeps `""` for an unclassified project; the two agree once
   the default is applied.
 
-All seven are omitempty, so a producer that has nothing to say emits none,
+- **`runsWith`** (v2 only) — the projects this one runs with, as the
+  orchestrator **resolved** them: the authored `putnami.json` list, else the
+  one the owning provider's workspace probe reported. Each entry names a
+  project by name or by id, as its source wrote it, and a consumer resolves it
+  by name first, then by id. It is populated inside `workspaceProjects`, where
+  a task that composes a workload with the workloads it runs with reads the
+  closure. `config` holds only the authored list, and a provider reads the list
+  from a native manifest (the TypeScript extension reads `package.json`'s
+  `putnami.runsWith`), so a task reads `runsWith`, not `config`. A v1 document
+  carrying it is rejected (`job.unexpected_field`).
+
+  Absence is read from the **containing** member. Inside `workspaceProjects`,
+  whose producer resolves every project's list, an entry without `runsWith`
+  runs with nothing.
+
+All eight are omitempty, so a producer that has nothing to say emits none,
 except that a `workspaceProjects` entry always carries `type`.
 
 ## Environment variable mirror

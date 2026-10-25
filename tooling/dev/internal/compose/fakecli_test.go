@@ -45,6 +45,10 @@ const (
 	fakeCLISlowPrepare = "slow-prepare"
 )
 
+// fakeCLIGenerated is the line a generate step that succeeds renders on
+// stderr, before the serve step starts.
+const fakeCLIGenerated = "generated the fixture sources"
+
 // fakeCLISlowPrepareDelay is how long a slow-prepare run's generate step takes.
 const fakeCLISlowPrepareDelay = 3 * time.Second
 
@@ -112,6 +116,7 @@ func runFakeCLI(args []string) int {
 	if run.fixture.CLI == fakeCLISlowPrepare {
 		time.Sleep(fakeCLISlowPrepareDelay)
 	}
+	fmt.Fprintln(os.Stderr, "["+generate+"] "+fakeCLIGenerated)
 	run.out.taskEnd(generate, protocolcli.TaskStatusSuccess, 0)
 	return run.serve(env, signals)
 }

@@ -46,8 +46,13 @@ type Request struct {
 	Output protocolcli.OutputMode
 	// Executable is the putnami CLI the members' serve runs start.
 	Executable string
-	Stdout     io.Writer
-	Stderr     io.Writer
+	// Verbose, Quiet and NoColor are the invocation's --verbose, --quiet and
+	// --no-color, which shape the members' serve logs.
+	Verbose bool
+	Quiet   bool
+	NoColor bool
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // Run composes the selected workload and blocks until its target exits or the
@@ -97,8 +102,9 @@ func Run(req Request) int {
 	signals, stopSignals := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stopSignals()
 
-	// Each member's serve run renders its serve log on stderr, which reaches
-	// this stderr as it arrives; stdout stays the start and exit documents.
+	// Each member's serve run renders its serve log on stderr, as the
+	// invocation's output flags ask, and it reaches this stderr as it arrives;
+	// stdout stays the start and exit documents.
 	comp, err := Up(signals, Options{
 		Workspace:    req.Workspace,
 		Target:       target,
@@ -107,7 +113,9 @@ func Run(req Request) int {
 		ReadyTimeout: readyTimeout,
 		Executable:   req.Executable,
 		Logs:         stderr,
-		NoColor:      structured,
+		Verbose:      req.Verbose,
+		Quiet:        req.Quiet,
+		NoColor:      structured || req.NoColor,
 	})
 	if err != nil {
 		writeDetail(stderr, err, structured)

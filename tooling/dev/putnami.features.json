@@ -225,6 +225,7 @@
             "kind": "acceptance",
             "checks": [
               "the-closure-is-transitive-runs-with-in-topological-order",
+              "a-provider-reported-runs-with-composes-its-provider",
               "an-unserveable-member-is-refused-before-anything-starts",
               "the-proxy-answers-unavailable-until-the-backend-is-known",
               "dependants-reach-a-provider-through-its-injected-proxy-url"
@@ -410,7 +411,11 @@
               "a-watched-target-follows-its-serve-step-across-restarts",
               "a-killed-composition-leaves-both-groups-of-each-member-to-the-reap",
               "the-environment-document-reaches-no-session-file",
-              "the-start-exit-and-verdict-documents-keep-their-bytes"
+              "the-start-exit-and-verdict-documents-keep-their-bytes",
+              "each-serve-run-takes-the-invocations-output-flags",
+              "a-caller-without-serve-logs-sees-only-a-failed-preparation",
+              "qualify-shows-the-serve-logs-only-in-a-verbose-human-run",
+              "qualify-reports-a-failed-preparation-on-stderr"
             ]
           }
         },
@@ -424,7 +429,8 @@
             "kind": "acceptance",
             "checks": [
               "the-manifest-declares-the-compose-and-qualify-groups",
-              "the-executable-dispatches-the-compose-and-qualify-commands"
+              "the-executable-dispatches-the-compose-and-qualify-commands",
+              "the-executable-reads-the-output-flags-from-the-job-context"
             ]
           }
         }

@@ -50,7 +50,16 @@ type Options struct {
 	// on stderr as `putnami serve` renders it. Nil discards it; a failure keeps
 	// its last lines either way (Error.Detail).
 	Logs io.Writer
-	// NoColor renders each serve run's serve log without color.
+	// Failures receives the text a member's serve run rendered before its
+	// serve step started, once that run failed its preparation: the output of
+	// the finite steps that failed. Nil reports none. A caller that discards
+	// Logs sets it so a failed preparation still says why.
+	Failures io.Writer
+	// Verbose, Quiet and NoColor are the caller's --verbose, --quiet and
+	// --no-color, which each member's serve run takes as its own: they shape
+	// the text it renders on stderr.
+	Verbose bool
+	Quiet   bool
 	NoColor bool
 }
 
@@ -198,8 +207,8 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 		isTarget := member == plan.Target
 		watchMode := isTarget && opts.WatchTarget
 		rt := newMemberRuntime(member, c.proxies[i], memberEnv(!watchMode, document), sections, watchMode)
-		rt.executable, rt.root, rt.logs = opts.Executable, root, opts.Logs
-		rt.args = serveRunArgs(member.Project.ID, watchMode, opts.NoColor)
+		rt.executable, rt.root, rt.logs, rt.failures = opts.Executable, root, opts.Logs, opts.Failures
+		rt.args = serveRunArgs(member.Project.ID, watchMode, opts)
 		memberID := member.Project.ID
 		rt.observeProcess = func(pgid int, leaderStart string) { c.recordProcessGroup(memberID, pgid, leaderStart) }
 		rt.releaseProcess = c.releaseProcessGroup

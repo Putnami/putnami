@@ -52,15 +52,25 @@ const eventTypeProcess = "process"
 
 // serveRunArgs is the argument vector of a member's serve run after the
 // executable. Only a watched target watches; every member binds an ephemeral
-// port and announces it.
-func serveRunArgs(projectID string, watch, noColor bool) []string {
+// port and announces it. The run renders its text as opts.Verbose, opts.Quiet
+// and opts.NoColor ask.
+func serveRunArgs(projectID string, watch bool, opts Options) []string {
 	args := []string{serveCommand, "--projects", projectID, "--port", ephemeralPort}
 	if !watch {
 		args = append(args, "--no-watch")
 	}
 	args = append(args, "--serve-env", "-", "--output=jsonl")
-	if noColor {
-		args = append(args, "--no-color")
+	for _, flag := range []struct {
+		set  bool
+		name string
+	}{
+		{opts.Verbose, "--verbose"},
+		{opts.Quiet, "--quiet"},
+		{opts.NoColor, "--no-color"},
+	} {
+		if flag.set {
+			args = append(args, flag.name)
+		}
 	}
 	return args
 }
@@ -74,11 +84,14 @@ type memberRuntime struct {
 	sections []string
 	watch    bool
 
-	// executable, root and args start the serve run; logs receives its stderr.
+	// executable, root and args start the serve run; logs receives its stderr,
+	// and failures what it wrote before a failed preparation.
 	executable string
 	root       string
 	args       []string
 	logs       io.Writer
+	failures   io.Writer
+	output     *outputSink
 
 	// observeProcess is told every process group of the member — the serve
 	// run's own, then each serve step's the stream names — with its leader's
@@ -157,7 +170,8 @@ func (rt *memberRuntime) start() error {
 	cmd := exec.Command(rt.executable, rt.args...)
 	cmd.Dir = rt.root
 	cmd.Stdin = bytes.NewReader(document)
-	output := newOutputSink(rt.logs, rt.addOutput)
+	output := newOutputSink(rt.logs, rt.failures, rt.addOutput)
+	rt.output = output
 	stream := &lineWriter{line: func(line []byte) { rt.observeLine(line, output) }}
 	cmd.Stdout = stream
 	cmd.Stderr = output
@@ -175,6 +189,9 @@ func (rt *memberRuntime) start() error {
 		stream.flush()
 		output.flush()
 		rt.serveRunEnded(err)
+		if rt.preparationFailed() {
+			output.reportHeld()
+		}
 		_ = tree.Close()
 		rt.releaseProcess(group)
 		close(rt.exited)
@@ -220,6 +237,9 @@ func (rt *memberRuntime) observeEvent(key string, event map[string]any) {
 		rt.serveGroups = append(rt.serveGroups, int(group))
 		rt.mu.Unlock()
 		rt.observeProcess(int(group), leaderStart)
+		// The serve step started, so the preparation succeeded: what the run
+		// wrote before it reports no failure.
+		rt.output.dropHeld()
 		rt.spawnOnce.Do(func() {
 			rt.spawnedAt = time.Now()
 			close(rt.spawned)
@@ -357,6 +377,17 @@ func (rt *memberRuntime) failPreparation(message string) {
 	}
 	rt.mu.Unlock()
 	rt.prepareOnce.Do(func() { close(rt.prepareFailed) })
+}
+
+// preparationFailed reports whether the serve run failed before its serve
+// step started.
+func (rt *memberRuntime) preparationFailed() bool {
+	select {
+	case <-rt.prepareFailed:
+		return true
+	default:
+		return false
+	}
 }
 
 // addOutput keeps a line of the serve run's output for a failure's detail.
@@ -562,16 +593,27 @@ func (w *lineWriter) flush() {
 }
 
 // outputSink is a serve run's text output: passed through to logs as it
-// arrives, and split into lines for the failure detail. A write never fails, so
-// a closed log stream cannot stall the run on a full pipe.
+// arrives, and split into lines for the failure detail. Until the serve step
+// starts it also holds the text for failures, which receive it only once the
+// preparation failed. A write never fails, so a closed log stream cannot stall
+// the run on a full pipe.
 type outputSink struct {
 	mu    sync.Mutex
 	logs  io.Writer
 	lines *lineWriter
+	// failures receives the held text of a failed preparation; nil once the
+	// serve step started or the text was reported.
+	failures io.Writer
+	held     []byte
 }
 
-func newOutputSink(logs io.Writer, line func([]byte)) *outputSink {
-	return &outputSink{logs: logs, lines: &lineWriter{line: line}}
+// heldOutputLimit bounds the text a sink holds for a failed preparation; past
+// it, the oldest bytes go first, because a failure's cause is in its last
+// lines.
+const heldOutputLimit = 1 << 20
+
+func newOutputSink(logs, failures io.Writer, line func([]byte)) *outputSink {
+	return &outputSink{logs: logs, failures: failures, lines: &lineWriter{line: line}}
 }
 
 func (s *outputSink) Write(p []byte) (int, error) {
@@ -580,7 +622,30 @@ func (s *outputSink) Write(p []byte) (int, error) {
 	if s.logs != nil {
 		_, _ = s.logs.Write(p)
 	}
+	if s.failures != nil {
+		s.held = append(s.held, p...)
+		if excess := len(s.held) - heldOutputLimit; excess > 0 {
+			s.held = append(s.held[:0], s.held[excess:]...)
+		}
+	}
 	return s.lines.Write(p)
+}
+
+// dropHeld discards the held text and holds no more: the serve step started.
+func (s *outputSink) dropHeld() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failures, s.held = nil, nil
+}
+
+// reportHeld writes the held text to failures, once.
+func (s *outputSink) reportHeld() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failures != nil && len(s.held) > 0 {
+		_, _ = s.failures.Write(s.held)
+	}
+	s.failures, s.held = nil, nil
 }
 
 func (s *outputSink) flush() {

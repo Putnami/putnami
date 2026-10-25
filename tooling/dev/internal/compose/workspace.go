@@ -10,7 +10,7 @@ import (
 )
 
 // Project is one project of the workspace a composition plans against: what
-// the job context records of it (job.ProjectRef) and its authored
+// the job context resolves of it (job.ProjectRef) and its authored
 // putnami.json.
 type Project struct {
 	// ID is the project's workspace id, such as /apps/web.
@@ -21,8 +21,10 @@ type Project struct {
 	Path string
 	// Type is the project's resolved classification.
 	Type string
-	// RunsWith names the workloads the project runs with, as its putnami.json
-	// declares them, each by project name or id.
+	// RunsWith names the workloads the project runs with, each by project name
+	// or id, as the job context resolves them: the authored putnami.json list,
+	// else the one the project's provider reported (package.json's
+	// putnami.runsWith for a TypeScript project).
 	RunsWith []string
 	// Config is the project's authored putnami.json; nil reads as empty.
 	Config *wsproto.ProjectConfig
@@ -42,7 +44,7 @@ type Workspace struct {
 // NewWorkspace returns the workspace at root whose complete membership is
 // projects, the job context's WorkspaceProjects. A nil cfg is an empty
 // configuration. A project's authored putnami.json that does not decode is an
-// error: a member's runsWith or disable.jobs would otherwise read as absent.
+// error: a member's disable.jobs would otherwise read as absent.
 func NewWorkspace(root string, cfg *wsproto.Config, projects []job.ProjectRef) (*Workspace, error) {
 	if cfg == nil {
 		cfg = &wsproto.Config{}
@@ -57,7 +59,7 @@ func NewWorkspace(root string, cfg *wsproto.Config, projects []job.ProjectRef) (
 		}
 		ws.Projects = append(ws.Projects, &Project{
 			ID: ref.ID, Name: ref.Name, Path: ref.Path, Type: ref.Type,
-			RunsWith: config.RunsWith, Config: config,
+			RunsWith: ref.RunsWith, Config: config,
 		})
 	}
 	return ws, nil

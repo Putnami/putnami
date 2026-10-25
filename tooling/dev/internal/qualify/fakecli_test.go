@@ -31,6 +31,21 @@ import (
 // fakeCLIInterrupted is the fake's exit code once a signal stopped it.
 const fakeCLIInterrupted = 130
 
+// fakeCLIPrepareFailure is what the fake's generate step writes on stderr
+// before it fails, for a member in fixturePrepareFails mode.
+const fakeCLIPrepareFailure = "fixture generate failed: boom"
+
+// fixtureModeOf is the mode of the member whose project directory is dir, or
+// "" when its fixture.json cannot be read.
+func fixtureModeOf(dir string) string {
+	var config localFixtureConfig
+	data, err := os.ReadFile(filepath.Join(dir, "fixture.json"))
+	if err != nil || json.Unmarshal(data, &config) != nil {
+		return ""
+	}
+	return config.Mode
+}
+
 // isFakeCLIInvocation reports whether this test binary was started as a
 // member's serve run: a test run's first argument is a -test flag.
 func isFakeCLIInvocation(args []string) bool {
@@ -73,8 +88,16 @@ func runFakeCLI(args []string) int {
 		return 2
 	}
 	out := &fakeStream{}
+	dir := filepath.Join(root, strings.TrimPrefix(project, "/"))
+	if fixtureModeOf(dir) == fixturePrepareFails {
+		generate := project + ":generate~generate"
+		fmt.Fprintln(os.Stderr, "["+generate+"] "+fakeCLIPrepareFailure)
+		out.taskEnd(generate, protocolcli.TaskStatusFailed, 1)
+		out.sessionEnd()
+		return 1
+	}
 	key := project + ":serve~serve"
-	workload, err := startFakeWorkload(filepath.Join(root, strings.TrimPrefix(project, "/")), project, key, env, out)
+	workload, err := startFakeWorkload(dir, project, key, env, out)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "putnami: start the serve step: "+err.Error())
 		out.taskEnd(key, protocolcli.TaskStatusFailed, 1)

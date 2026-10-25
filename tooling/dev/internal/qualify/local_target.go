@@ -28,7 +28,13 @@ type LocalOptions struct {
 	// Logs receives the members' serve logs, the text each member's serve run
 	// renders on stderr; nil discards them.
 	Logs io.Writer
-	// NoColor renders the serve logs without color.
+	// Failures receives the text a member's serve run rendered before a
+	// preparation that failed; nil reports none.
+	Failures io.Writer
+	// Verbose, Quiet and NoColor shape the text each member's serve run
+	// renders, as its --verbose, --quiet and --no-color.
+	Verbose bool
+	Quiet   bool
 	NoColor bool
 	// Executable is the putnami CLI each member's serve run starts.
 	Executable string
@@ -81,6 +87,9 @@ func NewLocalTarget(opts LocalOptions) (Target, error) {
 			ReadyTimeout: opts.ReadyTimeout,
 			Executable:   opts.Executable,
 			Logs:         opts.Logs,
+			Failures:     opts.Failures,
+			Verbose:      opts.Verbose,
+			Quiet:        opts.Quiet,
 			NoColor:      opts.NoColor,
 		},
 		project: opts.Project.ID,

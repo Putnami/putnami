@@ -31,12 +31,12 @@ invocation, and keeps them running until it receives `SIGINT` or `SIGTERM`.
 
 ### The composition
 
-The members are the transitive closure of the target's `runsWith`, as each
-project's `putnami.json` declares it. A `putnami.runsWith` that only a
-TypeScript `package.json` declares is not read: the job context `compose`
-plans from carries each project's `putnami.json`, not what a language
-extension reads from its own manifest. Each entry resolves by project name,
-then by project id. Nothing else is inferred: the
+The members are the transitive closure of the target's `runsWith`, as putnami
+resolves it for each project: the list its `putnami.json` declares, else the
+one its language extension reads from its own manifest, such as the
+`putnami.runsWith` of a TypeScript `package.json`. `compose` reads the resolved
+list from the workspace membership of its job context. Each entry resolves by
+project name, then by project id. Nothing else is inferred: the
 dependency graph links a consumer to the generated client package it compiles
 against, not to the provider workload it calls.
 
@@ -66,8 +66,12 @@ executable that launched `compose` (putnami names it in
 `PUTNAMI_CLI_EXECUTABLE`):
 
 ```bash
-putnami serve --projects <member> --port 0 [--no-watch] --serve-env - --output=jsonl
+putnami serve --projects <member> --port 0 [--no-watch] --serve-env - --output=jsonl [--verbose] [--quiet] [--no-color]
 ```
+
+The run takes the `--verbose` (or `--debug`), `--quiet` and `--no-color` you
+typed for `compose`, so it renders the member's serve log as `putnami serve`
+would with them. A run in a structured output mode always takes `--no-color`.
 
 `serve` is the development verb `@putnami/dev` declares, which the member's
 language extension runs. The member's environment document arrives
@@ -174,11 +178,12 @@ sections on stdout. Each member's serve run renders its serve log on stderr, as
 2. At exit: the same document without `reaped` (reported once, at start) and with `cleanup: {state, leftovers}`.
 
 A failure is a single failure document whose `data` is `{code, id, member, phase, cleanup, reaped}`; `id` and `cleanup` are present once the failed start had created its lease.
-The `@putnami/dev` executable exits `0` only when the composition stopped on
-a signal and its cleanup is `clean`; a target that exits on its own, a failed
-start and a `partial` cleanup exit `1`. `putnami compose` exits `130` when a
-signal stopped it, as every interactive command putnami stops on a signal
-does.
+`putnami compose` exits `0` only when the composition stopped on a signal and
+its cleanup is `clean`; a target that exits on its own, a failed start and a
+`partial` cleanup exit `1`. putnami keeps that exit code after a signal,
+because `compose` exits by itself once its teardown ends. putnami exits `130`
+only when it killed `compose`: on a second signal, or when the teardown
+outlasts the 90 seconds putnami waits for it.
 
 ### Recovery
 
@@ -292,6 +297,13 @@ putnami qualify @example/go-items-consumer --target local --output=json
 `--ready-timeout` bounds each member's typed ready event and then the readiness
 phase.
 
+stdout carries the verdict alone. With `--verbose` in text output, stderr shows
+what each member's serve run renders: the output of its finite steps and its
+serve log. Otherwise, and in every structured output mode, stderr shows only
+the output of a serve run that failed before its serve step started, which
+says why the verdict is `composition_failed`. Each serve run takes the
+`--quiet` and `--no-color` you typed, as under `compose`.
+
 #### Readiness
 
 A local target is ready when its application reports that its startup completed:
@@ -357,8 +369,9 @@ start and after `Ctrl-C`. The verdict's `cleanup` records what it released:
   so the verdict is never `passed`, and the lease stays on disk.
 
 The first `Ctrl-C` cancels the run: the active phase becomes `canceled` and the
-teardown still runs. A second `Ctrl-C`, or ten seconds without the run ending,
-forces the CLI to exit. What that leaves behind is reaped by the next `compose`
+teardown still runs, and the run exits `1` with that verdict. A second
+`Ctrl-C`, or 90 seconds without the run ending, makes putnami kill the run and
+exit `130`. What that leaves behind is reaped by the next `compose`
 or `qualify --target local`, as described in [Recovery](#recovery): a lease whose
 lock is free and whose owner is dead has the process groups it can confirm killed,
 its databases dropped and its directory removed.

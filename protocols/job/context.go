@@ -370,6 +370,22 @@ type ProjectRef struct {
 	// workloads declines rather than reading it as "application". v2 only, for
 	// the reason Config is.
 	Type string `json:"type,omitempty"`
+	// RunsWith are the projects this one runs with, as the orchestrator
+	// resolved them: the authored putnami.json list, else the one the owning
+	// provider's workspace probe reported. Each entry names a project by name
+	// or by id, as its source wrote it; a consumer resolves it by name first,
+	// then by id.
+	//
+	// The orchestrator populates it on WorkspaceProjects, where a task that
+	// composes a workload with the workloads it runs with reads the closure.
+	// Config carries only the authored list, and a provider reads the list from
+	// a native manifest (the TypeScript extension reads package.json's
+	// `putnami.runsWith`), so a consumer reads RunsWith, not Config.
+	//
+	// Absence is read from the containing member. Inside WorkspaceProjects,
+	// whose producer resolves every project's list, an entry without RunsWith
+	// runs with nothing. v2 only, for the reason Config is.
+	RunsWith []string `json:"runsWith,omitempty"`
 }
 
 // GetBinString returns the bin field as a string if it's a simple string value.

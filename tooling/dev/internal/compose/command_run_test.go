@@ -82,14 +82,18 @@ func (b *lockedBuffer) String() string {
 
 func startCommand(t *testing.T, fixture *compositionFixture, mode protocolcli.OutputMode, args ...string) *commandRun {
 	t.Helper()
+	return startRequest(t, fixture, Request{Args: args, Output: mode})
+}
+
+// startRequest runs req in the fixture's workspace, with the fixture's
+// executable and the run's own context and streams.
+func startRequest(t *testing.T, fixture *compositionFixture, req Request) *commandRun {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	run := &commandRun{stdout: newDocumentLines(), stderr: &lockedBuffer{}, code: make(chan int, 1), cancel: cancel}
-	go func() {
-		run.code <- Run(Request{
-			Ctx: ctx, Workspace: fixture.ws, Args: args, Output: mode,
-			Executable: fixture.executable, Stdout: run.stdout, Stderr: run.stderr,
-		})
-	}()
+	req.Ctx, req.Workspace, req.Executable = ctx, fixture.ws, fixture.executable
+	req.Stdout, req.Stderr = run.stdout, run.stderr
+	go func() { run.code <- Run(req) }()
 	t.Cleanup(cancel)
 	return run
 }

@@ -301,7 +301,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        255,
+		want:        256,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -436,7 +436,11 @@ var structuralPins = []structuralPin{
 			"line is compose's memberRuntime.observeEvent, which reads a task:event record's Event, the payload " +
 			"protocols/cli types as an untyped map, and hands a readiness claim on as a typed runtimeproto.ReadyData. " +
 			"A later change lowers 256→255 (ADR 0079): compose and qualify move to @putnami/dev, which deletes " +
-			"compose's memberRuntime.observeEvent line with internal/compose",
+			"compose's memberRuntime.observeEvent line with internal/compose. " +
+			"A later change raises 255→256 for cli.addOutputGlobalParams (tooling/workload-qualification): the " +
+			"interactive launch writes the typed --verbose, --quiet and --color globals into the params map this pin " +
+			"already names as untypable, at a named seam the planned path never calls, so no cache key moves. Nothing " +
+			"decodes, stores or forwards a new untyped document",
 	},
 	{
 		name:        "test lines mentioning map[string]any",
@@ -616,7 +620,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        915,
+		want:        916,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -683,7 +687,9 @@ var structuralPins = []structuralPin{
 			"lowering and the four fake-CLI test lines itemized on the two scoped pins above. " +
 			"A later change lowers 916→915 = 255 production + 660 test (ADR 0079): the production line and the " +
 			"six test lines that leave with compose, and the six parity test lines that arrive, itemized on the " +
-			"two scoped pins above",
+			"two scoped pins above. " +
+			"A later change raises 915→916 = 256 production + 660 test for cli.addOutputGlobalParams, itemized on " +
+			"the production pin above; tests add none",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

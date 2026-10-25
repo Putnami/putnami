@@ -85,31 +85,38 @@ func RunJobInteractiveWithStreams(
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
-	runErr := runInteractive(cmd, func(start func() error) error { return inv.startJob(job, start) })
+	forced, runErr := runInteractive(cmd, func(start func() error) error { return inv.startJob(job, start) })
 	duration := time.Since(start)
 
 	result := &JobResult{Status: "success", Duration: duration}
-	if runErr != nil {
+	if runErr == nil {
+		return result, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		result.ExitCode = exitErr.ExitCode()
+	}
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		// Same structural deadline marker the streaming runner sets.
 		result.Status = "failed"
-		var exitErr *exec.ExitError
-		if errors.As(runErr, &exitErr) {
-			result.ExitCode = exitErr.ExitCode()
-		}
-		if ctx.Err() != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				// Same structural deadline marker the streaming runner sets.
-				result.TimedOut = true
-				result.Error = &JobError{Message: "job timed out"}
-			} else {
-				result.Status = "canceled"
-			}
-		} else if endedByInterrupt(runErr) {
-			// A terminal Ctrl+C reached the child before this process's own
-			// cancel did. It is the same interrupted run.
+		result.TimedOut = true
+		result.Error = &JobError{Message: "job timed out"}
+	case ctx.Err() != nil || endedByInterrupt(runErr):
+		// A terminal signal stopped the run: this process's cancel, or a
+		// terminal Ctrl+C that reached the child first. The child owns its stop,
+		// so a child that exited by itself keeps its own exit code, 0 included.
+		// The run is canceled only when the child died by the signal or this
+		// process killed it.
+		switch {
+		case !exitedOnItsOwn(cmd.ProcessState, forced):
 			result.Status = "canceled"
-		} else {
-			result.Error = &JobError{Message: runErr.Error()}
+		case result.ExitCode != 0:
+			result.Status = "failed"
 		}
+	default:
+		result.Status = "failed"
+		result.Error = &JobError{Message: runErr.Error()}
 	}
 	return result, nil
 }

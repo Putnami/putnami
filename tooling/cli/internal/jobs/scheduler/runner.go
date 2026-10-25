@@ -522,6 +522,15 @@ func withServeStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, serveStepKey{}, true)
 }
 
+// serveStepStarted does what a serve-workload step does once its process
+// started: it releases the step's command-output lock
+// (releaseServeOutputLocks) and announces the step's process group
+// (announceProcessGroup). For a finite step it does nothing.
+func serveStepStarted(ctx context.Context, group int, onEvent EventHandler) {
+	releaseServeOutputLocks(ctx)
+	announceProcessGroup(ctx, group, onEvent)
+}
+
 // announceProcessGroup emits the CLI-built process event of a serve-workload
 // step: the id of the process group it runs in and the start time of that
 // group's leader, which together let a supervisor that outlives this CLI
@@ -649,8 +658,7 @@ func runJob(
 	defer func() { _ = tree.Close() }()
 	_ = stdoutWriter.Close()
 	_ = stderrWriter.Close()
-	releaseServeOutputLocks(ctx)
-	announceProcessGroup(ctx, tree.ID(), onEvent)
+	serveStepStarted(ctx, tree.ID(), onEvent)
 
 	// Read stdout (JSONL events) and stderr concurrently
 	eventsCh := make(chan jobReadResult, 1)

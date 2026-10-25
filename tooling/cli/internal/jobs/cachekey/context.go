@@ -50,6 +50,12 @@ type JobContextProjectRef struct {
 	// as Config is, and always set there, so a workspace task tells a workload
 	// from a library without reading Config, which holds only the authored half.
 	Type string `json:"type,omitempty"`
+	// RunsWith are the projects this one runs with: the authored putnami.json
+	// list, else the provider probe's. Set on workspaceProjects only, as Config
+	// is, so a task that composes a workload reads the providers a native
+	// manifest declares without reading Config, which holds only the authored
+	// list.
+	RunsWith []string `json:"runsWith,omitempty"`
 }
 
 // JobContextVersion describes the computed version metadata in the context file.
@@ -286,6 +292,7 @@ func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []J
 			Config:     encodedProjectConfig(project),
 			Extensions: slices.Clone(project.Extensions),
 			Type:       workspaceMemberType(project),
+			RunsWith:   slices.Clone(project.RunsWith),
 			// The resolved DIRECT edges. Publishing them here is what makes the
 			// member a graph rather than a listing: a consumer reading an entry
 			// with no edge list inside this member knows the project declares

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -142,6 +143,7 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"selectedProjects[1].dependencies",
 		"selectedProjects[0].extensions",
 		"selectedProjects[0].type",
+		"selectedProjects[0].runsWith",
 		"workspaceProjects",
 		"workspaceProjects[1].path",
 		"userScope",
@@ -625,6 +627,33 @@ func TestV2WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), `"type"`) {
 		t.Errorf("encoded reference = %s, want type omitted when empty", encoded)
+	}
+}
+
+// TestV2WorkspaceProjectsCarryTheResolvedRunsWith asserts the member a task
+// that composes a workload reads for the projects it runs with, and that a
+// reference without it encodes as it did before the member. Inside
+// workspaceProjects an entry without the member runs with nothing.
+func TestV2WorkspaceProjectsCarryTheResolvedRunsWith(t *testing.T) {
+	t.Parallel()
+	ctx, diags := ParseAndValidate(readFixture(t, "fixtures", "v2", "valid", "project-references.json"))
+	if diag.HasErrors(diags) {
+		t.Fatalf("valid fixture rejected: %v", diags)
+	}
+	if len(ctx.WorkspaceProjects) != 3 {
+		t.Fatalf("workspaceProjects = %d, want the fixture's three", len(ctx.WorkspaceProjects))
+	}
+	for i, want := range [][]string{{"legacy"}, nil, nil} {
+		if got := ctx.WorkspaceProjects[i].RunsWith; !slices.Equal(got, want) {
+			t.Errorf("workspaceProjects[%d].runsWith = %q, want %q", i, got, want)
+		}
+	}
+	encoded, err := json.Marshal(ProjectRef{Name: "a", Path: "a", FullPath: "/ws/a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "runsWith") {
+		t.Errorf("encoded reference = %s, want runsWith omitted when empty", encoded)
 	}
 }
 

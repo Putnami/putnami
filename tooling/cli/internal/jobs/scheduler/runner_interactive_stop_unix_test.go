@@ -100,10 +100,13 @@ func TestInteractiveStopBudgetIsNinetySeconds(t *testing.T) {
 
 // A canceled child that takes longer than the old five-second delay would
 // allow, scaled down, still finishes its own teardown: the runner waits for
-// its exit within the budget instead of killing it.
+// its exit within the budget instead of killing it. The child exited by
+// itself, so its exit code 0 is the run's: the run succeeds.
 func TestRunJobInteractive_CanceledChildStopsOnItsOwnTerms(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
 		"the-cli-waits-for-an-interactive-child-after-a-terminal-signal")
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code")
 	withInteractiveStopBudget(t, 30*time.Second)
 	ws, job, wsRoot := interactiveStopJob(t,
 		"trap 'sleep 1; echo stopped > \"$STOPPED\"; exit 0' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
@@ -114,8 +117,8 @@ func TestRunJobInteractive_CanceledChildStopsOnItsOwnTerms(t *testing.T) {
 	cancel()
 	res := awaitResult(t, done, 20*time.Second)
 
-	if res.Status != "canceled" {
-		t.Errorf("status = %q, want canceled", res.Status)
+	if res.Status != "success" || res.ExitCode != 0 || res.Error != nil {
+		t.Errorf("result = %+v, want the child's own success", res)
 	}
 	if _, err := os.Stat(filepath.Join(wsRoot, "stopped")); err != nil {
 		t.Errorf("the child was killed before its own teardown finished: %v", err)
@@ -125,10 +128,50 @@ func TestRunJobInteractive_CanceledChildStopsOnItsOwnTerms(t *testing.T) {
 	}
 }
 
+// A canceled child that exits by itself with a code of its own keeps it: the
+// run fails with that code, and putnami does not report it as interrupted.
+func TestRunJobInteractive_CanceledChildKeepsItsOwnExitCode(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code")
+	withInteractiveStopBudget(t, 30*time.Second)
+	ws, job, wsRoot := interactiveStopJob(t,
+		"trap 'exit 3' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := startInteractive(t, ctx, ws, job, wsRoot)
+	cancel()
+	res := awaitResult(t, done, 20*time.Second)
+
+	if res.Status != "failed" || res.ExitCode != 3 || res.TimedOut {
+		t.Errorf("result = %+v, want the child's own exit code 3", res)
+	}
+}
+
+// A canceled child that dies by the terminal signal has no exit code of its
+// own: the run is canceled, which putnami reports as interrupted.
+func TestRunJobInteractive_ChildThatDiesByTheSignalIsCanceled(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-dies-by-the-signal-or-is-killed-is-interrupted")
+	withInteractiveStopBudget(t, 30*time.Second)
+	ws, job, wsRoot := interactiveStopJob(t,
+		"echo ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := startInteractive(t, ctx, ws, job, wsRoot)
+	cancel()
+	if res := awaitResult(t, done, 20*time.Second); res.Status != "canceled" {
+		t.Errorf("result = %+v, want canceled", res)
+	}
+}
+
 // A child that ignores the cancel is killed once the budget runs out.
 func TestRunJobInteractive_ChildPastTheBudgetIsKilled(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
 		"the-cli-waits-for-an-interactive-child-after-a-terminal-signal")
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-dies-by-the-signal-or-is-killed-is-interrupted")
 	withInteractiveStopBudget(t, 200*time.Millisecond)
 	ws, job, wsRoot := interactiveStopJob(t,
 		"trap '' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
@@ -146,6 +189,8 @@ func TestRunJobInteractive_ChildPastTheBudgetIsKilled(t *testing.T) {
 func TestRunJobInteractive_KillInteractiveEndsTheChildAtOnce(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
 		"a-second-signal-kills-the-interactive-child-at-once")
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-dies-by-the-signal-or-is-killed-is-interrupted")
 	withInteractiveStopBudget(t, time.Minute)
 	ws, job, wsRoot := interactiveStopJob(t,
 		"trap '' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
