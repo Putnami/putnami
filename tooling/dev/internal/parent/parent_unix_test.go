@@ -27,7 +27,7 @@ const (
 
 // A real child whose parent is killed sees the loss: its watched context ends
 // with ErrGone, and a write to the stdout whose reader is gone fails instead of
-// ending it.
+// ending it, both before the loss is seen and after.
 func TestWatchSeesARealParentKilled(t *testing.T) {
 	spectest.Proves(t, workloadFeature, parentRequirement, "a-killed-parent-cancels-a-real-command-that-outlives-a-closed-stdout")
 	executable, err := os.Executable()
@@ -51,8 +51,11 @@ func TestWatchSeesARealParentKilled(t *testing.T) {
 
 	waitForResult(t, result, "watching")
 	// Close the read end, so the helper's next write to stdout meets a closed
-	// pipe, then kill the parent outright: it signals nothing.
+	// pipe while its parent still runs, then kill the parent outright: it
+	// signals nothing.
 	_ = reader.Close()
+	appendLine(t, result, "closed")
+	waitForResult(t, result, "early write: ")
 	if err := parent.Process.Signal(syscall.SIGKILL); err != nil {
 		t.Fatalf("SIGKILL the parent: %v", err)
 	}
@@ -61,14 +64,17 @@ func TestWatchSeesARealParentKilled(t *testing.T) {
 	if !strings.Contains(got, "gone: "+ErrGone.Error()) {
 		t.Errorf("the helper reported %q, want its context ended by ErrGone", got)
 	}
-	if !strings.Contains(got, "write: ") || strings.Contains(got, "write: <nil>") {
-		t.Errorf("the helper reported %q, want its write to the closed stdout to fail", got)
+	for _, write := range []string{"early write: ", "late write: "} {
+		if !strings.Contains(got, write) || strings.Contains(got, write+"<nil>") {
+			t.Errorf("the helper reported %q, want its %q to the closed stdout to fail", got, write)
+		}
 	}
 }
 
 // TestWatchHelper is the child half of TestWatchSeesARealParentKilled: it
-// watches its parent, reports the end of the watch, writes to its stdout and
-// reports that it survived the write.
+// watches its parent, writes to its stdout once the test closed its reader,
+// reports the end of the watch, writes again and reports that it survived both
+// writes.
 func TestWatchHelper(t *testing.T) {
 	result := os.Getenv(helperResultEnv)
 	if result == "" {
@@ -85,6 +91,17 @@ func TestWatchHelper(t *testing.T) {
 	ctx, stop := Watch(context.Background())
 	defer stop()
 	report("watching")
+	for {
+		data, _ := os.ReadFile(result)
+		if strings.Contains(string(data), "closed") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// The parent still runs: this write lands in the window before the loss
+	// is seen.
+	_, err := os.Stdout.WriteString("the reader is gone, the parent is not\n")
+	report(fmt.Sprintf("early write: %v", err))
 	select {
 	case <-ctx.Done():
 	case <-time.After(lossBound):
@@ -94,9 +111,22 @@ func TestWatchHelper(t *testing.T) {
 	report("gone: " + context.Cause(ctx).Error())
 	// A pipe without a reader fails every write with EPIPE, which ends a Go
 	// process writing to its stdout unless it ignores SIGPIPE.
-	_, err := os.Stdout.WriteString("the reader is gone\n")
-	report(fmt.Sprintf("write: %v", err))
+	_, err = os.Stdout.WriteString("the reader is gone\n")
+	report(fmt.Sprintf("late write: %v", err))
 	report("survived")
+}
+
+// appendLine adds line to the helper's report file.
+func appendLine(t *testing.T, path, line string) {
+	t.Helper()
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if _, err := fmt.Fprintln(file, line); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // waitForResult returns the helper's report once it holds want.

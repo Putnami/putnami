@@ -391,6 +391,7 @@ Reads and parses a Putnami context JSON file.
 | `Job` | `Job` | Current job identity |
 | `Params` | `Params` | Job parameters |
 | `InvocationDir` | `string` | The directory the user typed an interactive command in (empty for a planned job) |
+| `WorkspaceWarnings` | `[]cliproto.WorkspaceWarning` | The warnings putnami's workspace load for an interactive launch reported (empty for a planned job); pass them to `resultv2.EmitWithWarnings` |
 | `UserScope` | `*UserScope` | Set only when the job runs outside any workspace; `CallerDir` is where it was invoked |
 | `FilePatterns` | `[]string` | Optional file patterns for targeted operations |
 | `Version` | `*Version` | Git version info (nil if unavailable) |

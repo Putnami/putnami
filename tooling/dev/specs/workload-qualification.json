@@ -89,7 +89,7 @@
     },
     {
       "id": "a-lost-putnami-tears-the-command-down",
-      "text": "On Unix, compose and qualify watch the putnami process that launched them. Once it is gone, even killed outright, they notice within a second and tear down as on a terminal signal, and a write to a stdout or stderr without a reader no longer ends them. On Windows, putnami's Job Object ends them and every serve run they started with putnami, without a teardown, and the next composition reaps the lease."
+      "text": "On Unix, compose and qualify watch the putnami process that launched them. Once it is gone, even killed outright, they notice within a second and tear down as on a terminal signal, and a write to a stdout or stderr without a reader never ends them. On Windows, putnami's Job Object ends them and every serve run they started with putnami, without a teardown, and the next composition reaps the lease."
     },
     {
       "id": "the-dev-extension-runs-compose-and-qualify",

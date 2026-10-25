@@ -26,9 +26,11 @@ const pollInterval = 250 * time.Millisecond
 // Watch returns a copy of ctx that is canceled, with ErrGone as its cause, once
 // the process that started this one exits, and the function that ends the
 // watch. A Unix process whose parent exits is adopted by init or a subreaper,
-// so its parent pid changes: Watch polls it. Before it cancels, Watch ignores
-// SIGPIPE, because the reader of the stdout and stderr the command shares with
-// its parent is often gone too, and the teardown must outlive a write to them.
+// so its parent pid changes: Watch polls it. Watch ignores SIGPIPE from the
+// start, because the reader of the stdout and stderr the command shares with
+// its parent often dies with it, and a write in the poll interval before the
+// loss is seen, or during the teardown, must fail instead of ending the
+// command.
 //
 // On Windows putnami runs the command in a Job Object that ends it, and every
 // process it started, with putnami, so the command has no teardown to run:
@@ -38,12 +40,13 @@ func Watch(ctx context.Context) (context.Context, context.CancelFunc) {
 	if !supported {
 		return context.WithCancel(ctx)
 	}
-	return watch(ctx, pollInterval, os.Getppid, ignoreBrokenPipes)
+	ignoreBrokenPipes()
+	return watch(ctx, pollInterval, os.Getppid)
 }
 
-// watch is Watch with its clock, its parent pid reader and its loss hook
-// passed in. The parent pid it compares against is the one at the call.
-func watch(ctx context.Context, interval time.Duration, getppid func() int, onGone func()) (context.Context, context.CancelFunc) {
+// watch is Watch with its clock and its parent pid reader passed in. The
+// parent pid it compares against is the one at the call.
+func watch(ctx context.Context, interval time.Duration, getppid func() int) (context.Context, context.CancelFunc) {
 	watched, cancel := context.WithCancelCause(ctx)
 	start := getppid()
 	go func() {
@@ -55,7 +58,6 @@ func watch(ctx context.Context, interval time.Duration, getppid func() int, onGo
 				return
 			case <-ticker.C:
 				if getppid() != start {
-					onGone()
 					cancel(ErrGone)
 					return
 				}

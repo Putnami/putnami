@@ -36,6 +36,7 @@ func runFeaturesList(ctx *pctx.Context, args []string) int {
 | `Path(command, subcommand)` | `"features list"`, or `"features"` when the group is invoked bare |
 | `Envelope(command, subcommand, data, err)` | the `protocolcli.ResultV2` value, for a caller that wants to inspect or embed it |
 | `Emit(stdout, stderr, mode, command, subcommand, data, err)` | the process exit code, after writing whatever the mode calls for |
+| `EmitWithWarnings(stdout, stderr, mode, command, subcommand, data, err, warnings)` | what `Emit` returns; a structured envelope also carries `warnings` in `workspaceWarnings`. An interactive subcommand passes its job context's `WorkspaceWarnings`, which putnami already wrote on stderr |
 
 ## What `Emit` writes
 

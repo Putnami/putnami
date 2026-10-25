@@ -10,6 +10,10 @@ import (
 // CLI kills it. A first terminal signal cancels the run and the child stops on
 // its own terms within the budget; a second one kills it at once
 // (KillInteractive).
+//
+// The dev executable's compose teardown (teardownTimeout in
+// tooling/dev/internal/compose/up.go) ends 15s before this budget, so a
+// composition releases its lease itself: change both together.
 const InteractiveStopBudget = 90 * time.Second
 
 var (
