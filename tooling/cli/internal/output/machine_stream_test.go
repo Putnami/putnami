@@ -731,3 +731,43 @@ func TestMachineStreamSurfacesArtifactAppendFailureWithoutBoundedClaim(t *testin
 		t.Fatalf("append failure final makes a bounded artifact claim: %s", lines[len(lines)-1])
 	}
 }
+
+// TestMachineV2RendererEnvelopeCarriesTheLatestWorkspaceWarnings holds the
+// aggregated envelope to the warnings handed over last. A watch session builds
+// its renderer once and runs every iteration through it: an iteration whose
+// load reports no warning clears the member.
+func TestMachineV2RendererEnvelopeCarriesTheLatestWorkspaceWarnings(t *testing.T) {
+	t.Parallel()
+	first := []protocolcli.WorkspaceWarning{{Code: "workspace.jobs_ignored", Message: "project /app declares jobs"}}
+	var out bytes.Buffer
+	renderer := newMachineV2Renderer(&out, "build", false)
+	var current []protocolcli.WorkspaceWarning
+	renderer.workspaceWarnings = func() []protocolcli.WorkspaceWarning { return current }
+	for _, tc := range []struct {
+		name     string
+		warnings []protocolcli.WorkspaceWarning
+	}{
+		{"the first load", first},
+		{"a reload with no warning", nil},
+	} {
+		out.Reset()
+		current = tc.warnings
+		job := makeRendererTestJob()
+		result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+		renderer.Start([]*scheduler.ScheduledJob{job})
+		renderer.JobComplete(job, result)
+		renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
+
+		var envelope protocolcli.ResultV2
+		if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
+			t.Fatalf("%s: output is not one envelope: %v\n%s", tc.name, err, out.String())
+		}
+		if len(envelope.WorkspaceWarnings) != len(tc.warnings) ||
+			(len(tc.warnings) > 0 && envelope.WorkspaceWarnings[0] != tc.warnings[0]) {
+			t.Fatalf("%s: workspaceWarnings = %+v, want %+v", tc.name, envelope.WorkspaceWarnings, tc.warnings)
+		}
+		if tc.warnings == nil && strings.Contains(out.String(), "workspaceWarnings") {
+			t.Fatalf("%s: the envelope carries the member:\n%s", tc.name, out.String())
+		}
+	}
+}

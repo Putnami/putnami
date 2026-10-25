@@ -21,17 +21,16 @@
 # What it does
 # ------------
 # For a fixed, deterministic list of Go + TypeScript samples it runs
-# `putnami context pack --project <id>`, parses each emitted (gitignored,
-# ephemeral) `<project>/.gen/agent-context.json` with python3 (NOT jq), and prints
-# a table:
+# `putnami context pack --project <id> --output=json`, reads the document from
+# the result's data.documents with python3 (NOT jq), and prints a table:
 #
 #   sample | referenced files K | graph deps D | composition roots | tests
 #          | manual round-trips (>= K+2) | agent_context (1 call)
 #
 # Output order is fixed by the sample list below (no map iteration), so the table
 # is reproducible. Structural counts (K, D, roots) are stable across commits;
-# digests and the workspace revision embedded in the artifact are not, and are
-# deliberately not printed here.
+# digests and the workspace revision embedded in the document are not, and are
+# deliberately not printed here. Nothing is written to the workspace.
 #
 # Reproduce:  bash protocols/agentcontext/bench/orient-bench.sh
 #
@@ -52,19 +51,25 @@ SAMPLES="
 /typescript/samples/14-capabilities
 "
 
+OUT_DIR="$(mktemp -d)"
+trap 'rm -rf "$OUT_DIR"' EXIT
+
 echo "Packing agent-context for ${SAMPLES//$'\n'/ }" >&2
+index=0
 for id in $SAMPLES; do
-  ./putnamiw context pack --project "$id" >/dev/null
+  ./putnamiw context pack --project "$id" --output=json >"$OUT_DIR/$index.json"
+  index=$((index + 1))
 done
 
-# Parse every emitted document and print the table in one deterministic pass.
-# Sample ids are passed as argv so python does no globbing / map iteration.
-python3 - "$REPO_ROOT" $SAMPLES <<'PY'
+# Parse every printed result and print the table in one deterministic pass.
+# Sample ids are passed as argv, in the order the results were captured, so
+# python does no globbing / map iteration.
+python3 - "$OUT_DIR" $SAMPLES <<'PY'
 import json
 import os
 import sys
 
-repo_root = sys.argv[1]
+out_dir = sys.argv[1]
 ids = sys.argv[2:]
 
 REF_LIST_FIELDS = (
@@ -104,11 +109,14 @@ def tests_summary(doc):
 
 
 rows = []
-for pid in ids:
+for index, pid in enumerate(ids):
     rel = pid.lstrip("/")
-    artifact = os.path.join(repo_root, rel, ".gen", "agent-context.json")
-    with open(artifact) as fh:
-        doc = json.load(fh)
+    with open(os.path.join(out_dir, "%d.json" % index)) as fh:
+        result = json.load(fh)
+    documents = result["data"]["documents"]
+    if len(documents) != 1:
+        sys.exit("context pack --project %s returned %d documents, want 1" % (pid, len(documents)))
+    doc = documents[0]
     k = referenced_files(doc)
     deps = len(doc.get("identity", {}).get("dependencies", []) or [])
     roots = len(doc.get("compositionRoots") or [])

@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "commands-not-gate",
-      "text": "putnami.ci.json declares the ordered commands the runner executes, each blocking unless failOnError is false, and the flags appended to the invocation; the generated agent guidance derives its gate line from the blocking commands."
+      "text": "putnami.ci.json declares the ordered commands the runner executes, each blocking unless failOnError is false, and the flags appended to the invocation. The generated agent guidance and cache verify use its blocking commands in its order. Without a usable document they use the blocking commands of the protocol's default document."
     }
   ],
   "decisions": [

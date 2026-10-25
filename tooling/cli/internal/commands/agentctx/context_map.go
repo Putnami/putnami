@@ -2,22 +2,19 @@
 //
 // `putnami context map` renders the map from artifacts already on disk, as a
 // map-reduce (internal/mapgen): one fragment per project from PROJECT-SCOPED
-// inputs, then one reduce over the LIVE project set. The split is what lets a
-// selection-scoped run stay cheap while the emitted map is always complete — a
-// project not in the live set contributes nothing, so deletions and renames need
-// no diffing logic, and the previous map is never an input to the new one.
+// inputs, then one reduce over the LIVE project set. A project not in the live
+// set contributes nothing, so deletions and renames need no diffing logic.
 //
-// The map is EPHEMERAL CLI state under `.putnami/context-map/`, never
-// committed, so this command has no drift to report and no `--check`: a run
-// either refreshes those files or, with `--print`, renders to stdout and touches
-// nothing. A build writes no map; the MCP `workspace_map` tool serves the same
-// document rebuilt in memory.
+// The command prints the map and writes nothing: Markdown by default, and with
+// `--output=json` the map document as the result data — the same document the
+// MCP `workspace_map` tool serves. `--projects` and `--impacted` narrow the
+// printed projects; the reduce still runs over the whole live set, so every
+// printed entry carries its complete edges. A build writes no map.
 package agentctx
 
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -32,27 +29,19 @@ import (
 // `--impacted`, `--baseline`) so this package never depends on the flag parser
 // or on the engine.
 type ContextMapOptions struct {
-	// Args are the raw remaining arguments; only `--print[=json|md]` is read
-	// from them.
-	Args []string
 	// Projects is the raw `--projects` selector ("" selects every project).
 	Projects string
 	// Impacted requests the `--impacted` selection.
 	Impacted bool
 	// Baseline is the `--baseline` git ref backing `--impacted`.
 	Baseline string
-	// OutputFormat is the `--output` value ("jsonl", "cloud-logging", or "").
+	// OutputFormat is the `--output` value ("jsonl", "json", or "" for Markdown).
 	OutputFormat string
 }
 
-// Print formats accepted by `--print`.
-const (
-	printFormatMarkdown = "md"
-	printFormatJSON     = "json"
-)
-
-// ContextMapCommand is the `putnami context map [--print[=json|md]]
-// [--projects <sel>] [--impacted]` entrypoint.
+// ContextMapCommand is the `putnami context map [--projects <sel>]
+// [--impacted] [--output <format>]` entrypoint. It builds the map in memory,
+// narrows it to the selection, and prints it. It writes nothing.
 func ContextMapCommand(wsRoot string, opts ContextMapOptions) error {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
@@ -61,81 +50,22 @@ func ContextMapCommand(wsRoot string, opts ContextMapOptions) error {
 	if err := requireResolvedIdentity(ws); err != nil {
 		return err
 	}
-	printFormat, err := parsePrintFlag(opts.Args)
+	keep, err := selectMapProjects(ws, opts)
 	if err != nil {
 		return err
 	}
-	if printFormat != "" {
-		return printWorkspaceMap(ws, printFormat)
+	resolved, err := mapgen.ResolveMap(ws, nil)
+	if err != nil {
+		return err
 	}
+	printed := scopeWorkspaceMap(resolved.Map, MapSectionAll, keep)
 
-	selected, err := selectMapProjects(ws, opts)
-	if err != nil {
+	if protocolcli.OutputMode(opts.OutputFormat).IsStructured() {
+		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
+			protocolcli.NewResultV2("context map", printed, nil))
 		return err
 	}
-	report, err := mapgen.Generate(ws, selected)
-	if err != nil {
-		return err
-	}
-	return renderContextMap(opts.OutputFormat, report)
-}
-
-// parsePrintFlag reads `--print`, `--print=md`, or `--print=json` out of the raw
-// args, returning "" when the flag is absent. Bare `--print` renders markdown:
-// the reader of a piped map is a human or a file-first agent, and the machine
-// path is `--print=json` (or `--output=jsonl` for the run REPORT — which is why
-// this flag is not spelled `--output`).
-//
-// The format is accepted ATTACHED or as the next token, because the CLI's global
-// parser splits every unknown `--flag=value` that precedes the `--` separator
-// into two tokens before a command receives them (internal/cli/flags.go,
-// splitInlineValues). What a
-// user typed as `--print=json` therefore arrives here as `--print` `json`, and a
-// caller that builds Args itself must not have to know that.
-func parsePrintFlag(args []string) (string, error) {
-	for i, arg := range args {
-		name, value, hasValue := strings.Cut(arg, "=")
-		if name != "--print" {
-			continue
-		}
-		if !hasValue && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-			value, hasValue = args[i+1], true
-		}
-		switch {
-		case !hasValue, value == printFormatMarkdown:
-			return printFormatMarkdown, nil
-		case value == printFormatJSON:
-			return printFormatJSON, nil
-		default:
-			return "", cmderr.Usagef("unknown --print format: %s (want %s or %s)",
-				value, printFormatJSON, printFormatMarkdown)
-		}
-	}
-	return "", nil
-}
-
-// printWorkspaceMap renders the map to stdout and writes NOTHING — not a
-// fragment, not a document. It is the no-toolchain-state path: the same
-// in-memory reduce the MCP tool serves, so what a caller pipes is what an agent
-// would be told, whether or not `putnami context map` ever ran here.
-//
-// --print owns stdout: the run report (`--output=jsonl`, or the human summary)
-// is suppressed so the emitted bytes are exactly the document. A caller that
-// wants the report shape drops --print.
-func printWorkspaceMap(ws *workspace.Workspace, format string) error {
-	resolved, err := mapgen.ResolveMap(ws)
-	if err != nil {
-		return err
-	}
-	if format == printFormatJSON {
-		data, err := mapgen.RenderJSON(resolved.Map)
-		if err != nil {
-			return err
-		}
-		iox.Write(os.Stdout, data)
-		return nil
-	}
-	iox.Write(os.Stdout, mapgen.RenderMarkdown(resolved.Map))
+	iox.Write(os.Stdout, mapgen.RenderMarkdown(printed))
 	return nil
 }
 
@@ -196,23 +126,22 @@ func requireResolvedIdentity(ws *workspace.Workspace) error {
 	return nil
 }
 
-// selectMapProjects resolves which projects get their fragment REFRESHED. It
-// never narrows the rendered map: every live project is reduced either way, so a
-// wrong-looking selection can only cost time, never correctness.
+// selectMapProjects resolves the projects the printed map keeps, as a project-id
+// set. A nil set keeps every project: no selection flag was given.
 //
-// `--impacted` with an empty impacted set is a legitimate no-op selection (the
-// map still renders in full from validated fragments), which is why it does not
-// error the way an explicit `--projects` selector matching nothing does.
-func selectMapProjects(ws *workspace.Workspace, opts ContextMapOptions) ([]*workspace.Project, error) {
+// `--impacted` with an empty impacted set is a legitimate selection: it prints a
+// map with no project, which is why it does not error the way an explicit
+// `--projects` selector matching nothing does.
+func selectMapProjects(ws *workspace.Workspace, opts ContextMapOptions) (map[string]bool, error) {
 	if opts.Impacted {
 		impacted, _, err := workspace.ImpactedProjectsWithBaseline(ws, opts.Baseline)
 		if err != nil {
 			return nil, protocolcli.Classify(fmt.Errorf("--impacted failed: %w", err), protocolcli.ErrInvalidConfig)
 		}
-		return impacted, nil
+		return projectIDSet(impacted), nil
 	}
 	if opts.Projects == "" {
-		return sortedProjectsByID(ws.Projects), nil
+		return nil, nil
 	}
 	selected := workspace.FilterProjects(ws, workspace.FilterOptions{
 		Projects:     opts.Projects,
@@ -222,39 +151,17 @@ func selectMapProjects(ws *workspace.Workspace, opts ContextMapOptions) ([]*work
 	if len(selected) == 0 {
 		return nil, cmderr.NotFoundf("no projects matched: %s", opts.Projects)
 	}
-	return sortedProjectsByID(selected), nil
+	return projectIDSet(selected), nil
 }
 
-// sortedProjectsByID copies and orders a project slice so the fragment refresh
-// order (and therefore any error the run reports first) is deterministic.
-func sortedProjectsByID(projects []*workspace.Project) []*workspace.Project {
-	out := append([]*workspace.Project(nil), projects...)
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
-}
-
-// renderContextMap writes the run report: the success v2 envelope in structured
-// mode, a human summary otherwise. A refresh has no failure verdict to report —
-// the map cannot be "wrong", only absent or rewritten.
-func renderContextMap(outputFormat string, report mapgen.Report) error {
-	if protocolcli.OutputMode(outputFormat).IsStructured() {
-		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,
-			protocolcli.NewResultV2("context map", report, nil))
-		return err
+// projectIDSet returns the ids of projects as a set, empty but never nil, so
+// an empty selection still narrows.
+func projectIDSet(projects []*workspace.Project) map[string]bool {
+	ids := make(map[string]bool, len(projects))
+	for _, p := range projects {
+		if p != nil {
+			ids[p.ID] = true
+		}
 	}
-	printContextMapHuman(report)
-	return nil
-}
-
-// printContextMapHuman renders the report for a terminal.
-func printContextMapHuman(report mapgen.Report) {
-	iox.Fprintf(os.Stdout, "\n  Mapped %d project(s) (%d fragment(s) rebuilt, %d reused).\n",
-		report.Projects, report.FragmentsBuilt, report.FragmentsReused)
-	if len(report.Outputs) == 0 {
-		iox.Fprintf(os.Stdout, "    %s and %s already up to date.\n", mapgen.JSONPath, mapgen.MarkdownPath)
-	}
-	for _, out := range report.Outputs {
-		iox.Fprintf(os.Stdout, "    wrote %s\n", out)
-	}
-	iox.Fprintln(os.Stdout)
+	return ids
 }

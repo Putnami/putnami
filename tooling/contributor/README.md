@@ -127,9 +127,12 @@ superseded artifacts are deleted, and no CLI from this release on installs them
 ([CLI ADR 0047](../cli/doc/adr/0047-extension-owned-agent-content.md)).
 
 Hosted finalization naming a parent requires `--workflow-file` and native
-completion eligibility before publication, except a partial delivery whose
-changed paths all belong to projects that declare `featureAuthority.none` and
-author no feature. Its ready receipt records exact
+completion eligibility before publication, except a partial delivery. A partial
+delivery whose changed paths all belong to projects that declare
+`featureAuthority.none` and author no feature needs no workflow. A partial
+delivery whose workflow has no unit with passing native checks still publishes,
+with no ready unit and no receipt: the hosted checks never stand for native
+proof. A ready receipt records exact
 required checks and the immutable original workflow; later units and decisions
 stay incomplete until supported. Keep prior workflow files when appending a
 ready revision so native receipt replay can validate their original inputs.

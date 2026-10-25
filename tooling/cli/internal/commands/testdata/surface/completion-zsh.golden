@@ -230,14 +230,8 @@ _putnami_flags_for() {
                 '--force[Rewrite a guidance block that was edited or written by an older release]'
             )
             ;;
-        'context map')
-            reply=(
-                '--print[Render the map to stdout (md by default, or json) and write nothing]'
-            )
-            ;;
         'context pack')
             reply=(
-                '--check[Re-derive the documents, write nothing, and fail on drift]'
                 '--project[Project ID, path, or name; default is every workspace project]:selector:'
             )
             ;;

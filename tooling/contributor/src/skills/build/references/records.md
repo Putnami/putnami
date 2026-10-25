@@ -138,7 +138,9 @@ publication. After every policy-named check succeeds on the same full HEAD, the
 native publisher emits `hostedWorkflowReceipt`: original workflow ref, binding,
 proposal ref, required checks and raw provider status. It can advance eligible
 current units; pending later requirements and decisions still prevent full
-completion. A generic passing check never supplies that authority.
+completion. A generic passing check never supplies that authority. A partial
+delivery whose workflow has no eligible unit still publishes, with no ready
+unit and no receipt; record that unit at its current stage.
 
 Keep the original workflow file immutable and create a new revision when
 recording `stage: "ready"` with the publisher result as the unit receipt. The

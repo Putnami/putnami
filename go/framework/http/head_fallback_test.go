@@ -11,10 +11,35 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"go.putnami.dev/logger/logtest"
 	"go.putnami.dev/protocol/features/spectest"
 )
+
+// servedHandler wraps next and signals each request whose handler returned.
+// httptest.Server.Close does not wait for HTTP/2 handlers, so a test that reads
+// the records a handler writes calls waitServed first.
+func servedHandler(next http.Handler) (http.Handler, chan struct{}) {
+	served := make(chan struct{}, 16)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() { served <- struct{}{} }()
+		next.ServeHTTP(w, r)
+	}), served
+}
+
+// waitServed waits until n handlers wrapped by servedHandler have returned.
+func waitServed(t *testing.T, served chan struct{}, n int) {
+	t.Helper()
+	timeout := time.After(10 * time.Second)
+	for range n {
+		select {
+		case <-served:
+		case <-timeout:
+			t.Fatalf("waited 10s for %d handlers to return", n)
+		}
+	}
+}
 
 // countingSource is a stream source that counts the bytes read from it and
 // whether it was closed.
@@ -83,7 +108,8 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 					return route.handler(ctx, source)
 				})
 
-				ts := httptest.NewUnstartedServer(server.Handler())
+				handler, served := servedHandler(server.Handler())
+				ts := httptest.NewUnstartedServer(handler)
 				if major == 2 {
 					ts.EnableHTTP2 = true
 					ts.StartTLS()
@@ -112,7 +138,7 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 				}
 				body, _ := io.ReadAll(head.Body)
 				_ = head.Body.Close()
-				ts.Close() // waits for the handler, so every record it writes is in
+				waitServed(t, served, 2) // the GET and the HEAD wrote every record
 
 				if head.ProtoMajor != major {
 					t.Fatalf("protocol = %s, want HTTP/%d", head.Proto, major)
@@ -180,7 +206,8 @@ func TestHeadRequestWritesNoBody(t *testing.T) {
 		return NoContent()
 	})
 
-	ts := httptest.NewUnstartedServer(server.Handler())
+	handler, served := servedHandler(server.Handler())
+	ts := httptest.NewUnstartedServer(handler)
 	ts.EnableHTTP2 = true
 	ts.StartTLS()
 	defer ts.Close()
@@ -214,7 +241,7 @@ func TestHeadRequestWritesNoBody(t *testing.T) {
 			t.Errorf("HEAD %s Content-Length = %q, want %q", path, got, want.length)
 		}
 	}
-	ts.Close() // waits for the handlers, so every record they write is in
+	waitServed(t, served, 3) // the three HEAD requests wrote every record
 	if records := writeResponseRecords(t, rec); len(records) != 0 {
 		t.Errorf("want no write response record, got %d.%s", len(records), rec.Dump())
 	}

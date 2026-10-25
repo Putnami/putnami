@@ -11,6 +11,8 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	ciproto "go.putnami.dev/protocol/ci"
+	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -30,7 +32,7 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 			requests = append(requests, request)
 			return engine.SessionResult{ExitCode: engine.ExitSuccess, Projects: []*workspace.Project{project},
 				Plan: []*jobs.ScheduledJob{job}, Results: map[string]*jobs.JobResult{}}, nil
-		})
+		}, nil)
 
 	// The runner keeps its own copy of the commands it was built with.
 	commands[0] = "format"
@@ -44,7 +46,7 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 		if request.WorkspaceRoot != "/staged" || !reflect.DeepEqual(request.Commands, []string{"lint", "test", "build", "validate"}) {
 			t.Fatalf("request = %#v, want a staged run of the commands the runner was built with", request)
 		}
-		if !request.Global.All || request.Global.NoCache || request.Global.MaxParallel != 1 ||
+		if !request.Global.All || request.Global.Projects != "*" || request.Global.NoCache || request.Global.MaxParallel != 1 ||
 			!request.Global.Quiet || !request.EphemeralSession || request.Stdout != io.Discard || request.ErrorOut != io.Discard {
 			t.Fatalf("request policy = %#v", request)
 		}
@@ -55,20 +57,66 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 	}
 }
 
+// TestCacheVerifyRunnerReportsTheLoadOfTheFirstRunOnly holds the runner to
+// one copy of the workspace warnings: the three runs load the same HEAD, so
+// the first run reports its load into the command's report, which writes each
+// warning once, and the cache verify envelope lists it once.
+func TestCacheVerifyRunnerReportsTheLoadOfTheFirstRunOnly(t *testing.T) {
+	t.Parallel()
+	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
+	var written strings.Builder
+	report := workspace.NewWarningReport(&written)
+	var reports []*workspace.WarningReport
+	runner := newCacheVerifyRunner(nil, GlobalFlags{}, []string{"lint"},
+		func(_ context.Context, request engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
+			// The engine reports its load into the request's report, or into a
+			// quiet report of its own when the request has none.
+			reports = append(reports, request.WarningReport)
+			request.WarningReport.Report(&workspace.Workspace{Warnings: []workspace.Warning{warning}})
+			return engine.SessionResult{ExitCode: engine.ExitSuccess}, nil
+		}, report)
+	for _, label := range []string{"first live run", "second live run", "cache-hit run"} {
+		if _, err := runner(context.Background(), "/staged", "/isolated-store"); err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+	}
+	if !reflect.DeepEqual(reports, []*workspace.WarningReport{report, nil, nil}) {
+		t.Fatalf("run reports = %v, want the command's report on the first run only", reports)
+	}
+	if want := "putnami: warning: " + warning.Message + "\n"; written.String() != want {
+		t.Fatalf("written = %q, want the warning once: %q", written.String(), want)
+	}
+	want := []protocolcli.WorkspaceWarning{{Code: string(warning.Code), Message: warning.Message}}
+	if got := report.Envelope(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the report holds %+v, want the first run's warning once: %+v", got, want)
+	}
+}
+
 // TestCacheVerifyRunsTheWorkspaceGate pins that cache verify runs the
-// workspace's gate, read from its CI document, and no command list of the
-// core's own.
+// workspace's gate in the order of its CI document, and no command list of the
+// core's own. Without a usable document it runs the blocking commands of the
+// protocol's default CI document.
 func TestCacheVerifyRunsTheWorkspaceGate(t *testing.T) {
+	spectest.Proves(t, "cli/ci-document", "commands-not-gate", "cache-verify-runs-the-gate")
 	t.Parallel()
 	bare := t.TempDir()
-	if got, want := cacheVerifyCommands(bare), strings.Split(agentctx.GateTasks(bare), ","); !reflect.DeepEqual(got, want) {
-		t.Errorf("commands without a CI document = %v, want the gate %v", got, want)
+	var defaults []string
+	for _, command := range ciproto.DefaultDocument().Commands {
+		if command.Blocking() {
+			defaults = append(defaults, command.Name)
+		}
+	}
+	if got := cacheVerifyCommands(bare); !reflect.DeepEqual(got, defaults) {
+		t.Errorf("commands without a CI document = %v, want the default document's %v", got, defaults)
 	}
 	gated := t.TempDir()
-	if err := os.WriteFile(filepath.Join(gated, ciproto.Filename), []byte(`{"version":3,"commands":["check","lint"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(gated, ciproto.Filename), []byte(`{"version":3,"commands":["test","check",{"name":"audit","failOnError":false},"lint"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := cacheVerifyCommands(gated), []string{"lint", "check"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("commands = %v, want the CI document's gate %v", got, want)
+	if got, want := cacheVerifyCommands(gated), []string{"test", "check", "lint"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("commands = %v, want the CI document's blocking commands in its order %v", got, want)
+	}
+	if got, want := cacheVerifyCommands(gated), strings.Split(agentctx.GateTasks(gated), ","); !reflect.DeepEqual(got, want) {
+		t.Errorf("commands = %v, want the generated guidance gate %v", got, want)
 	}
 }

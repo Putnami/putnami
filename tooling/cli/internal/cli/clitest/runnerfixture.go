@@ -149,6 +149,9 @@ const (
 	FixtureOutputFile   = "output.jsonl"
 	fixtureLogFile      = "supervisor.log"
 	FixtureManifestFile = "manifest.json"
+	// fixtureClaimFile is created exclusively by whichever comes first: the
+	// supervisor starting the attempt, or a cancel that arrives before it.
+	fixtureClaimFile = "claim"
 )
 
 // fixtureMeta is written once at submission.
@@ -209,16 +212,18 @@ func superviseFixtureAttempt(dir string, getenv func(string) string) int {
 		_ = writeFixtureJSON(filepath.Join(dir, fixtureStateFile), state)
 		return 1
 	}
-	// A cancellation that arrived before supervision started wins: the
-	// attempt is terminal and nothing may run for it.
-	if runner.TerminalState(ReadFixtureState(dir).State) {
+	// A cancellation that claimed the attempt before supervision started
+	// wins: the attempt is terminal and nothing may run for it.
+	if !claimFixtureAttempt(dir) {
 		return 0
 	}
+	// Signals are caught before the pid is published, so a cancel that reads
+	// the pid always reaches a supervisor able to record its outcome.
+	interrupt := make(chan os.Signal, 2)
+	signal.Notify(interrupt, syscall.SIGTERM, syscall.SIGINT)
 	if err := writeFixtureJSON(filepath.Join(dir, fixtureStateFile), state); err != nil {
 		return 1
 	}
-	interrupt := make(chan os.Signal, 2)
-	signal.Notify(interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	if hold := getenv(RunnerFixtureHoldEnv); hold != "" {
 		_ = os.WriteFile(hold+".ready", []byte(meta.Snapshot), 0o600)
@@ -714,6 +719,16 @@ func (p *fixtureProvider) submit(payload json.RawMessage) (any, error) {
 	return runner.SubmitResult{Attempt: id, State: runner.StateQueued}, nil
 }
 
+// claimFixtureAttempt reports whether this call took the attempt's one claim.
+func claimFixtureAttempt(dir string) bool {
+	file, err := os.OpenFile(filepath.Join(dir, fixtureClaimFile), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return false
+	}
+	_ = file.Close()
+	return true
+}
+
 // startSupervisor launches the detached supervisor for one attempt: its own
 // session, its own log, no inherited pipe — so the RPC process's death, and
 // the client's, leave the execution running.
@@ -828,11 +843,19 @@ func (p *fixtureProvider) cancel(id string) (any, error) {
 	if runner.TerminalState(state.State) {
 		return runner.CancelResult{State: state.State}, nil
 	}
-	if state.Supervisor == 0 {
-		// Accepted but not yet supervised (a start still in flight): mark the
-		// attempt canceled so a late supervisor start finds nothing to run.
+	if state.Supervisor == 0 && claimFixtureAttempt(dir) {
+		// Accepted but not yet supervised (a start still in flight): the claim
+		// keeps a late supervisor start from running anything.
 		_ = writeFixtureJSON(filepath.Join(dir, fixtureStateFile), FixtureState{State: runner.StateCanceled, Reason: "canceled before supervision started"})
 		return runner.CancelResult{State: runner.StateCanceled}, nil
+	}
+	// The supervisor holds the claim: wait for it to publish its pid.
+	for waited := time.Duration(0); state.Supervisor == 0 && !runner.TerminalState(state.State) && waited < 2*time.Second; waited += 25 * time.Millisecond {
+		time.Sleep(25 * time.Millisecond)
+		state = ReadFixtureState(dir)
+	}
+	if runner.TerminalState(state.State) || state.Supervisor == 0 {
+		return runner.CancelResult{State: state.State}, nil
 	}
 	_ = stopSupervisor(state.Supervisor)
 	for waited := time.Duration(0); waited < 2*time.Second; waited += 25 * time.Millisecond {

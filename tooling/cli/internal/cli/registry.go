@@ -57,15 +57,7 @@ func (e *CommandEnv) envelopeWarnings() []protocolcli.WorkspaceWarning {
 	if e == nil {
 		return nil
 	}
-	reported := e.warnings.Warnings()
-	if len(reported) == 0 {
-		return nil
-	}
-	warnings := make([]protocolcli.WorkspaceWarning, len(reported))
-	for i, warning := range reported {
-		warnings[i] = protocolcli.WorkspaceWarning{Code: string(warning.Code), Message: warning.Message}
-	}
-	return warnings
+	return e.warnings.Envelope()
 }
 
 // Progress returns a progress.Reporter that writes human-readable phase/step

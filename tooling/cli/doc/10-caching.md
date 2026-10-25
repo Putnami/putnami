@@ -1486,7 +1486,8 @@ worktree is created.
 ### Cache Determinism Verification
 
 `putnami cache verify` audits the plan of the workspace's gate tasks (the
-blocking commands of `putnami.ci.json`, or `lint,test,build`) using the
+blocking commands of `putnami.ci.json` in its order, or those of the CI
+protocol's default document, `lint,test,build`) using the
 ordinary engine, scheduler, cache-key builder, capture, and restore paths. It
 does not define a second cache protocol and does not alter cache keys. The
 command requires a clean worktree, creates three detached temporary worktrees,
@@ -1522,8 +1523,8 @@ per-task check states, classified `.gen` paths, findings, and summary counts.
 
 Every observed `.gen` path must have exactly one effective role. Putnami derives
 `keyed-input` and `captured-output` roles from the existing task contracts and
-treats its existing generated version, agent-context, and per-project infra
-manifests as `ephemeral`. A project can classify a provider-owned exception in
+treats its existing generated version and per-project infra manifests as
+`ephemeral`. A project can classify a provider-owned exception in
 `putnami.json` without changing cache keys or entry formats:
 
 ```json

@@ -738,7 +738,7 @@ func (s *Server) runThroughEngine(ctx context.Context, a runJobsArgs, planOnly b
 	s.notices.Reset()
 	result, runErr := engine.New().Run(ctx, engine.Request{
 		WorkspaceRoot: s.opts.WorkspaceRoot,
-		Config:        s.opts.Config,
+		Config:        s.currentSelection().Config,
 		Commands:      a.Commands,
 		Global:        global,
 		// Empty, non-nil, exactly as the pre-A4 code passed to the planner and

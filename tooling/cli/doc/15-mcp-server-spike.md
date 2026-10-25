@@ -42,8 +42,16 @@ concurrency and output boundaries.
 `putnami mcp` starts a single-session JSON-RPC 2.0 server on stdin/stdout
 (the MCP "stdio" transport: one JSON object per newline-delimited line). It
 implements the MCP lifecycle (`initialize`, `notifications/initialized`,
-`ping`), tools (`tools/list`, `tools/call`), and one workspace resource
+`ping`), tools (`tools/list`, `tools/call`), and workspace resources
 (`resources/list`, `resources/read`).
+
+`initialize` answers with the protocol version the client requests when the
+server speaks it: `2024-11-05`, `2025-03-26`, `2025-06-18` or `2025-11-25`. It
+answers any other requested version, and a missing one, with `2025-11-25`, and
+never echoes a version it does not speak. The `./putnamiw mcp` relay that
+answers `initialize` while the CLI builds follows the same rule. Both answer
+`server/discover` with "method not found", which is how Claude Code falls back
+to `initialize`.
 
 One inbound frame is capped at **4 MiB** including its terminating newline
 (`maxFrameBytes` in `internal/mcp/server.go`). The framing carries no length
@@ -65,8 +73,8 @@ below):
 |------|---------|--------|
 | `list_projects` | All projects with id/name/path/type/tags/deps | `workspace.Load` |
 | `describe_project` | One project's deps, dependents, extensions, publish | `workspace` + graph |
-| `agent_context` | One project's deterministic orientation document plus native feature summaries and artifact status | context-pack aggregator + design graph |
-| `workspace_map` | The whole workspace orientation map — project paths, dependency and intercall edges, endpoints, config keys, schemas, docs — rebuilt in memory, scopable by `section`/`project` | `mapgen` reduce over validated fragments |
+| `agent_context` | One project's deterministic orientation document, built in memory, plus native feature summaries and the design graph status | context-pack aggregator + design graph |
+| `workspace_map` | The whole workspace orientation map — project paths, dependency and intercall edges, endpoints, config keys, schemas, docs — rebuilt in memory, scopable by `section`/`project` | `mapgen` reduce over fragments the session reuses while their inputs digest holds |
 | `deps` | Direct or transitive dependencies/dependents for one project | `DependencyGraph` |
 | `find_owner` | File path → nearest owning project, plus asset claimants | `workspace.ProjectOwnersForPath` |
 | `why_impacted` | Shortest path explaining why A impacts B, over the same dependency, contract and extension-consumer edges `impacted` widens through, each hop with its kind and the target's task scope | `workspace.ImpactPath` |
@@ -79,11 +87,91 @@ Every tool advertises read-only/mutating metadata through MCP annotations and
 a `putnami.dev/contract` `_meta` block. The only mutating tool is `run_jobs`,
 which is marked as mutating `workspace`/`cache` and supports `dryRun`.
 
-The resource surface is intentionally narrow:
+The resource surface is intentionally narrow. The server lists each resource by
+a concrete URI, not a resource template, and renders it on every
+`resources/read`. A resource whose builder is not injected is left out of the
+list. Listing prepares no workspace graph.
 
 | Resource | Purpose | Adapts |
 |----------|---------|--------|
 | `workspace://context` | Live workspace layout, graph, topological order, publish channels, warnings, and pinned lockfile versions | `workspace.Load` + `putnami.lock.json` |
+| `putnami://extension-guidance/AI.md?name=…&version=…` | Exact `AI.md` bytes of one lock-pinned extension, or an explicit unavailable status | lock-pinned extension artifacts |
+| `putnami://workspace/guidance` | The Putnami block body of `AGENTS.md`, then the settled decisions | `agentctx.WorkspaceGuidanceBody` |
+| `putnami://workspace/map`, `putnami://workspace/map/<section>` | The `workspace_map` answer for section `all`, or for `projects`, `dependencies`, `intercalls`, `apis`, `config-keys`, `schemas` or `docs` | the `workspace_map` builder |
+| `putnami://projects/<id>/context` | One project's `agent_context` answer. `<id>` is the canonical project id escaped as one path segment, for example `%2Ftooling%2Fcli` | the `agent_context` builder |
+
+The server also returns instructions when a client sends `initialize`. They
+hold, in order:
+
+1. a short routing preamble;
+2. the settled root decisions: a heading, one line that points at
+   `putnami://workspace/guidance` for the complete list (each decision's date
+   and enforcement, and the project registries), then one `- D-001 — statement`
+   line per decision in canonical order;
+3. the `AI.md` of each locked extension.
+
+The instructions never repeat the `AGENTS.md` block, because Claude Code reads
+both.
+
+Claude Code puts the instructions in the system prompt at session start, and
+cuts them at 4,096 UTF-16 code units (set by
+`CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH`; measured on 2.1.308 and 2.1.310). It
+keeps the first part, so the preamble and the decisions come first and share
+that limit. When every decision does not fit, the server lists the leading
+decisions that fit whole, never cutting a line, then one line that counts the
+decisions left out and names the resource. The extension guides follow the
+decisions and sit past the cut when the decisions fill the limit. The 128 KiB
+guide budget covers the guides alone. This repository's preamble and 24
+decisions come to 3,782 units with a 61-character root path, so all 24 fit.
+Codex 0.162 does not put the instructions in the model's context at start: it
+shows them only inside a tool-search result.
+
+The server builds the instructions once, at `initialize`, so a decision added
+later reaches the session through the change notice below and the
+`putnami://workspace/guidance` resource, which lists the current decisions in
+full on every read.
+
+The server notices a change of the agent context between two requests. No file
+watcher runs. Before it answers a `tools/call` or a `resources/read`, it hashes
+`putnami.workspace.json`, `putnami.lock.json`, `putnami.ci.json`, the manifest
+and `AI.md` of each extension loaded by path, and the `decisions.json` files its
+last workspace load found (`internal/mcp/context_change.go`). When the digest
+differs from the one the session last heard about, the next tool result ends
+with one more text block. It names each change and what to read:
+
+```text
+Putnami notice: the workspace context changed.
+- D-025 added; putnami.ci.json changed. Read putnami://workspace/guidance
+- @putnami/go 0.3.1 installed, replacing 0.3.0. Read putnami://extension-guidance/AI.md?name=%40putnami%2Fgo&version=0.3.1
+- Putnami reloaded its extension tools and guides; list the tools again.
+```
+
+A change is reported once. A `resources/read` notices it but carries no notice,
+because a resource has no free-text slot, so the next tool result reports it. A
+tool result is the one place the notice reaches the model: neither Claude Code
+nor Codex shows a notification to it. A line points at a resource only when the
+server lists it and the resource shows the change. Otherwise it points at the
+changed file: `putnami.lock.json` for an extension installed without a listed
+guide, and `putnami.workspace.json` for a version constraint or an option. The
+`decisions.json` of a project a workspace load finds for the first time, after
+a load that failed or a change to the `includes` for example, joins the
+baseline as it is, so only a later edit to it is reported.
+
+When the extensions changed (an extension added, removed or disabled, a locked
+version, or a path manifest), or the `includes` or `options.collaboration`
+changed, the server loads the workspace again and reloads its extension
+selection, guides and tools. It then writes `notifications/tools/list_changed`
+and `notifications/resources/list_changed`, in that order, before the response
+of the request that noticed the change. The server makes its start selection
+the same way, after its first read of the inputs. The tools count as built
+from the inputs as they were before the start or the reload, so an edit that
+lands during either is loaded by the next request, and the next tool result
+reports it. A call to a tool the reload removed returns an error tool result
+that says to list the tools again and carries the notice. A name the server
+never registered stays an invalid-params error. A project's own `putnami.json`
+is not an input: a change there reloads nothing. `initialize` declares
+`listChanged: true` for tools and resources, and the server writes nothing
+after its session ends.
 
 `run_jobs` reuses the exact CLI building blocks (`extension.DiscoverExtensions`
 → project selection → `planner.Plan` → `scheduler.RunPlan`) with
@@ -172,8 +260,9 @@ that principle for a protocol that is, for our purposes, small and stable:
 
 - The stdio transport is newline-delimited JSON-RPC 2.0 — a `bufio.Reader`
   loop and `encoding/json`. No framing library needed.
-- We use a narrow slice of MCP: lifecycle, tools, and one read-only resource.
-  We do not need prompts, sampling, roots, streaming, or notifications-out.
+- We use a narrow slice of MCP: lifecycle, tools, and read-only resources.
+  We do not need prompts, sampling, roots, or streaming; the only
+  notifications out are the two list-changed ones.
 - The hand-rolled surface remains fully unit-testable without a live client
   (see `server_test.go` and `contract_test.go`).
 

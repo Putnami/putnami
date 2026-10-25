@@ -75,6 +75,57 @@ type SpecVerificationGroup struct {
 	Counts SpecVerificationCounts `json:"counts"`
 	// Diagnostics carries group-scoped collection findings.
 	Diagnostics []diag.Diagnostic `json:"diagnostics,omitempty"`
+	// Unconsulted lists, sorted by project, the candidate projects the gate
+	// asked for this group's unresolved checks and could not consult, each with
+	// why. Absent means "not recorded": the session's own observations closed
+	// the group, every candidate answered, or an older CLI wrote the record.
+	Unconsulted []UnconsultedCandidate `json:"unconsulted,omitempty"`
+}
+
+// UnconsultedCandidate is one candidate project the gate could not consult:
+// its test did not run in the session, and no cache entry answered for it.
+type UnconsultedCandidate struct {
+	// Project is the candidate project's canonical ID.
+	Project string `json:"project"`
+	// Reason is why, from the closed UnconsultedReason set.
+	Reason UnconsultedReason `json:"reason"`
+}
+
+// UnconsultedReason is the closed set of reasons a candidate was not
+// consulted. Each one matches a cause the unobserved-requirement warning
+// states in prose.
+type UnconsultedReason string
+
+const (
+	// UnconsultedRemoteUnreachable means the remote cache lookup for the
+	// candidate's report task failed. Running the same change again can
+	// answer it.
+	UnconsultedRemoteUnreachable UnconsultedReason = "remote-unreachable"
+	// UnconsultedRemoteTimeout means the remote cache did not answer that
+	// lookup in time. Running the same change again can answer it.
+	UnconsultedRemoteTimeout UnconsultedReason = "remote-timeout"
+	// UnconsultedNoEntry means the caches answered, and hold no entry of the
+	// report task for these inputs.
+	UnconsultedNoEntry UnconsultedReason = "no-entry"
+	// UnconsultedNoCache means the run reads no cache, under --no-cache or
+	// without a cache store.
+	UnconsultedNoCache UnconsultedReason = "no-cache"
+	// UnconsultedNotCacheable means the report task is not cacheable, so no
+	// observation can be recovered.
+	UnconsultedNotCacheable UnconsultedReason = "not-cacheable"
+	// UnconsultedPlanFailed means the candidates' test plan or cache keys
+	// could not be derived.
+	UnconsultedPlanFailed UnconsultedReason = "plan-failed"
+)
+
+// ValidUnconsultedReasons is the closed UnconsultedReason vocabulary.
+var ValidUnconsultedReasons = map[UnconsultedReason]bool{
+	UnconsultedRemoteUnreachable: true,
+	UnconsultedRemoteTimeout:     true,
+	UnconsultedNoEntry:           true,
+	UnconsultedNoCache:           true,
+	UnconsultedNotCacheable:      true,
+	UnconsultedPlanFailed:        true,
 }
 
 // SpecRequirementVerdict is one textual requirement's decided state.
@@ -278,6 +329,17 @@ func ValidateSpecVerificationRecord(input *SpecVerificationRecord) []diag.Diagno
 					"state %q is not an executable-verification state", verdict.State))
 			}
 		}
+		for j, candidate := range group.Unconsulted {
+			candidateField := fmt.Sprintf("%s.unconsulted[%d]", field, j)
+			if candidate.Project == "" {
+				diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, candidateField+".project",
+					"unconsulted candidate project is required"))
+			}
+			if !ValidUnconsultedReasons[candidate.Reason] {
+				diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidVerification, candidateField+".reason",
+					"reason %q is not an unconsulted-candidate reason", candidate.Reason))
+			}
+		}
 		key := group.Project + "\x00" + group.Feature
 		if seen[key] {
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeDuplicateSpec, field,
@@ -318,6 +380,10 @@ func CanonicalSpecVerificationRecord(input *SpecVerificationRecord) *SpecVerific
 				return group.Reports[a].Task < group.Reports[b].Task
 			}
 			return group.Reports[a].Path < group.Reports[b].Path
+		})
+		group.Unconsulted = append([]UnconsultedCandidate(nil), group.Unconsulted...)
+		sort.Slice(group.Unconsulted, func(a, b int) bool {
+			return group.Unconsulted[a].Project < group.Unconsulted[b].Project
 		})
 	}
 	sort.Slice(out.Groups, func(i, j int) bool {

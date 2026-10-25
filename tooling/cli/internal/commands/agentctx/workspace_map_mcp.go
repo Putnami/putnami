@@ -1,13 +1,12 @@
 // Package agentctx: the read-only MCP `workspace_map` aggregator.
 //
 // BuildWorkspaceMapResult renders the workspace orientation map entirely in
-// memory — reusing every fragment whose recorded inputs digest still matches the
-// working tree and rebuilding the rest, so a warm call is O(changed) and a cold
-// one O(projects) — and reports whether the ephemeral
-// `.putnami/context-map/repo-map.json` convenience artifact matches that fresh
-// render. It shares mapgen.ResolveMap with `context map --print`, so the served
-// document and the CLI's render are the same bytes by construction rather than
-// by agreement.
+// memory — reusing every fragment the session's cache holds whose recorded
+// inputs digest still matches the working tree and rebuilding the rest, so a
+// warm call is O(changed) and a cold one O(projects). It reads and writes no
+// map file. It shares mapgen.ResolveMap and scopeWorkspaceMap with `context
+// map`, so the served document and the printed one are the same by
+// construction rather than by agreement.
 //
 // The MCP server reaches this builder through a dependency-injected closure on
 // mcp.Options, wired by the CLI shell (internal/cli/mcp_serve.go). internal/mcp
@@ -19,10 +18,7 @@
 package agentctx
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -59,12 +55,10 @@ var MapSections = []string{
 }
 
 // WorkspaceMapResult is the MCP workspace_map payload: the freshly rendered map
-// (scoped to the requested section/project), the freshness of the on-disk
-// convenience artifact, and how the answer was produced.
+// (scoped to the requested section/project) and how the answer was produced.
 type WorkspaceMapResult struct {
-	Document     *mapgen.RepoMap        `json:"document"`
-	DiskArtifact DiskArtifactStatus     `json:"diskArtifact"`
-	Provenance   WorkspaceMapProvenance `json:"provenance"`
+	Document   *mapgen.RepoMap        `json:"document"`
+	Provenance WorkspaceMapProvenance `json:"provenance"`
 }
 
 // WorkspaceMapProvenance says what this answer covers and what it cost, so a
@@ -86,28 +80,22 @@ type WorkspaceMapProvenance struct {
 	LiveProjects     int `json:"liveProjects"`
 	ReturnedProjects int `json:"returnedProjects"`
 	// FragmentsReused / FragmentsBuilt describe the reduce: reused fragments
-	// were validated against the working tree, built ones were recomputed.
+	// came from the session's cache after their inputs digest matched the
+	// working tree, built ones were recomputed.
 	FragmentsReused int `json:"fragmentsReused"`
 	FragmentsBuilt  int `json:"fragmentsBuilt"`
 }
 
 // BuildWorkspaceMapResult loads the workspace, renders the complete map in
-// memory, compares it byte-for-byte to the on-disk document to report freshness,
-// and returns it scoped to section (default "all") and, optionally, to one
-// project (id or name).
-//
-// It deliberately does NOT enforce the migration refusal that `putnami
-// context map` applies: that command PRODUCES the map, and a retired committed
-// copy is a producer conflict. This tool only reads, from the
-// working tree, so refusing to answer an agent's question over a leftover file
-// would withhold a correct answer to punish a state the agent cannot fix.
-func BuildWorkspaceMapResult(wsRoot, section, projectSelector string) (WorkspaceMapResult, error) {
+// memory, and returns it scoped to section (default "all") and, optionally, to
+// one project (id or name). fragments is the session's fragment cache; a nil
+// cache builds every fragment.
+func BuildWorkspaceMapResult(wsRoot, section, projectSelector string, fragments *mapgen.FragmentCache) (WorkspaceMapResult, error) {
 	// workspace.Load memoizes the workspace for the process lifetime. The CLI is
 	// a one-shot process, but the MCP server is long-lived: without invalidating,
 	// the first request's project set would be served for the rest of the
 	// session, so a project added after the first call would be missing from the
-	// map AND the on-disk artifact would be reported fresh against an equally
-	// stale render.
+	// map.
 	workspace.InvalidateLoadCache(wsRoot)
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
@@ -126,45 +114,25 @@ func BuildWorkspaceMapResult(wsRoot, section, projectSelector string) (Workspace
 		return WorkspaceMapResult{}, err
 	}
 
-	resolved, err := mapgen.ResolveMap(ws)
-	if err != nil {
-		return WorkspaceMapResult{}, err
-	}
-	freshBytes, err := mapgen.RenderJSON(resolved.Map)
-	if err != nil {
-		return WorkspaceMapResult{}, err
-	}
-
-	// Freshness is a property of the FULL document, so it is measured before the
-	// scope is applied: a scoped answer must not report the on-disk map stale
-	// merely because the caller asked for one section of it.
-	status := DiskArtifactStatus{Path: mapgen.JSONPath}
-	onDisk, readErr := os.ReadFile(filepath.Join(wsRoot, filepath.FromSlash(mapgen.JSONPath)))
-	switch {
-	case readErr == nil:
-		status.Present = true
-		status.Fresh = bytes.Equal(onDisk, freshBytes)
-	case os.IsNotExist(readErr):
-		// Present/Fresh stay false: `putnami context map` has not run here, or the file was deleted.
-		// The served document is unaffected — that is the point of the in-memory
-		// reduce.
-	default:
-		return WorkspaceMapResult{}, fmt.Errorf("read workspace map artifact %s: %w", mapgen.JSONPath, readErr)
-	}
-
 	projectID := ""
+	var keep map[string]bool
 	if selector := strings.TrimSpace(projectSelector); selector != "" {
 		proj := shared.ResolveProjectSelector(ws, selector)
 		if proj == nil {
 			return WorkspaceMapResult{}, cmderr.NotFoundf("project not found: %s", selector)
 		}
 		projectID = proj.ID
+		keep = map[string]bool{proj.ID: true}
 	}
-	scoped := scopeWorkspaceMap(resolved.Map, section, projectID)
+
+	resolved, err := mapgen.ResolveMap(ws, fragments)
+	if err != nil {
+		return WorkspaceMapResult{}, err
+	}
+	scoped := scopeWorkspaceMap(resolved.Map, section, keep)
 
 	return WorkspaceMapResult{
-		Document:     scoped,
-		DiskArtifact: status,
+		Document: scoped,
 		Provenance: WorkspaceMapProvenance{
 			Workspace:        resolved.Map.Workspace,
 			Revision:         resolveWorkspaceRevision(wsRoot),
@@ -197,9 +165,10 @@ func normalizeMapSection(section string) (string, error) {
 }
 
 // scopeWorkspaceMap projects the full map onto the requested section and, when
-// set, onto one project. The result is always a strict SUBSET of the full
-// document: it drops fields and entries, never adds or rewrites one, so a scoped
-// answer and the full map can never disagree.
+// keep is non-nil, onto the projects whose id it holds. The result is always a
+// SUBSET of the full document: it drops fields and entries, never adds or
+// rewrites one, so a scoped answer and the full map can never disagree. The
+// MCP tool and `context map` both print through it.
 //
 // The header (schema version, workspace, provenance strings) always survives —
 // it is a handful of bytes and it is what makes a scoped fragment
@@ -210,7 +179,7 @@ func normalizeMapSection(section string) (string, error) {
 // The docs index rides with `all` and `docs` only, and is unaffected by the
 // project filter: docs are workspace-scoped facts, so filtering them by a
 // project would mean inventing an ownership rule the map does not have.
-func scopeWorkspaceMap(full *mapgen.RepoMap, section, projectID string) *mapgen.RepoMap {
+func scopeWorkspaceMap(full *mapgen.RepoMap, section string, keep map[string]bool) *mapgen.RepoMap {
 	scoped := &mapgen.RepoMap{
 		SchemaVersion: full.SchemaVersion,
 		Workspace:     full.Workspace,
@@ -218,8 +187,7 @@ func scopeWorkspaceMap(full *mapgen.RepoMap, section, projectID string) *mapgen.
 		Regenerate:    full.Regenerate,
 		// Non-nil so a scope that matches nothing serializes as [] rather than
 		// null: "no project has an endpoint table" is an answer, "null" is a
-		// riddle. The full render is unaffected — it always has entries, and the
-		// document's own encoding is untouched.
+		// riddle.
 		Projects: []mapgen.ProjectEntry{},
 	}
 	if section == MapSectionAll || section == MapSectionDocs {
@@ -229,7 +197,7 @@ func scopeWorkspaceMap(full *mapgen.RepoMap, section, projectID string) *mapgen.
 		return scoped
 	}
 	for _, entry := range full.Projects {
-		if projectID != "" && entry.ID != projectID {
+		if keep != nil && !keep[entry.ID] {
 			continue
 		}
 		projected, populated := projectEntrySection(entry, section)

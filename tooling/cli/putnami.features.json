@@ -159,7 +159,9 @@
             "checks": [
               "listing-and-description-serve-the-loaded-graph",
               "identities-and-dependencies-come-from-discovery",
-              "load-warnings-reach-stderr-and-the-result-envelope"
+              "load-warnings-reach-stderr-and-the-result-envelope",
+              "a-job-run-envelope-carries-the-load-warnings",
+              "a-command-reports-the-warnings-of-its-own-load-once"
             ]
           }
         },
@@ -357,7 +359,9 @@
               "an-existing-entrypoint-keeps-every-byte-outside-the-block",
               "an-edited-block-is-preserved",
               "init-writes-the-guidance-block",
-              "context-generation-writes-no-mcp-registration"
+              "context-generation-writes-no-mcp-registration",
+              "context-pack-prints-the-documents-and-writes-nothing",
+              "the-check-flag-is-unknown"
             ]
           }
         },
@@ -389,7 +393,11 @@
             "kind": "acceptance",
             "checks": [
               "printing-the-map-writes-nothing",
-              "mcp-rebuilds-the-same-projection-in-memory"
+              "mcp-rebuilds-the-same-projection-in-memory",
+              "the-printed-json-is-the-mcp-document",
+              "a-selection-narrows-the-printed-map",
+              "mcp-reuses-a-fragment-until-its-inputs-change",
+              "the-print-flag-is-unknown"
             ]
           }
         },
@@ -402,7 +410,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-build-session-writes-nothing-under-the-map-directory"
+              "a-build-session-writes-nothing-under-the-map-directory",
+              "context-map-writes-no-file"
             ]
           }
         },
@@ -494,7 +503,8 @@
               "initialize-is-self-contained-and-carries-exact-locked-guidance",
               "versioned-resources-serve-exact-bytes-or-an-explicit-offline-status",
               "the-cli-and-mcp-consume-the-same-lock-faithful-ai-bytes",
-              "initialize-instructions-are-bounded-across-every-extension"
+              "initialize-instructions-are-bounded-across-every-extension",
+              "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides"
             ]
           }
         },
@@ -517,6 +527,96 @@
           }
         },
         {
+          "id": "mcp-workspace-resources",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-server-lists-each-workspace-resource-by-a-concrete-uri",
+              "the-guidance-resource-renders-the-block-body-on-every-read",
+              "a-map-or-project-resource-returns-its-tools-bytes",
+              "listing-resources-prepares-no-workspace-graph",
+              "an-unknown-or-unavailable-resource-is-invalid-params",
+              "project-resources-follow-the-current-project-set"
+            ]
+          }
+        },
+        {
+          "id": "mcp-protocol-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "initialize-answers-with-a-version-the-server-speaks",
+              "the-relay-answers-initialize-with-a-version-it-speaks",
+              "the-relay-and-the-server-speak-the-same-versions",
+              "server-discover-is-method-not-found"
+            ]
+          }
+        },
+        {
+          "id": "mcp-context-change-notice",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-digest-covers-each-guidance-input",
+              "the-notice-names-each-change-and-what-to-read",
+              "the-next-tool-result-reports-a-change-once",
+              "nothing-changed-adds-no-notice",
+              "a-resource-read-leaves-the-notice-for-the-next-tool-result",
+              "an-extension-set-change-reloads-and-notifies-before-the-response",
+              "the-lists-after-a-reload-follow-the-new-extension-set",
+              "the-capabilities-declare-list-changed",
+              "concurrent-requests-report-a-change-once-without-a-data-race",
+              "a-project-a-load-finds-later-joins-without-a-notice",
+              "an-includes-or-collaboration-change-reloads-and-notifies",
+              "an-edit-during-a-reload-is-loaded-by-the-next-request",
+              "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again",
+              "nothing-is-written-after-the-session-ends",
+              "an-edit-while-the-server-starts-is-loaded"
+            ]
+          }
+        },
+        {
+          "id": "settled-decisions-guidance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-block-names-the-decision-files-and-lists-no-decision",
+              "the-decision-list-renders-every-root-decision-in-canonical-order",
+              "the-guidance-resource-holds-the-block-body-then-the-decisions"
+            ]
+          }
+        },
+        {
+          "id": "instructions-decision-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-oversized-registry-renders-whole-leading-lines-and-an-omission-line",
+              "the-instruction-lines-are-compact-and-in-canonical-order"
+            ]
+          }
+        },
+        {
           "id": "agent-context-languages",
           "stage": "coded",
           "evidenceKinds": [
@@ -532,7 +632,18 @@
             ]
           }
         }
-      ]
+      ],
+      "surface": {
+        "commands": [
+          "context generate",
+          "context map",
+          "context pack"
+        ],
+        "tools": [
+          "agent_context",
+          "workspace_map"
+        ]
+      }
     },
     {
       "id": "cli/job-planning-execution",
@@ -1915,8 +2026,7 @@
             "kind": "acceptance",
             "checks": [
               "generated-bootstrap-routes-to-live-mcp-guidance",
-              "stale-or-absent-context-is-reported-for-fallback",
-              "the-default-gate-is-lint-test-build-whatever-the-extensions-declare"
+              "stale-or-absent-context-is-reported-for-fallback"
             ]
           }
         },
@@ -2337,7 +2447,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "guidance-follows-blocking-commands"
+              "guidance-follows-blocking-commands",
+              "the-gate-keeps-the-documents-order",
+              "an-unusable-document-falls-back-to-the-default-documents-commands",
+              "cache-verify-runs-the-gate"
             ]
           }
         }

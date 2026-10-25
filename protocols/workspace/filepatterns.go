@@ -26,11 +26,17 @@ import (
 //     root keeps its "../" prefix, as in "../contributor/src/**".
 //   - "*" matches inside one path segment, per path.Match.
 //   - "**" matches any number of segments, including none.
+//   - In an include without the "git:" prefix, no wildcard matches a ".."
+//     segment: only a literal ".." does. The collector lists the files under
+//     the pattern's static prefix, and a directory never lists "..", so "**"
+//     selects the project's own tree and "../shared/**" the shared one, never
+//     the whole workspace.
 //   - A leading "!" makes the pattern an EXCLUSION: a path any exclusion
 //     matches is not selected, whichever include also matched it.
 //   - A "git:" prefix restricts collection to the containing repository's
 //     tracked and non-ignored untracked candidates. Paths remain project-relative;
-//     "git:**" selects the whole repository, including siblings and ancestors.
+//     "git:**" selects the whole repository, including siblings and ancestors:
+//     its wildcards match ".." segments.
 //     Matching a changed path strips this prefix: deleted paths must still
 //     select their readers, so impact never consults current Git membership.
 
@@ -69,28 +75,47 @@ func MatchesAnyFilePattern(rel string, patterns []string) bool {
 
 // MatchFilePattern matches a forward-slash relative path against a single
 // pattern, honoring "**" as a recursive segment wildcard.
+//
+// Its wildcards match ".." segments, which an exclusion relies on: "!**/gen/**"
+// removes "../shared/gen/a.go" that "../shared/**" collected. SelectsPath
+// matches an include through matchIncludePattern instead.
 func MatchFilePattern(rel, pattern string) bool {
+	return matchFilePattern(rel, pattern, true)
+}
+
+// matchIncludePattern matches a path against one include the way the
+// collector selects files: a wildcard of an ordinary include never matches a
+// ".." segment, and a "git:" include matches like MatchFilePattern.
+func matchIncludePattern(rel, pattern string) bool {
+	_, git := GitFilePattern(pattern)
+	return matchFilePattern(rel, pattern, git)
+}
+
+// matchFilePattern matches rel against pattern. parentWildcard says whether
+// "*" and "**" may match a ".." segment.
+func matchFilePattern(rel, pattern string, parentWildcard bool) bool {
 	pattern, _ = GitFilePattern(pattern)
 	rel = strings.TrimPrefix(filepath.ToSlash(rel), "./")
 	pattern = strings.TrimPrefix(filepath.ToSlash(pattern), "./")
-	if strings.Contains(pattern, "**") {
-		return matchFilePatternSegments(strings.Split(pattern, "/"), strings.Split(rel, "/"))
+	if strings.Contains(pattern, "**") || !parentWildcard {
+		return matchFilePatternSegments(strings.Split(pattern, "/"), strings.Split(rel, "/"), parentWildcard)
 	}
 	ok, _ := path.Match(pattern, rel)
 	return ok
 }
 
-func matchFilePatternSegments(patterns, segments []string) bool {
+func matchFilePatternSegments(patterns, segments []string, parentWildcard bool) bool {
 	if len(patterns) == 0 {
 		return len(segments) == 0
 	}
 	if patterns[0] == "**" {
-		if matchFilePatternSegments(patterns[1:], segments) {
-			return true
-		}
-		for i := range segments {
-			if matchFilePatternSegments(patterns[1:], segments[i+1:]) {
+		for i := 0; i <= len(segments); i++ {
+			if matchFilePatternSegments(patterns[1:], segments[i:], parentWildcard) {
 				return true
+			}
+			// "**" goes on to consume segments[i]; a ".." stops it.
+			if i < len(segments) && segments[i] == ".." && !parentWildcard {
+				return false
 			}
 		}
 		return false
@@ -98,8 +123,11 @@ func matchFilePatternSegments(patterns, segments []string) bool {
 	if len(segments) == 0 {
 		return false
 	}
+	if segments[0] == ".." && patterns[0] != ".." && !parentWildcard {
+		return false
+	}
 	ok, _ := path.Match(patterns[0], segments[0])
-	return ok && matchFilePatternSegments(patterns[1:], segments[1:])
+	return ok && matchFilePatternSegments(patterns[1:], segments[1:], parentWildcard)
 }
 
 // ExcludesTree reports whether the exclusions remove every path at or under
@@ -127,7 +155,7 @@ func ExcludesTree(rel string, excludes []string) bool {
 		}
 		parts := strings.Split(prefix, "/")
 		for k := 0; k <= len(segments); k++ {
-			if matchFilePatternSegments(parts, segments[:k]) {
+			if matchFilePatternSegments(parts, segments[:k], true) {
 				return true
 			}
 		}
@@ -140,11 +168,20 @@ func ExcludesTree(rel string, excludes []string) bool {
 // caller that reads "no patterns" as "every file under the project root" — the
 // cache hasher does — owns that reading, because it is a statement about a
 // directory and this function is only ever asked about a path.
+//
+// An include selects the path the way the collector would: "**" selects
+// "src/a.go" and never "../../docs/README.md", which the collector, walking the
+// project root, never lists.
 func SelectsPath(rel string, patterns []string) bool {
 	includes, excludes := SplitFilePatterns(patterns)
 	slashed := filepath.ToSlash(rel)
 	if MatchesAnyFilePattern(slashed, excludes) {
 		return false
 	}
-	return MatchesAnyFilePattern(slashed, includes)
+	for _, include := range includes {
+		if matchIncludePattern(slashed, include) {
+			return true
+		}
+	}
+	return false
 }

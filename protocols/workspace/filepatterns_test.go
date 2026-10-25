@@ -35,6 +35,40 @@ func TestSelectsPath(t *testing.T) {
 	}
 }
 
+// A wildcard of an ordinary include never matches a ".." segment, because the
+// collector lists files under the pattern's static prefix and a directory never
+// lists "..". Only a literal ".." reaches outside the project root. A "git:"
+// include and an exclusion keep matching ".." with a wildcard.
+func TestSelectsPath_OrdinaryWildcardStaysInsideItsRoot(t *testing.T) {
+	for _, testCase := range []struct {
+		rel      string
+		patterns []string
+		want     bool
+	}{
+		{"own.go", []string{"**"}, true},
+		{"conf/env.prod.yaml", []string{"**"}, true},
+		{"../../docs/README.md", []string{"**"}, false},
+		{"../../docs/README.md", []string{"**/*.md"}, false},
+		{"internal/testdata/a.json", []string{"**/testdata/**"}, true},
+		{"../../identity/testdata/a.json", []string{"**/testdata/**"}, false},
+		{"../x.json", []string{"*/x.json"}, false},
+		{"../x.json", []string{"../*.json"}, true},
+		{"../shared/a/b.go", []string{"../shared/**"}, true},
+		{"../../other/b.go", []string{"../**"}, false},
+		{"../../putnami.json", []string{"../../**/putnami.json"}, true},
+		{"../../docs/README.md", []string{"git:**"}, true},
+		{"../shared/gen/a.go", []string{"../shared/**", "!**/gen/**"}, false},
+	} {
+		if got := SelectsPath(testCase.rel, testCase.patterns); got != testCase.want {
+			t.Errorf("SelectsPath(%q, %q) = %v, want %v", testCase.rel, testCase.patterns, got, testCase.want)
+		}
+	}
+	// MatchFilePattern is the exclusion grammar and is unchanged.
+	if !MatchFilePattern("../../docs/README.md", "**") {
+		t.Error(`MatchFilePattern("../../docs/README.md", "**") = false, want true`)
+	}
+}
+
 // An empty include list selects nothing here. The cache hasher reads "no
 // patterns" as "every file under the project root", but that is a statement
 // about a directory: answering true for an arbitrary path would make every

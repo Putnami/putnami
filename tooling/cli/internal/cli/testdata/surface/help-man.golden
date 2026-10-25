@@ -193,10 +193,10 @@ Set a configuration value.
 Regenerate AI context.
 .TP
 .B context map
-Build or print the workspace orientation map.
+Print the workspace orientation map.
 .TP
 .B context pack
-Write or check each project's agent-context document.
+Print each project's agent-context document.
 .SS Diagnostics
 .TP
 .B doctor
@@ -581,26 +581,20 @@ putnami context generate [--force]
 .B --force
 Rewrite a guidance block that was edited or written by an older release.
 .SS context map
-Regenerate the ephemeral workspace map under .putnami/context-map/ (repo-map.json and repo-map.md) from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree). Byte-deterministic on an unchanged tree, gitignored, and never committed. --print renders it to stdout and writes nothing. A build writes no map. Agents get the same document fresh from the MCP workspace_map tool.
+Print the workspace orientation map, built in memory from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree): Markdown by default, and with --output=json the map document as data, the same document the MCP workspace_map tool serves. --projects and --impacted narrow the printed projects. Byte-deterministic on an unchanged tree. It writes no file, and a build writes no map.
 .PP
 .B Usage:
 .br
-putnami context map [--print[=json|md]] [--projects <list>] [--impacted] [--output <format>]
-.TP
-.B --print
-Render the map to stdout (md by default, or json) and write nothing.
+putnami context map [--projects <list>] [--impacted] [--output <format>]
 .SS context pack
-Write one deterministic agent-context document per project to <project>/.gen/agent-context.json: its identity and graph, composition roots, commands, config and contracts. --check re-derives every document, writes nothing, and fails when one drifted. The MCP agent_context tool builds the same document in memory and reports whether the file is fresh.
+Print one deterministic agent-context document per project: its identity and graph, composition roots, commands, config and contracts. --output=json returns the documents as data, and --project narrows them to one project. It writes no file. The MCP agent_context tool builds the same document in memory.
 .PP
 .B Usage:
 .br
-putnami context pack [--project <selector>] [--check] [--output <format>]
+putnami context pack [--project <selector>] [--output <format>]
 .TP
 .B --project
 Project ID, path, or name; default is every workspace project.
-.TP
-.B --check
-Re-derive the documents, write nothing, and fail on drift.
 .SS doctor
 Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted.
 .PP
@@ -695,7 +689,7 @@ Report the pending migration without writing (default); exits non-zero when a mi
 .B --apply
 Perform the migration, atomically and idempotently.
 .SS mcp
-Run the Model Context Protocol server over stdio so an AI agent harness can discover projects, context, ownership, impact, plans, and diagnostics through 11 typed core tools (list_projects, describe_project, agent_context, workspace_map, deps, find_owner, why_impacted, topo_sort, impacted, run_jobs, get_diagnostics) and the workspace://context resource. All except run_jobs are read-only; run_jobs is the only mutating core tool, supports dry-run planning, and refuses long-lived or externally mutating execution. Spawned by the client; speaks JSON-RPC 2.0 on stdin/stdout and exits with the session. Before it serves, it brings the workspace's agent workflows to the version the lock pins, from the local artifact store only, and reports what it cannot reconcile as a warning on stderr. Optional request provenance is disabled by default; set PUTNAMI_AGENT_IDENTITY=1 and explicitly set PUTNAMI_AGENT_MODEL in the MCP server environment to propagate bounded harness/model headers.
+Run the Model Context Protocol server over stdio so an AI agent harness can discover projects, context, ownership, impact, plans, and diagnostics through 11 typed core tools (list_projects, describe_project, agent_context, workspace_map, deps, find_owner, why_impacted, topo_sort, impacted, run_jobs, get_diagnostics) and resources for the workspace context, the Putnami guidance, the workspace map, and each project's agent context. All except run_jobs are read-only; run_jobs is the only mutating core tool, supports dry-run planning, and refuses long-lived or externally mutating execution. Spawned by the client; speaks JSON-RPC 2.0 on stdin/stdout and exits with the session. Before it serves, it brings the workspace's agent workflows to the version the lock pins, from the local artifact store only, and reports what it cannot reconcile as a warning on stderr. Optional request provenance is disabled by default; set PUTNAMI_AGENT_IDENTITY=1 and explicitly set PUTNAMI_AGENT_MODEL in the MCP server environment to propagate bounded harness/model headers.
 .PP
 .B Usage:
 .br

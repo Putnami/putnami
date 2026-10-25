@@ -33,8 +33,9 @@ That teaches an assistant your conventions. Two commands teach it your *system*.
 ### `putnami context map` — where things are
 
 ```bash
-putnami context map            # regenerate
-putnami context map --print    # render to stdout, write nothing
+putnami context map                         # print the map as Markdown
+putnami context map --output=json           # print the map document as data
+putnami context map --projects <project-id> # print only the projects you name
 ```
 
 The workspace orientation map, rebuilt from committed artifacts — project
@@ -42,19 +43,20 @@ manifests, `schema/openapi.json`, `schema/config.jsonschema.json`, READMEs, and
 the docs tree. It answers "which project owns X", "what depends on Y", "where
 are the APIs, the config keys, the docs" without shell exploration.
 
-It is byte-deterministic on an unchanged tree, lives gitignored under
-`.putnami/context-map/`, and is never committed. A build does not write it: run
-`putnami context map` to refresh the file, or read the map from the MCP
-`workspace_map` tool, which renders it fresh on every call.
+It is byte-deterministic on an unchanged tree, and nothing writes it: neither
+the command nor a build stores a copy. `putnami context map` prints it, and the
+MCP `workspace_map` tool returns the same document, rebuilt on every call.
+`--projects` and `--impacted` narrow the printed projects.
 
 ### `putnami context pack` — how one project is composed
 
 ```bash
 putnami context pack --project <project-id>
+putnami context pack --output=json    # every project's document, as data
 ```
 
-It writes one deterministic **agent-context document** per project to
-`<project>/.gen/agent-context.json`:
+It prints one deterministic **agent-context document** per project and writes
+no file:
 
 - **identity and graph** — id, name, path, type, tags, languages, and the ids of
   dependencies and dependents;
@@ -64,8 +66,8 @@ It writes one deterministic **agent-context document** per project to
   and a `sha256:` digest, pointing at the committed artifacts;
 - **representative sources** — ordered ranges (`path`, `startLine`, `endLine`, a
   reason, a token estimate). Ranges only;
-- **tests** — the policy, referenced conformance packs, and fixture digests —
-  or, when there are none, a machine-readable reason for their absence;
+- **tests** — referenced conformance packs and fixture digests — or, when
+  there are none, a machine-readable reason for their absence;
 - **docs** — adjacent documentation, each marked checked or unchecked;
 - **config** — a config-schema reference and refs-only hints about the
   operational surface;
@@ -79,10 +81,10 @@ document safe to hand to a tool you don't control.
 content. The types have no slot for content, and the safety gate rejects any
 string long enough to look like it anyway.
 
-**It is ephemeral.** It lives under the gitignored `.gen/` root and is never
-committed — it embeds the workspace revision and content digests, so it would
-churn on every commit. Determinism is pinned byte-for-byte by tests at a fixed
-tree, not by committing the artifact.
+**It is never stored.** Every read builds it again from the working tree, so no
+copy can go stale. It embeds the workspace revision and content digests, so a
+stored copy would churn on every commit. Determinism is pinned byte-for-byte by
+tests at a fixed tree.
 
 **Publication fails closed.** Before a document can leave the workspace for an
 authorized index, a redaction gate runs and reports as hard errors: a reference
@@ -95,12 +97,6 @@ adds or removes representative-source and doc entries and force-flags paths as
 sensitive. It cannot override identity, capabilities, or provenance — those are
 framework-owned facts, and an author who could rewrite them could make the
 document lie.
-
-In CI or pre-flight:
-
-```bash
-putnami context pack --check   # re-derives, exits non-zero on drift, writes nothing
-```
 
 ---
 
@@ -133,8 +129,17 @@ exposes the workspace as typed tools instead of shell exploration:
 | **Intent** | `sdd.list_features` · `sdd.feature_context` · `sdd.list_specs` · `sdd.spec_context` | What was this built for, what were the non-goals, what did the team agree to |
 | **Execute** | `run_jobs` · `get_diagnostics` | Run lint / test / build, then read every failure as `file:line:col` with severity and code |
 
-Plus the `workspace://context` resource, so a client that prefers resources over
-tool calls gets the same facts.
+Plus resources, so a client that prefers resources over tool calls gets the same
+facts: `workspace://context`, `putnami://workspace/guidance` (the rules block of
+`AGENTS.md`, then the settled decisions), `putnami://workspace/map` and `putnami://workspace/map/<section>`
+(what `workspace_map` returns), and `putnami://projects/<id>/context` (what
+`agent_context` returns for one project).
+
+When the guidance changes during a session, for example a decision is added or
+an extension is installed, the next Putnami tool result ends with a short
+notice that names the change and the resource or file to read. When the
+extensions change, the server announces that its tool list changed, and Claude
+Code fetches the new list without a reconnect.
 
 ### Every graph answer says what it was derived from
 
@@ -290,8 +295,8 @@ someone remembered to pass.
 
 Alongside it: `get_diagnostics` re-reads the complete failure set from the last
 executed run without rerunning the work, conformance packs test declared
-capabilities against shared fixtures, and `putnami context pack --check` keeps
-the orientation document from going stale behind the code.
+capabilities against shared fixtures, and the orientation document is rebuilt
+on every read, so it cannot go stale behind the code.
 
 ---
 

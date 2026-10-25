@@ -253,6 +253,19 @@ under the same rules; `scopes list` and `workspace describe` also put it in
 their envelope. `projects sync` reports the state itself and writes no separate
 warning.
 
+A command that runs jobs (`build`, `test`, `lint`, `validate`, `run`, …) puts
+the load warnings in `workspaceWarnings` of its `--output=json` envelope too,
+under `--quiet` as well: the run's envelope and the plan-only envelope of
+`--plan` and `--dry-run`. `compose`, `qualify --target local`, `cache verify`
+and `impact-plan` run jobs inside their own result and carry them too. They
+write each one once on stderr, unless `--quiet`.
+`compose` and `qualify`, `--target <url>` and `--print-contract` included, also
+carry the warnings of the load they perform before any job runs, each warning
+once, on stderr and in the envelope. The `doctor` envelope of a blocked
+production preflight carries them in either structured mode. The
+`--output=jsonl` session stream of a run carries no result envelope, so there
+the warnings are on stderr only.
+
 `projects create <name> --template <template>` renders the template and lists
 the project in the workspace config. It then runs the `project-setup` job of
 the template's extension for the new project, when the extension declares one.
@@ -855,7 +868,8 @@ putnami cache verify --impacted     # Audit deterministic keys, artifacts, write
 Build-cache data lives in the machine-global per-repo store at `~/.putnami/store/<repo-id>/`, shared across all worktrees of the repo (override with `PUTNAMI_STORE_DIR`). Go compiler/modules at `~/.putnami/cache/go` and Bun downloads at `~/.bun/install/cache` (for a Bun that Putnami installed, `install/cache` under `~/.putnami/toolchains/bun/bun-<version>`) are shared across **all repositories and worktrees**. `cache clean` therefore clears the build cache for every worktree of the current repo; `cache gc` enforces the separate build, Go, Bun, and artifact-store budgets. Running with `--no-cache` skips Putnami action-cache lookups but still uses the native Go and Bun caches; `--no-cache-projects <selector>` skips them for the named projects and their planned dependents only, so the rest of the selection’s dependency closure keeps its cache. A task that failed is cached too: a re-run with unchanged inputs replays the same failure, with its original output, instead of executing it again — `--retry-failed` forces that one task to run while every other cache hit is kept, and `--no-cache` suppresses the replay without removing the record: only a run in which the task passes at the same key does that, whatever its cache policy or selection. See [Caching](10-caching.md) for the full model.
 
 `cache verify` runs the selected projects' gate tasks, the blocking commands
-of `putnami.ci.json` or `lint`, `test` and `build` without one, in
+of `putnami.ci.json` in its order, or those of the CI protocol's default
+document (`lint`, `test` and `build`) without one, in
 detached temporary worktrees and isolated stores. It requires a clean worktree
 and supports the ordinary project-selection flags plus structured output. See
 [Cache Determinism Verification](10-caching.md#cache-determinism-verification)
@@ -884,11 +898,10 @@ Manage assistant guidance.
 
 ```bash
 putnami context generate            # Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md
-putnami context map                 # Refresh .putnami/context-map/repo-map.{json,md}
-putnami context map --print         # Render the map to stdout (markdown); write nothing
-putnami context map --print=json    # Same, as JSON
-putnami context pack                # Write each project's .gen/agent-context.json
-putnami context pack --check        # Re-derive them, write nothing, fail on drift
+putnami context map                 # Print the workspace orientation map as Markdown
+putnami context map --output=json   # Print the map document, the one the MCP serves
+putnami context pack                # Print each project's agent-context document
+putnami context pack --output=json  # Return the documents as data
 ```
 
 `context generate` writes the guidance block and the agent content of the
@@ -896,13 +909,20 @@ extensions the workspace declares by path and opts into, and nothing else. It
 never writes `.mcp.json`: `init`, `install` and `upgrade` register the MCP
 server, and `putnami mcp install` repairs the registration. See [`mcp`](#mcp).
 
+The block holds the rules and the gate line. It names the `decisions.json` files
+in one line and lists no decision. The line appears with a registry's first
+decision and goes with its last, and those two changes regenerate the block; any
+other decision change leaves both files as they were. The MCP server lists the
+root decisions in full in the `putnami://workspace/guidance` resource, and as id
+and statement, as many as fit Claude Code's 4,096-character limit, in its
+`initialize` instructions.
+
 #### `context pack`
 
-`context pack` writes one deterministic agent-context document per project to
-`<project>/.gen/agent-context.json`; `--project <selector>` limits it to one
-project. `--check` re-derives every document, writes nothing, and exits non-zero
-when one drifted. Both accept `--output=json`. The MCP `agent_context` tool builds
-the same document in memory. The document contract is
+`context pack` builds one deterministic agent-context document per project in
+memory and prints it. It writes no file. `--output=json` returns the documents
+as data, and `--project <selector>` narrows them to one project. The MCP
+`agent_context` tool returns the same document. The document contract is
 `go.putnami.dev/protocol/agentcontext`.
 
 A project's `identity.languages` are the `language` members of the workspace
@@ -915,59 +935,45 @@ Run `putnami projects sync` to refresh the claims.
 
 #### `context map`
 
-`context map` renders the workspace orientation map — every project with its
+`context map` prints the workspace orientation map: every project with its
 path, tags, dependency edges, endpoint table, config keys, and README summary,
-plus the workspace `docs/` index — into
-`.putnami/context-map/repo-map.json` and `.putnami/context-map/repo-map.md`.
+plus the workspace `docs/` index. It prints Markdown by default. With
+`--output=json` it returns the map document as data, the same document the MCP
+`workspace_map` tool returns. It writes no file.
 
-The map is **ephemeral, gitignored, CLI-owned state**, never committed.
-It is a pure projection of committed inputs, so committing the projection bought
-nothing and cost a permanent merge hotspot (one flat sorted list, so parallel
-branches collide), a drift class, and a CI gate. A build writes no map. The MCP
-`workspace_map` tool serves it fresh, and `context map` writes it on demand, so
-nothing can go stale in a review.
+The map is a pure projection of committed inputs, so nothing stores it and
+nothing can go stale. A build writes no map. It is byte-deterministic on an
+unchanged tree: entries are sorted by project path, and the document carries no
+timestamp, no absolute path, and no CLI version.
 
-It is byte-deterministic on an unchanged tree: entries are sorted by project
-path, and the documents carry no timestamp, no absolute path, and no CLI version.
-A repeat run over an unchanged tree therefore costs one digest sweep and writes
-nothing.
+Rendering is a map-reduce in memory:
 
-Generation is a map-reduce:
+- **map**: one fragment per project, computed from that project's own
+  `putnami.json`, `schema/openapi.json`, `schema/config.jsonschema.json`,
+  `README.md` and `schema/` listing, with a digest of exactly those inputs.
+- **reduce**: the *live* project set from the workspace manifest plus the
+  fragments. A project the workspace no longer contains contributes nothing,
+  so deletions and renames need no diffing.
 
-- **map** — one fragment per project, computed from that project's own
-  `putnami.json`, `schema/openapi.json`, `schema/config.jsonschema.json`, and
-  `README.md`, cached under `.putnami/context-map/<project>/map-fragment.json`
-  with a digest of exactly those inputs.
-- **reduce** — the *live* project set from the workspace manifest plus the
-  fragments. A cached fragment is reused only when its recorded inputs digest
-  still matches the files on disk, so a selection-scoped run stays cheap while
-  the rendered map is always complete. A project the workspace no longer
-  contains simply contributes nothing — deletions and renames need no diffing —
-  and the previous map is never an input to the new one.
-
-`--projects <list>` and `--impacted` scope which fragments are *refreshed*, never
-which projects the map renders. `--print[=json|md]` runs the same reduce entirely
-in memory, writes nothing at all (no fragments, no documents), and emits the
-document on stdout — `--output` is already the run report's shape, which is why
-the flag is spelled `--print`. `--output=jsonl` emits the machine-readable run
-report.
+`--projects <list>` and `--impacted` narrow the projects the map prints. The
+reduce still runs over every project, so a printed entry keeps every dependency
+edge, and the workspace `docs/` index stays.
 
 A project's dependency edges and language identity come from the merged provider
 view (`.putnami/workspace-index.json`, which is not committed). On a clone that
 has none, every project would resolve from authored config alone and the map
-would render without provider-derived edges — a confident wrong answer — so in a
+would render without provider-derived edges, a confident wrong answer. So in a
 workspace that declares extensions, `context map` refuses and points at
 `putnami projects sync`.
 
 ##### Serving it to agents
 
 The MCP `workspace_map` tool (see [`mcp`](#mcp)) renders the same document on
-every call from the working tree, so an agent never depends on whether
-`context map` ran. It takes `section` (`projects`, `dependencies`,
-`intercalls`, `apis`, `config-keys`, `schemas`, `docs`, `all`) and an optional
-`project`, and reports whether the on-disk artifact is present and matches the
-fresh render. A missing or outdated file is reported as such; only `context map`
-rewrites it.
+every call from the working tree. It takes `section` (`projects`,
+`dependencies`, `intercalls`, `apis`, `config-keys`, `schemas`, `docs`, `all`)
+and an optional `project`. Within one MCP session it keeps each project's
+fragment in memory and reuses it while the fragment's inputs digest is
+unchanged, so a repeat call rebuilds only the projects that changed.
 
 ### `doctor`
 
@@ -1123,15 +1129,33 @@ The core server exposes eleven tools: ten read-heavy workspace tools
 `find_owner`, `why_impacted`, `topo_sort`, `impacted`, `get_diagnostics`) plus
 `run_jobs`, whose `dryRun` mode returns the planned DAG without executing
 subprocesses. `workspace_map` renders the whole
-workspace orientation map in memory on every call — independent of whether
-`putnami context map` ever wrote the ephemeral
-`.putnami/context-map/repo-map.json` — and takes
+workspace orientation map in memory on every call and takes
 `section` (`projects`, `dependencies`, `intercalls`, `apis`, `config-keys`,
 `schemas`, `docs`, `all`) plus an optional `project`, so a scoped question costs
 a few KB instead of the full map. It also exposes
 `workspace://context` as a
 read-only resource for live workspace graph/layout/channel/version context plus
-dependency-first topological project order. The server exits with the session.
+dependency-first topological project order. Three more resource families render
+on every read with the builders the tools and `context generate` use:
+`putnami://workspace/guidance` (the Putnami block body of `AGENTS.md`, then the
+settled decisions),
+`putnami://workspace/map` and `putnami://workspace/map/<section>` (the
+`workspace_map` answer), and `putnami://projects/<id>/context` (the
+`agent_context` answer, with the project id escaped as one path segment, for
+example `putnami://projects/%2Ftooling%2Fcli/context`). `initialize` answers
+with the requested protocol version when it is `2024-11-05`, `2025-03-26`,
+`2025-06-18` or `2025-11-25`, and with `2025-11-25` otherwise. The server exits
+with the session.
+
+Before it answers a tool call or a resource read, the server hashes
+`putnami.workspace.json`, `putnami.lock.json`, `putnami.ci.json`, the manifest
+and `AI.md` of each extension loaded by path, and the `decisions.json` files its
+last workspace load found. After a change, the next tool result ends with one
+more text block that names the change, for example `D-025 added` or
+`@putnami/go 0.3.1 installed`, and the resource or file to read. Each change is
+reported once. When the extensions, `includes` or `options.collaboration`
+changed, the server reloads its extension guides and tools and sends
+`notifications/tools/list_changed` and `notifications/resources/list_changed`.
 
 Before it answers the first request, the server brings the workspace's agent
 workflows to the version `putnami.lock.json` pins. A host starts the server when

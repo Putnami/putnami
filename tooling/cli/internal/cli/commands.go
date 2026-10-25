@@ -93,6 +93,12 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 		return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output), cmdPath, err, env.envelopeWarnings())
 	}
 	if envelope, ok := capturedResultEnvelope(captured); ok {
+		// A command that runs jobs inside its own result, such as impact-plan,
+		// cache verify and qualify, hands the warnings of its engine run to the
+		// command's report: its envelope carries them unless it names its own.
+		if len(envelope.WorkspaceWarnings) == 0 {
+			envelope.WorkspaceWarnings = env.envelopeWarnings()
+		}
 		code, _ := protocolcli.WriteResultV2(os.Stdout, protocolcli.OutputMode(parsed.Global.Output), envelope)
 		return code
 	}

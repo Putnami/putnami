@@ -79,7 +79,7 @@ type cachedObservationRecovery struct {
 	// disabled carries the one reason no lookup can be served at all, so every
 	// candidate is reported unconsulted with an accurate cause instead of a
 	// generic "no cache entry".
-	disabled string
+	disabled unconsultedCause
 
 	once      sync.Once
 	versions  cachekey.RunVersions
@@ -97,11 +97,19 @@ type cachedObservationRecovery struct {
 	remoteBudget time.Duration
 	// remoteMu guards remoteEnd, the end of the budget, set by the first
 	// remote lookup, and remoteMisses: each hash a remote lookup returned no
-	// entry for, with why the remote cache could not answer, or "" for a miss.
-	// A hash is asked at most once per gate.
+	// entry for, with why the remote cache could not answer, or the zero
+	// cause for a miss. A hash is asked at most once per gate.
 	remoteMu     sync.Mutex
 	remoteEnd    time.Time
-	remoteMisses map[string]string
+	remoteMisses map[string]unconsultedCause
+}
+
+// unconsultedCause is why a candidate could not be consulted: prose for the
+// unobserved-requirement warning, and the same cause from the record's closed
+// set. The zero value, with no code, is no cause.
+type unconsultedCause struct {
+	prose string
+	code  features.UnconsultedReason
 }
 
 // newCachedObservationRecovery builds the recovery source for one run, or nil
@@ -120,9 +128,9 @@ func newCachedObservationRecovery(req *Request, ws *workspace.Workspace,
 	source := &cachedObservationRecovery{req: req, ws: ws, extensions: extensions, cache: cache}
 	switch {
 	case req.Global.NoCache:
-		source.disabled = "--no-cache: no cached observation may be served"
+		source.disabled = unconsultedCause{"--no-cache: no cached observation may be served", features.UnconsultedNoCache}
 	case cache == nil:
-		source.disabled = "this run has no cache store"
+		source.disabled = unconsultedCause{"this run has no cache store", features.UnconsultedNoCache}
 	}
 	return source
 }
@@ -160,12 +168,8 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	if source == nil || len(candidates) == 0 {
 		return recovery
 	}
-	if source.disabled != "" {
-		for _, candidate := range candidates {
-			recovery.Unconsulted = append(recovery.Unconsulted,
-				specgate.UnconsultedProject{Project: candidate.ID, Reason: source.disabled})
-		}
-		return recovery
+	if source.disabled.code != "" {
+		return source.unconsultedAll(candidates, source.disabled)
 	}
 
 	// ONE plan and ONE keying pass over the whole candidate set, rather than the
@@ -189,12 +193,14 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	planned, err := planner.Plan(source.ws, commands, candidates, source.extensions,
 		source.req.CommandParams, disabledJobs, disabledExtensions)
 	if err != nil {
-		return source.unconsultedAll(candidates, fmt.Sprintf("their test plan could not be derived: %v", err))
+		return source.unconsultedAll(candidates, unconsultedCause{
+			fmt.Sprintf("their test plan could not be derived: %v", err), features.UnconsultedPlanFailed})
 	}
 	keys, err := cachekey.PrecomputeKeys(source.ws, planned, source.req.CommandParams,
 		source.runVersions(), source.cache, cachekey.CacheBypass{})
 	if err != nil {
-		return source.unconsultedAll(candidates, fmt.Sprintf("their cache keys could not be derived: %v", err))
+		return source.unconsultedAll(candidates, unconsultedCause{
+			fmt.Sprintf("their cache keys could not be derived: %v", err), features.UnconsultedPlanFailed})
 	}
 
 	outcomes := make(map[string]*candidateOutcome, len(candidates))
@@ -221,7 +227,7 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 		outcome.keyed++
 		entry, failure := source.lookupTaskEntry(hash, job)
 		if entry == nil {
-			if outcome.remoteFailure == "" {
+			if outcome.remoteFailure.code == "" {
 				outcome.remoteFailure = failure
 			}
 			continue
@@ -243,9 +249,8 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 			recovery.Reports = append(recovery.Reports, *outcome.report)
 			continue
 		}
-		if reason, unconsulted := outcome.unconsultedReason(); unconsulted {
-			recovery.Unconsulted = append(recovery.Unconsulted,
-				specgate.UnconsultedProject{Project: candidate.ID, Reason: reason})
+		if cause, unconsulted := outcome.unconsultedReason(); unconsulted {
+			recovery.Unconsulted = append(recovery.Unconsulted, specgate.UnconsultedProject{Project: candidate.ID, Reason: cause.prose, Code: cause.code})
 		}
 	}
 	return recovery
@@ -259,9 +264,9 @@ type candidateOutcome struct {
 	keyed       int
 	entries     int
 	// remoteFailure says why the run's remote cache could not answer for a
-	// keyed report task that has no entry, or is empty when it answered or
-	// was not asked.
-	remoteFailure string
+	// keyed report task that has no entry, completing "not selected, and
+	// ...", or is the zero cause when it answered or was not asked.
+	remoteFailure unconsultedCause
 }
 
 // unconsultedReason decides whether a candidate that produced no report was
@@ -280,36 +285,37 @@ type candidateOutcome struct {
 //
 // A report task whose remote lookup failed or ran out of time is unconsulted
 // too, and its reason says so rather than claim the entry does not exist.
-func (outcome *candidateOutcome) unconsultedReason() (string, bool) {
+func (outcome *candidateOutcome) unconsultedReason() (unconsultedCause, bool) {
 	switch {
 	case outcome.reportTasks == 0:
-		return "", false
+		return unconsultedCause{}, false
 	case outcome.keyed < outcome.reportTasks:
-		return "not selected, and the test task that would write its verification report is not cacheable, " +
-			"so no observation can be recovered", true
-	case outcome.entries < outcome.keyed && outcome.remoteFailure != "":
-		return "not selected, and " + outcome.remoteFailure, true
+		return unconsultedCause{"not selected, and the test task that would write its verification report is not cacheable, " +
+			"so no observation can be recovered", features.UnconsultedNotCacheable}, true
+	case outcome.entries < outcome.keyed && outcome.remoteFailure.code != "":
+		return unconsultedCause{"not selected, and " + outcome.remoteFailure.prose, outcome.remoteFailure.code}, true
 	case outcome.entries < outcome.keyed:
-		return "not selected, and the test task that writes its verification report has no cache entry for these inputs", true
+		return unconsultedCause{"not selected, and the test task that writes its verification report has no cache entry for these inputs",
+			features.UnconsultedNoEntry}, true
 	default:
-		return "", false
+		return unconsultedCause{}, false
 	}
 }
 
 // lookupTaskEntry returns the entry at hash of a candidate's report task: the
 // local store's, else the one the run's remote cache publishes into the local
-// store. failure says why the remote cache could not answer, and is empty for
-// an entry, a miss, and a run that reads no remote cache.
-func (source *cachedObservationRecovery) lookupTaskEntry(hash string, job *scheduler.ScheduledJob) (*store.TaskEntry, string) {
+// store. failure says why the remote cache could not answer, and is the zero
+// cause for an entry, a miss, and a run that reads no remote cache.
+func (source *cachedObservationRecovery) lookupTaskEntry(hash string, job *scheduler.ScheduledJob) (*store.TaskEntry, unconsultedCause) {
 	if entry, err := source.cache.LookupTaskEntry(hash); err == nil && entry != nil {
-		return entry, ""
+		return entry, unconsultedCause{}
 	}
 	if source.remote == nil {
-		return nil, ""
+		return nil, unconsultedCause{}
 	}
 	remote := source.remote()
 	if remote == nil {
-		return nil, ""
+		return nil, unconsultedCause{}
 	}
 	source.remoteMu.Lock()
 	failure, asked := source.remoteMisses[hash]
@@ -333,36 +339,37 @@ func (source *cachedObservationRecovery) lookupTaskEntry(hash string, job *sched
 		entry, err = remote.FetchTaskEntry(source.ctx, within, hash, job, source.cache)
 	}
 	if entry != nil {
-		return entry, ""
+		return entry, unconsultedCause{}
 	}
 	failure = remoteLookupFailure(err)
 	source.remoteMu.Lock()
 	if source.remoteMisses == nil {
-		source.remoteMisses = make(map[string]string)
+		source.remoteMisses = make(map[string]unconsultedCause)
 	}
 	source.remoteMisses[hash] = failure
 	source.remoteMu.Unlock()
 	return nil, failure
 }
 
-// remoteLookupFailure renders why a remote lookup returned no entry, completing
-// "not selected, and ...", or "" for a miss.
-func remoteLookupFailure(err error) string {
+// remoteLookupFailure states why a remote lookup returned no entry, its prose
+// completing "not selected, and ...", or the zero cause for a miss.
+func remoteLookupFailure(err error) unconsultedCause {
 	switch {
 	case err == nil:
-		return ""
+		return unconsultedCause{}
 	case errors.Is(err, context.DeadlineExceeded):
-		return "the remote cache did not answer in time for the test task that writes its verification report"
+		return unconsultedCause{"the remote cache did not answer in time for the test task that writes its verification report",
+			features.UnconsultedRemoteTimeout}
 	default:
-		return "the remote cache lookup for the test task that writes its verification report failed: " + err.Error()
+		return unconsultedCause{"the remote cache lookup for the test task that writes its verification report failed: " + err.Error(),
+			features.UnconsultedRemoteUnreachable}
 	}
 }
 
-func (source *cachedObservationRecovery) unconsultedAll(candidates []*workspace.Project, reason string) specgate.Recovery {
+func (source *cachedObservationRecovery) unconsultedAll(candidates []*workspace.Project, cause unconsultedCause) specgate.Recovery {
 	recovery := specgate.Recovery{}
 	for _, candidate := range candidates {
-		recovery.Unconsulted = append(recovery.Unconsulted,
-			specgate.UnconsultedProject{Project: candidate.ID, Reason: reason})
+		recovery.Unconsulted = append(recovery.Unconsulted, specgate.UnconsultedProject{Project: candidate.ID, Reason: cause.prose, Code: cause.code})
 	}
 	return recovery
 }

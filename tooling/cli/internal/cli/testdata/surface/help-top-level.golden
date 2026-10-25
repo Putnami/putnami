@@ -51,8 +51,8 @@ Configuration:
   config show                  Show effective configuration
   config set                   Set a configuration value
   context generate             Regenerate AI context
-  context map                  Build or print the workspace orientation map
-  context pack                 Write or check each project's agent-context document
+  context map                  Print the workspace orientation map
+  context pack                 Print each project's agent-context document
 
 Diagnostics:
   doctor                       Preflight production readiness under a deployment profile

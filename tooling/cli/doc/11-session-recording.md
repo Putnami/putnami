@@ -587,6 +587,38 @@ it.
 }
 ```
 
+The `remote` member of `cache` says whether the remote cache answered the run.
+A lookup is one request for one entry, made for a planned task or by the spec
+gate.
+
+| Member | Meaning |
+|--------|---------|
+| `answered` | `true` when every lookup got an answer: a hit or a miss |
+| `lookups` | How many lookups the run made |
+| `failedLookups` | How many got no answer. Present exactly when `answered` is `false` |
+| `reason` | Why, present exactly when `answered` is `false`: `unreachable` (the provider could not start, its session ended, or it could not reach the remote cache), `refused` (the provider answered and refused the request, such as a refused credential), or `timeout` (no answer in time). When lookups failed for several reasons, `refused` wins over `unreachable`, and `unreachable` over `timeout` |
+
+A cold cache stays distinct from a failure: its lookups answered with no entry,
+so `answered` is `true` and `hits` is `0`. Only a run whose remote cache did
+not answer gains from running the same change again. The member is absent when
+no remote cache provider took part in the run, including a provider that
+serves nothing by configuration, and in a session an older CLI recorded:
+absent means "not recorded". A lookup the run's own cancellation ended counts
+nowhere.
+
+```json
+{
+  "cache": {
+    "remote": {
+      "answered": false,
+      "lookups": 14,
+      "failedLookups": 14,
+      "reason": "unreachable"
+    }
+  }
+}
+```
+
 ## Session Events
 
 New `events.jsonl` files use the same version-2 variants as machine JSONL:

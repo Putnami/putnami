@@ -263,7 +263,12 @@ not change:
   session's other documents) is what the gate decided: per (spec-owning
   project, feature), the effective mode with provenance, every textual
   requirement's state with per-check detail, the observation reports read with
-  their SHA-256 digests, and the group's one `Blocked` decision. It is derived
+  their SHA-256 digests, and the group's one `Blocked` decision. A group's
+  optional `unconsulted` list names, sorted by project, the candidate projects
+  the gate asked and could not consult, each with a `reason` from the closed
+  `UnconsultedReason` set: `remote-unreachable`, `remote-timeout`, `no-entry`,
+  `no-cache`, `not-cacheable` or `plan-failed`. It is additive under protocol
+  version 1, and an absent list means "not recorded". It is derived
   history — the audit surface `putnami specs verify --session` replays — never
   an input to current maturity. A record with no group and no diagnostic
   means the gate ran and no selected project states a requirement; a session
@@ -588,10 +593,13 @@ a `settled` date that is not `YYYY-MM-DD`, an unknown `kind`, `rule` or
 convention all produce `features.invalid_decision_registry`. An **absent**
 `decisions.json` is adoption, never a failure. The `@putnami/sdd` extension
 proves every registry as the `decisions-validate` step of `validate-workspace`.
-`putnami context generate` renders every root entry into the workspace's
-`AGENTS.md` guidance block and names each project registry there; the
-`putnami.context` MCP tool returns a project's own decisions with that
-project.
+`putnami context generate` names the `decisions.json` files in one line of the
+workspace's `AGENTS.md` guidance block and lists no decision. The MCP server
+lists every root entry, with its date and enforcement, in the
+`putnami://workspace/guidance` resource, and names each project registry there.
+Its `initialize` instructions list as many root entries as fit the client's
+limit, as id and statement. The `putnami.context` MCP tool returns a project's
+own decisions with that project.
 
 The reasoning is recorded in
 [`tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md`](../../tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md).

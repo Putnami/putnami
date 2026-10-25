@@ -5,15 +5,32 @@ import "encoding/json"
 const (
 	jsonRPCVersion = "2.0"
 
-	// defaultProtocolVersion is the MCP revision the server advertises when a
-	// client does not request one. When the client sends a protocolVersion in
-	// initialize, the server echoes it back instead, which maximizes interop
-	// across spec revisions for a read-heavy server like this one.
-	defaultProtocolVersion = "2025-06-18"
+	// defaultProtocolVersion is the newest MCP revision the server speaks. It
+	// answers initialize with this version when the client requests none, or
+	// requests a revision outside supportedProtocolVersions. The server never
+	// echoes a version it does not speak.
+	defaultProtocolVersion = "2025-11-25"
 
 	// serverName is the MCP server identity reported in initialize.
 	serverName = "putnami"
 )
+
+// supportedProtocolVersions are the MCP revisions the server speaks. Tools,
+// resources and instructions exist in all four, and an older client ignores the
+// fields it does not know. The putnamiw relay (mcp_relay_while_preparing) keeps
+// the same list.
+var supportedProtocolVersions = []string{"2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"}
+
+// negotiateProtocolVersion returns the version initialize answers with: the
+// requested one when the server speaks it, else defaultProtocolVersion.
+func negotiateProtocolVersion(requested string) string {
+	for _, supported := range supportedProtocolVersions {
+		if requested == supported {
+			return requested
+		}
+	}
+	return defaultProtocolVersion
+}
 
 // JSON-RPC 2.0 error codes (the subset this server emits).
 const (
@@ -54,6 +71,20 @@ type rpcResponse struct {
 	Result  any             `json:"result,omitempty"`
 	Error   *rpcError       `json:"error,omitempty"`
 }
+
+// rpcNotification is a message the server sends without an id. The client
+// answers none.
+type rpcNotification struct {
+	JSONRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
+}
+
+// The list-changed notifications the server sends after it reloads its
+// extensions.
+const (
+	notificationToolsListChanged     = "notifications/tools/list_changed"
+	notificationResourcesListChanged = "notifications/resources/list_changed"
+)
 
 // --- MCP lifecycle types ---
 

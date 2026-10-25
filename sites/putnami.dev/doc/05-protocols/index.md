@@ -68,7 +68,7 @@ An agent does not need to be taught your repository. It reads the same contracts
 your build reads.
 
 **`putnami context pack`** aggregates one project's framework-owned facts into
-an agent-context document: identity and dependency graph, composition roots,
+an agent-context document and prints it, writing no file: identity and dependency graph, composition roots,
 capability / contract / infra / migration references, representative source
 *ranges*, tests, adjacent docs, and provenance. It aggregates **by reference** —
 paths, digests, and ranges, never file content — and runs a fail-closed

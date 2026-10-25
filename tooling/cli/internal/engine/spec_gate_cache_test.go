@@ -39,6 +39,7 @@ func TestCandidateOutcomeSeparatesSilenceFromUnreachability(t *testing.T) {
 		outcome         candidateOutcome
 		wantUnconsulted bool
 		wantReason      string
+		wantCode        features.UnconsultedReason
 	}{
 		"no report task at all is an answer": {
 			outcome: candidateOutcome{},
@@ -54,27 +55,48 @@ func TestCandidateOutcomeSeparatesSilenceFromUnreachability(t *testing.T) {
 			wantUnconsulted: true,
 			wantReason: "not selected, and the test task that would write its verification report is not cacheable, " +
 				"so no observation can be recovered",
+			wantCode: features.UnconsultedNotCacheable,
 		},
 		"a keyed report task with no entry was never reached": {
 			outcome:         candidateOutcome{reportTasks: 1, keyed: 1},
 			wantUnconsulted: true,
 			wantReason:      "not selected, and the test task that writes its verification report has no cache entry for these inputs",
+			wantCode:        features.UnconsultedNoEntry,
 		},
 		"one unanswered report task among several is enough": {
 			outcome:         candidateOutcome{reportTasks: 2, keyed: 2, entries: 1},
 			wantUnconsulted: true,
 			wantReason:      "not selected, and the test task that writes its verification report has no cache entry for these inputs",
+			wantCode:        features.UnconsultedNoEntry,
+		},
+		"a remote lookup that failed says so": {
+			outcome: candidateOutcome{reportTasks: 1, keyed: 1,
+				remoteFailure: remoteLookupFailure(errors.New("cache provider session ended"))},
+			wantUnconsulted: true,
+			wantReason: "not selected, and the remote cache lookup for the test task that writes its verification report failed: " +
+				"cache provider session ended",
+			wantCode: features.UnconsultedRemoteUnreachable,
+		},
+		"a remote lookup that ran out of time says so": {
+			outcome: candidateOutcome{reportTasks: 1, keyed: 1,
+				remoteFailure: remoteLookupFailure(context.DeadlineExceeded)},
+			wantUnconsulted: true,
+			wantReason:      "not selected, and the remote cache did not answer in time for the test task that writes its verification report",
+			wantCode:        features.UnconsultedRemoteTimeout,
 		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			reason, unconsulted := testCase.outcome.unconsultedReason()
+			cause, unconsulted := testCase.outcome.unconsultedReason()
 			if unconsulted != testCase.wantUnconsulted {
 				t.Fatalf("unconsulted = %v, want %v (outcome %+v)", unconsulted, testCase.wantUnconsulted, testCase.outcome)
 			}
-			if reason != testCase.wantReason {
-				t.Errorf("reason = %q, want %q", reason, testCase.wantReason)
+			if cause.prose != testCase.wantReason {
+				t.Errorf("reason = %q, want %q", cause.prose, testCase.wantReason)
+			}
+			if cause.code != testCase.wantCode {
+				t.Errorf("code = %q, want %q", cause.code, testCase.wantCode)
 			}
 		})
 	}
@@ -106,6 +128,9 @@ func TestNoCacheRunConsultsNothingAndSaysWhy(t *testing.T) {
 	}
 	if recovery.Unconsulted[0].Reason != "--no-cache: no cached observation may be served" {
 		t.Errorf("reason = %q, want the --no-cache cause", recovery.Unconsulted[0].Reason)
+	}
+	if recovery.Unconsulted[0].Code != features.UnconsultedNoCache {
+		t.Errorf("code = %q, want %q", recovery.Unconsulted[0].Code, features.UnconsultedNoCache)
 	}
 }
 

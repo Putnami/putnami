@@ -48,12 +48,11 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 		"This is a Putnami workspace.",
 		"`./putnamiw` when present, otherwise `putnami`",
 		// This temp dir declares no putnami.ci.json, so the gate is the
-		// documented fallback. Pinning the literal here is deliberate: the
-		// generic line a workspace without a CI document receives must not
-		// move, and the derived line is pinned against the real document by
-		// TestGeneratedGuidanceMatchesRepositoryCIDocument instead.
-		"`putnami " + defaultGateTasks + " --impacted --enforce-coverage`",
+		// protocol's default document gate. The derived line is pinned against
+		// the real document by TestGeneratedGuidanceMatchesRepositoryCIDocument.
+		"`putnami " + defaultGate() + " --impacted --enforce-coverage`",
 		"While iterating, select the projects you changed with `--projects <a>,<b>`",
+		"Use grep only for literal text, or after the tool answers stale or unavailable.",
 		"If the MCP root differs from your worktree, use the local CLI.",
 		"Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami.",
 		"Read `.agents/constraints.md` when it exists.",

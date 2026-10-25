@@ -242,6 +242,27 @@ func TestPortableProviderSubmitIsIdempotentByKey(t *testing.T) {
 		if _, err := session.Cancel(ctx, &runner.CancelParams{Attempt: attempt}); err != nil {
 			t.Fatal(err)
 		}
+		awaitAttemptSettled(t, filepath.Join(providerRoot, "attempts", attempt))
+	}
+}
+
+// awaitAttemptSettled waits until the attempt is terminal and its supervisor
+// has exited. A cancel answers after a bounded wait, so without this the
+// supervisor can still write into the attempt while the test's temporary
+// directory is removed.
+func awaitAttemptSettled(t *testing.T, dir string) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	state := clitest.ReadFixtureState(dir)
+	for !runner.TerminalState(state.State) {
+		if time.Now().After(deadline) {
+			t.Fatalf("attempt %s did not reach a terminal state: %+v", filepath.Base(dir), state)
+		}
+		time.Sleep(20 * time.Millisecond)
+		state = clitest.ReadFixtureState(dir)
+	}
+	if state.Supervisor != 0 && !processGone(state.Supervisor, time.Until(deadline)) {
+		t.Fatalf("attempt %s supervisor %d did not exit", filepath.Base(dir), state.Supervisor)
 	}
 }
 

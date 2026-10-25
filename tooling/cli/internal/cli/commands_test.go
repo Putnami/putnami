@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -110,6 +112,10 @@ func TestRunStructuredCommandWrapsLegacyPayloads(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("a command's own envelope carries the reported warnings", func(t *testing.T) {
+		assertOwnEnvelopeCarriesWarnings(t, cfg, wsRoot)
+	})
 }
 
 func structuredResultsEqual(left, right protocolcli.ResultV2) bool {
@@ -552,5 +558,63 @@ func TestWarningWriter(t *testing.T) {
 	}
 	if got := warningWriter(&CommandEnv{Global: GlobalFlags{Quiet: true}}); got != nil {
 		t.Errorf("warningWriter under --quiet = %v, want nil", got)
+	}
+}
+
+// assertOwnEnvelopeCarriesWarnings pins the envelope of a command that runs
+// jobs inside its own result, such as impact-plan, cache verify and qualify:
+// the dispatcher adds the warnings the command reported to the envelope the
+// command wrote, and keeps the warnings that envelope already names. It swaps
+// the handler of impact-plan, so it runs inside a serial test.
+func assertOwnEnvelopeCarriesWarnings(t *testing.T, cfg *wsproto.Config, wsRoot string) {
+	t.Helper()
+	reported := []workspace.Warning{{Code: workspace.WarningCodeJobsIgnored, Message: "reported by the engine run"}}
+	own := []protocolcli.WorkspaceWarning{{Code: "own.code", Message: "named by the command"}}
+
+	// The handler stands in for impact-plan: its engine run reports into the
+	// command's report, and it writes its own result envelope.
+	command, ok := lookupCommand("impact-plan")
+	if !ok {
+		t.Fatal("impact-plan command is not registered")
+	}
+	original := command.run
+	t.Cleanup(func() { command.run = original })
+
+	for _, tc := range []struct {
+		name     string
+		envelope []protocolcli.WorkspaceWarning
+		want     []protocolcli.WorkspaceWarning
+	}{
+		{"an envelope without warnings gets the reported ones", nil,
+			[]protocolcli.WorkspaceWarning{{Code: string(workspace.WarningCodeJobsIgnored), Message: "reported by the engine run"}}},
+		{"an envelope with warnings keeps its own", own, own},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command.run = func(env *CommandEnv) error {
+				env.WorkspaceWarnings().Report(&workspace.Workspace{Warnings: reported})
+				result := protocolcli.NewResultV2("impact-plan", map[string]any{"ok": true}, nil)
+				result.WorkspaceWarnings = tc.envelope
+				_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL, result)
+				return err
+			}
+			parsed := ParseArgs([]string{"impact-plan", "lint", "--output=json"}, cfg.Aliases, nil)
+			if parsed.Err != nil {
+				t.Fatalf("ParseArgs: %v", parsed.Err)
+			}
+			code := ExitError
+			out := captureStdout(t, func() {
+				code = (&App{}).runStructuredCommand(context.Background(), parsed, cfg, wsRoot)
+			})
+			if code != ExitSuccess {
+				t.Fatalf("exit code = %d, want %d\n%s", code, ExitSuccess, out)
+			}
+			var envelope protocolcli.ResultV2
+			if err := json.Unmarshal([]byte(out), &envelope); err != nil {
+				t.Fatalf("output is not one result envelope: %v\n%s", err, out)
+			}
+			if !reflect.DeepEqual(envelope.WorkspaceWarnings, tc.want) {
+				t.Fatalf("workspaceWarnings = %+v, want %+v", envelope.WorkspaceWarnings, tc.want)
+			}
+		})
 	}
 }

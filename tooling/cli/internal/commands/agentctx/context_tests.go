@@ -39,14 +39,6 @@ import (
 // each conformance pack lives at <project>/conformance/pack.json.
 const conformancePackRelPath = "conformance/pack.json"
 
-// The committed test policy lives in the workspace config at options.test.infra.
-// buildTestsSection derives its policy ONLY from this value so the artifact is
-// byte-stable at a fixed tree (see testPolicyFromConfig).
-const (
-	testInfraConfigCommand = "test"
-	testInfraConfigKey     = "infra"
-)
-
 // conformanceRunnerTokens are the one-line opt-in markers a project uses to
 // certify a conformance pack: the Go conformance.Run(t) runner and the TypeScript
 // registerConformanceTests() / registerHealthConformanceTests() runners. A test
@@ -77,14 +69,16 @@ type discoveredPack struct {
 }
 
 // buildTestsSection aggregates the project's tests section from committed
-// conformance-pack metadata ALONE. It reports the environment-independent test
-// policy plus, for each applicable-and-opted-in conformance pack reachable through
-// the project's dependency closure, a pack reference and (when the pack ships a
-// corpus) a fixture digest. When no pack is selected it records a machine-readable
-// absence reason so a consumer never has to guess why the section is empty. The
-// section is emitted for EVERY project so it is always informative.
+// conformance-pack metadata ALONE. For each applicable-and-opted-in conformance
+// pack reachable through the project's dependency closure it reports a pack
+// reference and (when the pack ships a corpus) a fixture digest. When no pack is
+// selected it records a machine-readable absence reason so a consumer never has
+// to guess why the section is empty. The section is emitted for EVERY project so
+// it is always informative. It reads no workspace option: how test
+// infrastructure is provisioned is a setting of the test jobs, not a fact of the
+// document.
 func buildTestsSection(ws *workspace.Workspace, proj *workspace.Project, projDir string) (*agentcontext.TestsSection, error) {
-	section := &agentcontext.TestsSection{Policy: testPolicyFromConfig(ws)}
+	section := &agentcontext.TestsSection{}
 
 	declared := declaredConformanceKinds(projDir)
 	selected := selectConformancePacks(ws, proj, projDir, declared)
@@ -106,25 +100,6 @@ func buildTestsSection(ws *workspace.Workspace, proj *workspace.Project, projDir
 	}
 	section.FixtureDigests = fixtures
 	return section, nil
-}
-
-// testPolicyFromConfig derives the DETERMINISM-CRITICAL test policy from committed
-// config alone: options.test.infra when it names a valid policy (auto/require/skip),
-// else the auto default. It deliberately does NOT consult the CI environment (as
-// the runtime planner's resolveTestMode does), so the artifact is byte-identical
-// in CI and locally at a fixed tree. A nil config is tolerated (auto).
-func testPolicyFromConfig(ws *workspace.Workspace) agentcontext.TestPolicy {
-	if ws != nil && ws.Config != nil && ws.Config.Options != nil {
-		if opts, ok := ws.Config.Options[testInfraConfigCommand]; ok {
-			if s, ok := opts[testInfraConfigKey].(string); ok {
-				policy := agentcontext.TestPolicy(strings.TrimSpace(s))
-				if agentcontext.ValidTestPolicies[policy] {
-					return policy
-				}
-			}
-		}
-	}
-	return agentcontext.TestPolicyAuto
 }
 
 // declaredConformanceKinds reads the project's committed capability manifest

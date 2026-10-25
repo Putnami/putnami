@@ -282,8 +282,16 @@ workspace, not a count of a task's diagnostics.
 
 `projects list`, `projects describe`, `scopes list` and `workspace describe`
 fill the member. `completion` and `projects tag` take no `--output=json`, so
-their warnings stay on stderr. A job run's envelope does not carry the member
-yet: its load warnings are on stderr only.
+their warnings stay on stderr. A command that runs jobs fills the member in
+its `--output=json` envelope, for the run's verdict and for a plan-only
+preview, and in the `doctor` envelope of a blocked production preflight in
+either structured mode. A command that runs jobs inside its own result, such as
+`compose`, `qualify --target local`, `cache verify` and `impact-plan`, fills the
+member with the warnings of its job run. `compose` and every `qualify` form,
+`--target <url>` and `--print-contract` included, also fill it with the
+warnings of the load they perform before any job runs. A warning that two loads
+of one command report appears once. The `--output=jsonl` session stream of a
+run writes no result envelope, so there its load warnings are on stderr only.
 
 ### Test case records
 
@@ -983,8 +991,7 @@ Two behavior changes travel with the shape, both settled above:
 - a run whose only failure was restored from cache reported success on the v1
   `--output=jsonl` summary, and fails in v2 (decision 1).
 
-A **non-job** command (`doctor`, `contracts check`, `context pack`,
-`migrate vnext`, …) has no run to report: its envelope carries
+A **non-job** command (`doctor`, `contracts check`, `migrate vnext`, …) has no run to report: its envelope carries
 `protocolVersion`, `command`, `status`, `exitCode`, the command's own payload in
 `data`, and `error` when it failed. Those payloads are unchanged from v1 — only
 the envelope around them gained the version stamp and the third status.

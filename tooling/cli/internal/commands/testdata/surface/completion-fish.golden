@@ -144,8 +144,6 @@ complete -c putnami -l 'version' -d 'Show version'
 complete -c putnami -n '__putnami_seen_path cli list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path cli use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
-complete -c putnami -n '__putnami_seen_path context map' -l 'print' -d 'Render the map to stdout (md by default, or json) and write nothing'
-complete -c putnami -n '__putnami_seen_path context pack' -l 'check' -d 'Re-derive the documents, write nothing, and fail on drift'
 complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Project ID, path, or name; default is every workspace project' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r

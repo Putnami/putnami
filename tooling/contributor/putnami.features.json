@@ -55,7 +55,8 @@
               "no-publication-names-an-agent",
               "an-explicit-hosted-gate-waits-without-local-execution",
               "hosted-parent-workflow-completeness",
-              "a-featureless-partial-needs-no-workflow"
+              "a-featureless-partial-needs-no-workflow",
+              "a-partial-without-an-eligible-unit-publishes-without-a-receipt"
             ]
           }
         },

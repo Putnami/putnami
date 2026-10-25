@@ -91,7 +91,10 @@ func (r *RemoteCache) RestoreTaskEntry(
 //
 // It returns (nil, nil) for a provider miss, an untrusted hit, and a provider
 // that serves nothing by configuration. It returns an error when the provider
-// cannot answer in time or at all, or when its payload is not interpretable.
+// cannot answer in time or at all, when it answers that it could not restore
+// the entry (cache.RestoreError), or when its payload is not interpretable.
+// Each lookup that reached the provider, or failed to, counts in the run's
+// cache stats (CacheStats.RecordRemoteLookup).
 func (r *RemoteCache) FetchTaskEntry(
 	ctx context.Context,
 	within time.Duration,
@@ -106,6 +109,7 @@ func (r *RemoteCache) FetchTaskEntry(
 		return nil, err
 	}
 	if _, ok := r.ensureProvider(ctx, nil, cm); !ok {
+		r.recordUnavailable()
 		return nil, r.provider.unavailable()
 	}
 	bounded, cancel := context.WithTimeout(ctx, within)
@@ -154,9 +158,11 @@ func (r *RemoteCache) restoreTaskEntry(
 
 	sess, ok := r.ensureProvider(ctx, nil, cm)
 	if !ok {
+		r.recordUnavailable()
 		return nil, jobmodel.ReuseNone, r.provider.unavailable()
 	}
 	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: store.RemoteTaskEntryKey(hash)})
+	r.recordLookup(restoreFailure(restore, err))
 	if err != nil {
 		if planned {
 			//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
@@ -164,6 +170,11 @@ func (r *RemoteCache) restoreTaskEntry(
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		}
 		return nil, jobmodel.ReuseNone, err
+	}
+	if restore.Status == cache.RestoreError {
+		// The provider could not reach the entry: not a miss, so a reader of
+		// the store learns the remote cache did not answer.
+		return nil, jobmodel.ReuseNone, errProviderRestoreFailed
 	}
 	if restore.Status != cache.RestoreHit || restore.Result == nil || restore.Manifest == nil {
 		return nil, jobmodel.ReuseNone, nil

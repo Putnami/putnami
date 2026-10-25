@@ -18,10 +18,10 @@ import (
 // This pins the rendered command surface so every later
 // change can prove it regenerated the same bytes from the new CommandCatalog.
 //
-// Hard constraint: these goldens are IN-PROCESS ONLY. The
-// suite runs with race: true (tooling/cli/putnami.json) where one subprocess
-// re-exec costs ≈1s, so every golden here calls the rendering
-// function directly instead of shelling out to the built binary.
+// Hard constraint: these goldens are IN-PROCESS ONLY. One subprocess re-exec
+// per golden would add its start-up cost to every golden, so every golden here
+// calls the rendering function directly instead of shelling out to the built
+// binary.
 //
 // Deliberately NOT pinned: invalid input. Bad flag values and unknown flags are
 // usage errors (flags.go, parse.go), not rendered surfaces. See

@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "identity": {
     "id": "/go/samples/library",
     "name": "go.putnami.dev/examples/library",

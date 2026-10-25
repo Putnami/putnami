@@ -163,6 +163,7 @@ func watchIterationRequest(
 		ExecutesUnderDryRun: req.ExecutesUnderDryRun,
 		ServeProcessEnv:     req.ServeProcessEnv,
 		watchIteration:      true,
+		latestWarnings:      req.latestWarnings,
 		VersionSnapshot:     req.VersionSnapshot,
 		Preflight:           req.Preflight,
 		Stdout:              io.Discard,

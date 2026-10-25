@@ -38,8 +38,13 @@ naming the decision: id, statement, settled date, and the registry to edit.
 
 Each decision reaches an agent where it binds:
 
-- `putnami context generate` renders every root decision into the `AGENTS.md`
-  guidance block and names each project registry with its decision count;
+- `putnami context generate` names the `decisions.json` files in one line of the
+  `AGENTS.md` guidance block and lists no decision;
+- the MCP server lists every root decision, with its date and enforcement, in
+  the `putnami://workspace/guidance` resource, and names each project registry
+  with its decision count there. Its `initialize` instructions list as many root
+  decisions as id and statement as fit Claude Code's 4,096-character limit, and
+  point at the resource;
 - the `putnami.context` MCP tool returns a project's own decisions with that
   project.
 
@@ -61,8 +66,10 @@ The boundaries:
   An entry carries exactly one of a check or `reviewOnly`.
 - **No verification-mode knob.** A written, dated decision is held or
   re-decided; it is not adopted gradually like an architecture graph.
-- **Nothing is truncated.** The protocol bounds a registry to 256 entries, so
-  what an agent reads stays finite without hiding a settled decision.
+- **Nothing is hidden.** The protocol bounds a registry to 256 entries, so
+  the guidance and the project context render it whole. A shorter listing,
+  such as the MCP instructions, counts the decisions it leaves out and names
+  the resource that holds them all.
 - **An ADR is justification only.** The registry carries the enforceable
   statement and the ADR explains why. Neither restates the other.
 
@@ -87,7 +94,7 @@ The boundaries:
 - Changing a settled value means editing its registry in the same pull request,
   which puts the re-decision in the diff.
 - An agent on one project reads the root decisions and that project's, not
-  every project's. The guidance still names every project registry.
+  every project's. The guidance resource still names every project registry.
 - A check with a wide glob costs an uncached worktree walk on every
   `validate-workspace`.
 - The generated guidance block differs per workspace; its begin marker carries

@@ -21,9 +21,10 @@ verified change. It uses public CLI and MCP surfaces only.
    `--projects <a>,<b>`: it keeps the upstream steps they need and skips every
    project that depends on them. Before declaring work complete, verify once
    with `putnami lint,test,build --impacted --enforce-coverage`. A
-   `putnami.ci.json` replaces that gate with its blocking commands. Without a
-   usable one, the gate stays `lint,test,build`, whatever the extensions of the
-   workspace declare. In a repository that provides
+   `putnami.ci.json` replaces that gate with its blocking commands, in the
+   document's order. Without a usable one, the gate is the blocking commands of
+   the CI protocol's default document (`lint,test,build`), whatever the
+   extensions of the workspace declare. In a repository that provides
    `./putnamiw`, use that pinned wrapper for build, test, lint, dependency, and
    generation workflows.
 5. Diagnose with `putnami doctor`, structured `--output=jsonl`,
@@ -62,8 +63,9 @@ public API. Filesystem, process, network, and terminal behavior remains in
 
 ## MCP routing and access
 
-The core MCP server exposes eleven tools and one `workspace://context`
-resource. Tool annotations are contractual: read-only methods do not execute
+The core MCP server exposes eleven tools, the `workspace://context` resource,
+and the guidance, workspace map and project context resources under
+`putnami://`. Tool annotations are contractual: read-only methods do not execute
 jobs, and `run_jobs` is the only mutating method.
 
 | Outcome | MCP methods | Feature and spec | Access and protection |

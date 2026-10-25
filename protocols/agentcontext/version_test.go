@@ -12,13 +12,14 @@ import (
 const agentContextSchemaPath = "schemas/agent-context.json"
 
 // TestProtocolVersion_SchemaMatches asserts the JSON schema accepts exactly the
-// current protocol version — no more, no less — for BOTH wire shapes. The schema
-// and the parser must agree in both directions: a schema that accepts fewer
-// versions rejects a document the parser reads, and a schema that accepts more
-// blesses one the parser drops. Either gap is drift.
+// current version of each wire shape — no more, no less: ProtocolVersion for the
+// document and OverridesProtocolVersion for the overrides file. The schema and
+// the parser must agree in both directions: a schema that accepts fewer versions
+// rejects a document the parser reads, and a schema that accepts more blesses
+// one the parser drops. Either gap is drift.
 func TestProtocolVersion_SchemaMatches(t *testing.T) {
-	want := []int{ProtocolVersion}
-	for _, def := range []string{"document", "overridesFile"} {
+	for def, version := range map[string]int{"document": ProtocolVersion, "overridesFile": OverridesProtocolVersion} {
+		want := []int{version}
 		t.Run(def, func(t *testing.T) {
 			accepted := schemaDefProtocolVersions(t, agentContextSchemaPath, def)
 			if !equalIntSets(accepted, want) {
@@ -32,8 +33,11 @@ func TestProtocolVersion_SchemaMatches(t *testing.T) {
 // TestProtocolVersion_Pinned pins the constant so a bump is a deliberate,
 // reviewed change rather than an accident.
 func TestProtocolVersion_Pinned(t *testing.T) {
-	if ProtocolVersion != 1 {
-		t.Fatalf("ProtocolVersion = %d, want 1 (a bump must be deliberate and update the schema + fixtures)", ProtocolVersion)
+	if ProtocolVersion != 2 {
+		t.Fatalf("ProtocolVersion = %d, want 2 (a bump must be deliberate and update the schema + fixtures)", ProtocolVersion)
+	}
+	if OverridesProtocolVersion != 1 {
+		t.Fatalf("OverridesProtocolVersion = %d, want 1 (the overrides shape did not change with the document; a bump must be deliberate)", OverridesProtocolVersion)
 	}
 }
 

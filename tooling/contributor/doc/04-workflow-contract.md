@@ -107,7 +107,12 @@ no workflow receipt. Pass `--workflow-file` to advance a unit that names such
 projects.
 Native preflight checks whether the outcome can complete after eligible current
 units reach ready; partial delivery preserves pending later obligations. Exact
-policy-named checks on the same full HEAD produce a `hostedWorkflowReceipt`.
+policy-named checks on the same full HEAD produce a `hostedWorkflowReceipt`
+for each eligible unit: a current unit at `candidate` whose native checks
+pass. A partial delivery whose valid workflow has no eligible unit, for example
+a unit still at `building`, still publishes with its non-closing task
+reference. It names no ready unit and produces no receipt, and the unit keeps
+its stage. The hosted checks never stand for a unit's native proof.
 Keep its original workflow file immutable and append a new stage-ready revision
 using the native publisher result as the receipt. Native replay checks the
 original inputs and provider status; a rewritten original or stale tree fails.

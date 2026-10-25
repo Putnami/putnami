@@ -393,13 +393,24 @@ list_processes() {
 # Print "pid directory" for the working directory of each process whose
 # directory the user can read: from /proc on Linux, from lsof where it is
 # installed (macOS). Where neither exists it prints nothing, and the command
-# lines alone decide.
+# lines alone decide. One ls reads every /proc link: a readlink per process
+# forks once for each process of the machine, on every probe of a stop.
 list_directories() {
   if readlink /proc/self/cwd >/dev/null 2>&1; then
-    for process_dir in /proc/[0-9]*; do
-      process_cwd="$(readlink "$process_dir/cwd" 2>/dev/null)" || continue
-      printf '%s %s\n' "${process_dir#/proc/}" "$process_cwd"
-    done
+    # ls -l prints a link as "... /proc/<pid>/cwd -> <directory>"; GNU and
+    # busybox leave out the arrow for a link they cannot read. Literal quoting
+    # and the C locale keep each directory byte for byte.
+    QUOTING_STYLE=literal LC_ALL=C ls -ld /proc/[0-9]*/cwd 2>/dev/null |
+      LC_ALL=C awk '{
+        start = index($0, " /proc/")
+        if (start == 0) next
+        rest = substr($0, start + 7)
+        arrow = index(rest, "/cwd -> ")
+        if (arrow == 0) next
+        pid = substr(rest, 1, arrow - 1)
+        if (pid !~ /^[0-9]+$/) next
+        print pid, substr(rest, arrow + 8)
+      }' || true
   elif command -v lsof >/dev/null 2>&1; then
     lsof -a -d cwd -Fpn 2>/dev/null |
       awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid, substr($0, 2) }' || true

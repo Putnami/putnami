@@ -326,8 +326,25 @@ Silence is an answer. A dependency whose cache entry exists and records the
 report output **empty** ran for these inputs and observed nothing, so it counts
 as consulted; so does a project with no task that declares the report. Only a
 candidate that could not be reached is unconsulted: the test task that writes its
-report has no cache entry or is not cacheable, or the run used `--no-cache`. The
-other steps of the `test` command are never asked.
+report has no cache entry or is not cacheable, the remote cache did not answer,
+or the run used `--no-cache`. The other steps of the `test` command are never
+asked.
+
+The warning states each cause in prose. The session's `spec-verification.json`
+record states the same causes in each group's `unconsulted` list: one entry per
+candidate project, with a `reason` from a closed set.
+
+| `reason` | The candidate's report task | Running the same change again helps |
+|----------|-----------------------------|-------------------------------------|
+| `remote-unreachable` | its remote cache lookup failed | yes |
+| `remote-timeout` | the remote cache did not answer in time | yes |
+| `no-entry` | the caches answered and hold no entry for these inputs | no |
+| `no-cache` | the run reads no cache: `--no-cache`, or no cache store | no |
+| `not-cacheable` | is not cacheable | no |
+| `plan-failed` | its test plan or cache keys could not be derived | no |
+
+The list is absent when the session's own observations closed the group, when
+every candidate answered, and in a record an older CLI wrote.
 
 The exemption cannot launder a real defect. It applies only when every one of a
 requirement's checks is either satisfied or missing with reason
