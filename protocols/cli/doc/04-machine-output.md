@@ -50,6 +50,9 @@ Failure priority is deliberately narrow and stable:
   protected path keeps it live after ordinary detail has exhausted its budget.
 - a `ready` event, the typed readiness claim a supervisor acts on. A workload
   that logged past the ordinary partition still delivers its claim live.
+- a `process` event, which the CLI emits when a serve step spawns and which
+  names the step's process group and its leader's start time. A supervisor
+  records them to reap the group if it dies without its teardown.
 
 A `test:case` record is never failure priority, whatever its status. The failed
 task's `task:end` already takes the reserve.

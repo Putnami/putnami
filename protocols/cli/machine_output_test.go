@@ -149,7 +149,7 @@ func TestMachineOutputFailurePriorityVocabulary(t *testing.T) {
 		{"failed test case", SessionStreamRecord{Record: RecordTestCase, TestCase: &TestCase{Status: TestCaseStatusFailed}}, false},
 		{"ready claim", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "ready", "target": "server", "endpoints": []any{map[string]any{"scheme": "http", "host": "127.0.0.1", "port": 43120}}}}, true},
 		{"debug ready claim", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "ready", "level": "debug"}}, true},
-		{"process group", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "process", "group": 4242, "leaderStart": "4242"}}, false},
+		{"process group", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "process", "group": 4242, "leaderStart": "4242"}}, true},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {

@@ -3555,8 +3555,10 @@ function failurePriorityEvent(event: JsonObject | undefined): boolean {
     case 'phase':
       return childString(event, 'status') === 'failed';
     case 'ready':
-      // A ready claim is the control event a supervisor waits on: a workload
-      // that logged past the ordinary partition must still deliver it.
+    case 'process':
+      // A ready claim is the control event a supervisor waits on, and a
+      // process event names the group the supervisor must reap: a workload
+      // that logged past the ordinary partition must still deliver both.
       return true;
     case 'result': {
       const result = childObject(event, 'data');

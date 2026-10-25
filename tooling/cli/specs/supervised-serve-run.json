@@ -23,7 +23,7 @@
     },
     {
       "id": "ready-claims-are-never-elided",
-      "text": "A ready task:event is a priority record of the bounded session stream, in Go and TypeScript alike: it is admitted from the failure reserve once ordinary records spent their partition, so a workload that logged past the partition still delivers its claim live. With --output=jsonl and --serve-env, stdout carries the session stream unchanged and stderr carries the serve steps' output as putnami serve renders it in text mode."
+      "text": "A ready task:event is a priority record of the bounded session stream, in Go and TypeScript alike: it is admitted from the failure reserve once ordinary records spent their partition, so a workload that logged past the partition still delivers its claim live. A serve step's process event is a priority record for the same reason. With --output=jsonl and --serve-env, stdout carries the session stream unchanged and stderr carries the serve steps' output as putnami serve renders it in text mode."
     },
     {
       "id": "a-serve-step-names-its-process-group",

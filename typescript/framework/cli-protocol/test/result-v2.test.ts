@@ -163,7 +163,7 @@ describe('bounded machine-output helpers', () => {
       ).toBe(true);
       expect(isMachineOutputFailurePriority(eventRecord({ type: 'ready', level: 'debug' }))).toBe(true);
       expect(isMachineOutputFailurePriority(eventRecord({ type: 'process', group: 4242, leaderStart: '4242' }))).toBe(
-        false,
+        true,
       );
       expect(isMachineOutputDebugDetail(eventRecord({ type: 'log', level: 'debug' }))).toBe(true);
       expect(isMachineOutputDebugDetail(eventRecord({ type: 'log', level: 'info' }))).toBe(false);
