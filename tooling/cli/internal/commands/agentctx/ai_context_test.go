@@ -52,6 +52,7 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 		// the real document by TestGeneratedGuidanceMatchesRepositoryCIDocument.
 		"`putnami " + defaultGate() + " --impacted --enforce-coverage`",
 		"While iterating, select the projects you changed with `--projects <a>,<b>`",
+		"Use grep only for literal text, or after the tool answers stale or unavailable.",
 		"If the MCP root differs from your worktree, use the local CLI.",
 		"Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami.",
 		"Read `.agents/constraints.md` when it exists.",

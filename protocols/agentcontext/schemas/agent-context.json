@@ -23,11 +23,6 @@
       "enum": ["checked", "unchecked"],
       "description": "Whether a doc-to-code relationship was verified. Closed enum; adding a status requires a protocol version bump."
     },
-    "testPolicy": {
-      "type": "string",
-      "enum": ["auto", "require", "skip"],
-      "description": "How the test tooling behaves; mirrors database TestMode. Closed enum; adding a value requires a protocol version bump."
-    },
     "absenceReason": {
       "type": "string",
       "enum": ["not-collected", "no-packs", "unsupported-project-type"],
@@ -142,10 +137,8 @@
     "testsSection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["policy"],
-      "description": "The optional tests section: packs + policy + fixture digests, or an absence reason.",
+      "description": "The optional tests section: packs + fixture digests, or an absence reason.",
       "properties": {
-        "policy": { "$ref": "#/$defs/testPolicy" },
         "packs": { "type": "array", "items": { "$ref": "#/$defs/packRef" }, "description": "Referenced conformance packs." },
         "fixtureDigests": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Test-fixture artifacts by path + digest." },
         "absenceReason": { "$ref": "#/$defs/absenceReason", "description": "Why packs is empty; required when packs is empty, forbidden otherwise." }
@@ -193,10 +186,10 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["protocolVersion", "identity", "provenance"],
-      "description": "The per-project agent-context artifact emitted to <project>/.gen/agent-context.json.",
+      "description": "The per-project agent-context document that putnami context pack prints and the MCP agent_context tool serves.",
       "properties": {
         "$schema": { "type": "string", "description": "JSON Schema reference." },
-        "protocolVersion": { "type": "integer", "const": 1, "description": "Current agent-context protocol version." },
+        "protocolVersion": { "type": "integer", "const": 2, "description": "Current agent-context protocol version." },
         "identity": { "$ref": "#/$defs/identity" },
         "compositionRoots": { "type": "array", "items": { "$ref": "#/$defs/compositionRoot" }, "description": "The project's entrypoints." },
         "capabilities": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "description": "Capability manifest references." },
@@ -217,7 +210,7 @@
       "description": "The author-owned schema/agent-context.overrides.json that narrows deterministic selection.",
       "properties": {
         "$schema": { "type": "string", "description": "JSON Schema reference." },
-        "protocolVersion": { "type": "integer", "const": 1, "description": "Current agent-context protocol version." },
+        "protocolVersion": { "type": "integer", "const": 1, "description": "Current overrides-file protocol version, versioned apart from the document." },
         "addSources": { "type": "array", "items": { "$ref": "#/$defs/sourceRange" }, "description": "Representative-source ranges to add." },
         "removeSources": { "type": "array", "items": { "$ref": "#/$defs/relativePath" }, "description": "Source paths to drop from the selection." },
         "addDocs": { "type": "array", "items": { "$ref": "#/$defs/docRef" }, "description": "Documentation references to add." },

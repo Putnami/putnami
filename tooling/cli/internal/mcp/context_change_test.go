@@ -389,6 +389,9 @@ func TestContextNoticeNamesEachChangeAndWhatToRead(t *testing.T) {
 func TestContextChangeReachesTheNextToolResultOnce(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, contextFeature, contextRequirement, checkNextToolResultReports)
+	// Context the agent already read went stale; the next answer says so and
+	// names what to read again.
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "stale-or-absent-context-is-reported-for-fallback")
 	f := newContextFixture(t)
 	srv := f.server(t, nil)
 

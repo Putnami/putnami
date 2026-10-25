@@ -1,13 +1,13 @@
 # Agent Context Protocol
 
-> **Status: adopted.** This package pins the v1 wire contract, strict parsing,
-> semantic validation, and the fail-closed publish-safety gate for the
-> per-project agent-context artifact. The deterministic aggregator (`putnami
-> context pack` / `--check`) and the read-only MCP `agent_context` tool have
-> shipped; see [Using it](#using-it).
+> **Status: adopted.** This package pins the version 2 wire contract, strict
+> parsing, semantic validation, and the fail-closed publish-safety gate for the
+> per-project agent-context document. The deterministic aggregator (`putnami
+> context pack`) and the read-only MCP `agent_context` tool have shipped; see
+> [Using it](#using-it).
 
-Why the document references instead of embedding, why it stays ephemeral, and
-why publication fails closed is recorded in
+Why the document references instead of embedding, why no producer writes it to
+a file, and why publication fails closed is recorded in
 [`doc/adr/0001-aggregate-by-reference-fail-closed.md`](doc/adr/0001-aggregate-by-reference-fail-closed.md).
 
 ## Why
@@ -20,11 +20,10 @@ those tools can answer "what is this project" from framework-owned facts without
 rescanning the repository, while a hosted index can consume it without leaking
 anything sensitive.
 
-The document is **ephemeral**: a producer writes it to
-`<project>/.gen/agent-context.json` (the `.gen/` root, gitignored, never
-promoted), because it embeds the workspace revision and content digests and
-would churn every commit. Determinism is pinned byte-for-byte at a fixed tree by
-tests, not by committing the artifact.
+The document is **built in memory and never written**: a producer builds it
+from committed facts and serves it, because it embeds the workspace revision and
+content digests and would churn every commit. Determinism is pinned
+byte-for-byte at a fixed tree by tests, not by storing the document.
 
 This package is the contract, not the pipeline.
 
@@ -45,11 +44,12 @@ Every fact is aggregated **by reference**, never by embedding content:
 - **representativeSources** — ordered `SourceRange` entries (`path`, 1-based
   `startLine`/`endLine`, a `why` reason, and a `tokens` estimate). **Ranges
   only**, never file content.
-- **tests** — an OPTIONAL section: a `policy` (`auto`/`require`/`skip`, mirroring
-  `database` `TestMode`), referenced conformance `packs` (id + capabilityKinds +
-  languages, matching `conformance/pack.json`), and `fixtureDigests`. When it
-  lists no packs it MUST carry a machine-readable `absenceReason`
-  (`not-collected`/`no-packs`/`unsupported-project-type`).
+- **tests** — an OPTIONAL section: referenced conformance `packs` (id +
+  capabilityKinds + languages, matching `conformance/pack.json`) and
+  `fixtureDigests`. When it lists no packs it MUST carry a machine-readable
+  `absenceReason` (`not-collected`/`no-packs`/`unsupported-project-type`). It
+  carries no test policy: how test infrastructure is provisioned is a setting of
+  the test jobs, not a fact about the project.
 - **docs** — adjacent documentation paths with a `checked`/`unchecked`
   relationship status.
 - **config** — a config-schema reference (`path` + digest) and refs-only
@@ -58,7 +58,7 @@ Every fact is aggregated **by reference**, never by embedding content:
   the aggregation method (`by-reference`). Token-budget entries carry their
   `method` (`bytes/4`).
 
-Every closed enum (`RootKind`, `SourceReason`, `DocRelationship`, `TestPolicy`,
+Every closed enum (`RootKind`, `SourceReason`, `DocRelationship`,
 `AbsenceReason`, `TokenMethod`, `AggregationMethod`) is frozen: extending one
 requires a `ProtocolVersion` bump.
 
@@ -87,22 +87,20 @@ A `nil` document fails the gate, so it never passes vacuously.
 author-owned **OverridesFile** (`OverridesPath`). It is deliberately narrow: it
 only adds/removes representative-source and doc entries and force-flags paths as
 sensitive. It never overrides identity, capabilities, or provenance — those are
-framework-owned facts.
+framework-owned facts. It carries its own version, `OverridesProtocolVersion`,
+apart from the document's, so a change to the document shape leaves a committed
+overrides file readable.
 
 ## Using it
 
 The contract in this package is consumed end to end by shipped tooling:
 
-- **`putnami context pack [--project <id>]`** — the deterministic aggregator.
-  It walks committed facts and writes one document per project to
-  `<project>/.gen/agent-context.json` (the gitignored, ephemeral `.gen/` root),
-  running the fail-closed publish-safety gate before anything leaves the
-  workspace.
-- **`putnami context pack --check`** — a freshness gate that re-derives the
-  document and exits non-zero (2) on drift without rewriting the artifact, so a
-  stale context is caught in pre-flight or CI.
-- **The read-only MCP `agent_context` tool** — serves the same document
-  in-memory per request (plus on-disk freshness), so an agent gets a project's
+- **`putnami context pack [--project <id>] [--output=json]`** — the
+  deterministic aggregator. It walks committed facts, runs the fail-closed
+  publish-safety gate, and prints one document per project; `--output=json`
+  returns them as `data.documents`. It writes no file.
+- **The read-only MCP `agent_context` tool** — builds the same document in
+  memory per request, so an agent gets a project's
   composition roots, contracts, representative source ranges, and tests in one
   structured call instead of enumerating files. It complements
   `describe_project`.
@@ -148,28 +146,30 @@ exercised directly in `strict_test.go` because the gate takes caller options.
 ### Versioning
 
 `version_test.go` asserts [`schemas/agent-context.json`](schemas/agent-context.json)
-pins exactly `ProtocolVersion` for both the `document` and `overridesFile`
-shapes.
+pins exactly `ProtocolVersion` for the `document` shape and exactly
+`OverridesProtocolVersion` for the `overridesFile` shape.
 
-**Compatibility.** `ProtocolVersion` is the exact integer `1`; readers accept no
-other token and reject unknown fields. Every enum listed above is closed, so
-adding a composition-root kind, a selection reason, an absence reason, or a
-token method is a version bump rather than an additive edit. The artifact is
-ephemeral, so a bump migrates producers and consumers only — there is no tracked
-document to rewrite — and `putnami context pack --check` exits non-zero (2) on
-drift, which is how a stale document is caught instead of being trusted.
+**Compatibility.** `ProtocolVersion`, the document version, is the exact integer
+`2`. `OverridesProtocolVersion`, the overrides-file version, is the exact
+integer `1`. Readers accept no other token for either shape and reject unknown
+fields. Document version 2 deletes `tests.policy`, so a version 1 document is
+rejected. The overrides shape did not change, so it stays at version 1 and every
+existing overrides file still reads. Every enum listed above is closed, so adding a
+composition-root kind, a selection reason, an absence reason, or a token method
+is a version bump rather than an additive edit. No producer stores the document,
+so a bump migrates producers and consumers only: there is no stored document to
+rewrite or to go stale.
 
 ## Producers and consumers
 
-- **Producer**: `putnami context pack` — the only writer. It aggregates
-  committed facts by reference, runs the publish-safety gate, and writes
-  `<project>/.gen/agent-context.json`.
+- **Producers**: `putnami context pack` and the MCP `agent_context` tool. Both
+  aggregate committed facts by reference through the same builder and run the
+  publish-safety gate; neither writes the document to a file.
 - **Author input**: `<project>/schema/agent-context.overrides.json`, strict
   parsed and reviewed like any other source.
-- **Consumers**: `putnami context pack --check` (freshness), the read-only MCP
-  `agent_context` tool (serves the document per request and complements
-  `describe_project`), and any authorized index that consumes a
-  publish-safety-checked document. The referenced artifacts —
+- **Consumers**: an agent that reads the printed or served document, the
+  orientation benchmark under [`bench/`](./bench/README.md), and any authorized
+  index that consumes a publish-safety-checked document. The referenced artifacts —
   `schema/capabilities.json`, `schema/contracts.json`, `infra/requirements.json`,
   migration bundles, conformance packs — are owned by
   [`capabilities`](../capabilities/README.md),
@@ -183,7 +183,7 @@ drift, which is how a stale document is caught instead of being trusted.
   [`putnami.support.json`](../../putnami.support.json) under the classification
   contract in
   [`protocols/support`](../support/doc/adr/0001-support-entry-ownership-and-evidence.md).
-- **Evidence**: a shipped producer and two shipped consumers, strict parse and
+- **Evidence**: two shipped producers sharing one builder, strict parse and
   validation for both shapes, a fail-closed publish-safety gate with its codes
   exercised directly, one invalid fixture per structural diagnostic code,
   canonical-byte determinism pinned across 100 marshals and round-trips, and a

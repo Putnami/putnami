@@ -358,7 +358,9 @@
               "an-existing-entrypoint-keeps-every-byte-outside-the-block",
               "an-edited-block-is-preserved",
               "init-writes-the-guidance-block",
-              "context-generation-writes-no-mcp-registration"
+              "context-generation-writes-no-mcp-registration",
+              "context-pack-prints-the-documents-and-writes-nothing",
+              "the-check-flag-is-unknown"
             ]
           }
         },
@@ -390,7 +392,11 @@
             "kind": "acceptance",
             "checks": [
               "printing-the-map-writes-nothing",
-              "mcp-rebuilds-the-same-projection-in-memory"
+              "mcp-rebuilds-the-same-projection-in-memory",
+              "the-printed-json-is-the-mcp-document",
+              "a-selection-narrows-the-printed-map",
+              "mcp-reuses-a-fragment-until-its-inputs-change",
+              "the-print-flag-is-unknown"
             ]
           }
         },
@@ -403,7 +409,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-build-session-writes-nothing-under-the-map-directory"
+              "a-build-session-writes-nothing-under-the-map-directory",
+              "context-map-writes-no-file"
             ]
           }
         },
@@ -593,7 +600,18 @@
             ]
           }
         }
-      ]
+      ],
+      "surface": {
+        "commands": [
+          "context generate",
+          "context map",
+          "context pack"
+        ],
+        "tools": [
+          "agent_context",
+          "workspace_map"
+        ]
+      }
     },
     {
       "id": "cli/job-planning-execution",

@@ -1135,6 +1135,9 @@ func TestGetDiagnosticsFiltersBySeverity(t *testing.T) {
 func TestGraphToolsFailClosedWithoutARecordedView(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-equivalence",
 		"graph-tools-report-the-recorded-view-they-answered-from")
+	// The workspace context is absent; every answer says so and names the
+	// command that rebuilds it.
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "stale-or-absent-context-is-reported-for-fallback")
 	dir := t.TempDir()
 	write := func(rel, content string) {
 		path := filepath.Join(dir, rel)

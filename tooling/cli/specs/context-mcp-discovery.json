@@ -18,7 +18,7 @@
   "requirements": [
     {
       "id": "generated-context",
-      "text": "Context generation writes deterministic shared guidance, owns exactly one delimited block inside AGENTS.md and CLAUDE.md, inserts it into existing files without altering any other byte, preserves an edited block, and writes nothing else into the workspace root: no .mcp.json. It never writes an existing .mcp.json, and the human-maintained .agents/constraints.md is only ever read."
+      "text": "Context generation writes deterministic shared guidance, owns exactly one delimited block inside AGENTS.md and CLAUDE.md, inserts it into existing files without altering any other byte, preserves an edited block, and writes nothing else into the workspace root: no .mcp.json. It never writes an existing .mcp.json, and the human-maintained .agents/constraints.md is only ever read. context pack prints each project's agent-context document and writes no file."
     },
     {
       "id": "implicit-mcp-registration",
@@ -26,11 +26,11 @@
     },
     {
       "id": "workspace-map",
-      "text": "The workspace map is a deterministic projection of committed inputs; printing it writes nothing, and MCP rebuilds the same projection in memory for each call."
+      "text": "The workspace map is a deterministic projection of committed inputs. putnami context map prints it and writes nothing: Markdown by default, and with --output=json the map document as data, the same document the MCP workspace_map tool returns. --projects and --impacted narrow the printed projects. MCP rebuilds the map in memory for each call and reuses a project's fragment within its session only while that fragment's inputs digest is unchanged."
     },
     {
       "id": "build-writes-no-workspace-map",
-      "text": "A build session writes no workspace map and reads no variable that controls one. The map comes live from the MCP workspace_map tool, or on demand from putnami context map, which writes it under .putnami/context-map/."
+      "text": "A build session writes no workspace map and reads no variable that controls one. The map comes live from the MCP workspace_map tool, or on demand from putnami context map, which prints it and writes no file."
     },
     {
       "id": "extension-tool-workspace-facts",

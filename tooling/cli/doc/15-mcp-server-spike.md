@@ -73,8 +73,8 @@ below):
 |------|---------|--------|
 | `list_projects` | All projects with id/name/path/type/tags/deps | `workspace.Load` |
 | `describe_project` | One project's deps, dependents, extensions, publish | `workspace` + graph |
-| `agent_context` | One project's deterministic orientation document plus native feature summaries and artifact status | context-pack aggregator + design graph |
-| `workspace_map` | The whole workspace orientation map — project paths, dependency and intercall edges, endpoints, config keys, schemas, docs — rebuilt in memory, scopable by `section`/`project` | `mapgen` reduce over validated fragments |
+| `agent_context` | One project's deterministic orientation document, built in memory, plus native feature summaries and the design graph status | context-pack aggregator + design graph |
+| `workspace_map` | The whole workspace orientation map — project paths, dependency and intercall edges, endpoints, config keys, schemas, docs — rebuilt in memory, scopable by `section`/`project` | `mapgen` reduce over fragments the session reuses while their inputs digest holds |
 | `deps` | Direct or transitive dependencies/dependents for one project | `DependencyGraph` |
 | `find_owner` | File path → nearest owning project, plus asset claimants | `workspace.ProjectOwnersForPath` |
 | `why_impacted` | Shortest path explaining why A impacts B, over the same dependency, contract and extension-consumer edges `impacted` widens through, each hop with its kind and the target's task scope | `workspace.ImpactPath` |

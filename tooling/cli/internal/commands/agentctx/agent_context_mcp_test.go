@@ -1,12 +1,12 @@
 package agentctx
 
 import (
+	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"go.putnami.dev/protocol/features/spectest"
 
 	agentcontext "go.putnami.dev/protocol/agentcontext"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -40,10 +40,10 @@ func makeLoadableFixture(t *testing.T) string {
 	return ws.Root
 }
 
-// packLoadedApp packs the app project via the on-disk-loaded workspace, so the
-// freshly written artifact is byte-identical to what BuildAgentContextResult
-// (which loads the same workspace) rebuilds. It returns the resolved revision.
-func packLoadedApp(t *testing.T, root string) string {
+// packLoadedApp prints the app project's document the way `context pack` does,
+// over the on-disk-loaded workspace BuildAgentContextResult also loads, at the
+// given revision and CLI version.
+func packLoadedApp(t *testing.T, root, revision, cliVersion string) *agentcontext.Document {
 	t.Helper()
 	ws, err := workspace.Load(root)
 	if err != nil {
@@ -53,71 +53,86 @@ func packLoadedApp(t *testing.T, root string) string {
 	if app == nil {
 		t.Fatal("fixture app project did not load")
 	}
-	rev := resolveWorkspaceRevision(root)
-	if _, err := ContextPack(ws, []*workspace.Project{app}, nil, rev, fixtureVersion); err != nil {
+	report, err := ContextPack(ws, []*workspace.Project{app}, nil, revision, cliVersion)
+	if err != nil {
 		t.Fatalf("ContextPack: %v", err)
 	}
-	return rev
+	if len(report.Documents) != 1 {
+		t.Fatalf("ContextPack returned %d documents, want 1", len(report.Documents))
+	}
+	return report.Documents[0]
 }
 
-// TestBuildAgentContextResult_FreshAfterPack pins the freshness invariant: right
-// after `context pack` writes the artifact with a given CLI version, an
-// agent_context build at the SAME version reports the on-disk artifact both
-// present and fresh, and the returned document is gate-passed with its
-// provenance stamped with the resolved workspace revision.
-func TestBuildAgentContextResult_FreshAfterPack(t *testing.T) {
+// TestBuildAgentContextResult_IsThePackedDocumentAndWritesNothing pins that
+// the agent_context tool and `context pack` agree byte for byte at the same
+// revision and CLI version, that the provenance stamps both, that the payload
+// carries no disk-artifact status, and that neither path writes a file.
+func TestBuildAgentContextResult_IsThePackedDocumentAndWritesNothing(t *testing.T) {
 	root := makeLoadableFixture(t)
-	rev := packLoadedApp(t, root)
+	before := treeOutsideState(t, root)
 
-	res, err := BuildAgentContextResult(root, fixtureVersion, "/svc/app")
-	if err != nil {
-		t.Fatalf("BuildAgentContextResult: %v", err)
-	}
-	if res.Document == nil {
-		t.Fatal("result document is nil")
-	}
-	if res.Document.Identity.ID != "/svc/app" {
-		t.Errorf("document id = %q, want /svc/app", res.Document.Identity.ID)
-	}
-	if res.Document.Provenance.WorkspaceRevision != rev {
-		t.Errorf("provenance revision = %q, want %q", res.Document.Provenance.WorkspaceRevision, rev)
-	}
-	if res.Document.Provenance.Generator.Version != fixtureVersion {
-		t.Errorf("provenance version = %q, want %q", res.Document.Provenance.Generator.Version, fixtureVersion)
+	for _, version := range []string{fixtureVersion, "1.2.3"} {
+		res, err := BuildAgentContextResult(root, version, "/svc/app")
+		if err != nil {
+			t.Fatalf("BuildAgentContextResult at %s: %v", version, err)
+		}
+		if res.Document == nil || res.Document.Identity.ID != "/svc/app" {
+			t.Fatalf("document at %s = %+v, want /svc/app", version, res.Document)
+		}
+		rev := resolveWorkspaceRevision(root)
+		if res.Document.Provenance.WorkspaceRevision != rev {
+			t.Errorf("provenance revision = %q, want %q", res.Document.Provenance.WorkspaceRevision, rev)
+		}
+		if res.Document.Provenance.Generator.Version != version {
+			t.Errorf("provenance version = %q, want the running CLI version %q", res.Document.Provenance.Generator.Version, version)
+		}
+
+		served, err := json.Marshal(res.Document)
+		if err != nil {
+			t.Fatalf("marshal the served document: %v", err)
+		}
+		printed, err := json.Marshal(packLoadedApp(t, root, rev, version))
+		if err != nil {
+			t.Fatalf("marshal the printed document: %v", err)
+		}
+		if string(served) != string(printed) {
+			t.Errorf("at %s the agent_context document differs from the one context pack prints:\n%s\n%s", version, served, printed)
+		}
+
+		payload, err := json.Marshal(res)
+		if err != nil {
+			t.Fatalf("marshal the payload: %v", err)
+		}
+		var keys map[string]json.RawMessage
+		if err := json.Unmarshal(payload, &keys); err != nil {
+			t.Fatalf("decode the payload: %v", err)
+		}
+		if _, present := keys["diskArtifact"]; present {
+			t.Errorf("the agent_context payload still carries diskArtifact: %s", payload)
+		}
+		if _, present := keys["designArtifact"]; !present {
+			t.Errorf("the agent_context payload lost designArtifact: %s", payload)
+		}
 	}
 
-	wantPath := filepath.ToSlash(filepath.Join("svc/app", agentcontext.DocumentEmitDir, agentcontext.DocumentFilename))
-	if res.DiskArtifact.Path != wantPath {
-		t.Errorf("artifact path = %q, want %q", res.DiskArtifact.Path, wantPath)
+	if after := treeOutsideState(t, root); !maps.Equal(after, before) {
+		t.Errorf("agent_context or context pack changed the workspace tree:\nbefore %v\nafter  %v", before, after)
 	}
-	if !res.DiskArtifact.Present {
-		t.Error("artifact must be present right after pack")
-	}
-	if !res.DiskArtifact.Fresh {
-		t.Error("artifact must be fresh right after pack at the same version")
-	}
+	assertNoMapState(t, root)
 }
 
-// TestBuildAgentContextResult_AbsentArtifact asserts that with no `context pack`
-// having run, the document is still built in-memory (the tool never depends on
-// the on-disk artifact) while the artifact reports absent and not fresh. It also
-// exercises selection by NAME.
-func TestBuildAgentContextResult_AbsentArtifact(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "stale-or-absent-context-is-reported-for-fallback")
+// TestBuildAgentContextResult_SelectsByName asserts that a selection by NAME
+// resolves the same project, and that a project without a design graph
+// reports the graph absent instead of failing.
+func TestBuildAgentContextResult_SelectsByName(t *testing.T) {
 	root := makeLoadableFixture(t)
 
 	res, err := BuildAgentContextResult(root, fixtureVersion, "example/app")
 	if err != nil {
 		t.Fatalf("BuildAgentContextResult: %v", err)
 	}
-	if res.Document == nil {
-		t.Fatal("document must be built in-memory even with no on-disk artifact")
-	}
-	if res.DiskArtifact.Present {
-		t.Error("no artifact was packed; Present must be false")
-	}
-	if res.DiskArtifact.Fresh {
-		t.Error("an absent artifact can never be fresh")
+	if res.Document == nil || res.Document.Identity.ID != "/svc/app" {
+		t.Fatalf("document = %+v, want /svc/app selected by name", res.Document)
 	}
 	if res.DesignArtifact.Present || res.DesignArtifact.Compatibility != "" || len(res.Features) != 0 {
 		t.Fatalf("absent design artifact = %+v, features = %+v", res.DesignArtifact, res.Features)
@@ -188,30 +203,35 @@ func TestBuildAgentContextResultServesDocumentDespiteUnreadableDesignGraph(t *te
 	}
 }
 
-// TestBuildAgentContextResult_StaleAfterMutation asserts that mutating a
-// referenced fact after packing makes the fresh in-memory build diverge from the
-// on-disk artifact: Present stays true, Fresh flips to false.
-func TestBuildAgentContextResult_StaleAfterMutation(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "stale-or-absent-context-is-reported-for-fallback")
+// TestBuildAgentContextResult_ReflectsAReferencedFileEdit asserts that each
+// call rebuilds the document from the working tree: an edit to a referenced
+// file changes the next document, with nothing on disk to go stale.
+func TestBuildAgentContextResult_ReflectsAReferencedFileEdit(t *testing.T) {
 	root := makeLoadableFixture(t)
-	packLoadedApp(t, root)
+	first, err := BuildAgentContextResult(root, fixtureVersion, "/svc/app")
+	if err != nil {
+		t.Fatalf("BuildAgentContextResult: %v", err)
+	}
+	firstBytes, err := json.Marshal(first.Document)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
 
-	// Mutate a referenced artifact so its digest — and thus the aggregated
-	// document — no longer matches the packed bytes.
 	capPath := filepath.Join(root, "svc", "app", "schema", "capabilities.json")
 	if err := os.WriteFile(capPath, []byte(`{"protocolVersion":1,"changed":true}`+"\n"), 0o644); err != nil {
 		t.Fatalf("mutate capabilities: %v", err)
 	}
 
-	res, err := BuildAgentContextResult(root, fixtureVersion, "/svc/app")
+	second, err := BuildAgentContextResult(root, fixtureVersion, "/svc/app")
 	if err != nil {
-		t.Fatalf("BuildAgentContextResult: %v", err)
+		t.Fatalf("BuildAgentContextResult after the edit: %v", err)
 	}
-	if !res.DiskArtifact.Present {
-		t.Error("artifact is still on disk; Present must be true")
+	secondBytes, err := json.Marshal(second.Document)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
 	}
-	if res.DiskArtifact.Fresh {
-		t.Error("a mutated reference must make the artifact stale")
+	if string(secondBytes) == string(firstBytes) {
+		t.Error("the document did not change after a referenced file changed")
 	}
 }
 
@@ -251,26 +271,6 @@ func TestBuildAgentContextResult_ReflectsWorkspaceEditsInLongSession(t *testing.
 	if len(res.Document.Identity.Dependencies) != 0 {
 		t.Errorf("identity.dependencies = %v after dropping the dependency from putnami.json; the MCP path served a stale, cached workspace",
 			res.Document.Identity.Dependencies)
-	}
-}
-
-// TestBuildAgentContextResult_VersionMismatchIsStale pins the version-parity
-// invariant that the closure threading exists to protect: an artifact packed at
-// one CLI version reads as stale when rebuilt at a different version, because the
-// provenance generator version is part of the canonical bytes.
-func TestBuildAgentContextResult_VersionMismatchIsStale(t *testing.T) {
-	root := makeLoadableFixture(t)
-	packLoadedApp(t, root) // packed at fixtureVersion
-
-	res, err := BuildAgentContextResult(root, "1.2.3", "/svc/app")
-	if err != nil {
-		t.Fatalf("BuildAgentContextResult: %v", err)
-	}
-	if !res.DiskArtifact.Present {
-		t.Error("artifact is on disk; Present must be true")
-	}
-	if res.DiskArtifact.Fresh {
-		t.Error("a version mismatch must read as stale (provenance version differs)")
 	}
 }
 

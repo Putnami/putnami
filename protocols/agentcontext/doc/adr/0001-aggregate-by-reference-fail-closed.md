@@ -1,6 +1,9 @@
 # ADR 0001 — Aggregate by reference, and fail closed before the document leaves the workspace
 
 - **Status**: accepted
+- **Amended**: 2026-10-24, decisions 2, 4 and 5, with document protocol
+  version 2: no producer writes the document to a file, the tests section
+  carries no test policy, and the overrides file keeps its own version, 1.
 - **Scope**: `go.putnami.dev/protocol/agentcontext` (`protocols/agentcontext`)
 
 ## Context
@@ -20,11 +23,11 @@ consumes it.
    is `path` + `sha256:<64hex>` (+ optional `kind`, `sensitive`). A
    representative source is `path` + 1-based line range + reason + token
    estimate. Redaction is a property of the schema, not of producer care.
-2. **The document is ephemeral and gitignored.** It is written to
-   `<project>/.gen/agent-context.json` (the `.gen/` root, not `.gen/schema/`),
-   so the codegen committer never promotes it. It embeds the workspace revision
-   and digests, so committing it would churn on every commit. Tests prove
-   determinism at a fixed tree.
+2. **The document is built in memory and never written.** `putnami context
+   pack` prints it and the MCP `agent_context` tool returns it, both from the
+   same builder. It embeds the workspace revision and digests, so committing it
+   would churn on every commit, and a stored copy is one more thing to go
+   stale. Tests prove determinism at a fixed tree.
 3. **Publish safety is a fail-closed gate.** `ValidatePublishSafety(doc, opts)`
    runs before a document leaves the workspace. It errors on a reference to a
    caller-flagged sensitive path not marked `sensitive`, a string long enough to
@@ -35,11 +38,17 @@ consumes it.
 4. **Author overrides are narrow.** `<project>/schema/agent-context.overrides.json`
    may add or remove representative-source and doc entries and force-flag a path
    as sensitive. Nothing else: identity, capabilities, contracts, and
-   provenance are framework-owned facts.
+   provenance are framework-owned facts. The file has its own exact version,
+   `OverridesProtocolVersion`, apart from the document's: a change to the
+   document shape must not break a file whose shape did not change.
 5. **Every enum is closed and the version is exact.** `RootKind`,
-   `SourceReason`, `DocRelationship`, `TestPolicy`, `AbsenceReason`,
-   `TokenMethod`, and `AggregationMethod` change only with a `ProtocolVersion`
-   bump. A tests section with no packs must carry an `absenceReason`.
+   `SourceReason`, `DocRelationship`, `AbsenceReason`, `TokenMethod`, and
+   `AggregationMethod` change only with a `ProtocolVersion` bump, and a change
+   to `SourceReason`, `DocRelationship` or `TokenMethod`, which the overrides
+   file also uses, bumps `OverridesProtocolVersion` too. A tests
+   section with no packs must carry an `absenceReason`. The tests section names
+   packs and fixtures only: how test infrastructure is provisioned is a setting
+   of the test jobs, so version 2 deletes `tests.policy`.
 
 ## Rejected alternatives
 
@@ -47,7 +56,12 @@ consumes it.
   document unbounded; a path plus line range lets an agent fetch the same bytes
   under its own permissions.
 - **Commit the document.** It churns on every commit, and a stale committed
-  copy is worse than none. `--check` re-derives instead.
+  copy is worse than none. Every read re-derives instead.
+- **Write an ephemeral copy under `.gen/`.** No reader needs it: the CLI prints
+  and the MCP serves the document from the same builder, and a file left on
+  disk needs its own freshness check.
+- **Carry the test policy in the tests section.** It restated one job setting
+  that the job reads from its own configuration, so the two could disagree.
 - **Redact by scanning strings at publication.** A scanner is a guess;
   structural absence plus a fail-closed reference check is checkable.
 - **Overrides that restate identity or capabilities.** That is a hand-written
@@ -62,7 +76,8 @@ consumes it.
 - A consumer that wants file content fetches it with its own authorization.
 - The gate is only as good as the caller's `SensitivePaths`; a producer that
   passes an empty set must defend that claim.
-- Freshness is a live check (`context pack --check`, exit 2 on drift).
+- Every read rebuilds the document from committed facts, so no stored copy
+  can be stale.
 - Adding an enum member is a version bump.
 - The contract is Go-only (one producer and one MCP consumer, both in the CLI),
   so no cross-language byte parity is promised. A second implementation

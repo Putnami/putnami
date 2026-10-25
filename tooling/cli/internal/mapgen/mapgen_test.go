@@ -85,6 +85,17 @@ func fixtureWorkspace(t *testing.T) (*workspace.Workspace, *workspace.Project, *
 	return ws, api, lib
 }
 
+// fragmentBytes serializes a fragment canonically, so two fragments compare by
+// every byte they carry.
+func fragmentBytes(t *testing.T, f *Fragment) []byte {
+	t.Helper()
+	data, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		t.Fatalf("serialize fragment: %v", err)
+	}
+	return append(data, '\n')
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	abs := filepath.Join(root, filepath.FromSlash(rel))
@@ -199,13 +210,7 @@ func TestBuildFragment_ByteStable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildFragment: %v", err)
 	}
-	firstBytes, err := CanonicalFragment(first)
-	if err != nil {
-		t.Fatalf("CanonicalFragment: %v", err)
-	}
-	if !strings.HasSuffix(string(firstBytes), "\n") {
-		t.Error("canonical fragment bytes must end with a trailing newline")
-	}
+	firstBytes := fragmentBytes(t, first)
 	if strings.Contains(string(firstBytes), ws.Root) {
 		t.Error("canonical fragment bytes leak the absolute workspace root")
 	}
@@ -214,11 +219,7 @@ func TestBuildFragment_ByteStable(t *testing.T) {
 		if err != nil {
 			t.Fatalf("BuildFragment iteration %d: %v", i, err)
 		}
-		gotBytes, err := CanonicalFragment(again)
-		if err != nil {
-			t.Fatalf("CanonicalFragment iteration %d: %v", i, err)
-		}
-		if string(gotBytes) != string(firstBytes) {
+		if gotBytes := fragmentBytes(t, again); string(gotBytes) != string(firstBytes) {
 			t.Fatalf("iteration %d: fragment not byte-stable\n--- first:\n%s\n--- got:\n%s", i, firstBytes, gotBytes)
 		}
 	}
@@ -270,41 +271,34 @@ func TestFragment_CarriesTheProjectClassification(t *testing.T) {
 	}
 }
 
-// TestResolveFragment_InputsDigestInvalidatesAStalePersistedFragment is the
+// TestResolveFragment_InputsDigestInvalidatesAStaleCachedFragment is the
 // acceptance test for "drift is unrepresentable, not detected-after-the-fact":
-// a persisted fragment is REUSED while its inputs are unchanged, and silently
-// discarded the moment any declared input — a file OR the workspace-resolved
+// a cached fragment is REUSED while its inputs are unchanged, and silently
+// rebuilt the moment any declared input — a file OR the workspace-resolved
 // identity — moves.
-func TestResolveFragment_InputsDigestInvalidatesAStalePersistedFragment(t *testing.T) {
+func TestResolveFragment_InputsDigestInvalidatesAStaleCachedFragment(t *testing.T) {
 	ws, api, _ := fixtureWorkspace(t)
+	cache := NewFragmentCache()
 
-	// Persist the current fragment.
-	fragment, err := BuildFragment(ws.Root, api)
-	if err != nil {
-		t.Fatalf("BuildFragment: %v", err)
-	}
-	data, err := CanonicalFragment(fragment)
-	if err != nil {
-		t.Fatalf("CanonicalFragment: %v", err)
-	}
-	fragPath := filepath.Join(ws.Root, filepath.FromSlash(FragmentPath(api.Path)))
-	if err := atomicWriteFile(fragPath, data); err != nil {
-		t.Fatalf("persist fragment: %v", err)
+	// A cold cache builds the fragment and keeps it.
+	fragment, reused, err := ResolveFragment(ws.Root, api, cache)
+	if err != nil || reused {
+		t.Fatalf("ResolveFragment on a cold cache = (reused=%v, err=%v), want built", reused, err)
 	}
 
 	// Unchanged inputs: reused.
-	got, reused, err := ResolveFragment(ws.Root, api)
+	got, reused, err := ResolveFragment(ws.Root, api, cache)
 	if err != nil || !reused {
 		t.Fatalf("ResolveFragment on unchanged inputs = (reused=%v, err=%v), want reused", reused, err)
 	}
-	if got.Inputs.Digest != fragment.Inputs.Digest {
-		t.Errorf("reused fragment digest = %q, want %q", got.Inputs.Digest, fragment.Inputs.Digest)
+	if got != fragment {
+		t.Error("a cache hit did not return the cached fragment")
 	}
 
 	// A changed FILE input invalidates it.
 	writeFile(t, ws.Root, "svc/api/schema/openapi.json",
 		strings.Replace(fixtureOpenAPI, `"summary": "List tasks"`, `"summary": "Enumerate tasks"`, 1))
-	got, reused, err = ResolveFragment(ws.Root, api)
+	got, reused, err = ResolveFragment(ws.Root, api, cache)
 	if err != nil {
 		t.Fatalf("ResolveFragment after edit: %v", err)
 	}
@@ -315,20 +309,14 @@ func TestResolveFragment_InputsDigestInvalidatesAStalePersistedFragment(t *testi
 		t.Errorf("rebuilt fragment did not pick the new summary up: %+v", got.Project.Endpoints)
 	}
 
-	// Re-persist, then change only the workspace-resolved IDENTITY (no file
-	// moved): the fragment must still be invalidated.
-	data, err = CanonicalFragment(got)
-	if err != nil {
-		t.Fatalf("CanonicalFragment: %v", err)
-	}
-	if err := atomicWriteFile(fragPath, data); err != nil {
-		t.Fatalf("persist fragment: %v", err)
-	}
-	if _, reused, err = ResolveFragment(ws.Root, api); err != nil || !reused {
-		t.Fatalf("ResolveFragment after re-persist = (reused=%v, err=%v), want reused", reused, err)
+	// The rebuild replaced the entry, so the next call reuses it; then change
+	// only the workspace-resolved IDENTITY (no file moved): the fragment must
+	// still be invalidated.
+	if _, reused, err = ResolveFragment(ws.Root, api, cache); err != nil || !reused {
+		t.Fatalf("ResolveFragment after the rebuild = (reused=%v, err=%v), want reused", reused, err)
 	}
 	api.Dependencies = append(api.Dependencies, "example/newdep")
-	if _, reused, err = ResolveFragment(ws.Root, api); err != nil {
+	if _, reused, err = ResolveFragment(ws.Root, api, cache); err != nil {
 		t.Fatalf("ResolveFragment after identity change: %v", err)
 	} else if reused {
 		t.Fatal("a fragment whose project identity changed was reused — the identity digest is not covering it")
@@ -342,24 +330,19 @@ func TestResolveFragment_InputsDigestInvalidatesAStalePersistedFragment(t *testi
 // on it and a digest that moves for nothing is a cache miss for nothing.
 func TestResolveFragment_SchemaListingInvalidatesOnAddAndRemove(t *testing.T) {
 	ws, api, _ := fixtureWorkspace(t)
+	cache := NewFragmentCache()
 	persist := func() *Fragment {
 		t.Helper()
 		fragment, err := BuildFragment(ws.Root, api)
 		if err != nil {
 			t.Fatalf("BuildFragment: %v", err)
 		}
-		data, err := CanonicalFragment(fragment)
-		if err != nil {
-			t.Fatalf("CanonicalFragment: %v", err)
-		}
-		if err := atomicWriteFile(filepath.Join(ws.Root, filepath.FromSlash(FragmentPath(api.Path))), data); err != nil {
-			t.Fatalf("persist fragment: %v", err)
-		}
+		cache.store(api.ID, fragment)
 		return fragment
 	}
 	reused := func() bool {
 		t.Helper()
-		_, ok, err := ResolveFragment(ws.Root, api)
+		_, ok, err := ResolveFragment(ws.Root, api, cache)
 		if err != nil {
 			t.Fatalf("ResolveFragment: %v", err)
 		}
@@ -439,59 +422,35 @@ func TestResolveFragment_SchemaListingInvalidatesOnAddAndRemove(t *testing.T) {
 	}
 }
 
-// TestResolveFragment_RejectsForeignFragmentShapes pins the fail-safe direction:
-// a corrupt, empty, or older-version fragment is a cache MISS, never an error
-// and never a trusted entry.
-func TestResolveFragment_RejectsForeignFragmentShapes(t *testing.T) {
+// TestResolveFragment_AnEntryWithoutADigestIsAMiss pins the fail-safe
+// direction: a cached entry that records no inputs digest is never trusted, and
+// a nil cache builds every time.
+func TestResolveFragment_AnEntryWithoutADigestIsAMiss(t *testing.T) {
 	ws, api, _ := fixtureWorkspace(t)
-	fragPath := filepath.Join(ws.Root, filepath.FromSlash(FragmentPath(api.Path)))
-
 	fragment, err := BuildFragment(ws.Root, api)
 	if err != nil {
 		t.Fatalf("BuildFragment: %v", err)
 	}
 
-	cases := []struct {
-		name    string
-		content func() []byte
-	}{
-		{"malformed", func() []byte { return []byte("{not json") }},
-		{"empty", func() []byte { return nil }},
-		{"old version", func() []byte {
-			stale := *fragment
-			stale.FragmentVersion = FragmentVersion - 1
-			data, err := CanonicalFragment(&stale)
-			if err != nil {
-				t.Fatalf("CanonicalFragment: %v", err)
-			}
-			return data
-		}},
-		{"digest cleared", func() []byte {
-			stale := *fragment
-			stale.Inputs.Digest = ""
-			data, err := CanonicalFragment(&stale)
-			if err != nil {
-				t.Fatalf("CanonicalFragment: %v", err)
-			}
-			return data
-		}},
+	cache := NewFragmentCache()
+	cleared := *fragment
+	cleared.Inputs.Digest = ""
+	cache.store(api.ID, &cleared)
+	got, reused, err := ResolveFragment(ws.Root, api, cache)
+	if err != nil {
+		t.Fatalf("ResolveFragment: %v", err)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if err := atomicWriteFile(fragPath, tc.content()); err != nil {
-				t.Fatalf("write fragment: %v", err)
-			}
-			got, reused, err := ResolveFragment(ws.Root, api)
-			if err != nil {
-				t.Fatalf("ResolveFragment: %v", err)
-			}
-			if reused {
-				t.Fatalf("a %s fragment was reused", tc.name)
-			}
-			if got == nil || got.Inputs.Digest != fragment.Inputs.Digest {
-				t.Errorf("rebuilt fragment digest = %v, want the fresh one", got)
-			}
-		})
+	if reused {
+		t.Fatal("an entry without a digest was reused")
+	}
+	if got == nil || got.Inputs.Digest != fragment.Inputs.Digest {
+		t.Errorf("rebuilt fragment digest = %v, want the fresh one", got)
+	}
+
+	for range 2 {
+		if _, reused, err := ResolveFragment(ws.Root, api, nil); err != nil || reused {
+			t.Fatalf("ResolveFragment with a nil cache = (reused=%v, err=%v), want built", reused, err)
+		}
 	}
 }
 
@@ -757,19 +716,13 @@ func TestResolveFragment_CacheHitSkipsParsing(t *testing.T) {
 		t.Fatalf("digestFragmentInputs: %v", err)
 	}
 	stored := &Fragment{
-		FragmentVersion: FragmentVersion,
-		Inputs:          inputs,
-		Project:         FragmentProject{ID: api.ID, Path: filepath.ToSlash(api.Path), Summary: "from cache"},
+		Inputs:  inputs,
+		Project: FragmentProject{ID: api.ID, Path: filepath.ToSlash(api.Path), Summary: "from cache"},
 	}
-	data, err := CanonicalFragment(stored)
-	if err != nil {
-		t.Fatalf("CanonicalFragment: %v", err)
-	}
-	if err := atomicWriteFile(filepath.Join(ws.Root, filepath.FromSlash(FragmentPath(api.Path))), data); err != nil {
-		t.Fatalf("persist fragment: %v", err)
-	}
+	cache := NewFragmentCache()
+	cache.store(api.ID, stored)
 
-	got, reused, err := ResolveFragment(ws.Root, api)
+	got, reused, err := ResolveFragment(ws.Root, api, cache)
 	if err != nil {
 		t.Fatalf("warm resolve parsed its inputs (err = %v), want a digest-only cache hit", err)
 	}
@@ -780,7 +733,7 @@ func TestResolveFragment_CacheHitSkipsParsing(t *testing.T) {
 	// A MISS over the same unparseable input must still surface the parse
 	// error — the digest gate must never swallow a real rebuild failure.
 	writeFile(t, ws.Root, "svc/api/schema/config.jsonschema.json", `{"type": ["still broken"`)
-	if _, _, err := ResolveFragment(ws.Root, api); err == nil {
+	if _, _, err := ResolveFragment(ws.Root, api, cache); err == nil {
 		t.Fatal("a cache miss over an unparseable schema resolved without error")
 	}
 }

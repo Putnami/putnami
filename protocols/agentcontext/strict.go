@@ -33,8 +33,6 @@ const (
 	ErrorCodeInvalidSourceReason = "agentcontext.invalid_source_reason"
 	// ErrorCodeInvalidDocRelationship marks a doc relationship outside the enum.
 	ErrorCodeInvalidDocRelationship = "agentcontext.invalid_doc_relationship"
-	// ErrorCodeInvalidTestPolicy marks a test policy outside the enum.
-	ErrorCodeInvalidTestPolicy = "agentcontext.invalid_test_policy"
 	// ErrorCodeInvalidAbsenceReason marks an absence reason outside the enum.
 	ErrorCodeInvalidAbsenceReason = "agentcontext.invalid_absence_reason"
 	// ErrorCodeMissingAbsenceReason marks an empty tests section with no absence reason.
@@ -76,7 +74,6 @@ var ValidDiagnosticCodes = map[string]bool{
 	ErrorCodeInvalidRootKind:          true,
 	ErrorCodeInvalidSourceReason:      true,
 	ErrorCodeInvalidDocRelationship:   true,
-	ErrorCodeInvalidTestPolicy:        true,
 	ErrorCodeInvalidAbsenceReason:     true,
 	ErrorCodeMissingAbsenceReason:     true,
 	ErrorCodeInvalidPack:              true,
@@ -161,7 +158,7 @@ func ValidateDocument(d *Document) []diag.Diagnostic {
 	}
 
 	var diags []diag.Diagnostic
-	diags = append(diags, validateProtocolVersion(d.ProtocolVersion)...)
+	diags = append(diags, validateProtocolVersion(d.ProtocolVersion, ProtocolVersion)...)
 	diags = append(diags, validateIdentity(d.Identity)...)
 
 	for i, r := range d.CompositionRoots {
@@ -169,7 +166,7 @@ func ValidateDocument(d *Document) []diag.Diagnostic {
 		diags = append(diags, validatePath(field+".path", r.Path)...)
 		if !ValidRootKinds[r.Kind] {
 			diags = append(diags, diag.Errorf(ErrorCodeInvalidRootKind, field+".kind",
-				"composition-root kind %q is not in the v1 set: applicationMain, describeEntrypoint", r.Kind))
+				"composition-root kind %q is not in the v2 set: applicationMain, describeEntrypoint", r.Kind))
 		}
 	}
 
@@ -189,7 +186,7 @@ func ValidateDocument(d *Document) []diag.Diagnostic {
 		diags = append(diags, validatePath(field+".path", doc.Path)...)
 		if !ValidDocRelationships[doc.Relationship] {
 			diags = append(diags, diag.Errorf(ErrorCodeInvalidDocRelationship, field+".relationship",
-				"doc relationship %q is not in the v1 set: checked, unchecked", doc.Relationship))
+				"doc relationship %q is not in the v2 set: checked, unchecked", doc.Relationship))
 		}
 	}
 
@@ -272,7 +269,7 @@ func validateSourceRange(field string, s SourceRange) []diag.Diagnostic {
 	}
 	if !ValidSourceReasons[s.Why] {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidSourceReason, field+".why",
-			"source reason %q is not in the v1 set: capability-evidence, main, override", s.Why))
+			"source reason %q is not in the v2 set: capability-evidence, main, override", s.Why))
 	}
 	diags = append(diags, validateTokenEstimate(field+".tokens", s.Tokens)...)
 	return diags
@@ -287,31 +284,26 @@ func validateTokenEstimate(field string, e TokenEstimate) []diag.Diagnostic {
 	}
 	if !ValidTokenMethods[e.Method] {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidTokenMethod, field+".method",
-			"token method %q is not in the v1 set: bytes/4", e.Method))
+			"token method %q is not in the v2 set: bytes/4", e.Method))
 	}
 	return diags
 }
 
-// validateTests validates the optional tests section. A present section must
-// name a known policy, and its packs and absence reason are mutually exclusive:
-// an empty section MUST carry an absence reason (so the emptiness is explained),
-// and a non-empty section MUST NOT.
+// validateTests validates the optional tests section. Its packs and absence
+// reason are mutually exclusive: an empty section MUST carry an absence reason
+// (so the emptiness is explained), and a non-empty section MUST NOT.
 func validateTests(t *TestsSection) []diag.Diagnostic {
 	if t == nil {
 		return nil
 	}
 	var diags []diag.Diagnostic
-	if !ValidTestPolicies[t.Policy] {
-		diags = append(diags, diag.Errorf(ErrorCodeInvalidTestPolicy, "tests.policy",
-			"test policy %q is not in the v1 set: auto, require, skip", t.Policy))
-	}
 	if len(t.Packs) == 0 {
 		if t.AbsenceReason == "" {
 			diags = append(diags, diag.Errorf(ErrorCodeMissingAbsenceReason, "tests.absenceReason",
 				"tests section lists no packs; set a machine-readable absenceReason (not-collected, no-packs, unsupported-project-type)"))
 		} else if !ValidAbsenceReasons[t.AbsenceReason] {
 			diags = append(diags, diag.Errorf(ErrorCodeInvalidAbsenceReason, "tests.absenceReason",
-				"absence reason %q is not in the v1 set: not-collected, no-packs, unsupported-project-type", t.AbsenceReason))
+				"absence reason %q is not in the v2 set: not-collected, no-packs, unsupported-project-type", t.AbsenceReason))
 		}
 	} else if t.AbsenceReason != "" {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidAbsenceReason, "tests.absenceReason",
@@ -354,7 +346,7 @@ func validateProvenance(p Provenance) []diag.Diagnostic {
 	}
 	if !ValidAggregationMethods[p.AggregationMethod] {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidAggregationMethod, "provenance.aggregationMethod",
-			"aggregation method %q is not in the v1 set: by-reference", p.AggregationMethod))
+			"aggregation method %q is not in the v2 set: by-reference", p.AggregationMethod))
 	}
 	return diags
 }
@@ -408,11 +400,12 @@ func isWorkspaceRelative(p string) bool {
 	return true
 }
 
-// validateProtocolVersion checks that v is the supported protocol version.
-func validateProtocolVersion(v int) []diag.Diagnostic {
-	if v != ProtocolVersion {
+// validateProtocolVersion checks that v is want, the one version the parser
+// supports for the shape being validated.
+func validateProtocolVersion(v, want int) []diag.Diagnostic {
+	if v != want {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion",
-			"protocolVersion %d is not supported by this parser (want %d)", v, ProtocolVersion)}
+			"protocolVersion %d is not supported by this parser (want %d)", v, want)}
 	}
 	return nil
 }
@@ -425,7 +418,7 @@ func ValidateOverrides(o *OverridesFile) []diag.Diagnostic {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "overrides file is nil")}
 	}
 	var diags []diag.Diagnostic
-	diags = append(diags, validateProtocolVersion(o.ProtocolVersion)...)
+	diags = append(diags, validateProtocolVersion(o.ProtocolVersion, OverridesProtocolVersion)...)
 	for i, s := range o.AddSources {
 		diags = append(diags, validateSourceRange(fmt.Sprintf("addSources[%d]", i), s)...)
 	}
@@ -437,7 +430,7 @@ func ValidateOverrides(o *OverridesFile) []diag.Diagnostic {
 		diags = append(diags, validatePath(field+".path", d.Path)...)
 		if !ValidDocRelationships[d.Relationship] {
 			diags = append(diags, diag.Errorf(ErrorCodeInvalidDocRelationship, field+".relationship",
-				"doc relationship %q is not in the v1 set: checked, unchecked", d.Relationship))
+				"doc relationship %q is not in the v2 set: checked, unchecked", d.Relationship))
 		}
 	}
 	for i, p := range o.RemoveDocs {

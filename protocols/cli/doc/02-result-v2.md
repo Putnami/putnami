@@ -968,8 +968,7 @@ Two behavior changes travel with the shape, both settled above:
 - a run whose only failure was restored from cache reported success on the v1
   `--output=jsonl` summary, and fails in v2 (decision 1).
 
-A **non-job** command (`doctor`, `contracts check`, `context pack`,
-`migrate vnext`, …) has no run to report: its envelope carries
+A **non-job** command (`doctor`, `contracts check`, `migrate vnext`, …) has no run to report: its envelope carries
 `protocolVersion`, `command`, `status`, `exitCode`, the command's own payload in
 `data`, and `error` when it failed. Those payloads are unchanged from v1 — only
 the envelope around them gained the version stamp and the third status.

@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/mapgen"
 	"go.putnami.dev/tooling/cli/internal/mcp"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -103,6 +104,10 @@ func newMCPServerWithContext(ctx context.Context, wsRoot, version string) *mcp.S
 	// replaces it, so graph preparation reads the extensions the server
 	// serves.
 	var current atomic.Pointer[wsproto.Config]
+	// fragments holds the workspace map fragments for this session, in memory
+	// only. Every call validates each one against its inputs digest before it
+	// reuses it, so an edit between two calls rebuilds that project's fragment.
+	fragments := mapgen.NewFragmentCache()
 
 	return mcp.NewServerWithContext(ctx, mcp.Options{
 		WorkspaceRoot: wsRoot,
@@ -125,7 +130,7 @@ func newMCPServerWithContext(ctx context.Context, wsRoot, version string) *mcp.S
 		// Dependency injection avoids an internal/mcp → internal/commands import
 		// cycle (commands already imports the agent-context builder). version is
 		// threaded through so the in-memory build stamps the same provenance
-		// version `context pack` did, keeping the freshness comparison honest.
+		// version `context pack` prints.
 		AgentContext: func(_ context.Context, sel string) (any, error) {
 			return agentctx.BuildAgentContextResult(wsRoot, version, sel)
 		},
@@ -133,7 +138,7 @@ func newMCPServerWithContext(ctx context.Context, wsRoot, version string) *mcp.S
 		// tree, so it needs no version: it carries no provenance stamp that a
 		// build could disagree with.
 		WorkspaceMap: func(_ context.Context, section, sel string) (any, error) {
-			return agentctx.BuildWorkspaceMapResult(wsRoot, section, sel)
+			return agentctx.BuildWorkspaceMapResult(wsRoot, section, sel, fragments)
 		},
 		// The guidance resource renders the block body on each read, from the
 		// same function `context generate` writes it with.

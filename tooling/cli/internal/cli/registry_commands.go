@@ -636,7 +636,6 @@ func cmdContext(env *CommandEnv) error {
 		// Project selection is CLI-global (--projects/--impacted/--baseline), so
 		// it arrives already parsed; the command never sees the flag parser.
 		return agentctx.ContextMapCommand(env.WsRoot, agentctx.ContextMapOptions{
-			Args:         env.Args,
 			Projects:     env.Global.Projects,
 			Impacted:     env.Global.Impacted,
 			Baseline:     env.Global.Baseline,

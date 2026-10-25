@@ -1508,8 +1508,8 @@ per-task check states, classified `.gen` paths, findings, and summary counts.
 
 Every observed `.gen` path must have exactly one effective role. Putnami derives
 `keyed-input` and `captured-output` roles from the existing task contracts and
-treats its existing generated version, agent-context, and per-project infra
-manifests as `ephemeral`. A project can classify a provider-owned exception in
+treats its existing generated version and per-project infra manifests as
+`ephemeral`. A project can classify a provider-owned exception in
 `putnami.json` without changing cache keys or entry formats:
 
 ```json

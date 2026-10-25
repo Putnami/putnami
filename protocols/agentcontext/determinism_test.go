@@ -67,7 +67,6 @@ func sampleDocument() *Document {
 			},
 		},
 		Tests: &TestsSection{
-			Policy: TestPolicyRequire,
 			Packs: []PackRef{
 				{ID: "putnami.transaction.conformance", CapabilityKinds: []string{"datasource"}, Languages: []string{"go", "typescript"}},
 			},
@@ -97,7 +96,7 @@ func sampleDocument() *Document {
 func sampleOverrides() *OverridesFile {
 	return &OverridesFile{
 		Schema:          "https://putnami.dev/schemas/putnami-agent-context.json",
-		ProtocolVersion: ProtocolVersion,
+		ProtocolVersion: OverridesProtocolVersion,
 		AddSources: []SourceRange{
 			{
 				Path:      "go/samples/task-api/handlers.go",
