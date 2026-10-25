@@ -53,9 +53,6 @@ func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verifi
 	if !c.opts.PartialDelivery && !projection.WouldCompleteAfterReady {
 		return verified, errors.New("hosted workflow is not eligible to complete the parent; use --partial-delivery")
 	}
-	if c.opts.PartialDelivery && len(projection.ReadyUnits) == 0 {
-		return verified, errors.New("hosted workflow has no eligible current unit for partial delivery")
-	}
 	c.workflowSHA = projection.WorkflowSHA256
 	return verified, nil
 }
@@ -84,9 +81,9 @@ func (c *publicationCandidate) promoteHosted(ctx context.Context, f Finalizer, s
 	if !c.opts.PartialDelivery && !projection.OutcomeComplete {
 		return errors.New("hosted workflow remains incomplete; parent task was not transitioned")
 	}
-	if c.opts.PartialDelivery && len(projection.ReadyUnits) == 0 {
-		return errors.New("hosted workflow has no eligible current unit for partial delivery")
-	}
+	// A partial delivery whose workflow has no eligible unit still publishes:
+	// the hosted checks gate the proposal, but they never stand for a unit's
+	// native proof, so no unit is ready and no receipt is written.
 	c.readyUnits = projection.ReadyUnits
 	return nil
 }

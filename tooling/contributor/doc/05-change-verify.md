@@ -62,7 +62,9 @@ or local task record for the handoff unit must also appear in its exact
 `handoff.inputs`.
 `--record` can establish `ready` for a current unit at `candidate` without a
 digest cycle. Hosted `change finalize --gate ci --workflow-file` can also
-establish it after the policy-named checks pass on the exact full HEAD. To
+establish it after the policy-named checks pass on the exact full HEAD. The
+hosted checks never stand for native proof: a unit at `building` stays there,
+and a partial delivery that publishes it names no ready unit. To
 resume a unit already at `ready`, its `receipt: ref` points to the unchanged
 JSON output of either a prior successful `change verify --record` call or that
 hosted finalizer. The local receipt requires the native ready verdict,

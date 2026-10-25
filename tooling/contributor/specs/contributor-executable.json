@@ -22,11 +22,11 @@
     },
     {
       "id": "squash-ready-publication",
-      "text": "Build selects one final local or hosted gate after independent review. Publication consumes a current dossier or awaits named hosted checks, never runs a local gate and rechecks proof per boundary. Hosted parent publication needs an immutable workflow and completion eligibility; incomplete parents need partial delivery, needing no workflow when only featureAuthority.none projects own its paths. Exact hosted proof can advance eligible current units, keeps later obligations and yields a replayable receipt."
+      "text": "Build picks one final local or hosted gate after independent review. Publication consumes a current dossier or awaits named hosted checks, runs no local gate and rechecks proof per boundary. A hosted parent needs an immutable workflow and completion eligibility; incomplete parents need partial delivery, with no workflow if only featureAuthority.none projects own its paths. Hosted checks advance only natively proven units to a replayable receipt, keeping later obligations; a partial with none has no receipt."
     },
     {
       "id": "native-workflow-validation",
-      "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
+      "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs native proof and exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
     },
     {
       "id": "change-language-parity",
