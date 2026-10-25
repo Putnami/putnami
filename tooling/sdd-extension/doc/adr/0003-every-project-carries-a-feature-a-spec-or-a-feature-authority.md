@@ -60,8 +60,8 @@ D-026, settled the same day, decides how the protocols answer:
    the semantics. Each project that implements the protocol depends on it and
    proves those requirements in its own tests, under a check of its own,
    because the spec gate blocks a check that two projects report. A protocol
-   that carries `featureAuthority.none` today keeps it until epic #565 gives
-   it a feature.
+   that carries `featureAuthority.none` today keeps it until it gets the
+   feature of its contract.
 
 ## Alternatives rejected
 
@@ -91,5 +91,6 @@ D-026, settled the same day, decides how the protocols answer:
   fewer projects.
 - A manifest or a spec that fails to parse covers nothing in this step. The
   project-scoped validate steps report the document itself.
-- In this repository, 8 projects start in the debt list. Epic #565 removes
-  them.
+- In this repository, 8 projects start in the debt list. The pull request
+  that gives one of them a feature, a spec or a `featureAuthority` removes its
+  entry.

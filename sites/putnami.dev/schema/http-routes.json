@@ -2180,6 +2180,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/spec-driven-development/adr/every-project-carries-a-feature-a-spec-or-a-feature-authority",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/spec-driven-development/adr/the-squash-commit-keeps-the-breaking-marker",
       "methods": [
         "GET",
@@ -2667,5 +2682,5 @@
       }
     }
   ],
-  "digest": "sha256:98bb13b4020c6d56d436c3260d166d911e05d62cf9e6255299c4477fb5c5b3b2"
+  "digest": "sha256:fcb5388bef50fec8594fed67c35b3089c03c1b85999e553a9c8fc2bf18c88b5a"
 }
