@@ -123,14 +123,15 @@ func TestJobRunEnvelopeCarriesWorkspaceLoadWarnings(t *testing.T) {
 }
 
 // TestComposeEnvelopeCarriesTheWarningsOfItsOwnLoad holds compose to reporting
-// the warnings of the workspace load it performs before it plans its members:
-// a compose that fails before any engine run still carries them in its
-// envelope and writes them on stderr, once.
+// the warnings of the workspace load that launched it: a compose that fails
+// before it starts any member still carries them in its envelope and writes
+// them on stderr, once. compose runs in @putnami/dev, which reads the
+// warnings from its job context.
 func TestComposeEnvelopeCarriesTheWarningsOfItsOwnLoad(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "project-inventory", "a-command-reports-the-warnings-of-its-own-load-once")
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	t.Setenv("DO_NOT_TRACK", "1")
-	root := jobWorkspace(t, true)
+	root := devWorkspace(t, true)
 
 	code, envelope, stdout, stderr := run(t, root, "compose", "missing", "--output=json")
 	if code != protocolcli.ExitUsage || envelope.Status != protocolcli.StatusFailure {
@@ -151,7 +152,7 @@ func TestComposeEnvelopeCarriesTheWarningsOfItsOwnLoad(t *testing.T) {
 		t.Errorf("--quiet wrote the warning to stderr:\n%s", stderr)
 	}
 
-	clean := jobWorkspace(t, false)
+	clean := devWorkspace(t, false)
 	code, _, stdout, stderr = run(t, clean, "compose", "missing", "--output=json")
 	if code != protocolcli.ExitUsage {
 		t.Fatalf("clean workspace exit code = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)

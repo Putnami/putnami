@@ -58,8 +58,12 @@ type Request struct {
 	Verbose bool
 	Quiet   bool
 	NoColor bool
-	Stdout  io.Writer
-	Stderr  io.Writer
+	// Warnings are the warnings of putnami's workspace load for the launch,
+	// which putnami already wrote on stderr unless --quiet. Every result
+	// envelope the command writes carries them in workspaceWarnings.
+	Warnings []protocolcli.WorkspaceWarning
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
 // invocation is one parsed `putnami qualify` invocation.
@@ -103,7 +107,7 @@ func (e *VerdictError) Error() string {
 // anything is derived. SIGINT and SIGTERM cancel the run, which still tears a
 // local composition down and prints the canceled verdict.
 func Run(req Request) int {
-	out := output{stdout: req.Stdout, stderr: req.Stderr, mode: req.Output}
+	out := output{stdout: req.Stdout, stderr: req.Stderr, mode: req.Output, warnings: req.Warnings}
 	inv, err := parseInvocation(req.Args)
 	if err != nil {
 		return out.failure(nil, err)
@@ -298,10 +302,13 @@ func validate(inv invocation) error {
 	return nil
 }
 
-// output writes the command's documents in the resolved output mode.
+// output writes the command's documents in the resolved output mode. Every
+// envelope carries warnings, the launch's workspace load warnings, in
+// workspaceWarnings.
 type output struct {
 	stdout, stderr io.Writer
 	mode           protocolcli.OutputMode
+	warnings       []protocolcli.WorkspaceWarning
 }
 
 // structured reports whether the mode writes documents rather than text.
@@ -332,7 +339,7 @@ func (o output) document(document any) int {
 	if err := json.Unmarshal(data, &value); err != nil {
 		return o.failure(nil, fmt.Errorf("encode qualify output: %w", err))
 	}
-	return resultv2.Emit(o.stdout, o.stderr, o.mode, CommandPath, "", value, nil)
+	return resultv2.EmitWithWarnings(o.stdout, o.stderr, o.mode, CommandPath, "", value, nil, o.warnings)
 }
 
 // failure writes a failed run: in json and jsonl the failure envelope, whose
@@ -342,5 +349,5 @@ func (o output) failure(data any, err error) int {
 	if data != nil && !o.mode.IsStructured() {
 		data = nil
 	}
-	return resultv2.Emit(o.stdout, o.stderr, o.mode, CommandPath, "", data, err)
+	return resultv2.EmitWithWarnings(o.stdout, o.stderr, o.mode, CommandPath, "", data, err, o.warnings)
 }

@@ -1,9 +1,11 @@
 // Package workspacewarnings drives the structured workspace-reading commands
 // through the real CLI on a workspace with no index: each one reports the load
 // warning on stderr and in its result envelope's workspaceWarnings. A command
-// that runs jobs does the same on a workspace that loads with a warning. These
-// tests swap the process streams and the working directory, so they run in
-// their own test binary.
+// that runs jobs does the same on a workspace that loads with a warning, and
+// so do compose and qualify, which run in @putnami/dev, built from
+// tooling/dev, and read the warnings of their launch from the job context.
+// These tests swap the process streams and the working directory, so they run
+// in their own test binary.
 package workspacewarnings
 
 import (
@@ -23,7 +25,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(clitest.Main(m))
+	code := clitest.Main(m)
+	removeDevRuntime()
+	os.Exit(code)
 }
 
 // run invokes the CLI in root and returns its exit code, its stdout decoded as

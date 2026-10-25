@@ -60,8 +60,20 @@ func normalizeVerdict(root, document string) string {
 // stderr.
 func runCommand(t *testing.T, ws *compose.Workspace, executable string, mode protocolcli.OutputMode, args ...string) (int, string, string) {
 	t.Helper()
+	return runWarnedCommand(t, nil, ws, executable, mode, args...)
+}
+
+// runWarnedCommand is runCommand for a launch whose workspace load reported
+// warnings.
+func runWarnedCommand(t *testing.T, warnings []protocolcli.WorkspaceWarning, ws *compose.Workspace, executable string,
+	mode protocolcli.OutputMode, args ...string,
+) (int, string, string) {
+	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := Run(Request{Ctx: t.Context(), Workspace: ws, Args: args, Output: mode, Executable: executable, Stdout: &stdout, Stderr: &stderr})
+	code := Run(Request{
+		Ctx: t.Context(), Workspace: ws, Args: args, Output: mode, Executable: executable,
+		Warnings: warnings, Stdout: &stdout, Stderr: &stderr,
+	})
 	return code, stdout.String(), stderr.String()
 }
 

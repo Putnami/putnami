@@ -160,6 +160,7 @@ func (a *App) runExtensionStructuredCommand(
 			iox.Fprintf(stderr, "putnami: load workspace: %v\n", err)
 			return ExitError
 		}
+		warnings := launchWarnings(ws, parsed.Global.Quiet, stderr)
 		// And the runtime it is about to exec, for the same reason: the
 		// scheduler bypass skips Engine.Run, which is where
 		// SynchronizeExtensionRuntimesForCommands would otherwise have prepared
@@ -243,7 +244,8 @@ func (a *App) runExtensionStructuredCommand(
 			// Setting it also makes the task identity's scope "workspace", which
 			// is what this job has always been: it runs once, for the synthetic
 			// workspace project above.
-			SelectedProjects: selection.Projects(),
+			SelectedProjects:  selection.Projects(),
+			WorkspaceWarnings: warnings,
 		}
 		// Interactive commands are the sole scheduler bypass. Mirror the
 		// execution-only global overlay Engine.execute supplies to planned tasks.
@@ -447,6 +449,19 @@ func runInteractiveExtensionCommand(
 	}
 	deadline, _ := scheduler.TaskDeadline(job)
 	return interactiveExitCode(result, commandPath, deadline, stderr)
+}
+
+// launchWarnings reports the warnings of an interactive launch's workspace
+// load as every command reports those of its own: each once on stderr, unless
+// quiet. It returns them for the subcommand's job context, so the result
+// envelope the subcommand writes carries them.
+func launchWarnings(ws *workspace.Workspace, quiet bool, stderr io.Writer) []protocolcli.WorkspaceWarning {
+	if quiet {
+		stderr = nil
+	}
+	report := workspace.NewWarningReport(stderr)
+	report.Report(ws)
+	return report.Envelope()
 }
 
 // addOutputGlobalParams adds the output globals the user typed to the params

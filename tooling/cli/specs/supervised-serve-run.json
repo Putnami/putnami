@@ -27,7 +27,7 @@
     },
     {
       "id": "a-supervised-serve-run-splits-its-output",
-      "text": "With --output=jsonl and --serve-env -, stdout carries the session stream unchanged and stderr is the serve log: each task's start, output, end and failure details as putnami serve renders them in text mode, and a watched run's [watch] lines. The serve log carries no session summary: no opening line, counts, hint, cache report or interrupt notice, because the supervisor reports its own session."
+      "text": "With --output=jsonl and --serve-env -, stdout carries the session stream unchanged and stderr is the serve log: each task's start, output, end and failure details as putnami serve renders them in text mode, and a watched run's [watch] lines. The serve log carries no session summary: no opening line, counts, hint, cache report or interrupt notice, and no workspace load warning, because the supervisor reports its own session and its own load."
     },
     {
       "id": "a-serve-step-names-its-process-group",

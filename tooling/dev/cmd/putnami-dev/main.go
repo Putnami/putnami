@@ -12,8 +12,9 @@
 // commands, and refuses every other invocation. putnami launches each command
 // as an interactive subcommand in the workspace root and appends
 // --putnamiContext <file>; the command reads the output mode, --dry-run, the
-// output flags (--verbose, --quiet, --no-color) and the workspace membership
-// from that job context. compose and qualify start
+// output flags (--verbose, --quiet, --no-color), the workspace membership and
+// the warnings of putnami's workspace load from that job context. compose and
+// qualify start
 // each member of a composition as a serve run of the putnami executable that
 // launched them, which putnami names in PUTNAMI_CLI_EXECUTABLE. The
 // development verbs the manifest declares run in the language extensions,
@@ -80,7 +81,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return compose.Run(compose.Request{
 				Ctx: launch.ctx, Workspace: launch.workspace, Args: launch.args, Output: launch.output,
 				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
-				Stdout: stdout, Stderr: stderr,
+				Warnings: launch.warnings, Stdout: stdout, Stderr: stderr,
 			})
 		})
 	case len(args) >= 2 && args[0] == "qualify" && args[1] == "run":
@@ -88,7 +89,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return qualify.Run(qualify.Request{
 				Ctx: launch.ctx, Workspace: launch.workspace, Args: launch.args, Output: launch.output,
 				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
-				Stdout: stdout, Stderr: stderr,
+				Warnings: launch.warnings, Stdout: stdout, Stderr: stderr,
 			})
 		})
 	}
@@ -115,6 +116,10 @@ type workloadLaunch struct {
 	verbose bool
 	quiet   bool
 	noColor bool
+	// warnings are the warnings of putnami's workspace load, which it already
+	// wrote on stderr unless --quiet; every result envelope the command writes
+	// carries them.
+	warnings []protocolcli.WorkspaceWarning
 	// workspace is the workspace membership the job context carries.
 	workspace *compose.Workspace
 	// executable is the absolute path of the putnami executable.
@@ -140,15 +145,16 @@ func runWorkload(command string, args []string, contextFile string, stdout, stde
 		return protocolcli.ExitFailure
 	}
 	launch := workloadLaunch{
-		args:    args,
-		output:  protocolcli.OutputMode(launchContext.Params.String("output")),
-		verbose: launchContext.Params.Bool("verbose", false),
-		quiet:   launchContext.Params.Bool("quiet", false),
-		noColor: !launchContext.Params.Bool("color", true),
+		args:     args,
+		output:   protocolcli.OutputMode(launchContext.Params.String("output")),
+		verbose:  launchContext.Params.Bool("verbose", false),
+		quiet:    launchContext.Params.Bool("quiet", false),
+		noColor:  !launchContext.Params.Bool("color", true),
+		warnings: launchContext.WorkspaceWarnings,
 	}
 	launch.workspace, launch.executable, err = readWorkloadLaunch(command, launchContext)
 	if err != nil {
-		return resultv2.Emit(stdout, stderr, launch.output, command, "", nil, err)
+		return resultv2.EmitWithWarnings(stdout, stderr, launch.output, command, "", nil, err, launch.warnings)
 	}
 	ctx, stop := parent.Watch(context.Background())
 	defer stop()

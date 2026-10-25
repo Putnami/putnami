@@ -98,6 +98,10 @@
     {
       "id": "the-dev-executable-reads-its-launch-from-the-job-context",
       "text": "The dev executable reads the workspace membership and the output flags --verbose, --quiet and --no-color from the job context putnami appends, and starts each serve run with the absolute putnami executable PUTNAMI_CLI_EXECUTABLE names. A launch without either fails with exit status 1 before anything starts, and a usage error exits 2. A hosted run refuses both groups."
+    },
+    {
+      "id": "compose-and-qualify-carry-their-launch-warnings",
+      "text": "putnami writes each warning of the workspace load that launches compose or qualify once on stderr, unless --quiet, and hands the warnings to the dev executable in the job context's workspaceWarnings. Every result envelope compose and qualify write, a usage error's and a failure's included, carries them in workspaceWarnings, and neither command writes them on stderr again. A load that warned of nothing hands no member, and no envelope carries one."
     }
   ],
   "decisions": [

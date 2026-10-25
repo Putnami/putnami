@@ -192,6 +192,12 @@ most 75 seconds, so it ends before putnami stops waiting for it 90 seconds after
 the signal. putnami exits `130` only when it killed `compose`: on a second
 signal, or past those 90 seconds.
 
+putnami writes each warning of the workspace load that launches `compose` or
+`qualify` once on stderr, unless `--quiet`, and hands the warnings to the
+command in its job context. Every result envelope either command writes, a
+failure's included, carries them in `workspaceWarnings`. Neither command, nor a
+member's serve run, writes them on stderr again.
+
 ### Recovery
 
 A composition keeps `.putnami/compose/<id>/lease.json` while it runs:

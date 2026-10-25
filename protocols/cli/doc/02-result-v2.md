@@ -286,12 +286,16 @@ their warnings stay on stderr. A command that runs jobs fills the member in
 its `--output=json` envelope, for the run's verdict and for a plan-only
 preview, and in the `doctor` envelope of a blocked production preflight in
 either structured mode. A command that runs jobs inside its own result, such as
-`compose`, `qualify --target local`, `cache verify` and `impact-plan`, fills the
-member with the warnings of its job run. `compose` and every `qualify` form,
-`--target <url>` and `--print-contract` included, also fill it with the
-warnings of the load they perform before any job runs. A warning that two loads
+`cache verify` and `impact-plan`, fills the member with the warnings of its job
+run. An interactive extension subcommand receives the warnings of the load that
+launched it in `workspaceWarnings` of its
+[job context](../../job/README.md), and the envelope it writes carries them:
+`compose` and every `qualify` form of `@putnami/dev`, `--target <url>` and
+`--print-contract` included, fill the member that way. A warning that two loads
 of one command report appears once. The `--output=jsonl` session stream of a
-run writes no result envelope, so there its load warnings are on stderr only.
+run writes no result envelope, so there its load warnings are on stderr only. A
+supervised serve run, one with `--output=jsonl` and `--serve-env -`, writes
+none on its serve log: its supervisor reports the warnings of its own load.
 
 ### Test case records
 

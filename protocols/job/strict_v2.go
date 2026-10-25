@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	cliproto "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 )
 
@@ -25,6 +26,7 @@ type contextPresence struct {
 	workspaceProjects        bool
 	userScope                bool
 	invocationDir            bool
+	workspaceWarnings        bool
 }
 
 // v2 validation rules. Validate (strict.go) checks every document against the
@@ -120,6 +122,10 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "invocationDir",
 				"invocationDir requires protocolVersion %d", ProtocolVersion2))
 		}
+		if ctx.presence.workspaceWarnings || ctx.WorkspaceWarnings != nil {
+			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "workspaceWarnings",
+				"workspaceWarnings requires protocolVersion %d", ProtocolVersion2))
+		}
 		// The v2-only members of ProjectRef are v2-only for the same reason as
 		// every member above, and the cost of getting it wrong is concrete: a
 		// v1 consumer ignores `sourceName` and renames the manifest anyway,
@@ -196,6 +202,7 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		diags = append(diags, validateInvocation(ctx.Invocation, ctx.presence.invocation)...)
 		diags = append(diags, validateUserScope(ctx.UserScope, ctx.presence.userScope)...)
 		diags = append(diags, validateInvocationDir(ctx.InvocationDir, ctx.presence.invocationDir)...)
+		diags = append(diags, validateWorkspaceWarnings(ctx.WorkspaceWarnings, ctx.presence.workspaceWarnings)...)
 		diags = append(diags, validateSelection(ctx.Selection, ctx.presence.selection)...)
 		for i, project := range ctx.SelectedProjects {
 			diags = append(diags, validateProjectRefConfig(
@@ -593,6 +600,32 @@ func validateInvocationDir(dir string, present bool) []diag.Diagnostic {
 			"invocationDir must be an absolute path, got %q", dir)}
 	}
 	return nil
+}
+
+// validateWorkspaceWarnings checks the warnings of an interactive launch's
+// workspace load. A present member is a non-empty array, because a load that
+// warned of nothing omits it, and each warning carries the non-empty code and
+// message the result envelope's workspaceWarnings requires.
+func validateWorkspaceWarnings(warnings []cliproto.WorkspaceWarning, present bool) []diag.Diagnostic {
+	if !present && warnings == nil {
+		return nil
+	}
+	if len(warnings) == 0 {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "workspaceWarnings",
+			"workspaceWarnings must be omitted or a non-empty array")}
+	}
+	var diags []diag.Diagnostic
+	for i, warning := range warnings {
+		if strings.TrimSpace(warning.Code) == "" {
+			diags = append(diags, diag.Errorf(ErrorCodeMissingField,
+				fmt.Sprintf("workspaceWarnings[%d].code", i), "workspaceWarnings[].code is required"))
+		}
+		if strings.TrimSpace(warning.Message) == "" {
+			diags = append(diags, diag.Errorf(ErrorCodeMissingField,
+				fmt.Sprintf("workspaceWarnings[%d].message", i), "workspaceWarnings[].message is required"))
+		}
+	}
+	return diags
 }
 
 // validateSelection checks the resolved project selection.

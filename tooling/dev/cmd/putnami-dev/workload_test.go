@@ -235,3 +235,73 @@ func TestRunWorkloadReadsTheOutputFlagsFromTheJobContext(t *testing.T) {
 		})
 	}
 }
+
+// TestRunWorkloadReadsTheWarningsFromTheJobContext pins that a compose or
+// qualify launch takes the warnings of putnami's workspace load from the job
+// context's workspaceWarnings, and that an envelope the executable writes
+// carries them, a launch failure's included, without writing them on stderr
+// again: putnami wrote them there. A context without the member hands none.
+func TestRunWorkloadReadsTheWarningsFromTheJobContext(t *testing.T) {
+	t.Setenv(wire.SocketEnv, "")
+	t.Setenv(wire.TokenEnv, "")
+	spectest.Proves(t, workloadFeature, "compose-and-qualify-carry-their-launch-warnings", "the-executable-reads-the-warnings-from-the-job-context")
+	root := t.TempDir()
+	member := `"workspaceRoot":` + quote(t, root) + `,"workspaceProjects":[{"id":"/app","name":"app","path":"app","type":"application"}]`
+	warnings := []protocolcli.WorkspaceWarning{
+		{Code: "workspace.jobs_ignored", Message: "project /app declares jobs, which putnami ignores"},
+		{Code: "workspace.name_divergence", Message: "project /lib is named lib in putnami.json and @acme/lib in package.json"},
+	}
+	encoded, err := json.Marshal(warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	warned := writeLaunchContext(t, `{`+member+`,"params":{"output":"json"},"workspaceWarnings":`+string(encoded)+`}`)
+	clean := writeLaunchContext(t, `{`+member+`,"params":{"output":"json"}}`)
+
+	t.Run("launch", func(t *testing.T) {
+		t.Setenv(cliExecutableEnv, filepath.Join(root, "bin", "putnami"))
+		for contextFile, want := range map[string][]protocolcli.WorkspaceWarning{warned: warnings, clean: nil} {
+			var launched workloadLaunch
+			var stdout, stderr bytes.Buffer
+			code := runWorkload("qualify", []string{"app"}, contextFile, &stdout, &stderr, func(launch workloadLaunch) int {
+				launched = launch
+				return 0
+			})
+			if code != 0 {
+				t.Fatalf("exit %d; stderr %q", code, stderr.String())
+			}
+			if !slices.Equal(launched.warnings, want) {
+				t.Errorf("launch warnings = %+v, want %+v", launched.warnings, want)
+			}
+		}
+	})
+
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		executable string
+		code       int
+	}{
+		{"compose usage", []string{"compose", "up", "--putnamiContext", warned}, filepath.Join(root, "bin", "putnami"), protocolcli.ExitUsage},
+		{"qualify usage", []string{"qualify", "run", "--putnamiContext", warned}, filepath.Join(root, "bin", "putnami"), protocolcli.ExitUsage},
+		{"qualify launch failure", []string{"qualify", "run", "app", "--putnamiContext", warned}, "putnami", protocolcli.ExitFailure},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(cliExecutableEnv, tc.executable)
+			var stdout, stderr bytes.Buffer
+			if code := run(tc.args, &stdout, &stderr); code != tc.code {
+				t.Fatalf("exit %d, want %d; stderr %q", code, tc.code, stderr.String())
+			}
+			var envelope protocolcli.ResultV2
+			if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+				t.Fatalf("stdout %q is not one result envelope: %v", stdout.String(), err)
+			}
+			if !slices.Equal(envelope.WorkspaceWarnings, warnings) {
+				t.Errorf("workspaceWarnings = %+v, want %+v", envelope.WorkspaceWarnings, warnings)
+			}
+			if strings.Contains(stderr.String(), "putnami: warning: ") {
+				t.Errorf("the executable wrote a launch warning on stderr: %q", stderr.String())
+			}
+		})
+	}
+}

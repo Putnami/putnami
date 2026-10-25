@@ -256,15 +256,16 @@ warning.
 A command that runs jobs (`build`, `test`, `lint`, `validate`, `run`, …) puts
 the load warnings in `workspaceWarnings` of its `--output=json` envelope too,
 under `--quiet` as well: the run's envelope and the plan-only envelope of
-`--plan` and `--dry-run`. `compose`, `qualify --target local`, `cache verify`
-and `impact-plan` run jobs inside their own result and carry them too. They
-write each one once on stderr, unless `--quiet`.
-`compose` and `qualify`, `--target <url>` and `--print-contract` included, also
-carry the warnings of the load they perform before any job runs, each warning
-once, on stderr and in the envelope. The `doctor` envelope of a blocked
-production preflight carries them in either structured mode. The
-`--output=jsonl` session stream of a run carries no result envelope, so there
-the warnings are on stderr only.
+`--plan` and `--dry-run`. `cache verify` and `impact-plan` run jobs inside
+their own result and carry them too. They write each one once on stderr, unless
+`--quiet`. The launch of an interactive extension subcommand writes each
+warning of its load once on stderr, unless `--quiet`, and hands the warnings to
+the subcommand in its job context, so `compose` and `qualify` of
+`@putnami/dev`, `--target <url>` and `--print-contract` included, carry them in
+their envelope. The members of a composition write none of them again. The
+`doctor` envelope of a blocked production preflight carries them in either
+structured mode. The `--output=jsonl` session stream of a run carries no result
+envelope, so there the warnings are on stderr only.
 
 `projects create <name> --template <template>` renders the template and lists
 the project in the workspace config. It then runs the `project-setup` job of

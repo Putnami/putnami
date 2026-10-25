@@ -511,6 +511,20 @@
               "the-executable-reads-the-output-flags-from-the-job-context"
             ]
           }
+        },
+        {
+          "id": "compose-and-qualify-carry-their-launch-warnings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-executable-reads-the-warnings-from-the-job-context",
+              "every-envelope-carries-the-launch-warnings"
+            ]
+          }
         }
       ],
       "surface": {

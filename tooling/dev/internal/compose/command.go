@@ -47,8 +47,12 @@ type Request struct {
 	Verbose bool
 	Quiet   bool
 	NoColor bool
-	Stdout  io.Writer
-	Stderr  io.Writer
+	// Warnings are the warnings of putnami's workspace load for the launch,
+	// which putnami already wrote on stderr unless --quiet. Every result
+	// envelope the command writes carries them in workspaceWarnings.
+	Warnings []protocolcli.WorkspaceWarning
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
 // Run composes the selected workload and blocks until its target exits or the
@@ -59,7 +63,9 @@ type Request struct {
 // envelope in a structured output mode, a short member table otherwise. They
 // are compose.Status projections, which carry section names, never
 // configuration values. A failure is one envelope whose data names the
-// composition, the failed member and what the teardown left behind.
+// composition, the failed member and what the teardown left behind. Every
+// envelope carries the launch's workspace load warnings, Request.Warnings, in
+// workspaceWarnings.
 //
 // The exit status is success only when the composition stopped on a signal
 // and its teardown left nothing behind: a target that exits on its own and a
@@ -72,7 +78,7 @@ func Run(req Request) int {
 	}
 	structured := structuredOutput(req.Output)
 	emit := func(data any, err error) int {
-		return resultv2.Emit(stdout, stderr, req.Output, CommandPath, "", data, err)
+		return resultv2.EmitWithWarnings(stdout, stderr, req.Output, CommandPath, "", data, err, req.Warnings)
 	}
 
 	parsed, err := cliargs.Parse(CommandPath, req.Args, commandFlags)
@@ -118,7 +124,7 @@ func Run(req Request) int {
 		return emit(failureData(err), err)
 	}
 
-	if err := writeStatus(stdout, req.Output, comp.Status()); err != nil {
+	if err := writeStatus(stdout, req.Output, comp.Status(), req.Warnings); err != nil {
 		fmt.Fprintf(stderr, "putnami: %v\n", err)
 	}
 
@@ -144,7 +150,7 @@ func Run(req Request) int {
 		// reads the cleanup either way.
 		return emit(status, runErr)
 	}
-	if err := writeStatus(stdout, req.Output, status); err != nil {
+	if err := writeStatus(stdout, req.Output, status, req.Warnings); err != nil {
 		fmt.Fprintf(stderr, "putnami: %v\n", err)
 	}
 	if runErr == nil {
@@ -240,13 +246,16 @@ func resolveReadyTimeout(raw string) (time.Duration, error) {
 }
 
 // writeStatus prints a composition document: the result envelope in a
-// structured mode, a short member table otherwise.
-func writeStatus(w io.Writer, mode protocolcli.OutputMode, status Status) error {
+// structured mode, a short member table otherwise. The envelope carries
+// warnings, the launch's workspace load warnings, in workspaceWarnings.
+func writeStatus(w io.Writer, mode protocolcli.OutputMode, status Status, warnings []protocolcli.WorkspaceWarning) error {
 	if structuredOutput(mode) {
 		if !mode.IsStructured() {
 			mode = protocolcli.OutputJSONL
 		}
-		_, err := protocolcli.WriteResultV2(w, mode, protocolcli.NewResultV2(CommandPath, status, nil))
+		result := protocolcli.NewResultV2(CommandPath, status, nil)
+		result.WorkspaceWarnings = warnings
+		_, err := protocolcli.WriteResultV2(w, mode, result)
 		return err
 	}
 	if status.Cleanup == nil {

@@ -161,7 +161,8 @@
               "identities-and-dependencies-come-from-discovery",
               "load-warnings-reach-stderr-and-the-result-envelope",
               "a-job-run-envelope-carries-the-load-warnings",
-              "a-command-reports-the-warnings-of-its-own-load-once"
+              "a-command-reports-the-warnings-of-its-own-load-once",
+              "an-interactive-launch-hands-its-load-warnings-to-the-subcommand"
             ]
           }
         },
@@ -4256,7 +4257,8 @@
             "kind": "acceptance",
             "checks": [
               "stdout-keeps-the-stream-and-stderr-renders-the-serve-steps",
-              "the-serve-log-carries-no-session-summary"
+              "the-serve-log-carries-no-session-summary",
+              "the-serve-log-carries-no-load-warning"
             ]
           }
         },

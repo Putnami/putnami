@@ -192,6 +192,57 @@ func TestEmit_HumanModeWritesNoDocument(t *testing.T) {
 	}
 }
 
+// TestEmitWithWarnings_CarriesTheLaunchWarningsInTheEnvelope pins the
+// warnings of the launch's workspace load: a structured envelope, success or
+// failure, carries them in workspaceWarnings, as a built-in command's envelope
+// carries the warnings of its load, and the rest of its bytes are Emit's. A
+// human run writes what Emit writes, because putnami already wrote them on
+// stderr. Nil warnings are Emit.
+func TestEmitWithWarnings_CarriesTheLaunchWarningsInTheEnvelope(t *testing.T) {
+	warnings := []protocolcli.WorkspaceWarning{{Code: "workspace.jobs_ignored", Message: "project /app declares jobs"}}
+	for _, mode := range []protocolcli.OutputMode{
+		protocolcli.OutputJSON, protocolcli.OutputJSONL, protocolcli.OutputText,
+	} {
+		for _, err := range []error{nil, errors.New("contract drift")} {
+			t.Run(fmt.Sprintf("%s/failure=%v", mode, err != nil), func(t *testing.T) {
+				var stdout, stderr bytes.Buffer
+				code := EmitWithWarnings(&stdout, &stderr, mode, "features", "list", samplePayload(), err, warnings)
+
+				var plainOut, plainErr bytes.Buffer
+				wantCode := Emit(&plainOut, &plainErr, mode, "features", "list", samplePayload(), err)
+				if code != wantCode || stderr.String() != plainErr.String() {
+					t.Errorf("exit %d, stderr %q; want Emit's %d, %q", code, stderr.String(), wantCode, plainErr.String())
+				}
+				if !mode.IsStructured() {
+					if stdout.String() != plainOut.String() {
+						t.Errorf("a human run wrote %q, want Emit's %q", stdout.String(), plainOut.String())
+					}
+					return
+				}
+				want := Envelope("features", "list", samplePayload(), err)
+				want.WorkspaceWarnings = warnings
+				var wantOut bytes.Buffer
+				if _, err := protocolcli.WriteResultV2(&wantOut, mode, want); err != nil {
+					t.Fatal(err)
+				}
+				if stdout.String() != wantOut.String() {
+					t.Errorf("stdout =\n%q\nwant\n%q", stdout.String(), wantOut.String())
+				}
+				if violations := protocolcli.ValidateDocument(protocolcli.DocumentResultEnvelope, stdout.Bytes()); len(violations) != 0 {
+					t.Errorf("the envelope violates the contract: %v", violations)
+				}
+			})
+		}
+	}
+
+	var withNil, plain bytes.Buffer
+	EmitWithWarnings(&withNil, &bytes.Buffer{}, protocolcli.OutputJSON, "features", "list", samplePayload(), nil, nil)
+	Emit(&plain, &bytes.Buffer{}, protocolcli.OutputJSON, "features", "list", samplePayload(), nil)
+	if withNil.String() != plain.String() || strings.Contains(withNil.String(), "workspaceWarnings") {
+		t.Errorf("nil warnings wrote\n%q\nwant Emit's\n%q", withNil.String(), plain.String())
+	}
+}
+
 // TestEnvelope_CarriesTheClassifiedFailure pins what the envelope says about a
 // failure: the exit code and the error code both come from the error's
 // classification, and the suggestion an extension attaches reaches error.next

@@ -10,6 +10,8 @@ package job
 import (
 	"encoding/json"
 	"strconv"
+
+	cliproto "go.putnami.dev/protocol/cli"
 )
 
 // ProtocolVersion is the current job context protocol version.
@@ -115,6 +117,15 @@ type Context struct {
 	// it, not against the directory the task runs in. Unlike UserScope it does
 	// not say whether a workspace exists.
 	InvocationDir string `json:"invocationDir,omitempty"`
+	// WorkspaceWarnings are the warnings the orchestrator's workspace load for
+	// an interactive extension command recorded, in order, each once, with the
+	// code and message of the result envelope's workspaceWarnings. v2 only and
+	// optional: the orchestrator sets it on an interactive launch whose load
+	// warned, and never on a planned job. It has already written each warning
+	// on stderr unless --quiet, so a command writes none of them again, and a
+	// command that writes a result envelope carries them in its
+	// workspaceWarnings. Absent means the load warned of nothing.
+	WorkspaceWarnings []cliproto.WorkspaceWarning `json:"workspaceWarnings,omitempty"`
 	// Params are the merged, coerced job parameters (CLI flags over config
 	// defaults); accessors define the shared coercion contract.
 	Params Params `json:"params"`
