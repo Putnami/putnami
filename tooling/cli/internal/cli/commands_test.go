@@ -571,8 +571,8 @@ func assertOwnEnvelopeCarriesWarnings(t *testing.T, cfg *wsproto.Config, wsRoot 
 	reported := []workspace.Warning{{Code: workspace.WarningCodeJobsIgnored, Message: "reported by the engine run"}}
 	own := []protocolcli.WorkspaceWarning{{Code: "own.code", Message: "named by the command"}}
 
-	// The handler stands in for impact-plan: it keeps the warnings of its
-	// engine run and writes its own result envelope.
+	// The handler stands in for impact-plan: its engine run reports into the
+	// command's report, and it writes its own result envelope.
 	command, ok := lookupCommand("impact-plan")
 	if !ok {
 		t.Fatal("impact-plan command is not registered")
@@ -591,7 +591,7 @@ func assertOwnEnvelopeCarriesWarnings(t *testing.T, cfg *wsproto.Config, wsRoot 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			command.run = func(env *CommandEnv) error {
-				env.WorkspaceWarnings().Keep(reported)
+				env.WorkspaceWarnings().Report(&workspace.Workspace{Warnings: reported})
 				result := protocolcli.NewResultV2("impact-plan", map[string]any{"ok": true}, nil)
 				result.WorkspaceWarnings = tc.envelope
 				_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL, result)

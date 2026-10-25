@@ -252,7 +252,8 @@ A command that runs jobs (`build`, `test`, `lint`, `validate`, `run`, …) puts
 the load warnings in `workspaceWarnings` of its `--output=json` envelope too,
 under `--quiet` as well: the run's envelope and the plan-only envelope of
 `--plan` and `--dry-run`. `compose`, `qualify --target local`, `cache verify`
-and `impact-plan` run jobs inside their own result and carry them too.
+and `impact-plan` run jobs inside their own result and carry them too. They
+write each one once on stderr, unless `--quiet`.
 `compose` and `qualify`, `--target <url>` and `--print-contract` included, also
 carry the warnings of the load they perform before any job runs, each warning
 once, on stderr and in the envelope. The `doctor` envelope of a blocked

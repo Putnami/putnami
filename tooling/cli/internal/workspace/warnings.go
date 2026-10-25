@@ -41,19 +41,6 @@ func (r *WarningReport) Report(ws *Workspace) {
 	}
 }
 
-// Keep keeps warnings, in order, except a warning the report already holds,
-// and writes nothing: their producer already wrote them, or was quiet. A caller
-// whose engine run loaded the workspace hands the run's warnings to the report
-// of its command this way. A nil report does nothing.
-func (r *WarningReport) Keep(warnings []Warning) {
-	if r == nil {
-		return
-	}
-	for _, warning := range warnings {
-		r.add(warning)
-	}
-}
-
 // add keeps warning unless the report already holds it, and reports whether it
 // kept it.
 func (r *WarningReport) add(warning Warning) bool {
