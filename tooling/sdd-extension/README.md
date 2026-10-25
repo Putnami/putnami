@@ -307,7 +307,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut. The breaking marker and the agent attribution are never cached |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker and the agent attribution are never cached |
 
 Both are in the canonical gate:
 
@@ -348,16 +348,19 @@ A task may be cacheable only when its declared inputs COVER what it reads.
 - `specs-ratchet-validate` keys on the manifests, specs, options and every
   committed `specs.baseline.json` — both sides of its shrink-only comparison
   are committed files its patterns name.
-- `decisions-validate`, `recipes-validate`, `codeowners-sync` and
-  `docs-links-validate` read files no narrow pattern names: the globs a
-  repository authors in its `decisions.json`, the sample directories an index
-  names, every `putnami.json` above a project, and any file a link names. Each
+- `decisions-validate`, `recipes-validate`, `codeowners-sync`,
+  `docs-links-validate` and `feature-coverage-validate` read files no narrow
+  pattern names: the globs a repository authors in its `decisions.json`, the
+  sample directories an index names, every `putnami.json` above a project, any
+  file a link names, and the feature manifest and specs of every project. Each
   reads the repository's Git candidate cut and nothing else: the tracked files
   and the untracked files no ignore rule excludes. Each declares the input
   `git:**`, which holds exactly that cut, so editing, adding, deleting or
   renaming a candidate moves the key, and an ignored file is neither read nor
-  keyed. Outside a Git work tree the steps read the disk, and the `git:` input
-  has no key, so they run every time.
+  keyed. The key also holds the workspace membership with each project's
+  configuration, where `feature-coverage-validate` reads each
+  `featureAuthority`. Outside a Git work tree the steps read the disk, and the
+  `git:` input has no key, so they run every time.
 - `features-validate` reads the same Git candidate cut: the feature manifests
   and evidence at every root, the capability manifests evidence reaches, and
   every file a source binding hashes. A binding records each bound file's bytes
@@ -420,6 +423,23 @@ directory exists when it holds a tracked or unignored file, and the task is
 cached on the input `git:**`, so emptying, renaming or deleting a sample
 directory moves the key. `putnami context generate` renders the indexes
 into the `build` skill's `references/recipes.md`.
+
+### The feature-coverage gate
+
+`feature-coverage-validate` asks every project of the workspace which outcome
+its code serves. A project answers with a feature in its own
+`putnami.features.json`, a spec under its own `specs/`, or a reviewed
+`featureAuthority` in its `putnami.json`: an `owner` that names an authored
+feature, or `none` with the reason it has no feature. A project that gives no
+answer fails with `sdd.uncovered_project`, unless the committed debt list
+`options.sdd.featureCoverage.debt` in `putnami.workspace.json` names it. An
+`owner` that names no authored feature covers nothing. A debt entry whose
+project answers, or that names no project, fails, so the list only shrinks. A
+workspace without `options.sdd.featureCoverage` has not adopted the gate and
+passes with a note. The task reads the manifests and specs through the Git
+candidate cut and is cached on the input `git:**`. See
+[the validation jobs](doc/02-validation-jobs.md) and
+[ADR 0003](doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md).
 
 ### CODEOWNERS
 

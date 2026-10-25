@@ -3,6 +3,7 @@
   "name": "@example/03-web",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/web-application-delivery"},
   "options": {
     "test": {
       "coverage": false,

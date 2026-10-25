@@ -708,7 +708,7 @@ func assessSpecCompleteness(repository *specRepository) (SpecCompleteness, int, 
 		}
 	}
 
-	linked := linkedFeatureRoots(repository)
+	linked := coveredRoots(repository.manifests, repository.discovery.Selected)
 	authoredIDs := make(map[string]bool, len(repository.authored))
 	for _, feature := range repository.authored {
 		authoredIDs[feature] = true
@@ -725,23 +725,19 @@ func assessSpecCompleteness(repository *specRepository) (SpecCompleteness, int, 
 			diagnostics = append(diagnostics, diag.Warningf(SpecCodeMissingSupportEntry, project.Path,
 				"publishable project %q has no %q entry in %s", name, requiredSupport.kind, supportproto.CatalogFilename))
 		}
-		if linked[project.Path] {
-			continue
-		}
-		// A reviewed `featureAuthority` answers the question this check asks, so
-		// it closes the gap instead of suppressing the report. An `owner` naming
-		// no authored feature is reported and the project still counts as
-		// unlinked: an unresolvable answer is worse than none.
-		switch authority := projectFeatureAuthority(project); {
-		case authority == nil:
-		case authority.None != "":
-			continue
-		case authoredIDs[authority.Owner]:
-			continue
-		default:
+		// The validate-workspace coverage gate asks the same question of every
+		// member, so both answer through projectCoverage (coverage.go). A
+		// reviewed `featureAuthority` closes the gap instead of suppressing the
+		// report; an `owner` naming no authored feature is reported and the
+		// project still counts as unlinked.
+		kind, dangling := projectCoverage(project, linked, authoredIDs)
+		if dangling != "" {
 			diagnostics = append(diagnostics, diag.Warningf(SpecCodeUnresolvedFeatureAuthority, project.Path,
 				"project %q claims feature %q owns its outcome, but no authored feature has that id",
-				name, authority.Owner))
+				name, dangling))
+		}
+		if kind != coverageNone {
+			continue
 		}
 		completeness.ProjectsWithoutFeature = append(completeness.ProjectsWithoutFeature, name)
 		diagnostics = append(diagnostics, diag.Warningf(SpecCodeMissingFeatureLink, project.Path,
@@ -769,30 +765,6 @@ func supportKindForProject(project *workspace.Project) supportproto.SubjectKind 
 		}
 	}
 	return supportproto.SubjectKindPackage
-}
-
-// linkedFeatureRoots marks the roots that carry an explicit link to product
-// intent: a durable manifest declaring at least one feature, or a spec hosted
-// at that root. Membership is per ROOT, never per module, so a package family
-// that shares one feature is not pushed into minting an artificial feature per
-// technical module — the check reports the gap, it does not prescribe the shape
-// of the fix.
-func linkedFeatureRoots(repository *specRepository) map[string]bool {
-	linked := make(map[string]bool)
-	for _, entry := range repository.declarations {
-		if entry.declaration.Kind != featureAuthorityManifest {
-			continue
-		}
-		root := path.Dir(entry.declaration.Source)
-		if root == "." {
-			root = ""
-		}
-		linked[root] = true
-	}
-	for _, discovered := range repository.discovery.Selected {
-		linked[discovered.Root] = true
-	}
-	return linked
 }
 
 // readSupportCatalog reads the reviewed support authority through the support

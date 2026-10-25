@@ -44,6 +44,18 @@
       "agentAttribution": "forbid",
       "verification": {
         "architecture": "enforce"
+      },
+      "featureCoverage": {
+        "debt": [
+          "/cloud/runtime/go",
+          "/cloud/runtime/typescript",
+          "/intelligence/areas",
+          "/protocols/doccov",
+          "/typescript/templates/proof",
+          "/typescript/templates/typescript-library",
+          "/typescript/templates/typescript-server",
+          "/typescript/templates/typescript-web"
+        ]
       }
     },
     "test": {

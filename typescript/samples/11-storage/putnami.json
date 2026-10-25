@@ -3,6 +3,7 @@
   "name": "@example/11-storage",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/object-storage"},
   "options": {
     "test": {
       "coverage": false,

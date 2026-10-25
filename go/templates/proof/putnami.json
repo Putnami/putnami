@@ -3,6 +3,7 @@
   "name": "@putnami/go-templates-proof",
   "tags": ["go"],
   "extensions": ["/go/extension"],
+  "featureAuthority": {"owner": "go/project-setup"},
   "disable": {
     "jobs": ["serve"]
   },

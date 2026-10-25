@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gitcandidate"
 )
 
@@ -252,6 +253,40 @@ func TestRecipesVerdictFollowsTheGitKey(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, true, missing},
+	})
+}
+
+// TestFeatureCoverageVerdictFollowsTheGitKey proves feature-coverage-validate's
+// key: a spec or a manifest covers its project when it is a candidate, so an
+// ignored one covers nothing and moves neither the key nor the verdict.
+func TestFeatureCoverageVerdictFollowsTheGitKey(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "every-project-carries-feature-coverage", "an-ignored-document-covers-nothing")
+	root := candidateWorkspace(t)
+	writeFixtureFile(t, filepath.Join(root, ".gitignore"), "lib/specs/\n")
+	writeFixtureFile(t, filepath.Join(root, "lib", "README.md"), "# lib\n")
+	ws := fixtureWorkspace("w", root, appProject("lib", "lib"))
+	verdict := func() string {
+		report, err := BuildFeatureCoverageResult(ws, coverageOptions())
+		if err == nil {
+			return fmt.Sprintf("ok, %d with a feature or spec", report.FeatureOrSpec)
+		}
+		codes := make([]string, 0, len(report.Diagnostics))
+		for _, finding := range report.Diagnostics {
+			codes = append(codes, finding.Code)
+		}
+		return strings.Join(codes, ",")
+	}
+	uncovered, covered := ErrorCodeUncoveredProject, "ok, 1 with a feature or spec"
+	assertVerdictFollowsTheKey(t, root, verdict, uncovered, []cutStep{
+		{"an ignored spec appears", func() {
+			writeFixtureFile(t, filepath.Join(root, "lib", "specs", "outcome.json"), coverageSpec)
+		}, false, uncovered},
+		{"the spec becomes a candidate", func() { writeFixtureFile(t, filepath.Join(root, ".gitignore"), "*.log\n") }, true, covered},
+		{"the cut is staged", func() { gitIn(t, root, "add", "-A") }, false, covered},
+		{"the spec is deleted", func() { removeIn(t, root, "lib/specs") }, true, uncovered},
+		{"a manifest declares a feature", func() {
+			writeFixtureFile(t, filepath.Join(root, "lib", featureproto.ManifestFilename), coverageFeatureManifest)
+		}, true, covered},
 	})
 }
 

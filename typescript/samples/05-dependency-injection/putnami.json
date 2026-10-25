@@ -3,6 +3,7 @@
   "name": "@example/05-dependency-injection",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/dependency-injection"},
   "options": {
     "test": {
       "coverage": false,
