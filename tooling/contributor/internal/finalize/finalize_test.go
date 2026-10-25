@@ -633,13 +633,6 @@ func TestHostedParentRequiresNativeWorkflowEligibilityAndStatus(t *testing.T) {
 	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 {
 		t.Fatalf("incomplete parent reached publication: %v", err)
 	}
-	opts.PartialDelivery = true
-	readyUnits = nil
-	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 {
-		t.Fatalf("partial hosted workflow without an eligible unit reached publication: %v", err)
-	}
-	opts.PartialDelivery = false
-	readyUnits = []string{"current"}
 	eligible = true
 	result, err := f.Run(context.Background(), opts)
 	if err != nil || provider.transitions != 1 || before < 2 || after != 2 || result.WorkflowSHA256 != "workflow-sha" || len(result.ReadyUnits) != 1 || result.HostedWorkflowReceipt == nil {
@@ -705,6 +698,38 @@ func TestHostedPartialPromotesOnlyCurrentUnitsAndKeepsParentOpen(t *testing.T) {
 	}
 	if strings.Contains(provider.proposal.Body, "Closes ") {
 		t.Fatalf("partial publication has closing directive: %s", provider.proposal.Body)
+	}
+}
+
+func TestHostedPartialWithoutAnEligibleUnitPublishesWithoutAReceipt(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "a-partial-without-an-eligible-unit-publishes-without-a-receipt")
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile, opts.WorkflowFile = "ci", "", ".context/workflow.json"
+	opts.TaskSource, opts.TaskID, opts.PartialDelivery = provider.task.Ref.Source, provider.task.Ref.ID, true
+	provider.checks = collab.Checks{Commit: git.head,
+		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
+	statuses := 0
+	// The native verifier finds a valid workflow whose current unit is still
+	// building, so it names no ready unit before or after the hosted checks.
+	f.Workflow = func(_ context.Context, request HostedWorkflowRequest) (HostedWorkflowResult, error) {
+		if request.Status != nil {
+			statuses++
+		}
+		return HostedWorkflowResult{WorkflowSHA256: "frozen-workflow"}, nil
+	}
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || git.pushes != 1 || statuses == 0 || provider.transitions != 0 || provider.task.State != collab.TaskStateInProgress ||
+		result.State != collab.ProposalStateOpen || result.Gate != "hosted checks passed on "+git.head ||
+		result.WorkflowSHA256 != "frozen-workflow" || len(result.ReadyUnits) != 0 || result.HostedWorkflowReceipt != nil {
+		t.Fatalf("partial without an eligible unit was not published as progress only: result=%+v statuses=%d err=%v", result, statuses, err)
+	}
+	if !strings.Contains(provider.proposal.Body, "Refs https://github.com/acme/app/issues/42") || strings.Contains(provider.proposal.Body, "Closes ") {
+		t.Fatalf("partial lost its non-closing task reference: %s", provider.proposal.Body)
+	}
+	opts.PartialDelivery = false
+	git.pushes = 0
+	if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "use --partial-delivery") || git.pushes != 0 {
+		t.Fatalf("normal delivery without an eligible unit reached a write: %v", err)
 	}
 }
 

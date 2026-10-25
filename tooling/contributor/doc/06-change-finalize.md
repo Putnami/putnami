@@ -66,13 +66,19 @@ title, the body and every nonempty branch commit must hold no closing
 directive.
 
 `--gate ci` with a task needs `--workflow-file <workflow.json>`, an immutable
-workflow record. It publishes only when that record makes the outcome
-eligible, or with `--partial-delivery`, a current unit. A partial delivery
-needs no workflow record when every changed path belongs to projects that
-declare `featureAuthority.none` and author no feature, both on the branch and
-at the base. The hosted checks on its head are then its evidence. putnami
-names the projects that own each changed path, with the rules its impact
-analysis uses.
+workflow record. Without `--partial-delivery`, it publishes only when that
+record makes the outcome eligible. With `--partial-delivery`, the record must
+be valid. Each current unit at `candidate` whose native checks pass becomes
+ready, and the result carries its receipt. When no unit is eligible, for
+example a unit still at `building`, the proposal still publishes with the
+non-closing task reference, with no ready unit and no receipt. The hosted
+checks never stand for a unit's native proof.
+
+A partial delivery needs no workflow record when every changed path belongs to
+projects that declare `featureAuthority.none` and author no feature, both on
+the branch and at the base. The hosted checks on its head are then its
+evidence. putnami names the projects that own each changed path, with the
+rules its impact analysis uses.
 
 ## Text rules
 

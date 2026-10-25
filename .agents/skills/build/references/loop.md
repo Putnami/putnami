@@ -154,6 +154,10 @@ evidence. Native
 preflight rejects an incomplete parent before publication unless partial delivery
 is explicit. Only exact required hosted checks on the current full HEAD can
 advance eligible current units to ready; later obligations remain incomplete.
+A partial delivery whose workflow has no eligible unit, such as a unit still at
+`building`, still publishes with its non-closing task reference, but names no
+ready unit and emits no receipt: the hosted checks never stand for native
+proof, so the unit needs a local producer run before it can reach ready.
 The command has no automatic local gate mode.
 Otherwise run the final gate with
 `--impacted --baseline <baseSHA> --enforce-coverage`, plus `--fix=false` when
