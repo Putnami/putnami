@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -853,6 +854,10 @@ func TestSpecGateEvidenceScope_EndToEnd(t *testing.T) {
 		}
 		if group.Blocked || group.Counts.Unobserved != 1 {
 			t.Fatalf("group = %+v, want an unblocked group counting one unobserved requirement", group)
+		}
+		want := []features.UnconsultedCandidate{{Project: "/library", Reason: features.UnconsultedNoCache}}
+		if !slices.Equal(group.Unconsulted, want) {
+			t.Errorf("unconsulted = %+v, want %+v", group.Unconsulted, want)
 		}
 	})
 

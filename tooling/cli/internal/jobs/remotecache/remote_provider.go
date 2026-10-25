@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -319,6 +320,60 @@ func (p *providerRemote) unavailable() error {
 		return p.initErr
 	default:
 		return errProviderClosed
+	}
+}
+
+// errProviderRestoreFailed is why a restore the provider answered with
+// cache.RestoreError returned no entry: the provider could not reach or
+// materialize it, which is not a miss.
+var errProviderRestoreFailed = errors.New("the cache provider could not restore the entry")
+
+// restoreFailure is the error of one provider restore: the call's own error,
+// else errProviderRestoreFailed for a cache.RestoreError answer, else nil for
+// a hit or a miss.
+func restoreFailure(restore *cache.RestoreResult, err error) error {
+	if err == nil && restore != nil && restore.Status == cache.RestoreError {
+		return errProviderRestoreFailed
+	}
+	return err
+}
+
+// lookupFailure classifies why a remote lookup got no answer, as one of the
+// closed jobmodel.RemoteCache* reasons, or "" when err is nil.
+func lookupFailure(err error) string {
+	var refused *cacheprovider.OpError
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, context.DeadlineExceeded):
+		return jobmodel.RemoteCacheTimeout
+	case errors.As(err, &refused):
+		return jobmodel.RemoteCacheRefused
+	default:
+		return jobmodel.RemoteCacheUnreachable
+	}
+}
+
+// recordLookup counts one lookup of the run, answered when err is nil. A
+// lookup the run's own cancellation ended counts nowhere: the remote cache
+// did not cause it.
+func (r *RemoteCache) recordLookup(err error) {
+	if r == nil || errors.Is(err, context.Canceled) {
+		return
+	}
+	r.stats.RecordRemoteLookup(lookupFailure(err))
+}
+
+// recordUnavailable counts one failed lookup when ensureProvider returned no
+// session because the provider failed to start, to initialize, or is closed.
+// A provider that serves nothing by configuration takes no part in the run,
+// so its lookups count nowhere.
+func (r *RemoteCache) recordUnavailable() {
+	if r == nil {
+		return
+	}
+	if err := r.provider.unavailable(); err != nil {
+		r.recordLookup(err)
 	}
 }
 

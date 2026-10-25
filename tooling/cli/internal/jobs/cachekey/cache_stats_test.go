@@ -9,6 +9,41 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 )
 
+// TestCacheStats_RemoteAnswer pins the remote member of the snapshot: absent
+// without a lookup, answered for a cold cache, and otherwise the failed count
+// with the preferred reason.
+func TestCacheStats_RemoteAnswer(t *testing.T) {
+	t.Parallel()
+	if remote := (&CacheStats{}).Snapshot().Remote; remote != nil {
+		t.Fatalf("a run with no remote lookup recorded %+v", remote)
+	}
+
+	cold := &CacheStats{}
+	cold.RecordRemoteLookup("")
+	cold.RecordRemoteLookup("")
+	snapshot := cold.Snapshot()
+	if want := (jobmodel.RemoteCacheAnswer{Answered: true, Lookups: 2}); snapshot.Remote == nil || *snapshot.Remote != want {
+		t.Fatalf("cold cache = %+v, want %+v", snapshot.Remote, want)
+	}
+	if !snapshot.HasActivity() {
+		t.Error("a snapshot with remote lookups reports no activity")
+	}
+
+	failing := &CacheStats{}
+	failing.RecordRemoteLookup("")
+	failing.RecordRemoteLookup(jobmodel.RemoteCacheTimeout)
+	failing.RecordRemoteLookup(jobmodel.RemoteCacheUnreachable)
+	failing.RecordRemoteLookup("an unknown reason")
+	want := jobmodel.RemoteCacheAnswer{Lookups: 4, FailedLookups: 3, Reason: jobmodel.RemoteCacheUnreachable}
+	if got := failing.Snapshot().Remote; got == nil || *got != want {
+		t.Fatalf("failing cache = %+v, want %+v", got, want)
+	}
+	failing.RecordRemoteLookup(jobmodel.RemoteCacheRefused)
+	if got := failing.Snapshot().Remote; got == nil || got.Reason != jobmodel.RemoteCacheRefused || got.FailedLookups != 4 {
+		t.Fatalf("a refused lookup = %+v, want refused to win with 4 failed lookups", got)
+	}
+}
+
 func TestCacheStats_SnapshotAggregates(t *testing.T) {
 	t.Parallel()
 	s := &CacheStats{}

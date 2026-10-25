@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -194,6 +195,9 @@ func TestFetchTaskEntryAnswersAMissAndAnUntrustedHitWithNoEntry(t *testing.T) {
 	if stats := remote.Stats(); stats.HintsWarmed != 0 || stats.BytesFetched != 0 || stats.Hits != 0 {
 		t.Errorf("an untrusted hit for a reader of the store warmed or counted something: %+v", stats)
 	}
+	if want := (jobmodel.RemoteCacheAnswer{Answered: true, Lookups: 2}); remote.Stats().Remote == nil || *remote.Stats().Remote != want {
+		t.Errorf("remote = %+v, want both lookups answered: %+v", remote.Stats().Remote, want)
+	}
 }
 
 // TestFetchTaskEntryEndsAtItsBound pins the bound: a lease another process
@@ -240,6 +244,10 @@ func TestFetchTaskEntryEndsAtItsBound(t *testing.T) {
 		if elapsed := time.Since(start); elapsed > 10*within {
 			t.Errorf("the lookup took %s, want about %s", elapsed, within)
 		}
+		want := jobmodel.RemoteCacheAnswer{Lookups: 1, FailedLookups: 1, Reason: jobmodel.RemoteCacheTimeout}
+		if got := remote.Stats().Remote; got == nil || *got != want {
+			t.Errorf("remote = %+v, want %+v", got, want)
+		}
 	})
 }
 
@@ -253,12 +261,53 @@ func TestFetchTaskEntryTellsAnUnconfiguredProviderFromAFailure(t *testing.T) {
 		err != nil {
 		t.Fatalf("an unconfigured provider = %v, %v, want no entry and no error", entry, err)
 	}
+	if remote := unconfigured.Stats().Remote; remote != nil {
+		t.Errorf("a provider that serves nothing took part in the run: %+v", remote)
+	}
 
 	closed := newFetchTestRemote(t, store.CacheTrustAny)
 	closed.Close()
 	if entry, err := closed.FetchTaskEntry(t.Context(), time.Minute, fetchTestKey, fetchTestJob(), newFetchTestStore(t)); entry != nil ||
 		!errors.Is(err, errProviderClosed) {
 		t.Fatalf("a closed provider = %v, %v, want %v", entry, err, errProviderClosed)
+	}
+	want := jobmodel.RemoteCacheAnswer{Lookups: 1, FailedLookups: 1, Reason: jobmodel.RemoteCacheUnreachable}
+	if got := closed.Stats().Remote; got == nil || *got != want {
+		t.Errorf("remote = %+v, want %+v", got, want)
+	}
+}
+
+// TestLookupFailureIsAClosedReason pins how a lookup error maps to the closed
+// reason session.json states, and that the run's own cancellation counts no
+// lookup.
+func TestLookupFailureIsAClosedReason(t *testing.T) {
+	for _, testCase := range []struct {
+		err  error
+		want string
+	}{
+		{errors.New("cache provider session ended"), jobmodel.RemoteCacheUnreachable},
+		{errProviderRestoreFailed, jobmodel.RemoteCacheUnreachable},
+		{fmt.Errorf("provider op restore: %w", context.DeadlineExceeded), jobmodel.RemoteCacheTimeout},
+		{&cacheprovider.OpError{Op: cache.OpAuthenticate, Code: "run_credential_invalid"}, jobmodel.RemoteCacheRefused},
+	} {
+		if got := lookupFailure(testCase.err); got != testCase.want {
+			t.Errorf("lookupFailure(%v) = %q, want %q", testCase.err, got, testCase.want)
+		}
+	}
+	if got := lookupFailure(nil); got != "" {
+		t.Errorf("lookupFailure(nil) = %q, want an answer", got)
+	}
+	if got := restoreFailure(&cache.RestoreResult{Status: cache.RestoreError}, nil); !errors.Is(got, errProviderRestoreFailed) {
+		t.Errorf("a restore answered with an error status = %v, want %v", got, errProviderRestoreFailed)
+	}
+	if got := restoreFailure(&cache.RestoreResult{Status: cache.RestoreMiss}, nil); got != nil {
+		t.Errorf("a miss = %v, want an answer", got)
+	}
+
+	remote := newFetchTestRemote(t, store.CacheTrustAny)
+	remote.recordLookup(fmt.Errorf("provider op restore: %w", context.Canceled))
+	if got := remote.Stats().Remote; got != nil {
+		t.Errorf("a canceled lookup was counted: %+v", got)
 	}
 }
 

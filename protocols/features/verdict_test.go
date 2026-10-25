@@ -97,6 +97,52 @@ func TestSpecVerificationRecordRejectsBrokenDocuments(t *testing.T) {
 	}
 }
 
+// TestSpecVerificationRecordCarriesUnconsultedCandidates pins the additive
+// member: it round-trips sorted by project, its reasons are the closed set, and
+// a record without it, as an older CLI wrote it, still reads.
+func TestSpecVerificationRecordCarriesUnconsultedCandidates(t *testing.T) {
+	record := sampleVerificationRecord()
+	record.Groups[0].Unconsulted = []UnconsultedCandidate{
+		{Project: "/go/framework/sink", Reason: UnconsultedRemoteTimeout},
+		{Project: "/go/framework/core", Reason: UnconsultedNoEntry},
+	}
+	encoded, err := MarshalSpecVerificationRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, diagnostics := ParseSpecVerificationRecord(encoded)
+	if parsed == nil || diag.HasErrors(ValidateSpecVerificationRecord(parsed)) {
+		t.Fatalf("a record with unconsulted candidates did not read: %v", diagnostics)
+	}
+	if got := parsed.Groups[0].Unconsulted; len(got) != 2 || got[0].Project != "/go/framework/core" ||
+		got[1].Reason != UnconsultedRemoteTimeout {
+		t.Fatalf("unconsulted = %+v, want both candidates sorted by project", got)
+	}
+
+	older, err := MarshalSpecVerificationRecord(sampleVerificationRecord())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(older, []byte(`"unconsulted"`)) {
+		t.Fatalf("a group without unconsulted candidates wrote the member:\n%s", older)
+	}
+	if parsed, diagnostics := ParseSpecVerificationRecord(older); parsed == nil || parsed.Groups[0].Unconsulted != nil {
+		t.Fatalf("a record without the member did not read as not recorded: %v", diagnostics)
+	}
+
+	for name, candidate := range map[string]UnconsultedCandidate{
+		"an unknown reason": {Project: "/go/framework/core", Reason: "cold"},
+		"no reason":         {Project: "/go/framework/core"},
+		"no project":        {Reason: UnconsultedNoCache},
+	} {
+		broken := sampleVerificationRecord()
+		broken.Groups[0].Unconsulted = []UnconsultedCandidate{candidate}
+		if findings := ValidateSpecVerificationRecord(broken); !diag.HasErrors(findings) {
+			t.Errorf("%s was accepted", name)
+		}
+	}
+}
+
 func TestCountSpecVerdictsCoversEveryState(t *testing.T) {
 	counts := CountSpecVerdicts([]SpecRequirementVerdict{
 		{State: RequirementVerified}, {State: RequirementVerified},

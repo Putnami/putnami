@@ -104,10 +104,15 @@ func (r *RemoteCache) RestoreTaskResult(
 		return nil, jobmodel.ReuseNone
 	}
 	sess, ok := r.ensureProvider(ctx, nil, cm)
-	if !ok || !sess.RestoreResultOnly() {
+	if !ok {
+		r.recordUnavailable()
+		return nil, jobmodel.ReuseNone
+	}
+	if !sess.RestoreResultOnly() {
 		return nil, jobmodel.ReuseNone
 	}
 	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: store.RemoteTaskEntryKey(hash), ResultOnly: true})
+	r.recordLookup(restoreFailure(restore, err))
 	if err != nil {
 		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Warn("remote cache: provider restore failed; building locally",
