@@ -1050,115 +1050,9 @@ The core CLI has no `contributor` command. `putnami contributor …` exits with 
 
 The core CLI has no `proposals finalize` command: `putnami proposals finalize …` exits with a usage error. `putnami change finalize` from `@putnami/contributor` publishes the current branch as a proposal; [Publish a proposal](../../contributor/doc/06-change-finalize.md) describes its flags and the evidence it consumes. [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
-### `compose`
+### Workload composition and qualification
 
-Serve a workload together with the workloads it runs with.
-
-```bash
-putnami compose @example/go-items-consumer                        # Target watches; its runsWith members run production-mode
-putnami compose /typescript/samples/06-database --port 0          # Ephemeral proxy port for the target
-putnami compose /go/samples/migrations-feature --no-watch         # Target production-mode too
-putnami compose @example/go-items-consumer --output=json          # Start document, then exit document
-```
-
-The composition is the transitive closure of `runsWith`, resolved by project
-name then by id; the dependency graph is never consulted. Members start in
-topological order, dependencies first, each only after the one before it emitted
-its typed `ready` event. `--ready-timeout`, default `60s`, counts from the
-start of the member's serve step, so the finite steps of its serve run never
-count against it.
-
-Each member is an ordinary serve run of the same `putnami` executable:
-`putnami <serve command> --projects <member> --port 0 [--no-watch] --serve-env - --output=jsonl`,
-where `<serve command>` is the one loaded command whose traits declare the `serve`
-workload, and only the watched target omits `--no-watch`. The run prepares the
-member's serve pipeline and starts its serve step; `compose` reads the run's
-session stream for the step's process group, readiness and end, and never
-starts a serve step itself. A run that fails before its serve step starts is
-`compose.prepare_failed`.
-
-- **Stable URLs.** Every member binds port `0` and sits behind a reverse proxy
-  on `127.0.0.1`. The proxy URL is known before any process starts and survives
-  every restart of the member; while the member has no port, the proxy answers
-  `503` with `{"status":"unavailable","checks":{"compose":"backend not ready"}}`.
-  The target's proxy port is `--port`, else `options.serve.port`, else `3000`.
-- **Injected configuration.** A member's serve step receives `CONFIG_DATA`
-  through its serve run's `--serve-env -`:
-  `clients.services.<id>.url` for each member it runs with, under the provider's
-  client-contract service id and its project name, and a `database` binding for
-  each datasource of its `infra/requirements.json`. Nothing is written into the
-  project tree, and the value is never printed or recorded. A composition started
-  from an environment that already carries `CONFIG_DATA` is refused.
-- **Databases.** With Docker, each (member, datasource) gets its own database,
-  created before the member starts and dropped when the composition stops;
-  with `PUTNAMI_TEST_PG_URL` the members share that server's database and the
-  composition reports `isolation: none`. Workloads apply their own migrations.
-- **Preparation.** Each member's serve run executes its serve pipeline's finite
-  steps (config merge, generate, describe) as `putnami serve` does, cached, with
-  one session record per member.
-- **Teardown and recovery.** On `SIGINT` or `SIGTERM` the members' serve runs
-  stop in reverse start order, then every proxy and database is released. A
-  lease under `.putnami/compose/<id>/` records what a composition owns, each
-  member's serve run and serve step process groups included, so the next
-  invocation reaps what an ungraceful death left behind and lists it under
-  `reaped`.
-
-With `--output=json|jsonl`, stdout carries exactly two result documents — one when
-every member is ready (`id`, `target`, `members[]` with `project`, `proxyUrl`,
-`backendPort`, `databases`, `configSections`, `readyMs`, `isolation`, `reaped`)
-and one at exit adding `cleanup`. In every output mode, each member's serve run
-renders its serve log on stderr. A failure is one
-failure document whose `data` names `code`, `member` and `phase`. See
-[24-workload-qualification.md](24-workload-qualification.md).
-
-### `qualify`
-
-Run a workload's derived smoke contract against a target and print one verdict.
-
-```bash
-putnami qualify /go/samples/service-to-service --print-contract              # The derived contract, nothing run
-putnami qualify /go/samples/service-to-service --print-contract --output=json
-putnami qualify @example/06-database --target https://pr-123.preview.example --expect-sha 3cc91b658
-putnami qualify /go/samples/task-api --target http://127.0.0.1:3801 --expect-sha "$(git rev-parse HEAD)" --output=json
-```
-
-The contract is **derived, never authored**: every exact, public `GET` or `HEAD`
-route in the workload's route inventory (`schema/http-routes.json`, then
-`.gen/schema/http-routes.json`), except the platform endpoints, sorted by path
-and capped at 25. Each request passes when it answers below `500`. The command
-then checks readiness (`<prefix>/readyz` answers `200` with `status: ok`), checks
-that `<prefix>/version` reports a sha starting with `--expect-sha`, runs the
-requests, and reduces everything to one verdict.
-
-The verdict **fails closed**. Only `passed` exits `0`; `failed`, `unsupported`,
-`not_run`, `timed_out`, `canceled`, `target_unreachable`, `digest_mismatch` and
-`composition_failed` exit `1` and still print the verdict — under `--output=json`
-it is the failure envelope's `data`. A URL target without `--expect-sha` is a
-usage error (`2`): a green verdict on a stale deployment proves nothing. A
-workload with no inventory, or with no safe route, is `unsupported`, never
-`passed`.
-
-`--target local` composes the workload on this machine the way `compose
---no-watch --port 0` does, runs the contract against its proxy, and tears the
-composition down on every path. Unless the route inventory declares
-`<prefix>/readyz` or `--platform-prefix` is set, its readiness is the
-application's own completed-startup report (a typed `ready` event with target
-`workload`), never a listening port or an answered request; the platform's
-`/readyz` answers `200` only after that same completed startup. Its verdict binds
-to the worktree fingerprint:
-read before the serve pipelines are prepared, and read again once every member is
-ready. A tree that changed in between is `digest_mismatch`, a composition that
-cannot start is `composition_failed` naming the member and phase, and `cleanup`
-records what teardown released. `--expect-sha` with a local target exits `2`;
-serve logs appear only with `--verbose`, on stderr.
-
-```bash
-putnami qualify /go/samples/migrations-feature --target local                 # Compose, smoke, tear down
-putnami qualify @example/go-items-consumer --target local --output=json       # The verdict as data
-```
-
-See [24-workload-qualification.md](24-workload-qualification.md) for the
-targets, the phases and states, the binding rules and the verdict document.
+The core CLI has no `compose` or `qualify` command. `putnami compose <project>` and `putnami qualify <project>` run in `@putnami/dev`, which every language extension depends on; `putnami compose …` and `putnami qualify …` exit with a usage error unless an installed extension declares that root. [Workload qualification](../../dev/doc/01-workload-qualification.md) describes both commands, and [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
 ### `report`
 
@@ -1768,7 +1662,7 @@ carries the serve steps' output as `putnami serve` renders it in text mode, so
 the supervisor keeps every log line the bounded stream elides. The stream names
 the process group of each serve-workload step in a `process` event before any
 event the step writes, and keeps every `ready` claim live (see
-[Output and Rendering](08-output-and-rendering.md)). [`putnami compose`](#compose)
+[Output and Rendering](08-output-and-rendering.md)). [`putnami compose`](../../dev/doc/01-workload-qualification.md#compose)
 starts each member as such a run.
 
 ### Structured output
@@ -1816,9 +1710,10 @@ Use the `=` spelling too when the first word of the value holds `=`:
 A global switch such as `--verbose` or `--watch` takes no value, but accepts
 an inline boolean: `--verbose=true` is `--verbose`, and `--verbose=false`
 leaves it off. `--color=false` is `--no-color`, and `--no-color=false` is
-`--color`. On `compose`, and on a command whose traits declare the `serve`
-workload, such as `serve`, `--watch=false` is `--no-watch`, which turns off the
-command's own `watch` flag and its restarts on changes. Any other
+`--color`. On a command whose traits declare the `serve` workload, such as
+`serve` and `compose up`, flat or through the command group that runs it,
+`--watch=false` is `--no-watch`, which turns off the command's own `watch` flag
+and its restarts on changes. Any other
 inline value on a switch is a usage error. A supervisor that starts such a
 command hands its serve steps their environment with `--serve-env -` (see
 [Supervised serve run](#supervised-serve-run---serve-env)).

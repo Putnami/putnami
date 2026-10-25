@@ -301,7 +301,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        256,
+		want:        255,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -434,7 +434,9 @@ var structuralPins = []structuralPin{
 			"A later change lowers 258→256 (cli/workload-qualification): compose requests each member as a serve run " +
 			"of the CLI, which deletes scheduler.RunJobWithProcessEnv's two lines and compose's serveParams; its one new " +
 			"line is compose's memberRuntime.observeEvent, which reads a task:event record's Event, the payload " +
-			"protocols/cli types as an untyped map, and hands a readiness claim on as a typed runtimeproto.ReadyData",
+			"protocols/cli types as an untyped map, and hands a readiness claim on as a typed runtimeproto.ReadyData. " +
+			"A later change lowers 256→255 (ADR 0079): compose and qualify move to @putnami/dev, which deletes " +
+			"compose's memberRuntime.observeEvent line with internal/compose",
 	},
 	{
 		name:        "test lines mentioning map[string]any",
@@ -601,14 +603,20 @@ var structuralPins = []structuralPin{
 			"map protocols/cli types, so the fake states the serve step's process event, decodes the fixture " +
 			"workload's runtime event, folds that event's data members beside its type, and writes the record " +
 			"through one helper that takes the map. The --no-watch fixture line moves with its test from " +
-			"engine/serve_withhold_test.go to engine/watch_test.go; production lowers by two, itemized above",
+			"engine/serve_withhold_test.go to engine/watch_test.go; production lowers by two, itemized above. " +
+			"A later change (ADR 0079) keeps 660: moving compose and qualify to @putnami/dev deletes SIX lines, " +
+			"four in compose/fakecli_test.go, one in compose/configdata_test.go and one in " +
+			"commands/composecmd/compose_test.go, and the e2e/devworkload parity package adds SIX. Three are the " +
+			"fixture workload's ready events, whose data is the untyped object protocols/runtime types, and three " +
+			"read the shipped @putnami/dev manifest's tasks as a generic document to point the runtime at the " +
+			"test's build of tooling/dev",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        916,
+		want:        915,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -672,7 +680,10 @@ var structuralPins = []structuralPin{
 			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added. " +
 			"A later change raises 912→915 = 258 production + 657 test for the serve step's process event and the two serve-env fixture lines itemized on the two scoped pins above. " +
 			"A later change raises 915→916 = 256 production + 660 test (cli/workload-qualification): the production " +
-			"lowering and the four fake-CLI test lines itemized on the two scoped pins above",
+			"lowering and the four fake-CLI test lines itemized on the two scoped pins above. " +
+			"A later change lowers 916→915 = 255 production + 660 test (ADR 0079): the production line and the " +
+			"six test lines that leave with compose, and the six parity test lines that arrive, itemized on the " +
+			"two scoped pins above",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

@@ -92,8 +92,10 @@ func TestServeWorkloadSteps_NamesOnlyTheTerminalServeStep(t *testing.T) {
 // Only the terminal, uncacheable serve step of every SELECTED project is a
 // serve-workload step: the generate step of a dependency nobody asked to
 // serve, a step something still depends on, and a step of a project that was
-// not selected are not.
+// not selected are not. A composition member is the one project its serve run
+// selects, so this step is the member's workload.
 func TestServeWorkloadSteps_TakesOnlyTheTerminalServeStepOfSelectedProjects(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-composition-member-is-a-serve-workload-step")
 	provider := &workspace.Project{ID: "/provider", Name: "provider", Path: "provider"}
 	consumer := &workspace.Project{ID: "/consumer", Name: "consumer", Path: "consumer"}
 	library := &workspace.Project{ID: "/library", Name: "library", Path: "library"}

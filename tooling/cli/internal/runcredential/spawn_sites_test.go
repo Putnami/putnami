@@ -77,8 +77,6 @@ var spawnSites = map[string]spawnSite{
 		why: "a listed CLI may be a build of the workspace's source"},
 	"commands/versioncmd/version_source.go:buildStampedCLI": {spawns: 1, verdict: marked, by: "commands/versioncmd/version_source.go:buildStampedCLI",
 		why: "go build of the workspace's source"},
-	"compose/member.go:(*memberRuntime).start": {spawns: 2, verdict: marked, by: "compose/member.go:(*memberRuntime).start",
-		why: "a member's serve run, a nested CLI that runs the workspace's jobs; and ps, through proctree.StartTime, on its group leader"},
 	"hooks/cache_command.go:RunCacheCommand": {spawns: 1, verdict: marked, by: "hooks/cache_command.go:RunCacheCommand",
 		why: "an extension cache command runs in the workspace"},
 	"hooks/cache_command.go:StartDetachedCacheGC": {spawns: 1, verdict: marked, by: "hooks/cache_command.go:StartDetachedCacheGC",
@@ -143,12 +141,6 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only: rev-parse, status"},
 	"commands/versioncmd/version_release.go:lastRelease": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
-	"compose/lease.go:defaultReapDeps": {spawns: 1, verdict: noRepositoryCode,
-		why: "docker with the digest-pinned postgres image of dbtestenv"},
-	"compose/lease.go:identifyGroup": {spawns: 1, verdict: noRepositoryCode,
-		why: "ps, through proctree.StartTime, on a system without /proc"},
-	"compose/up.go:defaultUpDeps": {spawns: 1, verdict: noRepositoryCode,
-		why: "docker with the digest-pinned postgres image of dbtestenv"},
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
 	"git/fingerprint.go:FingerprintTree": {spawns: 1, verdict: noRepositoryCode,
@@ -616,7 +608,6 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 // itself or returns what starts one:
 //   - registrycred starts `putnami cloud registry-token`;
 //   - a releaseset client starts `putnami cloud release-set`;
-//   - a dbtestenv provider or job starts docker;
 //   - linetag.LastRelease starts git with read verbs only;
 //   - treefingerprint.Compute starts git with read verbs only;
 //   - proctree.StartTime starts ps with fixed arguments on a system without
@@ -631,10 +622,7 @@ var spawnCalls = map[string]map[string]bool{
 	"go.putnami.dev/sdk/extension/registrycred": {
 		"ResolveToken": true, "ResolveTokenWithCLI": true, "EnsureNativeCredential": true,
 	},
-	"go.putnami.dev/sdk/extension/releaseset": {"NewClient": true},
-	"go.putnami.dev/sdk/extension/dbtestenv": {
-		"SelectProvider": true, "NewProvisioner": true, "UpJob": true, "DownJob": true,
-	},
+	"go.putnami.dev/sdk/extension/releaseset":      {"NewClient": true},
 	"go.putnami.dev/sdk/extension/linetag":         {"LastRelease": true},
 	"go.putnami.dev/sdk/extension/proctree":        {"StartTime": true},
 	"go.putnami.dev/sdk/extension/treefingerprint": {"Compute": true},

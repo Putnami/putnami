@@ -276,25 +276,17 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 }
 
 // rejectUnsupportedRemoteShape refuses, before any transfer, the invocations
-// this release does not carry: long-running or interactive modes, compose and
-// qualify, a command whose resolved traits in extensions declare a workload or
-// source rewriting (refuseUnportableCommands), and jobs with side effects
-// outside the workspace. Rejection is a precise diagnostic, never a silent
-// modification of the request.
+// this release does not carry: long-running or interactive modes, a command
+// whose resolved traits in extensions declare a workload or source rewriting
+// (refuseUnportableCommands), and jobs with side effects outside the
+// workspace. Rejection is a precise diagnostic, never a silent modification of
+// the request.
 func rejectUnsupportedRemoteShape(req *Request, extensions []*internalextension.ExtensionDescription, planned []*scheduler.ScheduledJob) error {
 	if req.Global.Watch {
 		return fmt.Errorf("--watch is not portable; remote execution covers finite commands only")
 	}
 	if req.ExecutesUnderDryRun {
 		return fmt.Errorf("an executing dry-run is not portable")
-	}
-	for _, command := range req.Commands {
-		switch command {
-		case "compose":
-			return fmt.Errorf("%q streams a live workload and is not portable", command)
-		case "qualify":
-			return fmt.Errorf("%q reaches a live workload from this machine and is not portable", command)
-		}
 	}
 	if err := refuseUnportableCommands(extensions, req.Commands); err != nil {
 		return err

@@ -239,7 +239,7 @@
     },
     {
       "id": "workload-lifecycle",
-      "text": "A command whose traits declare the serve workload streams it until interrupted: the run is promoted to watch unless its own --no-watch is set, which a command group invocation that runs such a command owns the same way, a hosted run and MCP run_jobs refuse it, a composition starts only its terminal uncacheable step, and no portable run carries it. The once workload streams once and forwards the workload's exit code. A command that declares rewritesSources is never portable. Neither behavior follows a command's name."
+      "text": "A command whose traits declare the serve workload streams it until interrupted: the run is promoted to watch unless its own --no-watch is set, which a command group invocation that runs such a command owns the same way, a hosted run and MCP run_jobs refuse it, a serve run streams only the terminal uncacheable step of each project it selects, which is the workload of a composition member's serve run, and no portable run carries it. The once workload streams once and forwards the workload's exit code. A command that declares rewritesSources is never portable. Neither behavior follows a command's name."
     },
     {
       "id": "an-interactive-launch-names-the-directory-it-was-typed-in",

@@ -217,6 +217,22 @@ func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
 	}
 }
 
+// TestValidateRecordAcceptsTheDevWorkloadCommands holds the vocabulary to the
+// compose and qualify groups of @putnami/dev and the commands they run.
+func TestValidateRecordAcceptsTheDevWorkloadCommands(t *testing.T) {
+	t.Parallel()
+	for _, command := range []string{"compose", "compose-up", "qualify", "qualify-run"} {
+		if !IsCommand(command) {
+			t.Errorf("%q is not in the command vocabulary", command)
+		}
+	}
+	attrs := startAttrs()
+	attrs[AttrCommands] = telemetry.StringVal("compose-up,qualify-run")
+	if diags := ValidateRecord(recordFromAttrs(attrs)); diag.HasErrors(diags) {
+		t.Fatalf("session:start naming compose-up and qualify-run rejected: %v", diags)
+	}
+}
+
 // releasedCommands are the names a released CLI sends. The receiver accepts
 // each of them, or it drops every record of that CLI that names one. A name
 // that no released CLI sends is absent: it may leave Commands. Add a name here

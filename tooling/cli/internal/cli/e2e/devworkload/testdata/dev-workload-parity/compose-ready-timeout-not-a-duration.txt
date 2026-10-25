@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --ready-timeout "soon" is not a positive duration (for example 60s or 2m)

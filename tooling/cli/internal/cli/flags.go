@@ -40,12 +40,11 @@ func parseCommandFlags(args, commands, serveWorkloads []string) (GlobalFlags, []
 
 // ownsWatchFlag reports whether a command watches by default and reads
 // --no-watch to stop it: a command of serveWorkloads, whose traits declare the
-// serve workload, through its `watch` flag, and compose for its target. For a
-// command group, commands is the flat command the invocation runs
-// (watchCommands).
+// serve workload, through its `watch` flag. For a command group, commands is
+// the flat command the invocation runs (watchCommands).
 func ownsWatchFlag(commands, serveWorkloads []string) bool {
 	return slices.ContainsFunc(commands, func(command string) bool {
-		return command == "compose" || slices.Contains(serveWorkloads, command)
+		return slices.Contains(serveWorkloads, command)
 	})
 }
 
@@ -182,10 +181,10 @@ func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error)
 
 // switchOpposite is the spelling `<switch>=false` stands for when leaving the
 // switch off is not enough. A global pair such as --color and --no-color gives
-// the other half. `--watch=false` on a serve-workload command or compose is
-// `--no-watch`: both watch without --watch, and only --no-watch turns that
-// off, through the command's `watch` flag (engine.forcesServeWatch) or
-// compose's own; the Go serve docs spell it `--watch=false`.
+// the other half. `--watch=false` on a serve-workload command is
+// `--no-watch`: it watches without --watch, and only --no-watch turns that
+// off, through the command's `watch` flag (engine.forcesServeWatch); the Go
+// serve docs spell it `--watch=false`.
 func switchOpposite(long string, opts flagParseOptions) (string, bool) {
 	if long == "--watch" {
 		return "--no-watch", opts.ownWatch

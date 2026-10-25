@@ -1,0 +1,72 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "qualify",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "binding": {
+      "expectedSHA": "0123456789ab",
+      "kind": "artifact",
+      "observedSHA": "0123456789abcdef0123456789abcdef01234567",
+      "version": "1.2.3"
+    },
+    "contract": {
+      "derivedFrom": [
+        {
+          "digest": "sha256:8d957da3be380f191d6329b5aca64ec414b207933dd26b5d978d84760a4b7a17",
+          "kind": "http-routes",
+          "path": "app/schema/http-routes.json"
+        }
+      ],
+      "digest": "sha256:a6f777e23ee9a3ab2cdf5f9276a80f91e06493c4b78cdf9d8c150f62ccfa3336",
+      "requests": 1
+    },
+    "finishedAt": "<time>",
+    "phases": [
+      {
+        "durationMs": "<ms>",
+        "name": "resolve-target",
+        "state": "passed"
+      },
+      {
+        "durationMs": "<ms>",
+        "name": "readiness",
+        "state": "passed"
+      },
+      {
+        "durationMs": "<ms>",
+        "name": "version-binding",
+        "state": "passed"
+      },
+      {
+        "durationMs": "<ms>",
+        "name": "smoke",
+        "state": "passed"
+      },
+      {
+        "durationMs": "<ms>",
+        "name": "teardown",
+        "state": "passed"
+      }
+    ],
+    "project": "/app",
+    "protocolVersion": 1,
+    "requests": [
+      {
+        "durationMs": "<ms>",
+        "id": "GET /items",
+        "state": "passed",
+        "status": 200
+      }
+    ],
+    "startedAt": "<time>",
+    "state": "passed",
+    "target": {
+      "kind": "url",
+      "url": "http://127.0.0.1:<port>"
+    }
+  }
+}
+--- stderr ---

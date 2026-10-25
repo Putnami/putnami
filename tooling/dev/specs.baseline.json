@@ -12,6 +12,20 @@
     "tooling/version-commands#release-is-reviewable-first",
     "tooling/version-commands#release-refusals",
     "tooling/version-commands#usage-and-host-errors",
-    "tooling/version-commands#version-group-runs-the-executable"
+    "tooling/version-commands#version-group-runs-the-executable",
+    "tooling/workload-qualification#each-member-is-an-ordinary-serve-run",
+    "tooling/workload-qualification#ephemeral-databases-per-composition",
+    "tooling/workload-qualification#every-non-pass-state-exits-non-zero",
+    "tooling/workload-qualification#injected-configuration-never-reaches-output",
+    "tooling/workload-qualification#local-readiness-is-completed-startup",
+    "tooling/workload-qualification#local-target-reads-the-local-config",
+    "tooling/workload-qualification#local-verdict-binds-to-the-exact-worktree",
+    "tooling/workload-qualification#no-derivable-request-is-unsupported-not-success",
+    "tooling/workload-qualification#remote-verdict-binds-to-the-deployed-sha",
+    "tooling/workload-qualification#runs-with-closure-served-behind-stable-proxies",
+    "tooling/workload-qualification#smoke-is-derived-from-the-route-inventory",
+    "tooling/workload-qualification#the-dev-extension-runs-compose-and-qualify",
+    "tooling/workload-qualification#typed-readiness-bounds-every-member",
+    "tooling/workload-qualification#ungraceful-death-is-reaped-by-the-next-invocation"
   ]
 }

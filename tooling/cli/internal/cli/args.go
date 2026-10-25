@@ -151,8 +151,8 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	structured := isStructuredCommand(commands[0]) || extensionGroups[commands[0]]
 
 	// Check if this is a structured command (e.g., "extensions install", "projects list").
-	// A structured leaf that takes a positional (qualify <project>) keeps that
-	// argument among its own arguments: see commandmeta.PositionalLeaf.
+	// A structured leaf that takes a positional (impact-plan <commands>) keeps
+	// that argument among its own arguments: see commandmeta.PositionalLeaf.
 	if structured && len(rest) > 0 && !strings.HasPrefix(rest[0], "-") && !commandmeta.PositionalLeaf(commands[0]) {
 		result.Commands = commands
 		result.Subcommand = rest[0]

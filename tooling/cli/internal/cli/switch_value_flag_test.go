@@ -2,7 +2,6 @@ package cli
 
 import (
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -69,17 +68,9 @@ func TestParseArgs_SwitchTakesAnInlineBoolean(t *testing.T) {
 	}
 }
 
-// compose watches its target by default too, and reads its own --no-watch.
-func TestParseArgs_ComposeWatchFalseIsNoWatch(t *testing.T) {
-	t.Parallel()
-	parsed := ParseArgs([]string{"compose", "app", "--watch=false"}, nil, nil)
-	if parsed.Err != nil || parsed.Global.Watch || !slices.Contains(parsed.RawJobArgs, "--no-watch") {
-		t.Errorf("watch=%v raw=%v err=%v, want --no-watch", parsed.Global.Watch, parsed.RawJobArgs, parsed.Err)
-	}
-}
-
-// Only a serve-workload command and compose own --no-watch: elsewhere
-// `--watch=false` leaves watch off and hands the job no undeclared --no-watch.
+// Only a serve-workload command owns --no-watch, flat or through the group
+// that runs it (group_default_positionals_test.go): elsewhere `--watch=false`
+// leaves watch off and hands the job no undeclared --no-watch.
 func TestParseArgs_WatchFalseOutsideServeOnlyLeavesWatchOff(t *testing.T) {
 	t.Parallel()
 	parsed := ParseArgs([]string{"test", "--projects", "app", "--watch=false"}, nil, nil)

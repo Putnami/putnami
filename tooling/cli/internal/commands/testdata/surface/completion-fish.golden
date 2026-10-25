@@ -46,7 +46,6 @@ end
 complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
 complete -c putnami -n '__fish_use_subcommand' -a 'cli' -d 'Installed CLI binaries'
 complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
-complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
 complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
 complete -c putnami -n '__fish_use_subcommand' -a 'context' -d 'Manage AI context'
 complete -c putnami -n '__fish_use_subcommand' -a 'deps' -d 'Manage dependencies'
@@ -60,7 +59,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'mcp' -d 'Run the MCP server o
 complete -c putnami -n '__fish_use_subcommand' -a 'migrate' -d 'Migrate Putnami workspace files forward'
 complete -c putnami -n '__fish_use_subcommand' -a 'pin' -d 'Pin the CLI version this workspace uses'
 complete -c putnami -n '__fish_use_subcommand' -a 'projects' -d 'Manage projects'
-complete -c putnami -n '__fish_use_subcommand' -a 'qualify' -d 'Run a workload\'s derived smoke contract against a target and emit one verdict'
 complete -c putnami -n '__fish_use_subcommand' -a 'report' -d 'Read back a run\'s report'
 complete -c putnami -n '__fish_use_subcommand' -a 'scopes' -d 'List workspace scopes'
 complete -c putnami -n '__fish_use_subcommand' -a 'sessions' -d 'Inspect execution sessions'
@@ -145,9 +143,6 @@ complete -c putnami -l 'version' -d 'Show version'
 # Structured command flags
 complete -c putnami -n '__putnami_seen_path cli list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path cli use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
-complete -c putnami -n '__putnami_seen_path compose' -l 'no-watch' -d 'Run the target production-mode without watch, like its dependencies'
-complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port' -r
-complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
 complete -c putnami -n '__putnami_seen_path context map' -l 'print' -d 'Render the map to stdout (md by default, or json) and write nothing'
 complete -c putnami -n '__putnami_seen_path context pack' -l 'check' -d 'Re-derive the documents, write nothing, and fail on drift'
@@ -183,12 +178,6 @@ complete -c putnami -n '__putnami_seen_path projects sync' -l 'prune' -d 'Drop c
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'skip-install' -d 'Do not run dependency installation after syncing'
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'remove' -d 'Remove the given tags from the project'
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'set' -d 'Replace the project\'s tags with the given list'
-complete -c putnami -n '__putnami_seen_path qualify' -l 'expect-sha' -d 'Required with a URL target: the git sha the deployment must report on /version' -r
-complete -c putnami -n '__putnami_seen_path qualify' -l 'platform-prefix' -d 'Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root' -r
-complete -c putnami -n '__putnami_seen_path qualify' -l 'print-contract' -d 'Print the derived contract and exit without a target'
-complete -c putnami -n '__putnami_seen_path qualify' -l 'ready-timeout' -d 'Deadline for readiness; default 60s' -r
-complete -c putnami -n '__putnami_seen_path qualify' -l 'request-timeout' -d 'Deadline per smoke request; default 5s' -r
-complete -c putnami -n '__putnami_seen_path qualify' -l 'target' -d 'local composes the workload on this machine; an http(s) URL is a running deployment' -r
 complete -c putnami -n '__putnami_seen_path report' -l 'session' -d 'Report to read, by session ID (default: the newest CLI-driven run\'s)' -r
 complete -c putnami -n '__putnami_seen_path sessions export' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not emitted' -r
 complete -c putnami -n '__putnami_seen_path sessions inspect' -l 'run' -d 'Inspect the session of a remote attempt by its attempt reference or submission key, resuming the attempt first when it was never imported' -r

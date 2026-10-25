@@ -1,8 +1,8 @@
 // Package commands is the container directory for the CLI's command
 // verticals, not a package with logic of its own. It holds one subpackage per
 // command surface — internal/commands/{agentctx,cachecmd,ci,completion,
-// composecmd,configcmd,doctor,extensions,lifecycle,migrate,qualifycmd,
-// sessions,treecmd,versioncmd} — plus the two
+// configcmd,doctor,extensions,lifecycle,migrate,sessions,treecmd,
+// versioncmd} — plus the two
 // packages a vertical may share: internal/commands/shared for production
 // helpers, internal/commands/sharedtest for test-only ones (kept separate so
 // the "testing" package never reaches cmd/putnami's dependency graph).

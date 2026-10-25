@@ -4,11 +4,13 @@ You will prove that a workload you changed boots through its production entrypoi
 
 `putnami lint,test,build,validate` proves a change statically. `putnami qualify` proves it by running it. Keep both: the gate is static evidence, the verdict is execution evidence.
 
+`qualify` and `compose` come with `@putnami/dev`, which every language extension installs.
+
 ## Steps
 
 ### 1) Declare what the workload runs with
 
-A workload that calls another workload names it in `runsWith`, in its `putnami.json` (or under `putnami.runsWith` in a TypeScript `package.json`):
+A workload that calls another workload names it in `runsWith`, in its `putnami.json`. A TypeScript workload declares it there too: `compose` and `qualify` do not read `putnami.runsWith` from a `package.json`.
 
 ```json
 {

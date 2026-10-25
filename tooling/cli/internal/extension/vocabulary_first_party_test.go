@@ -216,8 +216,9 @@ func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) 
 				t.Errorf("%s: %s traits = %+v, want %+v", name, key, got[key], want)
 			}
 		}
-		// The shipped manifest also declares the version commands, which
-		// are its own jobs, not first-party jobs its vocabulary changes.
+		// The shipped manifest also declares the version, compose and
+		// qualify commands, which are its own jobs, not first-party jobs its
+		// vocabulary changes.
 		others := 0
 		for key := range got {
 			if !strings.HasPrefix(key, "@putnami/dev ") {
@@ -245,6 +246,14 @@ var selfDeclaredKinds = map[string]CommandTraits{
 	"@putnami/typescript run":         {Workload: proto.WorkloadOnce},
 	"@putnami/python serve":           {Workload: proto.WorkloadServe},
 	"@putnami/python run":             {Workload: proto.WorkloadOnce},
+}
+
+// devDeclaredKinds are the workloads the commands of @putnami/dev itself
+// declare. The core reads the workload, never the name, to decide watch mode
+// and the portable and MCP run_jobs refusals.
+var devDeclaredKinds = map[string]CommandTraits{
+	"@putnami/dev compose-up":  {Workload: proto.WorkloadServe},
+	"@putnami/dev qualify-run": {Workload: proto.WorkloadOnce},
 }
 
 // verbKinds are the kinds, workloads and effects the shipped development
@@ -294,6 +303,9 @@ func TestTheDevVocabularyDeclaresEveryFirstPartyKind(t *testing.T) {
 		_, name, _ := strings.Cut(job, " ")
 		want, own := selfDeclaredKinds[job]
 		if !own {
+			want, own = devDeclaredKinds[job]
+		}
+		if !own {
 			want = verbKinds[proto.BaseCommandName(name)]
 		}
 		if got := kindTraits(traits); got != want {
@@ -308,6 +320,12 @@ func TestTheDevVocabularyDeclaresEveryFirstPartyKind(t *testing.T) {
 	for _, verb := range []string{"build", "test", "lint", "validate", "serve", "run"} {
 		if !seen[verb] {
 			t.Errorf("no first-party job of the verb %q was discovered", verb)
+		}
+	}
+
+	for job := range devDeclaredKinds {
+		if _, ok := withVocabulary[job]; !ok {
+			t.Errorf("the @putnami/dev job %s was not discovered", job)
 		}
 	}
 

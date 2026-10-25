@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "eleven-ordered-verbs",
-      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no tool, hook or agent content, and no command, command group or task beyond the version commands, claims CLI contract 11 and passes the strict validation of the package-time gate."
+      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no tool, hook or agent content, and no command, command group or task beyond the version, compose and qualify commands, claims CLI contract 15 and passes the strict validation of the package-time gate."
     },
     {
       "id": "dev-is-the-sole-declarer",
@@ -26,7 +26,7 @@
     },
     {
       "id": "handshake-only-runtime",
-      "text": "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against. It refuses every invocation other than the handshake and the version commands with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
+      "text": "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against. It refuses every invocation other than the handshake, the version commands and the compose up and qualify run commands with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
     }
   ],
   "decisions": [

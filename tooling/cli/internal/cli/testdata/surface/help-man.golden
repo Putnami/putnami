@@ -222,13 +222,6 @@ Summarize recorded sessions, one row per run.
 .TP
 .B report
 Read back a run's report.
-.SS Execution
-.TP
-.B compose
-Serve a workload with the workloads it runs with.
-.TP
-.B qualify
-Run a workload's derived smoke contract against a target and emit one verdict.
 .SS Migration
 .TP
 .B migrate vnext
@@ -629,45 +622,6 @@ Print one digest covering HEAD, the tracked diff against it, and the content of 
 .B Usage:
 .br
 putnami tree fingerprint [--output <format>]
-.SS compose
-Start the selected workload and the transitive closure of its runsWith projects in one invocation. Every process binds an ephemeral port and answers behind a local reverse proxy whose URL stays stable across restarts; dependency URLs travel through the clients config block and databases declared in infra/requirements.json are provisioned per composition. Dependencies run production-mode without watch; the target watches by default. Stops every owned process, proxy and database on exit; the next invocation reaps what an ungraceful death left behind.
-.PP
-.B Usage:
-.br
-putnami compose <project> [--port <n>] [--no-watch] [--ready-timeout <duration>] [--output <format>]
-.TP
-.B --port
-Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port.
-.TP
-.B --no-watch
-Run the target production-mode without watch, like its dependencies.
-.TP
-.B --ready-timeout
-Deadline for each member's typed ready event; default 60s.
-.SS qualify
-Derive the smoke contract from the workload's route inventory, execute it against --target (local composes the workload with compose; a URL is any deployed environment), and print one verdict bound to the tested tree or to the deployed sha. Fails closed: unsupported, not_run, timed_out, canceled, target_unreachable, digest_mismatch and composition_failed are distinct from passed and exit non-zero.
-.PP
-.B Usage:
-.br
-putnami qualify <project> --target <local|url> [--expect-sha <sha>] [--platform-prefix <path>] [--ready-timeout <duration>] [--request-timeout <duration>] [--print-contract] [--output <format>]
-.TP
-.B --target
-local composes the workload on this machine; an http(s) URL is a running deployment.
-.TP
-.B --expect-sha
-Required with a URL target: the git sha the deployment must report on /version.
-.TP
-.B --platform-prefix
-Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root.
-.TP
-.B --ready-timeout
-Deadline for readiness; default 60s.
-.TP
-.B --request-timeout
-Deadline per smoke request; default 5s.
-.TP
-.B --print-contract
-Print the derived contract and exit without a target.
 .SS sessions list
 Show recent execution sessions with timing and status. --revision keeps the sessions whose recorded tree sat on the named commit (a lowercase hex prefix of its id, 7 to 64 characters) and adds the head commit and the actual placement to each row, so a new session can find what judged a given revision; a session that recorded no tree never matches. --output=jsonl rows carry revision and placement when the record states them.
 .PP

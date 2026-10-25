@@ -1,0 +1,4 @@
+exit 0
+--- stdout ---
+{"protocolVersion":2,"command":"qualify","status":"success","exitCode":0,"data":{"derivedFrom":[],"digest":"sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945","project":"/provider","protocolVersion":1,"requests":[]}}
+--- stderr ---

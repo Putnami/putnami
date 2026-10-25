@@ -1,0 +1,35 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Putnami platform endpoints (protocols/platform: /readyz, /version) and the putnami.http-routes.v1 routes of the workload under qualification, reached at the base URL the user names with --target",
+      "adapter": "tooling/dev/internal/qualify/target.go",
+      "callsites": [
+        {
+          "path": "tooling/dev/internal/qualify/target.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "761ff386b52763c9e418417c7f54a75f868fd5f4174fbefc1f9dd5bff6140818"
+        },
+        {
+          "path": "tooling/dev/internal/qualify/target.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "f433234df9337f888a6189d4215feaa161384988514dda62ab442d216c602a94"
+        },
+        {
+          "path": "tooling/dev/internal/qualify/target.go",
+          "transport": "http",
+          "symbol": "http.Transport",
+          "fingerprint": "16b2cdf891557af6c72b1338ba38cce6f6a9b747f4c5f1ec14f61c4c68c5582a"
+        }
+      ],
+      "owner": "@putnami/dev",
+      "tests": [
+        "tooling/dev/internal/qualify/command_test.go",
+        "tooling/dev/internal/qualify/execute_test.go"
+      ],
+      "reason": "`putnami qualify` smoke-tests whatever deployment the user names: the platform surface is a protocol every runtime serves, and the requests are derived from that workload's own route inventory, so no provider declaration can generate one client for every qualified workload."
+    }
+  ]
+}

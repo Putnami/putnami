@@ -183,7 +183,9 @@ to `putnami doctor --machine` in the core, and its language check moved to the
 `proposals` command group keeps the operations of the collaboration contract;
 `proposals finalize` moved to the `change` group too. `version get` and
 `version tag` keep their names and moved to `@putnami/dev`, which every
-language extension depends on.
+language extension depends on. `compose` and `qualify` keep their spellings
+and moved to `@putnami/dev` too, as the `compose` and `qualify` command groups
+whose default subcommand takes the project.
 
 | Former command | Command now | Extension that serves it |
 |---|---|---|
@@ -192,6 +194,8 @@ language extension depends on.
 | `putnami features`, `specs`, `architecture`, `contracts` | Unchanged | `@putnami/sdd` |
 | `putnami version list`, `putnami version use <name>` | `putnami cli list`, `putnami cli use <name>` | None: the core serves `cli` |
 | `putnami version get`, `putnami version tag` | Unchanged | `@putnami/dev`, which every language extension depends on |
+| `putnami compose <project>` | Unchanged, or `putnami compose up <project>` | `@putnami/dev` |
+| `putnami qualify <project> --target local` | Unchanged, or `putnami qualify run <project> --target local` | `@putnami/dev` |
 | `putnami infra plan [<project>]` | `putnami cloud infra plan [<project>]` | `@putnami/cloud` |
 | `putnami change-plan --base <commit>` | `putnami impact-plan lint,test,build,validate --base <commit>`, then `ChangePlanFromImpactPlan` from `go.putnami.dev/protocol/ci` | None: the core serves `impact-plan` |
 | `putnami dev extension validate [path]` | `putnami extensions validate [path]` | None: the core serves `extensions` |
@@ -211,9 +215,9 @@ To get a moved command, add its extension to `extensions` in
 ```
 
 The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan`,
-`putnami infra …`, `putnami dev …` and `putnami contributor …`, and `putnami
-help` of each, with exit code 2, unless an installed extension declares that
-root. It always refuses `putnami tree verify …`, `putnami proposals finalize …`
+`putnami infra …`, `putnami dev …`, `putnami contributor …`, `putnami
+compose …` and `putnami qualify …`, and `putnami help` of each, with exit
+code 2, unless an installed extension declares that root. It always refuses `putnami tree verify …`, `putnami proposals finalize …`
 and `putnami help` of each, because the core still answers `tree` and
 `proposals`. The refusal of `putnami dev …` names the `extensions` and
 `templates` spellings, and the refusal of `putnami contributor …` names

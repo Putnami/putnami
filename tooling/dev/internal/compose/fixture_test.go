@@ -1,0 +1,441 @@
+package compose
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
+	pdb "go.putnami.dev/protocol/database"
+	runtimeproto "go.putnami.dev/protocol/runtime"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/scratch"
+)
+
+// The composition tests run real serve steps. The workload is this test binary
+// re-executed in a fixture mode, so each member is a process that binds a real
+// port, announces it with the runtime protocol's typed ready event, and answers
+// HTTP — no toolchain, no install, no fixed port.
+const (
+	fixtureModeEnv   = "PUTNAMI_COMPOSE_FIXTURE"
+	fixtureMemberEnv = "PUTNAMI_COMPOSE_FIXTURE_MEMBER"
+	fixtureRecordEnv = "PUTNAMI_COMPOSE_FIXTURE_RECORD"
+)
+
+// Fixture modes.
+const (
+	fixtureServe       = "serve"        // bind, announce, serve
+	fixtureNeverReady  = "never-ready"  // log, then wait without announcing
+	fixtureExitEarly   = "exit-early"   // log, then exit 3
+	fixtureIgnoreTerm  = "ignore-term"  // used by the reap tests: survive SIGTERM
+	fixtureRecordFirst = "record-first" // serve, after recording what its first dependency answers
+	// fixtureStarted serves, then reports completed startup with a workload
+	// claim that carries no endpoint, as an application framework does.
+	fixtureStarted = "started"
+	// fixtureListenThenExit announces its listener, then exits 3 without
+	// completed startup once GET /exit asks it to, as an application whose
+	// start hook fails after its HTTP server bound does.
+	fixtureListenThenExit = "listen-then-exit"
+)
+
+// fixtureDiskMode, as the mode, has the workload read its mode, member and
+// record path from fixture.json in its working directory, the project
+// directory: one task of an on-disk extension manifest serves every project, so
+// its environment cannot name them.
+const fixtureDiskMode = "disk"
+
+// diskFixture is a project's fixture.json. CLI is the fake CLI's behavior
+// (fakecli_test.go); empty runs the serve step as the CLI does.
+type diskFixture struct {
+	Mode   string `json:"mode"`
+	Member string `json:"member"`
+	Record string `json:"record"`
+	CLI    string `json:"cli,omitempty"`
+}
+
+func TestMain(m *testing.M) {
+	if mode := os.Getenv(fixtureModeEnv); mode != "" {
+		if mode == fixtureDiskMode {
+			mode = loadDiskFixture()
+		}
+		os.Exit(runFixtureWorkload(mode))
+	}
+	if isFakeCLIInvocation(os.Args) {
+		os.Exit(runFakeCLI(os.Args[1:]))
+	}
+	// scratch.New, not os.MkdirTemp: a killed binary cannot run the removal
+	// below, and the next run reclaims what it left.
+	dir, err := scratch.New("putnami-compose-test-")
+	if err == nil {
+		_ = os.Setenv("PUTNAMI_STORE_DIR", filepath.Join(dir.Path(), "store"))
+		_ = os.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(dir.Path(), "artifacts"))
+	}
+	code := m.Run()
+	_ = dir.Remove()
+	os.Exit(code)
+}
+
+// loadDiskFixture reads fixture.json into the environment runFixtureWorkload
+// reads, and returns the mode it names.
+func loadDiskFixture() string {
+	var fixture diskFixture
+	data, err := os.ReadFile("fixture.json")
+	if err == nil {
+		err = json.Unmarshal(data, &fixture)
+	}
+	if err != nil {
+		emitLog("error", "fixture.json: "+err.Error())
+		os.Exit(2)
+	}
+	_ = os.Setenv(fixtureMemberEnv, fixture.Member)
+	_ = os.Setenv(fixtureRecordEnv, fixture.Record)
+	return fixture.Mode
+}
+
+// fixtureRecord is what a fixture member writes about the environment it was
+// started with: never a value of CONFIG_DATA, only its shape.
+type fixtureRecord struct {
+	Member          string   `json:"member"`
+	Port            string   `json:"port"`
+	NodeEnv         string   `json:"nodeEnv"`
+	ConfigSections  []string `json:"configSections"`
+	ServiceKeys     []string `json:"serviceKeys,omitempty"`
+	DependencyReply string   `json:"dependencyReply,omitempty"`
+}
+
+// fixtureEvent is one runtime protocol v2 line a fixture member prints.
+type fixtureEvent struct {
+	V       int                     `json:"v"`
+	Type    string                  `json:"type"`
+	Level   string                  `json:"level,omitempty"`
+	Message string                  `json:"message,omitempty"`
+	Data    *runtimeproto.ReadyData `json:"data,omitempty"`
+}
+
+func emitLog(level, message string) {
+	emit(fixtureEvent{V: 2, Type: "log", Level: level, Message: message})
+}
+
+func emit(event fixtureEvent) {
+	data, _ := json.Marshal(event)
+	fmt.Println(string(data))
+}
+
+func runFixtureWorkload(mode string) int {
+	member := os.Getenv(fixtureMemberEnv)
+	emitLog("info", "fixture "+member+" starting in "+mode)
+	parentGone := func() bool { return os.Getppid() == 1 }
+
+	switch mode {
+	case fixtureExitEarly:
+		emitLog("error", "fixture "+member+" cannot start")
+		return 3
+	case fixtureNeverReady:
+		for !parentGone() {
+			time.Sleep(50 * time.Millisecond)
+		}
+		return 0
+	case fixtureIgnoreTerm:
+		signal.Ignore(syscall.SIGTERM)
+		for !parentGone() {
+			time.Sleep(50 * time.Millisecond)
+		}
+		return 0
+	}
+
+	record := fixtureRecord{Member: member, Port: os.Getenv("PORT"), NodeEnv: os.Getenv("NODE_ENV")}
+	var document map[string]json.RawMessage
+	if raw := os.Getenv(ConfigDataEnv); raw != "" && json.Unmarshal([]byte(raw), &document) == nil {
+		for section := range document {
+			record.ConfigSections = append(record.ConfigSections, section)
+		}
+		sort.Strings(record.ConfigSections)
+		var clients clientsSection
+		if json.Unmarshal(document[SectionClients], &clients) == nil {
+			for key, binding := range clients.Services {
+				record.ServiceKeys = append(record.ServiceKeys, key)
+				if mode == fixtureRecordFirst && record.DependencyReply == "" {
+					record.DependencyReply = fetch(binding.URL + "/whoami")
+				}
+			}
+			sort.Strings(record.ServiceKeys)
+		}
+	}
+	if path := os.Getenv(fixtureRecordEnv); path != "" {
+		data, _ := json.Marshal(record)
+		_ = os.WriteFile(path, data, 0o600)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:"+record.Port)
+	if err != nil {
+		emitLog("error", err.Error())
+		return 1
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	exit := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/whoami", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, member+" host="+r.Host)
+	})
+	if mode == fixtureListenThenExit {
+		mux.HandleFunc("/exit", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, "exiting")
+			close(exit)
+		})
+	}
+	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go func() { _ = server.Serve(listener) }()
+	emit(fixtureEvent{V: 2, Type: "ready", Data: &runtimeproto.ReadyData{
+		Target:    runtimeproto.ReadyTargetServer,
+		Endpoints: []runtimeproto.ReadyEndpoint{{Scheme: runtimeproto.ReadySchemeHTTP, Host: "127.0.0.1", Port: port}},
+	}})
+	if mode == fixtureStarted {
+		emit(fixtureEvent{V: 2, Type: "ready", Data: &runtimeproto.ReadyData{Target: runtimeproto.ReadyTargetWorkload}})
+	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	for {
+		select {
+		case <-stop:
+			_ = server.Close()
+			return 0
+		case <-exit:
+			emitLog("error", "fixture "+member+" failed after it started listening")
+			// Shutdown lets the answer to GET /exit finish first.
+			shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = server.Shutdown(shutdown)
+			cancel()
+			return 3
+		case <-time.After(50 * time.Millisecond):
+			if parentGone() {
+				return 0
+			}
+		}
+	}
+}
+
+func fetch(url string) string {
+	client := http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return "error: " + err.Error()
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	return strconv.Itoa(resp.StatusCode) + " " + string(body)
+}
+
+// fixtureProject is one workspace project of a composition fixture.
+type fixtureProject struct {
+	id       string
+	name     string
+	runsWith []string
+	mode     string
+	// cli is the fake CLI's behavior for the project's serve run.
+	cli string
+	// requirements, when set, is written as the project's infra/requirements.json.
+	requirements string
+}
+
+// compositionFixture is a temporary workspace whose members' serve runs are
+// the fake CLI, each running the fixture workload as its serve step.
+type compositionFixture struct {
+	root     string
+	ws       *Workspace
+	projects map[string]*Project
+	// executable is the fake CLI the members' serve runs start: this test
+	// binary.
+	executable string
+}
+
+func newCompositionFixture(t *testing.T, specs ...fixtureProject) *compositionFixture {
+	t.Helper()
+	return newCompositionFixtureAt(t, t.TempDir(), specs...)
+}
+
+// newCompositionFixtureAt is newCompositionFixture in root, which another test
+// process may have written the same fixture in.
+func newCompositionFixtureAt(t *testing.T, root string, specs ...fixtureProject) *compositionFixture {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+	fixture := &compositionFixture{root: root, projects: map[string]*Project{}, executable: executable}
+	projects := make([]*Project, 0, len(specs))
+	for _, spec := range specs {
+		path := strings.TrimPrefix(spec.id, "/")
+		if spec.requirements != "" {
+			writeFile(t, filepath.Join(root, path, "infra", "requirements.json"), spec.requirements)
+		}
+		project := &Project{ID: spec.id, Name: spec.name, Path: path, RunsWith: spec.runsWith, Config: &wsproto.ProjectConfig{}}
+		projects = append(projects, project)
+		fixture.projects[spec.id] = project
+		mode := spec.mode
+		if mode == "" {
+			mode = fixtureServe
+		}
+		data, err := json.Marshal(diskFixture{Mode: mode, Member: spec.id, Record: filepath.Join(root, path, "record.json"), CLI: spec.cli})
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(root, path, "fixture.json"), string(data))
+	}
+	fixture.ws = &Workspace{Root: root, Config: &wsproto.Config{}, Projects: projects}
+	return fixture
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func (f *compositionFixture) deps(provider databaseProvider) upDeps {
+	return upDeps{
+		provider: func() databaseProvider { return provider },
+		reap:     func(root string) []ReapedLease { return reapOrphans(root, reapDeps{killDelay: 100 * time.Millisecond}) },
+	}
+}
+
+// argv is the argument vector the member's serve run was started with.
+func (f *compositionFixture) argv(t *testing.T, id string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, strings.TrimPrefix(id, "/"), fakeCLIArgsFile))
+	if err != nil {
+		t.Fatalf("member %s left no argument record: %v", id, err)
+	}
+	var args []string
+	if err := json.Unmarshal(data, &args); err != nil {
+		t.Fatalf("decode the arguments of %s: %v", id, err)
+	}
+	return args
+}
+
+// serveGroups are the process groups of the member's serve steps, in start
+// order.
+func (f *compositionFixture) serveGroups(t *testing.T, id string) []int {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, strings.TrimPrefix(id, "/"), fakeCLIGroupsFile))
+	if err != nil {
+		t.Fatalf("member %s started no serve step: %v", id, err)
+	}
+	lines := strings.Fields(string(data))
+	groups := make([]int, 0, len(lines))
+	for _, line := range lines {
+		group, err := strconv.Atoi(line)
+		if err != nil {
+			t.Fatalf("groups of %s: %v", id, err)
+		}
+		groups = append(groups, group)
+	}
+	return groups
+}
+
+// stopOrder is the order in which the members' serve runs received SIGTERM.
+func (f *compositionFixture) stopOrder(t *testing.T) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, fakeCLIStopFile))
+	if err != nil {
+		t.Fatalf("no serve run was stopped: %v", err)
+	}
+	return strings.Fields(string(data))
+}
+
+// lease reads the composition's lease.
+func (f *compositionFixture) lease(t *testing.T, id string) Lease {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(Root(f.root), id, leaseFileName))
+	if err != nil {
+		t.Fatalf("read lease: %v", err)
+	}
+	var lease Lease
+	if err := json.Unmarshal(data, &lease); err != nil {
+		t.Fatalf("decode lease: %v", err)
+	}
+	return lease
+}
+
+func (f *compositionFixture) record(t *testing.T, id string) fixtureRecord {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, strings.TrimPrefix(id, "/"), "record.json"))
+	if err != nil {
+		t.Fatalf("member %s left no record: %v", id, err)
+	}
+	var record fixtureRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatalf("decode record of %s: %v", id, err)
+	}
+	return record
+}
+
+// fakeIsolator is a database provider that isolates, recording every
+// statement it was asked for.
+type fakeIsolator struct {
+	created  []string
+	dropped  []string
+	existing map[string]bool
+	dropErr  error
+	listErr  error
+}
+
+const fakePassword = "compose-fixture-password"
+
+func (f *fakeIsolator) Provision() (pdb.Connection, string, error) {
+	return pdb.Connection{Host: "127.0.0.1", Port: 55432, Database: "putnami_test", User: "putnami", Password: fakePassword}, "fakedigest", nil
+}
+
+func (f *fakeIsolator) CreateDatabase(_ context.Context, _ string, name string) error {
+	if f.existing == nil {
+		f.existing = map[string]bool{}
+	}
+	f.created = append(f.created, name)
+	f.existing[name] = true
+	return nil
+}
+
+func (f *fakeIsolator) DropDatabase(_ context.Context, _ string, name string) error {
+	f.dropped = append(f.dropped, name)
+	if f.dropErr != nil {
+		return f.dropErr
+	}
+	delete(f.existing, name)
+	return nil
+}
+
+func (f *fakeIsolator) ListDatabases(_ context.Context, _ string, prefix string) ([]string, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var names []string
+	for name := range f.existing {
+		if strings.HasPrefix(name, prefix) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// sharedServer is a database provider that does not isolate.
+type sharedServer struct{}
+
+func (sharedServer) Provision() (pdb.Connection, string, error) {
+	return pdb.Connection{Host: "127.0.0.1", Port: 55432, Database: "shared", User: "putnami", Password: fakePassword}, "shareddigest", nil
+}

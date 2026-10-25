@@ -78,7 +78,7 @@ func readManifestAt(t *testing.T, path string) *extension.Manifest {
 
 // TestTheManifestDeclaresTheElevenVerbsInOrder holds the shipped manifest to
 // the eleven development verbs in help order, and to nothing that runs
-// beyond the version commands.
+// beyond the version, compose and qualify commands.
 func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, feature, "eleven-ordered-verbs", "the-manifest-declares-the-eleven-verbs-in-order")
@@ -97,14 +97,15 @@ func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	if !slices.Equal(names, want) {
 		t.Fatalf("verbs %v, want %v", names, want)
 	}
-	if got := slices.Sorted(maps.Keys(manifest.Commands)); !slices.Equal(got, versionCommands) {
-		t.Errorf("commands %v, want only the version commands %v", got, versionCommands)
+	commands := slices.Sorted(slices.Values(append(slices.Clone(versionCommands), workloadCommands...)))
+	if got := slices.Sorted(maps.Keys(manifest.Commands)); !slices.Equal(got, commands) {
+		t.Errorf("commands %v, want only the version, compose and qualify commands %v", got, commands)
 	}
-	if got := slices.Sorted(maps.Keys(manifest.Tasks)); !slices.Equal(got, versionCommands) {
-		t.Errorf("tasks %v, want only the version tasks %v", got, versionCommands)
+	if got := slices.Sorted(maps.Keys(manifest.Tasks)); !slices.Equal(got, commands) {
+		t.Errorf("tasks %v, want only the version, compose and qualify tasks %v", got, commands)
 	}
-	if got := slices.Sorted(maps.Keys(manifest.CommandGroups)); !slices.Equal(got, []string{"version"}) {
-		t.Errorf("command groups %v, want only version", got)
+	if got := slices.Sorted(maps.Keys(manifest.CommandGroups)); !slices.Equal(got, []string{"compose", "qualify", "version"}) {
+		t.Errorf("command groups %v, want only compose, qualify and version", got)
 	}
 	if len(manifest.Tools) != 0 || manifest.AgentContent != nil || manifest.Hooks != nil {
 		t.Errorf("the manifest declares tools %v, agent content %+v or hooks %+v", manifest.Tools, manifest.AgentContent, manifest.Hooks)
@@ -114,13 +115,14 @@ func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	}
 }
 
-// TestTheManifestPassesStrictValidationAtContract11 runs the verdict of the
+// TestTheManifestPassesStrictValidationAtContract15 runs the verdict of the
 // package-time gate on the source manifest, and holds its claimed contract to
-// the one the packager stamps: the command kind contract, which the declared
-// kinds, workloads and effects require.
-func TestTheManifestPassesStrictValidationAtContract11(t *testing.T) {
+// the one the packager stamps: the default positionals contract, which the
+// compose and qualify groups require, since each default subcommand takes the
+// project as a positional.
+func TestTheManifestPassesStrictValidationAtContract15(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, feature, "eleven-ordered-verbs", "the-manifest-passes-strict-validation-at-contract-11")
+	spectest.Proves(t, feature, "eleven-ordered-verbs", "the-manifest-passes-strict-validation-at-contract-15")
 	manifest := readManifest(t)
 	if errs := diag.Errors(extension.FullValidateManifest(manifest)); len(errs) > 0 {
 		t.Fatalf("the manifest fails the package-time validation: %v", errs)
@@ -128,9 +130,9 @@ func TestTheManifestPassesStrictValidationAtContract11(t *testing.T) {
 	if !extension.DeclaresContractSurface(manifest) {
 		t.Fatal("the vocabulary does not count as contract surface")
 	}
-	if got, want := manifest.CLIContract, extension.RequiredCLIContract(manifest); got != want || got != protocolcli.CommandKindContract {
-		t.Errorf("cliContract %d, want %d, the command kind contract the packager stamps (%d)",
-			got, protocolcli.CommandKindContract, want)
+	if got, want := manifest.CLIContract, extension.RequiredCLIContract(manifest); got != want || got != protocolcli.DefaultPositionalsContract {
+		t.Errorf("cliContract %d, want %d, the default positionals contract the packager stamps (%d)",
+			got, protocolcli.DefaultPositionalsContract, want)
 	}
 }
 

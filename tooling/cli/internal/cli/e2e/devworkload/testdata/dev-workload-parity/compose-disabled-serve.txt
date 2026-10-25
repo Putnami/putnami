@@ -1,0 +1,5 @@
+exit 1
+--- stdout ---
+{"protocolVersion":2,"command":"compose","status":"failure","exitCode":1,"data":{"code":"compose.serve_disabled","member":"/provider","phase":"plan"},"error":{"code":"failure","message":"compose.serve_disabled: /provider: the project's putnami.json disables a command whose traits declare the serve workload (phase plan)"}}
+--- stderr ---
+putnami: compose.serve_disabled: /provider: the project's putnami.json disables a command whose traits declare the serve workload (phase plan)

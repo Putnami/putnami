@@ -17,8 +17,9 @@ import (
 )
 
 // workloadWorkspace writes, at root, a workspace whose one extension declares
-// build with no trait, daemon with the serve workload, migrate with the once
-// workload and tidy with rewritesSources.
+// build with no trait, daemon and compose-up with the serve workload, migrate
+// and qualify-run with the once workload and tidy with rewritesSources:
+// compose-up and qualify-run are declared as @putnami/dev declares them.
 func workloadWorkspace(t *testing.T, root string) *workspacepb.Config {
 	t.Helper()
 	step := func(id string) []extensionproto.PipelineStep {
@@ -27,10 +28,12 @@ func workloadWorkspace(t *testing.T, root string) *workspacepb.Config {
 	manifest, err := json.Marshal(extensionproto.Manifest{
 		Name: "@test/workload", Version: "1.0.0", CLIContract: protocolcli.CommandKindContract,
 		Commands: map[string]extensionproto.CommandDefinition{
-			"build":   {Run: step("build")},
-			"daemon":  {Run: step("daemon"), Traits: &extensionproto.CommandTraits{Workload: extensionproto.WorkloadServe}},
-			"migrate": {Run: step("migrate"), Traits: &extensionproto.CommandTraits{Workload: extensionproto.WorkloadOnce}},
-			"tidy":    {Run: step("tidy"), Traits: &extensionproto.CommandTraits{RewritesSources: true}},
+			"build":       {Run: step("build")},
+			"daemon":      {Run: step("daemon"), Traits: &extensionproto.CommandTraits{Workload: extensionproto.WorkloadServe}},
+			"migrate":     {Run: step("migrate"), Traits: &extensionproto.CommandTraits{Workload: extensionproto.WorkloadOnce}},
+			"tidy":        {Run: step("tidy"), Traits: &extensionproto.CommandTraits{RewritesSources: true}},
+			"compose-up":  {Run: step("compose-up"), Traits: &extensionproto.CommandTraits{Workload: extensionproto.WorkloadServe}},
+			"qualify-run": {Run: step("qualify-run"), Traits: &extensionproto.CommandTraits{Workload: extensionproto.WorkloadOnce}},
 		},
 		Tasks: map[string]extensionproto.TaskDefinition{
 			"noop": {Kind: "command", Command: "true", Cwd: "{projectRoot}", TimeoutMs: -1},
@@ -69,9 +72,11 @@ func TestPortableExecutionRefusesAWorkloadOrRewritingCommand(t *testing.T) {
 	spectest.Proves(t, "cli/portable-runner", "commit-request", "the-executing-engine-refuses-a-workload-or-rewriting-command")
 	all := runner.RequestedSelection{Mode: runner.SelectionModeAll}
 	for command, refusal := range map[string]string{
-		"daemon":  `"daemon" streams a live workload and is not portable`,
-		"migrate": `"migrate" streams a live workload and is not portable`,
-		"tidy":    `"tidy" rewrites source and is not portable`,
+		"daemon":      `"daemon" streams a live workload and is not portable`,
+		"migrate":     `"migrate" streams a live workload and is not portable`,
+		"tidy":        `"tidy" rewrites source and is not portable`,
+		"compose-up":  `"compose-up" streams a live workload and is not portable`,
+		"qualify-run": `"qualify-run" streams a live workload and is not portable`,
 	} {
 		for version, portable := range map[string]*PortableExecution{
 			"version 1": {Request: runner.ExecutionRequest{Invocation: runner.InvocationBlock{Commands: []string{"build", command}}}},

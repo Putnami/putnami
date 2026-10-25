@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --expect-sha is required with a URL target: a verdict must name the build it proves

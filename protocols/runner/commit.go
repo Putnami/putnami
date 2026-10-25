@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -20,15 +19,6 @@ const (
 	// the version 1 one and from every other SHA-256 value.
 	CommitInputDomain = "putnami/runner/execution-input/v2"
 )
-
-// UnportableCommands are the core commands no portable run carries: compose
-// streams live workloads, and qualify reaches one from the executing machine.
-// The submitting CLI refuses them before it builds a version 1 request; a
-// version 2 request has no such submitter, so ValidateCommitRequest refuses
-// them. An extension command that declares a workload or rewritesSources is
-// not named here: the executing engine refuses it from the traits of the
-// manifests it loads.
-var UnportableCommands = []string{"compose", "qualify"}
 
 // CommitRequest is the version 2 execution request. It names a commit instead
 // of a snapshot and a requested selection instead of a frozen one, and carries
@@ -267,10 +257,11 @@ func strictRequestedSelection(raw json.RawMessage) error {
 }
 
 // ValidateCommitRequest checks the semantic rules of a version 2 request. The
-// invocation block follows the version 1 rules and names no command of
-// UnportableCommands. ValidatePublication does not run, because there is no
-// plan: the executing engine checks the plan it makes against
-// invocation.publication instead.
+// invocation block follows the version 1 rules, and no command is refused by
+// its name: the executing engine refuses a command whose traits, in the
+// manifests it loads, declare a workload or rewritesSources.
+// ValidatePublication does not run, because there is no plan: the executing
+// engine checks the plan it makes against invocation.publication instead.
 func ValidateCommitRequest(request CommitRequest) error {
 	if request.Version != CommitRequestVersion {
 		return fmt.Errorf("runner: unsupported commit request version %d", request.Version)
@@ -286,11 +277,6 @@ func ValidateCommitRequest(request CommitRequest) error {
 	}
 	if err := validateInvocation(request.Invocation); err != nil {
 		return err
-	}
-	for _, command := range request.Invocation.Commands {
-		if slices.Contains(UnportableCommands, command) {
-			return fmt.Errorf("runner: invocation.commands names %q, which no portable run carries: compose streams live workloads, and qualify reaches one", command)
-		}
 	}
 	if err := validateRequestedSelection(request.Selection, request.Source); err != nil {
 		return err

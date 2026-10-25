@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: qualify needs --target: `local` or the http(s) URL of a running deployment (or --print-contract)

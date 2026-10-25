@@ -671,17 +671,34 @@ func TestRejectLongLivedCommands_ScopedToTheWatchPromotion(t *testing.T) {
 	renamed := []*extension.ExtensionDescription{{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
 		"daemon": command("daemon", extension.WorkloadServe), "serve": command("serve", ""),
 	}}}
+	// @putnami/dev declares compose-up with the serve workload and qualify-run
+	// with the once workload, each carried only by the interactive default of
+	// its group. The serve trait refuses compose-up and the interactive carrier
+	// refuses qualify-run; neither name is refused on its own.
+	dev := []*extension.ExtensionDescription{{
+		Name: "@putnami/dev",
+		Jobs: map[string]*extension.JobDefinition{
+			"compose-up": command("compose-up", extension.WorkloadServe), "qualify-run": command("qualify-run", extension.WorkloadOnce),
+		},
+		CommandGroups: map[string]extension.CommandGroupDefinition{
+			"compose": {Default: "up", Subcommands: map[string]extension.SubcommandDefinition{"up": {Command: "compose-up", Interactive: true}}},
+			"qualify": {Default: "run", Subcommands: map[string]extension.SubcommandDefinition{"run": {Command: "qualify-run", Interactive: true}}},
+		},
+	}}
 	for _, tc := range []struct {
 		name       string
 		extensions []*extension.ExtensionDescription
 		commands   []string
 		refused    bool
+		why        string
 	}{
 		{name: "serve is refused", extensions: firstParty, commands: []string{"serve"}, refused: true},
 		{name: "serve refused among others", extensions: firstParty, commands: []string{"build", "serve"}, refused: true},
 		{name: "a serve-workload daemon is refused", extensions: renamed, commands: []string{"daemon"}, refused: true},
 		{name: "a serve without the workload is accepted", extensions: renamed, commands: []string{"serve"}, refused: false},
-		{name: "qualify is refused", commands: []string{"build", "qualify"}, refused: true},
+		{name: "compose-up is refused by its serve workload", extensions: dev, commands: []string{"build", "compose-up"}, refused: true, why: serveWorkloadHazard},
+		{name: "qualify-run is refused by its interactive carrier", extensions: dev, commands: []string{"build", "qualify-run"}, refused: true, why: "`putnami qualify run`"},
+		{name: "compose and qualify are not refused by name", commands: []string{"compose", "qualify"}, refused: false},
 		{name: "run is accepted", extensions: firstParty, commands: []string{"run"}, refused: false},
 		{name: "ordinary commands accepted", extensions: firstParty, commands: []string{"lint", "test", "build"}, refused: false},
 	} {
@@ -692,6 +709,9 @@ func TestRejectLongLivedCommands_ScopedToTheWatchPromotion(t *testing.T) {
 			}
 			if !tc.refused && err != nil {
 				t.Fatalf("rejectLongLivedCommands(%v) = %v, want it accepted", tc.commands, err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.why) {
+				t.Errorf("rejectLongLivedCommands(%v) = %v, want it to name %q", tc.commands, err, tc.why)
 			}
 		})
 	}

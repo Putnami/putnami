@@ -1,0 +1,10 @@
+exit 0
+--- stdout ---
+✓ resolve-target <ms>
+✓ readiness <ms>
+✓ version-binding <ms>
+✓ smoke <ms>
+✓ teardown <ms>
+  ✓ GET /items 200 <ms>
+verdict: passed (/app, local, tree <fingerprint>)
+--- stderr ---

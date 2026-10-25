@@ -1,0 +1,12 @@
+exit 1
+--- stdout ---
+✓ resolve-target <ms>
+✓ readiness <ms>
+✗ version-binding digest_mismatch <ms>
+    qualify.version_mismatch: GET http://127.0.0.1:<port>/version reports sha fedcba9876543210fedcba9876543210fedcba98, which does not start with the expected 0123456789abcdef0123456789abcdef01234567
+- smoke not_run <ms>
+✓ teardown <ms>
+  - GET /items not_run <ms>
+verdict: digest_mismatch (/app, url, artifact expected 0123456789abcdef0123456789abcdef01234567 observed fedcba9876543210fedcba9876543210fedcba98)
+--- stderr ---
+putnami: qualify /app: verdict digest_mismatch

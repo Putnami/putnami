@@ -111,7 +111,7 @@ verification and does not rerun the gate.
 - **[Compatibility and Migration](doc/21-compatibility-and-migration.md)** — Supported version window per artifact format, what migrates, what is rejected, and the remedy
 - **[Installing the CLI](doc/22-installing-the-cli.md)** — What the public installer trusts and refuses, the platform matrix, every flag, `PATH` behavior, and the release smoke
 - **[Testing at Production Boundaries](doc/23-testing-at-production-boundaries.md)** — Recorded exchanges at the registry and credential boundaries, and how an incident closes with a test that fails on its pre-fix tree
-- **[Workload Qualification](doc/24-workload-qualification.md)** — `compose` and `qualify`: serving a workload with what it runs with (stable proxy URLs, per-composition databases, typed readiness, orphan reaping), the smoke contract derived from the route inventory, the sha binding, and the fail-closed verdict
+- **[Workload Qualification](../dev/doc/01-workload-qualification.md)** — `compose` and `qualify`, served by `@putnami/dev`: serving a workload with what it runs with (stable proxy URLs, per-composition databases, typed readiness, orphan reaping), the smoke contract derived from the route inventory, the sha binding, and the fail-closed verdict
 - **[Collaboration Providers](doc/25-collaboration-providers.md)** — Binding task, change-proposal and memory providers in `options.collaboration`, `putnami <contract> <operation>` and the matching MCP tools, capability discovery, and the outcomes that keep missing capabilities and uncertain writes explicit
 
 ## Command Reference

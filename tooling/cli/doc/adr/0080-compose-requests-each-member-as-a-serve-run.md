@@ -1,6 +1,10 @@
 # ADR 0080 — Compose requests each member as a serve run
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0079](0079-compose-and-qualify-move-to-putnami-dev.md): the packages and
+  their goldens live in `@putnami/dev` (`tooling/dev/internal/compose` and
+  `tooling/dev/internal/qualify`), a member runs `serve`, and the codes
+  `no_serve_command` and `ambiguous_serve` are deleted
 - **Date**: 2026-10-25
 - **Scope**: `@putnami/cli` (`internal/compose`, `internal/qualify`,
   `internal/commands/composecmd`, `internal/commands/qualifycmd`,

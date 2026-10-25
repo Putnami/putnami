@@ -16,8 +16,9 @@ import (
 // the flat internal/commands package; BG1–BG3 then moved its 129 files, one
 // vertical at a time, into internal/commands/<vertical>/ — agentctx,
 // cachecmd, ci, completion, configcmd, doctor, extensions, lifecycle,
-// migrate, sessions, versioncmd (composecmd, qualifycmd and treecmd came
-// later). The plan assumed near-zero sharing
+// migrate, sessions, versioncmd (treecmd came later; composecmd and
+// qualifycmd came later and left with compose and qualify). The plan assumed
+// near-zero sharing
 // between them, and R2 (a symbol 2+ verticals need moves to shared, never to
 // a sibling vertical) held at every step because the compiler forced the
 // question each time a file moved. Nothing forces it on a LATER change,

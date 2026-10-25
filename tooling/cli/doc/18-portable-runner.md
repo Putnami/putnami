@@ -52,9 +52,10 @@ capability is a precise error; it is never a reason to run locally, and no
 task runs in the submitting worktree. Two providers are an ambiguous
 configuration. An edit made after submission never reaches execution.
 
-Refused before submission, with a diagnostic: `--watch`, `compose`, `qualify`,
-a command whose traits declare a `workload` or `rewritesSources` (the
-first-party `serve`, `run` and `format`), whatever its name, an executing
+Refused before submission, with a diagnostic: `--watch`, a command whose
+traits declare a `workload` or `rewritesSources` (the first-party `serve`,
+`run`, `format`, and `compose-up` and `qualify-run` of `@putnami/dev`, which
+`putnami compose` and `putnami qualify` run), whatever its name, an executing
 `--dry-run`, tasks with registry or cloud side effects, tasks whose declared
 cwd leaves the workspace, and cacheable tasks keyed on environment variables.
 Verification never publishes or deploys through this path.
@@ -134,10 +135,10 @@ A caller that holds a commit and no snapshot, such as a hosted CI service,
 sends a version 2 request on the same channel: the commit, the invocation, and
 a requested selection (`all`, `impacted` with `source.base`, or `projects`
 with selectors), with no plan and no environment (see the `protocols/runner`
-README). No submitting CLI checked it, so the protocol refuses the core
-commands by name: a request that names `compose` or `qualify` is malformed and
-exits 2. The provider checks the commit out and launches its pinned entrypoint
-as it does for a snapshot. The engine then:
+README). No submitting CLI checked it, and the protocol refuses no command by
+name: only the executing engine reads the traits a command declares. The
+provider checks the commit out and launches its pinned entrypoint as it does
+for a snapshot. The engine then:
 
 1. Refuses the request unless the checkout's HEAD is `source.commit` and no
    tracked file differs from it, in the index or the working tree. The check
