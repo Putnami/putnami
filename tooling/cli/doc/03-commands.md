@@ -1059,35 +1059,50 @@ putnami compose @example/go-items-consumer --output=json          # Start docume
 The composition is the transitive closure of `runsWith`, resolved by project
 name then by id; the dependency graph is never consulted. Members start in
 topological order, dependencies first, each only after the one before it emitted
-its typed `ready` event (`--ready-timeout`, default `60s`).
+its typed `ready` event. `--ready-timeout`, default `60s`, counts from the
+start of the member's serve step, so the finite steps of its serve run never
+count against it.
+
+Each member is an ordinary serve run of the same `putnami` executable:
+`putnami <serve command> --projects <member> --port 0 [--no-watch] --serve-env - --output=jsonl`,
+where `<serve command>` is the one loaded command whose traits declare the `serve`
+workload, and only the watched target omits `--no-watch`. The run prepares the
+member's serve pipeline and starts its serve step; `compose` reads the run's
+session stream for the step's process group, readiness and end, and never
+starts a serve step itself. A run that fails before its serve step starts is
+`compose.prepare_failed`.
 
 - **Stable URLs.** Every member binds port `0` and sits behind a reverse proxy
   on `127.0.0.1`. The proxy URL is known before any process starts and survives
   every restart of the member; while the member has no port, the proxy answers
   `503` with `{"status":"unavailable","checks":{"compose":"backend not ready"}}`.
   The target's proxy port is `--port`, else `options.serve.port`, else `3000`.
-- **Injected configuration.** A member receives `CONFIG_DATA` on its serve step:
+- **Injected configuration.** A member's serve step receives `CONFIG_DATA`
+  through its serve run's `--serve-env -`:
   `clients.services.<id>.url` for each member it runs with, under the provider's
   client-contract service id and its project name, and a `database` binding for
   each datasource of its `infra/requirements.json`. Nothing is written into the
-  project tree, and the value is never printed or recorded. A member whose
-  environment already carries `CONFIG_DATA` is refused.
+  project tree, and the value is never printed or recorded. A composition started
+  from an environment that already carries `CONFIG_DATA` is refused.
 - **Databases.** With Docker, each (member, datasource) gets its own database,
   created before the member starts and dropped when the composition stops;
   with `PUTNAMI_TEST_PG_URL` the members share that server's database and the
   composition reports `isolation: none`. Workloads apply their own migrations.
-- **Preparation.** The serve pipelines' finite steps (config merge, generate,
-  describe) run through the ordinary engine first, cached, with a session record;
-  only the long-running serve step is started by `compose`.
-- **Teardown and recovery.** On `SIGINT` or `SIGTERM` every member, proxy and
-  database is released. A lease under `.putnami/compose/<id>/` records what a
-  composition owns, so the next invocation reaps what an ungraceful death left
-  behind and lists it under `reaped`.
+- **Preparation.** Each member's serve run executes its serve pipeline's finite
+  steps (config merge, generate, describe) as `putnami serve` does, cached, with
+  one session record per member.
+- **Teardown and recovery.** On `SIGINT` or `SIGTERM` the members' serve runs
+  stop in reverse start order, then every proxy and database is released. A
+  lease under `.putnami/compose/<id>/` records what a composition owns, each
+  member's serve run and serve step process groups included, so the next
+  invocation reaps what an ungraceful death left behind and lists it under
+  `reaped`.
 
 With `--output=json|jsonl`, stdout carries exactly two result documents — one when
 every member is ready (`id`, `target`, `members[]` with `project`, `proxyUrl`,
 `backendPort`, `databases`, `configSections`, `readyMs`, `isolation`, `reaped`)
-and one at exit adding `cleanup` — and serve logs go to stderr. A failure is one
+and one at exit adding `cleanup`. In every output mode, each member's serve run
+renders its serve log on stderr. A failure is one
 failure document whose `data` names `code`, `member` and `phase`. See
 [24-workload-qualification.md](24-workload-qualification.md).
 
@@ -1740,7 +1755,8 @@ carries the serve steps' output as `putnami serve` renders it in text mode, so
 the supervisor keeps every log line the bounded stream elides. The stream names
 the process group of each serve-workload step in a `process` event before any
 event the step writes, and keeps every `ready` claim live (see
-[Output and Rendering](08-output-and-rendering.md)).
+[Output and Rendering](08-output-and-rendering.md)). [`putnami compose`](#compose)
+starts each member as such a run.
 
 ### Structured output
 

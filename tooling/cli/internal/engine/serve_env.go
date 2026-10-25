@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/sdk/extension/envkeys"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -14,21 +15,49 @@ import (
 
 // serveWorkloadSteps returns, by job key, the plan's serve-workload steps:
 // the long-running steps `--serve-env` reaches and the job runner announces
-// the process group of. It is the rule withholdServeSteps splits a plan by: a
-// selected project's uncacheable serve-workload step that no other planned
-// job depends on. A finite step of a serve pipeline (config merge, generate,
-// describe), a dependency's step and a cacheable task are never one. Nil when
-// the plan holds none.
+// the process group of. A step is one only when every one of these holds, so
+// nothing finite can receive the supervisor's environment by accident:
+//
+//   - it belongs to a SELECTED project: a dependency's `^generate` step, which
+//     the serve pipeline schedules on a project nobody asked to serve, is not;
+//   - its command's resolved traits declare the serve workload;
+//   - its task is uncacheable, which is what every serve step declares ("a
+//     cache hit cannot reproduce a live process or a bound port");
+//   - no other planned job depends on it or is serialized after it: it is the
+//     terminal step of its pipeline.
+//
+// A finite step of a serve pipeline (config merge, generate, describe) is
+// therefore never one. Nil when the plan holds none.
 func serveWorkloadSteps(planned []*scheduler.ScheduledJob, selected []*workspace.Project) map[string]bool {
-	_, steps := withholdServeSteps(planned, selected)
-	if len(steps) == 0 {
-		return nil
+	selectedIDs := make(map[string]bool, len(selected))
+	for _, project := range selected {
+		if project != nil {
+			selectedIDs[project.ID] = true
+		}
 	}
-	keys := make(map[string]bool, len(steps))
-	for _, job := range steps {
-		keys[job.Key()] = true
+	predecessors := make(map[string]bool)
+	for _, job := range planned {
+		if job != nil {
+			for _, key := range job.SchedulingPredecessors() {
+				predecessors[key] = true
+			}
+		}
 	}
-	return keys
+	var steps map[string]bool
+	for _, job := range planned {
+		if job == nil || job.Project == nil || job.JobDef == nil ||
+			!selectedIDs[job.Project.ID] ||
+			job.JobDef.Traits.Workload != extension.WorkloadServe ||
+			job.JobDef.Cache ||
+			predecessors[job.Key()] {
+			continue
+		}
+		if steps == nil {
+			steps = make(map[string]bool)
+		}
+		steps[job.Key()] = true
+	}
+	return steps
 }
 
 // refuseInvalidServeEnv is the usage check of `--serve-env`, made once the

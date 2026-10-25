@@ -19,7 +19,6 @@ import (
 	"slices"
 	"strings"
 
-	"go.putnami.dev/cli/model/jobs"
 	pdb "go.putnami.dev/protocol/database"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/infra"
@@ -48,9 +47,9 @@ type DatabaseBinding struct {
 type Member struct {
 	// Project is the member's workspace project.
 	Project *workspace.Project
-	// ServeJob is the extension's serve step for this project, bound after the
-	// engine prepared the composition (ADR 0001 §3: only the engine plans).
-	ServeJob *jobs.ScheduledJob
+	// ServeCommand is the serve-workload command the member's serve run
+	// requests; the engine plans its pipeline and starts its serve step.
+	ServeCommand string
 	// ProxyURL is http://127.0.0.1:<proxyPort>, stable for the composition's
 	// lifetime. Empty until the proxies phase ran.
 	ProxyURL string
@@ -109,9 +108,8 @@ func (p *Plan) ProjectIDs() []string {
 // It rejects a member that cannot serve before anything starts: a library or
 // image project (compose.not_serveable), a project that disables a serve
 // command (compose.serve_disabled), a runsWith name that resolves to no project
-// (compose.unknown_member), and a runsWith cycle (compose.cycle). Whether an
-// extension provides a serve step is only known once the engine planned it:
-// BindServeJobs reports compose.no_serve_command and compose.ambiguous_serve.
+// (compose.unknown_member), and a runsWith cycle (compose.cycle).
+// BindServeCommands then names the command each member's serve run requests.
 func PlanFor(ws *workspace.Workspace, target *workspace.Project, serveCommands []string) (*Plan, error) {
 	if ws == nil || target == nil {
 		return nil, newError(CodeUnknownMember, "", PhasePlan, "no workspace or target project")
@@ -190,34 +188,29 @@ func PlanFor(ws *workspace.Workspace, target *workspace.Project, serveCommands [
 	return &Plan{Target: byID[target.ID], Members: order}, nil
 }
 
-// BindServeJobs attaches each member's serve step from the jobs the engine
-// withheld while preparing the composition. A member without one has no
-// extension that serves it (compose.no_serve_command). A member with the serve
-// steps of two commands has no one workload to start
-// (compose.ambiguous_serve).
-func (p *Plan) BindServeJobs(withheld []*jobs.ScheduledJob) error {
+// BindServeCommands names the serve-workload command each member's serve run
+// requests: the one command of serveCommands, the loaded commands whose
+// resolved traits declare the serve workload (PlanFor already refused a member
+// that disables one). Without one there is no command to serve a member
+// (compose.no_serve_command); with two there is no one workload to start
+// (compose.ambiguous_serve). Whether an extension serves a member at all is the
+// serve run's answer: it fails before its serve step starts
+// (compose.prepare_failed).
+func (p *Plan) BindServeCommands(serveCommands []string) error {
+	commands := slices.Clone(serveCommands)
+	slices.Sort(commands)
+	commands = slices.Compact(commands)
 	for _, member := range p.Members {
-		member.ServeJob = nil
-		var commands []string
-		for _, job := range withheld {
-			if job == nil || job.Project == nil || job.Project.ID != member.Project.ID {
-				continue
-			}
-			if member.ServeJob == nil {
-				member.ServeJob = job
-			}
-			if job.JobDef != nil && !slices.Contains(commands, job.CommandName()) {
-				commands = append(commands, job.CommandName())
-			}
-		}
-		if member.ServeJob == nil {
+		member.ServeCommand = ""
+		switch len(commands) {
+		case 0:
 			return newError(CodeNoServeCommand, member.Project.ID, PhasePlan,
-				"no extension provides a serve step for this project")
-		}
-		if len(commands) > 1 {
-			slices.Sort(commands)
+				"no loaded extension declares a command whose traits declare the serve workload")
+		case 1:
+			member.ServeCommand = commands[0]
+		default:
 			return newError(CodeAmbiguousServe, member.Project.ID, PhasePlan,
-				"the commands "+strings.Join(commands, ", ")+" each provide a serve step for this project; compose starts one per project")
+				"the commands "+strings.Join(commands, ", ")+" each declare the serve workload; compose starts one serve run per member")
 		}
 	}
 	return nil

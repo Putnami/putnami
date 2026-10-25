@@ -66,9 +66,14 @@
     {
       "id": "every-non-pass-state-exits-non-zero",
       "text": "Exit 0 follows passed alone. Every other verdict state exits 1 and still delivers the verdict: human output prints it, and --output=json carries it as the failure envelope's data. A request answering 500 or above fails the smoke without stopping the other requests."
+    },
+    {
+      "id": "each-member-is-an-ordinary-serve-run",
+      "text": "compose starts each member as `putnami <serve command> --projects <member> --port 0 --serve-env - --output=jsonl`, with --no-watch unless the member is the watched target. The member's environment document (the port, production mode for a dependency and an unwatched target, and CONFIG_DATA) arrives on the run's stdin and reaches only its serve step, never a session file. compose reads the run's session stream for the serve step's process group, its readiness claims and its end, passes the run's stderr through and keeps its last lines for a failure; a run that fails before its serve step starts is compose.prepare_failed, and --ready-timeout and readyMs count from the serve step's start, so the run's finite steps never count against them. The lease records the run's process group and each serve step's, with their leaders' start times, so the next invocation reaps both. Teardown stops the members' runs in reverse start order, then the proxies, the databases and the lease. The start, exit, failure and verdict documents keep their bytes."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0039-derived-smoke-contracts-and-fail-closed-verdicts.md"
+    "tooling/cli/doc/adr/0039-derived-smoke-contracts-and-fail-closed-verdicts.md",
+    "tooling/cli/doc/adr/0080-compose-requests-each-member-as-a-serve-run.md"
   ]
 }

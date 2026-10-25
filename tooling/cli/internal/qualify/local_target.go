@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
-	"go.putnami.dev/cli/model/jobs"
 	qualifyproto "go.putnami.dev/protocol/qualify"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/compose"
@@ -28,11 +28,14 @@ type LocalOptions struct {
 	// ReadyTimeout bounds each member's typed ready event; zero is compose's
 	// default.
 	ReadyTimeout time.Duration
-	// Output renders the members' serve logs; nil discards them.
-	Output jobs.Renderer
-	// Preparation renders the engine run that prepares the serve pipelines;
-	// nil reports only failures, on stderr.
-	Preparation jobs.Renderer
+	// Logs receives the members' serve logs, the text each member's serve run
+	// renders on stderr; nil discards them. Verbose renders them with
+	// --verbose.
+	Logs    io.Writer
+	Verbose bool
+	// Executable is the putnami CLI each member's serve run starts; empty is
+	// this process's own executable.
+	Executable string
 }
 
 // localTarget is a workload composed on this machine. It runs production-mode
@@ -81,8 +84,9 @@ func NewLocalTarget(opts LocalOptions) (Target, error) {
 			ProxyPort:     0,
 			WatchTarget:   false,
 			ReadyTimeout:  opts.ReadyTimeout,
-			Output:        opts.Output,
-			Preparation:   opts.Preparation,
+			Executable:    opts.Executable,
+			Logs:          opts.Logs,
+			Verbose:       opts.Verbose,
 		},
 		project: opts.Project.ID,
 		root:    opts.WorkspaceRoot,

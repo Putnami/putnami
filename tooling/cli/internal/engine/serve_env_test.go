@@ -17,6 +17,22 @@ import (
 
 const serveEnvTestSecret = "supervisor-secret-value"
 
+// pipelineJob is a planned step whose command's resolved traits declare
+// workload, or none when it is empty.
+func pipelineJob(project *workspace.Project, name, workload string, cache bool, dependsOn ...string) *jobs.ScheduledJob {
+	return &jobs.ScheduledJob{
+		Project:   project,
+		Extension: &extension.ExtensionDescription{Name: "@putnami/fixture"},
+		JobDef:    &extension.JobDefinition{Name: name, Cache: cache, Traits: extension.CommandTraits{Workload: workload}},
+		DependsOn: dependsOn,
+	}
+}
+
+// servePipelineJob is a step of a command that declares the serve workload.
+func servePipelineJob(project *workspace.Project, name string, cache bool, dependsOn ...string) *jobs.ScheduledJob {
+	return pipelineJob(project, name, extension.WorkloadServe, cache, dependsOn...)
+}
+
 // serveEnvPlan is one selected project's serve pipeline, a dependency's
 // finite step and a non-serve task.
 func serveEnvPlan() ([]*jobs.ScheduledJob, []*workspace.Project) {
@@ -70,6 +86,64 @@ func TestServeWorkloadSteps_NamesOnlyTheTerminalServeStep(t *testing.T) {
 	}
 	if steps := serveWorkloadSteps(planned[3:], selected); steps != nil {
 		t.Errorf("a plan without a serve step named %v, want nil", sortedKeys(steps))
+	}
+}
+
+// Only the terminal, uncacheable serve step of every SELECTED project is a
+// serve-workload step: the generate step of a dependency nobody asked to
+// serve, a step something still depends on, and a step of a project that was
+// not selected are not.
+func TestServeWorkloadSteps_TakesOnlyTheTerminalServeStepOfSelectedProjects(t *testing.T) {
+	provider := &workspace.Project{ID: "/provider", Name: "provider", Path: "provider"}
+	consumer := &workspace.Project{ID: "/consumer", Name: "consumer", Path: "consumer"}
+	library := &workspace.Project{ID: "/library", Name: "library", Path: "library"}
+
+	planned := []*jobs.ScheduledJob{
+		servePipelineJob(library, "serve~generate", true),
+		servePipelineJob(provider, "serve~generate", true, "/library:serve~generate"),
+		servePipelineJob(provider, "serve~describe", true, "/provider:serve~generate"),
+		servePipelineJob(provider, "serve~serve", false, "/provider:serve~describe"),
+		servePipelineJob(consumer, "serve~generate", true),
+		servePipelineJob(consumer, "serve~serve", false, "/consumer:serve~generate"),
+		// An uncacheable serve-command step something still depends on is not
+		// terminal, and a library's own serve step was not selected.
+		servePipelineJob(consumer, "serve~prepare", false),
+		servePipelineJob(consumer, "serve~after", true, "/consumer:serve~prepare"),
+		servePipelineJob(library, "serve~serve", false),
+	}
+
+	steps := serveWorkloadSteps(planned, []*workspace.Project{provider, consumer})
+	if got, want := sortedKeys(steps), []string{"/consumer:serve~serve", "/provider:serve~serve"}; !slices.Equal(got, want) {
+		t.Errorf("serve-workload steps = %v, want %v", got, want)
+	}
+}
+
+func TestServeWorkloadSteps_NonServeCommandsAreNeverOne(t *testing.T) {
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	planned := []*jobs.ScheduledJob{
+		pipelineJob(app, "run~exec", extension.WorkloadOnce, false),
+		pipelineJob(app, "test", "", false),
+		nil,
+	}
+	if steps := serveWorkloadSteps(planned, []*workspace.Project{app, nil}); steps != nil {
+		t.Errorf("serve-workload steps = %v, want none", sortedKeys(steps))
+	}
+}
+
+// The terminal step of a command whose traits declare the serve workload is a
+// serve-workload step whatever its name: a daemon command that declares it
+// streams until interrupted, and a serve command that declares no workload
+// runs its step like any finite one.
+func TestServeWorkloadSteps_FollowTheServeWorkloadNotTheName(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-serve-workload-command-of-any-name-streams-until-interrupted")
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	planned := []*jobs.ScheduledJob{
+		pipelineJob(app, "daemon~start", extension.WorkloadServe, false),
+		pipelineJob(app, "serve~serve", "", false),
+	}
+	if got := sortedKeys(serveWorkloadSteps(planned, []*workspace.Project{app})); !slices.Equal(got, []string{"/app:daemon~start"}) {
+		t.Errorf("serve-workload steps = %v, want [/app:daemon~start]", got)
 	}
 }
 

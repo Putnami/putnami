@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/cli/model/jobs"
 	qualifyproto "go.putnami.dev/protocol/qualify"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -55,9 +54,9 @@ type Options struct {
 	// Config is the loaded workspace configuration a local target composes
 	// with; nil loads it.
 	Config *wsproto.Config
-	// Verbose renders a local composition's preparation and serve logs, on
-	// stderr, in text output. Structured output never carries them: the verdict
-	// is the record.
+	// Verbose renders a local composition's serve logs, each member's serve
+	// run with its preparation, on stderr, in text output. Structured output
+	// never carries them: the verdict is the record.
 	Verbose bool
 }
 
@@ -151,28 +150,20 @@ func newTarget(opts Options, project *workspace.Project, structured bool) (quali
 		}
 		return target, nil
 	}
-	serveLogs, preparation := compositionRenderers(opts, structured)
-	return qualify.NewLocalTarget(qualify.LocalOptions{
+	// Only a verbose human run sees the members' serve logs, which each
+	// member's serve run renders with its preparation's task output, on stderr
+	// so stdout stays the verdict. Otherwise they are dropped: a failed start's
+	// verdict names the member, the phase and the cause.
+	local := qualify.LocalOptions{
 		WorkspaceRoot: opts.WorkspaceRoot,
 		Config:        opts.Config,
 		Project:       project,
 		ReadyTimeout:  opts.ReadyTimeout,
-		Output:        serveLogs,
-		Preparation:   preparation,
-	})
-}
-
-// compositionRenderers choose what a local composition writes. Only a verbose
-// human run sees the members' serve logs and the preparation's task output, on
-// stderr so stdout stays the verdict. Otherwise serve logs are dropped and the
-// preparation reports only its failures, on stderr.
-func compositionRenderers(opts Options, structured bool) (serveLogs, preparation jobs.Renderer) {
-	if structured || !opts.Verbose {
-		return nil, nil
 	}
-	serveLogs = output.NewTextRenderer(os.Stderr, os.Stderr, output.TextRendererConfig{ServeMode: true, Verbose: true})
-	preparation = output.NewTextRenderer(os.Stderr, os.Stderr, output.TextRendererConfig{Verbose: true})
-	return serveLogs, preparation
+	if !structured && opts.Verbose {
+		local.Logs, local.Verbose = os.Stderr, true
+	}
+	return qualify.NewLocalTarget(local)
 }
 
 // validate refuses an invocation that cannot run before any file is read.

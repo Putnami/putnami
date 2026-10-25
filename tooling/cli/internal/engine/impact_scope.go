@@ -34,8 +34,7 @@ const extensionScopeSeparator = "#"
 //     reach, and no declaration names the session results these commands
 //     follow, so the kind stands in for that declaration;
 //   - a kept job depends on it, transitively: the kept plan stays a closed
-//     graph, the rule serve_withhold.go applies to the jobs it hands a
-//     supervisor. A scoped `test` keeps the `build` it depends on whichever
+//     graph. A scoped `test` keeps the `build` it depends on whichever
 //     extension owns it, and a dependency's `^generate` step keeps running.
 //
 // A kept criteria job keeps what it depends on and nothing else. The spec gate

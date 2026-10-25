@@ -85,12 +85,6 @@ func TestUp_StartsMembersInOrderAndWaitsForTypedReady(t *testing.T) {
 		}
 	}()
 
-	if !slices.Equal(fixture.prepared, []string{"/provider", "/consumer"}) {
-		t.Errorf("prepared %v, want the closure in start order", fixture.prepared)
-	}
-	if !slices.Equal(fixture.serveCommands, []string{"serve"}) {
-		t.Errorf("prepared the commands %v, want the serve workload's [serve]", fixture.serveCommands)
-	}
 	status := comp.Status()
 	if len(status.Members) != 2 || status.Isolation != IsolationDatabase || status.Target != "/consumer" {
 		t.Fatalf("status = %+v", status)
@@ -137,7 +131,8 @@ func TestUp_StartsMembersInOrderAndWaitsForTypedReady(t *testing.T) {
 	if err := json.Unmarshal(data, &lease); err != nil {
 		t.Fatalf("decode lease: %v", err)
 	}
-	if lease.PID != os.Getpid() || len(lease.PGIDs) != 2 || !slices.Equal(lease.Databases, isolator.created) ||
+	// Each member holds two groups: its serve run's and its serve step's.
+	if lease.PID != os.Getpid() || len(lease.PGIDs) != 4 || !slices.Equal(lease.Databases, isolator.created) ||
 		lease.ProvisionerDigest != "fakedigest" || len(lease.ProxyPorts) != 2 {
 		t.Errorf("lease = %+v", lease)
 	}
@@ -149,6 +144,9 @@ func TestUp_StartsMembersInOrderAndWaitsForTypedReady(t *testing.T) {
 	closed = true
 	if report.State != CleanupClean {
 		t.Fatalf("cleanup = %+v", report)
+	}
+	if got := fixture.stopOrder(t); !slices.Equal(got, []string{"/consumer", "/provider"}) {
+		t.Errorf("serve runs stopped in the order %v, want the reverse of the start order", got)
 	}
 	for _, pgid := range lease.PGIDs {
 		if processGroupAlive(pgid) {

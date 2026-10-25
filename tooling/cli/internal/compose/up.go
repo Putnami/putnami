@@ -6,29 +6,23 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dbtestenv"
-	"go.putnami.dev/sdk/extension/proctree"
-	"go.putnami.dev/tooling/cli/internal/commands/doctor"
-	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
-	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // DefaultReadyTimeout bounds each member's wait for its typed ready event.
 const DefaultReadyTimeout = 60 * time.Second
 
-// memberStopTimeout bounds how long Close waits for the members to exit after
-// they were canceled. The job runner escalates SIGTERM to SIGKILL after five
-// seconds, so this is a hang detector, not a grace period.
+// memberStopTimeout bounds how long Close waits for a member's serve run to
+// exit after SIGTERM, before it sends SIGKILL. The run stops its serve step
+// with SIGTERM and SIGKILL after five seconds, and forces its own exit after
+// ten, so this is a hang detector, not a grace period.
 const memberStopTimeout = 30 * time.Second
 
 // Cleanup states.
@@ -55,11 +49,18 @@ type Options struct {
 	// ReadyTimeout bounds each member's wait for its ready event; zero is
 	// DefaultReadyTimeout.
 	ReadyTimeout time.Duration
-	// Output renders the members' serve logs. Nil discards them.
-	Output jobs.Renderer
-	// Preparation renders the engine run that prepares the serve pipelines.
-	// Nil reports only failures, on stderr.
-	Preparation jobs.Renderer
+	// Executable is the putnami CLI each member's serve run starts; empty is
+	// this process's own executable.
+	Executable string
+	// Logs receives each member's serve log, the text its serve run renders
+	// on stderr as `putnami serve` renders it. Nil discards it; a failure keeps
+	// its last lines either way (Error.Detail).
+	Logs io.Writer
+	// Verbose, Quiet and NoColor are the display flags each serve run renders
+	// its serve log with.
+	Verbose bool
+	Quiet   bool
+	NoColor bool
 }
 
 // CleanupReport is what a composition's teardown left behind.
@@ -68,21 +69,12 @@ type CleanupReport struct {
 	Leftovers []string `json:"leftovers,omitempty"`
 }
 
-// preparation is the engine's answer to "prepare these members": the
-// workspace it planned against and the serve steps it withheld.
-type preparation struct {
-	ws       *workspace.Workspace
-	withheld []*jobs.ScheduledJob
-	versions cachekey.RunVersions
-}
-
 // upDeps are the effects Up acts through, replaceable in tests.
 type upDeps struct {
 	loadWorkspace func(root string) (*workspace.Workspace, error)
 	// discover loads the workspace's extensions, whose resolved traits name the
 	// serve-workload commands every member runs.
 	discover func(ws *workspace.Workspace, cfg *wsproto.Config) ([]*extension.ExtensionDescription, error)
-	prepare  func(ctx context.Context, opts Options, projectIDs, serveCommands []string) (*preparation, error)
 	provider func() databaseProvider
 	reap     func(workspaceRoot string) []ReapedLease
 }
@@ -93,7 +85,6 @@ func defaultUpDeps() upDeps {
 		discover: func(ws *workspace.Workspace, cfg *wsproto.Config) ([]*extension.ExtensionDescription, error) {
 			return extension.DiscoverExtensions(ws.Root, cfg, ws.ProjectPaths())
 		},
-		prepare:  enginePrepare,
 		provider: func() databaseProvider { return dbtestenv.SelectProvider() },
 		reap:     ReapOrphans,
 	}
@@ -109,7 +100,6 @@ type Composition struct {
 	proxies   []*proxy
 	runtimes  []*memberRuntime
 	reaped    []ReapedLease
-	cancel    context.CancelFunc
 
 	// pgMu orders every change to the recorded process groups, in memory and
 	// in the lease, so a release never removes a record made after its check.
@@ -120,10 +110,12 @@ type Composition struct {
 	report    CleanupReport
 }
 
-// Up starts a composition: it reaps orphaned compositions, prepares every
-// member's serve pipeline through the engine, provisions the databases,
-// starts one proxy per member, then starts the members in topological order,
-// each only once the one before it announced readiness.
+// Up starts a composition: it reaps orphaned compositions, provisions the
+// databases, starts one proxy per member, then starts each member as an
+// ordinary serve run of the putnami CLI, in topological order, each only once
+// the one before it announced readiness. The serve run prepares the member's
+// serve pipeline and starts its serve step: only the engine starts a serve
+// step.
 //
 // On failure everything already started is torn down before Up returns the
 // error, a *Error which names the member and the phase and, once anything was
@@ -153,9 +145,6 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 
 	reaped = deps.reap(opts.WorkspaceRoot)
 
-	// Plan once against the loaded workspace to know which projects to
-	// prepare, then again against the workspace the engine prepared, whose
-	// probe view is the one the serve steps run with.
 	loaded, err := deps.loadWorkspace(opts.WorkspaceRoot)
 	if err != nil {
 		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePlan, "load the workspace: "+err.Error())
@@ -164,51 +153,31 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 	if target == nil {
 		return nil, newError(CodeUnknownMember, opts.Target.ID, PhasePlan, "the target is not a project of this workspace")
 	}
-	draft, serveCommands, err := planDraft(opts, deps, loaded, target)
+	plan, serveCommands, err := planComposition(opts, deps, loaded, target)
 	if err != nil {
 		return nil, err
 	}
-	prepared, err := deps.prepare(ctx, opts, draft.ProjectIDs(), serveCommands)
-	if err != nil {
+	if err := plan.BindServeCommands(serveCommands); err != nil {
 		return nil, err
 	}
-	if prepared.ws.Config == nil {
-		prepared.ws.Config = &wsproto.Config{}
-	}
-	target = prepared.ws.ProjectByID(opts.Target.ID)
-	if target == nil {
-		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, "the prepared workspace no longer contains the target")
-	}
-	plan, err := PlanFor(prepared.ws, target, serveCommands)
-	if err != nil {
-		return nil, err
-	}
-	if strings.Join(plan.ProjectIDs(), ",") != strings.Join(draft.ProjectIDs(), ",") {
-		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare,
-			"the runsWith closure changed while the composition was prepared: "+
-				strings.Join(draft.ProjectIDs(), ",")+" became "+strings.Join(plan.ProjectIDs(), ","))
-	}
-	if err := plan.BindServeJobs(prepared.withheld); err != nil {
-		return nil, err
-	}
-	for _, member := range plan.Members {
-		if err := checkConfigDataConflict(member); err != nil {
-			return nil, err
+	executable := opts.Executable
+	if executable == "" {
+		if executable, err = os.Executable(); err != nil {
+			return nil, newError(CodeStartFailed, target.ID, PhasePlan, "locate the putnami executable: "+err.Error())
 		}
 	}
+	display := serveRunDisplay{verbose: opts.Verbose, quiet: opts.Quiet, noColor: opts.NoColor}
 
 	lease, err := createLease(opts.WorkspaceRoot, target.ID)
 	if err != nil {
 		return nil, newError(CodeLeaseFailed, target.ID, PhasePlan, err.Error())
 	}
-	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	c := &Composition{
 		id:     lease.lease.ID,
 		root:   opts.WorkspaceRoot,
 		plan:   plan,
 		lease:  lease,
 		reaped: reaped,
-		cancel: cancel,
 		pgids:  make(map[int]trackedGroup),
 	}
 	// fail tears down what the start acquired and reports that teardown on the
@@ -248,10 +217,6 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 		}
 	}
 
-	renderer := opts.Output
-	if renderer == nil {
-		renderer = output.NewTextRenderer(io.Discard, io.Discard, output.TextRendererConfig{ServeMode: true})
-	}
 	for i, member := range plan.Members {
 		document, sections, err := configData(member, plan)
 		if err != nil {
@@ -260,15 +225,16 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 		isTarget := member == plan.Target
 		watchMode := isTarget && opts.WatchTarget
 		rt := newMemberRuntime(member, c.proxies[i], memberEnv(!watchMode, document), sections, watchMode)
-		rt.ws = prepared.ws
-		rt.versions = prepared.versions
-		rt.output = renderer
+		rt.executable, rt.root, rt.logs = executable, opts.WorkspaceRoot, opts.Logs
+		rt.args = serveRunArgs(member.ServeCommand, member.Project.ID, watchMode, display)
 		memberID := member.Project.ID
-		rt.observeProcess = func(pgid int) { c.recordProcessGroup(memberID, pgid) }
+		rt.observeProcess = func(pgid int, leaderStart string) { c.recordProcessGroup(memberID, pgid, leaderStart) }
 		rt.releaseProcess = c.releaseProcessGroup
 		c.runtimes = append(c.runtimes, rt)
 
-		rt.start(runCtx)
+		if err := rt.start(); err != nil {
+			return fail(newError(CodeStartFailed, memberID, PhaseStart, err.Error()))
+		}
 		if err := rt.waitReady(ctx, opts.ReadyTimeout); err != nil {
 			return fail(err)
 		}
@@ -277,7 +243,8 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 	return c, nil
 }
 
-// trackedGroup is a serve step's process group as the composition recorded it.
+// trackedGroup is a member's process group as the composition recorded it: its
+// serve run's, or a serve step's.
 type trackedGroup struct {
 	member string
 	// leaderStart identifies the group's leader (proctree.StartTime); empty when
@@ -285,22 +252,23 @@ type trackedGroup struct {
 	leaderStart string
 }
 
-// recordProcessGroup adds a spawned serve step's process group to the lease,
-// with its leader's start time, before anything else can happen to it.
-func (c *Composition) recordProcessGroup(member string, pgid int) {
-	start, _ := proctree.StartTime(pgid)
+// recordProcessGroup adds a member's process group to the lease, with its
+// leader's start time, before anything else can happen to it: the serve run's
+// own group as it starts, and each serve step's as the run's session stream
+// names it.
+func (c *Composition) recordProcessGroup(member string, pgid int, leaderStart string) {
 	c.pgMu.Lock()
 	defer c.pgMu.Unlock()
-	c.pgids[pgid] = trackedGroup{member: member, leaderStart: start}
-	_ = c.lease.update(func(l *Lease) { l.recordGroup(pgid, start) })
+	c.pgids[pgid] = trackedGroup{member: member, leaderStart: leaderStart}
+	_ = c.lease.update(func(l *Lease) { l.recordGroup(pgid, leaderStart) })
 }
 
-// releaseProcessGroup forgets a serve step's process group once its job has
-// returned and nothing of the group runs any more, so a composition never
-// keeps an id the host can hand to another process: every watch restart
-// releases the group of the run it replaces. A group that outlives its job
-// stays recorded; its leader is gone, so a later teardown or reap names it
-// instead of signaling it.
+// releaseProcessGroup forgets a member's process group once its process ended
+// and nothing of the group runs any more, so a composition never keeps an id
+// the host can hand to another process: every watch restart releases the
+// group of the serve step it replaces. A group that outlives its process stays
+// recorded; its leader is gone, so a later teardown or reap names it instead of
+// signaling it.
 func (c *Composition) releaseProcessGroup(pgid int) {
 	if len(waitForGroups([]int{pgid}, groupReleaseWait)) > 0 {
 		return
@@ -336,7 +304,7 @@ func (c *Composition) Endpoint(projectID string) (string, bool) {
 	return member.ProxyURL, true
 }
 
-// Wait returns when the target's serve loop ends or ctx is done.
+// Wait returns when the target's serve run ends or ctx is done.
 func (c *Composition) Wait(ctx context.Context) error {
 	if len(c.runtimes) == 0 {
 		return nil
@@ -426,11 +394,11 @@ func (c *Composition) Status() Status {
 	return status
 }
 
-// Close tears the composition down: it cancels the members (the job runner
-// sends SIGTERM to each process group and SIGKILL after five seconds), closes
-// the proxies, drops the databases, and releases the lease. Anything that
-// survives is named in the report, whose state is then "partial", and stays
-// recorded in the lease for the next invocation to reap. Close is idempotent.
+// Close tears the composition down: it stops the members' serve runs in
+// reverse start order (each run stops its serve step), closes the proxies,
+// drops the databases, and releases the lease. Anything that survives is named
+// in the report, whose state is then "partial", and stays recorded in the
+// lease for the next invocation to reap. Close is idempotent.
 func (c *Composition) Close(ctx context.Context) CleanupReport {
 	c.closeOnce.Do(func() {
 		c.report = c.close(ctx)
@@ -440,17 +408,11 @@ func (c *Composition) Close(ctx context.Context) CleanupReport {
 
 func (c *Composition) close(ctx context.Context) CleanupReport {
 	var leftovers []string
-	c.cancel()
-
-	stopCtx, stop := context.WithTimeout(ctx, memberStopTimeout)
-	for _, rt := range c.runtimes {
-		select {
-		case <-rt.exited:
-		case <-stopCtx.Done():
-			leftovers = append(leftovers, "serve step of "+rt.member.Project.ID+" did not stop within "+memberStopTimeout.String())
+	for i := len(c.runtimes) - 1; i >= 0; i-- {
+		if leftover := c.runtimes[i].stop(ctx); leftover != "" {
+			leftovers = append(leftovers, leftover)
 		}
 	}
-	stop()
 
 	for _, p := range c.proxies {
 		if err := p.close(ctx); err != nil {
@@ -507,11 +469,12 @@ func (c *Composition) close(ctx context.Context) CleanupReport {
 	return CleanupReport{State: CleanupPartial, Leftovers: leftovers}
 }
 
-// planDraft plans target against the loaded workspace ws, and returns the plan
-// with the loaded commands whose resolved traits declare the serve workload.
-// A member that cannot serve is refused first, then a workspace whose loaded
-// extensions declare no serve-workload command (compose.no_serve_command).
-func planDraft(opts Options, deps upDeps, ws *workspace.Workspace, target *workspace.Project) (*Plan, []string, error) {
+// planComposition plans target against the loaded workspace ws, and returns
+// the plan with the loaded commands whose resolved traits declare the serve
+// workload. A member that cannot serve is refused first, then a workspace whose
+// loaded extensions declare no serve-workload command
+// (compose.no_serve_command).
+func planComposition(opts Options, deps upDeps, ws *workspace.Workspace, target *workspace.Project) (*Plan, []string, error) {
 	cfg := opts.Config
 	if cfg == nil {
 		cfg = wsproto.Load(opts.WorkspaceRoot)
@@ -521,7 +484,7 @@ func planDraft(opts Options, deps upDeps, ws *workspace.Workspace, target *works
 		return nil, nil, newError(CodePrepareFailed, opts.Target.ID, PhasePlan, "discover the workspace's extensions: "+err.Error())
 	}
 	serveCommands := jobs.CommandsOfWorkload(extensions, extension.WorkloadServe)
-	draft, err := PlanFor(ws, target, serveCommands)
+	plan, err := PlanFor(ws, target, serveCommands)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -529,70 +492,5 @@ func planDraft(opts Options, deps upDeps, ws *workspace.Workspace, target *works
 		return nil, nil, newError(CodeNoServeCommand, opts.Target.ID, PhasePlan,
 			"no loaded extension declares a command whose traits declare the serve workload")
 	}
-	return draft, serveCommands, nil
-}
-
-// enginePrepare runs the members' serve pipelines, those of serveCommands,
-// through the engine without their serve steps, and returns the steps it
-// withheld (engine.Request WithholdServeSteps).
-func enginePrepare(ctx context.Context, opts Options, projectIDs, serveCommands []string) (*preparation, error) {
-	cfg := opts.Config
-	if cfg == nil {
-		cfg = wsproto.Load(opts.WorkspaceRoot)
-	}
-	sink := opts.Preparation
-	if sink == nil {
-		sink = output.NewTextRenderer(io.Discard, os.Stderr, output.TextRendererConfig{Quiet: true})
-	}
-	result, err := engine.New().Run(ctx, engine.Request{
-		WorkspaceRoot:      opts.WorkspaceRoot,
-		Config:             cfg,
-		Commands:           serveCommands,
-		Global:             engine.GlobalFlags{Projects: strings.Join(projectIDs, ",")},
-		WithholdServeSteps: true,
-		Preflight:          doctor.DoctorPreflight,
-		Stdout:             io.Discard,
-		// The returned error becomes the composition's failure, which the caller reports.
-		ErrorOut: io.Discard,
-	}, sink)
-	if err != nil {
-		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, err.Error())
-	}
-	if result.ExitCode != engine.ExitSuccess || result.Workspace == nil {
-		member := failedProject(result)
-		if member == "" {
-			member = opts.Target.ID
-		}
-		return nil, newError(CodePrepareFailed, member, PhasePrepare,
-			"preparing the serve pipelines failed with exit code "+strconv.Itoa(result.ExitCode)+"; the task output above names the cause")
-	}
-	versions, err := engine.BuildVersionInfo(result.Workspace)
-	if err != nil {
-		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, err.Error())
-	}
-	return &preparation{
-		ws:       result.Workspace,
-		withheld: result.Withheld,
-		versions: versions,
-	}, nil
-}
-
-// failedProject names the project of the first failed job of a preparation,
-// in key order, so a failure is attributed to a member.
-func failedProject(result engine.SessionResult) string {
-	keys := make([]string, 0, len(result.Results))
-	for key, res := range result.Results {
-		if res != nil && res.Status == "failed" {
-			keys = append(keys, key)
-		}
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		for _, job := range result.Plan {
-			if job != nil && job.Key() == key && job.Project != nil {
-				return job.Project.ID
-			}
-		}
-	}
-	return ""
+	return plan, serveCommands, nil
 }

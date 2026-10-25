@@ -20,7 +20,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
@@ -34,8 +33,8 @@ import (
 // CommandPath is the catalog path this vertical serves.
 const CommandPath = "compose"
 
-// teardownTimeout bounds Close after the composition stops. Members get the
-// job runner's SIGTERM-then-SIGKILL window; the rest is proxies and databases.
+// teardownTimeout bounds Close after the composition stops. Each member's serve
+// run gets its SIGTERM-then-SIGKILL window; the rest is proxies and databases.
 const teardownTimeout = 90 * time.Second
 
 // Request is one `putnami compose` invocation, as the dispatcher parsed it.
@@ -102,6 +101,8 @@ func Run(req Request) error {
 	signals, stopSignals := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stopSignals()
 
+	// Each member's serve run renders its serve log on stderr, which reaches
+	// this stderr as it arrives; stdout stays the start and exit documents.
 	comp, err := compose.Up(signals, compose.Options{
 		WorkspaceRoot: req.WorkspaceRoot,
 		Config:        req.Config,
@@ -109,8 +110,10 @@ func Run(req Request) error {
 		ProxyPort:     proxyPort,
 		WatchTarget:   !req.NoWatch,
 		ReadyTimeout:  readyTimeout,
-		Output:        serveRenderer(req, stdout, stderr, structured),
-		Preparation:   preparationRenderer(req, stderr),
+		Logs:          stderr,
+		Verbose:       req.Verbose,
+		Quiet:         req.Quiet,
+		NoColor:       req.NoColor || structured,
 	})
 	if err != nil {
 		writeDetail(stderr, err, structured)
@@ -227,31 +230,6 @@ func resolveReadyTimeout(raw string) (time.Duration, error) {
 		return 0, cmderr.Usagef("--ready-timeout %q is not a positive duration (for example 60s or 2m)", raw)
 	}
 	return timeout, nil
-}
-
-// serveRenderer renders the members' serve logs: on stdout for a human, on
-// stderr when stdout carries the structured documents.
-func serveRenderer(req Request, stdout, stderr io.Writer, structured bool) jobs.Renderer {
-	out := stdout
-	if structured {
-		out = stderr
-	}
-	output.SetColorsEnabled(!req.NoColor && !structured)
-	return output.NewTextRenderer(out, stderr, output.TextRendererConfig{
-		ServeMode: true,
-		Verbose:   req.Verbose,
-		Quiet:     req.Quiet,
-	})
-}
-
-// preparationRenderer renders the engine run that prepares the serve
-// pipelines. It always writes to stderr, so a structured stdout stays two
-// documents.
-func preparationRenderer(req Request, stderr io.Writer) jobs.Renderer {
-	return output.NewTextRenderer(stderr, stderr, output.TextRendererConfig{
-		Verbose: req.Verbose,
-		Quiet:   req.Quiet,
-	})
 }
 
 // writeStatus prints a composition document: the result envelope in a

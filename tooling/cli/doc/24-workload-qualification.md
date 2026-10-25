@@ -7,7 +7,9 @@ without re-running anything.
 
 The wire documents live in [`protocols/qualify`](../../../protocols/qualify/README.md);
 [ADR 0039](adr/0039-derived-smoke-contracts-and-fail-closed-verdicts.md) records
-why the smoke is derived and the verdict fails closed.
+why the smoke is derived and the verdict fails closed, and
+[ADR 0080](adr/0080-compose-requests-each-member-as-a-serve-run.md) why each
+composition member is an ordinary serve run.
 
 ## `compose`
 
@@ -34,35 +36,53 @@ Planning refuses, before anything starts:
 | `compose.serve_disabled` | A member's `putnami.json`, or the workspace, disables a command whose traits declare the `serve` workload |
 | `compose.unknown_member` | A `runsWith` entry names no project |
 | `compose.cycle` | `runsWith` forms a cycle |
-| `compose.no_serve_command` | No loaded extension declares a command with the `serve` workload, or none provides a serve step for a member |
-| `compose.ambiguous_serve` | Two commands with the `serve` workload each provide a serve step for one member |
+| `compose.no_serve_command` | No loaded extension declares a command with the `serve` workload |
+| `compose.ambiguous_serve` | The loaded extensions declare two commands with the `serve` workload, and `compose` starts one serve run per member |
 | `compose.invalid_requirements` | A member's `infra/requirements.json` or client contract is invalid |
 
 ### Start order and readiness
 
 1. Orphaned compositions are reaped (see [Recovery](#recovery)).
-2. The members' pipelines of every command whose traits declare the `serve`
-   workload (the first-party `serve`) are prepared through the engine: every
-   finite step (config merge, generate, describe, and the steps of their dependencies)
-   runs as an ordinary cached session. The long-running serve steps are withheld.
-3. Databases are provisioned.
-4. One reverse proxy starts per member, so every URL is known.
-5. Members start in topological order, dependencies first, target last. Each
+2. Databases are provisioned.
+3. One reverse proxy starts per member, so every URL is known.
+4. Members start in topological order, dependencies first, target last. Each
    member starts only after the one before it emitted the runtime protocol's
    typed `ready` event (v2, target `server` or `workload`). The proxy forwards to
    the port of the event's first `http` or `https` endpoint, else of its first
    endpoint.
 
-Readiness is never inferred from a log line or a TCP poll. A member that exits
-before its ready event fails the composition at once (`compose.member_exited`);
-one that stays silent fails after `--ready-timeout`, default `60s`
-(`compose.ready_timeout`). Either way the error names the member and the phase,
-text output prints the last lines of the member's output on stderr, and
-everything already started is torn down before `compose` exits.
+Each member is an ordinary serve run of the same `putnami` executable, for that
+member alone:
 
-Dependencies run production-mode (`NODE_ENV=production`) without watch. The
-target watches by default: a change restarts it behind the same proxy URL;
-`--no-watch` runs it like its dependencies.
+```bash
+putnami <serve command> --projects <member> --port 0 [--no-watch] --serve-env - --output=jsonl
+```
+
+`<serve command>` is the one loaded command whose traits declare the `serve`
+workload (the first-party `serve`). The member's environment document arrives
+on the run's stdin (see [Injected configuration](#injected-configuration)). The
+run prepares the member's serve pipeline as `putnami serve` does: every finite
+step (config merge, generate, describe, and the steps of their dependencies)
+runs as an ordinary cached session, one session per member, and then the engine
+starts the serve step. `compose` reads the run's session stream on stdout for
+the serve step's process group, its readiness claims and its end, and passes
+the run's stderr through. It never starts a serve step itself.
+
+Readiness is never inferred from a log line or a TCP poll. A serve run that
+fails before its serve step starts, on a usage error or a failed finite step,
+fails the composition at once (`compose.prepare_failed`). A member whose serve
+step exits before its ready event fails it at once (`compose.member_exited`);
+one that stays silent fails after `--ready-timeout`, default `60s`, counted
+from the start of its serve step (`compose.ready_timeout`). Either way the
+error names the member and the phase, text output prints the last lines of the
+member's serve run output on stderr, and everything already started is torn
+down before `compose` exits.
+
+Dependencies run production-mode (`NODE_ENV=production`) without watch
+(`--no-watch`). The target's serve run watches by default: a change re-plans its
+pipeline and restarts its serve step behind the same proxy URL, and `compose`
+follows the new step's process group and port. `--no-watch` runs it like its
+dependencies.
 
 Production mode selects the build, not the configuration. A production member
 also receives `APP_ENV=local`, unless you exported `APP_ENV` yourself, so it
@@ -71,7 +91,7 @@ reads `conf/.env.local.yaml` and `conf/.secrets.local.yaml` as it does under
 
 ### Proxies
 
-Every member binds port `0` (`PORT=0` and the serve step's `port` param) and is
+Every member binds port `0` (`PORT=0` and the serve run's `--port 0`) and is
 reached through a proxy on `127.0.0.1`. Dependants hold the proxy URL, which stays
 the same across every restart of the member. While the member has no bound port —
 starting, restarting, or gone — the proxy answers `503` with the platform
@@ -106,14 +126,16 @@ both runtimes read at priority 60, above every configuration file:
 - `database` has one binding per datasource of the member's committed
   `infra/requirements.json`, with the first declared schema, or `public`.
 
-A section with nothing to carry is omitted. The value is injected into the serve
-step's process only: it never reaches a file in the project tree, a job context,
-a cache key, the lease, an error, or the output, which name sections and
-datasources only. A member's own output is not held to that: a workload can print
+A section with nothing to carry is omitted. The value reaches the serve step's
+process only, through the serve run's `--serve-env -`: it never reaches a file
+in the project tree, a session record, a job context, a cache key, the lease,
+an error, or the output, which name sections and datasources only. A member's own output is not held to that: a workload can print
 what it received, so its log lines stay out of every error message, structured
-failure document and verdict, and reach stderr in text output only. A member whose environment already carries `CONFIG_DATA` — from
-the invoking shell or from its serve task's manifest — is refused
-(`compose.config_data_conflict`) rather than merged.
+failure document and verdict, and reach stderr in text output only. A composition started from an environment that already carries `CONFIG_DATA`
+is refused (`compose.config_data_conflict`) rather than merged. A serve task that
+declares `CONFIG_DATA` in its own manifest `env` is refused by the member's
+serve run, because `--serve-env` refuses a variable the task would replace, and
+the member fails as `compose.prepare_failed`.
 
 ### Databases
 
@@ -131,11 +153,13 @@ the CLI carries no database driver.
 ### Output
 
 Human output lists each member with its proxy URL, readiness time and injected
-sections, then the serve logs. With `--output=json` or `--output=jsonl`, stdout
-carries exactly two result documents and serve logs go to stderr:
+sections on stdout. Each member's serve run renders its serve log on stderr, as
+`putnami serve` does, in every output mode. With `--output=json` or
+`--output=jsonl`, stdout carries exactly two result documents:
 
 1. When every member is ready: `data` is `{id, target, members[], isolation, reaped}`,
    each member `{project, proxyUrl, backendPort, databases, configSections, readyMs}`.
+   `readyMs` counts from the start of the member's serve step.
 2. At exit: the same document without `reaped` (reported once, at start) and with `cleanup: {state, leftovers}`.
 
 A failure is a single failure document whose `data` is `{code, id, member, phase, cleanup, reaped}`; `id` and `cleanup` are present once the failed start had created its lease.
@@ -147,14 +171,18 @@ cleanup is `clean`.
 A composition keeps `.putnami/compose/<id>/lease.json` while it runs:
 
 ```json
-{"version": 1, "id": "…", "pid": 0, "createdAt": "…", "target": "/…", "pgids": [0], "groups": [{"pgid": 0, "leaderStart": "…"}], "databases": ["compose_…"], "provisionerDigest": "…", "proxyPorts": [0]}
+{"version": 1, "id": "…", "pid": 0, "createdAt": "…", "target": "/…", "pgids": [0, 0], "groups": [{"pgid": 0, "leaderStart": "…"}, {"pgid": 0, "leaderStart": "…"}], "databases": ["compose_…"], "provisionerDigest": "…", "proxyPorts": [0]}
 ```
 
 The owner holds `owner.lock` for its whole life, and records each resource before
-acquiring it. On `SIGINT` or `SIGTERM`, `compose` cancels its members (the process
-group receives `SIGTERM`, then `SIGKILL` after five seconds), closes the proxies,
-drops the databases, confirms none is left, and removes the lease. Whatever
-survives is reported as `cleanup.state: partial` and stays in the lease.
+acquiring it. A member holds two process groups: its serve run's, recorded as
+the run starts, and its serve step's, recorded when the run's session stream
+names it. On `SIGINT` or `SIGTERM`, `compose` stops the members' serve runs in
+reverse start order: each run receives `SIGTERM`, stops its serve step
+(`SIGTERM`, then `SIGKILL` after five seconds) and exits, and a run still running
+after 30 seconds receives `SIGKILL`. `compose` then closes the proxies, drops
+the databases, confirms none is left, and removes the lease. Whatever survives
+is reported as `cleanup.state: partial` and stays in the lease.
 
 A composition killed without teardown (`kill -9`, a crash) leaves its lease. The
 next `compose` reaps every lease whose lock is free **and** whose pid is dead:
@@ -168,7 +196,8 @@ the leader's start time next to the id. A group whose leader is gone, or whose
 start time was never recorded, is named in `leftovers` and never signaled. An id
 led by another process is no longer this composition's and is ignored. A serve
 step's group leaves the lease as soon as the step returns with nothing of the
-group still running, so a long watch session does not accumulate ids.
+group still running, so a long watch session does not accumulate ids. A reap
+stops both groups of a member, its serve run's and its serve step's.
 
 ## The contract
 
@@ -273,10 +302,11 @@ polls `<prefix>/readyz` through the target's proxy instead, as it does for a URL
 target. The platform plugin of both frameworks answers `503` there until the
 same completed startup, so a `200` proves the same thing as the claim.
 
-Serve logs are not part of the verdict. Human output shows them, with the
-preparation's task output, only with `--verbose`, on stderr. Without `--verbose`,
-and always with `--output=json`, they are dropped; the preparation still reports
-its failures on stderr.
+Serve logs are not part of the verdict. Human output shows each member's serve
+run output, preparation included, on stderr, only with `--verbose`. Without
+`--verbose`, and always with `--output=json`, it is dropped. A composition
+failure's diagnostic still names the member and the phase, and for
+`compose.prepare_failed` the step that failed.
 
 #### The tree binding
 

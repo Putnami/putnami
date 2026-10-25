@@ -1,0 +1,2 @@
+exit 1
+{"protocolVersion":2,"command":"compose","status":"failure","exitCode":1,"data":{"code":"compose.ready_timeout","id":"<composition>","member":"/provider","phase":"readiness","cleanup":{"state":"clean"}},"error":{"code":"failure","message":"compose.ready_timeout: /provider: no typed ready event within 2s (phase readiness)"}}

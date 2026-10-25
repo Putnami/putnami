@@ -2982,6 +2982,25 @@
               "a-server-error-fails-the-smoke"
             ]
           }
+        },
+        {
+          "id": "each-member-is-an-ordinary-serve-run",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-member-starts-as-a-serve-run-of-the-cli-with-its-environment-on-stdin",
+              "the-lease-records-the-serve-run-and-each-serve-step-with-its-leader-start",
+              "members-stop-in-reverse-start-order",
+              "a-failed-preparation-is-prepare-failed-with-the-output-tail",
+              "the-ready-timeout-counts-from-the-serve-step-start",
+              "a-watched-target-follows-its-serve-step-across-restarts",
+              "a-killed-composition-leaves-both-groups-of-each-member-to-the-reap",
+              "the-environment-document-reaches-no-session-file",
+              "the-start-exit-and-verdict-documents-keep-their-bytes"
+            ]
+          }
         }
       ]
     },

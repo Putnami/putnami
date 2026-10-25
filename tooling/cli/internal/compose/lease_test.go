@@ -265,7 +265,6 @@ func TestLease_PartialCloseKeepsWhatSurvivedForTheNextReap(t *testing.T) {
 		root:      root,
 		plan:      &Plan{},
 		lease:     handle,
-		cancel:    func() {},
 		pgids:     map[int]trackedGroup{},
 		databases: &databaseSet{id: handle.lease.ID, isolator: isolator, digest: "d", isolation: IsolationDatabase, created: []string{"compose_" + handle.lease.ID + "_app_default"}},
 	}
@@ -338,12 +337,12 @@ func TestComposition_ReleasesAGroupOnceItsStepReturned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createLease: %v", err)
 	}
-	c := &Composition{id: handle.lease.ID, root: root, plan: &Plan{}, lease: handle, cancel: func() {}, pgids: map[int]trackedGroup{}}
+	c := &Composition{id: handle.lease.ID, root: root, plan: &Plan{}, lease: handle, pgids: map[int]trackedGroup{}}
 
 	exited, exitedDone := startGroup(t, fixtureNeverReady)
 	running, _ := startGroup(t, fixtureNeverReady)
-	c.recordProcessGroup("/app", exited)
-	c.recordProcessGroup("/app", running)
+	c.recordProcessGroup("/app", exited, identityOf(t, exited).LeaderStart)
+	c.recordProcessGroup("/app", running, identityOf(t, running).LeaderStart)
 	if lease := handle.snapshot(); !slices.Equal(lease.PGIDs, []int{exited, running}) || lease.leaderStart(exited) == "" {
 		t.Fatalf("lease after two spawns = %+v, want both groups with identities", lease)
 	}
@@ -385,7 +384,7 @@ func TestLease_PartialCloseKeepsDatabasesItCouldNotConfirmDropped(t *testing.T) 
 		t.Fatal(err)
 	}
 	c := &Composition{
-		id: handle.lease.ID, root: root, plan: &Plan{}, lease: handle, cancel: func() {}, pgids: map[int]trackedGroup{},
+		id: handle.lease.ID, root: root, plan: &Plan{}, lease: handle, pgids: map[int]trackedGroup{},
 		databases: &databaseSet{id: handle.lease.ID, isolator: isolator, digest: "d", isolation: IsolationDatabase, created: []string{name}},
 	}
 	if report := c.Close(context.Background()); report.State != CleanupPartial {
@@ -394,6 +393,44 @@ func TestLease_PartialCloseKeepsDatabasesItCouldNotConfirmDropped(t *testing.T) 
 	lease, ok := readLease(filepath.Join(Root(root), handle.lease.ID))
 	if !ok || !slices.Equal(lease.Databases, []string{name}) {
 		t.Fatalf("lease after an unconfirmed drop = %+v (%v), want the database kept on record", lease, ok)
+	}
+}
+
+func TestIdentifyGroup_ALeaderThatExitsBetweenItsReadsLeavesNoGroup(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", serveRunRequirement,
+		"a-killed-composition-leaves-both-groups-of-each-member-to-the-reap")
+	const recorded = "Sun Oct 25 13:11:34 2026"
+	running := func(int) bool { return true }
+	startAt := func(start string) func(int) (string, bool) {
+		return func(int) (string, bool) { return start, true }
+	}
+	noStart := func(int) (string, bool) { return "", false }
+	// exitsAfterFirstRead is a group that runs at the first read and is gone
+	// at every later one, as a serve run that ends on its own does.
+	exitsAfterFirstRead := func() func(int) bool {
+		reads := 0
+		return func(int) bool { reads++; return reads == 1 }
+	}
+	cases := []struct {
+		name        string
+		alive       func(int) bool
+		startTime   func(int) (string, bool)
+		leaderStart string
+		want        groupIdentity
+	}{
+		{"no process runs in the group", func(int) bool { return false }, noStart, recorded, groupGone},
+		{"the leader exits between the reads", exitsAfterFirstRead(), noStart, recorded, groupGone},
+		{"the leader is gone and the group still runs", running, noStart, recorded, groupUnverified},
+		{"no start time is on record", running, startAt(recorded), "", groupUnverified},
+		{"the recorded leader leads the group", running, startAt(recorded), recorded, groupOwned},
+		{"another process leads the id", running, startAt("Sun Oct 25 13:12:00 2026"), recorded, groupGone},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := identifyGroupBy(4242, tc.leaderStart, tc.alive, tc.startTime); got != tc.want {
+				t.Fatalf("identifyGroupBy = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
 

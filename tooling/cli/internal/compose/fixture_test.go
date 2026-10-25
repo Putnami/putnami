@@ -17,12 +17,12 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/cli/model/jobs"
 	pdb "go.putnami.dev/protocol/database"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -52,9 +52,30 @@ const (
 	fixtureListenThenExit = "listen-then-exit"
 )
 
+// fixtureDiskMode, as the mode, has the workload read its mode, member and
+// record path from fixture.json in its working directory, the project
+// directory: one task of an on-disk extension manifest serves every project, so
+// its environment cannot name them.
+const fixtureDiskMode = "disk"
+
+// diskFixture is a project's fixture.json. CLI is the fake CLI's behavior
+// (fakecli_test.go); empty runs the serve step as the CLI does.
+type diskFixture struct {
+	Mode   string `json:"mode"`
+	Member string `json:"member"`
+	Record string `json:"record"`
+	CLI    string `json:"cli,omitempty"`
+}
+
 func TestMain(m *testing.M) {
 	if mode := os.Getenv(fixtureModeEnv); mode != "" {
+		if mode == fixtureDiskMode {
+			mode = loadDiskFixture()
+		}
 		os.Exit(runFixtureWorkload(mode))
+	}
+	if isFakeCLIInvocation(os.Args) {
+		os.Exit(runFakeCLI(os.Args[1:]))
 	}
 	// scratch.New, not os.MkdirTemp: a killed binary cannot run the removal
 	// below, and the next run reclaims what it left.
@@ -64,8 +85,26 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(dir.Path(), "artifacts"))
 	}
 	code := m.Run()
+	fixtureproc.Remove()
 	_ = dir.Remove()
 	os.Exit(code)
+}
+
+// loadDiskFixture reads fixture.json into the environment runFixtureWorkload
+// reads, and returns the mode it names.
+func loadDiskFixture() string {
+	var fixture diskFixture
+	data, err := os.ReadFile("fixture.json")
+	if err == nil {
+		err = json.Unmarshal(data, &fixture)
+	}
+	if err != nil {
+		emitLog("error", "fixture.json: "+err.Error())
+		os.Exit(2)
+	}
+	_ = os.Setenv(fixtureMemberEnv, fixture.Member)
+	_ = os.Setenv(fixtureRecordEnv, fixture.Record)
+	return fixture.Mode
 }
 
 // fixtureRecord is what a fixture member writes about the environment it was
@@ -208,20 +247,18 @@ type fixtureProject struct {
 	name     string
 	runsWith []string
 	mode     string
+	// cli is the fake CLI's behavior for the project's serve run.
+	cli string
 	// requirements, when set, is written as the project's infra/requirements.json.
 	requirements string
 }
 
-// compositionFixture is a temporary workspace whose serve steps run the fixture
-// workload, and the fake engine preparation that hands them back.
+// compositionFixture is a temporary workspace whose members' serve runs are
+// the fake CLI, each running the fixture workload as its serve step.
 type compositionFixture struct {
 	root     string
 	ws       *workspace.Workspace
 	projects map[string]*workspace.Project
-	jobs     []*jobs.ScheduledJob
-	prepared []string
-	// serveCommands are the commands the fake preparation was asked to plan.
-	serveCommands []string
 }
 
 // serveWorkloadExtensions are the loaded extensions of a workspace whose
@@ -236,18 +273,17 @@ func serveWorkloadExtensions(workloads map[string]string) []*extension.Extension
 
 func newCompositionFixture(t *testing.T, specs ...fixtureProject) *compositionFixture {
 	t.Helper()
-	root := t.TempDir()
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatalf("os.Executable: %v", err)
-	}
+	return newCompositionFixtureAt(t, t.TempDir(), specs...)
+}
+
+// newCompositionFixtureAt is newCompositionFixture in root, which another test
+// process may have written the same fixture in.
+func newCompositionFixtureAt(t *testing.T, root string, specs ...fixtureProject) *compositionFixture {
+	t.Helper()
 	fixture := &compositionFixture{root: root, projects: map[string]*workspace.Project{}}
 	var projects []*workspace.Project
 	for _, spec := range specs {
 		path := strings.TrimPrefix(spec.id, "/")
-		if err := os.MkdirAll(filepath.Join(root, path), 0o755); err != nil {
-			t.Fatalf("mkdir project: %v", err)
-		}
 		if spec.requirements != "" {
 			writeFile(t, filepath.Join(root, path, "infra", "requirements.json"), spec.requirements)
 		}
@@ -258,22 +294,11 @@ func newCompositionFixture(t *testing.T, specs ...fixtureProject) *compositionFi
 		if mode == "" {
 			mode = fixtureServe
 		}
-		fixture.jobs = append(fixture.jobs, &jobs.ScheduledJob{
-			Project:   project,
-			Extension: &extension.ExtensionDescription{Name: "@putnami/fixture-serve", Path: root},
-			JobDef: &extension.JobDefinition{
-				ExtensionName: "@putnami/fixture-serve",
-				Name:          "serve~serve",
-				Kind:          "command",
-				Command:       executable,
-				TimeoutMs:     -1,
-				Env: map[string]string{
-					fixtureModeEnv:   mode,
-					fixtureMemberEnv: spec.id,
-					fixtureRecordEnv: filepath.Join(root, path, "record.json"),
-				},
-			},
-		})
+		data, err := json.Marshal(diskFixture{Mode: mode, Member: spec.id, Record: filepath.Join(root, path, "record.json"), CLI: spec.cli})
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(root, path, "fixture.json"), string(data))
 	}
 	fixture.ws = workspace.NewWorkspace(root, &wsproto.Config{}, projects)
 	fixture.ws.Name = "compose-fixture"
@@ -296,14 +321,66 @@ func (f *compositionFixture) deps(provider databaseProvider) upDeps {
 		discover: func(*workspace.Workspace, *wsproto.Config) ([]*extension.ExtensionDescription, error) {
 			return serveWorkloadExtensions(map[string]string{"serve": extension.WorkloadServe}), nil
 		},
-		prepare: func(_ context.Context, _ Options, projectIDs, serveCommands []string) (*preparation, error) {
-			f.prepared = append([]string(nil), projectIDs...)
-			f.serveCommands = append([]string(nil), serveCommands...)
-			return &preparation{ws: f.ws, withheld: f.jobs}, nil
-		},
 		provider: func() databaseProvider { return provider },
 		reap:     func(root string) []ReapedLease { return reapOrphans(root, reapDeps{killDelay: 100 * time.Millisecond}) },
 	}
+}
+
+// argv is the argument vector the member's serve run was started with.
+func (f *compositionFixture) argv(t *testing.T, id string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, strings.TrimPrefix(id, "/"), fakeCLIArgsFile))
+	if err != nil {
+		t.Fatalf("member %s left no argument record: %v", id, err)
+	}
+	var args []string
+	if err := json.Unmarshal(data, &args); err != nil {
+		t.Fatalf("decode the arguments of %s: %v", id, err)
+	}
+	return args
+}
+
+// serveGroups are the process groups of the member's serve steps, in start
+// order.
+func (f *compositionFixture) serveGroups(t *testing.T, id string) []int {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, strings.TrimPrefix(id, "/"), fakeCLIGroupsFile))
+	if err != nil {
+		t.Fatalf("member %s started no serve step: %v", id, err)
+	}
+	var groups []int
+	for _, line := range strings.Fields(string(data)) {
+		group, err := strconv.Atoi(line)
+		if err != nil {
+			t.Fatalf("groups of %s: %v", id, err)
+		}
+		groups = append(groups, group)
+	}
+	return groups
+}
+
+// stopOrder is the order in which the members' serve runs received SIGTERM.
+func (f *compositionFixture) stopOrder(t *testing.T) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, fakeCLIStopFile))
+	if err != nil {
+		t.Fatalf("no serve run was stopped: %v", err)
+	}
+	return strings.Fields(string(data))
+}
+
+// lease reads the composition's lease.
+func (f *compositionFixture) lease(t *testing.T, id string) Lease {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(Root(f.root), id, leaseFileName))
+	if err != nil {
+		t.Fatalf("read lease: %v", err)
+	}
+	var lease Lease
+	if err := json.Unmarshal(data, &lease); err != nil {
+		t.Fatalf("decode lease: %v", err)
+	}
+	return lease
 }
 
 func (f *compositionFixture) record(t *testing.T, id string) fixtureRecord {

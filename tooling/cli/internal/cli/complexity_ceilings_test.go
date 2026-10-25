@@ -84,16 +84,20 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "engine",
 		prefix: "internal/engine/",
-		files:  25,
-		funcs:  191,
-		why: "RAISED 24/188→25/191 (cli/supervised-serve-run): serve_env.go holds the usage check " +
+		files:  24,
+		funcs:  186,
+		why: "LOWERED 25/191→24/186 (cli/workload-qualification, each-member-is-an-ordinary-serve-run): " +
+			"compose requests each member as a serve run of the CLI, so the engine hands no step back to " +
+			"a caller. serve_withhold.go is deleted with Request.WithholdServeSteps and the five functions " +
+			"that split a plan by it and attached the split steps to the session result. forcesServeWatch " +
+			"moves to watch.go, and serveWorkloadSteps in serve_env.go states its rule itself. " +
+			"RAISED 24/188→25/191 (cli/supervised-serve-run): serve_env.go holds the usage check " +
 			"of `--serve-env -`, made once the plan is final: serveWorkloadSteps names the steps the " +
 			"supervisor's environment reaches by the rule withholdServeSteps already splits a plan " +
 			"by, and refuseInvalidServeEnv refuses a hosted or portable run, a plan without such a " +
 			"step and a serve task whose own env declares one of the variables. execute.go holds " +
 			"serveLog, which chooses stderr as the serve log of a supervised jsonl run. They add no " +
 			"stage and no mode: the request carries the environment, the scheduler applies it. " +
-			"Phase 2 of the same epic deletes serve_withhold.go, which returns the file. " +
 			"RAISED 183→188 (cli/job-planning-execution, spec-gate-evidence-scope): an unplanned " +
 			"attester's report entry that only the run's remote cache holds resolves through that remote " +
 			"cache. spec_gate_cache.go holds readingRemote, which attaches the run's context and remote " +
@@ -237,12 +241,8 @@ var complexityCeilings = []complexityCeiling{
 			"this unit holds. It is selection finishing on the plan, not a caller policy: no flag, " +
 			"no mode, the same stage on every adapter and on the executing side of a portable " +
 			"request. " +
-			"RAISED 20/127→21/133 (`putnami compose`): serve_withhold.go holds the one " +
-			"new stage, Request.WithholdServeSteps — the serve pipeline's finite steps keep running " +
-			"through this engine (planning, guards, cache, session), and only each selected " +
-			"project's terminal uncacheable serve step is handed back to the composition that " +
-			"supervises it. Six small functions keep Engine.run and executeSession inside their " +
-			"complexity and statement budgets rather than adding branches to them. " +
+			"RAISED 20/127→21/133 (`putnami compose`) for a serve-step stage that the 25/191→24/186 " +
+			"lowering above deletes. " +
 			"the ONE place a run is assembled: selection, planning, preflight, cache lifetime, the " +
 			"session file, run markers and the canonical result (ADR 0001 §3). The epic collapsed " +
 			"five run loops into it, so this package is where every adapter's special case wants to " +

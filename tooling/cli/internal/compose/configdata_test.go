@@ -12,11 +12,9 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"go.putnami.dev/cli/model/jobs"
 	pdb "go.putnami.dev/protocol/database"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -78,8 +76,8 @@ func TestConfigData_ServicesAndDatabasesNeverLeakIntoOutput(t *testing.T) {
 	if len(emptySections) != 0 || string(empty) != "{}" {
 		t.Errorf("provider document = %s, sections %v; want an empty document", empty, emptySections)
 	}
-	if env := memberEnv(true, nil); slices.ContainsFunc(env, func(entry string) bool { return strings.HasPrefix(entry, ConfigDataEnv+"=") }) {
-		t.Errorf("an empty document still set %s: %v", ConfigDataEnv, env)
+	if _, set := memberEnv(true, nil)[ConfigDataEnv]; set {
+		t.Errorf("an empty document still set %s", ConfigDataEnv)
 	}
 
 	// The status a composition prints carries section and datasource names only.
@@ -112,23 +110,19 @@ func TestConfigData_ServicesAndDatabasesNeverLeakIntoOutput(t *testing.T) {
 	}
 }
 
+// compose owns CONFIG_DATA: a composition started from an environment that
+// already carries one is refused before anything starts. A serve task that
+// declares it in its own env is the serve run's usage error
+// (compose.prepare_failed).
 func TestConfigData_RefusesAnEnvironmentThatAlreadyCarriesConfigData(t *testing.T) {
-	member := &Member{Project: &workspace.Project{ID: "/app"}, ServeJob: &jobs.ScheduledJob{
-		JobDef: &extension.JobDefinition{Env: map[string]string{ConfigDataEnv: "{}"}},
-	}}
-	if err := checkConfigDataConflict(member); err == nil || composeError(t, err).Code != CodeConfigDataConflict {
-		t.Fatalf("a manifest-declared %s was accepted: %v", ConfigDataEnv, err)
-	}
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app"})
 	t.Setenv(ConfigDataEnv, `{"clients":{}}`)
-	member.ServeJob.JobDef.Env = nil
-	if err := checkConfigDataConflict(member); err == nil || composeError(t, err).Code != CodeConfigDataConflict {
-		t.Fatalf("an inherited %s was accepted: %v", ConfigDataEnv, err)
-	}
-	ws := workspace.NewWorkspace(t.TempDir(), &wsproto.Config{}, []*workspace.Project{member.Project})
-	fixture := &compositionFixture{ws: ws, projects: map[string]*workspace.Project{"/app": member.Project}}
-	_, err := up(t.Context(), Options{WorkspaceRoot: ws.Root, Target: member.Project}, fixture.deps(nil))
+	_, err := up(t.Context(), Options{WorkspaceRoot: fixture.root, Target: fixture.projects["/app"]}, fixture.deps(nil))
 	if err == nil || composeError(t, err).Code != CodeConfigDataConflict {
 		t.Fatalf("Up with an inherited %s = %v, want compose.config_data_conflict", ConfigDataEnv, err)
+	}
+	if dirs := leaseDirs(t, fixture.root); len(dirs) != 0 {
+		t.Errorf("a refused start left leases behind: %v", dirs)
 	}
 }
 

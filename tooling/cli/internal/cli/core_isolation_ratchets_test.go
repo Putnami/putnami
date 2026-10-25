@@ -386,12 +386,12 @@ func TestTheCoreExpandsNoInputSelector(t *testing.T) {
 // per-composition databases, the typed-readiness wait, and the lease the next
 // invocation reaps — and internal/commands/composecmd is the vertical that
 // chooses what reaches the terminal. The composition cannot live in the engine
-// (it supervises long-lived processes the engine deliberately withholds, see
-// Request.WithholdServeSteps) nor in internal/watch (a replan trigger, which
-// compose uses for its target), and `qualify --target local` consumes it as a
-// library, which rules out folding it into the command vertical. It plans
-// nothing and schedules nothing: the serve pipelines are planned and their
-// finite steps executed by Engine.Run.
+// (it runs one serve session per member, each a serve run of the CLI, and a
+// session cannot hold the others) nor in internal/watch (a replan trigger,
+// which each member's serve run uses itself), and `qualify --target local`
+// consumes it as a library, which rules out folding it into the command
+// vertical. It plans nothing and schedules nothing: each member's serve run
+// plans its serve pipeline and its engine starts every step of it.
 //
 // RAISED 58 → 60 (ADR 0039): internal/qualify derives a workload's
 // smoke contract from its route inventory, runs it against a target and

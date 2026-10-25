@@ -175,21 +175,3 @@ func configData(m *Member, plan *Plan) ([]byte, []string, error) {
 	}
 	return data, sections, nil
 }
-
-// checkConfigDataConflict fails closed when the member's process would already
-// receive CONFIG_DATA from somewhere compose does not own: the invoking
-// environment, or the serve task's own manifest Env (which the job runner
-// appends after, and would therefore silently replace, the injected value).
-func checkConfigDataConflict(m *Member) error {
-	if os.Getenv(ConfigDataEnv) != "" {
-		return newError(CodeConfigDataConflict, m.Project.ID, PhaseStart,
-			ConfigDataEnv+" is already set in this environment; compose injects it and refuses to merge or replace a value it does not own")
-	}
-	if m.ServeJob != nil && m.ServeJob.JobDef != nil {
-		if _, declared := m.ServeJob.JobDef.Env[ConfigDataEnv]; declared {
-			return newError(CodeConfigDataConflict, m.Project.ID, PhaseStart,
-				"the serve task declares "+ConfigDataEnv+" in its own environment, which would replace the injected document")
-		}
-	}
-	return nil
-}

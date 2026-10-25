@@ -175,13 +175,10 @@ exit 0
 		ctx, stop = cancelable, cancel
 	}
 	defer stop()
+	// The job runs as a serve step, whose first event names its process group,
+	// so the test can kill the group whatever happens to the job.
 	var pgid atomic.Int64
-	ctx = WithProcessGroupObserver(ctx, func(id int) {
-		pgid.Store(int64(id))
-		if ctx.Err() != nil {
-			_ = proctree.KillGroup(id)
-		}
-	})
+	ctx = withServeStep(ctx)
 	defer func() { _ = proctree.KillGroup(int(pgid.Load())) }()
 	// This is only a failure watchdog. Success depends on event ordering and
 	// descendant EOF, not on startup or scheduling fitting a small wall budget.
@@ -200,6 +197,13 @@ exit 0
 	}()
 
 	result, err := RunJob(ctx, ws, job, nil, nil, nil, func(event RawJobEvent) {
+		if event.Type == EventTypeProcess {
+			group, _ := event.Data["group"].(int)
+			pgid.Store(int64(group))
+			if ctx.Err() != nil {
+				_ = proctree.KillGroup(group)
+			}
+		}
 		if mode != "exit" && event.Type == "log" {
 			stop()
 		}

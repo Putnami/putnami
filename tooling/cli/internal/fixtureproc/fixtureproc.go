@@ -264,12 +264,13 @@ func buildHelper() {
 	}
 }
 
-// Remove removes the helper program Write built, if any. Call it in TestMain
-// after m.Run.
+// Remove removes the helper program Write built and the CLI that CLI built, if
+// any. Call it in TestMain after m.Run.
 func Remove() {
 	if helper.dir != nil {
 		_ = helper.dir.Remove()
 	}
+	removeCLI()
 }
 
 // Binary places the running test binary at path, with ".exe" appended on

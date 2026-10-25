@@ -3,11 +3,12 @@ package compose
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -144,7 +145,11 @@ func TestPlanFor_RejectsLibraryImageUnknownAndCycle(t *testing.T) {
 	}
 }
 
-func TestPlan_BindServeJobsNamesTheMemberWithoutAServeStep(t *testing.T) {
+// Every member's serve run requests the one loaded command whose traits declare
+// the serve workload; a workspace that loads none is compose.no_serve_command,
+// naming the first member. Two extensions that declare the same command are one
+// command.
+func TestPlan_BindServeCommandsNamesTheCommandEveryMemberRequests(t *testing.T) {
 	provider := &workspace.Project{ID: "/provider", Name: "provider"}
 	consumer := &workspace.Project{ID: "/consumer", Name: "consumer", RunsWith: []string{"provider"}}
 	ws := planWorkspace(t, provider, consumer)
@@ -152,21 +157,24 @@ func TestPlan_BindServeJobsNamesTheMemberWithoutAServeStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanFor: %v", err)
 	}
-	err = plan.BindServeJobs([]*jobs.ScheduledJob{{Project: consumer}})
-	composeErr := composeError(t, err)
-	if composeErr.Code != CodeNoServeCommand || composeErr.Member != "/provider" {
-		t.Fatalf("error = %v, want compose.no_serve_command for /provider", err)
+	composeErr := composeError(t, plan.BindServeCommands(nil))
+	if composeErr.Code != CodeNoServeCommand || composeErr.Member != "/provider" || composeErr.Phase != PhasePlan {
+		t.Fatalf("error = %v, want compose.no_serve_command for /provider", composeErr)
 	}
-	if err := plan.BindServeJobs([]*jobs.ScheduledJob{{Project: consumer}, {Project: provider}}); err != nil {
-		t.Fatalf("BindServeJobs with both steps: %v", err)
+	if err := plan.BindServeCommands([]string{"serve", "serve"}); err != nil {
+		t.Fatalf("BindServeCommands with one command twice: %v", err)
+	}
+	for _, member := range plan.Members {
+		if member.ServeCommand != "serve" {
+			t.Errorf("%s requests %q, want serve", member.Project.ID, member.ServeCommand)
+		}
 	}
 }
 
-// A member that the serve steps of two commands serve, the first-party serve
-// and a daemon another extension declares with the serve workload, is refused:
-// compose starts one workload per member and does not pick one. Two steps of
-// one command are not refused.
-func TestPlan_BindServeJobsRefusesAMemberThatTwoCommandsServe(t *testing.T) {
+// A workspace whose extensions declare two commands with the serve workload, the
+// first-party serve and a daemon, is refused: compose starts one serve run per
+// member and does not pick one.
+func TestPlan_BindServeCommandsRefusesTwoServeWorkloadCommands(t *testing.T) {
 	spectest.Proves(t, "cli/workload-qualification", "runs-with-closure-served-behind-stable-proxies",
 		"an-unserveable-member-is-refused-before-anything-starts")
 	app := &workspace.Project{ID: "/app", Name: "app"}
@@ -174,17 +182,10 @@ func TestPlan_BindServeJobsRefusesAMemberThatTwoCommandsServe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanFor: %v", err)
 	}
-	step := func(name string) *jobs.ScheduledJob {
-		return &jobs.ScheduledJob{Project: app, JobDef: &extension.JobDefinition{Name: name}}
-	}
-	err = plan.BindServeJobs([]*jobs.ScheduledJob{step("serve~serve"), step("daemon")})
-	composeErr := composeError(t, err)
+	composeErr := composeError(t, plan.BindServeCommands([]string{"serve", "daemon"}))
 	if composeErr.Code != CodeAmbiguousServe || composeErr.Member != "/app" || composeErr.Phase != PhasePlan ||
 		!strings.Contains(composeErr.Message, "daemon, serve") {
-		t.Fatalf("error = %v, want compose.ambiguous_serve for /app naming daemon and serve", err)
-	}
-	if err := plan.BindServeJobs([]*jobs.ScheduledJob{step("serve~a"), step("serve~b")}); err != nil {
-		t.Fatalf("two steps of one command: %v", err)
+		t.Fatalf("error = %v, want compose.ambiguous_serve for /app naming daemon and serve", composeErr)
 	}
 }
 
@@ -227,43 +228,47 @@ func TestPlanFor_ReadsDatabasesAndProviderServiceIDs(t *testing.T) {
 	}
 }
 
-// A composition member runs the commands whose traits declare the serve
-// workload, whatever their name: Up plans exactly those for its members, a
-// disable entry turns off a member only when it names one of them, and a
+// A composition member runs the command whose traits declare the serve
+// workload, whatever its name: each member's serve run requests exactly that
+// command, a disable entry turns off a member only when it names it, and a
 // workspace whose loaded extensions declare none is compose.no_serve_command
-// before anything is prepared, even when a command is named serve.
-func TestUp_AMemberRunsTheServeWorkloadCommands(t *testing.T) {
+// before anything starts, even when a command is named serve.
+func TestUp_AMemberRunsTheServeWorkloadCommand(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-composition-member-is-a-serve-workload-step")
-	app := &workspace.Project{ID: "/app", Name: "app"}
-	library := &workspace.Project{ID: "/lib", Name: "lib", Type: "library"}
-	ws := planWorkspace(t, app, library)
-	stop := errors.New("stop after preparation")
-	upWith := func(target *workspace.Project, workloads map[string]string) (prepared []string, err error) {
-		_, err = up(context.Background(), Options{WorkspaceRoot: ws.Root, Config: &wsproto.Config{}, Target: target}, upDeps{
-			loadWorkspace: func(string) (*workspace.Workspace, error) { return ws, nil },
-			discover: func(*workspace.Workspace, *wsproto.Config) ([]*extension.ExtensionDescription, error) {
-				return serveWorkloadExtensions(workloads), nil
-			},
-			prepare: func(_ context.Context, _ Options, _, serveCommands []string) (*preparation, error) {
-				prepared = serveCommands
-				return nil, stop
-			},
-			reap: func(string) []ReapedLease { return nil },
-		})
-		return prepared, err
+	upWith := func(fixture *compositionFixture, target *workspace.Project, workloads map[string]string) (*Composition, error) {
+		deps := fixture.deps(nil)
+		deps.discover = func(*workspace.Workspace, *wsproto.Config) ([]*extension.ExtensionDescription, error) {
+			return serveWorkloadExtensions(workloads), nil
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+		defer cancel()
+		return up(ctx, Options{WorkspaceRoot: fixture.root, Config: &wsproto.Config{}, Target: target, ReadyTimeout: hangDetector}, deps)
 	}
 
-	prepared, err := upWith(app, map[string]string{"daemon": extension.WorkloadServe, "serve": "", "run": extension.WorkloadOnce})
-	if !errors.Is(err, stop) || !slices.Equal(prepared, []string{"daemon"}) {
-		t.Fatalf("prepared %v (%v), want the serve-workload daemon alone", prepared, err)
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app"})
+	comp, err := upWith(fixture, fixture.projects["/app"], map[string]string{"daemon": extension.WorkloadServe, "serve": "", "run": extension.WorkloadOnce})
+	if err != nil {
+		t.Fatalf("Up: %v", err)
 	}
-	prepared, err = upWith(app, map[string]string{"serve": "", "run": extension.WorkloadOnce})
-	if composeErr := composeError(t, err); composeErr.Code != CodeNoServeCommand || composeErr.Phase != PhasePlan || prepared != nil {
-		t.Fatalf("error = %v, prepared %v; want compose.no_serve_command before preparation", err, prepared)
+	comp.Close(context.Background())
+	if args := fixture.argv(t, "/app"); len(args) == 0 || args[0] != "daemon" {
+		t.Fatalf("the serve run requested %v, want the serve-workload daemon", args)
+	}
+
+	idle := newCompositionFixture(t, fixtureProject{id: "/app", name: "app"})
+	_, err = upWith(idle, idle.projects["/app"], map[string]string{"serve": "", "run": extension.WorkloadOnce})
+	if composeErr := composeError(t, err); composeErr.Code != CodeNoServeCommand || composeErr.Phase != PhasePlan {
+		t.Fatalf("error = %v, want compose.no_serve_command", err)
+	}
+	if _, err := os.Stat(filepath.Join(idle.root, "app", fakeCLIArgsFile)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a serve run started for a workspace without a serve-workload command")
 	}
 	// A member that cannot serve is named before the missing workload.
-	if _, err := upWith(library, nil); composeError(t, err).Code != CodeNotServeable {
+	library := &workspace.Project{ID: "/lib", Name: "lib", Type: "library"}
+	libraryFixture := newCompositionFixture(t)
+	libraryFixture.ws = planWorkspace(t, library)
+	if _, err := upWith(libraryFixture, library, nil); composeError(t, err).Code != CodeNotServeable {
 		t.Errorf("a library member without a serve workload: %v, want compose.not_serveable", err)
 	}
 

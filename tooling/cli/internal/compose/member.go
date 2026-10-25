@@ -1,9 +1,15 @@
 package compose
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,65 +19,108 @@ import (
 	modeljobs "go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
-	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
-	"go.putnami.dev/tooling/cli/internal/watch"
-	"go.putnami.dev/tooling/cli/internal/workspace"
+	"go.putnami.dev/sdk/extension/proctree"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
-// Process environment entries compose owns on a member's serve step.
+// A member runs as an ordinary serve run of the putnami CLI:
+//
+//	putnami <serve command> --projects <member> --port 0 [--no-watch] --serve-env - --output=jsonl
+//
+// Its environment document arrives on stdin and reaches only its serve step.
+// The run writes its session stream on stdout, which compose reads for the
+// serve step's process group, its readiness claims and its end, and renders its
+// serve log as text on stderr, which compose passes through to Options.Logs and
+// keeps the last lines of. The engine plans the serve pipeline and starts the
+// serve step; compose never does.
+
+// Variables compose sets in a member's environment document.
 const (
-	envPort              = "PORT=0"
-	envProductionNodeEnv = "NODE_ENV=production"
-	envAppEnv            = "APP_ENV"
-	envLocalAppEnv       = envAppEnv + "=local"
-	serveParamPort       = "port"
-	serveParamEphemeral  = 0
+	envPort           = "PORT"
+	envNodeEnv        = "NODE_ENV"
+	envAppEnv         = "APP_ENV"
+	ephemeralPort     = "0"
+	productionNodeEnv = "production"
+	localAppEnv       = "local"
 )
 
-// isServeReadyEvent reports whether a job event is a readiness claim. Copied
-// from internal/watch (serve_ready.go), where it is unexported: the type must be
-// `ready`, the envelope v2, and the payload a claim inside the closed target
-// vocabulary. Anything else fails closed — the member stays not ready.
-func isServeReadyEvent(event scheduler.RawJobEvent) bool {
-	if event.Type != scheduler.EventTypeReady || event.Version != runtimeproto.ProtocolVersion2 {
-		return false
-	}
-	data, err := runtimeproto.ExtractReadyData(event.Data)
-	if err != nil || data == nil {
-		return false
-	}
-	return data.Target == runtimeproto.ReadyTargetServer || data.Target == runtimeproto.ReadyTargetWorkload
+// serveRunWaitDelay bounds how long a member's serve run may keep its output
+// pipes open after it exited, through a process it left behind.
+const serveRunWaitDelay = 5 * time.Second
+
+// serveRunDisplay is how each member's serve run renders its serve log.
+type serveRunDisplay struct {
+	verbose bool
+	quiet   bool
+	noColor bool
 }
 
-// memberRuntime is a running member: its proxy, the environment its serve step
-// receives, and what it announced.
+// serveRunArgs is the argument vector of a member's serve run after the
+// executable. Only a watched target watches; every member binds an ephemeral
+// port and announces it.
+func serveRunArgs(command, projectID string, watch bool, display serveRunDisplay) []string {
+	args := []string{command, "--projects", projectID, "--port", ephemeralPort}
+	if !watch {
+		args = append(args, "--no-watch")
+	}
+	args = append(args, "--serve-env", "-", "--output=jsonl")
+	if display.verbose {
+		args = append(args, "--verbose")
+	}
+	if display.quiet {
+		args = append(args, "--quiet")
+	}
+	if display.noColor {
+		args = append(args, "--no-color")
+	}
+	return args
+}
+
+// memberRuntime is a running member: its proxy, its serve run, and what the
+// run's session stream said about it.
 type memberRuntime struct {
 	member   *Member
 	proxy    *proxy
-	env      []string
+	env      map[string]string
 	sections []string
 	watch    bool
 
-	ws             *workspace.Workspace
-	versions       cachekey.RunVersions
-	output         scheduler.Renderer
-	observeProcess func(pgid int)
-	// releaseProcess is told every group a serve step spawned once the step
-	// returned.
+	// executable, root and args start the serve run; logs receives its stderr.
+	executable string
+	root       string
+	args       []string
+	logs       io.Writer
+
+	// observeProcess is told every process group of the member — the serve
+	// run's own, then each serve step's the stream names — with its leader's
+	// start time. releaseProcess is told each group once its process ended.
+	observeProcess func(pgid int, leaderStart string)
 	releaseProcess func(pgid int)
 
-	startedAt time.Time
+	tree     *proctree.Tree
+	stopping atomic.Bool
+	// spawned closes on the serve step's first process event. The ready
+	// timeout and readyMs count from it: the finite steps the serve run runs
+	// before it are bounded by their own task timeouts, not by the ready
+	// timeout. Only the stream reader writes spawnedAt.
+	spawned   chan struct{}
+	spawnOnce sync.Once
+	spawnedAt time.Time
 	ready     chan struct{}
 	readyOnce sync.Once
 	readyMs   atomic.Int64
 	exited    chan struct{}
 	// stoppedBeforeReady closes when a serve step ends without ever having
-	// announced readiness. Under watch the loop outlives that iteration (it
+	// announced readiness. Under watch the serve run outlives that step (it
 	// waits for a change), so exited alone would let a failed start run into
 	// the ready timeout.
 	stoppedBeforeReady chan struct{}
 	stoppedOnce        sync.Once
+	// prepareFailed closes when the serve run failed before its serve step
+	// started: a finite step of the pipeline failed, or the run exited first,
+	// as on a usage error.
+	prepareFailed chan struct{}
+	prepareOnce   sync.Once
 	// startupCompleted closes on the first workload claim: the member's
 	// application reports that its whole startup finished, which a server claim
 	// (a listening port) does not. stoppedBeforeStartup is its counterpart of
@@ -81,124 +130,221 @@ type memberRuntime struct {
 	stoppedBeforeStartup chan struct{}
 	stoppedStartupOnce   sync.Once
 
-	mu        sync.Mutex
-	tail      tailLines
-	lastError string
+	mu sync.Mutex
+	// serveKey is the identity key of the serve step, learned from its process
+	// event; serveGroups are the groups of its current process.
+	serveKey    string
+	serveGroups []int
+	tail        tailLines
+	lastError   string
+	prepareErr  string
 }
 
-func newMemberRuntime(member *Member, p *proxy, env, sections []string, watchMode bool) *memberRuntime {
+func newMemberRuntime(member *Member, p *proxy, env map[string]string, sections []string, watchMode bool) *memberRuntime {
 	return &memberRuntime{
 		member:   member,
 		proxy:    p,
 		env:      env,
 		sections: sections,
 		watch:    watchMode,
+		spawned:  make(chan struct{}),
 		ready:    make(chan struct{}),
 		exited:   make(chan struct{}),
 
 		stoppedBeforeReady:   make(chan struct{}),
+		prepareFailed:        make(chan struct{}),
 		startupCompleted:     make(chan struct{}),
 		stoppedBeforeStartup: make(chan struct{}),
 	}
 }
 
-// serveParams are the job params of every serve step: port 0, so the workload
-// binds an ephemeral port and announces it. A fresh map per call, because the
-// job runner may project aliases into it.
-func serveParams() map[string]any { return map[string]any{serveParamPort: serveParamEphemeral} }
-
-// observe captures what a member's event stream says about it: its output
-// tail, and every typed readiness claim. A claim with an endpoint moves the
-// proxy to the announced port; a claim without one (a workload claim) leaves
-// the backend where an earlier claim put it, because it says nothing about
-// where the member listens. A workload claim also records that the member's
-// application completed its startup.
-func (rt *memberRuntime) observe(event scheduler.RawJobEvent) {
-	if event.Type == scheduler.EventTypeLog && event.Message != "" {
-		rt.mu.Lock()
-		rt.tail.add(event.Message)
-		rt.mu.Unlock()
+// start starts the member's serve run. Its process group is recorded before
+// anything else can happen to it; the run's end closes exited.
+func (rt *memberRuntime) start() error {
+	document, err := json.Marshal(rt.env)
+	if err != nil {
+		return fmt.Errorf("encode the environment document: %w", err)
 	}
-	if !isServeReadyEvent(event) {
+	// The serve run executes the workspace's jobs.
+	runcredential.MarkRepositoryCodeStarted("putnami " + strings.Join(rt.args, " "))
+	cmd := exec.Command(rt.executable, rt.args...)
+	cmd.Dir = rt.root
+	cmd.Stdin = bytes.NewReader(document)
+	output := newOutputSink(rt.logs, rt.addOutput)
+	stream := &lineWriter{line: func(line []byte) { rt.observeLine(line, output) }}
+	cmd.Stdout = stream
+	cmd.Stderr = output
+	cmd.WaitDelay = serveRunWaitDelay
+	tree := proctree.New(cmd)
+	if err := tree.Start(); err != nil {
+		return fmt.Errorf("start %s %s: %w", rt.executable, rt.args[0], err)
+	}
+	rt.tree = tree
+	group := tree.ID()
+	leaderStart, _ := proctree.StartTime(group)
+	rt.observeProcess(group, leaderStart)
+	go func() {
+		err := cmd.Wait()
+		stream.flush()
+		output.flush()
+		rt.serveRunEnded(err)
+		_ = tree.Close()
+		rt.releaseProcess(group)
+		close(rt.exited)
+	}()
+	return nil
+}
+
+// observeLine reads one line of the serve run's stdout. A line that is not a
+// session stream record joins the output.
+func (rt *memberRuntime) observeLine(line []byte, output *outputSink) {
+	var record protocolcli.SessionStreamRecord
+	if json.Unmarshal(line, &record) != nil || record.Record == "" {
+		_, _ = output.Write(append(append([]byte(nil), line...), '\n'))
 		return
 	}
-	target, port := watch.ReadyClaim(event)
-	if port > 0 {
+	key := ""
+	if record.Identity != nil {
+		key = record.Identity.Key
+	}
+	switch record.Record {
+	case protocolcli.RecordTaskEvent:
+		rt.observeEvent(key, record.Event)
+	case protocolcli.RecordTaskEnd:
+		if record.Task != nil {
+			rt.observeTaskEnd(key, record.Task)
+		}
+	}
+}
+
+// observeEvent reads a task event. The CLI's process event names the serve
+// step and its process group, before any event the step emits; a readiness
+// claim counts only from that step.
+func (rt *memberRuntime) observeEvent(key string, event map[string]any) {
+	switch event["type"] {
+	case modeljobs.EventTypeProcess:
+		group, _ := event["group"].(float64)
+		leaderStart, _ := event["leaderStart"].(string)
+		if group <= 0 || key == "" {
+			return
+		}
+		rt.mu.Lock()
+		rt.serveKey = key
+		rt.serveGroups = append(rt.serveGroups, int(group))
+		rt.mu.Unlock()
+		rt.observeProcess(int(group), leaderStart)
+		rt.spawnOnce.Do(func() {
+			rt.spawnedAt = time.Now()
+			close(rt.spawned)
+		})
+	case modeljobs.EventTypeReady:
+		rt.mu.Lock()
+		serve := key != "" && key == rt.serveKey
+		rt.mu.Unlock()
+		if !serve {
+			return
+		}
+		if claim, err := runtimeproto.ExtractReadyData(event); err == nil && claim != nil {
+			rt.observeClaim(claim)
+		}
+	}
+}
+
+// observeClaim records a typed readiness claim. A claim with an endpoint moves
+// the proxy to the announced port; a claim without one (a workload claim)
+// leaves the backend where an earlier claim put it, because it says nothing
+// about where the member listens. A workload claim also records that the
+// member's application completed its startup. A claim outside the closed
+// target vocabulary is ignored: the member stays not ready.
+func (rt *memberRuntime) observeClaim(claim *runtimeproto.ReadyData) {
+	if claim.Target != runtimeproto.ReadyTargetServer && claim.Target != runtimeproto.ReadyTargetWorkload {
+		return
+	}
+	if port := claimedPort(claim); port > 0 {
 		rt.proxy.setBackend(port)
 	}
 	rt.readyOnce.Do(func() {
-		rt.readyMs.Store(time.Since(rt.startedAt).Milliseconds())
+		rt.readyMs.Store(time.Since(rt.spawnedAt).Milliseconds())
 		close(rt.ready)
 	})
-	if target == runtimeproto.ReadyTargetWorkload {
+	if claim.Target == runtimeproto.ReadyTargetWorkload {
 		rt.startupOnce.Do(func() { close(rt.startupCompleted) })
 	}
 }
 
-// runOnce executes the member's serve step once and returns its result. The
-// proxy answers 503 again as soon as the process is gone.
-func (rt *memberRuntime) runOnce(ctx context.Context, sink scheduler.Renderer) (*scheduler.JobResult, error) {
-	job := rt.member.ServeJob
-	if sink != nil {
-		sink.JobStart(job)
-	}
-	// The workspace's command defaults, exactly as the scheduler resolves them
-	// for a planned serve step (up guarantees the configuration is loaded).
-	var spawnedMu sync.Mutex
-	var spawned []int
-	observe := func(pgid int) {
-		spawnedMu.Lock()
-		spawned = append(spawned, pgid)
-		spawnedMu.Unlock()
-		if rt.observeProcess != nil {
-			rt.observeProcess(pgid)
+// claimedPort is the port a claim announces: its first http(s) endpoint's,
+// else its first endpoint's, else 0.
+func claimedPort(claim *runtimeproto.ReadyData) int {
+	for _, endpoint := range claim.Endpoints {
+		if endpoint.Scheme == runtimeproto.ReadySchemeHTTP || endpoint.Scheme == runtimeproto.ReadySchemeHTTPS {
+			return endpoint.Port
 		}
 	}
-	result, err := scheduler.RunJobWithProcessEnv(
-		scheduler.WithProcessGroupObserver(ctx, observe),
-		rt.ws, job, serveParams(), rt.ws.Config.GetCommandDefaults(modeljobs.JobCommandName(job), job.Extension.Name),
-		rt.versions, rt.env,
-		func(event scheduler.RawJobEvent) {
-			rt.observe(event)
-			if sink != nil {
-				sink.JobEvent(job, event)
-			}
-		},
-	)
+	if len(claim.Endpoints) > 0 {
+		return claim.Endpoints[0].Port
+	}
+	return 0
+}
+
+// observeTaskEnd reads a task's end. The serve step's end empties the proxy's
+// backend and releases its process group; a finite step that fails before any
+// serve step started fails the preparation.
+func (rt *memberRuntime) observeTaskEnd(key string, task *protocolcli.TaskRecord) {
+	status := task.Status
+	if task.ExitCode != 0 {
+		status += ", exit code " + strconv.Itoa(task.ExitCode)
+	}
+	rt.mu.Lock()
+	serve := key != "" && key == rt.serveKey
+	spawned := rt.serveKey != ""
+	var groups []int
+	if serve {
+		groups, rt.serveGroups = rt.serveGroups, nil
+		rt.lastError = status
+	}
+	rt.mu.Unlock()
+	if serve {
+		rt.proxy.setBackend(0)
+		for _, group := range groups {
+			rt.releaseProcess(group)
+		}
+		rt.stepStopped()
+		return
+	}
+	if task.Status == protocolcli.TaskStatusFailed && !spawned && !rt.isReady() {
+		rt.failPreparation("the serve run's step " + key + " failed before the serve step started (" + status + ")")
+	}
+}
+
+// serveRunEnded records how the serve run ended. A run that never started a
+// serve step failed its preparation; one that ended without the serve step's
+// end record keeps its own exit status.
+func (rt *memberRuntime) serveRunEnded(err error) {
 	rt.proxy.setBackend(0)
-	spawnedMu.Lock()
-	returned := append([]int(nil), spawned...)
-	spawnedMu.Unlock()
-	if rt.releaseProcess != nil {
-		for _, pgid := range returned {
-			rt.releaseProcess(pgid)
-		}
+	code := 0
+	var exitErr *exec.ExitError
+	switch {
+	case errors.As(err, &exitErr):
+		code = exitErr.ExitCode()
+	case err != nil:
+		code = -1
 	}
-	if err != nil {
-		rt.recordExit(err.Error())
-	} else {
-		if sink != nil {
-			sink.JobComplete(job, result)
-		}
-		// The status says how the step ended. The job's error text is the
-		// workload's own stderr, so it joins the output tail, never the message.
-		status := result.Status
-		if result.ExitCode != 0 {
-			status += ", exit code " + strconv.Itoa(result.ExitCode)
-		}
-		rt.recordExit(status)
-		if result.Error != nil && result.Error.Message != "" {
-			rt.mu.Lock()
-			for _, line := range strings.Split(result.Error.Message, "\n") {
-				rt.tail.add(line)
-			}
-			rt.mu.Unlock()
-		}
+	rt.mu.Lock()
+	spawned := rt.serveKey != ""
+	if rt.lastError == "" {
+		rt.lastError = "serve run ended, exit code " + strconv.Itoa(code)
 	}
-	// Signaled after the exit is recorded, so a waiter reads the status.
-	select {
-	case <-rt.ready:
-	default:
+	rt.mu.Unlock()
+	if !spawned && !rt.stopping.Load() {
+		rt.failPreparation("the serve run exited before the serve step started (exit code " + strconv.Itoa(code) + ")")
+	}
+	rt.stepStopped()
+}
+
+// stepStopped signals the waiters of a claim that did not arrive, after the
+// exit was recorded, so a waiter reads the status.
+func (rt *memberRuntime) stepStopped() {
+	if !rt.isReady() {
 		rt.stoppedOnce.Do(func() { close(rt.stoppedBeforeReady) })
 	}
 	select {
@@ -206,13 +352,31 @@ func (rt *memberRuntime) runOnce(ctx context.Context, sink scheduler.Renderer) (
 	default:
 		rt.stoppedStartupOnce.Do(func() { close(rt.stoppedBeforeStartup) })
 	}
-	return result, err
 }
 
-func (rt *memberRuntime) recordExit(message string) {
+func (rt *memberRuntime) isReady() bool {
+	select {
+	case <-rt.ready:
+		return true
+	default:
+		return false
+	}
+}
+
+func (rt *memberRuntime) failPreparation(message string) {
+	rt.mu.Lock()
+	if rt.prepareErr == "" {
+		rt.prepareErr = message
+	}
+	rt.mu.Unlock()
+	rt.prepareOnce.Do(func() { close(rt.prepareFailed) })
+}
+
+// addOutput keeps a line of the serve run's output for a failure's detail.
+func (rt *memberRuntime) addOutput(line []byte) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	rt.lastError = message
+	rt.tail.add(stripANSI(string(line)))
 }
 
 func (rt *memberRuntime) exitDetail() (string, []string) {
@@ -221,57 +385,62 @@ func (rt *memberRuntime) exitDetail() (string, []string) {
 	return rt.lastError, rt.tail.snapshot()
 }
 
-// start runs the member until ctx is canceled: once for a dependency or a
-// target without watch, under the watch loop for a watched target.
-func (rt *memberRuntime) start(ctx context.Context) {
-	rt.startedAt = time.Now()
-	if !rt.watch {
-		go func() {
-			defer close(rt.exited)
-			_, _ = rt.runOnce(ctx, rt.output)
-		}()
-		return
+// stop ends the member's serve run: SIGTERM to its process group, which the
+// CLI answers as an interrupted `putnami serve` does — it stops its serve step
+// and exits — then SIGKILL once memberStopTimeout passed. It names a run that
+// is still running after that.
+func (rt *memberRuntime) stop(ctx context.Context) string {
+	if rt.tree == nil {
+		return ""
 	}
-	target := rt.member.Project
-	session := watch.NewSession(watch.SessionConfig{
-		Workspace:        rt.ws,
-		SelectedProjects: []*workspace.Project{target},
-		CommandParams:    serveParams(),
-		ServeMode:        true,
-		Renderer:         rt.output,
-		RunIteration: func(ctx context.Context, _ []*workspace.Project, sink scheduler.Renderer) watch.IterationResult {
-			result, err := rt.runOnce(ctx, sink)
-			switch {
-			case err != nil:
-				return watch.IterationResult{ExitCode: protocolcli.ExitFailure}
-			case result.Status == "canceled":
-				return watch.IterationResult{Aborted: true}
-			case result.Status == "success":
-				return watch.IterationResult{ExitCode: protocolcli.ExitSuccess}
-			default:
-				return watch.IterationResult{ExitCode: protocolcli.ExitFailure}
-			}
-		},
-	})
-	go func() {
-		defer close(rt.exited)
-		session.Run(ctx)
-	}()
+	rt.stopping.Store(true)
+	select {
+	case <-rt.exited:
+		return ""
+	default:
+	}
+	_ = rt.tree.Terminate()
+	timer := time.NewTimer(memberStopTimeout)
+	defer timer.Stop()
+	select {
+	case <-rt.exited:
+		return ""
+	case <-timer.C:
+	case <-ctx.Done():
+	}
+	_ = rt.tree.Kill()
+	select {
+	case <-rt.exited:
+		return ""
+	case <-time.After(serveRunWaitDelay + groupReleaseWait):
+	}
+	return "serve run of " + rt.member.Project.ID + " did not stop within " + memberStopTimeout.String()
 }
 
-// waitReady blocks until the member announced readiness, exited, or timeout
-// elapsed.
+// waitReady blocks until the member announced readiness, its serve run failed
+// or ended, or timeout elapsed after its serve step started.
 func (rt *memberRuntime) waitReady(ctx context.Context, timeout time.Duration) error {
+	id := rt.member.Project.ID
+	select {
+	case <-rt.spawned:
+	case <-rt.prepareFailed:
+		return rt.notReady(id)
+	case <-rt.exited:
+		return rt.notReady(id)
+	case <-ctx.Done():
+		return canceledBeforeReady(id, ctx.Err())
+	}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	id := rt.member.Project.ID
 	select {
 	case <-rt.ready:
 		return nil
+	case <-rt.prepareFailed:
+		return rt.notReady(id)
 	case <-rt.stoppedBeforeReady:
-		return rt.exitedBeforeReady(id)
+		return rt.notReady(id)
 	case <-rt.exited:
-		return rt.exitedBeforeReady(id)
+		return rt.notReady(id)
 	case <-timer.C:
 		_, tail := rt.exitDetail()
 		err := newError(CodeReadyTimeout, id, PhaseReadiness,
@@ -279,13 +448,31 @@ func (rt *memberRuntime) waitReady(ctx context.Context, timeout time.Duration) e
 		err.Detail = tail
 		return err
 	case <-ctx.Done():
-		return newError(CodeStartFailed, id, PhaseReadiness, "canceled while waiting for the ready event: "+ctx.Err().Error())
+		return canceledBeforeReady(id, ctx.Err())
 	}
 }
 
-// exitedBeforeReady is the failure of a serve step that ended without a ready
-// event, with its exit status and the tail of its output.
-func (rt *memberRuntime) exitedBeforeReady(id string) error {
+// canceledBeforeReady is the failure of a start canceled before the member's
+// ready event.
+func canceledBeforeReady(id string, cause error) error {
+	return newError(CodeStartFailed, id, PhaseReadiness, "canceled while waiting for the ready event: "+cause.Error())
+}
+
+// notReady is the failure of a member whose serve run stopped short of its
+// ready event: a failed preparation when the serve step never started, the
+// serve step's exit otherwise.
+func (rt *memberRuntime) notReady(id string) error {
+	select {
+	case <-rt.prepareFailed:
+		rt.mu.Lock()
+		message := rt.prepareErr
+		tail := rt.tail.snapshot()
+		rt.mu.Unlock()
+		err := newError(CodePrepareFailed, id, PhasePrepare, message)
+		err.Detail = tail
+		return err
+	default:
+	}
 	return rt.exitedBefore(id, "its ready event")
 }
 
@@ -326,25 +513,26 @@ func (rt *memberRuntime) waitStartup(ctx context.Context) error {
 	return rt.exitedBefore(rt.member.Project.ID, "its application reported completed startup")
 }
 
-// memberEnv is the process environment of a member's serve step: an
-// ephemeral port, production mode for a dependency and for an unwatched
-// target, and the CONFIG_DATA document when there is one.
+// memberEnv is a member's environment document, the variables its serve step
+// alone receives: an ephemeral port, production mode for a dependency and for
+// an unwatched target, and the CONFIG_DATA document when there is one.
 //
 // Production mode selects the build, not the configuration: a composition runs
 // on this machine, so a production member still reads its local config files
 // (conf/.env.local.yaml, conf/.secrets.local.yaml), as a watched one does.
 // APP_ENV names that config environment; a TypeScript runtime would otherwise
-// derive it from NODE_ENV. An APP_ENV the caller exported is kept.
-func memberEnv(production bool, document []byte) []string {
-	env := []string{envPort}
+// derive it from NODE_ENV. An APP_ENV the caller exported is kept: the serve
+// run inherits it.
+func memberEnv(production bool, document []byte) map[string]string {
+	env := map[string]string{envPort: ephemeralPort}
 	if production {
-		env = append(env, envProductionNodeEnv)
+		env[envNodeEnv] = productionNodeEnv
 		if os.Getenv(envAppEnv) == "" {
-			env = append(env, envLocalAppEnv)
+			env[envAppEnv] = localAppEnv
 		}
 	}
 	if len(document) > 0 {
-		env = append(env, ConfigDataEnv+"="+string(document))
+		env[ConfigDataEnv] = string(document)
 	}
 	return env
 }
@@ -353,3 +541,69 @@ func memberEnv(production bool, document []byte) []string {
 func describeProcessGroup(member string, pgid int) string {
 	return fmt.Sprintf("process group %s of %s", strconv.Itoa(pgid), member)
 }
+
+// lineWriter hands every complete line written to it, without its newline, to
+// line; flush hands it an unterminated last one.
+type lineWriter struct {
+	mu   sync.Mutex
+	buf  []byte
+	line func([]byte)
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf = append(w.buf, p...)
+	for {
+		i := bytes.IndexByte(w.buf, '\n')
+		if i < 0 {
+			break
+		}
+		w.line(bytes.TrimSuffix(w.buf[:i], []byte("\r")))
+		w.buf = w.buf[i+1:]
+	}
+	return len(p), nil
+}
+
+func (w *lineWriter) flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.buf) > 0 {
+		w.line(w.buf)
+		w.buf = nil
+	}
+}
+
+// outputSink is a serve run's text output: passed through to logs as it
+// arrives, and split into lines for the failure detail. A write never fails, so
+// a closed log stream cannot stall the run on a full pipe.
+type outputSink struct {
+	mu    sync.Mutex
+	logs  io.Writer
+	lines *lineWriter
+}
+
+func newOutputSink(logs io.Writer, line func([]byte)) *outputSink {
+	return &outputSink{logs: logs, lines: &lineWriter{line: line}}
+}
+
+func (s *outputSink) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.logs != nil {
+		_, _ = s.logs.Write(p)
+	}
+	return s.lines.Write(p)
+}
+
+func (s *outputSink) flush() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lines.flush()
+}
+
+// ansiEscape matches the terminal control sequences a text renderer colors its
+// output with.
+var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;?]*[A-Za-z]")
+
+func stripANSI(line string) string { return ansiEscape.ReplaceAllString(line, "") }

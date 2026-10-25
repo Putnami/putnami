@@ -361,14 +361,24 @@ const (
 // or a non-empty group holds it; a leader alive with the recorded start time is
 // therefore the recorded process, leading the recorded group.
 func identifyGroup(pgid int, leaderStart string) groupIdentity {
-	if !processGroupAlive(pgid) {
+	return identifyGroupBy(pgid, leaderStart, processGroupAlive, proctree.StartTime)
+}
+
+// identifyGroupBy is identifyGroup over its two reads, the group's liveness
+// and its leader's start time. A leader without a start time has exited. Its
+// group is unverified only if the group still runs after that read: a leader
+// that exits alone between the two reads leaves no group to signal.
+func identifyGroupBy(pgid int, leaderStart string, alive func(int) bool, startTime func(int) (string, bool)) groupIdentity {
+	if !alive(pgid) {
 		return groupGone
 	}
 	if leaderStart == "" {
 		return groupUnverified
 	}
-	start, ok := proctree.StartTime(pgid)
+	start, ok := startTime(pgid)
 	switch {
+	case !ok && !alive(pgid):
+		return groupGone
 	case !ok:
 		return groupUnverified
 	case start != leaderStart:

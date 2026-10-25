@@ -301,7 +301,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        258,
+		want:        256,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -430,14 +430,18 @@ var structuralPins = []structuralPin{
 			"A later change raises 255→256 for jobs.keyInputs, and the line is the ONE payload this pin already names as untypable on one more hop of the path it already travels: the key-movement analysis hands the command params map to keyFilePatterns, exactly as the cache key, the mutation detector and the portable admission do, so the region it bounds is the region the key hashes. Nothing decodes, stores or forwards a new untyped document. " +
 			"A later change takes the count from 255 back to 256, under this ceiling, for jobs.RawJobEvent.RecordPayload: its signature and the one copy it makes to fold an event's type, level and message into the task:event payload, which already was this untyped map. It deletes the inline fold's own make in retainedJobEvents.add. " +
 			"A later change raises 256→257, net of the deleted Go steps of create and deps: lifecycle.setUpProject and lifecycle.runDepsEdit hand the project-setup and deps-edit jobs of an extension their params in the existing untyped params bag of WorkspaceJobRequest, two lines for the project-setup params and the deps-edit params, which the job context carries as every job's params. Each deps-edit entry is a typed struct. " +
-			"A later change raises 257→258 for jobs/scheduler/runner.go announceProcessGroup (cli/supervised-serve-run): the runner states a serve-workload step's process group and its leader's start time in the existing untyped RawJobEvent.Data payload every task event already carries, which the machine renderer copies into the task:event record. Nothing decodes it",
+			"A later change raises 257→258 for jobs/scheduler/runner.go announceProcessGroup (cli/supervised-serve-run): the runner states a serve-workload step's process group and its leader's start time in the existing untyped RawJobEvent.Data payload every task event already carries, which the machine renderer copies into the task:event record. Nothing decodes it. " +
+			"A later change lowers 258→256 (cli/workload-qualification): compose requests each member as a serve run " +
+			"of the CLI, which deletes scheduler.RunJobWithProcessEnv's two lines and compose's serveParams; its one new " +
+			"line is compose's memberRuntime.observeEvent, which reads a task:event record's Event, the payload " +
+			"protocols/cli types as an untyped map, and hands a readiness claim on as a typed runtimeproto.ReadyData",
 	},
 	{
 		name:        "test lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       testFiles,
 		ceilingOnly: true,
-		want:        657,
+		want:        660,
 		why: "test fixtures built from untyped maps; they shrink as the canonical model lands. " +
 			"A0 pinned 516; A2b's scheduler and profiler tests now assert against typed records. " +
 			"An earlier change took it from 513 to 515: the two auto-selection tests that used to call " +
@@ -590,14 +594,21 @@ var structuralPins = []structuralPin{
 			"literal, which RunPlan and cachekey.ComputeJobCacheHash both take as the existing untyped " +
 			"bag, so the test can prove the supervisor's environment moves no cache key. The rewritten " +
 			"ephemeral-port watch test states its two CommandParams literals in place of the two it " +
-			"replaces; production adds the one line itemized on the production pin above",
+			"replaces; production adds the one line itemized on the production pin above. " +
+			"A later change raises 657→660 (cli/workload-qualification): it deletes the one RunJobWithProcessEnv call " +
+			"line of jobs/scheduler/runner_process_env_test.go and adds FOUR lines in compose/fakecli_test.go, the " +
+			"fake CLI that stands in for a member's serve run. A task:event record carries its Event as the untyped " +
+			"map protocols/cli types, so the fake states the serve step's process event, decodes the fixture " +
+			"workload's runtime event, folds that event's data members beside its type, and writes the record " +
+			"through one helper that takes the map. The --no-watch fixture line moves with its test from " +
+			"engine/serve_withhold_test.go to engine/watch_test.go; production lowers by two, itemized above",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        915,
+		want:        916,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -659,7 +670,9 @@ var structuralPins = []structuralPin{
 			"A later change raises 911→912 for the ONE --no-watch serve fixture line itemized on the test pin above. " +
 			"A later change lowers 912→911 for the fxObj line the test pin above names; production adds none. " +
 			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added. " +
-			"A later change raises 912→915 = 258 production + 657 test for the serve step's process event and the two serve-env fixture lines itemized on the two scoped pins above",
+			"A later change raises 912→915 = 258 production + 657 test for the serve step's process event and the two serve-env fixture lines itemized on the two scoped pins above. " +
+			"A later change raises 915→916 = 256 production + 660 test (cli/workload-qualification): the production " +
+			"lowering and the four fake-CLI test lines itemized on the two scoped pins above",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

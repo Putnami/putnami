@@ -88,6 +88,18 @@ func (e *Engine) runWatch(
 	return SessionResult{ExitCode: code}
 }
 
+// forcesServeWatch reports whether a run is promoted to watch mode.
+// Serve-workload commands watch by default, except an iteration of an outer
+// watch loop, which already owns the replan policy, and a run that turned the
+// command's own `watch` flag off with --no-watch: restarting it on changes
+// would overrule that flag.
+func forcesServeWatch(req *Request, isServeMode bool) bool {
+	if watch, set := req.CommandParams["watch"].(bool); set && !watch {
+		return false
+	}
+	return isServeMode && !req.Global.Watch && !req.watchIteration
+}
+
 // watchIterationRequest builds the Request for ONE replan iteration.
 //
 // It is the whole watch→engine mapping, in one place, so "what a watch iteration

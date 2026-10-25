@@ -26,6 +26,7 @@ import (
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/compose"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -62,6 +63,9 @@ func TestMain(m *testing.M) {
 	if os.Getenv(localFixtureEnv) != "" {
 		os.Exit(runLocalFixtureWorkload())
 	}
+	// A local target starts each member as a serve run of the CLI, with this
+	// process's environment.
+	fixtureproc.IsolateCLIEnv()
 	// scratch.New, not os.MkdirTemp: a killed binary cannot run the removal
 	// below, and the next run reclaims what it left.
 	dir, err := scratch.New("putnami-qualify-test-")
@@ -70,6 +74,7 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(dir.Path(), "artifacts"))
 	}
 	code := m.Run()
+	fixtureproc.Remove()
 	_ = dir.Remove()
 	os.Exit(code)
 }
@@ -321,6 +326,10 @@ func newLocalFixture(t *testing.T, members ...localMember) *localFixture {
     "serve": {
       "description": "Serve the qualify fixture workload.",
       "traits": {"workload": "serve"},
+      "flags": {
+        "port": {"type": "number", "default": 3000},
+        "watch": {"type": "boolean", "default": true}
+      },
       "run": [{"id": "serve", "task": "serve-run"}]
     }
   },
@@ -392,7 +401,12 @@ func (f *localFixture) project(t *testing.T, name string) *workspace.Project {
 
 func (f *localFixture) target(t *testing.T, name string, readyTimeout time.Duration) Target {
 	t.Helper()
-	target, err := NewLocalTarget(LocalOptions{WorkspaceRoot: f.root, Project: f.project(t, name), ReadyTimeout: readyTimeout})
+	target, err := NewLocalTarget(LocalOptions{
+		WorkspaceRoot: f.root,
+		Project:       f.project(t, name),
+		ReadyTimeout:  readyTimeout,
+		Executable:    fixtureproc.CLI(t),
+	})
 	if err != nil {
 		t.Fatalf("NewLocalTarget: %v", err)
 	}
