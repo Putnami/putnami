@@ -140,10 +140,16 @@ func newMCPServerWithContext(ctx context.Context, wsRoot, version string) *mcp.S
 		WorkspaceMap: func(_ context.Context, section, sel string) (any, error) {
 			return agentctx.BuildWorkspaceMapResult(wsRoot, section, sel, fragments)
 		},
-		// The guidance resource renders the block body on each read, from the
-		// same function `context generate` writes it with.
+		// The guidance resource renders the block body and the settled
+		// decisions on each read, from the same functions `context generate`
+		// and the instructions use.
 		WorkspaceGuidance: func(context.Context) string {
 			return agentctx.WorkspaceGuidanceBody(wsRoot)
+		},
+		// The initialize instructions list as many settled root decisions as
+		// fit the client's limit, which the generated block only names.
+		SettledDecisionLines: func() []string {
+			return agentctx.SettledDecisionLines(wsRoot)
 		},
 		// The selection an EXTENSION-contributed tool receives on its request.
 		// It is the same resolver, through the same seam, for the

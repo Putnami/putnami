@@ -71,7 +71,7 @@ func (s *Server) resourceDefs() []Resource {
 		resources = append(resources, Resource{
 			URI:         workspaceGuidanceURI,
 			Name:        "Putnami workspace guidance",
-			Description: "The Putnami guidance block of AGENTS.md as `putnami context generate` renders it now: the rules, the gate line, and the settled decisions.",
+			Description: "The Putnami guidance block of AGENTS.md as `putnami context generate` renders it now (the rules, the gate line, and the line that names the decisions.json files), then the settled decisions.",
 			MimeType:    "text/markdown",
 		})
 	}

@@ -502,7 +502,8 @@
               "initialize-is-self-contained-and-carries-exact-locked-guidance",
               "versioned-resources-serve-exact-bytes-or-an-explicit-offline-status",
               "the-cli-and-mcp-consume-the-same-lock-faithful-ai-bytes",
-              "initialize-instructions-are-bounded-across-every-extension"
+              "initialize-instructions-are-bounded-across-every-extension",
+              "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides"
             ]
           }
         },
@@ -582,6 +583,35 @@
               "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again",
               "nothing-is-written-after-the-session-ends",
               "an-edit-while-the-server-starts-is-loaded"
+            ]
+          }
+        },
+        {
+          "id": "settled-decisions-guidance",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-block-names-the-decision-files-and-lists-no-decision",
+              "the-decision-list-renders-every-root-decision-in-canonical-order",
+              "the-guidance-resource-holds-the-block-body-then-the-decisions"
+            ]
+          }
+        },
+        {
+          "id": "instructions-decision-budget",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-oversized-registry-renders-whole-leading-lines-and-an-omission-line",
+              "the-instruction-lines-are-compact-and-in-canonical-order"
             ]
           }
         },

@@ -68,10 +68,12 @@ const (
 	DecisionsSettledLayout = "2006-01-02"
 
 	// decisionsMaxEntries bounds one committed registry. A registry is rendered
-	// whole wherever an agent reads it — the workspace guidance for the root
-	// one, the project context for a project one — so the bound is what keeps
-	// that text finite rather than a truncation rule that would silently hide a
-	// settled decision, the one failure this whole file exists to stop.
+	// whole in the documents an agent reads — the workspace guidance for the
+	// root one, the project context for a project one — so the bound is what
+	// keeps that text finite rather than a truncation rule that would silently
+	// hide a settled decision, the one failure this whole file exists to stop.
+	// A shorter listing, such as an MCP server's instructions, counts what it
+	// leaves out and names where the whole registry is.
 	decisionsMaxEntries = 256
 	// decisionsMaxCheckFiles bounds one check's glob set.
 	decisionsMaxCheckFiles = 32

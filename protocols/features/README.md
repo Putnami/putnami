@@ -588,10 +588,13 @@ a `settled` date that is not `YYYY-MM-DD`, an unknown `kind`, `rule` or
 convention all produce `features.invalid_decision_registry`. An **absent**
 `decisions.json` is adoption, never a failure. The `@putnami/sdd` extension
 proves every registry as the `decisions-validate` step of `validate-workspace`.
-`putnami context generate` renders every root entry into the workspace's
-`AGENTS.md` guidance block and names each project registry there; the
-`putnami.context` MCP tool returns a project's own decisions with that
-project.
+`putnami context generate` names the `decisions.json` files in one line of the
+workspace's `AGENTS.md` guidance block and lists no decision. The MCP server
+lists every root entry, with its date and enforcement, in the
+`putnami://workspace/guidance` resource, and names each project registry there.
+Its `initialize` instructions list as many root entries as fit the client's
+limit, as id and statement. The `putnami.context` MCP tool returns a project's
+own decisions with that project.
 
 The reasoning is recorded in
 [`tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md`](../../tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md).

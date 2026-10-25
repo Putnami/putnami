@@ -903,6 +903,14 @@ extensions the workspace declares by path and opts into, and nothing else. It
 never writes `.mcp.json`: `init`, `install` and `upgrade` register the MCP
 server, and `putnami mcp install` repairs the registration. See [`mcp`](#mcp).
 
+The block holds the rules and the gate line. It names the `decisions.json` files
+in one line and lists no decision. The line appears with a registry's first
+decision and goes with its last, and those two changes regenerate the block; any
+other decision change leaves both files as they were. The MCP server lists the
+root decisions in full in the `putnami://workspace/guidance` resource, and as id
+and statement, as many as fit Claude Code's 4,096-character limit, in its
+`initialize` instructions.
+
 #### `context pack`
 
 `context pack` builds one deterministic agent-context document per project in
@@ -1214,7 +1222,8 @@ a few KB instead of the full map. It also exposes
 read-only resource for live workspace graph/layout/channel/version context plus
 dependency-first topological project order. Three more resource families render
 on every read with the builders the tools and `context generate` use:
-`putnami://workspace/guidance` (the Putnami block body of `AGENTS.md`),
+`putnami://workspace/guidance` (the Putnami block body of `AGENTS.md`, then the
+settled decisions),
 `putnami://workspace/map` and `putnami://workspace/map/<section>` (the
 `workspace_map` answer), and `putnami://projects/<id>/context` (the
 `agent_context` answer, with the project id escaped as one path segment, for
