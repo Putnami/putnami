@@ -1,6 +1,6 @@
 //go:build windows
 
-package compose
+package proctree
 
 import (
 	"math"
@@ -9,12 +9,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// processStartTime returns the creation time of process pid, in 100-nanosecond
+// StartTime returns the creation time of process pid, in 100-nanosecond
 // intervals since 1601 (GetProcessTimes). The value is fixed for the life of
 // the process, so two reads of the same process agree and a process that
 // reuses the pid reads differently. ok is false when the process is gone or
 // cannot be read.
-func processStartTime(pid int) (string, bool) {
+func StartTime(pid int) (string, bool) {
 	if pid <= 0 || uint64(pid) > math.MaxUint32 {
 		return "", false
 	}

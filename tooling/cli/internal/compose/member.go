@@ -44,25 +44,6 @@ func isServeReadyEvent(event scheduler.RawJobEvent) bool {
 	return data.Target == runtimeproto.ReadyTargetServer || data.Target == runtimeproto.ReadyTargetWorkload
 }
 
-// readyClaim is the target of a readiness claim and the port the proxy should
-// forward to: the first http or https endpoint, because the proxy speaks HTTP,
-// else the first endpoint, else 0 for a claim that carries none.
-func readyClaim(event scheduler.RawJobEvent) (target string, port int) {
-	data, err := runtimeproto.ExtractReadyData(event.Data)
-	if err != nil || data == nil {
-		return "", 0
-	}
-	if len(data.Endpoints) == 0 {
-		return data.Target, 0
-	}
-	for _, endpoint := range data.Endpoints {
-		if endpoint.Scheme == runtimeproto.ReadySchemeHTTP || endpoint.Scheme == runtimeproto.ReadySchemeHTTPS {
-			return data.Target, endpoint.Port
-		}
-	}
-	return data.Target, data.Endpoints[0].Port
-}
-
 // memberRuntime is a running member: its proxy, the environment its serve step
 // receives, and what it announced.
 type memberRuntime struct {
@@ -84,7 +65,6 @@ type memberRuntime struct {
 	ready     chan struct{}
 	readyOnce sync.Once
 	readyMs   atomic.Int64
-	lastPort  atomic.Int64
 	exited    chan struct{}
 	// stoppedBeforeReady closes when a serve step ends without ever having
 	// announced readiness. Under watch the loop outlives that iteration (it
@@ -142,10 +122,9 @@ func (rt *memberRuntime) observe(event scheduler.RawJobEvent) {
 	if !isServeReadyEvent(event) {
 		return
 	}
-	target, port := readyClaim(event)
+	target, port := watch.ReadyClaim(event)
 	if port > 0 {
 		rt.proxy.setBackend(port)
-		rt.lastPort.Store(int64(port))
 	}
 	rt.readyOnce.Do(func() {
 		rt.readyMs.Store(time.Since(rt.startedAt).Milliseconds())
@@ -260,7 +239,6 @@ func (rt *memberRuntime) start(ctx context.Context) {
 		CommandParams:    serveParams(),
 		ServeMode:        true,
 		Renderer:         rt.output,
-		BoundPort:        func() int { return int(rt.lastPort.Load()) },
 		RunIteration: func(ctx context.Context, _ []*workspace.Project, sink scheduler.Renderer) watch.IterationResult {
 			result, err := rt.runOnce(ctx, sink)
 			switch {

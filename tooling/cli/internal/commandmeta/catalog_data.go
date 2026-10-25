@@ -1291,6 +1291,7 @@ var globalFlags = []GlobalFlag{
 	{Long: "--retry", Type: FlagValue, ValueName: "<n>", Description: "Retry transient failures", Category: "Execution", JobOnly: true},
 	{Long: "--retry-failed", Description: "Re-run tasks whose identical failure is cached", Category: "Execution", JobOnly: true},
 	{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile: dev | test | production", Category: "Execution", Values: []string{"dev", "test", "production"}, JobOnly: true},
+	{Long: "--serve-env", Type: FlagValue, ValueName: "<->", Description: "Read the serve steps' process environment from stdin: one JSON object of string variables", Category: "Execution", Values: []string{"-"}, JobOnly: true},
 	{Long: "--dry-run", Description: "Show changes without applying", Category: "Execution"},
 
 	{Long: "--output", Type: FlagValue, ValueName: "<format>", Description: "Output format: text | json | jsonl | cloud-logging", Category: "Output", Values: []string{"text", "json", "jsonl", "cloud-logging"}},

@@ -283,6 +283,11 @@ func applyGlobalFlag(g *GlobalFlags, arg, value string) error {
 		g.Watch = true
 	case "--dry-run":
 		g.DryRun = true
+	case "--serve-env":
+		if value != "-" {
+			return usageErrorf("invalid --serve-env value %q: expected -, to read the serve steps' environment from stdin", value)
+		}
+		g.ServeEnv = value
 	case "--color":
 		g.Color = boolPtr(true)
 	case "--no-color":

@@ -186,6 +186,8 @@ func TestWatchIterationRequest_ForwardsTheRunsIdentity(t *testing.T) {
 	outer := outerWatchRequest()
 	outer.ExecutesUnderDryRun = true
 	outer.VersionSnapshot = &git.VersionInfo{Full: "1.2.3"}
+	outer.Global.ServeEnv = "-"
+	outer.ServeProcessEnv = []string{"PORT=0"}
 	planExtensions := []*extension.ExtensionDescription{{Name: "@putnami/one"}}
 
 	iteration := watchIterationRequest(outer, planExtensions, watchTestProjects(), false)
@@ -210,6 +212,11 @@ func TestWatchIterationRequest_ForwardsTheRunsIdentity(t *testing.T) {
 	}
 	if !iteration.ExecutesUnderDryRun {
 		t.Error("iteration dropped ExecutesUnderDryRun; an alias's --dry-run iterations would preview forever")
+	}
+	// A restarted serve step is a new process: the supervisor's environment
+	// must reach it as it reached the first one.
+	if !reflect.DeepEqual(iteration.ServeProcessEnv, outer.ServeProcessEnv) || iteration.Global.ServeEnv != "-" {
+		t.Errorf("iteration serve env = %v (flag %q), want the outer run's %v", iteration.ServeProcessEnv, iteration.Global.ServeEnv, outer.ServeProcessEnv)
 	}
 	if iteration.Stdout != io.Discard {
 		t.Error("iteration engine notices are not discarded; 'No jobs matched' would print on every save")

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/dbtestenv"
+	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/flock"
 )
 
@@ -366,7 +367,7 @@ func identifyGroup(pgid int, leaderStart string) groupIdentity {
 	if leaderStart == "" {
 		return groupUnverified
 	}
-	start, ok := processStartTime(pgid)
+	start, ok := proctree.StartTime(pgid)
 	switch {
 	case !ok:
 		return groupUnverified

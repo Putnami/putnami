@@ -147,6 +147,9 @@ func TestMachineOutputFailurePriorityVocabulary(t *testing.T) {
 		{"debug error diagnostic", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "diagnostic", "level": "debug", "severity": "error"}}, true},
 		{"warning diagnostic", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "diagnostic", "severity": "warning"}}, false},
 		{"failed test case", SessionStreamRecord{Record: RecordTestCase, TestCase: &TestCase{Status: TestCaseStatusFailed}}, false},
+		{"ready claim", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "ready", "target": "server", "endpoints": []any{map[string]any{"scheme": "http", "host": "127.0.0.1", "port": 43120}}}}, true},
+		{"debug ready claim", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "ready", "level": "debug"}}, true},
+		{"process group", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "process", "group": 4242, "leaderStart": "4242"}}, false},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -194,6 +197,8 @@ func TestMachineOutputClassifiersAgreeOnDecodedRecords(t *testing.T) {
 		{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusFailed, TestCasesDropped: 3}},
 		{Record: RecordTaskEvent, Event: map[string]any{"type": "log", "level": "debug"}},
 		{Record: RecordTaskEvent, Event: map[string]any{"type": "log", "level": "error"}},
+		{Record: RecordTaskEvent, Event: map[string]any{"type": "ready", "target": "server"}},
+		{Record: RecordTaskEvent, Event: map[string]any{"type": "process", "group": 4242}},
 	}
 	for _, record := range records {
 		data, err := json.Marshal(record)

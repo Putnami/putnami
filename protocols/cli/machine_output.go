@@ -205,7 +205,9 @@ func checkMachineOutputSanitized(v *validator, path string, value any) {
 // IsMachineOutputFailurePriority reports whether a record consumes the
 // dedicated protected reserve. It principally retains failure evidence; the
 // successful managed-publication handoff also uses it because that terminal
-// control record arrives only after ordinary capacity may be exhausted.
+// control record arrives only after ordinary capacity may be exhausted, and a
+// workload's ready claim uses it because a supervisor waits on that event
+// however much log output preceded it.
 // Within each partition records keep arrival order. A test:case record is
 // never failure priority: the failed task's task:end already is.
 func IsMachineOutputFailurePriority(record SessionStreamRecord) bool {
@@ -267,6 +269,10 @@ func failurePriorityEvent(event map[string]any) bool {
 	case "phase":
 		status, _ := childString(event, "status")
 		return status == "failed"
+	case "ready":
+		// A ready claim is the control event a supervisor waits on: a workload
+		// that logged past the ordinary partition must still deliver it.
+		return true
 	case "result":
 		result := childObject(event, "data")
 		status, present := childString(result, "status")

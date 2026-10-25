@@ -4,7 +4,7 @@ import "go.putnami.dev/sdk/extension/proctree"
 
 // A recorded process group is the process tree a member's job runs in
 // (proctree): its id is the process group id on Unix and the pid of the tree's
-// root on Windows, and processStartTime of that id confirms which tree it
+// root on Windows, and proctree.StartTime of that id confirms which tree it
 // names. On Windows a tree also ends with the process that started it, so a
 // dead owner leaves no group behind to reap.
 

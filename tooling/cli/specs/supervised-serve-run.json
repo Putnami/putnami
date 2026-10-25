@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/supervised-serve-run",
+  "outcomes": [
+    "A supervisor runs a workload with one putnami serve run and hands its serve step the process environment it needs, such as a port, the URLs of the workloads it runs with and a CONFIG_DATA document, without that environment reaching anything else",
+    "The supervisor reads the session stream for the process group the workload runs in and for its readiness claims, and reads the workload's output as text on stderr"
+  ],
+  "nonGoals": [
+    "Starting or ordering several workloads: a supervisor such as compose requests one serve run per workload",
+    "Reading the environment from a file or a flag value: --serve-env accepts only -, stdin",
+    "Recording the environment, or the fact that a run carried one, in the session",
+    "Running a supervised serve run on a hosted or portable runner"
+  ],
+  "requirements": [
+    {
+      "id": "serve-env-reaches-only-serve-steps",
+      "text": "--serve-env - reads one JSON object of string variables from stdin and hands them to the process of each serve-workload step: a selected project's uncacheable serve step that no planned job depends on. A finite step of the same pipeline, a dependency's step, the job context, a param, a cache key, the output and the session never receive them. The flag is a job-only global flag, refused on an extension subcommand, a hosted or portable run, and a plan without a serve-workload step."
+    },
+    {
+      "id": "a-manifest-env-conflict-is-refused",
+      "text": "A run is refused as a usage error before any step starts when a serve-workload step's task declares in its own manifest env a variable the document sets, because the task's env would replace it. A name in the PUTNAMI_ namespace, a repeated name, a value that is not a string and a document over 1 MiB are refused the same way. A refusal names the variable, the task and the project, never a value."
+    },
+    {
+      "id": "ready-claims-are-never-elided",
+      "text": "A ready task:event is a priority record of the bounded session stream, in Go and TypeScript alike: it is admitted from the failure reserve once ordinary records spent their partition, so a workload that logged past the partition still delivers its claim live. With --output=jsonl and --serve-env, stdout carries the session stream unchanged and stderr carries the serve steps' output as putnami serve renders it in text mode."
+    },
+    {
+      "id": "a-serve-step-names-its-process-group",
+      "text": "The job runner emits one task:event of type process for each serve-workload step it starts, before any event the step writes: group is the process group the step runs in and leaderStart the start time of its leader, which a reused pid reads differently. A finite step emits none, and a producer line of type process is dropped."
+    },
+    {
+      "id": "an-ephemeral-port-waits-on-the-announced-port",
+      "text": "Under watch, a serve run with --port 0 waits between restarts on the port of the last ready claim that announced one, the first http or https endpoint, else the first endpoint; before any claim it waits on nothing. A pinned port waits on that port and a run without a port parameter on the default port, and neither consults a claim."
+    }
+  ]
+}

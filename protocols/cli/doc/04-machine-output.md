@@ -48,6 +48,8 @@ Failure priority is deliberately narrow and stable:
   `data.status` is `OK` and whose `data.data.releaseSet` carries the immutable
   deployment handoff. It is produced only at session finalization, so this
   protected path keeps it live after ordinary detail has exhausted its budget.
+- a `ready` event, the typed readiness claim a supervisor acts on. A workload
+  that logged past the ordinary partition still delivers its claim live.
 
 A `test:case` record is never failure priority, whatever its status. The failed
 task's `task:end` already takes the reserve.

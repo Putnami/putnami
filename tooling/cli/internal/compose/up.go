@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dbtestenv"
+	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -279,7 +280,7 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 // trackedGroup is a serve step's process group as the composition recorded it.
 type trackedGroup struct {
 	member string
-	// leaderStart identifies the group's leader (processStartTime); empty when
+	// leaderStart identifies the group's leader (proctree.StartTime); empty when
 	// it could not be read, which leaves the group unconfirmable.
 	leaderStart string
 }
@@ -287,7 +288,7 @@ type trackedGroup struct {
 // recordProcessGroup adds a spawned serve step's process group to the lease,
 // with its leader's start time, before anything else can happen to it.
 func (c *Composition) recordProcessGroup(member string, pgid int) {
-	start, _ := processStartTime(pgid)
+	start, _ := proctree.StartTime(pgid)
 	c.pgMu.Lock()
 	defer c.pgMu.Unlock()
 	c.pgids[pgid] = trackedGroup{member: member, leaderStart: start}

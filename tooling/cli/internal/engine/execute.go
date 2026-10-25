@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"io"
 	"os"
 	"slices"
 	"strconv"
@@ -71,7 +72,19 @@ func executionRenderer(
 		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
 		// The live view orders its command columns by the merged vocabulary.
 		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
+		ServeLog:  serveLog(req),
 	})
+}
+
+// serveLog is where a supervised serve run renders its text: stderr, for a
+// jsonl run that reads its serve steps' environment from stdin, so the
+// supervisor keeps the workloads' output however much of it the bounded stream
+// elides. Nil for every other run.
+func serveLog(req *Request) io.Writer {
+	if req.Global.ServeEnv == "" || req.Global.Output != "jsonl" {
+		return nil
+	}
+	return os.Stderr
 }
 
 func executionSessionRenderer(
@@ -303,6 +316,10 @@ func (e *Engine) executeSession(
 		Debug:             req.Global.Debug,
 		CacheVerification: req.CacheVerification != nil,
 		VersionInfo:       versionInfo,
+		// The serve-workload steps announce their process group, and only they
+		// receive the supervisor's environment (Request.ServeProcessEnv).
+		ServeSteps:      serveWorkloadSteps(planned, selectedProjects),
+		ServeProcessEnv: req.ServeProcessEnv,
 		// Phase 1c/1d's runtime-preparation attribution rides to the session
 		// recorder here. The scheduler never adds to it; it only publishes it.
 		Preparation: req.preparation,

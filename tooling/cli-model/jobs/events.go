@@ -279,6 +279,8 @@ func oversizedEventLine() RawJobEvent {
 // about which contract the extension implements, and interpreting it would be
 // guessing which one is true. Unknown-to-the-renderer event TYPES stay
 // tolerated, as before: every renderer switches on type with no default branch.
+// The one exception is EventTypeProcess, which the job runner builds itself: a
+// line of that type is refused, so a producer cannot name a process group.
 //
 // Subprocess events use flat top-level keys (e.g. "severity", "location",
 // "current", "total") rather than nesting them under a "data" key. This
@@ -309,7 +311,7 @@ func ParseRawEvent(line string) (RawJobEvent, bool) {
 		event.Message = m
 	}
 
-	if event.Version != runtimeproto.MaxKnownProtocolVersion || event.Type == "" {
+	if event.Version != runtimeproto.MaxKnownProtocolVersion || event.Type == "" || event.Type == EventTypeProcess {
 		return event, false
 	}
 

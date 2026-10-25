@@ -212,6 +212,13 @@ const (
 	EventTypeReady = string(runtimeproto.EventReady)
 )
 
+// EventTypeProcess is a task event the CLI builds itself, never a producer:
+// it names the process group a serve-workload step runs in ("group") and the
+// start time of that group's leader ("leaderStart"), before any event the step
+// writes. The runtime event protocol does not list it, and ParseRawEvent
+// refuses a producer line of this type.
+const EventTypeProcess = "process"
+
 // EventHandler receives parsed JSONL events in real-time as they arrive.
 type EventHandler func(event RawJobEvent)
 

@@ -84,9 +84,17 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "engine",
 		prefix: "internal/engine/",
-		files:  24,
-		funcs:  188,
-		why: "RAISED 183→188 (cli/job-planning-execution, spec-gate-evidence-scope): an unplanned " +
+		files:  25,
+		funcs:  191,
+		why: "RAISED 24/188→25/191 (cli/supervised-serve-run): serve_env.go holds the usage check " +
+			"of `--serve-env -`, made once the plan is final: serveWorkloadSteps names the steps the " +
+			"supervisor's environment reaches by the rule withholdServeSteps already splits a plan " +
+			"by, and refuseInvalidServeEnv refuses a hosted or portable run, a plan without such a " +
+			"step and a serve task whose own env declares one of the variables. execute.go holds " +
+			"serveLog, which chooses stderr as the serve log of a supervised jsonl run. They add no " +
+			"stage and no mode: the request carries the environment, the scheduler applies it. " +
+			"Phase 2 of the same epic deletes serve_withhold.go, which returns the file. " +
+			"RAISED 183→188 (cli/job-planning-execution, spec-gate-evidence-scope): an unplanned " +
 			"attester's report entry that only the run's remote cache holds resolves through that remote " +
 			"cache. spec_gate_cache.go holds readingRemote, which attaches the run's context and remote " +
 			"cache to the recovery source; runObservationRecovery, which builds the run's source with " +
@@ -491,8 +499,12 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "scheduler",
 		prefix: "internal/jobs/scheduler/scheduler",
 		files:  6,
-		funcs:  97,
-		why: "internal/jobs/scheduler/scheduler*.go: dispatch, batching, per-task cache boundaries, retry and " +
+		funcs:  98,
+		why: "RAISED 97→98 (cli/supervised-serve-run): jobProcessEnvFor hands a job the run's " +
+			"process environment plus the supervisor's when the engine names the job a " +
+			"serve-workload step. It adds no cache route and no branch to dispatch: the entries " +
+			"reach cmd.Env only, never a key, and the batch attempt keeps jobProcessEnv. " +
+			"internal/jobs/scheduler/scheduler*.go: dispatch, batching, per-task cache boundaries, retry and " +
 			"metrics. The largest unit here by function count and the one with the most concurrency " +
 			"per line, so it is also the one where an added branch is hardest to reason about — " +
 			"per-task batching is why it is this size. An earlier change removed the v2 " +
@@ -899,9 +911,14 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "output",
 		prefix: "internal/output/",
-		files:  29,
-		funcs:  270,
-		why: "internal/output: the renderers. This is the unit the epic shrank most directly — " +
+		files:  30,
+		funcs:  276,
+		why: "RAISED 29/270→30/276 (cli/supervised-serve-run): serve_log.go holds serveLogRenderer, " +
+			"its constructor and the five Renderer methods it fans out. It is not a second machine " +
+			"renderer: it embeds the one machine renderer, whose stream it leaves byte for byte, and " +
+			"drives the existing TextRenderer in serve mode on the serve log writer, so a supervised " +
+			"jsonl run keeps every workload log line the bounded stream elides. " +
+			"internal/output: the renderers. This is the unit the epic shrank most directly — " +
 			"An earlier change deleted jsonl.go and the v1 JSON renderer, leaving ONE machine renderer " +
 			"(machine_v2.go) that projects the canonical reduction for both --output=json and " +
 			"--output=jsonl. Its one additional scheduler-cap reporter keeps Docker publication " +

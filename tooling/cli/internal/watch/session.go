@@ -49,7 +49,9 @@ type SessionConfig struct {
 	// iterations run for the projects the changed files map to.
 	SelectedProjects []*workspace.Project
 	// CommandParams are the run's job params. The loop reads exactly one of them,
-	// "port", to wait for a serve port to be released between restarts.
+	// "port", to wait for a serve port to be released between restarts. A port
+	// of 0 waits on the port the last ready claim announced
+	// (WatchRenderer.BoundPort).
 	CommandParams map[string]any
 	// WorkspaceInputPatterns are the workspace-scoped task input patterns
 	// (lockfiles, root compiler config) that make a change affect every project.
@@ -66,12 +68,6 @@ type SessionConfig struct {
 	// re-derived from the commands: the engine already decided this fact when it
 	// force-enabled watch for serve, and deriving it twice let the two disagree.
 	ServeMode bool
-	// BoundPort reports the port the served process last bound, for a run whose
-	// "port" param is 0 (an ephemeral port the workload picks and announces in
-	// its ready event). The loop waits for THAT port to be released between
-	// restarts, since port 0 names no listener. Nil keeps the param-derived
-	// port, which is every serve that pins its port.
-	BoundPort func() int
 }
 
 // Session manages the watch loop: initial run, file watching,

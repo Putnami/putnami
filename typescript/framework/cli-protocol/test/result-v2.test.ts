@@ -152,6 +152,19 @@ describe('bounded machine-output helpers', () => {
       ).toBe(true);
       expect(isMachineOutputFailurePriority(eventRecord({ v: 1, type: 'result', data: { status: 'OK' } }))).toBe(false);
       expect(isMachineOutputFailurePriority(eventRecord({ type: 'diagnostic', severity: 'warning' }))).toBe(false);
+      expect(
+        isMachineOutputFailurePriority(
+          eventRecord({
+            type: 'ready',
+            target: 'server',
+            endpoints: [{ scheme: 'http', host: '127.0.0.1', port: 43_120 }],
+          }),
+        ),
+      ).toBe(true);
+      expect(isMachineOutputFailurePriority(eventRecord({ type: 'ready', level: 'debug' }))).toBe(true);
+      expect(isMachineOutputFailurePriority(eventRecord({ type: 'process', group: 4242, leaderStart: '4242' }))).toBe(
+        false,
+      );
       expect(isMachineOutputDebugDetail(eventRecord({ type: 'log', level: 'debug' }))).toBe(true);
       expect(isMachineOutputDebugDetail(eventRecord({ type: 'log', level: 'info' }))).toBe(false);
       expect(

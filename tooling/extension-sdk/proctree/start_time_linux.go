@@ -1,6 +1,6 @@
 //go:build linux
 
-package compose
+package proctree
 
 import (
 	"os"
@@ -8,12 +8,12 @@ import (
 	"strings"
 )
 
-// processStartTime returns the start time of process pid, in clock ticks since
+// StartTime returns the start time of process pid, in clock ticks since
 // boot (field 22 of /proc/<pid>/stat). The value is fixed for the life of the
 // process, so two reads of the same process agree and a process that reuses
 // the pid reads differently. ok is false when the process is gone or the
 // record cannot be parsed.
-func processStartTime(pid int) (string, bool) {
+func StartTime(pid int) (string, bool) {
 	if pid <= 0 {
 		return "", false
 	}

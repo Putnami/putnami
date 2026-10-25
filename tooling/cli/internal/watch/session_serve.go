@@ -154,19 +154,28 @@ func (s *Session) runServeLoop(ctx context.Context) int {
 	}
 }
 
+// servePortToRelease is the port the serve loop waits on between restarts,
+// and false when there is none. A pinned port (the "port" param, else
+// DefaultPort) is that port, whatever the workload announced. Port 0 is not a
+// listener: the port is the one the previous iteration's last ready claim
+// announced (WatchRenderer.BoundPort), and none announced means nothing to
+// release.
+func (s *Session) servePortToRelease() (int, bool) {
+	raw, ok := s.cfg.CommandParams["port"]
+	if !ok {
+		return DefaultPort, true
+	}
+	if !isEphemeralPort(raw) {
+		return parsePortValue(raw, DefaultPort), true
+	}
+	port := s.watchRend.BoundPort()
+	return port, port > 0
+}
+
 func (s *Session) waitForServePortRelease(ctx context.Context) {
-	port := DefaultPort
-	if raw, ok := s.cfg.CommandParams["port"]; ok {
-		if isEphemeralPort(raw) && s.cfg.BoundPort != nil {
-			// Port 0 is not a listener: the port to wait on is the one the
-			// previous iteration bound. None observed means nothing to release.
-			port = s.cfg.BoundPort()
-			if port <= 0 {
-				return
-			}
-		} else {
-			port = parsePortValue(raw, port)
-		}
+	port, ok := s.servePortToRelease()
+	if !ok {
+		return
 	}
 
 	if IsPortAvailable(port) {

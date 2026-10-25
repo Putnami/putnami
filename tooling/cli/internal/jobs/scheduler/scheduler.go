@@ -75,6 +75,19 @@ type SchedulerConfig struct {
 	// would miss on every run forever. It reaches only cmd.Env through
 	// jobProcessEnv() and the session audit event.
 	SessionID string
+	// ServeSteps names, by job key, the plan's serve-workload steps: the
+	// long-running terminal steps of a serve pipeline, never one of its finite
+	// steps. The engine computes it from the final plan. runJob announces the
+	// process group of each one (EventTypeProcess), and only these steps
+	// receive ServeProcessEnv. Nil for a run without one.
+	ServeSteps map[string]bool
+	// ServeProcessEnv is the process environment `--serve-env -` read from
+	// stdin: KEY=value entries a supervisor owns, which may hold secrets. It is
+	// EXECUTION-ONLY, like SessionID: it reaches only the cmd.Env of the
+	// ServeSteps, through jobProcessEnvFor, and never a finite step, the job
+	// context file, the task params, a cache key, a run marker, the session
+	// document or an output.
+	ServeProcessEnv []string
 	// Preparation is the dependency-preparation stage's phase attribution,
 	// accumulated by the composer BEFORE this scheduler existed (runtime
 	// synchronization runs in engine phase 1c/1d, ahead of

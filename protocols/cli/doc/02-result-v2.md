@@ -229,6 +229,21 @@ The `event` payload of a `task:event` record stays owned by
 [`protocols/runtime`](../../runtime/README.md) and is versioned there; this
 contract treats it as an opaque object.
 
+One `event` type is the CLI's own and the runtime protocol does not list it:
+`process`, which the CLI builds for each serve-workload step it starts, before
+any event the step writes. Its `group` is the process group the step runs in
+(the root process id on Windows) and its `leaderStart` is the start time of
+that group's leader, an opaque string a reader compares and never parses,
+empty when the platform cannot read it. A producer cannot
+emit it: the CLI drops a producer line of type `process`. A finite step has
+none.
+
+```json
+{"protocolVersion":2,"record":"task:event","time":"2026-10-24T10:15:30Z",
+ "identity":{"key":"/apps/api:serve~serve","…":"…"},
+ "event":{"type":"process","group":48213,"leaderStart":"Sat Oct 24 10:15:30 2026","time":"2026-10-24T10:15:30Z"}}
+```
+
 ### Workspace load warnings
 
 `workspaceWarnings` is an additive optional member of the result envelope. It

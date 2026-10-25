@@ -473,6 +473,9 @@ reserve one 16 KiB terminal record. Normal mode suppresses debug-level task
 detail, including per-test success transcripts, while `--verbose` admits it
 under the larger budget. Records are sanitized, compacted, and then selected
 whole in arrival order; ordinary traffic cannot consume the failure reserve.
+A `ready` claim is admitted from the failure reserve too, because it is the
+control event a supervisor waits on: a serve workload that logged past the
+ordinary partition still delivers its claim live.
 `machineOutput.elided` reports exact omitted record and byte counts by class,
 including normal-mode debug omissions. The mode never changes execution,
 verdict, or exit status. The complete sanitized sequence is incrementally
@@ -500,6 +503,20 @@ pin already fix the version — a CLI that requires extension contract 3 accepts
 exactly one runtime-event version, so restating it per line would add a second
 place for the two to disagree. Unknown event types travel through untouched, so
 a reader must not assume a closed `type` set.
+
+One type is the CLI's own, never a producer's: for each serve-workload step it
+starts, the job runner emits a `process` event before any event the step
+writes. `group` is the process group the step runs in (the root pid on
+Windows) and `leaderStart` is the start time of the group's leader, an opaque
+string, so a supervisor that records the group can tell it from a later process
+that reuses the pid. `leaderStart` is empty when the platform cannot read it. A finite
+step emits no `process` event, and the CLI drops a producer line of that type.
+
+With `--serve-env -` (see [Commands](03-commands.md#supervised-serve-run---serve-env)),
+a `--output=jsonl` run writes the session stream to stdout unchanged and also
+renders the run on stderr as `putnami serve` renders it in text mode, so the
+serve steps' log lines stay readable however much of them the bounded stream
+elides.
 
 A test result's `data.testCases` member is removed from its `task:event`, and
 from each member of a batch result's `data.batchResults`: the cases travel in

@@ -301,7 +301,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        257,
+		want:        258,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -429,14 +429,15 @@ var structuralPins = []structuralPin{
 			"The final change raises 254→255 for testCasesOf in cli-model/jobs/result_model.go: a test task hands its per-case results to the CLI in the result's untyped data bag, beside testSummary, and this is the one decode that turns them into typed protocolcli.TestCase values. " +
 			"A later change raises 255→256 for jobs.keyInputs, and the line is the ONE payload this pin already names as untypable on one more hop of the path it already travels: the key-movement analysis hands the command params map to keyFilePatterns, exactly as the cache key, the mutation detector and the portable admission do, so the region it bounds is the region the key hashes. Nothing decodes, stores or forwards a new untyped document. " +
 			"A later change takes the count from 255 back to 256, under this ceiling, for jobs.RawJobEvent.RecordPayload: its signature and the one copy it makes to fold an event's type, level and message into the task:event payload, which already was this untyped map. It deletes the inline fold's own make in retainedJobEvents.add. " +
-			"A later change raises 256→257, net of the deleted Go steps of create and deps: lifecycle.setUpProject and lifecycle.runDepsEdit hand the project-setup and deps-edit jobs of an extension their params in the existing untyped params bag of WorkspaceJobRequest, two lines for the project-setup params and the deps-edit params, which the job context carries as every job's params. Each deps-edit entry is a typed struct",
+			"A later change raises 256→257, net of the deleted Go steps of create and deps: lifecycle.setUpProject and lifecycle.runDepsEdit hand the project-setup and deps-edit jobs of an extension their params in the existing untyped params bag of WorkspaceJobRequest, two lines for the project-setup params and the deps-edit params, which the job context carries as every job's params. Each deps-edit entry is a typed struct. " +
+			"A later change raises 257→258 for jobs/scheduler/runner.go announceProcessGroup (cli/supervised-serve-run): the runner states a serve-workload step's process group and its leader's start time in the existing untyped RawJobEvent.Data payload every task event already carries, which the machine renderer copies into the task:event record. Nothing decodes it",
 	},
 	{
 		name:        "test lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       testFiles,
 		ceilingOnly: true,
-		want:        655,
+		want:        657,
 		why: "test fixtures built from untyped maps; they shrink as the canonical model lands. " +
 			"A0 pinned 516; A2b's scheduler and profiler tests now assert against typed records. " +
 			"An earlier change took it from 513 to 515: the two auto-selection tests that used to call " +
@@ -583,14 +584,20 @@ var structuralPins = []structuralPin{
 			"fixture Request states that one existing untyped bag; production adds none, because " +
 			"forcesServeWatch reads the CommandParams the Request already carries. " +
 			"A later change lowers 656→655: deleting the core's tree verifier deletes " +
-			"treecmd/verify_test.go and its one fxObj line",
+			"treecmd/verify_test.go and its one fxObj line. " +
+			"A later change raises 655→657 for TWO lines in jobs/scheduler/runner_process_env_test.go " +
+			"(cli/supervised-serve-run): the serve-env fixture's command params, its field and its one " +
+			"literal, which RunPlan and cachekey.ComputeJobCacheHash both take as the existing untyped " +
+			"bag, so the test can prove the supervisor's environment moves no cache key. The rewritten " +
+			"ephemeral-port watch test states its two CommandParams literals in place of the two it " +
+			"replaces; production adds the one line itemized on the production pin above",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        912,
+		want:        915,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -651,7 +658,8 @@ var structuralPins = []structuralPin{
 			"A later change raises 895→911 = 256 production + 655 test for the sixteen test lines of jobs.RawJobEvent.RecordPayload, itemized on the test pin above; production stays at its ceiling. " +
 			"A later change raises 911→912 for the ONE --no-watch serve fixture line itemized on the test pin above. " +
 			"A later change lowers 912→911 for the fxObj line the test pin above names; production adds none. " +
-			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added",
+			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added. " +
+			"A later change raises 912→915 = 258 production + 657 test for the serve step's process event and the two serve-env fixture lines itemized on the two scoped pins above",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

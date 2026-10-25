@@ -1,12 +1,14 @@
 package engine
 
 import (
+	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/machine"
 )
 
 // Two adapter seams were added to Request. Both exist because the
@@ -172,5 +174,24 @@ func TestEngine_DryRunDecisionsGoThroughPreviewsOnly(t *testing.T) {
 		t.Fatalf("Global.DryRun read at %v, want exactly one site in engine.go (previewsOnly).\n"+
 			"  Every stage deciding whether the run executes must read previewsOnly, or the "+
 			"extension-alias adapter loses its --dry-run job param.", sites)
+	}
+}
+
+// TestRequest_ServeProcessEnvStaysOutOfTheSessionDocument pins the
+// ServeProcessEnv seam to the serve processes: the session document a run
+// records holds neither the flag, nor a variable's name, nor its value.
+func TestRequest_ServeProcessEnvStaysOutOfTheSessionDocument(t *testing.T) {
+	t.Parallel()
+	req := &Request{Commands: []string{"serve"}, ServeProcessEnv: []string{"SUPERVISOR_SECRET=supervisor-secret-value"}}
+	req.Global.ServeEnv = "-"
+	document := recordedSessionDocument(machine.Run{}, req, "20261024-101500-a1b2c3", nil, nil)
+	data, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, leaked := range []string{"SUPERVISOR_SECRET", "supervisor-secret-value", "serve-env", "ServeEnv"} {
+		if strings.Contains(string(data), leaked) {
+			t.Errorf("the session document holds %q:\n%s", leaked, data)
+		}
 	}
 }

@@ -116,6 +116,10 @@
       "type": "bool"
     },
     {
+      "long": "--serve-env",
+      "type": "value"
+    },
+    {
       "long": "--tag",
       "type": "value"
     },

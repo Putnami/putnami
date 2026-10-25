@@ -270,6 +270,17 @@ type Request struct {
 	// injected environment out of every cache key: the steps that DO run here
 	// never see it.
 	WithholdServeSteps bool
+	// ServeProcessEnv is the process environment of the run's serve-workload
+	// steps, as `--serve-env -` read it from stdin: KEY=value entries a
+	// supervisor owns (the port, the URLs of the workloads it runs with, a
+	// CONFIG_DATA document), which may hold secrets. It is EXECUTION-ONLY: it
+	// reaches the processes of the serve-workload steps (serveWorkloadSteps)
+	// and nothing else, never a finite step, the job context, a param, a cache
+	// key, a run marker, a session record or an output. The engine refuses a
+	// run that sets Global.ServeEnv without a serve-workload step, hosted or
+	// portable, or whose serve task declares one of the variables itself
+	// (refuseInvalidServeEnv).
+	ServeProcessEnv []string
 	// watchIteration marks this request as ONE iteration of an outer watch/serve
 	// loop. It suppresses the serve force-watch rule in execute(): the outer loop
 	// already owns the replan policy, and without this marker a serve iteration
@@ -886,6 +897,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// run, once the plan is final and before anything reads it for
 	// authorization, preview or execution (Request.WithholdServeSteps).
 	planned, withheld := withholdRequestedServeSteps(req, dropUndryableSideEffectJobs(req, planned), selectedProjects)
+
+	// A supervisor's environment must reach a serve-workload step of this plan,
+	// and nothing it declares may silently replace it (refuseInvalidServeEnv).
+	if refuseInvalidServeEnv(req, planned, serveWorkloadSteps(planned, selectedProjects), os.Stderr) {
+		return SessionResult{ExitCode: ExitUsage, Plan: planned, Projects: selectedProjects}, nil
+	}
 
 	// A repository can declare side-effect traits and dependency edges, so the
 	// trait alone never carries authority. Build an opaque proof from the exact

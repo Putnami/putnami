@@ -74,6 +74,14 @@ func (a *App) runExtensionStructuredCommand(
 		}
 	}
 
+	// --serve-env reaches the serve steps of a flat command's run only. An
+	// extension subcommand would drop it, and a supervisor whose environment is
+	// dropped starts a workload without its port or its CONFIG_DATA.
+	if parsed.Global.ServeEnv != "" {
+		iox.Fprintf(stderr, "putnami: --serve-env is refused on `putnami %s %s`: run the flat command, such as `putnami serve`, which reads it\n", group, sub)
+		return ExitUsage
+	}
+
 	if wsRoot == "" {
 		return a.runUserScopeSubcommand(ctx, parsed, cfg, extensions, group, sub, stdin, stdout, stderr)
 	}

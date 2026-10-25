@@ -1700,6 +1700,48 @@ The flag changes no cache key and no run marker: every task receives the
 arguments of the same invocation without it. Without the flag and without
 `--providers install`, the CLI behaves exactly as before.
 
+### Supervised serve run: `--serve-env`
+
+`--serve-env -` reads the process environment of a run's serve steps from
+stdin, so a supervisor, such as a test harness or a process manager, can start
+a workload with the URLs and the `CONFIG_DATA` document it needs. Stdin holds
+one JSON object whose members are strings. `-` is the only accepted value.
+
+```bash
+printf '%s' '{"API_ORIGIN":"http://127.0.0.1:43120"}' |
+  putnami serve --projects api --port 0 --no-watch --serve-env - --output=jsonl
+```
+
+The variables reach the process of each serve-workload step and nothing else.
+A serve-workload step is a selected project's uncacheable step of a command
+whose traits declare the `serve` workload, which no other planned step depends
+on. The finite steps of the same pipeline (config merge, generate, describe),
+a dependency's steps, the job context, the params, every cache key and run
+marker, the output and the session never receive them. The flag itself is
+execution policy: it changes no cache key.
+
+The run is a usage error (exit 2) before any step starts when:
+
+- stdin is not one JSON object of strings, is larger than 1 MiB, sets a
+  variable twice, or holds a NUL byte;
+- a variable name is empty, holds `=`, or starts with `PUTNAMI_` in any case,
+  the namespace of the variables the CLI hands a job;
+- the plan holds no serve-workload step;
+- a serve-workload step's task declares one of the variables in its own `env`,
+  which the job runner applies last and which would replace the supervisor's
+  value;
+- the run is hosted, or portable on either side of `--where`;
+- the command is an extension subcommand (`putnami <group> <subcommand>`).
+
+A refusal names the variable, the task and the project, never a value.
+
+With `--output=jsonl`, stdout carries the session stream unchanged and stderr
+carries the serve steps' output as `putnami serve` renders it in text mode, so
+the supervisor keeps every log line the bounded stream elides. The stream names
+the process group of each serve-workload step in a `process` event before any
+event the step writes, and keeps every `ready` claim live (see
+[Output and Rendering](08-output-and-rendering.md)).
+
 ### Structured output
 
 `--output=jsonl` and `--output=json` are accepted only by the commands that
@@ -1748,7 +1790,9 @@ leaves it off. `--color=false` is `--no-color`, and `--no-color=false` is
 `--color`. On `compose`, and on a command whose traits declare the `serve`
 workload, such as `serve`, `--watch=false` is `--no-watch`, which turns off the
 command's own `watch` flag and its restarts on changes. Any other
-inline value on a switch is a usage error.
+inline value on a switch is a usage error. A supervisor that starts such a
+command hands its serve steps their environment with `--serve-env -` (see
+[Supervised serve run](#supervised-serve-run---serve-env)).
 
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.
 

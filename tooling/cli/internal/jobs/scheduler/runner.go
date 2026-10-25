@@ -550,11 +550,45 @@ func WithProcessGroupObserver(ctx context.Context, observe func(pgid int)) conte
 	return context.WithValue(ctx, processGroupObserverKey{}, observe)
 }
 
-// observeProcessGroup reports pgid to the context's observer, if any.
-func observeProcessGroup(ctx context.Context, pgid int) {
+// observeProcessGroup reports pgid to the context's observer, if any, then
+// announces it as a serve-workload step's first event (announceProcessGroup).
+func observeProcessGroup(ctx context.Context, pgid int, onEvent EventHandler) {
 	if observe, ok := ctx.Value(processGroupObserverKey{}).(func(pgid int)); ok {
 		observe(pgid)
 	}
+	announceProcessGroup(ctx, pgid, onEvent)
+}
+
+// serveStepKey marks a context under which runJob runs a serve-workload step.
+type serveStepKey struct{}
+
+// withServeStep returns a context under which runJob announces the spawned
+// process group as the step's first event (announceProcessGroup).
+func withServeStep(ctx context.Context) context.Context {
+	return context.WithValue(ctx, serveStepKey{}, true)
+}
+
+// announceProcessGroup emits the CLI-built process event of a serve-workload
+// step: the id of the process group it runs in and the start time of that
+// group's leader, which together let a supervisor that outlives this CLI
+// confirm and stop exactly that tree. runJob reaches it after the spawn and
+// before it reads the step's stdout, so the event precedes every event the
+// step writes. leaderStart is empty when the start time cannot be read. A
+// finite step, or a context without withServeStep, emits nothing.
+func announceProcessGroup(ctx context.Context, group int, onEvent EventHandler) {
+	if onEvent == nil {
+		return
+	}
+	if serving, _ := ctx.Value(serveStepKey{}).(bool); !serving {
+		return
+	}
+	leaderStart, _ := proctree.StartTime(group)
+	onEvent(RawJobEvent{
+		Version: runtimeproto.MaxKnownProtocolVersion,
+		Type:    EventTypeProcess,
+		Time:    time.Now().UTC().Format(time.RFC3339Nano),
+		Data:    map[string]any{"group": group, "leaderStart": leaderStart},
+	})
 }
 
 // runJob is RunJob with the run-level process environment the scheduler owns.
@@ -661,7 +695,7 @@ func runJob(
 	defer func() { _ = tree.Close() }()
 	_ = stdoutWriter.Close()
 	_ = stderrWriter.Close()
-	observeProcessGroup(ctx, tree.ID())
+	observeProcessGroup(ctx, tree.ID(), onEvent)
 
 	// Read stdout (JSONL events) and stderr concurrently
 	eventsCh := make(chan jobReadResult, 1)

@@ -4186,6 +4186,75 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/supervised-serve-run",
+      "type": "feature",
+      "name": "Supervised serve run",
+      "outcome": "A supervisor starts a workload with one putnami serve run, hands its serve step the process environment the workload needs on stdin, and reads from the session stream which process group the workload runs in and when it is ready, however much the workload logs",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "serve-env-reaches-only-serve-steps",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-flag-is-execution-only",
+              "the-engine-names-only-the-terminal-serve-step",
+              "only-the-serve-step-process-receives-the-env",
+              "a-supervised-serve-run-hands-the-env-to-the-serve-step-alone"
+            ]
+          }
+        },
+        {
+          "id": "a-manifest-env-conflict-is-refused",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-refusal-names-the-variable-and-the-task",
+              "the-cli-refuses-the-run-before-any-step-starts"
+            ]
+          }
+        },
+        {
+          "id": "ready-claims-are-never-elided",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-ready-claim-uses-the-failure-reserve"
+            ]
+          }
+        },
+        {
+          "id": "a-serve-step-names-its-process-group",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-process-event-precedes-every-producer-event"
+            ]
+          }
+        },
+        {
+          "id": "an-ephemeral-port-waits-on-the-announced-port",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-release-wait-reads-the-announced-port"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

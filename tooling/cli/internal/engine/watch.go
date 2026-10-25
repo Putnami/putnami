@@ -119,6 +119,9 @@ func (e *Engine) runWatch(
 //     chrome); the engine's generic notices — "No jobs matched. Nothing to do."
 //     above all — would print on every save. Diagnostics stay on stderr, which is
 //     not routed here for any adapter.
+//   - ServeProcessEnv is FORWARDED, with Global.ServeEnv. A restarted serve
+//     step is a new process, and it needs the supervisor's environment as much
+//     as the first one did.
 //   - Preflight is FORWARDED. Every iteration executes jobs, so every iteration
 //     is gated exactly as the outer run is; withholding it would make an
 //     ungated iteration out of a gated session — and, because a nil gate fails
@@ -146,6 +149,7 @@ func watchIterationRequest(
 		// still executes; dropping this would silently turn every iteration of
 		// `putnami <group> serve --dry-run --watch` into a plan preview.
 		ExecutesUnderDryRun: req.ExecutesUnderDryRun,
+		ServeProcessEnv:     req.ServeProcessEnv,
 		watchIteration:      true,
 		VersionSnapshot:     req.VersionSnapshot,
 		Preflight:           req.Preflight,

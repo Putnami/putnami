@@ -233,7 +233,7 @@ func TestLeaseHolderUntilKilled(t *testing.T) {
 		t.Fatalf("createLease: %v", err)
 	}
 	pgid, _ := strconv.Atoi(os.Getenv("PUTNAMI_COMPOSE_LEASE_PGID"))
-	start, ok := processStartTime(pgid)
+	start, ok := proctree.StartTime(pgid)
 	if !ok {
 		t.Fatalf("read the start time of group %d", pgid)
 	}
@@ -287,7 +287,7 @@ func TestLease_PartialCloseKeepsWhatSurvivedForTheNextReap(t *testing.T) {
 // identityOf is the identity a composition records for a running group.
 func identityOf(t *testing.T, pgid int) ProcessGroup {
 	t.Helper()
-	start, ok := processStartTime(pgid)
+	start, ok := proctree.StartTime(pgid)
 	if !ok {
 		t.Fatalf("read the start time of group %d", pgid)
 	}
