@@ -33,11 +33,10 @@ type LocalOptions struct {
 	// Preparation renders the engine run that prepares the serve pipelines;
 	// nil reports only failures, on stderr.
 	Preparation jobs.Renderer
-	// Quiet keeps the preparation's engine run from writing the workspace load
-	// warnings on stderr.
+	// Quiet is the caller's --quiet, which the preparation's engine run takes.
 	Quiet bool
-	// Warnings receives the workspace load warnings of that engine run; nil
-	// keeps none.
+	// Warnings is the report that engine run reports the warnings of its
+	// workspace load into (compose.Options.Warnings).
 	Warnings *workspace.WarningReport
 }
 

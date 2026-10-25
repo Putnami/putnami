@@ -56,9 +56,9 @@ type Request struct {
 	Verbose      bool
 	Quiet        bool
 	NoColor      bool
-	// Warnings is the report the workspace load warnings of the preparation
-	// are kept in; both status envelopes carry them in workspaceWarnings. Nil
-	// keeps none.
+	// Warnings reports the workspace load warnings of the command's own load
+	// and of the preparation, each once; both status envelopes carry them in
+	// workspaceWarnings. Nil reports none.
 	Warnings *workspace.WarningReport
 
 	// Stdout and Stderr default to the process streams.
@@ -90,6 +90,7 @@ func Run(req Request) error {
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
+	req.Warnings.Report(ws)
 	target, err := resolveTarget(ws, req.Selector)
 	if err != nil {
 		return err
