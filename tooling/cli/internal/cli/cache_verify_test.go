@@ -46,7 +46,7 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 		if request.WorkspaceRoot != "/staged" || !reflect.DeepEqual(request.Commands, []string{"lint", "test", "build", "validate"}) {
 			t.Fatalf("request = %#v, want a staged run of the commands the runner was built with", request)
 		}
-		if !request.Global.All || request.Global.NoCache || request.Global.MaxParallel != 1 ||
+		if !request.Global.All || request.Global.Projects != "*" || request.Global.NoCache || request.Global.MaxParallel != 1 ||
 			!request.Global.Quiet || !request.EphemeralSession || request.Stdout != io.Discard || request.ErrorOut != io.Discard {
 			t.Fatalf("request policy = %#v", request)
 		}
@@ -57,21 +57,34 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 	}
 }
 
-// TestCacheVerifyRunnerKeepsTheWarningsOfTheFirstRunOnly holds the runner to
+// TestCacheVerifyRunnerReportsTheLoadOfTheFirstRunOnly holds the runner to
 // one copy of the workspace warnings: the three runs load the same HEAD, so
-// each warning appears once in the cache verify envelope.
-func TestCacheVerifyRunnerKeepsTheWarningsOfTheFirstRunOnly(t *testing.T) {
+// the first run reports its load into the command's report, which writes each
+// warning once, and the cache verify envelope lists it once.
+func TestCacheVerifyRunnerReportsTheLoadOfTheFirstRunOnly(t *testing.T) {
 	t.Parallel()
 	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
-	report := workspace.NewWarningReport(nil)
+	var written strings.Builder
+	report := workspace.NewWarningReport(&written)
+	var reports []*workspace.WarningReport
 	runner := newCacheVerifyRunner(nil, GlobalFlags{}, []string{"lint"},
-		func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
-			return engine.SessionResult{ExitCode: engine.ExitSuccess, WorkspaceWarnings: []workspace.Warning{warning}}, nil
+		func(_ context.Context, request engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
+			// The engine reports its load into the request's report, or into a
+			// quiet report of its own when the request has none.
+			reports = append(reports, request.WarningReport)
+			request.WarningReport.Report(&workspace.Workspace{Warnings: []workspace.Warning{warning}})
+			return engine.SessionResult{ExitCode: engine.ExitSuccess}, nil
 		}, report)
 	for _, label := range []string{"first live run", "second live run", "cache-hit run"} {
 		if _, err := runner(context.Background(), "/staged", "/isolated-store"); err != nil {
 			t.Fatalf("%s: %v", label, err)
 		}
+	}
+	if !reflect.DeepEqual(reports, []*workspace.WarningReport{report, nil, nil}) {
+		t.Fatalf("run reports = %v, want the command's report on the first run only", reports)
+	}
+	if want := "putnami: warning: " + warning.Message + "\n"; written.String() != want {
+		t.Fatalf("written = %q, want the warning once: %q", written.String(), want)
 	}
 	want := []protocolcli.WorkspaceWarning{{Code: string(warning.Code), Message: warning.Message}}
 	if got := report.Envelope(); !reflect.DeepEqual(got, want) {

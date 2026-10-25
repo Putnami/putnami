@@ -163,22 +163,30 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 	}
 }
 
-// TestImpactPlanPlannerKeepsTheWarningsOfItsEngineRun holds the planner to the
+// TestImpactPlanPlannerReportsTheLoadOfItsEngineRun holds the planner to the
 // workspace warnings of its engine run: the run is quiet and loads the
-// workspace itself, so the planner hands them to the command's report, whether
-// the run succeeded or returned an error.
-func TestImpactPlanPlannerKeepsTheWarningsOfItsEngineRun(t *testing.T) {
+// workspace itself into the command's report, which writes each warning once
+// and keeps it, whether the run succeeded or returned an error.
+func TestImpactPlanPlannerReportsTheLoadOfItsEngineRun(t *testing.T) {
 	t.Parallel()
 	root := structuredOutputWorkspace(t)
 	workspace.InvalidateLoadCache(root)
 	warning := workspace.Warning{Code: workspace.WarningCodeJobsIgnored, Message: "project /app declares jobs"}
 	for _, runErr := range []error{nil, errors.New("engine refused the plan")} {
-		report := workspace.NewWarningReport(nil)
+		var written strings.Builder
+		report := workspace.NewWarningReport(&written)
 		planner := newImpactPlanPlanner(root, &wsproto.Config{}, []string{"test"},
-			func(context.Context, engine.Request, engine.EventSink) (engine.SessionResult, error) {
-				return engine.SessionResult{ExitCode: engine.ExitSuccess, WorkspaceWarnings: []workspace.Warning{warning}}, runErr
+			func(_ context.Context, request engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
+				if request.WarningReport != report {
+					t.Fatalf("run error %v: the engine run does not report into the command's report", runErr)
+				}
+				request.WarningReport.Report(&workspace.Workspace{Warnings: []workspace.Warning{warning}})
+				return engine.SessionResult{ExitCode: engine.ExitSuccess}, runErr
 			}, report)
 		_, _ = planner(context.Background(), impactPlanTestBase, false)
+		if want := "putnami: warning: " + warning.Message + "\n"; written.String() != want {
+			t.Fatalf("run error %v: written = %q, want the warning once: %q", runErr, written.String(), want)
+		}
 		want := []protocolcli.WorkspaceWarning{{Code: string(warning.Code), Message: warning.Message}}
 		if got := report.Envelope(); !reflect.DeepEqual(got, want) {
 			t.Fatalf("run error %v: the report holds %+v, want %+v", runErr, got, want)

@@ -79,7 +79,7 @@ func TestPrepareThrough_ReportsTheWarningsOfItsEngineRun(t *testing.T) {
 				var request engine.Request
 				run := func(_ context.Context, r engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
 					request = r
-					r.WarningReport.Keep([]workspace.Warning{warning})
+					r.WarningReport.Report(&workspace.Workspace{Warnings: []workspace.Warning{warning}})
 					result := tc.result
 					if tc.success {
 						result.Workspace = workspace.NewWorkspace(root, &wsproto.Config{}, nil)

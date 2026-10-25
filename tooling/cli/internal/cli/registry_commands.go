@@ -140,8 +140,9 @@ type engineRun func(context.Context, engine.Request, engine.EventSink) (engine.S
 // ordinary impacted engine plan for commands. The CLI owns this adapter:
 // commands receives only its typed result and cannot form an engine cycle. The
 // result and every error it returns name commands, the list it planned. The
-// engine run is quiet and loads the workspace itself: the planner keeps the
-// warnings of that load in warnings, so the impact-plan envelope carries them.
+// engine run is quiet and loads the workspace itself into warnings, the
+// command's report: it writes each load warning once on the command's stderr,
+// unless --quiet, and the impact-plan envelope carries them.
 func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string, run engineRun,
 	warnings *workspace.WarningReport,
 ) ci.Planner {
@@ -161,10 +162,9 @@ func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string,
 			},
 			Stdout: io.Discard,
 			// The dispatcher reports the error returned below, once.
-			ErrorOut: io.Discard,
+			ErrorOut:      io.Discard,
+			WarningReport: warnings,
 		}, nil)
-		// A failed run reports the warnings of its load too.
-		warnings.Keep(result.WorkspaceWarnings)
 		if err != nil {
 			return ci.PlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)
 		}
@@ -545,9 +545,10 @@ func cacheVerifyCommands(wsRoot string) []string {
 // newCacheVerifyRunner is the CLI-owned adapter from the cache verifier onto
 // Engine.Run for commands. The checker observes the real plan, keys,
 // scheduler, capture, and restore paths without becoming a second execution
-// composition. The three runs load the same HEAD, so the runner keeps the
-// workspace warnings of the first run only in warnings: the cache verify
-// envelope lists each warning once.
+// composition. The three runs load the same HEAD, so only the first run
+// reports its workspace load into warnings, the command's report: it writes
+// each load warning once on the command's stderr, unless --quiet, and the
+// cache verify envelope lists each warning once.
 func newCacheVerifyRunner(
 	cfg *wsproto.Config,
 	global GlobalFlags,
@@ -556,7 +557,7 @@ func newCacheVerifyRunner(
 	warnings *workspace.WarningReport,
 ) cachecmd.CacheVerifyRunner {
 	commands = append([]string(nil), commands...)
-	keptWarnings := false
+	reported := false
 	return func(ctx context.Context, workspaceRoot, storeRoot string) (cachecmd.CacheVerifyEngineResult, error) {
 		flags := global
 		flags.Plan = false
@@ -575,8 +576,12 @@ func newCacheVerifyRunner(
 		flags.Debug = false
 		flags.MaxParallel = 1
 		flags.MaxParallelMode = ""
+		// No selection means every project, as --all sets it: the runs plan in
+		// a staged worktree, so the default selection, the projects under the
+		// working directory, would match none.
 		if flags.Projects == "" && !flags.Impacted && !flags.All && flags.FilterTag == "" {
 			flags.All = true
+			flags.Projects = "*"
 		}
 		var hooks *wsproto.HooksConfig
 		if cfg != nil {
@@ -595,11 +600,13 @@ func newCacheVerifyRunner(
 			ErrorOut: io.Discard,
 		}
 		request.CacheVerification = &engine.CacheVerificationRequest{StoreRoot: storeRoot}
-		result, err := run(ctx, request, output.NewPassthroughRenderer())
-		if !keptWarnings {
-			keptWarnings = true
-			warnings.Keep(result.WorkspaceWarnings)
+		// A later run is quiet and gets no report: the engine makes one that
+		// writes nothing.
+		if !reported {
+			reported = true
+			request.WarningReport = warnings
 		}
+		result, err := run(ctx, request, output.NewPassthroughRenderer())
 		return cachecmd.CacheVerifyEngineResult{
 			ExitCode: result.ExitCode,
 			Plan:     result.Plan,
