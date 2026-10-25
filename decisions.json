@@ -179,6 +179,31 @@
       "settled": "2026-10-22",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-025",
+      "statement": "every workspace project carries a feature of its own, a spec or a reviewed featureAuthority; validate-workspace fails a project that carries none unless the committed debt list names it, and that list only shrinks",
+      "settled": "2026-10-25",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
+      "check": {
+        "kind": "json-value",
+        "files": [
+          "putnami.workspace.json"
+        ],
+        "pointer": "/options/sdd/featureCoverage/debt",
+        "rule": "notEquals",
+        "value": false,
+        "whenMissing": "violated"
+      }
+    },
+    {
+      "id": "D-026",
+      "statement": "a protocol owns the feature of its contract and the contract's functional requirements; each project that implements the protocol depends on it and proves those requirements in its own tests, under a check of its own",
+      "settled": "2026-10-25",
+      "settledBy": "fdumay",
+      "adr": "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
+      "reviewOnly": true
     }
   ]
 }

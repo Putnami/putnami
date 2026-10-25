@@ -388,6 +388,42 @@ func runAgentAttributionValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []str
 	return finish(report, verdict)
 }
 
+// runFeatureCoverageValidate is the ninth step of the workspace-scoped
+// `validate-workspace` command. Every member of the workspace carries a
+// feature of its own, a spec, or a reviewed featureAuthority, unless the
+// committed debt list in options.sdd.featureCoverage.debt names it; the list
+// is exact, so an entry whose project is covered fails until it is removed
+// (ADR 0003 of this extension). A workspace that declares no list has not
+// adopted the gate and passes with a note.
+//
+// Like decisions-validate it reads the candidate cut and is cached on the input
+// `git:**`, which holds every manifest and spec it reads and the debt list.
+// Each member's putnami.json reaches it on the wire, and a key on the cut also
+// holds the membership with its configs, so declaring a featureAuthority moves
+// the key.
+func runFeatureCoverageValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	workspaceOptions, err := wsview.WorkspaceOptionsFromContext(ctx)
+	if err != nil {
+		return "", nil, protocolcli.Classify(
+			fmt.Errorf("decode workspace options: %w", err),
+			protocolcli.ErrInvalidConfig,
+		)
+	}
+	ws, err := workspaceValidationView(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	report, verdict := sdd.BuildFeatureCoverageResult(ws, workspaceOptions)
+	publishDiagnostics(emit, report.Diagnostics)
+	if report.Note != "" {
+		emit.Summary("feature coverage: " + report.Note)
+	} else {
+		emit.Summary(fmt.Sprintf("feature coverage: %d project(s), %d with a feature or spec, %d with featureAuthority, %d in debt, %d finding(s)",
+			report.Projects, report.FeatureOrSpec, report.Authority, len(report.Debt), len(report.Diagnostics)))
+	}
+	return finish(report, verdict)
+}
+
 // projectValidationView builds the membership and the projection a PROJECT-
 // SCOPED validation task runs over.
 //

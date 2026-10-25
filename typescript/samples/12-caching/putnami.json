@@ -3,6 +3,7 @@
   "name": "@example/12-caching",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"none": "This sample demonstrates application and HTTP caching, which no authored TypeScript feature declares; it is not a product deliverable."},
   "options": {
     "test": {
       "coverage": false,

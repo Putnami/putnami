@@ -3,6 +3,7 @@
   "name": "@example/04-configuration",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/typed-configuration"},
   "options": {
     "test": {
       "coverage": false,

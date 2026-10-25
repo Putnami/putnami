@@ -3,6 +3,7 @@
   "name": "go.putnami.dev/examples/application",
   "tags": ["sample", "e2e"],
   "extensions": ["/go/extension"],
+  "featureAuthority": {"owner": "go/go-project-toolchain"},
   "dependencies": ["/go/samples/library"],
   "options": {
     "package": {

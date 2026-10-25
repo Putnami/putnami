@@ -3,6 +3,7 @@
   "name": "@example/13-fullstack-app",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"none": "This sample composes several framework features and is not a product deliverable."},
   "options": {
     "test": {
       "coverage": false,

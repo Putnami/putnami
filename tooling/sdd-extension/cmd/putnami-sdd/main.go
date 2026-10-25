@@ -24,6 +24,7 @@
 //	docs-links-validate        Check the links of every README.md file and doc/ tree of the workspace
 //	breaking-marker-validate   Check that the proposed squash commit keeps the breaking marker its commits declare
 //	agent-attribution-validate Check that the proposed squash commit names no agent, when the workspace forbids it
+//	feature-coverage-validate  Check that every project carries a feature, a spec or a featureAuthority
 //
 // Command groups (the interactive surface):
 //
@@ -90,6 +91,7 @@ func commandHandlers() map[string]cli.JobFunc {
 		"docs-links-validate":        runDocsLinksValidate,
 		"breaking-marker-validate":   runBreakingMarkerValidate,
 		"agent-attribution-validate": runAgentAttributionValidate,
+		"feature-coverage-validate":  runFeatureCoverageValidate,
 	}
 }
 

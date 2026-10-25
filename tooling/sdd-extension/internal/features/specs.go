@@ -100,6 +100,18 @@ func DiscoverSpecs(ws *workspace.Workspace, scope *Scope) SpecDiscoveryResult {
 			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace root is unavailable"),
 		}}
 	}
+	return DiscoverSpecsWith(ws, scope, reader)
+}
+
+// DiscoverSpecsWith is DiscoverSpecs through reader. A step cached on the input
+// `git:**` passes the candidate cut (NewTaskReader), so a spec its key does
+// not hold is never read.
+func DiscoverSpecsWith(ws *workspace.Workspace, scope *Scope, reader Reader) SpecDiscoveryResult {
+	if ws == nil {
+		return SpecDiscoveryResult{Diagnostics: []diag.Diagnostic{
+			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace is required"),
+		}}
+	}
 	request := Request{Workspace: ws, Reader: reader, Scope: scope}
 	roots, diagnostics := discoverRoots(request)
 	projects := projectNamesByRoot(ws)
