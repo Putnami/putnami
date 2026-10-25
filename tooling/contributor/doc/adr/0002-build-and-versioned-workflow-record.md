@@ -101,6 +101,10 @@ Amended 2026-10-14: a partial delivery whose changed paths all belong
 to projects that declare `featureAuthority.none` and author no feature, at
 base and on the branch, needs no workflow. The exact required provider checks
 on its head are its evidence, and it emits no receipt.
+Amended 2026-10-25: a partial delivery whose valid workflow has no eligible
+unit, such as a unit still at `building`, publishes with its non-closing task
+reference, names no ready unit and emits no receipt. The hosted checks never
+stand for a unit's native proof.
 The native result retains a typed hosted receipt referencing the original
 workflow and raw provider status. A new workflow revision can replay that
 receipt; rewriting the original makes it stale. Standalone planning validation
