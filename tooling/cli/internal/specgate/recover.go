@@ -86,10 +86,25 @@ type RecoveredReport struct {
 
 // UnconsultedProject is one candidate no observation source could be reached
 // for at all: its test was not planned in this session AND no cache entry
-// answered for it. Reason is short human prose naming why.
+// answered for it. Reason is short human prose naming why, which the warning
+// carries, and Code the same cause from the record's closed set.
 type UnconsultedProject struct {
 	Project string
 	Reason  string
+	Code    features.UnconsultedReason
+}
+
+// unconsultedCandidates is the record's form of the unconsulted set, in its
+// project order, or nil when it is empty.
+func unconsultedCandidates(unconsulted []UnconsultedProject) []features.UnconsultedCandidate {
+	if len(unconsulted) == 0 {
+		return nil
+	}
+	candidates := make([]features.UnconsultedCandidate, 0, len(unconsulted))
+	for _, entry := range unconsulted {
+		candidates = append(candidates, features.UnconsultedCandidate{Project: entry.Project, Reason: entry.Code})
+	}
+	return candidates
 }
 
 // Recovery is one lookup pass's complete answer.

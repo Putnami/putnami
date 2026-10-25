@@ -158,6 +158,7 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 	if evidence != nil && unresolvedInSession(verdicts) {
 		recovered := evidence.forProject(projectID)
 		group.Diagnostics = append(group.Diagnostics, recovered.diagnostics...)
+		group.Unconsulted = unconsultedCandidates(recovered.unconsulted)
 		if len(recovered.observations) > 0 {
 			// One re-evaluation over the UNION, never a merge of two verdicts: a
 			// restored observation must be able to contradict as well as support,

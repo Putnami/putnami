@@ -1,6 +1,7 @@
 package cachekey
 
 import (
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -70,6 +71,12 @@ type CacheStats struct {
 	// honest "spent on upload" figure now that uploads run off the worker path.
 	uploadWallNanos atomic.Int64
 	uploadFailures  atomic.Int64
+
+	// remoteLookups counts the remote-cache lookups of the run, one per
+	// request for one entry, and remoteFailed those that got no answer, by
+	// reason (remoteFailureReasons order).
+	remoteLookups atomic.Int64
+	remoteFailed  [len(remoteFailureReasons)]atomic.Int64
 
 	// providerSummary* preserves the exact totals returned by the cache
 	// provider's terminal Summary operation. The aggregate counters above are
@@ -329,6 +336,53 @@ func (s *CacheStats) RecordUploadFailure() {
 	s.uploadFailures.Add(1)
 }
 
+// remoteFailureReasons is the closed set of lookup failure reasons, in the
+// order the snapshot prefers one when lookups failed for several.
+var remoteFailureReasons = [...]string{
+	jobmodel.RemoteCacheRefused,
+	jobmodel.RemoteCacheUnreachable,
+	jobmodel.RemoteCacheTimeout,
+}
+
+// RecordRemoteLookup counts one remote-cache lookup: answered when failure is
+// "", else failed for failure, one of the jobmodel.RemoteCache* reasons. An
+// unknown reason counts as unreachable.
+func (s *CacheStats) RecordRemoteLookup(failure string) {
+	if s == nil {
+		return
+	}
+	s.remoteLookups.Add(1)
+	if failure == "" {
+		return
+	}
+	index := slices.Index(remoteFailureReasons[:], failure)
+	if index < 0 {
+		index = slices.Index(remoteFailureReasons[:], jobmodel.RemoteCacheUnreachable)
+	}
+	s.remoteFailed[index].Add(1)
+}
+
+// remoteAnswer is the snapshot's Remote member, or nil when the run made no
+// remote lookup.
+func (s *CacheStats) remoteAnswer() *jobmodel.RemoteCacheAnswer {
+	lookups := s.remoteLookups.Load()
+	if lookups == 0 {
+		return nil
+	}
+	answer := &jobmodel.RemoteCacheAnswer{Answered: true, Lookups: lookups}
+	for i, reason := range remoteFailureReasons {
+		failed := s.remoteFailed[i].Load()
+		if failed == 0 {
+			continue
+		}
+		if answer.Answered {
+			answer.Answered, answer.Reason = false, reason
+		}
+		answer.FailedLookups += failed
+	}
+	return answer
+}
+
 func (s *CacheStats) RecordProviderSummary(sum *cache.SummaryResult) {
 	if sum == nil {
 		return
@@ -408,5 +462,6 @@ func (s *CacheStats) Snapshot() *jobmodel.CacheStatsSnapshot {
 		ProviderSummaryAvailable:     s.providerSummaryAvailable.Load(),
 
 		StoreBudget: storeBudget,
+		Remote:      s.remoteAnswer(),
 	}
 }

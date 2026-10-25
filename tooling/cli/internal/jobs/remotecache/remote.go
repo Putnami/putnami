@@ -584,9 +584,11 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.Sc
 
 	sess, ok := r.ensureProvider(ctx, nil, cm)
 	if !ok {
+		r.recordUnavailable()
 		return nil
 	}
 	restore, err := sess.Restore(ctx, &cache.RestoreParams{Key: hash})
+	r.recordLookup(restoreFailure(restore, err))
 	if err != nil {
 		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
 		slog.Warn("remote cache: provider restore failed; building locally",

@@ -42,6 +42,42 @@ type CacheStatsSnapshot struct {
 	// passes it started at batch boundaries and their outcome. Absent when no
 	// pass ran.
 	StoreBudget *StoreBudgetStats `json:"storeBudget,omitempty"`
+
+	// Remote says whether the remote cache answered the run's lookups. It is
+	// absent when no remote cache provider took part in the run, and in a
+	// session an older CLI recorded: absent means "not recorded".
+	Remote *RemoteCacheAnswer `json:"remote,omitempty"`
+}
+
+// The closed set of reasons a remote cache lookup got no answer.
+const (
+	// RemoteCacheUnreachable means the provider could not start, its session
+	// ended, or it could not reach the remote cache for the entry.
+	RemoteCacheUnreachable = "unreachable"
+	// RemoteCacheRefused means the provider answered and refused the request,
+	// for example because the remote cache refused its credential.
+	RemoteCacheRefused = "refused"
+	// RemoteCacheTimeout means the lookup got no answer in time.
+	RemoteCacheTimeout = "timeout"
+)
+
+// RemoteCacheAnswer says whether the remote cache answered the run. A lookup
+// is one request for one entry, made for a planned task or by the spec gate.
+// A cold cache answers every lookup with no entry: Answered is true and no
+// lookup failed.
+type RemoteCacheAnswer struct {
+	// Answered is true when every lookup of the run got an answer: a hit or a
+	// miss.
+	Answered bool `json:"answered"`
+	// Lookups is how many lookups the run made.
+	Lookups int64 `json:"lookups"`
+	// FailedLookups is how many of them got no answer. It is present exactly
+	// when Answered is false.
+	FailedLookups int64 `json:"failedLookups,omitempty"`
+	// Reason says why, from the closed set above. It is present exactly when
+	// Answered is false. When lookups failed for several reasons, refused wins
+	// over unreachable, and unreachable over timeout.
+	Reason string `json:"reason,omitempty"`
 }
 
 // StoreBudgetStats is the outcome of the collection passes a run's in-run
@@ -74,7 +110,7 @@ type StoreBudgetStats struct {
 func (s *CacheStatsSnapshot) HasActivity() bool {
 	return s != nil && (s.LocalHits > 0 || s.LocalMisses > 0 || s.LocalServedMs > 0 ||
 		s.KeysRequested > 0 || s.Uploads > 0 || s.Restored > 0 || s.HintsWarmed > 0 ||
-		s.StoreBudget != nil)
+		s.StoreBudget != nil || s.Remote != nil)
 }
 
 // OverheadMs is the total wall time the cache machinery itself cost: the pre-run
