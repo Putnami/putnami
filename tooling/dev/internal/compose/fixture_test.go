@@ -47,7 +47,15 @@ const (
 	// completed startup once GET /exit asks it to, as an application whose
 	// start hook fails after its HTTP server bound does.
 	fixtureListenThenExit = "listen-then-exit"
+	// fixtureOutliveParent serves and stops on a signal only: it outlives the
+	// process that started it, keeping that process's output open, for at
+	// most fixtureOutliveLimit.
+	fixtureOutliveParent = "outlive-parent"
 )
+
+// fixtureOutliveLimit bounds how long an outlive-parent workload runs, so a
+// failed test leaves no process behind for long.
+const fixtureOutliveLimit = 2 * time.Minute
 
 // fixtureDiskMode, as the mode, has the workload read its mode, member and
 // record path from fixture.json in its working directory, the project
@@ -206,6 +214,7 @@ func runFixtureWorkload(mode string) int {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	started := time.Now()
 	for {
 		select {
 		case <-stop:
@@ -219,7 +228,11 @@ func runFixtureWorkload(mode string) int {
 			cancel()
 			return 3
 		case <-time.After(50 * time.Millisecond):
-			if parentGone() {
+			if mode == fixtureOutliveParent {
+				if time.Since(started) > fixtureOutliveLimit {
+					return 0
+				}
+			} else if parentGone() {
 				return 0
 			}
 		}

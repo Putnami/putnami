@@ -117,7 +117,7 @@ func TestTheManifestDeclaresTheComposeAndQualifyGroups(t *testing.T) {
 func TestRunDispatchesTheComposeAndQualifyCommands(t *testing.T) {
 	t.Setenv(wire.SocketEnv, "")
 	t.Setenv(wire.TokenEnv, "")
-	spectest.Proves(t, workloadFeature, "the-dev-extension-runs-compose-and-qualify", "the-executable-dispatches-the-compose-and-qualify-commands")
+	spectest.Proves(t, workloadFeature, "the-dev-executable-reads-its-launch-from-the-job-context", "the-executable-dispatches-the-compose-and-qualify-commands")
 	root := t.TempDir()
 	member := `"workspaceRoot":` + quote(t, root) + `,"workspaceProjects":[{"id":"/app","name":"app","path":"app","type":"application"}]`
 	noMembership := writeJobContext(t, `{}`)
@@ -203,7 +203,7 @@ func quote(t *testing.T, s string) string {
 func TestRunWorkloadReadsTheOutputFlagsFromTheJobContext(t *testing.T) {
 	t.Setenv(wire.SocketEnv, "")
 	t.Setenv(wire.TokenEnv, "")
-	spectest.Proves(t, workloadFeature, "the-dev-extension-runs-compose-and-qualify", "the-executable-reads-the-output-flags-from-the-job-context")
+	spectest.Proves(t, workloadFeature, "the-dev-executable-reads-its-launch-from-the-job-context", "the-executable-reads-the-output-flags-from-the-job-context")
 	root := t.TempDir()
 	t.Setenv(cliExecutableEnv, filepath.Join(root, "bin", "putnami"))
 	member := `"workspaceRoot":` + quote(t, root) + `,"workspaceProjects":[{"id":"/app","name":"app","path":"app","type":"application"}]`

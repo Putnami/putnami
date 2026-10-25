@@ -397,7 +397,7 @@ func TestLease_PartialCloseKeepsDatabasesItCouldNotConfirmDropped(t *testing.T) 
 }
 
 func TestIdentifyGroup_ALeaderThatExitsBetweenItsReadsLeavesNoGroup(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", teardownRequirement,
 		"a-killed-composition-leaves-both-groups-of-each-member-to-the-reap")
 	const recorded = "Sun Oct 25 13:11:34 2026"
 	running := func(int) bool { return true }

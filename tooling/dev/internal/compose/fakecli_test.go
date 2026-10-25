@@ -32,8 +32,9 @@ const (
 	// fakeCLIUsage exits 2 with a usage error on stderr and no record, as the
 	// CLI does on a flag it refuses.
 	fakeCLIUsage = "usage"
-	// fakeCLIFailPrepare fails the serve pipeline's finite generate step and
-	// exits 1 without starting the serve step.
+	// fakeCLIFailPrepare runs the serve pipeline's finite describe step, which
+	// succeeds, then fails its generate step and exits 1 without starting the
+	// serve step.
 	fakeCLIFailPrepare = "fail-prepare"
 	// fakeCLIStrayLine writes a line that is not a record on stdout first.
 	fakeCLIStrayLine = "stray-line"
@@ -43,6 +44,25 @@ const (
 	// fakeCLISlowPrepare runs the generate step for fakeCLISlowPrepareDelay
 	// before it starts the serve step.
 	fakeCLISlowPrepare = "slow-prepare"
+	// fakeCLIIgnoreStop serves and never answers a signal: only SIGKILL ends
+	// it, and SIGKILL does not reach its serve step, in a group of its own.
+	fakeCLIIgnoreStop = "ignore-stop"
+	// fakeCLIRestartThenEnd replaces the serve step once, after its first
+	// readiness claim, then, after the second step's claim, stops that step and
+	// exits 1 without its end record, as a run that failed under watch does.
+	fakeCLIRestartThenEnd = "restart-then-end"
+)
+
+// What a fail-prepare run's steps write. The describe step succeeds; its log
+// and its line of the serve log are no failure's output. The generate step
+// fails with a log event, a diagnostic and an error that holds its stderr.
+const (
+	fakeCLIDescribeLog     = "described the fixture project"
+	fakeCLIDescribeRender  = "describe rendered its serve log"
+	fakeCLIGenerateLog     = "generate failed: fixture boom"
+	fakeCLIGenerateFile    = "src/app.fixture"
+	fakeCLIGenerateProblem = "the fixture source does not parse"
+	fakeCLIGenerateStderr  = "fixture generator: exit status 1"
 )
 
 // fakeCLIGenerated is the line a generate step that succeeds renders on
@@ -55,9 +75,10 @@ const fakeCLISlowPrepareDelay = 3 * time.Second
 // Files the fake CLI writes in the project directory, and the stop order it
 // appends to at the workspace root.
 const (
-	fakeCLIArgsFile   = "argv.json"
-	fakeCLIGroupsFile = "groups.log"
-	fakeCLIStopFile   = "stop-order.log"
+	fakeCLIArgsFile        = "argv.json"
+	fakeCLIGroupsFile      = "groups.log"
+	fakeCLIStopFile        = "stop-order.log"
+	fakeCLIInteractiveFile = "interactive.txt"
 )
 
 // fakeCLIInterrupted is the fake's exit code once SIGTERM stopped it.
@@ -108,8 +129,22 @@ func runFakeCLI(args []string) int {
 	}
 	generate := run.project + ":serve~generate"
 	if run.fixture.CLI == fakeCLIFailPrepare {
-		fmt.Fprintln(os.Stderr, "["+generate+"] generate failed: fixture boom")
-		run.out.taskEnd(generate, protocolcli.TaskStatusFailed, 1)
+		describe := run.project + ":serve~describe"
+		run.out.event(describe, map[string]any{"type": "log", "level": "info", "message": fakeCLIDescribeLog})
+		fmt.Fprintln(os.Stderr, "["+describe+"] "+fakeCLIDescribeRender)
+		run.out.taskEnd(describe, protocolcli.TaskStatusSuccess, 0)
+		run.out.event(generate, map[string]any{"type": "log", "level": "debug", "message": "fixture generate debug"})
+		run.out.event(generate, map[string]any{"type": "log", "level": "error", "message": fakeCLIGenerateLog})
+		fmt.Fprintln(os.Stderr, "["+generate+"] "+fakeCLIGenerateLog)
+		run.out.write(protocolcli.SessionStreamRecord{
+			Record:   protocolcli.RecordTaskEnd,
+			Identity: &protocolcli.TaskIdentity{Key: generate},
+			Task: &protocolcli.TaskRecord{
+				Status: protocolcli.TaskStatusFailed, ExitCode: 1,
+				Error:       &protocolcli.ResultError{Code: "failure", Message: fakeCLIGenerateStderr},
+				Diagnostics: []protocolcli.Diagnostic{{Severity: "error", Message: fakeCLIGenerateProblem, File: fakeCLIGenerateFile, Line: 3}},
+			},
+		})
 		run.out.sessionEnd()
 		return 1
 	}
@@ -146,6 +181,13 @@ func parseFakeServeRun(args []string) (*fakeServeRun, error) {
 	if err := os.WriteFile(filepath.Join(run.dir, fakeCLIArgsFile), argv, 0o600); err != nil {
 		return nil, err
 	}
+	interactive, set := os.LookupEnv(interactiveEnv)
+	if !set {
+		interactive = "unset"
+	}
+	if err := os.WriteFile(filepath.Join(run.dir, fakeCLIInteractiveFile), []byte(interactive), 0o600); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(filepath.Join(run.dir, "fixture.json"))
 	if err == nil {
 		err = json.Unmarshal(data, &run.fixture)
@@ -167,9 +209,16 @@ func (r *fakeServeRun) serve(env map[string]string, signals <-chan os.Signal) in
 			r.out.sessionEnd()
 			return 1
 		}
-		var restart <-chan struct{}
-		if r.fixture.CLI == fakeCLIRestart && attempt == 0 {
+		var restart, end <-chan struct{}
+		if (r.fixture.CLI == fakeCLIRestart || r.fixture.CLI == fakeCLIRestartThenEnd) && attempt == 0 {
 			restart = workload.ready
+		}
+		if r.fixture.CLI == fakeCLIRestartThenEnd && attempt == 1 {
+			end = workload.ready
+		}
+		stop := signals
+		if r.fixture.CLI == fakeCLIIgnoreStop {
+			stop = nil
 		}
 		select {
 		case <-workload.done:
@@ -192,7 +241,11 @@ func (r *fakeServeRun) serve(env map[string]string, signals <-chan os.Signal) in
 		case <-restart:
 			workload.stop()
 			r.out.taskEnd(key, protocolcli.TaskStatusCanceled, 0)
-		case <-signals:
+		case <-end:
+			workload.stop()
+			r.out.sessionEnd()
+			return 1
+		case <-stop:
 			r.recordStop()
 			workload.stop()
 			r.out.taskEnd(key, protocolcli.TaskStatusCanceled, 0)

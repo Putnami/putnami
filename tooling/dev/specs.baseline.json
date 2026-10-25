@@ -13,6 +13,8 @@
     "tooling/version-commands#release-refusals",
     "tooling/version-commands#usage-and-host-errors",
     "tooling/version-commands#version-group-runs-the-executable",
+    "tooling/workload-qualification#a-member-is-reached-through-its-stable-proxy",
+    "tooling/workload-qualification#compose-follows-each-serve-step-through-the-session-stream",
     "tooling/workload-qualification#each-member-is-an-ordinary-serve-run",
     "tooling/workload-qualification#ephemeral-databases-per-composition",
     "tooling/workload-qualification#every-non-pass-state-exits-non-zero",
@@ -23,8 +25,11 @@
     "tooling/workload-qualification#no-derivable-request-is-unsupported-not-success",
     "tooling/workload-qualification#remote-verdict-binds-to-the-deployed-sha",
     "tooling/workload-qualification#runs-with-closure-served-behind-stable-proxies",
+    "tooling/workload-qualification#serve-run-output-reaches-stderr-only",
     "tooling/workload-qualification#smoke-is-derived-from-the-route-inventory",
+    "tooling/workload-qualification#the-dev-executable-reads-its-launch-from-the-job-context",
     "tooling/workload-qualification#the-dev-extension-runs-compose-and-qualify",
+    "tooling/workload-qualification#the-lease-and-the-teardown-cover-every-serve-run",
     "tooling/workload-qualification#typed-readiness-bounds-every-member",
     "tooling/workload-qualification#ungraceful-death-is-reaped-by-the-next-invocation"
   ]

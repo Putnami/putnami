@@ -1,6 +1,16 @@
 # ADR 0003 — The dev executable serves `compose` and `qualify`
 
-- **Status**: proposed
+- **Status**: accepted
+- **Date**: 2026-10-25
+- **Amended**: 2026-10-25, §2 and §4: the launch reader also reads the output
+  flags `--verbose`, `--quiet` and `--no-color` from the job context, and each
+  member's serve run takes them. Differences (a), (b) and (d) no longer hold:
+  putnami keeps the exit code of an interactive command that exits by itself
+  after a signal, so a composition a signal stopped exits 0; qualify passes
+  the members' serve logs through in a verbose human run; and the job context
+  carries each project's resolved `runsWith` in `ProjectRef.runsWith`
+  (`go.putnami.dev/protocol/job`), so a TypeScript `package.json`
+  `putnami.runsWith` is read. One narrower difference replaces (b), as (f).
 - **Scope**: `@putnami/dev` (`tooling/dev`): its manifest, its runtime, the
   packages `internal/compose`, `internal/qualify` and `internal/cliargs`, and
   its Go module
@@ -44,8 +54,9 @@ and qualify bounds itself with its own ready and request deadlines.
 
 `main.go` dispatches `compose up` and `qualify run` to one launch reader. It
 takes the host channel out of the environment, so no serve run inherits it.
-It reads the output mode and the workspace membership (`workspaceProjects`)
-from the job context putnami appends, and the workspace configuration from
+It reads the output mode, the output flags `--verbose`, `--quiet` and
+`--no-color`, and the workspace membership (`workspaceProjects`, whose
+entries carry the resolved `runsWith`) from the job context putnami appends, and the workspace configuration from
 `putnami.workspace.json`. It reads the absolute putnami executable from
 `PUTNAMI_CLI_EXECUTABLE`. A launch without a job context, a membership or an
 absolute executable fails with exit status 1 before anything starts.
@@ -73,20 +84,24 @@ was clean, and 1 otherwise.
 
 Known differences from the core's commands:
 
-- **(a) A signal exit.** putnami reports a composition a signal stopped as
-  interrupted, with exit status 130, where the core exited 0.
-- **(b) Global flags.** `--verbose`, `--quiet` and `--no-color` do not reach
+- ~~**(a) A signal exit.** putnami reports a composition a signal stopped as
+  interrupted, with exit status 130, where the core exited 0.~~ Struck by the
+  2026-10-25 amendment.
+- ~~**(b) Global flags.** `--verbose`, `--quiet` and `--no-color` do not reach
   the members' serve runs. qualify drops the members' serve logs in every
-  output mode.
+  output mode.~~ Struck by the 2026-10-25 amendment.
 - **(c) The serve command.** A member runs `serve`, the verb this extension
   declares, so the codes `compose.no_serve_command` and
   `compose.ambiguous_serve` are deleted. `disable.jobs` turns a member off
   with `serve` or `<extension>:serve`.
-- **(d) `runsWith`.** Compose reads `runsWith` from each project's
+- ~~**(d) `runsWith`.** Compose reads `runsWith` from each project's
   `putnami.json` in the job context. A TypeScript `package.json`
-  `putnami.runsWith` is not read.
+  `putnami.runsWith` is not read.~~ Struck by the 2026-10-25 amendment.
 - **(e) Workspace warnings.** A result envelope carries no
   `workspaceWarnings`.
+- **(f) A failed preparation.** Outside a verbose human run, qualify writes on
+  stderr the member, the step that failed its serve run's preparation and
+  that step's own output, where the core wrote a count of the failed steps.
 
 ### 5. A hosted run refuses both groups
 

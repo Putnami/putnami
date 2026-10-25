@@ -378,6 +378,13 @@ them:
   whose producer resolves every project's list, an entry without `runsWith`
   runs with nothing.
 
+  The orchestrator keys a task that reads the Git candidate cut (a `git:`
+  pattern among its key inputs) on the whole membership `workspaceProjects`
+  carries, without `version` and `fullPath`, so `runsWith` enters that key as
+  `type` does. An edit to a project's resolved `runsWith` invalidates such a
+  task's cached results, and the release that added the member invalidated
+  each of them once, in a workspace where a project runs with another.
+
 All eight are omitempty, so a producer that has nothing to say emits none,
 except that a `workspaceProjects` entry always carries `type`.
 

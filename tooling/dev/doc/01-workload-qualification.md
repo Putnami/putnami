@@ -7,8 +7,9 @@ without re-running anything.
 
 `@putnami/dev` serves `putnami compose` and `putnami qualify`, as the
 `compose` and `qualify` command groups. Each group runs its only subcommand,
-`compose up` and `qualify run`, when the first word after the group is a
-project, so both spellings work. Every language extension depends on
+`compose up` and `qualify run`, when the first word after the group names none
+of the group's subcommands, such as a project, so both spellings work. A
+project named `up` or `run` takes its id. Every language extension depends on
 `@putnami/dev`, so a workspace that declares one has both commands.
 
 The wire documents live in [`protocols/qualify`](../../../protocols/qualify/README.md);
@@ -81,7 +82,10 @@ step (config merge, generate, describe, and the steps of their dependencies)
 runs as an ordinary cached session, one session per member, and then the engine
 starts the serve step. `compose` reads the run's session stream on stdout for
 the serve step's process group, its readiness claims and its end, and passes
-the run's stderr through. It never starts a serve step itself.
+the run's stderr through. It never starts a serve step itself. The run inherits
+the environment of `compose` without `PUTNAMI_INTERACTIVE`, which putnami sets
+for the interactive command that runs `compose`: a serve run is no interactive
+command, and the steps it starts inherit its environment.
 
 Readiness is never inferred from a log line or a TCP poll. A serve run that
 fails before its serve step starts, on a usage error or a failed finite step,
@@ -97,7 +101,9 @@ Dependencies run production-mode (`NODE_ENV=production`) without watch
 (`--no-watch`). The target's serve run watches by default: a change re-plans its
 pipeline and restarts its serve step behind the same proxy URL, and `compose`
 follows the new step's process group and port. `--no-watch` runs it like its
-dependencies.
+dependencies. A target whose serve run ends reports how its serve last ended:
+the serve step's own exit status, else the run's exit code. The step a restart
+canceled is not that end.
 
 Production mode selects the build, not the configuration. A production member
 also receives `APP_ENV=local`, unless you exported `APP_ENV` yourself, so it
@@ -146,7 +152,7 @@ process only, through the serve run's `--serve-env -`: it never reaches a file
 in the project tree, a session record, a job context, a cache key, the lease,
 an error, or the output, which name sections and datasources only. A member's own output is not held to that: a workload can print
 what it received, so its log lines stay out of every error message, structured
-failure document and verdict, and reach stderr in text output only. A composition started from an environment that already carries `CONFIG_DATA`
+failure document and verdict, and reach stderr only. A composition started from an environment that already carries `CONFIG_DATA`
 is refused (`compose.config_data_conflict`) rather than merged. A serve task that
 declares `CONFIG_DATA` in its own manifest `env` is refused by the member's
 serve run, because `--serve-env` refuses a variable the task would replace, and
@@ -181,9 +187,10 @@ A failure is a single failure document whose `data` is `{code, id, member, phase
 `putnami compose` exits `0` only when the composition stopped on a signal and
 its cleanup is `clean`; a target that exits on its own, a failed start and a
 `partial` cleanup exit `1`. putnami keeps that exit code after a signal,
-because `compose` exits by itself once its teardown ends. putnami exits `130`
-only when it killed `compose`: on a second signal, or when the teardown
-outlasts the 90 seconds putnami waits for it.
+because `compose` exits by itself once its teardown ends. The teardown takes at
+most 75 seconds, so it ends before putnami stops waiting for it 90 seconds after
+the signal. putnami exits `130` only when it killed `compose`: on a second
+signal, or past those 90 seconds.
 
 ### Recovery
 
@@ -200,8 +207,10 @@ names it. On `SIGINT` or `SIGTERM`, `compose` stops the members' serve runs in
 reverse start order: each run receives `SIGTERM`, stops its serve step
 (`SIGTERM`, then `SIGKILL` after five seconds) and exits, and a run still running
 after 30 seconds receives `SIGKILL`. `compose` then closes the proxies, drops
-the databases, confirms none is left, and removes the lease. Whatever survives
-is reported as `cleanup.state: partial` and stays in the lease.
+the databases, confirms none is left, and removes the lease. The whole teardown
+has 75 seconds: once they pass, a run still running receives `SIGKILL` at once,
+and `compose` waits for no killed run. Whatever survives is reported as
+`cleanup.state: partial` and stays in the lease.
 
 A composition killed without teardown (`kill -9`, a crash) leaves its lease. The
 next `compose` reaps every lease whose lock is free **and** whose pid is dead:
@@ -300,9 +309,12 @@ phase.
 stdout carries the verdict alone. With `--verbose` in text output, stderr shows
 what each member's serve run renders: the output of its finite steps and its
 serve log. Otherwise, and in every structured output mode, stderr shows only
-the output of a serve run that failed before its serve step started, which
-says why the verdict is `composition_failed`. Each serve run takes the
-`--quiet` and `--no-color` you typed, as under `compose`.
+why a serve run failed before its serve step started, which is why the verdict
+is `composition_failed`: the member, the step that failed and that step's own
+output (its log events, diagnostics and error, as the run's session stream
+reports them), or the run's last lines when no step failed, as on a refused
+flag. The steps that succeeded and the serve logs stay off stderr. Each serve
+run takes the `--quiet` and `--no-color` you typed, as under `compose`.
 
 #### Readiness
 
@@ -328,10 +340,11 @@ polls `<prefix>/readyz` through the target's proxy instead, as it does for a URL
 target. The platform plugin of both frameworks answers `503` there until the
 same completed startup, so a `200` proves the same thing as the claim.
 
-Serve logs are not part of the verdict: `qualify` drops each member's serve
-run output, preparation included, in every output mode. A composition
-failure's diagnostic still names the member and the phase, and for
-`compose.prepare_failed` the step that failed.
+Serve logs are not part of the verdict: no verdict document, phase diagnostic
+or error carries a member's output, in any output mode. A composition
+failure's diagnostic names the member and the phase, and for
+`compose.prepare_failed` the step that failed; that step's own output reaches
+stderr only, as described above.
 
 #### The tree binding
 

@@ -22,10 +22,6 @@ import (
 // the documents of `putnami compose` reads the same documents.
 const CommandPath = "compose"
 
-// teardownTimeout bounds Close after the composition stops. Each member's serve
-// run gets its SIGTERM-then-SIGKILL window; the rest is proxies and databases.
-const teardownTimeout = 90 * time.Second
-
 // commandFlags are the flags `putnami compose` accepts after putnami consumed
 // its own: --watch=false reaches this command as --no-watch.
 var commandFlags = []cliargs.Flag{

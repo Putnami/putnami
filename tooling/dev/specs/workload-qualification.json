@@ -21,7 +21,11 @@
   "requirements": [
     {
       "id": "runs-with-closure-served-behind-stable-proxies",
-      "text": "compose serves the transitive runsWith closure of one project in topological order, reading each runsWith list from the workspace membership of its job context: the list putnami.json authors, else the one the provider reported, such as a TypeScript package.json's putnami.runsWith. Each member runs behind a 127.0.0.1 proxy whose URL is known before any process starts and answers 503 until the member announces a port. A dependant receives each provider's proxy URL under its client-contract service id and its project name. A library, image, unknown or cyclic member, or one whose configuration disables serve, is refused before anything starts."
+      "text": "compose serves the transitive runsWith closure of one project in topological order, reading each runsWith list from the workspace membership of its job context: the list putnami.json authors, else the one the provider reported, such as a TypeScript package.json's putnami.runsWith. A library, image, unknown or cyclic member, or one whose configuration disables serve, is refused before anything starts."
+    },
+    {
+      "id": "a-member-is-reached-through-its-stable-proxy",
+      "text": "Each member of a composition runs behind a 127.0.0.1 proxy whose URL is known before any process starts and answers 503 until the member announces a port. A dependant receives each provider's proxy URL under its client-contract service id and its project name."
     },
     {
       "id": "ephemeral-databases-per-composition",
@@ -69,11 +73,27 @@
     },
     {
       "id": "each-member-is-an-ordinary-serve-run",
-      "text": "compose starts each member as `putnami serve --projects <member> --port 0 --serve-env - --output=jsonl`, with the putnami executable that launched it, with --no-watch unless the member is the watched target, and with the invocation's --verbose, --quiet and --no-color; a structured run always adds --no-color. The member's environment document (the port, production mode for a dependency and an unwatched target, and CONFIG_DATA) arrives on the run's stdin and reaches only its serve step, never a session file. compose reads the run's session stream for the serve step's process group, its readiness claims and its end, passes the run's stderr through and keeps its last lines for a failure (qualify passes it through only in a verbose human run, and otherwise writes on stderr only what a run that failed before its serve step rendered); a run that fails before its serve step starts is compose.prepare_failed, and --ready-timeout and readyMs count from the serve step's start, so the run's finite steps never count against them. The lease records the run's process group and each serve step's, with their leaders' start times, so the next invocation reaps both. Teardown stops the members' runs in reverse start order, then the proxies, the databases and the lease. The start, exit, failure and verdict documents keep their bytes."
+      "text": "compose runs each member as `putnami serve --projects <member> --port 0 --serve-env - --output=jsonl` of the putnami that launched it, without PUTNAMI_INTERACTIVE, with --no-watch unless it is the watched target, and with the invocation's --verbose, --quiet and --no-color; a structured run always adds --no-color. Its environment document arrives on stdin and reaches only its serve step, never a session file. The start, exit, failure and verdict documents keep their bytes."
+    },
+    {
+      "id": "compose-follows-each-serve-step-through-the-session-stream",
+      "text": "compose reads each serve run's session stream for the serve step's process group, its readiness claims and its end. A run that fails before its serve step starts is compose.prepare_failed, and --ready-timeout and readyMs count from the serve step's start, so the run's finite steps never count against them. A member reports how its serve last ended: the serve step's own end, else the run's exit, never a step the run canceled to replace it."
+    },
+    {
+      "id": "serve-run-output-reaches-stderr-only",
+      "text": "compose passes each serve run's stderr through and keeps its last lines for a failure. qualify passes it through only in a verbose human run; otherwise it writes on stderr only the output of the step that failed a run before its serve step, from the session stream: that step's log events, diagnostics and error, or the run's last lines when no step failed."
+    },
+    {
+      "id": "the-lease-and-the-teardown-cover-every-serve-run",
+      "text": "The lease records each serve run's process group and each serve step's, with their leaders' start times, so the next invocation reaps both. Teardown stops the members' runs in reverse start order, then the proxies, the databases and the lease, within 75s, so it ends before putnami kills the command 90s after a signal; it waits for a killed run no longer than that."
     },
     {
       "id": "the-dev-extension-runs-compose-and-qualify",
-      "text": "The @putnami/dev manifest declares the compose and qualify command groups at CLI contract 15. Each defaults to its only subcommand, up and run, which is interactive and takes the project as a required positional, so putnami compose <project> and putnami qualify <project> run it with their flags unchanged. compose-up declares the serve workload and qualify-run the once workload, so no portable, commit-addressed or MCP run carries either. Their tasks run the dev executable in the workspace root, uncached and without a deadline. The executable reads the workspace membership and the output flags --verbose, --quiet and --no-color from the job context putnami appends and starts each serve run with the absolute putnami executable PUTNAMI_CLI_EXECUTABLE names; a launch without either fails with exit status 1 before anything starts, and a usage error exits 2. A hosted run refuses both groups, as it refuses every extension command group."
+      "text": "The @putnami/dev manifest declares the compose and qualify command groups at CLI contract 15. Each defaults to its only subcommand, up and run, which is interactive and takes the project as a required positional, so putnami compose <project> and putnami qualify <project> run it. compose-up declares the serve workload and qualify-run the once workload, so no portable, commit-addressed or MCP run carries either. Their tasks run the dev executable in the workspace root, uncached and without a deadline."
+    },
+    {
+      "id": "the-dev-executable-reads-its-launch-from-the-job-context",
+      "text": "The dev executable reads the workspace membership and the output flags --verbose, --quiet and --no-color from the job context putnami appends, and starts each serve run with the absolute putnami executable PUTNAMI_CLI_EXECUTABLE names. A launch without either fails with exit status 1 before anything starts, and a usage error exits 2. A hosted run refuses both groups."
     }
   ],
   "decisions": [

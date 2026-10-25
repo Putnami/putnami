@@ -326,7 +326,7 @@ func runCase(t *testing.T, cli, root string, tc devWorkloadCase) answer {
 
 // awaitOutput waits until stdout matches pattern, failing the test when the
 // run ends first or nothing matches within a minute.
-func awaitOutput(t *testing.T, stdout *lockedBuffer, pattern *regexp.Regexp, done <-chan error, stderr *bytes.Buffer) {
+func awaitOutput(t *testing.T, stdout *lockedBuffer, pattern *regexp.Regexp, done <-chan error, stderr fmt.Stringer) {
 	t.Helper()
 	deadline := time.After(time.Minute)
 	for !pattern.MatchString(stdout.String()) {

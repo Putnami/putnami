@@ -126,7 +126,7 @@ func TestConfigData_RefusesAnEnvironmentThatAlreadyCarriesConfigData(t *testing.
 }
 
 func TestProxy_503UntilBackendKnown_ThenForwardsAndKeepsHost(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "runs-with-closure-served-behind-stable-proxies",
+	spectest.Proves(t, "tooling/workload-qualification", "a-member-is-reached-through-its-stable-proxy",
 		"the-proxy-answers-unavailable-until-the-backend-is-known")
 	var seenHost string
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

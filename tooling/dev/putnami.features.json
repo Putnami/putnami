@@ -226,7 +226,19 @@
             "checks": [
               "the-closure-is-transitive-runs-with-in-topological-order",
               "a-provider-reported-runs-with-composes-its-provider",
-              "an-unserveable-member-is-refused-before-anything-starts",
+              "an-unserveable-member-is-refused-before-anything-starts"
+            ]
+          }
+        },
+        {
+          "id": "a-member-is-reached-through-its-stable-proxy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
               "the-proxy-answers-unavailable-until-the-backend-is-known",
               "dependants-reach-a-provider-through-its-injected-proxy-url"
             ]
@@ -404,18 +416,58 @@
             "kind": "acceptance",
             "checks": [
               "a-member-starts-as-a-serve-run-of-the-cli-with-its-environment-on-stdin",
-              "the-lease-records-the-serve-run-and-each-serve-step-with-its-leader-start",
-              "members-stop-in-reverse-start-order",
-              "a-failed-preparation-is-prepare-failed-with-the-output-tail",
-              "the-ready-timeout-counts-from-the-serve-step-start",
-              "a-watched-target-follows-its-serve-step-across-restarts",
-              "a-killed-composition-leaves-both-groups-of-each-member-to-the-reap",
               "the-environment-document-reaches-no-session-file",
               "the-start-exit-and-verdict-documents-keep-their-bytes",
               "each-serve-run-takes-the-invocations-output-flags",
+              "a-serve-run-does-not-inherit-the-interactive-marker"
+            ]
+          }
+        },
+        {
+          "id": "compose-follows-each-serve-step-through-the-session-stream",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-preparation-is-prepare-failed-with-the-output-tail",
+              "the-ready-timeout-counts-from-the-serve-step-start",
+              "a-watched-target-follows-its-serve-step-across-restarts",
+              "a-member-reports-how-its-serve-last-ended"
+            ]
+          }
+        },
+        {
+          "id": "serve-run-output-reaches-stderr-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
               "a-caller-without-serve-logs-sees-only-a-failed-preparation",
               "qualify-shows-the-serve-logs-only-in-a-verbose-human-run",
               "qualify-reports-a-failed-preparation-on-stderr"
+            ]
+          }
+        },
+        {
+          "id": "the-lease-and-the-teardown-cover-every-serve-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-lease-records-the-serve-run-and-each-serve-step-with-its-leader-start",
+              "members-stop-in-reverse-start-order",
+              "a-killed-composition-leaves-both-groups-of-each-member-to-the-reap",
+              "the-teardown-waits-no-longer-than-its-deadline",
+              "the-teardown-ends-before-putnami-kills-the-command"
             ]
           }
         },
@@ -428,7 +480,19 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-manifest-declares-the-compose-and-qualify-groups",
+              "the-manifest-declares-the-compose-and-qualify-groups"
+            ]
+          }
+        },
+        {
+          "id": "the-dev-executable-reads-its-launch-from-the-job-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
               "the-executable-dispatches-the-compose-and-qualify-commands",
               "the-executable-reads-the-output-flags-from-the-job-context"
             ]

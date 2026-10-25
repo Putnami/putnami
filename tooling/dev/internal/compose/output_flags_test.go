@@ -50,28 +50,48 @@ func TestRun_EachServeRunTakesTheInvocationsOutputFlags(t *testing.T) {
 }
 
 // A caller that discards the serve logs still learns why a preparation
-// failed: Failures receives what the serve run rendered before its serve step
-// would have started. A preparation that succeeds reports nothing there, and
-// the serve log never reaches it.
+// failed: Failures receives the member, why, and the output of the step that
+// failed, from the session stream: its log events but debug ones, its
+// diagnostics and its error. The steps that succeeded and the serve log are
+// not in it. A run that failed without a failed step, as on a refused flag,
+// reports the last lines it wrote. A preparation that succeeds reports
+// nothing there.
 func TestUp_FailuresReceiveOnlyAFailedPreparationsOutput(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", serveOutputRequirement,
 		"a-caller-without-serve-logs-sees-only-a-failed-preparation")
-	t.Run("failed", func(t *testing.T) {
-		fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", cli: fakeCLIFailPrepare})
-		var failures lockedBuffer
-		ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
-		defer cancel()
-		_, err := up(ctx, Options{
-			Workspace: fixture.ws, Executable: fixture.executable, Target: fixture.projects["/app"],
-			ReadyTimeout: 10 * hangDetector, Failures: &failures,
-		}, fixture.deps(nil))
-		if composeErr := composeError(t, err); composeErr.Code != CodePrepareFailed {
-			t.Fatalf("error = %v, want compose.prepare_failed", err)
-		}
-		if got := failures.String(); !strings.Contains(got, "generate failed: fixture boom") {
-			t.Errorf("failures = %q, want the failed step's output", got)
-		}
-	})
+	for _, tc := range []struct {
+		cli, want string
+	}{
+		{
+			cli: fakeCLIFailPrepare,
+			want: "/app: the serve run's step /app:serve~generate failed before the serve step started (failed, exit code 1):\n" +
+				"  | error: " + fakeCLIGenerateLog + "\n" +
+				"  | " + fakeCLIGenerateFile + ":3: error: " + fakeCLIGenerateProblem + "\n" +
+				"  | " + fakeCLIGenerateStderr + "\n",
+		},
+		{
+			cli: fakeCLIUsage,
+			want: "/app: the serve run exited before the serve step started (exit code 2):\n" +
+				"  | putnami: serve: unknown flag --fixture-refused\n",
+		},
+	} {
+		t.Run(tc.cli, func(t *testing.T) {
+			fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", cli: tc.cli})
+			var failures lockedBuffer
+			ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+			defer cancel()
+			_, err := up(ctx, Options{
+				Workspace: fixture.ws, Executable: fixture.executable, Target: fixture.projects["/app"],
+				ReadyTimeout: 10 * hangDetector, Failures: &failures,
+			}, fixture.deps(nil))
+			if composeErr := composeError(t, err); composeErr.Code != CodePrepareFailed {
+				t.Fatalf("error = %v, want compose.prepare_failed", err)
+			}
+			if got := failures.String(); got != tc.want {
+				t.Errorf("failures:\n%s\nwant:\n%s", got, tc.want)
+			}
+		})
+	}
 	t.Run("passed", func(t *testing.T) {
 		fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app"})
 		var failures, logs lockedBuffer

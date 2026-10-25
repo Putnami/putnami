@@ -8,13 +8,21 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-const serveRunRequirement = "each-member-is-an-ordinary-serve-run"
+// The requirements of tooling/workload-qualification that a member's serve
+// run carries.
+const (
+	serveRunRequirement    = "each-member-is-an-ordinary-serve-run"
+	serveStreamRequirement = "compose-follows-each-serve-step-through-the-session-stream"
+	serveOutputRequirement = "serve-run-output-reaches-stderr-only"
+	teardownRequirement    = "the-lease-and-the-teardown-cover-every-serve-run"
+)
 
 // Each member starts as `putnami serve` for its project alone, with an
 // ephemeral port, without color when the composition renders none, and its
@@ -24,7 +32,7 @@ const serveRunRequirement = "each-member-is-an-ordinary-serve-run"
 func TestUp_EachMemberIsAnOrdinaryServeRun(t *testing.T) {
 	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
 		"a-member-starts-as-a-serve-run-of-the-cli-with-its-environment-on-stdin")
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", teardownRequirement,
 		"the-lease-records-the-serve-run-and-each-serve-step-with-its-leader-start")
 	fixture := newCompositionFixture(t,
 		fixtureProject{id: "/provider", name: "provider"},
@@ -84,7 +92,7 @@ func TestUp_EachMemberIsAnOrdinaryServeRun(t *testing.T) {
 // Close stops the members' serve runs from the last started to the first, so a
 // dependant never outlives the provider it calls.
 func TestClose_StopsMembersInReverseStartOrder(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement, "members-stop-in-reverse-start-order")
+	spectest.Proves(t, "tooling/workload-qualification", teardownRequirement, "members-stop-in-reverse-start-order")
 	fixture := newCompositionFixture(t,
 		fixtureProject{id: "/provider", name: "provider"},
 		fixtureProject{id: "/middle", name: "middle", runsWith: []string{"provider"}},
@@ -109,7 +117,7 @@ func TestClose_StopsMembersInReverseStartOrder(t *testing.T) {
 // compose.prepare_failed for that member, at once, with the last lines of the
 // run's output as detail and never in the message.
 func TestUp_AServeRunThatFailsBeforeItsServeStepIsPrepareFailed(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", serveStreamRequirement,
 		"a-failed-preparation-is-prepare-failed-with-the-output-tail")
 	for _, tc := range []struct {
 		cli, message, detail string
@@ -170,7 +178,7 @@ func TestUp_AStrayLineOfTheServeRunJoinsItsOutput(t *testing.T) {
 // The ready timeout bounds the serve step, from its process event: a serve run
 // whose finite steps outlast it still starts a member that is ready in time.
 func TestUp_TheReadyTimeoutCountsFromTheServeStepStart(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", serveStreamRequirement,
 		"the-ready-timeout-counts-from-the-serve-step-start")
 	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", cli: fakeCLISlowPrepare})
 	ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
@@ -191,7 +199,7 @@ func TestUp_TheReadyTimeoutCountsFromTheServeStepStart(t *testing.T) {
 // composition follows it: it releases the group of the step that ended,
 // records the new one, and forwards to the port the new step announced.
 func TestUp_AWatchedTargetFollowsItsServeStepAcrossARestart(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", serveStreamRequirement,
 		"a-watched-target-follows-its-serve-step-across-restarts")
 	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", cli: fakeCLIRestart})
 	ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
@@ -221,11 +229,115 @@ func TestUp_AWatchedTargetFollowsItsServeStepAcrossARestart(t *testing.T) {
 	}
 }
 
+// A watched target's serve run that ends after it replaced its serve step
+// reports its own exit: the replaced step's cancellation is the run's doing,
+// and the step that replaced it never reported an end.
+func TestWait_AWatchedTargetReportsHowItsServeRunEnded(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", serveStreamRequirement,
+		"a-member-reports-how-its-serve-last-ended")
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", cli: fakeCLIRestartThenEnd})
+	ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+	defer cancel()
+	comp, err := up(ctx, Options{Workspace: fixture.ws, Executable: fixture.executable, Target: fixture.projects["/app"], WatchTarget: true, ReadyTimeout: hangDetector}, fixture.deps(nil))
+	if err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	defer comp.Close(context.Background())
+	composeErr := composeError(t, comp.Wait(ctx))
+	if want := "the target's serve step exited (serve run ended, exit code 1)"; composeErr.Code != CodeMemberExited || composeErr.Message != want {
+		t.Errorf("Wait = %v, want compose.member_exited with %q", composeErr, want)
+	}
+	if groups := fixture.serveGroups(t, "/app"); len(groups) != 2 {
+		t.Errorf("serve steps = %v, want the replaced one and its replacement", groups)
+	}
+}
+
+// A member's serve run does not inherit the interactive marker putnami set
+// for the command that runs compose: the run is no interactive command, and
+// the tasks it starts inherit its environment.
+func TestUp_AServeRunDoesNotInheritTheInteractiveMarker(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+		"a-serve-run-does-not-inherit-the-interactive-marker")
+	t.Setenv(interactiveEnv, "1")
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app"})
+	ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+	defer cancel()
+	comp, err := up(ctx, Options{Workspace: fixture.ws, Executable: fixture.executable, Target: fixture.projects["/app"], ReadyTimeout: hangDetector}, fixture.deps(nil))
+	if err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	defer comp.Close(context.Background())
+	data, err := os.ReadFile(filepath.Join(fixture.root, "app", fakeCLIInteractiveFile))
+	if err != nil {
+		t.Fatalf("the serve run left no environment record: %v", err)
+	}
+	if got := string(data); got != "unset" {
+		t.Errorf("the serve run's %s = %q, want it unset", interactiveEnv, got)
+	}
+}
+
+// A serve run that answers no signal is killed once the teardown's deadline
+// passed, and the teardown waits for it no longer than that: the run's serve
+// step, in a group of its own, outlives it and keeps its output open, which
+// the wait for the killed run would otherwise outlast the deadline for. The
+// report names the run, and the lease keeps what survived for the next
+// invocation's reap.
+func TestClose_WaitsForAKilledServeRunNoLongerThanItsDeadline(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", teardownRequirement,
+		"the-teardown-waits-no-longer-than-its-deadline")
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", mode: fixtureOutliveParent, cli: fakeCLIIgnoreStop})
+	ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+	defer cancel()
+	comp, err := up(ctx, Options{Workspace: fixture.ws, Executable: fixture.executable, Target: fixture.projects["/app"], ReadyTimeout: hangDetector}, fixture.deps(nil))
+	if err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+	groups := fixture.serveGroups(t, "/app")
+	// The serve step outlives the killed run; once it is gone too, the run's
+	// output closes and the member's end is recorded before the fixture goes.
+	t.Cleanup(func() {
+		for _, group := range groups {
+			_ = syscall.Kill(-group, syscall.SIGKILL)
+		}
+		select {
+		case <-comp.runtimes[0].exited:
+		case <-time.After(hangDetector):
+			t.Errorf("the serve run's output stayed open after its serve step was killed")
+		}
+	})
+
+	deadline := time.Second
+	teardown, stop := context.WithTimeout(context.Background(), deadline)
+	defer stop()
+	started := time.Now()
+	report := comp.Close(teardown)
+	if elapsed := time.Since(started); elapsed >= serveRunWaitDelay {
+		t.Errorf("Close took %s with a %s deadline, want it bounded by the deadline", elapsed, deadline)
+	}
+	if want := "serve run of /app did not stop before the teardown deadline"; report.State != CleanupPartial || !slices.Contains(report.Leftovers, want) {
+		t.Errorf("cleanup = %+v, want a partial one naming %q", report, want)
+	}
+	if lease := fixture.lease(t, comp.ID()); !slices.Contains(lease.PGIDs, groups[0]) {
+		t.Errorf("lease groups = %v, want the surviving serve step %d kept for the reap", lease.PGIDs, groups[0])
+	}
+}
+
+// The teardown ends before putnami, which runs this executable as an
+// interactive command, stops waiting for it after a signal and kills it: 90s.
+func TestTeardownTimeout_EndsBeforePutnamiKillsTheCommand(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", teardownRequirement,
+		"the-teardown-ends-before-putnami-kills-the-command")
+	const putnamiStopBudget = 90 * time.Second
+	if margin := putnamiStopBudget - teardownTimeout; margin < 15*time.Second {
+		t.Errorf("teardownTimeout %s leaves %s of putnami's %s stop budget, want at least 15s", teardownTimeout, margin, putnamiStopBudget)
+	}
+}
+
 // A composition killed without a teardown leaves both groups of each member on
 // its lease, its serve run's and its serve step's; the next invocation's reap
 // confirms and stops both.
 func TestReapOrphans_StopsTheServeRunAndTheServeStepOfAKilledComposition(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", serveRunRequirement,
+	spectest.Proves(t, "tooling/workload-qualification", teardownRequirement,
 		"a-killed-composition-leaves-both-groups-of-each-member-to-the-reap")
 	root := t.TempDir()
 	handshake := filepath.Join(t.TempDir(), "composition-id")

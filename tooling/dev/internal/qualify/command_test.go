@@ -272,7 +272,7 @@ func TestRun_AnInvalidInventoryIsAConfigurationError(t *testing.T) {
 // structured run whatever was typed, keeps stderr for a failed preparation and
 // the verdict error.
 func TestRun_QualifyShowsTheServeLogsOnlyInAVerboseHumanRun(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "each-member-is-an-ordinary-serve-run",
+	spectest.Proves(t, "tooling/workload-qualification", "serve-run-output-reaches-stderr-only",
 		"qualify-shows-the-serve-logs-only-in-a-verbose-human-run")
 	const serveLog = "[/app] fixture app starting in serve"
 	for _, tc := range []struct {
@@ -308,10 +308,10 @@ func TestRun_QualifyShowsTheServeLogsOnlyInAVerboseHumanRun(t *testing.T) {
 
 // A member whose serve run fails before its serve step starts says why on
 // qualify's stderr in every output mode, once: a verbose human run passes the
-// whole serve log through, and any other run writes only what the failed run
-// rendered. stdout stays the verdict.
+// whole serve log through, and any other run writes only the output of the
+// step that failed. stdout stays the verdict.
 func TestRun_QualifyReportsAFailedPreparationOnStderr(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "each-member-is-an-ordinary-serve-run",
+	spectest.Proves(t, "tooling/workload-qualification", "serve-run-output-reaches-stderr-only",
 		"qualify-reports-a-failed-preparation-on-stderr")
 	for _, tc := range []struct {
 		name    string
@@ -334,6 +334,11 @@ func TestRun_QualifyReportsAFailedPreparationOnStderr(t *testing.T) {
 			}
 			if count := strings.Count(stderr.String(), fakeCLIPrepareFailure); count != 1 {
 				t.Errorf("stderr reports the failed preparation %d times, want once:\n%s", count, stderr.String())
+			}
+			// Only a verbose human run shows the serve log, with the steps
+			// that succeeded; any other run shows the failed step alone.
+			if got := strings.Contains(stderr.String(), fakeCLIDescribed); got != (tc.verbose && tc.mode == "") {
+				t.Errorf("stderr shows the step that succeeded: %v, want %v:\n%s", got, tc.verbose && tc.mode == "", stderr.String())
 			}
 			if strings.Contains(stdout.String(), fakeCLIPrepareFailure) {
 				t.Errorf("stdout carries the preparation output:\n%s", stdout.String())

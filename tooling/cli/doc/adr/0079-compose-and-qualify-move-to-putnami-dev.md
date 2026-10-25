@@ -1,7 +1,16 @@
 # ADR 0079 — Compose and qualify move to @putnami/dev
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-10-25
+- **Amended**: 2026-10-25, the known differences: (a), (b) and (d) no longer
+  hold. putnami keeps the exit code of an interactive command that exits by
+  itself after a signal, so a composition a signal stopped exits 0. Each
+  member's serve run takes `--verbose`, `--quiet` and `--no-color` from the
+  job context, and `qualify` passes the members' serve logs through in a
+  verbose human run. The job context carries each project's resolved
+  `runsWith` in `ProjectRef.runsWith` (`go.putnami.dev/protocol/job`), so
+  compose reads a `putnami.runsWith` that only a TypeScript `package.json`
+  declares. One narrower difference replaces (b), as (f).
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commandmeta`,
   `internal/engine`, `internal/mcp`), `@putnami/dev`,
   `go.putnami.dev/protocol/runner` and `go.putnami.dev/protocol/telemetry`;
@@ -82,22 +91,27 @@ the names were core commands then.
 
 ### Known differences from the core's commands
 
-- **(a) A signal exit.** A composition stopped by a signal exits 130, where
+- ~~**(a) A signal exit.** A composition stopped by a signal exits 130, where
   the core exited 0: the core reports every interactive command it canceled
-  as interrupted.
-- **(b) Global flags.** `--verbose`, `--quiet` and `--no-color` no longer
+  as interrupted.~~ Struck by the 2026-10-25 amendment.
+- ~~**(b) Global flags.** `--verbose`, `--quiet` and `--no-color` no longer
   reach the members' serve logs. `qualify` drops the members' serve logs in
-  every output mode, where the core printed them with `--verbose`.
+  every output mode, where the core printed them with `--verbose`.~~ Struck
+  by the 2026-10-25 amendment.
 - **(c) The serve command.** Compose requests `serve`, the development verb
   `@putnami/dev` declares, so `compose.no_serve_command` and
   `compose.ambiguous_serve` are deleted. A member that `disable.jobs` turns
   off names `serve` or `<extension>:serve`.
-- **(d) `runsWith`.** Compose reads each project's `runsWith` from its
+- ~~**(d) `runsWith`.** Compose reads each project's `runsWith` from its
   `putnami.json`, which the job context carries. A `putnami.runsWith` that
   only a TypeScript `package.json` declares, which the core read from the
-  language extension's project view, is not read.
+  language extension's project view, is not read.~~ Struck by the 2026-10-25
+  amendment.
 - **(e) Workspace warnings.** The dev executable's result envelopes carry no
   `workspaceWarnings`.
+- **(f) A failed preparation.** Outside a verbose human run, `qualify` writes
+  on stderr the member, the step that failed its serve run's preparation and
+  that step's own output, where the core wrote a count of the failed steps.
 
 ## Rejected alternatives
 
@@ -111,7 +125,8 @@ the names were core commands then.
   the owner rule allows no transition shim.
 - **A host RPC method that answers the resolved workspace.** It would carry the
   provider-view `runsWith` of difference (d), but it adds a host contract for
-  one field. An additive member of the job context is the smaller follow-up.
+  one field. The job context carries it instead, in the additive member
+  `ProjectRef.runsWith` of `workspaceProjects`.
 
 ## Consequences
 

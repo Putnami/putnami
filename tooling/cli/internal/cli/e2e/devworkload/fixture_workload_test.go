@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -25,6 +26,22 @@ import (
 // fixture extension serves every project, so the workload reads what it is
 // from fixture.json in its working directory, the project directory.
 const fixtureModeEnv = "PUTNAMI_DEV_WORKLOAD_FIXTURE"
+
+// fixtureStartsEnv, when set, names a directory outside the workspace where
+// each fixture member records its start, in <pid>.json: what it is, and the
+// environment its serve step received. Outside the workspace, the record
+// changes no file a watched serve run or a tree binding reads. runEnv drops
+// every PUTNAMI_ variable of the test's environment, so the name has no
+// PUTNAMI_ prefix.
+const fixtureStartsEnv = "DEV_WORKLOAD_FIXTURE_STARTS"
+
+// fixtureStart is a member's start record.
+type fixtureStart struct {
+	Member     string `json:"member"`
+	PID        int    `json:"pid"`
+	Port       string `json:"port"`
+	ConfigData string `json:"configData"`
+}
 
 // Fixture modes.
 const (
@@ -103,6 +120,15 @@ func runFixtureWorkload() int {
 		emitLog("error", "fixture "+config.Member+" cannot start")
 		return 3
 	}
+	if dir := os.Getenv(fixtureStartsEnv); dir != "" {
+		record, _ := json.Marshal(fixtureStart{
+			Member: config.Member, PID: os.Getpid(), Port: os.Getenv("PORT"), ConfigData: os.Getenv("CONFIG_DATA"),
+		})
+		if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(os.Getpid())+".json"), record, 0o600); err != nil {
+			emitLog("error", "record the start: "+err.Error())
+			return 1
+		}
+	}
 	listener, err := net.Listen("tcp", "127.0.0.1:"+os.Getenv("PORT"))
 	if err != nil {
 		emitLog("error", err.Error())
@@ -112,6 +138,9 @@ func runFixtureWorkload() int {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/whoami", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, config.Member)
+	})
+	mux.HandleFunc("/pid", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, strconv.Itoa(os.Getpid()))
 	})
 	mux.HandleFunc("/items", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

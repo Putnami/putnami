@@ -21,6 +21,13 @@ const DefaultReadyTimeout = 60 * time.Second
 // ten, so this is a hang detector, not a grace period.
 const memberStopTimeout = 30 * time.Second
 
+// teardownTimeout bounds a composition's teardown, after it stopped or after
+// its start failed. putnami waits 90s for the interactive command it runs this
+// executable as to exit after a signal, then kills it; the teardown ends 15s
+// before that, so the composition reports what it left behind and releases its
+// lease itself.
+const teardownTimeout = 75 * time.Second
+
 // Cleanup states.
 const (
 	CleanupClean   = "clean"
@@ -50,10 +57,13 @@ type Options struct {
 	// on stderr as `putnami serve` renders it. Nil discards it; a failure keeps
 	// its last lines either way (Error.Detail).
 	Logs io.Writer
-	// Failures receives the text a member's serve run rendered before its
-	// serve step started, once that run failed its preparation: the output of
-	// the finite steps that failed. Nil reports none. A caller that discards
-	// Logs sets it so a failed preparation still says why.
+	// Failures receives, once a member's serve run failed its preparation,
+	// the member, why, and the output of the step that failed: its log events,
+	// diagnostics and error from the session stream. When no step failed, as
+	// when the run refused its arguments, it receives the last lines the run
+	// wrote. Steps that succeeded and the serve log never reach it. Nil reports
+	// none. A caller that discards Logs sets it so a failed preparation still
+	// says why.
 	Failures io.Writer
 	// Verbose, Quiet and NoColor are the caller's --verbose, --quiet and
 	// --no-color, which each member's serve run takes as its own: they shape
@@ -166,7 +176,7 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 	// error, so a caller that records cleanup (qualify --target local) states
 	// what a failed start left behind instead of assuming nothing.
 	fail := func(err error) (*Composition, error) {
-		teardown, stop := context.WithTimeout(context.Background(), memberStopTimeout+time.Minute)
+		teardown, stop := context.WithTimeout(context.Background(), teardownTimeout)
 		defer stop()
 		report := c.Close(teardown)
 		var composeErr *Error

@@ -70,5 +70,6 @@ move no rung.
 - A manifest stamped below 15 with such a default is refused with "requires 15
   for a default subcommand that takes positionals" and `putnami extensions
   update` as the remedy.
-- `@putnami/dev` keeps its stamp until its `compose` group declares a
-  positional default.
+- `@putnami/dev` claims 15: its `compose` and `qualify` groups each declare a
+  default that takes the positional `project`
+  ([ADR 0003 of `@putnami/dev`](../../../../tooling/dev/doc/adr/0003-the-dev-executable-serves-compose-and-qualify.md)).

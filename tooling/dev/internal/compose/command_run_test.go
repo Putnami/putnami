@@ -326,7 +326,9 @@ func TestRun_RefusesAnInvocationBeforeAnythingStarts(t *testing.T) {
 }
 
 // A target that stops on its own fails the run: in text mode the exit table
-// follows the start table, then the member's output tail and the error.
+// follows the start table, then the member's output tail and the error. The
+// members' serve logs reach stderr, as the core's compose rendered them:
+// stdout holds the tables alone.
 func TestRun_ATargetThatExitsFailsTheRunInText(t *testing.T) {
 	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", mode: fixtureListenThenExit})
 	run := startCommand(t, fixture, "", "app", "--port", "0", "--no-watch")
@@ -344,7 +346,7 @@ func TestRun_ATargetThatExitsFailsTheRunInText(t *testing.T) {
 		t.Fatalf("exit %d with %q\nstderr:\n%s", code, rest, run.stderr.String())
 	}
 	stderr := run.stderr.String()
-	for _, want := range []string{"last output of /app:\n", "putnami: compose.member_exited: /app: "} {
+	for _, want := range []string{"[/app:serve~generate] " + fakeCLIGenerated + "\n", "last output of /app:\n", "putnami: compose.member_exited: /app: "} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr lacks %q:\n%s", want, stderr)
 		}

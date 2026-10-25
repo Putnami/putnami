@@ -51,7 +51,7 @@ func leaseDirs(t *testing.T, root string) []string {
 func TestUp_StartsMembersInOrderAndWaitsForTypedReady(t *testing.T) {
 	spectest.Proves(t, "tooling/workload-qualification", "typed-readiness-bounds-every-member",
 		"a-member-starts-only-after-the-one-before-it-announced-readiness")
-	spectest.Proves(t, "tooling/workload-qualification", "runs-with-closure-served-behind-stable-proxies",
+	spectest.Proves(t, "tooling/workload-qualification", "a-member-is-reached-through-its-stable-proxy",
 		"dependants-reach-a-provider-through-its-injected-proxy-url")
 	spectest.Proves(t, "tooling/workload-qualification", "ephemeral-databases-per-composition",
 		"each-datasource-gets-a-database-created-and-dropped-with-the-composition")

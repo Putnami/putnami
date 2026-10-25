@@ -32,8 +32,13 @@ import (
 const fakeCLIInterrupted = 130
 
 // fakeCLIPrepareFailure is what the fake's generate step writes on stderr
-// before it fails, for a member in fixturePrepareFails mode.
+// before it fails, for a member in fixturePrepareFails mode: the serve run
+// renders it in its serve log, and its end record's error holds it.
 const fakeCLIPrepareFailure = "fixture generate failed: boom"
+
+// fakeCLIDescribed is the log of the describe step a fixturePrepareFails run
+// runs first, which succeeds: the serve run renders it in its serve log.
+const fakeCLIDescribed = "fixture describe succeeded"
 
 // fixtureModeOf is the mode of the member whose project directory is dir, or
 // "" when its fixture.json cannot be read.
@@ -90,9 +95,20 @@ func runFakeCLI(args []string) int {
 	out := &fakeStream{}
 	dir := filepath.Join(root, strings.TrimPrefix(project, "/"))
 	if fixtureModeOf(dir) == fixturePrepareFails {
+		describe := project + ":describe~describe"
+		out.event(describe, map[string]any{"type": "log", "level": "info", "message": fakeCLIDescribed})
+		fmt.Fprintln(os.Stderr, "["+describe+"] "+fakeCLIDescribed)
+		out.taskEnd(describe, protocolcli.TaskStatusSuccess, 0)
 		generate := project + ":generate~generate"
 		fmt.Fprintln(os.Stderr, "["+generate+"] "+fakeCLIPrepareFailure)
-		out.taskEnd(generate, protocolcli.TaskStatusFailed, 1)
+		out.write(protocolcli.SessionStreamRecord{
+			Record:   protocolcli.RecordTaskEnd,
+			Identity: &protocolcli.TaskIdentity{Key: generate},
+			Task: &protocolcli.TaskRecord{
+				Status: protocolcli.TaskStatusFailed, ExitCode: 1,
+				Error: &protocolcli.ResultError{Code: "failure", Message: fakeCLIPrepareFailure},
+			},
+		})
 		out.sessionEnd()
 		return 1
 	}
