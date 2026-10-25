@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@example/items-client",
+  "featureAuthority": {"none": "Generated client code mirrors provider-owned operations and does not own a separate user outcome."}
+}

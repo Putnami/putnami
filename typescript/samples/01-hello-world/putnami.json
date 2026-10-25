@@ -3,6 +3,7 @@
   "name": "@example/01-hello-world",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"none": "A minimal starter that serves one route beside the platform endpoints; it demonstrates no single framework feature."},
   "options": {
     "test": {
       "coverage": false,

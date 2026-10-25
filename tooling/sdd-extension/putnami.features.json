@@ -307,6 +307,26 @@
               "feature-context-returns-the-declared-surface"
             ]
           }
+        },
+        {
+          "id": "every-project-carries-feature-coverage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-covered-debt-entry-fails",
+              "a-malformed-list-fails-closed",
+              "a-project-without-putnami-json-is-judged",
+              "an-absent-option-is-adoption",
+              "an-ignored-document-covers-nothing",
+              "an-uncovered-project-fails-naming-it",
+              "an-unknown-debt-entry-fails",
+              "an-unresolvable-owner-does-not-cover"
+            ]
+          }
         }
       ],
       "surface": {

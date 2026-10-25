@@ -3,6 +3,7 @@
   "name": "@example/09-events",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/event-messaging"},
   "options": {
     "test": {
       "coverage": false,

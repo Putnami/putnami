@@ -430,10 +430,9 @@ The reasoning is in
 
 ### `featureAuthority` — why a project declares no feature
 
-A published project is normally expected to declare a user-facing feature, and
-`putnami specs validate` reports one that does not. Two kinds of project answer
-that question differently, and both answers used to live only in prose that no
-check can read:
+Every project says which outcome its code serves: with a feature in its own
+`putnami.features.json`, a spec under its own `specs/`, or this field. A
+project answers with the field in one of two ways:
 
 ```json
 {
@@ -449,20 +448,35 @@ check can read:
 }
 ```
 
-`none` states the reason a module has no user-facing feature — every
-`protocols/*` module carries one, because a wire contract is not something a
-user enables. `owner` names the authored feature this project contributes to
-when the declaration lives elsewhere: `go.putnami.dev/{openapi,proto}` both
-serve the `go/api-contracts` outcome declared by `go.putnami.dev/api`.
+`none` states the reason a project has no feature of its own: a generated
+client mirrors operations its provider owns, and a sample that composes several
+features is not a product deliverable. `owner` names the authored feature this
+project contributes to when the declaration lives elsewhere:
+`go.putnami.dev/{openapi,proto}` both serve the `go/api-contracts` outcome
+declared by `go.putnami.dev/api`.
+
+A protocol module owns the feature of its contract (D-026 in `decisions.json`).
+Its spec states what every implementation must do, and each project that
+implements the protocol depends on it and proves those requirements in its own
+tests, under a check of its own. A protocol that still carries `none` keeps it
+until it gets that feature.
 
 Exactly one member is set, and validation rejects an empty block, a blank
-reason, or both members at once. An `owner` that names no authored feature is
-reported as `specs.unresolved_feature_authority` **and** still counts as a
-missing link — an answer nobody can resolve is worse than no answer, and the
-field must never become the cheapest way to silence completeness.
+reason, or both members at once. An `owner` that names no authored feature
+answers nothing: `putnami specs validate` reports it as
+`specs.unresolved_feature_authority`, and it still counts as a missing link. An
+answer nobody can resolve is worse than no answer, and the field must never
+become the cheapest way to silence a check.
 
-The field is optional and additive: a project that omits it is assessed exactly
-as before.
+Two checks read the answer. `putnami specs validate` warns about a published
+project that gives none, with `specs.missing_feature_link`. In a workspace that
+sets `options.sdd.featureCoverage`, the `feature-coverage-validate` step of
+`validate-workspace` fails every project that gives none, unless the committed
+debt list names it
+([ADR 0003 of `@putnami/sdd`](../../tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md)).
+
+The field is optional: a project that omits it answers with its own feature or
+spec, or not at all.
 
 ## Producers and consumers
 

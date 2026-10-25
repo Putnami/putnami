@@ -3,6 +3,7 @@
   "name": "@example/02-rest-api",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/api-contracts"},
   "options": {
     "test": {
       "coverage": false,

@@ -87,10 +87,10 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			},
 		}).
 		Command("validate-workspace", proto.CommandDefinition{
-			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare, and, when the workspace forbids it, that the proposed squash commit names no agent.",
+			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority.",
 			Activation:  "workspace-once",
 			Traits:      &proto.CommandTraits{Kind: proto.CommandKindCriteria},
-			// The eight steps are independent workspace-wide steps; none reads
+			// The nine steps are independent workspace-wide steps; none reads
 			// another's answer, so no dependsOn orders them.
 			Run: []proto.PipelineStep{
 				{ID: "architecture", Task: "architecture-validate"},
@@ -101,6 +101,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				{ID: "docs-links", Task: "docs-links-validate"},
 				{ID: "breaking-marker", Task: "breaking-marker-validate"},
 				{ID: "agent-attribution", Task: "agent-attribution-validate"},
+				{ID: "feature-coverage", Task: "feature-coverage-validate"},
 			},
 		}).
 		Task("features-validate", proto.TaskDefinition{
@@ -314,6 +315,33 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Recipe report: the index files read, the recipe count, and sorted diagnostics."},
+			},
+			Declares: sdkmanifest.Declares(),
+		}).
+		Task("feature-coverage-validate", proto.TaskDefinition{
+			Description: "Check that every workspace project carries a feature authored in its own putnami.features.json, a spec under its own specs/, or a reviewed featureAuthority in its putnami.json: an owner that names an authored feature, or none with a reason. " +
+				"A project that carries none fails unless options.sdd.featureCoverage.debt in putnami.workspace.json names it. The list is exact: an entry whose project is covered, or that names no project, fails until it is removed. " +
+				"A workspace that declares no options.sdd.featureCoverage has not adopted the gate and passes with a note. " +
+				"The task reads the manifests and specs through the workspace's Git candidate cut and each project's putnami.json from the job context, and its key is the input `git:**`, which holds that cut and the workspace membership with each project's config: " +
+				"declaring a feature, a spec or a featureAuthority moves the key, and an ignored file covers nothing.",
+			Kind:      "command",
+			Command:   "{extensionRuntime}",
+			Args:      []string{"feature-coverage-validate"},
+			Cwd:       "{workspaceRoot}",
+			TimeoutMs: 120000,
+			// The cut holds every manifest, spec and putnami.json, and
+			// putnami.workspace.json with the debt list. The port is
+			// project-scoped for the reason decisions-validate gives.
+			Inputs: map[string]proto.TaskInputPort{
+				"repository": {From: "project", Files: []string{"git:**"}},
+			},
+			// Serialized after the tasks that rewrite the tree, like
+			// decisions-validate: a formatter reflowing a manifest while this
+			// task parses it would be a verdict about bytes that no longer exist.
+			Reads: []proto.ResourceRef{{ID: proto.ResourceIDSources}},
+			Cache: cacheEnabledNoOutput(),
+			Outputs: map[string]proto.TaskOutputPort{
+				"data": {Description: "Feature-coverage report: whether the gate is adopted, the projects judged, how many a feature or spec and a featureAuthority cover, the debt list, the uncovered projects, and sorted diagnostics."},
 			},
 			Declares: sdkmanifest.Declares(),
 		}).
@@ -712,9 +740,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if workspace.Activation != "workspace-once" {
 		t.Errorf("validate-workspace activation = %q, want workspace-once", workspace.Activation)
 	}
-	// The eight workspace-wide steps are independent — none reads another's
+	// The nine workspace-wide steps are independent — none reads another's
 	// answer — so no dependsOn orders them.
-	if len(workspace.Run) != 8 ||
+	if len(workspace.Run) != 9 ||
 		workspace.Run[0].Task != "architecture-validate" ||
 		workspace.Run[1].Task != "specs-ratchet-validate" ||
 		workspace.Run[2].Task != "decisions-validate" ||
@@ -723,14 +751,16 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		workspace.Run[5].Task != "docs-links-validate" ||
 		workspace.Run[6].Task != "breaking-marker-validate" ||
 		workspace.Run[7].Task != "agent-attribution-validate" ||
+		workspace.Run[8].Task != "feature-coverage-validate" ||
 		len(workspace.Run[1].DependsOn) != 0 ||
 		len(workspace.Run[2].DependsOn) != 0 ||
 		len(workspace.Run[3].DependsOn) != 0 ||
 		len(workspace.Run[4].DependsOn) != 0 ||
 		len(workspace.Run[5].DependsOn) != 0 ||
 		len(workspace.Run[6].DependsOn) != 0 ||
-		len(workspace.Run[7].DependsOn) != 0 {
-		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step and the agent-attribution step", workspace.Run)
+		len(workspace.Run[7].DependsOn) != 0 ||
+		len(workspace.Run[8].DependsOn) != 0 {
+		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step and the feature-coverage gate", workspace.Run)
 	}
 	// Both are user-facing: they are what `putnami validate` and the CI gate
 	// run. The internal self-check is the only hidden command here.
@@ -751,10 +781,10 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 // REPORTS ON. specs-validate reports on one project and resolves against every
 // authored manifest and spec in the workspace, so it declares both.
 // architecture-validate reads the workspace's ARC declarations, capability
-// evidence, and adoption policy, which is exactly what it declares. The four
+// evidence, and adoption policy, which is exactly what it declares. The five
 // workspace steps whose read set no narrow pattern names (decisions, recipes,
-// codeowners and docs links) read the repository's Git candidate cut and
-// declare `git:**`, which holds it. features-validate reads the same cut,
+// codeowners, docs links and feature coverage) read the repository's Git
+// candidate cut and declare `git:**`, which holds it. features-validate reads the same cut,
 // evidence source bindings included: a binding records each bound file's
 // executable bit, which a `git:` key holds, and a submodule commit, over which
 // a `git:` key refuses to exist.
@@ -790,7 +820,7 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 	// The port is project-scoped because a workspace-once task's project is
 	// rooted at the workspace root, and a project side left empty would key on
 	// every file under the root, ignored build output included.
-	for _, name := range []string{"decisions-validate", "recipes-validate", "codeowners-sync", "docs-links-validate"} {
+	for _, name := range []string{"decisions-validate", "recipes-validate", "codeowners-sync", "docs-links-validate", "feature-coverage-validate"} {
 		task := m.Tasks[name]
 		if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
 			t.Errorf("task %q cache = %+v, want enabled with noOutput: its key holds the candidate cut it reads", name, task.Cache)

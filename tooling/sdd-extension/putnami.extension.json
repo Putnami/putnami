@@ -276,7 +276,7 @@
       ]
     },
     "validate-workspace": {
-      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare, and, when the workspace forbids it, that the proposed squash commit names no agent.",
+      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority.",
       "activation": "workspace-once",
       "traits": {"kind": "criteria"},
       "run": [
@@ -311,6 +311,10 @@
         {
           "id": "agent-attribution",
           "task": "agent-attribution-validate"
+        },
+        {
+          "id": "feature-coverage",
+          "task": "feature-coverage-validate"
         }
       ]
     }
@@ -903,6 +907,37 @@
       "outputs": {
         "data": {
           "description": "Recipe report: the index files read, the recipe count, and sorted diagnostics."
+        }
+      },
+      "reads": [
+        "sources"
+      ],
+      "cache": {
+        "enabled": true,
+        "noOutput": true
+      },
+      "declares": {}
+    },
+    "feature-coverage-validate": {
+      "description": "Check that every workspace project carries a feature authored in its own putnami.features.json, a spec under its own specs/, or a reviewed featureAuthority in its putnami.json: an owner that names an authored feature, or none with a reason. A project that carries none fails unless options.sdd.featureCoverage.debt in putnami.workspace.json names it. The list is exact: an entry whose project is covered, or that names no project, fails until it is removed. A workspace that declares no options.sdd.featureCoverage has not adopted the gate and passes with a note. The task reads the manifests and specs through the workspace's Git candidate cut and each project's putnami.json from the job context, and its key is the input `git:**`, which holds that cut and the workspace membership with each project's config: declaring a feature, a spec or a featureAuthority moves the key, and an ignored file covers nothing.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "feature-coverage-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "repository": {
+          "from": "project",
+          "files": [
+            "git:**"
+          ]
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Feature-coverage report: whether the gate is adopted, the projects judged, how many a feature or spec and a featureAuthority cover, the debt list, the uncovered projects, and sorted diagnostics."
         }
       },
       "reads": [

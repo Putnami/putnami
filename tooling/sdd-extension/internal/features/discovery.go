@@ -102,6 +102,18 @@ func DiscoverAuthoredManifests(ws *workspace.Workspace) AuthoredManifestResult {
 			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace root is unavailable"),
 		}}
 	}
+	return DiscoverAuthoredManifestsWith(ws, reader)
+}
+
+// DiscoverAuthoredManifestsWith is DiscoverAuthoredManifests through reader. A
+// step cached on the input `git:**` passes the candidate cut (NewTaskReader),
+// so a manifest its key does not hold is never read.
+func DiscoverAuthoredManifestsWith(ws *workspace.Workspace, reader Reader) AuthoredManifestResult {
+	if ws == nil {
+		return AuthoredManifestResult{Diagnostics: []diag.Diagnostic{
+			diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace is required"),
+		}}
+	}
 	request := Request{Workspace: ws, Reader: reader}
 	roots, diagnostics := discoverRoots(request)
 	manifests, findings := discoverManifests(request, roots, make(map[string]bool))

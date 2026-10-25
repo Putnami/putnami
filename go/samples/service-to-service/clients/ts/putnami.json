@@ -1,5 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@example/go-items-client",
-  "tags": ["ts"]
+  "tags": ["ts"],
+  "featureAuthority": {"none": "Generated client code mirrors provider-owned operations and does not own a separate user outcome."}
 }

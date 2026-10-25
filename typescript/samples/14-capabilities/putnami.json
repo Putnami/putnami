@@ -3,6 +3,7 @@
   "name": "@example/14-capabilities",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": {"owner": "typescript/application-lifecycle"},
   "options": {
     "test": {
       "coverage": false,

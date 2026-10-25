@@ -3,6 +3,7 @@
   "name": "py_example_application",
   "tags": ["sample", "python", "e2e"],
   "extensions": ["/python/extension"],
+  "featureAuthority": {"owner": "python/experimental-workspace-integration"},
   "dependencies": ["/python/samples/library"],
   "options": {
     "publish": {

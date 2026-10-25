@@ -8,7 +8,7 @@ contract.
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
 | `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut. The breaking marker and the agent attribution are never cached |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker and the agent attribution are never cached |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -132,7 +132,7 @@ its existing admission gate; the shared absent-policy default remains `report`.
   intention, an unknown member, or an empty or multi-line field fails with
   `sdd.invalid_recipe_index`. An **absent** index is adoption. A sample
   directory exists when it holds a tracked or unignored file, and the step is
-  cached on the input `git:**` (see [Caching](#the-four-steps-cached-on-the-git-candidate-cut)).
+  cached on the input `git:**` (see [Caching](#the-steps-cached-on-the-git-candidate-cut)).
 
 - **`codeowners-sync`** — the CODEOWNERS step. It writes
   `.github/CODEOWNERS` from `options.sdd.owners`: `putnami.workspace.json`
@@ -254,6 +254,38 @@ its existing admission gate; the shared absent-policy default remains `report`.
   is never checked. It is never cached (see
   [below](#agent-attribution-validate--never-cached)). The decision is
   [ADR 0002](adr/0002-the-squash-commit-names-no-agent.md).
+
+- **`feature-coverage-validate`** — the feature-coverage gate. Every project
+  answers one question: which outcome does its code serve? A project answers
+  with a feature in its own `putnami.features.json`, a spec under its own
+  `specs/`, or a reviewed `featureAuthority` in its `putnami.json`: an `owner`
+  that names an authored feature, or `none` with the reason the project has no
+  feature. Once the workspace adopts the gate in `putnami.workspace.json`, the
+  step judges every member of the workspace, with or without a `putnami.json`:
+
+  ```json
+  "options": {
+    "sdd": {
+      "featureCoverage": { "debt": ["/cloud/runtime/go"] }
+    }
+  }
+  ```
+
+  | Situation | Result |
+  |---|---|
+  | `options.sdd.featureCoverage` unset | Passes, with a note that counts the projects that give no answer |
+  | A project gives no answer and `debt` does not list it | Fails with one `sdd.uncovered_project` diagnostic at the project's `putnami.json#featureAuthority` |
+  | A `featureAuthority.owner` names no authored feature | Covers nothing: `sdd.uncovered_project`, naming the owner |
+  | A `debt` entry whose project answers | Fails with `sdd.stale_coverage_debt`: remove the entry |
+  | A `debt` entry that names no project | Fails with `sdd.unknown_coverage_debt` |
+  | Another member, no `debt`, an entry that is not a project id, or a duplicate entry | Fails with `sdd.invalid_feature_coverage`, and judges no project |
+
+  The list only shrinks: a paid debt fails until its entry is removed, and a
+  new entry is an edit a reviewer sees. The step reads no history. A manifest
+  or a spec covers its project when it is a tracked or unignored file, and the
+  step is cached on the input `git:**` (see
+  [Caching](#the-steps-cached-on-the-git-candidate-cut)). The decision is
+  [ADR 0003](adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md).
 
 Selection narrows what a run **owns**, never what it **reads**: durable
 manifests and canonical spec documents are read at every root under any
@@ -512,7 +544,7 @@ that fails to parse, so the two steps run side by side.
 `putnami features validate`, the interactive command, still reads the disk,
 the version Git resolved, and the HEAD commit it reports.
 
-### The four steps cached on the Git candidate cut
+### The steps cached on the Git candidate cut
 
 ```json
 "inputs": {
@@ -520,10 +552,11 @@ the version Git resolved, and the HEAD commit it reports.
 }
 ```
 
-`decisions-validate`, `recipes-validate`, `codeowners-sync` and
-`docs-links-validate` read files no narrow pattern names: the globs a
-repository authors in its `decisions.json`, the sample directories an index
-names, every `putnami.json` above a project, and any file a link names. Each
+`decisions-validate`, `recipes-validate`, `codeowners-sync`,
+`docs-links-validate` and `feature-coverage-validate` read files no narrow
+pattern names: the globs a repository authors in its `decisions.json`, the
+sample directories an index names, every `putnami.json` above a project, any
+file a link names, and the feature manifest and specs of every project. Each
 reads the repository's **candidate cut** and nothing else: the tracked files
 and the untracked files no ignore rule excludes, as
 `git ls-files --cached --others --exclude-standard` lists them. The input
@@ -540,6 +573,9 @@ bit, and a symbolic link's target text.
   at the workspace root. A workspace port alone would leave the project side of
   the key empty, and the CLI keys an empty project side on every file under the
   root, ignored build output included.
+- The key of a task cached on the cut also holds the workspace membership,
+  with each project's configuration. `feature-coverage-validate` reads each
+  `featureAuthority` from that configuration, so declaring one moves its key.
 - Outside a Git work tree the steps read the disk, and the `git:` input has no
   key, so they run every time.
 

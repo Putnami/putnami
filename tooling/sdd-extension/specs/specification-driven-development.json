@@ -95,6 +95,10 @@
     {
       "id": "features-name-their-surface",
       "text": "A feature declaration may name, under surface, the command paths and MCP tool names that carry it. features-validate reports a listed name that the declaring project's own extension manifest does not serve as features.unresolved_surface; a project without a manifest is not resolved. feature_context and features inspect return the surface as declared."
+    },
+    {
+      "id": "every-project-carries-feature-coverage",
+      "text": "With options.sdd.featureCoverage declared, validate-workspace judges every project, with or without a putnami.json. A project passes when its root declares a feature or hosts a spec in the candidate cut, or when its featureAuthority is none with a reason or an owner that names an authored feature. Any other project fails, named, unless the debt list names it. A debt entry whose project passes, or that names no project, fails. A malformed block fails closed; an absent one is adoption."
     }
   ],
   "decisions": [
@@ -105,6 +109,7 @@
     "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
     "tooling/sdd-extension/doc/adr/0001-the-squash-commit-keeps-the-breaking-marker.md",
     "tooling/sdd-extension/doc/adr/0002-the-squash-commit-names-no-agent.md",
+    "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
     "protocols/features/doc/adr/0005-a-feature-declaration-names-its-surface.md"
   ]
 }

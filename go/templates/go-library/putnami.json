@@ -5,6 +5,7 @@
   "extensions": [
     "@putnami/scaffold"
   ],
+  "featureAuthority": {"owner": "go/project-setup"},
   "publish": [
     "template-archives"
   ],
