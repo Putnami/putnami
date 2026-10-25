@@ -23,7 +23,10 @@ package scheduler
 //     files into it (the Go test job's coverage profile), and every
 //     command-output declared output lives inside it. The key is the whole
 //     directory because detaching a cached symlink rewrites the whole
-//     directory, not one declared path.
+//     directory, not one declared path. A serve-workload step, the terminal
+//     uncacheable step of a serve pipeline that the engine starts
+//     (SchedulerConfig.ServeSteps, the steps `--serve-env` reaches), holds it
+//     only until its process started: see What a hold covers.
 //   - project:<project>, when the task declares a durable project-rooted
 //     output. One key per project rather than per path: a pathFrom output's
 //     path is known only after the task ran, a literal .gen output contains
@@ -104,13 +107,29 @@ package scheduler
 // cache restore into the task's outputs (restoreDeclaredCacheHit) with the
 // writer keys alone: the restore writes the recorded outputs and reads no
 // resource. For an execution it covers everything from output preparation
-// through capture: the pre-run detach, the version-stamp refresh, the
+// through capture, but for a serve-workload step's command-output key
+// (below): the pre-run detach, the version-stamp refresh, the
 // preBuild hook, the subprocess and its retries, the capture into the cache
 // and the drift judgement (executeJobGroup). The reader keys span the same
 // stretch, since the subprocess reads the resource and the capture stores
 // what it read. A finalizer takes no lock: it reclaims invocation-scoped
 // resources on the cleanup path, and a cleanup never waits for another
 // session.
+//
+// A serve-workload step releases its command-output key once its process
+// started (serveStarted), and holds it no more through its retries and its
+// capture: it is the one writer key a hold releases before the capture.
+// Another session therefore runs the finite steps of that project's serve
+// command, which write that directory, while the step serves: the serve run
+// of a project that depends on it, from a second terminal or a composition's
+// next member. Those steps can rewrite the step's command output while it
+// serves; a cache hit restores the bytes the directory already holds. The
+// rule covers that key alone. A finite step of a serve pipeline keeps it
+// until its capture, although its command's traits declare the serve
+// workload too: the predicate is the engine's (SchedulerConfig.ServeSteps),
+// not the trait every step of the pipeline carries. The serve-workload step
+// keeps every other key until its capture: the writer key of a durable
+// project-rooted or workspace-rooted output, and its reader keys.
 //
 // prepareRun's version-stamp seed is not excluded: it takes no lock. It runs
 // before any cache key exists and rewrites a project's stamp only when the
@@ -140,13 +159,14 @@ package scheduler
 // timeout. Every other wait of the lifecycle happens before the acquisition
 // and holds no key: the cache lease, a shared-execution leader, a restore. A
 // task may hold its cache lease while it waits for a key, and no key holder
-// ever waits for a lease. Releasing the preparation keys early only shortens
-// a hold. A shared hold excludes fewer holders than an exclusive one. The
-// drain, the one in-session wait, keeps the argument: an exclusive need that
-// waits for its own session's readers waits, like any waiter of that key, for
-// holders that obey the same rules, and the needs queued behind it wait for
-// the same key. Under those rules the holder of the
-// highest contended key always progresses, so the waits form no cycle. A
+// ever waits for a lease. Releasing the preparation keys early, and a
+// serve-workload step's command-output key once its process started, only
+// shortens a hold: neither is taken back. A shared hold excludes fewer holders
+// than an exclusive one. The drain, the one in-session wait, keeps the
+// argument: an exclusive need that waits for its own session's readers waits,
+// like any waiter of that key, for holders that obey the same rules, and the
+// needs queued behind it wait for the same key. Under those rules the holder
+// of the highest contended key always progresses, so the waits form no cycle. A
 // shared flock is granted whenever no exclusive one is held, so a writer
 // whose key other sessions keep reading waits until none does.
 //
@@ -164,7 +184,9 @@ package scheduler
 // holds only for reading therefore does not wait: another session's writer
 // still waits for the ancestor's shared hold, but another session's reader may
 // read while the nested task writes. Waiting instead would mean waiting for
-// its own ancestor.
+// its own ancestor. The subprocess of a serve-workload step does not receive
+// its command-output key: the step releases it once its process started, so
+// a session that process starts waits for that key like any other session.
 //
 // A nested session still waits for a key a task of another session, or a
 // sibling of its spawning task, holds. That wait is the one exception to the
@@ -253,6 +275,10 @@ type outputLockKey struct {
 	// preparation is true when no task of the acquisition needs the key after
 	// its preparation: the hold releases it before the subprocess starts.
 	preparation bool
+	// serve is true when every task of the acquisition that needs the key is
+	// a serve-workload step and the key is its command-output key: the hold
+	// releases it once the step's process started (serveStarted).
+	serve bool
 	// exclusive is true when a task of the acquisition writes under the key:
 	// a writer key, or a preparation that writes the project tree. A key the
 	// acquisition only reads under is shared.
@@ -285,6 +311,10 @@ type taskOutputLocks struct {
 	holder outputLockHolder
 	// inherited holds the ids an ancestor task holds for this session.
 	inherited map[string]bool
+	// serveSteps names, by job key, the session's serve-workload steps
+	// (SchedulerConfig.ServeSteps): each holds its command-output key until
+	// its process started. Nil names none.
+	serveSteps map[string]bool
 	// notify receives the one wait line of a contended acquisition.
 	notify func(message string)
 	// onOwnSessionWait observes a task that waits for its own session's shared
@@ -345,6 +375,11 @@ type outputLockHold struct {
 	// prepared is true once endPreparation released the preparation keys.
 	prepared bool
 }
+
+// outputLockHoldKey carries the hold of a task's execution from the end of
+// its preparation to runJob, which releases its serve keys once a
+// serve-workload step's process started (releaseServeOutputLocks).
+type outputLockHoldKey struct{}
 
 // newTaskOutputLocks returns the manager for one session of the workspace at
 // root. inherited is the heldOutputLocksEnv value the session started with.
@@ -482,15 +517,17 @@ func outputLockSubject(name string) string {
 // whose preparation writes their project tree; nil reports none. reading adds
 // the reader keys of the resources the jobs read: an execution reads them, a
 // restore does not. A key is a preparation key when every job that needs it
-// needs it for its preparation alone, and exclusive when any job writes under
-// it.
+// needs it for its preparation alone, a serve key when every job that needs
+// it is a serve-workload step (serveSteps) and the key is its command-output
+// key, and exclusive when any job writes under it.
 func (m *taskOutputLocks) keysFor(jobs []*ScheduledJob, preparing func(*ScheduledJob) bool, reading bool) []outputLockKey {
 	index := make(map[string]int)
 	var keys []outputLockKey
-	add := func(name string, exclusive, preparation bool) {
+	add := func(name string, exclusive, preparation, serve bool) {
 		id := m.keyID(name)
 		if i, seen := index[id]; seen {
 			keys[i].preparation = keys[i].preparation && preparation
+			keys[i].serve = keys[i].serve && serve
 			keys[i].exclusive = keys[i].exclusive || exclusive
 			return
 		}
@@ -500,20 +537,22 @@ func (m *taskOutputLocks) keysFor(jobs []*ScheduledJob, preparing func(*Schedule
 			name:        name,
 			subject:     outputLockSubject(name),
 			preparation: preparation,
+			serve:       serve,
 			exclusive:   exclusive,
 		})
 	}
 	for _, job := range jobs {
+		serving := m.serveSteps[job.Key()]
 		names := taskOutputLockNames(job)
 		for _, name := range names {
-			add(name, true, false)
+			add(name, true, false, serving && outputLockClass(name) == outputLockClassCommandOutput)
 		}
 		if len(names) > 0 && preparing != nil && preparing(job) {
-			add(projectOutputLockName(job), true, true)
+			add(projectOutputLockName(job), true, true, false)
 		}
 		if reading {
 			for _, name := range taskReadLockNames(job) {
-				add(name, false, false)
+				add(name, false, false, false)
 			}
 		}
 	}
@@ -532,16 +571,23 @@ func outputLockOrder(a, b outputLockKey) int {
 	return strings.Compare(a.id, b.id)
 }
 
+// The key classes, from the narrowest to the widest.
+const (
+	outputLockClassCommandOutput = iota
+	outputLockClassProject
+	outputLockClassWorkspace
+)
+
 // outputLockClass ranks a key name's kind from the narrowest to the widest.
 func outputLockClass(name string) int {
 	kind, _, _ := strings.Cut(name, ":")
 	switch kind {
 	case "command-output":
-		return 0
+		return outputLockClassCommandOutput
 	case "project":
-		return 1
+		return outputLockClassProject
 	default:
-		return 2
+		return outputLockClassWorkspace
 	}
 }
 
@@ -572,8 +618,9 @@ func (m *taskOutputLocks) acquire(
 }
 
 // value is the heldOutputLocksEnv value for what the hold covers now: the
-// inherited ids and the ids of its keys, without the preparation keys once
-// the preparation ended.
+// inherited ids and the ids of its keys, without the preparation keys and the
+// serve keys once the preparation ended. A serve key is still held then, until
+// the step's process started, but that process never holds it.
 func (h *outputLockHold) value() string {
 	if h == nil {
 		return ""
@@ -585,7 +632,7 @@ func (h *outputLockHold) value() string {
 		ids = append(ids, id)
 	}
 	for _, key := range h.keys {
-		if h.m.inherited[key.id] || (h.prepared && key.preparation) {
+		if h.m.inherited[key.id] || (h.prepared && (key.preparation || key.serve)) {
 			continue
 		}
 		ids = append(ids, key.id)
@@ -595,7 +642,9 @@ func (h *outputLockHold) value() string {
 }
 
 // endPreparation releases the preparation keys and returns ctx carrying the
-// value the subprocesses receive from then on. A second call changes nothing.
+// value the subprocesses receive from then on, and the hold, whose serve keys
+// runJob releases once a serve-workload step's process started. A second call
+// changes nothing.
 func (h *outputLockHold) endPreparation(ctx context.Context) context.Context {
 	if h == nil {
 		return ctx
@@ -614,7 +663,38 @@ func (h *outputLockHold) endPreparation(ctx context.Context) context.Context {
 		h.taken = kept
 	}
 	h.mu.Unlock()
+	ctx = context.WithValue(ctx, outputLockHoldKey{}, h)
 	return context.WithValue(ctx, heldOutputLocksKey{}, h.value())
+}
+
+// serveStarted releases the serve keys: a serve-workload step's process
+// started. A second call, and a hold without a serve key, change nothing.
+func (h *outputLockHold) serveStarted() {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	kept := make([]outputLockKey, 0, len(h.taken))
+	for _, key := range h.taken {
+		if key.serve {
+			h.m.releaseOne(key.id, h.task)
+			continue
+		}
+		kept = append(kept, key)
+	}
+	h.taken = kept
+}
+
+// releaseServeOutputLocks releases the serve keys of the hold ctx carries.
+// runJob calls it once the process of a step that runs under withServeStep
+// started; under any other context it changes nothing.
+func releaseServeOutputLocks(ctx context.Context) {
+	if serving, _ := ctx.Value(serveStepKey{}).(bool); !serving {
+		return
+	}
+	hold, _ := ctx.Value(outputLockHoldKey{}).(*outputLockHold)
+	hold.serveStarted()
 }
 
 // release drops every reference the hold still has. A second call changes

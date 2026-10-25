@@ -139,11 +139,15 @@
     },
     {
       "id": "concurrent-session-output-exclusion",
-      "text": "Sessions of one workspace never write one task output at once. A task locks, in one global order, its command-output directory plus the project or workspace with a durable output, across a cache restore and an execution through capture; a preparation writing the project tree locks the project until the subprocess starts. A contended task prints one line naming the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
+      "text": "Sessions of one workspace never write one task output at once. A task locks, in one global order, its command-output directory plus the project or workspace with a durable output, across a cache restore and an execution through capture, but for a serve-workload step's command-output directory; a preparation writing the project tree locks the project until the subprocess starts. A contended task prints one line naming the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
     },
     {
       "id": "concurrent-session-read-exclusion",
       "text": "An executing task that reads a resource it does not write shares the lock its writers hold: its project's, or the workspace's for a workspace-scoped resource, from its preparation through its capture. The sources resource takes none, and a restore reads nothing. Readers in several sessions hold the lock together, a writer in another session waits for all of them, and a reader waits for that writer. A wait behind readers prints one line saying another putnami process is reading, naming no holder."
+    },
+    {
+      "id": "a-serve-step-releases-its-command-output-once-it-started",
+      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline that the engine starts, releases its command-output lock once its process started and does not take it back for its retries or its capture. Another session then runs the finite steps of that project's serve command beside it, as the serve run of a dependent project does from a second terminal or a composition, and they can rewrite that directory while it serves. A finite step keeps the lock until its capture, although its command declares the serve workload, and the serve-workload step keeps every other lock until its capture. The step's process never receives the released lock as held."
     },
     {
       "id": "scratch-generation-retention",

@@ -185,7 +185,21 @@ func (f *outputRaceFixture) scheduler(job *ScheduledJob, session string, cache *
 
 // plan is a session running jobs one at a time.
 func (f *outputRaceFixture) plan(session string, cache *store.CacheManager, jobs ...*ScheduledJob) *Scheduler {
-	return newScheduler(f.ws, jobs, nil, SchedulerConfig{MaxParallel: 1, SessionID: session}, &mockRenderer{}, cache)
+	return f.servePlan(session, cache, nil, jobs...)
+}
+
+// servePlan is a session running jobs one at a time whose serving jobs are its
+// serve-workload steps (SchedulerConfig.ServeSteps). It is the fixture's one
+// scheduler construction.
+func (f *outputRaceFixture) servePlan(session string, cache *store.CacheManager, serving []*ScheduledJob, jobs ...*ScheduledJob) *Scheduler {
+	var steps map[string]bool
+	if len(serving) > 0 {
+		steps = make(map[string]bool, len(serving))
+		for _, job := range serving {
+			steps[job.Key()] = true
+		}
+	}
+	return newScheduler(f.ws, jobs, nil, SchedulerConfig{MaxParallel: 1, SessionID: session, ServeSteps: steps}, &mockRenderer{}, cache)
 }
 
 // runAsync runs a scheduler on its own goroutine.
@@ -413,6 +427,127 @@ func TestScheduler_AnExecutionReleasesItsPreparationKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireSuccess(t, "first", <-first, firstJob.Key())
+}
+
+// serveJob is a step of proj's serve command, whose resolved traits declare
+// the serve workload as every step of a serve pipeline does. Its task declares
+// outputs; the command's terminal step declares none.
+func (f *outputRaceFixture) serveJob(name, command string, outputs map[string]extension.DeclaredOutput) *ScheduledJob {
+	job := f.resourceJob(name, command, outputs, nil)
+	job.JobDef.Traits.Workload = extension.WorkloadServe
+	return job
+}
+
+// serveGenerateOutputs declares the file a finite serve step writes into
+// proj's serve command output, .putnami/out/proj/serve.
+func serveGenerateOutputs() map[string]extension.DeclaredOutput {
+	return map[string]extension.DeclaredOutput{
+		"stamp": fileDeclaration(extension.OutputRootCommandOutput, "generate.txt", false),
+	}
+}
+
+// serveGenerateScript writes the finite serve step's declared file.
+func (f *outputRaceFixture) serveGenerateScript(t *testing.T, content string) string {
+	t.Helper()
+	file := filepath.Join(f.root, ".putnami", "out", "proj", "serve", "generate.txt")
+	path := filepath.Join(f.root, "serve-generate-"+content+".sh")
+	writeExecutable(t, path, "#!/bin/sh\n"+
+		"mkdir -p "+shellQuote(filepath.Dir(file))+"\n"+
+		"printf '"+content+"\\n' > "+shellQuote(file)+"\n")
+	return path
+}
+
+// servingScript announces itself and serves until the test releases it.
+func (f *outputRaceFixture) servingScript(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(f.root, "serving.sh")
+	writeExecutable(t, path, "#!/bin/sh\n"+
+		"printf 'started\\n' > "+shellQuote(f.started)+"\n"+
+		releaseWaitScript(f.release, os.Getpid()))
+	return path
+}
+
+// TestScheduler_AFiniteStepRunsBesideAnotherSessionsServeStep is the
+// two-terminal case: one session serves proj, and another session, which
+// serves a project that depends on proj, runs proj's finite serve step. That
+// step writes proj's serve command output, whose key the serving step
+// released once its process started, so it runs to completion while proj
+// serves.
+func TestScheduler_AFiniteStepRunsBesideAnotherSessionsServeStep(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
+		"a-finite-step-runs-beside-another-sessions-serve-step")
+	f := newOutputRaceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	serving := f.serveJob("serve~serve", f.servingScript(t), nil)
+	first := runAsync(ctx, f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, serving))
+	f.awaitFirstStarted(t, first)
+
+	waits := make(chan string, 1)
+	generate := f.serveJob("serve~generate", f.serveGenerateScript(t, "b"), serveGenerateOutputs())
+	secondScheduler := f.servePlan("20260925-192013-000001", nil, nil, generate)
+	secondScheduler.onOutputLockWait = func(message string) { waits <- message }
+	second := runAsync(ctx, secondScheduler)
+
+	select {
+	case message := <-waits:
+		t.Fatalf("a finite step waited for another session's serve step: %s", message)
+	case result := <-first:
+		t.Fatalf("the serving session ended before the finite step ran: %+v", result.Results)
+	case result := <-second:
+		requireSuccess(t, "second", result, generate.Key())
+	case <-time.After(answerWaitBudget):
+		t.Fatal("the finite step neither finished nor waited")
+	}
+	if got := readFileAt(t, filepath.Join(f.root, ".putnami", "out", "proj", "serve", "generate.txt")); got != "b\n" {
+		t.Fatalf("generate.txt = %q, want the finite step's output", got)
+	}
+	if err := os.WriteFile(f.release, []byte("release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	requireSuccess(t, "serving", <-first, serving.Key())
+}
+
+// TestScheduler_AFiniteStepWaitsForAnotherSessionsFiniteStep is the
+// counterpart: the step another session runs is a finite step of the same
+// serve command, whose traits declare the serve workload but which is not
+// the run's serve-workload step. It keeps the command-output key until its
+// capture, so the second session's finite step waits for it and names it.
+func TestScheduler_AFiniteStepWaitsForAnotherSessionsFiniteStep(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
+		"a-finite-step-still-waits-for-another-sessions-finite-step")
+	f := newOutputRaceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	generated := filepath.Join(f.root, ".putnami", "out", "proj", "serve", "generate.txt")
+	generating := f.serveJob("serve~generate", f.blockingWriter(t, "blocking-generate.sh", generated), serveGenerateOutputs())
+	serving := f.serveJob("serve~serve", f.noopScript(t), nil)
+	serving.DependsOn = []string{generating.Key()}
+	first := runAsync(ctx, f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, generating, serving))
+	f.awaitFirstStarted(t, first)
+
+	waits := make(chan string, 1)
+	merge := f.serveJob("serve~config-merge", f.serveGenerateScript(t, "b"), serveGenerateOutputs())
+	secondScheduler := f.servePlan("20260925-192013-000001", nil, nil, merge)
+	secondScheduler.onOutputLockWait = func(message string) { waits <- message }
+	second := runAsync(ctx, secondScheduler)
+
+	message := awaitSecondWaits(t, waits, second)
+	want := fmt.Sprintf("%s waits for session %s (pid %d, task %s), which is writing .putnami/out/proj/serve",
+		merge.Key(), outputRaceSessionA, os.Getpid(), generating.Key())
+	if message != want {
+		t.Errorf("wait line = %q, want %q", message, want)
+	}
+	if err := os.WriteFile(f.release, []byte("release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	requireSuccess(t, "first", <-first, serving.Key())
+	requireSuccess(t, "second", <-second, merge.Key())
+	if got := readFileAt(t, f.endState); got != "a-begin\na-end\n" {
+		t.Fatalf("the first finite step ended holding %q: another session wrote its output while it ran", got)
+	}
 }
 
 // genData is proj's generated file the gen writers of these cases own.

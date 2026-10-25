@@ -514,8 +514,10 @@ func RunJob(
 // serveStepKey marks a context under which runJob runs a serve-workload step.
 type serveStepKey struct{}
 
-// withServeStep returns a context under which runJob announces the spawned
-// process group as the step's first event (announceProcessGroup).
+// withServeStep returns a context under which runJob, once the step's process
+// started, releases the step's command-output lock (releaseServeOutputLocks)
+// and announces the spawned process group as the step's first event
+// (announceProcessGroup).
 func withServeStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, serveStepKey{}, true)
 }
@@ -647,6 +649,7 @@ func runJob(
 	defer func() { _ = tree.Close() }()
 	_ = stdoutWriter.Close()
 	_ = stderrWriter.Close()
+	releaseServeOutputLocks(ctx)
 	announceProcessGroup(ctx, tree.ID(), onEvent)
 
 	// Read stdout (JSONL events) and stderr concurrently

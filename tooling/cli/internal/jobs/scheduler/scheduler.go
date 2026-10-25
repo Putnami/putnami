@@ -78,8 +78,9 @@ type SchedulerConfig struct {
 	// ServeSteps names, by job key, the plan's serve-workload steps: the
 	// long-running terminal steps of a serve pipeline, never one of its finite
 	// steps. The engine computes it from the final plan. runJob announces the
-	// process group of each one (EventTypeProcess), and only these steps
-	// receive ServeProcessEnv. Nil for a run without one.
+	// process group of each one (EventTypeProcess), only these steps receive
+	// ServeProcessEnv, and each releases its command-output lock once its
+	// process started (task_output_lock.go). Nil for a run without one.
 	ServeSteps map[string]bool
 	// ServeProcessEnv is the process environment `--serve-env -` read from
 	// stdin: KEY=value entries a supervisor owns, which may hold secrets. It is
@@ -370,6 +371,9 @@ func newScheduler(
 			os.Getenv(heldOutputLocksEnv),
 			s.announceOutputLockWait,
 		)
+	}
+	if s.outputLocks != nil {
+		s.outputLocks.serveSteps = cfg.ServeSteps
 	}
 	return s
 }
