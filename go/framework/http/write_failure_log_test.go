@@ -92,7 +92,8 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 				return Stream(http.StatusOK, "application/octet-stream", endlessBody{})
 			})
 
-			ts := httptest.NewUnstartedServer(server.Handler())
+			handler, served := servedHandler(server.Handler())
+			ts := httptest.NewUnstartedServer(handler)
 			if tc.major == 2 {
 				ts.EnableHTTP2 = true
 				ts.StartTLS()
@@ -140,7 +141,7 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
-			ts.Close() // waits for the handler, so every record it writes is in
+			waitServed(t, served, 1) // the handler wrote every record
 			for _, record := range writeResponseRecords(t, rec) {
 				if record["severity"] != "INFO" {
 					t.Errorf("severity = %v, want INFO", record["severity"])
