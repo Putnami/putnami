@@ -493,18 +493,14 @@ func withAutomaticReadPreparation(ctx context.Context, wsRoot string, cfg *wspro
 
 // ancestryCommands are the commands whose traits decide whether the run reads
 // its ancestry: the parsed ones, or the flat command that an extension
-// group's subcommand, or its default, runs.
+// group's invocation runs (extension.GroupInvocationCommand).
 func ancestryCommands(parsed *ParsedArgs, extensions []*extension.ExtensionDescription, extensionGroups map[string]bool) []string {
 	group := parsed.Commands[0]
 	if !extensionGroups[group] {
 		return parsed.Commands
 	}
-	sub := parsed.Subcommand
-	if sub == "" {
-		sub = extension.GroupDefaultSubcommand(extensions, group)
-	}
-	if resolved, _ := extension.ResolveSubcommand(extensions, group, sub); resolved != nil {
-		return []string{resolved.CommandName}
+	if command := extension.GroupInvocationCommand(extensions, group, parsed.Subcommand); command != "" {
+		return []string{command}
 	}
 	return parsed.Commands
 }
@@ -603,8 +599,9 @@ func ensureArtifactsForProcessMode(
 }
 
 // processAliases returns the alias tables this process resolves a command name
-// through, with the serve-workload commands of extensions, and a warning for
-// each vocabulary alias a workspace alias hides.
+// through, with the serve-workload commands of extensions and the resolver of
+// their command groups' invocations, and a warning for each vocabulary alias a
+// workspace alias hides.
 func processAliases(
 	cfg *wsproto.Config,
 	providerMode bool,
@@ -619,7 +616,11 @@ func processAliases(
 	user := workspaceAliases(cfg)
 	vocabulary := commandVocabulary(extensions, user).AliasMap()
 	serveWorkloads := scheduler.CommandsOfWorkload(extensions, extension.WorkloadServe)
-	return commandAliases{vocabulary: vocabulary, user: user, serveWorkloads: serveWorkloads}, hiddenAliasWarnings(extensions, user)
+	groupCommand := func(group, word string) string {
+		return extension.GroupInvocationCommand(extensions, group, word)
+	}
+	return commandAliases{vocabulary: vocabulary, user: user, serveWorkloads: serveWorkloads, groupCommand: groupCommand},
+		hiddenAliasWarnings(extensions, user)
 }
 
 // shouldDiscoverExtensions reports whether App.Run should pre-load extensions

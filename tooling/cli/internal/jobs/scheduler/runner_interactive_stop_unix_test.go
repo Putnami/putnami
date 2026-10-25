@@ -1,0 +1,164 @@
+//go:build unix
+
+package scheduler
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/abort"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/workspace"
+)
+
+// interactiveStopJob is an interactive job that runs script, a /bin/sh script,
+// in a fresh workspace, with the path of a file the script writes once it
+// runs.
+func interactiveStopJob(t *testing.T, script string) (*workspace.Workspace, *ScheduledJob, string) {
+	t.Helper()
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	wsRoot := t.TempDir()
+	scriptPath := filepath.Join(wsRoot, "job.sh")
+	writeExecutable(t, scriptPath, "#!/bin/sh\nREADY="+filepath.Join(wsRoot, "ready")+"\nSTOPPED="+filepath.Join(wsRoot, "stopped")+"\n"+script)
+	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
+	job := &ScheduledJob{
+		Project:   &workspace.Project{ID: "test-ws", Name: "test-ws", Path: "."},
+		Extension: &extension.ExtensionDescription{Name: "@putnami/test", Path: wsRoot},
+		JobDef: &extension.JobDefinition{
+			ExtensionName: "@putnami/test",
+			Name:          "demo-stop",
+			Kind:          "command",
+			Command:       scriptPath,
+			TimeoutMs:     unboundedJobTimeoutMs,
+		},
+	}
+	return ws, job, wsRoot
+}
+
+// withInteractiveStopBudget runs the test with budget as the stop budget.
+func withInteractiveStopBudget(t *testing.T, budget time.Duration) {
+	t.Helper()
+	previous := interactiveStopBudget
+	interactiveStopBudget = budget
+	t.Cleanup(func() { interactiveStopBudget = previous })
+}
+
+// startInteractive runs the job until ctx is canceled and returns the channel
+// its result arrives on, once the script wrote its ready file.
+func startInteractive(t *testing.T, ctx context.Context, ws *workspace.Workspace, job *ScheduledJob, wsRoot string) <-chan *JobResult {
+	t.Helper()
+	done := make(chan *JobResult, 1)
+	go func() {
+		res, err := RunJobInteractive(ctx, ws, job, nil, nil, nil)
+		if err != nil {
+			t.Errorf("RunJobInteractive: %v", err)
+		}
+		done <- res
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Stat(filepath.Join(wsRoot, "ready")); err == nil {
+			return done
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the interactive job never wrote its ready file")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// awaitResult returns the job's result, or fails after limit.
+func awaitResult(t *testing.T, done <-chan *JobResult, limit time.Duration) *JobResult {
+	t.Helper()
+	select {
+	case res := <-done:
+		if res == nil {
+			t.Fatal("RunJobInteractive returned no result")
+		}
+		return res
+	case <-time.After(limit):
+		t.Fatalf("the interactive job still runs after %s", limit)
+		return nil
+	}
+}
+
+// The core gives a canceled interactive child the 90 s budget the owner set,
+// rather than the five seconds a streamed job gets.
+func TestInteractiveStopBudgetIsNinetySeconds(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-waits-for-an-interactive-child-after-a-terminal-signal")
+	if abort.InteractiveStopBudget != 90*time.Second || interactiveStopBudget != abort.InteractiveStopBudget {
+		t.Fatalf("stop budget = %s (abort %s), want 90s", interactiveStopBudget, abort.InteractiveStopBudget)
+	}
+}
+
+// A canceled child that takes longer than the old five-second delay would
+// allow, scaled down, still finishes its own teardown: the runner waits for
+// its exit within the budget instead of killing it.
+func TestRunJobInteractive_CanceledChildStopsOnItsOwnTerms(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-waits-for-an-interactive-child-after-a-terminal-signal")
+	withInteractiveStopBudget(t, 30*time.Second)
+	ws, job, wsRoot := interactiveStopJob(t,
+		"trap 'sleep 1; echo stopped > \"$STOPPED\"; exit 0' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := startInteractive(t, ctx, ws, job, wsRoot)
+	cancel()
+	res := awaitResult(t, done, 20*time.Second)
+
+	if res.Status != "canceled" {
+		t.Errorf("status = %q, want canceled", res.Status)
+	}
+	if _, err := os.Stat(filepath.Join(wsRoot, "stopped")); err != nil {
+		t.Errorf("the child was killed before its own teardown finished: %v", err)
+	}
+	if abort.InteractiveHeld() {
+		t.Error("the runner still holds the child after it exited")
+	}
+}
+
+// A child that ignores the cancel is killed once the budget runs out.
+func TestRunJobInteractive_ChildPastTheBudgetIsKilled(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-waits-for-an-interactive-child-after-a-terminal-signal")
+	withInteractiveStopBudget(t, 200*time.Millisecond)
+	ws, job, wsRoot := interactiveStopJob(t,
+		"trap '' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := startInteractive(t, ctx, ws, job, wsRoot)
+	cancel()
+	if res := awaitResult(t, done, 10*time.Second); res.Status != "canceled" {
+		t.Errorf("status = %q, want canceled", res.Status)
+	}
+}
+
+// A second signal to the CLI kills the child at once, within the budget.
+func TestRunJobInteractive_KillInteractiveEndsTheChildAtOnce(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-second-signal-kills-the-interactive-child-at-once")
+	withInteractiveStopBudget(t, time.Minute)
+	ws, job, wsRoot := interactiveStopJob(t,
+		"trap '' TERM\necho ready > \"$READY\"\nwhile :; do sleep 0.05; done\n")
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := startInteractive(t, ctx, ws, job, wsRoot)
+	if !abort.InteractiveHeld() {
+		t.Fatal("the runner does not hold the running child")
+	}
+	cancel()
+	abort.KillInteractive()
+	if res := awaitResult(t, done, 10*time.Second); res.Status != "canceled" {
+		t.Errorf("status = %q, want canceled", res.Status)
+	}
+}

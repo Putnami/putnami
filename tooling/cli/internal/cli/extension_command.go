@@ -49,20 +49,9 @@ func (a *App) runExtensionStructuredCommand(
 		return a.runCollaborationCommand(ctx, parsed, cfg, wsRoot, extensions, stdin, stdout, stderr)
 	}
 
-	// `putnami <group>` with no subcommand word runs the group's declared
-	// default, exactly like a built-in DefaultSub; flags that follow reach it.
-	// A group without one, or whose default does not resolve, prints its help.
-	// `putnami <group> --help` never gets here: App.Run prints the group help.
-	if sub == "" {
-		sub = extension.GroupDefaultSubcommand(extensions, group)
-		if sub == "" {
-			printExtensionGroupHelp(extensions, group, parsed.Global.Output)
-			return ExitSuccess
-		}
-	}
-
 	// `putnami <group> help [<sub>]` is a help alias, unless the group defines a
-	// real subcommand literally named "help" (guard against shadowing it).
+	// real subcommand literally named "help" (guard against shadowing it). It
+	// is read before a positional default, which would take the word.
 	if sub == "help" {
 		if _, _, ok := extension.LookupSubcommand(extensions, group, "help"); !ok {
 			if len(parsed.RawJobArgs) > 0 && !strings.HasPrefix(parsed.RawJobArgs[0], "-") {
@@ -72,6 +61,23 @@ func (a *App) runExtensionStructuredCommand(
 			}
 			return ExitSuccess
 		}
+	}
+
+	// `putnami <group>` with no subcommand word runs the group's declared
+	// default, exactly like a built-in DefaultSub; flags that follow reach it.
+	// A word that names no subcommand runs the default too when the default
+	// declares positionals, and reaches it as its first argument, as if typed
+	// after the default's name (ResolveGroupInvocation). A group without a
+	// default, or whose default does not resolve, prints its help.
+	// `putnami <group> --help` never gets here: App.Run prints the group help.
+	word := sub
+	sub, positional := extension.ResolveGroupInvocation(extensions, group, word)
+	if sub == "" {
+		printExtensionGroupHelp(extensions, group, parsed.Global.Output)
+		return ExitSuccess
+	}
+	if positional {
+		parsed.RawJobArgs = append([]string{word}, parsed.RawJobArgs...)
 	}
 
 	// --serve-env reaches the serve steps of a flat command's run only. An
@@ -552,11 +558,14 @@ func workspaceOnceProject(ws *workspace.Workspace) *workspace.Project {
 }
 
 // printExtensionGroupOrSubcommandHelp routes `putnami <group> [--help]` help:
-// per-subcommand help when a subcommand is named, otherwise the group listing.
+// per-subcommand help when a word follows the group, otherwise the group
+// listing. The word resolves as dispatch resolves it, so `putnami <group>
+// <project> --help` prints the help of the positional default that runs it.
 // The output selector (--output=json|jsonl) opts into the machine-readable help
 // contract instead of the human text.
 func printExtensionGroupOrSubcommandHelp(extensions []*extension.ExtensionDescription, group, sub, output string) {
 	if sub != "" {
+		sub, _ = extension.ResolveGroupInvocation(extensions, group, sub)
 		printExtensionSubcommandHelp(extensions, group, sub, output)
 		return
 	}
@@ -576,11 +585,44 @@ func printExtensionGroupHelp(extensions []*extension.ExtensionDescription, group
 		iox.Fprintf(os.Stdout, "putnami: command group %s has no subcommands\n", group)
 		return
 	}
-	iox.Fprintf(os.Stdout, "Usage: putnami %s <subcommand> [flags]\n\n", group)
+	printExtensionGroupUsage(extensions, group)
 	iox.Fprintln(os.Stdout, "Subcommands:")
 	for _, s := range subs {
 		iox.Fprintf(os.Stdout, "  %s\n", s)
 	}
+}
+
+// printExtensionGroupUsage prints the usage lines of a group. A group whose
+// default declares positionals gets a line for that spelling first, and a
+// sentence saying which word takes it.
+func printExtensionGroupUsage(extensions []*extension.ExtensionDescription, group string) {
+	def := extension.GroupPositionalDefault(extensions, group)
+	if def == nil {
+		iox.Fprintf(os.Stdout, "Usage: putnami %s <subcommand> [flags]\n\n", group)
+		return
+	}
+	first := def.Subdef.Positionals[0].Name
+	iox.Fprintf(os.Stdout, "Usage: putnami %s [%s]%s [flags]\n", group, def.Subcommand, positionalUsage(def.Subdef.Positionals))
+	iox.Fprintf(os.Stdout, "       putnami %s <subcommand> [flags]\n\n", group)
+	iox.Fprintf(os.Stdout, "A word that names no subcommand runs `putnami %s %s` with that word as <%s>.", group, def.Subcommand, first)
+	if first == "project" {
+		iox.Fprint(os.Stdout, " A project named like a subcommand is addressed by its id.")
+	}
+	iox.Fprint(os.Stdout, "\n\n")
+}
+
+// positionalUsage renders positionals for a usage line, in declaration order:
+// ` <name>` for a required one and ` [<name>]` otherwise.
+func positionalUsage(positionals []extension.PositionalDefinition) string {
+	var b strings.Builder
+	for _, positional := range positionals {
+		if positional.Required {
+			b.WriteString(" <" + positional.Name + ">")
+		} else {
+			b.WriteString(" [<" + positional.Name + ">]")
+		}
+	}
+	return b.String()
 }
 
 // printExtensionGroupHelpJSON emits the group's subcommands as the machine
@@ -590,10 +632,12 @@ func printExtensionGroupHelp(extensions []*extension.ExtensionDescription, group
 func printExtensionGroupHelpJSON(extensions []*extension.ExtensionDescription, group, format string) {
 	subs := extension.ListSubcommands(extensions, group)
 	summaries := make([]subcommandSummaryJSON, 0, len(subs))
+	def := extension.GroupDefaultSubcommand(extensions, group)
 	for _, s := range subs {
-		summary := subcommandSummaryJSON{Command: group + " " + s}
+		summary := subcommandSummaryJSON{Command: group + " " + s, Default: s == def}
 		if ext, subdef, ok := extension.LookupSubcommand(extensions, group, s); ok {
 			summary.Description = subcommandDescription(ext, subdef)
+			summary.Positionals = helpPositionals(subdef.Positionals)
 		}
 		summaries = append(summaries, summary)
 	}
@@ -634,7 +678,12 @@ func printExtensionSubcommandHelp(extensions []*extension.ExtensionDescription, 
 		return
 	}
 
-	iox.Fprintf(os.Stdout, "Usage: putnami %s %s [flags]\n\n", group, sub)
+	// The positional default can be typed without its name.
+	usage := sub
+	if def := extension.GroupPositionalDefault(extensions, group); def != nil && def.Subcommand == sub {
+		usage = "[" + sub + "]"
+	}
+	iox.Fprintf(os.Stdout, "Usage: putnami %s %s%s [flags]\n\n", group, usage, positionalUsage(subdef.Positionals))
 
 	description := subcommandDescription(ext, subdef)
 	if description != "" {
@@ -702,10 +751,31 @@ func collectSubcommandFlags(ext *extension.ExtensionDescription, group string, s
 // subcommandHelpJSON is the per-subcommand help object emitted for
 // `putnami <group> <sub> --help --output=json|jsonl`.
 type subcommandHelpJSON struct {
-	Command     string            `json:"command"`
-	Description string            `json:"description,omitempty"`
-	Flags       []helpFlagJSON    `json:"flags"`
-	Examples    []helpExampleJSON `json:"examples"`
+	Command     string               `json:"command"`
+	Description string               `json:"description,omitempty"`
+	Positionals []helpPositionalJSON `json:"positionals,omitempty"`
+	Flags       []helpFlagJSON       `json:"flags"`
+	Examples    []helpExampleJSON    `json:"examples"`
+}
+
+// helpPositionalJSON is one positional in the structured help contract, in
+// declaration order.
+type helpPositionalJSON struct {
+	Name     string `json:"name"`
+	Required bool   `json:"required,omitempty"`
+}
+
+// helpPositionals returns positionals in the structured help contract, or nil
+// for none.
+func helpPositionals(positionals []extension.PositionalDefinition) []helpPositionalJSON {
+	if len(positionals) == 0 {
+		return nil
+	}
+	out := make([]helpPositionalJSON, 0, len(positionals))
+	for _, positional := range positionals {
+		out = append(out, helpPositionalJSON{Name: positional.Name, Required: positional.Required})
+	}
+	return out
 }
 
 // helpFlagJSON describes one flag in the structured help contract.
@@ -726,10 +796,14 @@ type helpExampleJSON struct {
 }
 
 // subcommandSummaryJSON is one entry in the group-level catalog emitted for
-// `putnami <group> --help --output=json|jsonl`.
+// `putnami <group> --help --output=json|jsonl`. Default marks the subcommand
+// `putnami <group>` runs; with positionals, a word that names no subcommand
+// runs it too.
 type subcommandSummaryJSON struct {
-	Command     string `json:"command"`
-	Description string `json:"description,omitempty"`
+	Command     string               `json:"command"`
+	Description string               `json:"description,omitempty"`
+	Default     bool                 `json:"default,omitempty"`
+	Positionals []helpPositionalJSON `json:"positionals,omitempty"`
 }
 
 // helpJSONFormat reports the machine-readable help format selected by --output,
@@ -783,6 +857,7 @@ func buildSubcommandHelpJSON(ext *extension.ExtensionDescription, group, sub str
 	return subcommandHelpJSON{
 		Command:     group + " " + sub,
 		Description: subcommandDescription(ext, subdef),
+		Positionals: helpPositionals(subdef.Positionals),
 		Flags:       flagList,
 		Examples:    examples,
 	}

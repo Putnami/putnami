@@ -252,10 +252,18 @@ func TestAncestryCommandsReadAGroupThroughItsFlatCommand(t *testing.T) {
 		Jobs: map[string]*extension.JobDefinition{
 			"ship": {Name: "ship", Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
 		},
-		CommandGroups: map[string]extension.CommandGroupDefinition{"release": {
-			Default:     "now",
-			Subcommands: map[string]extension.SubcommandDefinition{"now": {Command: "ship"}},
-		}},
+		CommandGroups: map[string]extension.CommandGroupDefinition{
+			"release": {
+				Default:     "now",
+				Subcommands: map[string]extension.SubcommandDefinition{"now": {Command: "ship"}},
+			},
+			"publish": {
+				Default: "to",
+				Subcommands: map[string]extension.SubcommandDefinition{
+					"to": {Command: "ship", Positionals: []extension.PositionalDefinition{{Name: "project", Required: true}}},
+				},
+			},
+		},
 	}}
 	groups := extension.CommandGroupNames(extensions)
 	cases := []struct {
@@ -266,6 +274,7 @@ func TestAncestryCommandsReadAGroupThroughItsFlatCommand(t *testing.T) {
 		{"subcommand", &ParsedArgs{Commands: []string{"release"}, Subcommand: "now"}, []string{"ship"}},
 		{"default subcommand", &ParsedArgs{Commands: []string{"release"}}, []string{"ship"}},
 		{"unknown subcommand", &ParsedArgs{Commands: []string{"release"}, Subcommand: "later"}, []string{"release"}},
+		{"positional default", &ParsedArgs{Commands: []string{"publish"}, Subcommand: "/apps/web"}, []string{"ship"}},
 		{"job commands", &ParsedArgs{Commands: []string{"ship", "lint"}}, []string{"ship", "lint"}},
 	}
 	for _, c := range cases {

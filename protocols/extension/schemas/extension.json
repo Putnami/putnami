@@ -508,7 +508,7 @@
         "default": {
           "type": "string",
           "minLength": 1,
-          "description": "Name of one of this group's own subcommands. `putnami <group>` with no subcommand word runs it, with any flags that follow; `putnami <group> --help` still prints the group help."
+          "description": "Name of one of this group's own subcommands. `putnami <group>` with no subcommand word runs it, with any flags that follow; `putnami <group> --help` still prints the group help. When this subcommand declares positionals (CLI contract 15), `putnami <group> <word>` also runs it when the word names no subcommand of the group, with the word as its first argument; a declared subcommand wins, so a project named like a subcommand is passed by its id."
         },
         "flags": {
           "type": "object",
@@ -573,7 +573,7 @@
         },
         "positionals": {
           "type": "array",
-          "description": "Positional arguments accepted by this subcommand. Static completion does not provide positional values yet.",
+          "description": "Positional arguments accepted by this subcommand, passed to its runtime as arguments and printed in its usage line. Shell completion offers the workspace's project ids after the group word when this subcommand is the group default and its first positional is named `project`, and no value for any other positional.",
           "items": {
             "$ref": "#/$defs/positionalDefinition"
           }

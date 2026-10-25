@@ -1,0 +1,32 @@
+{
+  "name": "@acme/demo",
+  "version": "0.1.0",
+  "cliContract": 11,
+  "commands": {
+    "stage-up": { "traits": { "workload": "once" }, "activationFiles": ["demo.activate"], "run": [{ "id": "up", "task": "workload" }] },
+    "stage-status": { "activationFiles": ["demo.activate"], "run": [{ "id": "status", "task": "workload" }] },
+    "notes-draft": { "activationFiles": ["demo.activate"], "run": [{ "id": "draft", "task": "workload" }] },
+    "notes-show": { "activationFiles": ["demo.activate"], "run": [{ "id": "show", "task": "workload" }] },
+    "notes-count": { "activationFiles": ["demo.activate"], "run": [{ "id": "count", "task": "workload" }] }
+  },
+  "commandGroups": {
+    "stage": {
+      "description": "Stage projects.",
+      "subcommands": {
+        "up": { "command": "stage-up", "interactive": true },
+        "status": { "command": "stage-status" }
+      }
+    },
+    "notes": {
+      "description": "Keep notes.",
+      "subcommands": {
+        "show": { "command": "notes-show", "interactive": true },
+        "add": { "command": "notes-show", "interactive": true, "subcommands": { "draft": { "command": "notes-draft" } } },
+        "peek": { "command": "notes-show" }
+      }
+    }
+  },
+  "tasks": {
+    "workload": { "kind": "command", "command": "{extensionRoot}/ok.sh", "cache": false, "timeoutMs": -1 }
+  }
+}

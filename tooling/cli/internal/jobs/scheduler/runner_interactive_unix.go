@@ -6,7 +6,8 @@ import (
 	"errors"
 	"os/exec"
 	"syscall"
-	"time"
+
+	"go.putnami.dev/tooling/cli/internal/abort"
 )
 
 // runInteractive runs cmd, an interactive job that shares the CLI's terminal,
@@ -30,11 +31,17 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) erro
 		// also terminate the CLI process itself.
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
-	cmd.WaitDelay = 5 * time.Second
+	// A canceled child stops on its own terms: it has interactiveStopBudget to
+	// exit before Wait kills it. A terminal Ctrl+C reaches it directly, and the
+	// cancel's SIGTERM reaches it when a supervisor signaled the CLI alone.
+	cmd.WaitDelay = interactiveStopBudget
 
 	if err := startJob(cmd.Start); err != nil {
 		return err
 	}
+	// A second signal to the CLI kills the child at once.
+	release := abort.HoldInteractive(func() { _ = cmd.Process.Kill() })
+	defer release()
 	return cmd.Wait()
 }
 

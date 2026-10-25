@@ -496,6 +496,56 @@ func GroupCarriedCommands(groups map[string]CommandGroupDefinition) map[string]b
 	return carried
 }
 
+// InteractiveOnlyCarrier returns the command path, `<group> <subcommand>`,
+// that a user types to run command, when every subcommand of extensions that
+// carries command (GroupCarriedCommands) dispatches interactive: such a command
+// needs the terminal's streams and the host channel that interactive dispatch
+// opens. A nested subcommand dispatches under the Interactive flag of its
+// top-level subcommand. Of several carriers it returns the first path in
+// sorted order. ok is false when no subcommand carries command, or one that
+// carries it is not interactive.
+func InteractiveOnlyCarrier(extensions []*ExtensionDescription, command string) (path string, ok bool) {
+	var paths []string
+	for _, ext := range extensions {
+		for group, groupDef := range ext.CommandGroups {
+			for name, sub := range groupDef.Subcommands {
+				carrier, carried := carrierPath(sub, group+" "+name, command)
+				if !carried {
+					continue
+				}
+				if !sub.Interactive {
+					return "", false
+				}
+				paths = append(paths, carrier)
+			}
+		}
+	}
+	if len(paths) == 0 {
+		return "", false
+	}
+	sort.Strings(paths)
+	return paths[0], true
+}
+
+// carrierPath returns the path of the first subcommand, in sorted order, at or
+// below sub (whose own path is path) that names command.
+func carrierPath(sub SubcommandDefinition, path, command string) (string, bool) {
+	if sub.Command == command {
+		return path, true
+	}
+	names := make([]string, 0, len(sub.Subcommands))
+	for name := range sub.Subcommands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if carrier, ok := carrierPath(sub.Subcommands[name], path+" "+name, command); ok {
+			return carrier, true
+		}
+	}
+	return "", false
+}
+
 // CommandSubcommandOwners returns, sorted, the names of every extension with
 // an executable definition for the given command-group subcommand. Multiple
 // owners make dispatch first-match-wins across independently released
@@ -597,6 +647,54 @@ func GroupDefaultSubcommand(extensions []*ExtensionDescription, group string) st
 			return ""
 		}
 		return groupDef.Default
+	}
+	return ""
+}
+
+// ResolveGroupInvocation returns the subcommand `putnami <group> <word>` runs,
+// where word is the first word after the group, or "" when none follows. No
+// word runs the group default (GroupDefaultSubcommand). A word that names a
+// subcommand of the group runs that subcommand: a declared subcommand wins, so
+// a project named like one is addressed by its id. Any other word runs the
+// default when the default declares positionals, and positional reports that
+// the word is the default's first argument rather than a subcommand. Otherwise
+// it returns the word unchanged, so the caller reports an unknown subcommand.
+func ResolveGroupInvocation(extensions []*ExtensionDescription, group, word string) (sub string, positional bool) {
+	if word == "" {
+		return GroupDefaultSubcommand(extensions, group), false
+	}
+	if _, _, ok := LookupSubcommand(extensions, group, word); ok {
+		return word, false
+	}
+	if def := GroupPositionalDefault(extensions, group); def != nil {
+		return def.Subcommand, true
+	}
+	return word, false
+}
+
+// GroupPositionalDefault returns the group default (GroupDefaultSubcommand)
+// when it declares positionals, the subcommand that `putnami <group> <word>`
+// runs for a word that names no subcommand of the group, and nil otherwise.
+func GroupPositionalDefault(extensions []*ExtensionDescription, group string) *ResolvedSubcommand {
+	def := GroupDefaultSubcommand(extensions, group)
+	if def == "" {
+		return nil
+	}
+	resolved, _ := ResolveSubcommand(extensions, group, def)
+	if resolved == nil || len(resolved.Subdef.Positionals) == 0 {
+		return nil
+	}
+	return resolved
+}
+
+// GroupInvocationCommand returns the flat command `putnami <group> <word>`
+// runs (ResolveGroupInvocation), or "" when the invocation resolves to no
+// executable subcommand. Its traits are the run's: whether it reads its
+// ancestry, and whether it watches by default and owns --no-watch.
+func GroupInvocationCommand(extensions []*ExtensionDescription, group, word string) string {
+	sub, _ := ResolveGroupInvocation(extensions, group, word)
+	if resolved, _ := ResolveSubcommand(extensions, group, sub); resolved != nil {
+		return resolved.CommandName
 	}
 	return ""
 }

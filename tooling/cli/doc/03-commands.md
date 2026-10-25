@@ -31,9 +31,14 @@ extensions declare, with the aliases of their verb vocabulary, then a
 `Commands (from extensions):` section with one row per command group of those
 extensions and its description. A group named like a core command is not
 listed, because the core answers that name first; a group named like a flat
-extension command is listed once, as the group. Shell
-completion offers the groups and their subcommands, and not the flat commands a
-group carries, which fail when typed directly. Outside a workspace help lists
+extension command is listed once, as the group. `putnami <group>` with no
+subcommand runs the group's default subcommand, and a group without one prints
+its help. When the default declares positionals, a word that names none of the
+group's subcommands runs the default with that word as its first argument, so
+a project named like a subcommand is addressed by its id. Shell completion
+offers the groups and their subcommands, the project ids after a group whose
+default takes a `project`, and not the flat commands a group carries, which
+fail when typed directly. Outside a workspace help lists
 none of these, and says how to add an extension. A command that no
 loaded extension declares is a usage error (exit code 2) in every entry point,
 help included.
@@ -1261,6 +1266,14 @@ for them, exactly as it does for a command whose traits declare the `serve`
 workload, such as `serve` (which `run_jobs` also refuses to execute, because
 the engine promotes it to watch mode and one blocking tool call wedges the
 whole stdio session).
+
+`run_jobs` also refuses to execute a command that the loaded extensions carry
+only under `interactive` subcommands, such as the command behind `putnami
+<group> <subcommand>`. An interactive subcommand needs a terminal and the host
+channel the CLI opens for it, and a tool call has neither. The refusal names
+the subcommand to run in a terminal. A command that a non-interactive
+subcommand or no subcommand carries is unaffected, and `dryRun: true` still
+plans it.
 
 Claude Code discovers the server through a `.mcp.json` file at the workspace
 root:

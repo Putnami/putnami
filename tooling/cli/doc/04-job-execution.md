@@ -734,6 +734,14 @@ shares the CLI's process group, and the runner signals only its root. A
 timed-out job stays failed with its error, and a canceled job stays canceled,
 whatever the teardown had to do.
 
+An interactive job stops on its own terms. On timeout or cancellation the
+runner sends SIGTERM to its root on Unix, or CTRL_BREAK_EVENT to its Job
+Object on Windows, and waits up to 90 seconds for it to exit before it kills
+it, so a command that tears down what it started can finish. While an
+interactive job runs, the CLI waits up to 100 seconds after the first SIGINT
+or SIGTERM: those 90 seconds, then the 10 seconds any run gets to unwind. A
+second signal kills the interactive job at once, and the CLI exits 130.
+
 An interactive subcommand that passes its deadline prints
 ``putnami: `<group> <subcommand>` stopped: it passed its <deadline> deadline``
 and exits 1, whatever code its process returned. A process that ends from a

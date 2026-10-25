@@ -46,6 +46,10 @@ type completionContext struct {
 	structuredFlags      map[string][]StructuredFlagInfo
 	structuredFlagValues map[string][]completionValue
 	globalFlags          []commandmeta.GlobalFlag // CLI-wide flags, from the catalog
+	// projectPositionals are the command groups whose default takes a first
+	// positional named project: the word after the group also completes the
+	// project IDs (addPositionalDefaultCompletions).
+	projectPositionals map[string]bool
 }
 
 // discoverCompletionExtensions returns the extensions that load at wsRoot, the
@@ -85,6 +89,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings *works
 		subcommands:          map[string][]string{},
 		knownSubcommandPaths: map[string]bool{},
 		structuredFlags:      map[string][]StructuredFlagInfo{},
+		projectPositionals:   map[string]bool{},
 		structuredFlagValues: map[string][]completionValue{
 			"workspace init --extension": {
 				{Value: "ts", Description: "TypeScript"},
@@ -201,6 +206,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings *works
 			}
 		}
 		addExtensionCommandGroupCompletions(&ctx, extensions)
+		addPositionalDefaultCompletions(&ctx, extensions)
 		declaresCommands = declaresCommands || declaresReachableGroup(extensions)
 		templates, _ := template.DiscoverTemplates(wsRoot, projectPaths)
 		for _, tpl := range templates {
@@ -350,6 +356,32 @@ func addExtensionCommandGroupCompletions(ctx *completionContext, extensions []*e
 			addExtensionSubcommandCompletions(ctx, ext, groupName, group.Subcommands, "", group.Flags)
 		}
 	}
+}
+
+// addPositionalDefaultCompletions completes `putnami <group> <word>` for a
+// group whose default declares positionals, which runs the default for a word
+// that names no subcommand (extension.ResolveGroupInvocation). The word also
+// completes the project IDs when the first positional is named project: an ID
+// starts with a slash, so it never names a subcommand. The group word offers
+// the default's flags, as `putnami <group> --flag` runs the default.
+func addPositionalDefaultCompletions(ctx *completionContext, extensions []*extension.ExtensionDescription) {
+	for group := range extension.CommandGroupNames(extensions) {
+		def := extension.GroupPositionalDefault(extensions, group)
+		if def == nil {
+			continue
+		}
+		if def.Subdef.Positionals[0].Name == "project" {
+			ctx.projectPositionals[group] = true
+		}
+		if flags := ctx.structuredFlags[group+" "+def.Subcommand]; len(flags) > 0 {
+			ctx.structuredFlags[group] = mergeStructuredCompletionFlags(ctx.structuredFlags[group], flags)
+		}
+	}
+}
+
+// projectPositionalGroups returns the projectPositionals in name order.
+func (c completionContext) projectPositionalGroups() []string {
+	return slices.Sorted(maps.Keys(c.projectPositionals))
 }
 
 func addExtensionSubcommandCompletions(

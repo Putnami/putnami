@@ -21,6 +21,19 @@ import (
 // to outlast the worst single-job teardown plus the scheduler's drain.
 const shutdownTimeout = 10 * time.Second
 
+// interactiveShutdownTimeout caps the wait for a run whose interactive child
+// runs when the first signal lands: the child has abort.InteractiveStopBudget
+// to exit on its own, and the run then has shutdownTimeout to unwind.
+const interactiveShutdownTimeout = abort.InteractiveStopBudget + shutdownTimeout
+
+// shutdownTimeoutNow is the bound for a run signaled now.
+func shutdownTimeoutNow() time.Duration {
+	if abort.InteractiveHeld() {
+		return interactiveShutdownTimeout
+	}
+	return shutdownTimeout
+}
+
 func main() {
 	os.Exit(runMain())
 }
@@ -56,13 +69,13 @@ func runMain() int {
 
 	// Bounded-shutdown signal handler: first SIGINT/SIGTERM cancels
 	// the root context and starts a hard-deadline timer; the second signal
-	// (or the timer firing) calls os.Exit immediately so a wedged child
-	// cannot make Ctrl-C feel unresponsive.
+	// (or the timer firing) kills an interactive child and calls os.Exit
+	// immediately so a wedged child cannot make Ctrl-C feel unresponsive.
 	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 	runDone := make(chan struct{})
-	go waitForShutdown(runDone, cancel, sigCh, shutdownTimeout, os.Exit, launch.Delegated)
+	go waitForShutdown(runDone, cancel, sigCh, shutdownTimeoutNow, os.Exit, launch.Delegated)
 
 	code := run(rootCtx)
 	close(runDone)
@@ -72,9 +85,12 @@ func runMain() int {
 // waitForShutdown implements the two-signal shutdown policy. runDone is
 // closed by main when run() returns so the handler can distinguish "first
 // signal canceled the run and it's now finished" from "first signal
-// canceled the run but it's still tearing down". exitFn is taken as a
-// parameter so tests can verify forced-exit calls without actually
-// terminating the test process.
+// canceled the run but it's still tearing down". timeout returns the bound
+// for a run signaled at the time of the call, read at the first signal. A
+// forced exit first kills the interactive child of the run, if one runs
+// (abort.KillInteractive): it shares the terminal and would outlive the CLI.
+// exitFn is taken as a parameter so tests can verify forced-exit calls
+// without actually terminating the test process.
 //
 // delegated reports whether a relaunched child owns this invocation
 // (launch.Delegated). The child receives the same console interrupts and runs
@@ -84,7 +100,7 @@ func waitForShutdown(
 	runDone <-chan struct{},
 	cancel context.CancelFunc,
 	sigCh <-chan os.Signal,
-	timeout time.Duration,
+	timeout func() time.Duration,
 	exitFn func(int),
 	delegated func() bool,
 ) {
@@ -103,6 +119,7 @@ func waitForShutdown(
 	// run unwinds, so the end-of-run summary can say who stopped the build
 	// instead of reporting the leftover work as an ordinary skip.
 	abort.Record(sig)
+	bound := timeout()
 	iox.Fprintln(os.Stderr, "\nputnami: interrupting... press Ctrl-C again to force quit")
 	cancel()
 	select {
@@ -111,12 +128,14 @@ func waitForShutdown(
 			return
 		}
 		iox.Fprintln(os.Stderr, "putnami: force quit")
+		abort.KillInteractive()
 		exitFn(cli.ExitSignalReceived)
-	case <-time.After(timeout):
+	case <-time.After(bound):
 		if delegated() {
 			return
 		}
 		iox.Fprintln(os.Stderr, "putnami: shutdown timeout exceeded, forcing exit")
+		abort.KillInteractive()
 		exitFn(cli.ExitSignalReceived)
 	case <-runDone:
 		// run() returned cleanly between signals; nothing to force.

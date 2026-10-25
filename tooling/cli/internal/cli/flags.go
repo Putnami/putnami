@@ -40,7 +40,9 @@ func parseCommandFlags(args, commands, serveWorkloads []string) (GlobalFlags, []
 
 // ownsWatchFlag reports whether a command watches by default and reads
 // --no-watch to stop it: a command of serveWorkloads, whose traits declare the
-// serve workload, through its `watch` flag, and compose for its target.
+// serve workload, through its `watch` flag, and compose for its target. For a
+// command group, commands is the flat command the invocation runs
+// (watchCommands).
 func ownsWatchFlag(commands, serveWorkloads []string) bool {
 	return slices.ContainsFunc(commands, func(command string) bool {
 		return command == "compose" || slices.Contains(serveWorkloads, command)

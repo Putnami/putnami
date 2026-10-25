@@ -1,5 +1,6 @@
 // Package abort records why the process was asked to stop, so end-of-run
-// reporting can name the cause instead of guessing at it.
+// reporting can name the cause instead of guessing at it, and which
+// interactive child the stop waits for or kills (HoldInteractive).
 //
 // Signal delivery is process-global and arrives on its own goroutine, long
 // after the run's contexts are built, so the source is recorded here rather

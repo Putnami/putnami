@@ -9,9 +9,17 @@ import (
 	"os/exec"
 	"time"
 
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
+
+// interactiveStopBudget is how long a canceled interactive job has to exit on
+// its own before the runner kills it (abort.InteractiveStopBudget). The exec
+// WaitDelay that enforces it also bounds the wait for the I/O pipes of a stream
+// that is no file once the child exited; the terminal streams of a dispatch are
+// files and need none.
+var interactiveStopBudget = abort.InteractiveStopBudget
 
 // RunJobInteractive runs a job as an interactive subprocess, inheriting the
 // parent's stdin/stdout/stderr. Unlike RunJob, no JSONL parsing happens — the

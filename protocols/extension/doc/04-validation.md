@@ -183,9 +183,11 @@ kind, workload or effect, or a batchable kind or phase,
 `protocols/cli.PublishChannelsContract` (12) for a task that declares
 `declares.publishChannels`,
 `protocols/cli.ProvisionedToolchainContract` (13) for a runtime toolchain that
-declares a `provisioned` candidate, or
+declares a `provisioned` candidate,
 `protocols/cli.InputSelectorsContract` (14) for `runtime.inputSelectors` or a
-task file pattern that names an input selector. Rung 6 named the
+task file pattern that names an input selector, or
+`protocols/cli.DefaultPositionalsContract` (15) for a command group whose
+default subcommand declares positionals. Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
@@ -194,7 +196,7 @@ tool, or agent-content surface, and to a verb vocabulary. A non-conforming manif
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 7, 8, 9, 10, 11, 12, 13 and 14 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14 and 15 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, input selectors, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content and nothing else requires
@@ -234,9 +236,14 @@ whose task file pattern names a selector requires contract 14 wherever it loads
 from: a reader at 14 asks the extension for the files each selector reads, and
 an older reader expands rung 6's two selectors itself or not at all. A manifest
 stamped below 14 that names a selector is refused, whatever its stamp.
-`RequiredLoadContract` includes that rung too. The reader loads every stamp
-from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (14):
+`RequiredLoadContract` includes that rung too. A manifest whose command group
+defaults to a subcommand that declares positionals requires contract 15
+wherever it loads from: a reader at 15 runs that default for a word that names
+no subcommand, with the word as its first argument, and an older reader
+answers "unknown subcommand". Positionals on a subcommand that is not the
+group's default keep the base stamp. `RequiredLoadContract` includes that rung
+as well. The reader loads every stamp from the one the manifest's vocabulary
+requires up to `protocols/cli.LatestContract` (15):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -276,7 +283,7 @@ rejected like any other future manifest. `TestLoadManifest_CompatibilityMatrix`
 (manifest_matrix_test.go) is the executable form of this table — the full cross
 product of {absent, one behind, current, latest, one ahead} × {commands,
 command groups, tools, agent content, verbs, command kinds, publish channels,
-provisioned toolchain, none}. Ratcheting a row means editing that table and
+provisioned toolchain, default positionals, none}. Ratcheting a row means editing that table and
 this one together.
 
 ### The packaging ratchet
@@ -309,11 +316,14 @@ package job.
 | current | contract-5 manifest | Loads; its agent content is materialized only in a workspace that opts in. |
 | current | contract-14 manifest with input selectors | Loads; the CLI asks the extension for the files each selector reads. |
 | current | manifest naming an input selector, stamped 13 or lower, or unstamped | Rejected for its input selectors, with `putnami extensions update` as the remedy: the stamp does not cover the input-resolve call. |
+| current | contract-15 manifest whose group default declares positionals | Loads; a word after the group that names no subcommand runs the default with the word as its first argument. |
+| current | manifest whose group default declares positionals, stamped 14 or lower, or unstamped | Rejected for its default subcommand that takes positionals, with `putnami extensions update` as the remedy. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
 | current | manifest naming a registry dependency, stamped 7 or lower or unstamped, from the artifact store or a declared path | Rejected: the stamp does not cover the dependencies the CLI would install and load. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |
 | contract-4 CLI | contract-5 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). Its permissive decode would drop `agentContent` silently, which is why the stamp, not the schema, carries the refusal. The remedy is `putnami upgrade`. |
 | contract-13 CLI | contract-14 artifact | Rejected by that CLI's own higher-contract arm. It expands no selector through the extension. |
+| contract-14 CLI | contract-15 artifact | Rejected by that CLI's own higher-contract arm. It would answer "unknown subcommand" for a word the default takes. |
 | contract-3 CLI | contract-4 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). The remedy is `putnami upgrade`; there is no artifact shape that both permits the new field and lets the old reader ignore it. |
 
 Task-contract version stays ORTHOGONAL to this ladder. A contract-4 manifest

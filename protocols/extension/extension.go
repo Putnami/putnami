@@ -361,8 +361,12 @@ type ToolCallResult struct {
 //
 // Default names one of the group's own top-level subcommands. `putnami
 // <group>` with no subcommand word runs it, with any flags that follow; `putnami
-// <group> --help` still prints the group help. A group without Default prints
-// its help when no subcommand is named.
+// <group> --help` still prints the group help. When the default declares
+// Positionals (DeclaresDefaultPositionals, contract 15), `putnami <group>
+// <word>` also runs it when the word names no subcommand of the group, with the
+// word as its first argument. A declared subcommand wins, so a project named
+// like a subcommand is addressed by its id. A group without Default prints its
+// help when no subcommand is named.
 type CommandGroupDefinition struct {
 	Description string                          `json:"description,omitempty"`
 	Default     string                          `json:"default,omitempty"`
@@ -425,9 +429,12 @@ type ExampleDefinition struct {
 }
 
 // PositionalDefinition describes a positional argument accepted by an
-// extension subcommand. Completion is intentionally static for now; dynamic
-// value providers can be added later without requiring extension binaries to
-// run during shell completion.
+// extension subcommand. The CLI parses no positional: it passes the words to
+// the subcommand's runtime as arguments and prints each one in the usage line,
+// `<name>` when Required and `[<name>]` otherwise. Shell completion runs no
+// extension binary: it offers the workspace's project ids after the group word
+// of a default whose first positional is named "project", and no value for any
+// other positional.
 type PositionalDefinition struct {
 	Name     string `json:"name"`
 	Required bool   `json:"required,omitempty"`

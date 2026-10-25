@@ -9,11 +9,18 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 func notDelegated() bool { return false }
+
+// fixedTimeout is a shutdown bound that does not depend on the run.
+func fixedTimeout(bound time.Duration) func() time.Duration {
+	return func() time.Duration { return bound }
+}
 
 // TestWaitForShutdown_SecondSignalForcesExit verifies the two-signal
 // policy: one SIGINT cancels and warns; a second SIGINT calls
@@ -27,7 +34,7 @@ func TestWaitForShutdown_SecondSignalForcesExit(t *testing.T) {
 	var exitedWith int32
 	exited := make(chan struct{})
 
-	go waitForShutdown(runDone, cancel, sigCh, time.Minute, func(code int) {
+	go waitForShutdown(runDone, cancel, sigCh, fixedTimeout(time.Minute), func(code int) {
 		atomic.StoreInt32(&exitedWith, int32(code))
 		close(exited)
 	}, notDelegated)
@@ -61,7 +68,7 @@ func TestWaitForShutdown_TimeoutForcesExit(t *testing.T) {
 	var exitedWith int32
 	exited := make(chan struct{})
 
-	go waitForShutdown(runDone, cancel, sigCh, 50*time.Millisecond, func(code int) {
+	go waitForShutdown(runDone, cancel, sigCh, fixedTimeout(50*time.Millisecond), func(code int) {
 		atomic.StoreInt32(&exitedWith, int32(code))
 		close(exited)
 	}, notDelegated)
@@ -91,7 +98,7 @@ func TestWaitForShutdown_CleanRunReturnNoExit(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		waitForShutdown(runDone, cancel, sigCh, time.Minute, func(_ int) {
+		waitForShutdown(runDone, cancel, sigCh, fixedTimeout(time.Minute), func(_ int) {
 			atomic.StoreInt32(&exitCalled, 1)
 		}, notDelegated)
 		close(done)
@@ -126,7 +133,7 @@ func TestWaitForShutdown_NoSignalsCleanExit(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		waitForShutdown(runDone, cancel, sigCh, time.Minute, func(_ int) {
+		waitForShutdown(runDone, cancel, sigCh, fixedTimeout(time.Minute), func(_ int) {
 			atomic.StoreInt32(&exitCalled, 1)
 		}, notDelegated)
 		close(done)
@@ -159,7 +166,7 @@ func TestWaitForShutdown_DelegatedParentWaitsForTheChild(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		waitForShutdown(runDone, cancel, sigCh, 10*time.Millisecond, func(_ int) {
+		waitForShutdown(runDone, cancel, sigCh, fixedTimeout(10*time.Millisecond), func(_ int) {
 			atomic.StoreInt32(&exitCalled, 1)
 		}, func() bool { return true })
 		close(done)
@@ -196,5 +203,66 @@ func TestRunMainRefusesInsideAHostedFetch(t *testing.T) {
 	os.Args = []string{"putnami", "commit-msg", message}
 	if code := runMain(); code != cli.ExitUsage {
 		t.Errorf("runMain() = %d, want %d", code, cli.ExitUsage)
+	}
+}
+
+// While an interactive child runs, the shutdown bound outlasts the budget the
+// child has to exit on its own; once it is gone, the bound is the plain one.
+func TestShutdownTimeoutNow_CoversTheInteractiveBudget(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-waits-for-an-interactive-child-after-a-terminal-signal")
+	if got := shutdownTimeoutNow(); got != shutdownTimeout {
+		t.Fatalf("shutdownTimeoutNow() = %s without an interactive child, want %s", got, shutdownTimeout)
+	}
+	release := abort.HoldInteractive(func() {})
+	got := shutdownTimeoutNow()
+	release()
+	if got != interactiveShutdownTimeout || got <= abort.InteractiveStopBudget {
+		t.Errorf("shutdownTimeoutNow() = %s with an interactive child, want %s, above the %s budget",
+			got, interactiveShutdownTimeout, abort.InteractiveStopBudget)
+	}
+}
+
+// A forced exit, from a second signal or from the bound, kills the interactive
+// child before the CLI exits, so the child does not outlive it.
+func TestWaitForShutdown_ForcedExitKillsTheInteractiveChild(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-second-signal-kills-the-interactive-child-at-once")
+	for name, signals := range map[string]int{"second signal": 2, "timeout": 1} {
+		t.Run(name, func(t *testing.T) {
+			_, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var killed atomic.Bool
+			release := abort.HoldInteractive(func() { killed.Store(true) })
+			defer release()
+
+			sigCh := make(chan os.Signal, 2)
+			runDone := make(chan struct{}) // never closed: the child still runs
+			killedBeforeExit := make(chan bool, 1)
+			bound := time.Minute
+			if signals == 1 {
+				bound = 50 * time.Millisecond
+			}
+			go waitForShutdown(runDone, cancel, sigCh, fixedTimeout(bound), func(int) {
+				killedBeforeExit <- killed.Load()
+			}, notDelegated)
+
+			sigCh <- syscall.SIGINT
+			if signals == 2 {
+				time.Sleep(20 * time.Millisecond)
+				if killed.Load() {
+					t.Fatal("the first signal killed the interactive child")
+				}
+				sigCh <- syscall.SIGINT
+			}
+			select {
+			case ok := <-killedBeforeExit:
+				if !ok {
+					t.Error("the CLI exited before it killed the interactive child")
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("exitFn was not called")
+			}
+		})
 	}
 }

@@ -104,6 +104,12 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_takes_project() {
+    case "$1" in
+        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     case "$1" in
         'cli list') printf '%s\n' '--global' ;;
@@ -180,6 +186,9 @@ _putnami_completions() {
 
     local nested_subcommands="$(_putnami_subcommands_for "${path}")"
     if [[ -n "${nested_subcommands}" && "${cur}" != -* && ${i} -eq ${cword} ]]; then
+        if _putnami_takes_project "${path}"; then
+            nested_subcommands="${nested_subcommands} ${project_ids}"
+        fi
         COMPREPLY=( $(compgen -W "${nested_subcommands}" -- "${cur}") )
         return
     fi

@@ -89,6 +89,13 @@ end
 		}
 	}
 
+	// The word after a group whose default takes a project positional.
+	for _, group := range ctx.projectPositionalGroups() {
+		for _, id := range ctx.projectIDs {
+			iox.Fprintf(w, "complete -c putnami -n '__putnami_complete_children %s' -a '%s' -d 'project'\n", fishPathArgs(group), id)
+		}
+	}
+
 	iox.Fprintf(w, "\n# Global flags\n")
 
 	for _, flag := range ctx.globalFlags {

@@ -460,7 +460,8 @@
             "kind": "acceptance",
             "checks": [
               "dry-run-executes-nothing",
-              "long-lived-and-externally-mutating-jobs-are-refused"
+              "long-lived-and-externally-mutating-jobs-are-refused",
+              "a-command-carried-only-by-an-interactive-subcommand-is-refused"
             ]
           }
         },
@@ -1469,6 +1470,7 @@
               "a-once-workload-command-forwards-its-exit-code",
               "a-hosted-run-refuses-a-serve-workload-command",
               "a-serve-workload-command-owns-no-watch",
+              "a-group-invocation-that-serves-owns-no-watch",
               "a-composition-member-is-a-serve-workload-step"
             ]
           }
@@ -1487,6 +1489,38 @@
               "a-planned-job-carries-none",
               "an-inherited-value-is-stripped",
               "outside-a-workspace-it-equals-the-caller-directory"
+            ]
+          }
+        },
+        {
+          "id": "a-group-default-takes-positionals",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-word-that-names-no-subcommand-runs-the-positional-default",
+              "a-declared-subcommand-wins-over-a-positional-word",
+              "a-word-without-a-positional-default-stays-an-unknown-subcommand",
+              "the-group-help-prints-the-positional-in-its-usage-line",
+              "completion-offers-project-ids-after-the-group-word",
+              "a-manifest-with-a-positional-default-requires-contract-15"
+            ]
+          }
+        },
+        {
+          "id": "an-interactive-command-stops-on-its-own-terms",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-waits-for-an-interactive-child-after-a-terminal-signal",
+              "a-second-signal-kills-the-interactive-child-at-once"
             ]
           }
         },

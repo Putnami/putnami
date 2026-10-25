@@ -893,8 +893,12 @@ var longLivedCommands = map[string]string{
 // loop — so that wedges the WHOLE session with no way out.
 const serveWorkloadHazard = "is promoted to watch mode by the engine, so it never returns — not even when its child exits"
 
-// rejectLongLivedCommands refuses the longLivedCommands and every command whose
-// resolved traits in extensions declare the serve workload.
+// rejectLongLivedCommands refuses the longLivedCommands, every command whose
+// resolved traits in extensions declare the serve workload, and every command
+// that extensions carry only under interactive subcommands
+// (extension.InteractiveOnlyCarrier): interactive dispatch hands the child the
+// terminal's streams and the host channel, and a run_jobs call has neither, so
+// the refusal names the subcommand to type in a terminal.
 func rejectLongLivedCommands(extensions []*extension.ExtensionDescription, commands []string) error {
 	for _, command := range commands {
 		why, blocked := longLivedCommands[command]
@@ -904,6 +908,11 @@ func rejectLongLivedCommands(extensions []*extension.ExtensionDescription, comma
 		if blocked {
 			return fmt.Errorf("run_jobs cannot run %q: it %s, and one MCP tool call blocks the whole session. "+
 				"Run it in a terminal instead", command, why)
+		}
+		if path, interactive := extension.InteractiveOnlyCarrier(extensions, command); interactive {
+			return fmt.Errorf("run_jobs cannot run %q: an extension runs it only as the interactive subcommand "+
+				"`putnami %s`, which needs a terminal and a host channel, and an MCP tool call has neither. "+
+				"Run `putnami %s` in a terminal instead", command, path, path)
 		}
 	}
 	return nil

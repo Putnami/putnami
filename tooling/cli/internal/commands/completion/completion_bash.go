@@ -38,6 +38,16 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_takes_project() {
+    case "$1" in
+`)
+	for _, group := range ctx.projectPositionalGroups() {
+		iox.Fprintf(w, "        %s) return 0 ;;\n", bashQuote(group))
+	}
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     case "$1" in
 `)
@@ -85,6 +95,9 @@ _putnami_completions() {
 
     local nested_subcommands="$(_putnami_subcommands_for "${path}")"
     if [[ -n "${nested_subcommands}" && "${cur}" != -* && ${i} -eq ${cword} ]]; then
+        if _putnami_takes_project "${path}"; then
+            nested_subcommands="${nested_subcommands} ${project_ids}"
+        fi
         COMPREPLY=( $(compgen -W "${nested_subcommands}" -- "${cur}") )
         return
     fi

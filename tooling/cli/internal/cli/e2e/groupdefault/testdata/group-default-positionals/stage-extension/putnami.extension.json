@@ -1,0 +1,51 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/stage",
+  "version": "0.1.0",
+  "cliContract": 15,
+  "commandGroups": {
+    "stage": {
+      "description": "Stage projects.",
+      "default": "up",
+      "subcommands": {
+        "up": {
+          "description": "Stage one project.",
+          "command": "stage-up",
+          "interactive": true,
+          "positionals": [{ "name": "project", "required": true }]
+        },
+        "list": { "description": "List the staged projects.", "command": "stage-list", "interactive": true }
+      }
+    },
+    "notes": {
+      "description": "Keep notes.",
+      "default": "show",
+      "subcommands": {
+        "show": { "description": "Show the notes.", "command": "notes-show", "interactive": true },
+        "add": {
+          "description": "Add a note.",
+          "command": "notes-add",
+          "interactive": true,
+          "positionals": [{ "name": "text", "required": true }, { "name": "tag" }]
+        }
+      }
+    }
+  },
+  "commands": {
+    "stage-up": {
+      "description": "Stage one project.",
+      "traits": { "workload": "serve" },
+      "flags": { "watch": { "type": "boolean", "default": true, "description": "Restage the project on change." } },
+      "run": [{ "id": "up", "task": "stage-up" }]
+    },
+    "stage-list": { "description": "List the staged projects.", "run": [{ "id": "list", "task": "stage-list" }] },
+    "notes-show": { "description": "Show the notes.", "run": [{ "id": "show", "task": "notes-show" }] },
+    "notes-add": { "description": "Add a note.", "run": [{ "id": "add", "task": "notes-add" }] }
+  },
+  "tasks": {
+    "stage-up": { "kind": "command", "command": "{extensionRoot}/argv.sh", "args": ["up"], "cache": false, "timeoutMs": -1 },
+    "stage-list": { "kind": "command", "command": "{extensionRoot}/argv.sh", "args": ["list"], "cache": false, "timeoutMs": -1 },
+    "notes-show": { "kind": "command", "command": "{extensionRoot}/argv.sh", "args": ["show"], "cache": false, "timeoutMs": -1 },
+    "notes-add": { "kind": "command", "command": "{extensionRoot}/argv.sh", "args": ["add"], "cache": false, "timeoutMs": -1 }
+  }
+}
