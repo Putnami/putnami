@@ -19,6 +19,11 @@ type TextRendererConfig struct {
 	// Lifecycle suppresses successful task chrome and the generic session recap.
 	// The lifecycle caller emits one composed action list after all phases finish.
 	Lifecycle bool
+	// TasksOnly renders the tasks alone: each one's start, output, end and
+	// failure details, without the session's opening line and summary. A
+	// supervised serve run's serve log sets it, because its supervisor renders
+	// its own session around the text it passes through.
+	TasksOnly bool
 }
 
 // TextRenderer renders job execution output as human-readable text.
@@ -48,7 +53,7 @@ func (r *TextRenderer) Start(planned []*jobs.ScheduledJob) {
 	r.planned = planned
 	r.multiJob = len(planned) > 1
 	r.computeVerboseLayout(planned)
-	if r.cfg.Quiet || r.cfg.Lifecycle {
+	if r.cfg.Quiet || r.cfg.Lifecycle || r.cfg.TasksOnly {
 		return
 	}
 	iox.Fprintf(r.errOut, "\n")

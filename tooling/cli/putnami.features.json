@@ -4136,6 +4136,18 @@
           }
         },
         {
+          "id": "a-supervised-serve-run-splits-its-output",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "stdout-keeps-the-stream-and-stderr-renders-the-serve-steps",
+              "the-serve-log-carries-no-session-summary"
+            ]
+          }
+        },
+        {
           "id": "a-serve-step-names-its-process-group",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

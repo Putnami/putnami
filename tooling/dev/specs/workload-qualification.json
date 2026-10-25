@@ -88,6 +88,10 @@
       "text": "The lease records each serve run's process group and each serve step's, with their leaders' start times, so the next invocation reaps both. Teardown stops the members' runs in reverse start order, then the proxies, the databases and the lease, within 75s, so it ends before putnami kills the command 90s after a signal; it waits for a killed run no longer than that."
     },
     {
+      "id": "a-lost-putnami-tears-the-command-down",
+      "text": "On Unix, compose and qualify watch the putnami process that launched them. Once it is gone, even killed outright, they notice within a second and tear down as on a terminal signal, and a write to a stdout or stderr without a reader no longer ends them. On Windows, putnami's Job Object ends them and every serve run they started with putnami, without a teardown, and the next composition reaps the lease."
+    },
+    {
       "id": "the-dev-extension-runs-compose-and-qualify",
       "text": "The @putnami/dev manifest declares the compose and qualify command groups at CLI contract 15. Each defaults to its only subcommand, up and run, which is interactive and takes the project as a required positional, so putnami compose <project> and putnami qualify <project> run it. compose-up declares the serve workload and qualify-run the once workload, so no portable, commit-addressed or MCP run carries either. Their tasks run the dev executable in the workspace root, uncached and without a deadline."
     },

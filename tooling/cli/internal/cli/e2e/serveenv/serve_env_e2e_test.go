@@ -18,6 +18,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 )
@@ -162,14 +163,23 @@ var serveArgs = []string{"serve", "--projects", "example", "--port", "0", "--no-
 // end to end: the serve step alone sees the supervisor's variable, which no
 // job context, stream or session record holds; the stream names the serve
 // step's process group before its ready claim; and stderr carries the
-// workload's output as `putnami serve` renders it in text mode.
+// workload's output as `putnami serve` renders it in text mode, without the
+// run's summary or cache report.
 func TestSupervisedServeRunReachesOnlyTheServeStep(t *testing.T) {
 	clitest.RequireShell(t)
 	spectest.Proves(t, "cli/supervised-serve-run", "serve-env-reaches-only-serve-steps", "a-supervised-serve-run-hands-the-env-to-the-serve-step-alone")
+	spectest.Proves(t, "cli/supervised-serve-run", "a-supervised-serve-run-splits-its-output", "stdout-keeps-the-stream-and-stderr-renders-the-serve-steps")
 	root := serveFixture(t)
+	abort.Reset()
+	t.Cleanup(abort.Reset)
 	code, stdout, stderr := runWithStdin(t, root, `{"`+secretName+`":"`+secretValue+`","SERVE_ORIGIN":"http://127.0.0.1:43120"}`, serveArgs...)
 	if code != 0 {
 		t.Fatalf("putnami %s exited %d\nstdout:\n%s\nstderr:\n%s", strings.Join(serveArgs, " "), code, stdout, stderr)
+	}
+	// The process's first signal then prints no interrupt notice on the serve
+	// log (cmd/putnami waitForShutdown).
+	if !abort.Supervised() {
+		t.Error("the supervised serve run did not record its supervision")
 	}
 
 	if got := readProjectFile(t, root, "serve.env"); got != secretValue {
@@ -223,6 +233,13 @@ func TestSupervisedServeRunReachesOnlyTheServeStep(t *testing.T) {
 	}
 	if strings.Contains(stderr, `"record":`) {
 		t.Errorf("stderr carries session stream records:\n%s", stderr)
+	}
+	// The serve log carries the tasks alone: the run's summary and cache report
+	// are its supervisor's to render.
+	for _, sessionText := range []string{"succeeded", "Cache:"} {
+		if strings.Contains(stderr, sessionText) {
+			t.Errorf("stderr carries the session text %q:\n%s", sessionText, stderr)
+		}
 	}
 }
 

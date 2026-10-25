@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -227,9 +226,9 @@ func TestRefuseInvalidServeEnv_RefusesAHostedRun(t *testing.T) {
 	}
 }
 
-// Only a jsonl run that reads --serve-env renders the serve log on stderr; a
-// text run already renders it on its own streams.
-func TestServeLog_IsStderrOnlyForASupervisedJSONLRun(t *testing.T) {
+// Only a jsonl run that reads --serve-env is supervised, and renders the serve
+// log on stderr; a text run already renders it on its own streams.
+func TestSupervisedServe_IsOnlyAJSONLRunThatReadsServeEnv(t *testing.T) {
 	cases := []struct {
 		serveEnv, output string
 		want             bool
@@ -240,14 +239,9 @@ func TestServeLog_IsStderrOnlyForASupervisedJSONLRun(t *testing.T) {
 		{"", "jsonl", false},
 	}
 	for _, c := range cases {
-		req := &Request{}
-		req.Global.ServeEnv, req.Global.Output = c.serveEnv, c.output
-		got := serveLog(req)
-		if c.want && got != os.Stderr {
-			t.Errorf("serveLog(--serve-env=%q --output=%q) = %v, want stderr", c.serveEnv, c.output, got)
-		}
-		if !c.want && got != nil {
-			t.Errorf("serveLog(--serve-env=%q --output=%q) = %v, want nil", c.serveEnv, c.output, got)
+		flags := &GlobalFlags{ServeEnv: c.serveEnv, Output: c.output}
+		if got := SupervisedServe(flags); got != c.want {
+			t.Errorf("SupervisedServe(--serve-env=%q --output=%q) = %v, want %v", c.serveEnv, c.output, got, c.want)
 		}
 	}
 }

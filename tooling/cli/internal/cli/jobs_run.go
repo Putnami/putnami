@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -46,6 +47,11 @@ func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wspro
 			return engine.ExitUsage
 		}
 		req.ServeProcessEnv = env
+	}
+	// A supervised serve run's supervisor stops it and reports the stop, so the
+	// first signal prints no interrupt notice on its serve log.
+	if engine.SupervisedServe(&parsed.Global) {
+		abort.Supervise()
 	}
 	req.HostedRemoteCache = hostedCache
 	req.HostedReporters = hostedReporters

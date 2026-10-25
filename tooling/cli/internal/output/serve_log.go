@@ -4,10 +4,13 @@ import "go.putnami.dev/cli/model/jobs"
 
 // serveLogRenderer is the jsonl renderer of a supervised serve run
 // (Config.ServeLog): the machine stream on stdout, exactly the one the run
-// would write without it, and the same run rendered as `putnami serve` renders
-// it in text mode on the serve log writer. A supervisor reads the session
-// stream for its typed claims and passes the text through, so the workloads'
-// output stays readable whatever the stream's budget elides.
+// would write without it, and the run's tasks rendered as `putnami serve`
+// renders them in text mode on the serve log writer. A supervisor reads the
+// session stream for its typed claims and passes the text through, so the
+// workloads' output stays readable whatever the stream's budget elides. The
+// serve log carries no session summary, such as an opening line or the counts:
+// the supervisor renders its own session around it
+// (TextRendererConfig.TasksOnly).
 //
 // Only the jsonl stream fans out: an aggregated json envelope is written once,
 // at Finish, too late for a workload's live output.
@@ -29,6 +32,7 @@ func newServeLogRenderer(machine *machineV2Renderer, cfg Config) *serveLogRender
 			Debug:     cfg.Debug,
 			Quiet:     cfg.Quiet,
 			ServeMode: true,
+			TasksOnly: true,
 		}),
 	}
 }
@@ -59,8 +63,8 @@ func (r *serveLogRenderer) JobComplete(job *jobs.ScheduledJob, result *jobs.JobR
 	r.text.JobComplete(job, result)
 }
 
-// Finish ends both renderings: session:end on the stream, the text summary on
-// the serve log writer.
+// Finish ends both renderings: session:end on the stream; the serve log, which
+// carries the tasks alone, writes nothing more.
 func (r *serveLogRenderer) Finish(results map[string]*jobs.JobResult, outcome jobs.SessionOutcome) {
 	r.machineV2Renderer.Finish(results, outcome)
 	r.text.Finish(results, outcome)

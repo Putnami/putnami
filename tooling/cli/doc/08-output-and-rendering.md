@@ -520,9 +520,11 @@ step emits no `process` event, and the CLI drops a producer line of that type.
 
 With `--serve-env -` (see [Commands](03-commands.md#supervised-serve-run---serve-env)),
 a `--output=jsonl` run writes the session stream to stdout unchanged and also
-renders the run on stderr as `putnami serve` renders it in text mode, so the
-serve steps' log lines stay readable however much of them the bounded stream
-elides.
+renders the run's tasks on stderr as `putnami serve` renders them in text mode,
+so the serve steps' log lines stay readable however much of them the bounded
+stream elides. Stderr carries no session summary: no opening line, counts,
+hint, cache report or interrupt notice, which the supervisor renders for its own
+session. A watched run keeps its `[watch]` lines.
 
 A test result's `data.testCases` member is removed from its `task:event`, and
 from each member of a batch result's `data.batchResults`: the cases travel in

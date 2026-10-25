@@ -23,7 +23,11 @@
     },
     {
       "id": "ready-claims-are-never-elided",
-      "text": "A ready task:event is a priority record of the bounded session stream, in Go and TypeScript alike: it is admitted from the failure reserve, so a workload whose ordinary records spent their partition still delivers its claim live. A serve step's process event is a priority record for the same reason. The reserve is shared with every failure-priority record and bounded: 256 records and 256 KiB in normal mode, 2048 records and 2 MiB in verbose mode. A ready or process event that arrives once the run's failure-priority records spent it is elided from the live stream, counted in machineOutput.elided.failure and kept in the session artifact. With --output=jsonl and --serve-env, stdout carries the session stream unchanged and stderr carries the serve steps' output as putnami serve renders it in text mode."
+      "text": "A ready task:event and a serve step's process event are priority records of the bounded session stream, in Go and TypeScript alike: admitted from the failure reserve, they stay live after ordinary records spent their partition. The reserve, shared with every failure-priority record, holds 256 records and 256 KiB in normal mode, 2048 records and 2 MiB in verbose mode. One arriving once it is spent is elided from the live stream, counted in machineOutput.elided.failure and kept in the session artifact."
+    },
+    {
+      "id": "a-supervised-serve-run-splits-its-output",
+      "text": "With --output=jsonl and --serve-env -, stdout carries the session stream unchanged and stderr is the serve log: each task's start, output, end and failure details as putnami serve renders them in text mode, and a watched run's [watch] lines. The serve log carries no session summary: no opening line, counts, hint, cache report or interrupt notice, because the supervisor reports its own session."
     },
     {
       "id": "a-serve-step-names-its-process-group",

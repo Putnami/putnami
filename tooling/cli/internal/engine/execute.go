@@ -58,6 +58,10 @@ func executionRenderer(
 	replayed := slices.DeleteFunc(slices.Clone(req.Commands), func(command string) bool {
 		return !slices.Contains(verification, command)
 	})
+	var serveLog io.Writer
+	if SupervisedServe(&req.Global) {
+		serveLog = os.Stderr
+	}
 	return output.NewRenderer(output.Config{
 		Output:  req.Global.Output,
 		Command: strings.Join(req.Commands, ","),
@@ -72,19 +76,16 @@ func executionRenderer(
 		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
 		// The live view orders its command columns by the merged vocabulary.
 		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
-		ServeLog:  serveLog(req),
+		ServeLog:  serveLog,
 	})
 }
 
-// serveLog is where a supervised serve run renders its text: stderr, for a
-// jsonl run that reads its serve steps' environment from stdin, so the
-// supervisor keeps the workloads' output however much of it the bounded stream
-// elides. Nil for every other run.
-func serveLog(req *Request) io.Writer {
-	if req.Global.ServeEnv == "" || req.Global.Output != "jsonl" {
-		return nil
-	}
-	return os.Stderr
+// SupervisedServe reports whether a run with these flags is a supervised serve
+// run: a jsonl run that reads its serve steps' environment from stdin. Its
+// stderr is the serve log, where it renders its tasks' text, so the supervisor
+// keeps the workloads' output however much of it the bounded stream elides.
+func SupervisedServe(g *GlobalFlags) bool {
+	return g.ServeEnv != "" && g.Output == "jsonl"
 }
 
 func executionSessionRenderer(
@@ -477,20 +478,27 @@ func (e *Engine) executeSession(
 		}
 	}
 
-	// Surface the scheduler tuning decision and DAG wait metrics. Verbose/debug
-	// summarize the selected parallelism; debug and --trace-profile add the
-	// critical path and ready wait so profiling needs no external trace analysis.
-	reportSchedulerTuning(os.Stderr, &req.Global, result.Tuning)
+	// A supervised serve run's stderr is its serve log, which carries its tasks
+	// alone: the supervisor reports its own session, so the run-level reports
+	// below stay off it. The session document still records the tuning and
+	// the cache summary.
+	if !SupervisedServe(&req.Global) {
+		// Surface the scheduler tuning decision and DAG wait metrics.
+		// Verbose/debug summarize the selected parallelism; debug and
+		// --trace-profile add the critical path and ready wait so profiling
+		// needs no external trace analysis.
+		reportSchedulerTuning(os.Stderr, &req.Global, result.Tuning)
 
-	// Surface the remote build cache's payoff (hits, time saved vs spent). The
-	// summary is the only signal that the cache helped, so it shows whenever the
-	// cache did work, not just under verbose.
-	reportCacheSummary(os.Stderr, &req.Global, result.Cache)
+		// Surface the remote build cache's payoff (hits, time saved vs spent).
+		// The summary is the only signal that the cache helped, so it shows
+		// whenever the cache did work, not just under verbose.
+		reportCacheSummary(os.Stderr, &req.Global, result.Cache)
 
-	// The size of the change and the mixed-intent warning come last, where a
-	// reader of the gate looks for its outcome. Both are information: the exit
-	// code is the run's alone.
-	iox.Fprint(os.Stderr, req.selectionEvidence.closingNotes)
+		// The size of the change and the mixed-intent warning come last, where
+		// a reader of the gate looks for its outcome. Both are information: the
+		// exit code is the run's alone.
+		iox.Fprint(os.Stderr, req.selectionEvidence.closingNotes)
+	}
 
 	if result.Success && shouldRecordSuccessfulBuild(req) {
 		recordSuccessfulBuild(sessStore, ws, wsRoot, req.Commands, req.runMarkerParams(), req.Global.Debug, remote, observedRunMarkerSHA(req))

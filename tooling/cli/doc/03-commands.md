@@ -1663,9 +1663,12 @@ A refusal names the variable, the task and the project, never a value.
 
 With `--output=jsonl`, stdout carries the session stream unchanged and stderr
 carries the serve steps' output as `putnami serve` renders it in text mode, so
-the supervisor keeps every log line the bounded stream elides. The stream names
-the process group of each serve-workload step in a `process` event before any
-event the step writes, and admits each `process` event and `ready` claim from
+the supervisor keeps every log line the bounded stream elides. Stderr carries
+each task's start, output, end and failure details, and a watched run's
+`[watch]` lines, but no session summary: no opening line, counts, hint, cache
+report or interrupt notice, because the supervisor reports its own session. The
+stream names the process group of each serve-workload step in a `process` event
+before any event the step writes, and admits each `process` event and `ready` claim from
 the failure reserve, so they stay live until a run's failure records and
 priority events together spend it (see
 [Output and Rendering](08-output-and-rendering.md)). [`putnami compose`](../../dev/doc/01-workload-qualification.md#compose)

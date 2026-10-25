@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,6 +34,10 @@ func shutdownTimeoutNow() time.Duration {
 	}
 	return shutdownTimeout
 }
+
+// shutdownNotices is where waitForShutdown writes its interrupt notice:
+// stderr, replaceable by tests.
+var shutdownNotices io.Writer = os.Stderr
 
 func main() {
 	os.Exit(runMain())
@@ -120,7 +125,11 @@ func waitForShutdown(
 	// instead of reporting the leftover work as an ordinary skip.
 	abort.Record(sig)
 	bound := timeout()
-	iox.Fprintln(os.Stderr, "\nputnami: interrupting... press Ctrl-C again to force quit")
+	// The notice addresses a user at a terminal. A supervised run's stderr is
+	// its supervisor's serve log, and the supervisor reports its own stop.
+	if !abort.Supervised() {
+		iox.Fprintln(shutdownNotices, "\nputnami: interrupting... press Ctrl-C again to force quit")
+	}
 	cancel()
 	select {
 	case <-sigCh:

@@ -45,6 +45,9 @@ func Source() string {
 	return ""
 }
 
-// Reset clears the recorded source, so a test (or a watch-mode iteration that
-// survives its own cancellation) starts from a clean slate.
-func Reset() { source.Store(nil) }
+// Reset clears the recorded source and the supervision record (Supervise), so
+// a test starts from a clean slate.
+func Reset() {
+	source.Store(nil)
+	supervised.Store(false)
+}

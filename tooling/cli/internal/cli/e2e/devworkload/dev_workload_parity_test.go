@@ -11,11 +11,12 @@
 // # The oracle is recorded
 //
 // testdata/dev-workload-parity holds one answer of the core per case: the
-// exit code, stdout and, where it is the command's own, stderr.
-// TestRecordDevWorkloadParity wrote them with a putnami binary built from the
-// tree whose core still served both commands. A later binary has no such
-// command, so it cannot record them again: it answers that the command moved
-// to @putnami/dev, and the comparison then fails.
+// exit code, stdout and stderr. TestRecordDevWorkloadParity wrote them with a
+// putnami binary built from commit 4687a0e9, whose core still served
+// both commands. A binary built from this tree has no such command, so it
+// cannot record them: it answers that the command moved to @putnami/dev, and
+// the comparison then fails. To record again, build the CLI in a worktree of
+// that commit and name it in PUTNAMI_RECORD_DEV_WORKLOAD_PARITY.
 //
 // # Nothing differs
 //
@@ -29,9 +30,10 @@
 // composition id, ports, durations, timestamps, the worktree fingerprint and
 // commit, and the fixture's directory. The replay fixture also holds the
 // @putnami/dev extension, which the recording core did not load. Every other
-// byte of stdout is compared verbatim. The stderr of a case that starts
-// members is the members' serve logs, which the nested serve runs render in
-// both, so it is neither recorded nor compared.
+// byte of stdout and stderr is compared verbatim, the stderr of a case that
+// starts members included: it carries the members' serve logs, which the
+// core's composition rendered in its own process and each nested serve run
+// renders now.
 package devworkload
 
 import (
@@ -71,8 +73,6 @@ type devWorkloadCase struct {
 	// stopWhen, when set, is the stdout the run must print before the case
 	// sends it SIGTERM: a composition runs until it is stopped.
 	stopWhen *regexp.Regexp
-	// logs marks a case whose stderr is the members' serve logs.
-	logs bool
 	// wantExit is the exit code the extension must return. It is stated so a
 	// recording edited into another verdict shows here.
 	wantExit int
@@ -107,23 +107,23 @@ func devWorkloadCases() []devWorkloadCase {
 		{name: "compose unknown runsWith", args: fixed("compose", "app", "--output=jsonl"), before: unknownRunsWith, wantExit: 1},
 		{
 			name: "compose jsonl", args: fixed("compose", "app", "--port", "0", "--no-watch", "--ready-timeout", "60s", "--output=jsonl"),
-			stopWhen: startDocument, logs: true, wantExit: 0,
+			stopWhen: startDocument, wantExit: 0,
 		},
 		{
 			name: "compose by id with an inline port", args: fixed("compose", "/app", "--port=0", "--no-watch", "--output=jsonl"),
-			stopWhen: startDocument, logs: true, wantExit: 0,
+			stopWhen: startDocument, wantExit: 0,
 		},
 		{
 			name: "compose watch false", args: fixed("compose", "app", "--port", "0", "--watch=false", "--output=jsonl"),
-			stopWhen: startDocument, logs: true, wantExit: 0,
+			stopWhen: startDocument, wantExit: 0,
 		},
 		{
 			name: "compose text", args: fixed("compose", "app", "--port", "0", "--no-watch"),
-			stopWhen: startTable, logs: true, wantExit: 0,
+			stopWhen: startTable, wantExit: 0,
 		},
 		{
 			name: "compose member exited", args: fixed("compose", "app", "--port", "0", "--no-watch", "--output=jsonl"),
-			before: providerExitsEarly, logs: true, wantExit: 1,
+			before: providerExitsEarly, wantExit: 1,
 		},
 		{name: "qualify without a project", args: fixed("qualify", "--target", "local"), wantExit: 2},
 		{name: "qualify without a target", args: fixed("qualify", "app"), wantExit: 2},
@@ -318,9 +318,6 @@ func runCase(t *testing.T, cli, root string, tc devWorkloadCase) answer {
 		code = exitErr.ExitCode()
 	}
 	result := answer{exit: code, stdout: stdout.String(), stderr: stderr.String()}
-	if tc.logs {
-		result.stderr = ""
-	}
 	return result.normalized(root)
 }
 
@@ -700,8 +697,8 @@ func readAnswer(t *testing.T, path string) answer {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read the recorded answer %s: %v\n"+
-			"There is no regenerating this file: the core commands that produced it were removed. "+
-			"A missing recording means a case was added without recording what the core answered.", path, err)
+			"Only a CLI built from commit 4687a0e9, whose core served the commands, records it "+
+			"(TestRecordDevWorkloadParity). A missing recording means a case was added without recording what the core answered.", path, err)
 	}
 	head, rest, found := strings.Cut(string(data), stdoutMarker)
 	if !found {

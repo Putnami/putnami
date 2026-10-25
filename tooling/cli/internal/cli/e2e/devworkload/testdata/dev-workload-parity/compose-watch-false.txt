@@ -3,3 +3,7 @@ exit 0
 {"protocolVersion":2,"command":"compose","status":"success","exitCode":0,"data":{"id":"<composition>","target":"/app","members":[{"project":"/provider","proxyUrl":"http://127.0.0.1:<port>","backendPort":"<port>","databases":[],"configSections":[],"readyMs":"<ms>"},{"project":"/app","proxyUrl":"http://127.0.0.1:<port>","backendPort":"<port>","databases":[],"configSections":["clients"],"readyMs":"<ms>"}],"isolation":"none"}}
 {"protocolVersion":2,"command":"compose","status":"success","exitCode":0,"data":{"id":"<composition>","target":"/app","members":[{"project":"/provider","proxyUrl":"http://127.0.0.1:<port>","backendPort":0,"databases":[],"configSections":[],"readyMs":"<ms>"},{"project":"/app","proxyUrl":"http://127.0.0.1:<port>","backendPort":0,"databases":[],"configSections":["clients"],"readyMs":"<ms>"}],"isolation":"none","cleanup":{"state":"clean"}}}
 --- stderr ---
+  serve(provider) INF fixture /provider starting in serve
+  serve(app) INF fixture /app starting in started
+
+putnami: interrupting... press Ctrl-C again to force quit

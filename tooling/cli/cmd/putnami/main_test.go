@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -117,6 +119,39 @@ func TestWaitForShutdown_CleanRunReturnNoExit(t *testing.T) {
 	}
 	if atomic.LoadInt32(&exitCalled) != 0 {
 		t.Error("exitFn should NOT be called on clean run return after first signal")
+	}
+}
+
+// The first signal prints the interrupt notice for a user at a terminal, and
+// none for a supervised serve run, whose stderr is its supervisor's serve log.
+// Both runs cancel.
+func TestWaitForShutdown_ASupervisedRunPrintsNoInterruptNotice(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "a-supervised-serve-run-splits-its-output", "the-serve-log-carries-no-session-summary")
+	t.Cleanup(abort.Reset)
+	for _, supervised := range []bool{false, true} {
+		abort.Reset()
+		if supervised {
+			abort.Supervise()
+		}
+		var notices bytes.Buffer
+		shutdownNotices = &notices
+		ctx, cancel := context.WithCancel(context.Background())
+		sigCh := make(chan os.Signal, 1)
+		runDone := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			waitForShutdown(runDone, cancel, sigCh, fixedTimeout(time.Minute), func(int) {}, notDelegated)
+			close(done)
+		}()
+		sigCh <- syscall.SIGTERM
+		<-ctx.Done()
+		close(runDone)
+		<-done
+		shutdownNotices = os.Stderr
+		printed := strings.Contains(notices.String(), "putnami: interrupting")
+		if printed == supervised {
+			t.Errorf("supervised=%v: notice printed=%v, want %v (%q)", supervised, printed, !supervised, notices.String())
+		}
 	}
 }
 

@@ -38,6 +38,7 @@ import (
 
 	"go.putnami.dev/tooling/dev/internal/compose"
 	"go.putnami.dev/tooling/dev/internal/host"
+	"go.putnami.dev/tooling/dev/internal/parent"
 	"go.putnami.dev/tooling/dev/internal/qualify"
 	"go.putnami.dev/tooling/dev/internal/version"
 )
@@ -77,7 +78,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case len(args) >= 2 && args[0] == "compose" && args[1] == "up":
 		return runWorkload(compose.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
 			return compose.Run(compose.Request{
-				Ctx: context.Background(), Workspace: launch.workspace, Args: launch.args, Output: launch.output,
+				Ctx: launch.ctx, Workspace: launch.workspace, Args: launch.args, Output: launch.output,
 				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
 				Stdout: stdout, Stderr: stderr,
 			})
@@ -85,7 +86,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case len(args) >= 2 && args[0] == "qualify" && args[1] == "run":
 		return runWorkload(qualify.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
 			return qualify.Run(qualify.Request{
-				Ctx: context.Background(), Workspace: launch.workspace, Args: launch.args, Output: launch.output,
+				Ctx: launch.ctx, Workspace: launch.workspace, Args: launch.args, Output: launch.output,
 				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
 				Stdout: stdout, Stderr: stderr,
 			})
@@ -102,6 +103,9 @@ const cliExecutableEnv = "PUTNAMI_CLI_EXECUTABLE"
 // workloadLaunch is what an interactive compose or qualify launch reads from
 // putnami before the command runs.
 type workloadLaunch struct {
+	// ctx ends once the putnami process that launched the command is gone
+	// (parent.Watch), which cancels the command as a terminal signal does.
+	ctx context.Context
 	// args are the user's arguments after the subcommand.
 	args []string
 	// output is the output mode putnami resolved.
@@ -121,7 +125,9 @@ type workloadLaunch struct {
 // takes the host channel out of the environment first, so no serve run the
 // command starts inherits it. A launch that names no job context, no
 // workspace membership or no absolute putnami executable is refused before
-// anything starts.
+// anything starts. The command runs under a watch of its parent: a putnami
+// killed outright signals nothing, so its loss cancels the command, which then
+// tears its composition down as it does on a terminal signal.
 func runWorkload(command string, args []string, contextFile string, stdout, stderr io.Writer, run func(workloadLaunch) int) int {
 	_ = host.Take("").Close()
 	if contextFile == "" {
@@ -144,6 +150,9 @@ func runWorkload(command string, args []string, contextFile string, stdout, stde
 	if err != nil {
 		return resultv2.Emit(stdout, stderr, launch.output, command, "", nil, err)
 	}
+	ctx, stop := parent.Watch(context.Background())
+	defer stop()
+	launch.ctx = ctx
 	return run(launch)
 }
 

@@ -101,6 +101,7 @@ func recordShapes(t *testing.T, stream []byte) []string {
 // serve log, recorded into the session the same way, and the serve log carries
 // the workload's output rendered as `putnami serve` renders it in text mode.
 func TestServeLogRendererKeepsTheStreamAndRendersTheServeLog(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "a-supervised-serve-run-splits-its-output", "stdout-keeps-the-stream-and-stderr-renders-the-serve-steps")
 	var live, serveLog, plainLive bytes.Buffer
 	supervised := NewRenderer(Config{Output: "jsonl", Command: "serve", Out: &live, NoColor: true, ServeMode: true, ServeLog: &serveLog})
 	if _, ok := supervised.(*serveLogRenderer); !ok {
@@ -125,6 +126,45 @@ func TestServeLogRendererKeepsTheStreamAndRendersTheServeLog(t *testing.T) {
 	}
 	if _, fans := NewRenderer(Config{Output: "json", Out: &bytes.Buffer{}, ServeLog: &serveLog}).(*serveLogRenderer); fans {
 		t.Error("an aggregated json run fans out to the serve log, whose envelope is written once at the end")
+	}
+}
+
+// The serve log carries the tasks alone: a failed serve step's output, end and
+// details, and no session summary, such as an opening line, the failure hint,
+// the abort line or the counts, which the supervisor renders for its own
+// session.
+func TestServeLogCarriesTheTasksAlone(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "a-supervised-serve-run-splits-its-output", "the-serve-log-carries-no-session-summary")
+	var live, serveLog bytes.Buffer
+	renderer := NewRenderer(Config{Output: "jsonl", Command: "serve", Out: &live, NoColor: true, ServeMode: true, ServeLog: &serveLog})
+	job := serveLogTestJob()
+	result := &scheduler.JobResult{
+		Status: string(scheduler.TaskStatusFailed),
+		Error:  &jobmodel.JobError{Message: "api cannot start"},
+	}
+	renderer.Start([]*scheduler.ScheduledJob{job})
+	renderer.JobStart(job)
+	renderer.JobEvent(job, serveLogEvent(t, `{"v":2,"type":"log","level":"info","message":"api starting"}`))
+	renderer.JobComplete(job, result)
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{Aborted: true, AbortedBy: jobmodel.SourceSignal})
+
+	lines := strings.Split(strings.TrimSuffix(serveLog.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("the serve log has %d lines, want the log line, the failed end and its detail:\n%s", len(lines), serveLog.String())
+	}
+	if !strings.Contains(lines[0], "api starting") {
+		t.Errorf("the serve log opens with %q, want the step's log line", lines[0])
+	}
+	if !strings.Contains(lines[1], "serve~serve") || !strings.Contains(lines[2], "api cannot start") {
+		t.Errorf("the serve log does not end the step with its failure:\n%s", serveLog.String())
+	}
+	for _, sessionText := range []string{"Hint:", "1/1 failed", "Session ", "succeeded"} {
+		if strings.Contains(serveLog.String(), sessionText) {
+			t.Errorf("the serve log carries the session summary text %q:\n%s", sessionText, serveLog.String())
+		}
+	}
+	if !bytes.Contains(live.Bytes(), []byte(`"record":"session:end"`)) {
+		t.Errorf("the stream lost its session:end record:\n%s", live.String())
 	}
 }
 

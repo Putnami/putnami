@@ -212,6 +212,14 @@ has 75 seconds: once they pass, a run still running receives `SIGKILL` at once,
 and `compose` waits for no killed run. Whatever survives is reported as
 `cleanup.state: partial` and stays in the lease.
 
+On Unix, `compose` and `qualify` also watch the putnami process that launched
+them. A putnami killed outright (`kill -9`, an out-of-memory kill) signals
+nothing, so they notice its loss within a second and run the teardown a signal
+runs; a write to a stdout or stderr whose reader is gone no longer ends them. On
+Windows, putnami runs them in a Job Object that ends them, and every serve run
+they started, with putnami: nothing is torn down, and the next `compose` reaps
+the lease.
+
 A composition killed without teardown (`kill -9`, a crash) leaves its lease. The
 next `compose` reaps every lease whose lock is free **and** whose pid is dead:
 `SIGTERM` to each recorded process group, `SIGKILL` after two seconds, drop the

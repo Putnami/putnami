@@ -472,6 +472,20 @@
           }
         },
         {
+          "id": "a-lost-putnami-tears-the-command-down",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-changed-parent-pid-cancels-the-command",
+              "a-killed-parent-cancels-a-real-command-that-outlives-a-closed-stdout"
+            ]
+          }
+        },
+        {
           "id": "the-dev-extension-runs-compose-and-qualify",
           "stage": "coded",
           "evidenceKinds": [
