@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 )
@@ -20,6 +21,20 @@ const maxServeEnvBytes = 1 << 20
 // the credential descriptor. A supervisor's document never sets one, so it
 // can neither forge a channel nor rename the session that spawned the step.
 const reservedServeEnvPrefix = "PUTNAMI_"
+
+// readServeEnvStdin reads the --serve-env document from the process's stdin.
+// A stdin that is a character device, such as a terminal, is refused
+// as a usage error before any read: a supervisor pipes the document, and a
+// read from a terminal would wait for input that no prompt asks for.
+func readServeEnvStdin(stdin *os.File) ([]string, error) {
+	if stdin == nil {
+		return readServeEnv(nil)
+	}
+	if info, err := stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+		return nil, usageErrorf("--serve-env -: stdin is a character device, such as a terminal; pipe the JSON object of the serve steps' environment to stdin")
+	}
+	return readServeEnv(stdin)
+}
 
 // readServeEnv reads the --serve-env document from stdin: one JSON object
 // whose members are the variables of the serve steps' process environment,

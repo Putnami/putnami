@@ -5,7 +5,8 @@
   "commands": {
     "stage-up": { "traits": { "workload": "once" }, "activationFiles": ["demo.activate"], "run": [{ "id": "up", "task": "workload" }] },
     "stage-status": { "activationFiles": ["demo.activate"], "run": [{ "id": "status", "task": "workload" }] },
-    "notes-draft": { "activationFiles": ["demo.activate"], "run": [{ "id": "draft", "task": "workload" }] },
+    "stage-sync": { "activationFiles": ["demo.activate"], "run": [{ "id": "sync", "task": "workload" }] },
+    "notes-draft": { "traits": { "workload": "once" }, "activationFiles": ["demo.activate"], "run": [{ "id": "draft", "task": "workload" }] },
     "notes-show": { "activationFiles": ["demo.activate"], "run": [{ "id": "show", "task": "workload" }] },
     "notes-count": { "activationFiles": ["demo.activate"], "run": [{ "id": "count", "task": "workload" }] }
   },
@@ -14,6 +15,7 @@
       "description": "Stage projects.",
       "subcommands": {
         "up": { "command": "stage-up", "interactive": true },
+        "sync": { "command": "stage-sync", "interactive": true },
         "status": { "command": "stage-status" }
       }
     },

@@ -25,8 +25,9 @@ package scheduler
 //     directory because detaching a cached symlink rewrites the whole
 //     directory, not one declared path. A serve-workload step, the terminal
 //     uncacheable step of a serve pipeline that the engine starts
-//     (SchedulerConfig.ServeSteps, the steps `--serve-env` reaches), holds it
-//     only until its process started: see What a hold covers.
+//     (SchedulerConfig.ServeSteps, the steps `--serve-env` reaches), whose
+//     task declares no command-output output, holds it only until its process
+//     started: see What a hold covers.
 //   - project:<project>, when the task declares a durable project-rooted
 //     output. One key per project rather than per path: a pathFrom output's
 //     path is known only after the task ran, a literal .gen output contains
@@ -116,9 +117,14 @@ package scheduler
 // resources on the cleanup path, and a cleanup never waits for another
 // session.
 //
-// A serve-workload step releases its command-output key once its process
-// started (serveStarted), and holds it no more through its retries and its
-// capture: it is the one writer key a hold releases before the capture.
+// A serve-workload step whose task declares no command-output output releases
+// its command-output key once its process started (serveStarted), and holds it
+// no more through its retries and its capture: it is the one writer key a hold
+// releases before the capture. Such a step owns no declared bytes in that
+// directory, so its retry empties nothing there (emptyOwnedOutputs) and its
+// capture stores nothing from it. A serve-workload step whose task declares a
+// command-output output keeps the key until its capture, like a finite step:
+// its retry empties that output, and its capture stores it.
 // Another session therefore runs the finite steps of that project's serve
 // command, which write that directory, while the step serves: the serve run
 // of a project that depends on it, from a second terminal or a composition's
@@ -184,9 +190,10 @@ package scheduler
 // holds only for reading therefore does not wait: another session's writer
 // still waits for the ancestor's shared hold, but another session's reader may
 // read while the nested task writes. Waiting instead would mean waiting for
-// its own ancestor. The subprocess of a serve-workload step does not receive
-// its command-output key: the step releases it once its process started, so
-// a session that process starts waits for that key like any other session.
+// its own ancestor. The subprocess of a serve-workload step whose task declares
+// no command-output output does not receive its command-output key: the step
+// releases it once its process started, so a session that process starts
+// waits for that key like any other session.
 //
 // A nested session still waits for a key a task of another session, or a
 // sibling of its spawning task, holds. That wait is the one exception to the
@@ -518,8 +525,9 @@ func outputLockSubject(name string) string {
 // the reader keys of the resources the jobs read: an execution reads them, a
 // restore does not. A key is a preparation key when every job that needs it
 // needs it for its preparation alone, a serve key when every job that needs
-// it is a serve-workload step (serveSteps) and the key is its command-output
-// key, and exclusive when any job writes under it.
+// it is a serve-workload step (serveSteps) whose task declares no
+// command-output output and the key is its command-output key, and exclusive
+// when any job writes under it.
 func (m *taskOutputLocks) keysFor(jobs []*ScheduledJob, preparing func(*ScheduledJob) bool, reading bool) []outputLockKey {
 	index := make(map[string]int)
 	var keys []outputLockKey
@@ -542,7 +550,7 @@ func (m *taskOutputLocks) keysFor(jobs []*ScheduledJob, preparing func(*Schedule
 		})
 	}
 	for _, job := range jobs {
-		serving := m.serveSteps[job.Key()]
+		serving := m.serveSteps[job.Key()] && !planner.DeclaresCommandOutput(job)
 		names := taskOutputLockNames(job)
 		for _, name := range names {
 			add(name, true, false, serving && outputLockClass(name) == outputLockClassCommandOutput)

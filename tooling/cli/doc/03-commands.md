@@ -1161,13 +1161,15 @@ workload, such as `serve` (which `run_jobs` also refuses to execute, because
 the engine promotes it to watch mode and one blocking tool call wedges the
 whole stdio session).
 
-`run_jobs` also refuses to execute a command that the loaded extensions carry
-only under `interactive` subcommands, such as the command behind `putnami
-<group> <subcommand>`. An interactive subcommand needs a terminal and the host
-channel the CLI opens for it, and a tool call has neither. The refusal names
-the subcommand to run in a terminal. A command that a non-interactive
-subcommand or no subcommand carries is unaffected, and `dryRun: true` still
-plans it.
+`run_jobs` also refuses to execute a command whose traits declare a workload
+and that the loaded extensions carry only under `interactive` subcommands, such
+as `qualify-run`, the `once` workload behind `putnami qualify run`. Such a
+subcommand runs its workload in the terminal it shares with the user, and a
+tool call has none. The refusal names the subcommand to run in a terminal. A
+command without a workload is finite work that runs as a planned job, so it is
+unaffected even when only interactive subcommands carry it, such as
+`sdd-contracts-generate`. A command that a non-interactive subcommand or no
+subcommand carries is unaffected too, and `dryRun: true` still plans every one.
 
 Claude Code discovers the server through a `.mcp.json` file at the workspace
 root:
@@ -1644,6 +1646,8 @@ execution policy: it changes no cache key.
 
 The run is a usage error (exit 2) before any step starts when:
 
+- stdin is a character device, such as a terminal, which the CLI refuses
+  before it reads, because a supervisor pipes the document;
 - stdin is not one JSON object of strings, is larger than 1 MiB, sets a
   variable twice, or holds a NUL byte;
 - a variable name is empty, holds `=`, or starts with `PUTNAMI_` in any case,
@@ -1661,7 +1665,9 @@ With `--output=jsonl`, stdout carries the session stream unchanged and stderr
 carries the serve steps' output as `putnami serve` renders it in text mode, so
 the supervisor keeps every log line the bounded stream elides. The stream names
 the process group of each serve-workload step in a `process` event before any
-event the step writes, and keeps every `ready` claim live (see
+event the step writes, and admits each `process` event and `ready` claim from
+the failure reserve, so they stay live until a run's failure records and
+priority events together spend it (see
 [Output and Rendering](08-output-and-rendering.md)). [`putnami compose`](../../dev/doc/01-workload-qualification.md#compose)
 starts each member as such a run.
 

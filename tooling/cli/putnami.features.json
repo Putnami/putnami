@@ -461,7 +461,7 @@
             "checks": [
               "dry-run-executes-nothing",
               "long-lived-and-externally-mutating-jobs-are-refused",
-              "a-command-carried-only-by-an-interactive-subcommand-is-refused"
+              "a-workload-carried-only-by-an-interactive-subcommand-is-refused"
             ]
           }
         },
@@ -1079,6 +1079,7 @@
               "a-finite-step-runs-beside-another-sessions-serve-step",
               "a-finite-step-still-waits-for-another-sessions-finite-step",
               "a-serve-step-keeps-every-other-key-until-capture",
+              "a-serve-step-that-declares-a-command-output-keeps-it-until-capture",
               "a-dependents-serve-run-comes-up-beside-its-dependencys-serve-run"
             ]
           }
@@ -1539,6 +1540,7 @@
             "checks": [
               "the-cli-waits-for-an-interactive-child-after-a-terminal-signal",
               "a-second-signal-kills-the-interactive-child-at-once",
+              "the-cli-holds-the-interactive-child-from-before-its-start",
               "a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code",
               "a-child-that-dies-by-the-signal-or-is-killed-is-interrupted"
             ]
@@ -4090,7 +4092,7 @@
       "id": "cli/supervised-serve-run",
       "type": "feature",
       "name": "Supervised serve run",
-      "outcome": "A supervisor starts a workload with one putnami serve run, hands its serve step the process environment the workload needs on stdin, and reads from the session stream which process group the workload runs in and when it is ready, however much the workload logs",
+      "outcome": "A supervisor starts a workload with one putnami serve run, hands its serve step the process environment the workload needs on stdin, and reads from the session stream which process group the workload runs in and when it is ready, however many ordinary log lines the workload writes",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -4116,7 +4118,8 @@
             "kind": "acceptance",
             "checks": [
               "the-refusal-names-the-variable-and-the-task",
-              "the-cli-refuses-the-run-before-any-step-starts"
+              "the-cli-refuses-the-run-before-any-step-starts",
+              "a-terminal-stdin-is-refused"
             ]
           }
         },
@@ -4127,7 +4130,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-ready-claim-uses-the-failure-reserve"
+              "a-ready-claim-uses-the-failure-reserve",
+              "a-ready-claim-shares-the-bounded-failure-reserve"
             ]
           }
         },

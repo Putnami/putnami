@@ -64,20 +64,28 @@ func runStdout(t *testing.T, wsRoot string, args ...string) string {
 
 // A word that names no subcommand of a group whose default takes positionals
 // runs the default, with the word as its first argument and the flags after it.
+// A flag or "--" before the word names no subcommand either, so the group runs
+// its default, which receives the arguments in the order given and parses the
+// positional itself.
 func TestGroupWordRunsThePositionalDefault(t *testing.T) {
 	spectest.Proves(t, groupDefaultFeature, groupDefaultRequirement,
 		"a-word-that-names-no-subcommand-runs-the-positional-default")
 	wsRoot := copyFixture(t)
-	for _, args := range [][]string{
-		{"stage", "/apps/web", "--no-watch"},
-		{"stage", "up", "/apps/web", "--no-watch"},
+	for _, tc := range []struct {
+		args []string
+		argv string
+	}{
+		{[]string{"stage", "/apps/web", "--no-watch"}, "argv:up /apps/web --no-watch --putnamiContext "},
+		{[]string{"stage", "up", "/apps/web", "--no-watch"}, "argv:up /apps/web --no-watch --putnamiContext "},
+		{[]string{"stage", "--no-watch", "/apps/web"}, "argv:up --no-watch /apps/web --putnamiContext "},
+		{[]string{"stage", "--", "/apps/web"}, "argv:up -- /apps/web --putnamiContext "},
 	} {
-		code, output := clitest.RunGateArgs(t, wsRoot, args...)
+		code, output := clitest.RunGateArgs(t, wsRoot, tc.args...)
 		if code != cli.ExitSuccess {
-			t.Fatalf("%v: exit %d, want %d:\n%s", args, code, cli.ExitSuccess, output)
+			t.Fatalf("%v: exit %d, want %d:\n%s", tc.args, code, cli.ExitSuccess, output)
 		}
-		if !strings.Contains(output, "argv:up /apps/web --no-watch --putnamiContext ") {
-			t.Errorf("%v did not run up with the project first:\n%s", args, output)
+		if !strings.Contains(output, tc.argv) {
+			t.Errorf("%v did not run %q:\n%s", tc.args, tc.argv, output)
 		}
 	}
 }

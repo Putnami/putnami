@@ -166,8 +166,8 @@ const remoteDeadline = 4 * time.Hour
 // publication and admission checks read the whole graph.
 // A version 2 request carries no expected plan and captured no input, and no
 // CLI submitter ran rejectUnsupportedRemoteShape on it: the protocol refuses
-// the commands it names as unportable, the executing engine refuses a
-// workload or source-rewriting command after discovery
+// no command by name, the executing engine refuses a workload or
+// source-rewriting command after discovery, from its declared traits
 // (refuseUnportableCommands), and this seam refuses a task outside the
 // checkout, then checks publication (validateCommitPublication). Its
 // publication rides invocation.publication, as on the version 1 executing

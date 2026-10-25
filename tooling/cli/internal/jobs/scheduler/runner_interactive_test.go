@@ -3,12 +3,15 @@ package scheduler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -203,5 +206,69 @@ func TestRunJobInteractive_PropagatesNonZeroExit(t *testing.T) {
 	}
 	if res.ExitCode != 7 {
 		t.Errorf("ExitCode = %d, want 7", res.ExitCode)
+	}
+}
+
+// A kill that lands before the child started ends it as soon as it started,
+// and counts as forced.
+func TestInteractiveHold_AKillBeforeTheStartEndsTheChildOnceStarted(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-holds-the-interactive-child-from-before-its-start")
+	kills := 0
+	h := holdInteractive(func() { kills++ })
+	defer h.release()
+	if !abort.InteractiveHeld() {
+		t.Fatal("the hold does not record the child before its start")
+	}
+	h.killNow()
+	if kills != 0 {
+		t.Fatal("the hold killed a child that did not start")
+	}
+	if err := h.start(func() error { return nil }); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if kills != 1 || !h.forced() {
+		t.Errorf("kills = %d, forced = %v; want the started child killed", kills, h.forced())
+	}
+}
+
+// A kill that lands once the child runs ends it at once.
+func TestInteractiveHold_AKillAfterTheStartEndsTheChild(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-holds-the-interactive-child-from-before-its-start")
+	kills := 0
+	h := holdInteractive(func() { kills++ })
+	defer h.release()
+	if err := h.start(func() error { return nil }); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if kills != 0 || h.forced() {
+		t.Fatalf("kills = %d, forced = %v before any kill", kills, h.forced())
+	}
+	h.killNow()
+	if kills != 1 || !h.forced() {
+		t.Errorf("kills = %d, forced = %v; want the child killed", kills, h.forced())
+	}
+}
+
+// A child that failed to start is never killed, and its release leaves
+// nothing held.
+func TestInteractiveHold_AFailedStartReleasesTheHold(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-holds-the-interactive-child-from-before-its-start")
+	kills := 0
+	h := holdInteractive(func() { kills++ })
+	h.killNow()
+	startErr := errors.New("start failed")
+	if err := h.start(func() error { return startErr }); !errors.Is(err, startErr) {
+		t.Fatalf("start = %v, want %v", err, startErr)
+	}
+	h.release()
+	h.release()
+	if kills != 0 {
+		t.Errorf("kills = %d, want none for a child that never started", kills)
+	}
+	if abort.InteractiveHeld() {
+		t.Error("the hold still records a child that failed to start")
 	}
 }

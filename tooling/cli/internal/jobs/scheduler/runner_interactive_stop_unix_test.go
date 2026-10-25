@@ -4,7 +4,9 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -205,5 +207,51 @@ func TestRunJobInteractive_KillInteractiveEndsTheChildAtOnce(t *testing.T) {
 	abort.KillInteractive()
 	if res := awaitResult(t, done, 10*time.Second); res.Status != "canceled" {
 		t.Errorf("status = %q, want canceled", res.Status)
+	}
+}
+
+// The runner holds the child from before its start: a first signal that lands
+// while the child starts finds it held, so the CLI gives it the interactive
+// shutdown bound, and a second one that lands then kills it as soon as it
+// started.
+func TestRunInteractive_HoldsTheChildFromBeforeItsStart(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"the-cli-holds-the-interactive-child-from-before-its-start")
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	withInteractiveStopBudget(t, time.Minute)
+	cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "trap '' TERM; while :; do sleep 0.05; done")
+
+	type outcome struct {
+		heldBeforeStart bool
+		forced          bool
+		err             error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		var o outcome
+		o.forced, o.err = runInteractive(cmd, func(start func() error) error {
+			o.heldBeforeStart = abort.InteractiveHeld()
+			abort.KillInteractive()
+			return start()
+		})
+		done <- o
+	}()
+	var o outcome
+	select {
+	case o = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the child still runs 10s after a kill that landed while it started")
+	}
+	if !o.heldBeforeStart {
+		t.Error("the runner did not hold the child before its start")
+	}
+	var exitErr *exec.ExitError
+	if !o.forced || !errors.As(o.err, &exitErr) {
+		t.Errorf("forced = %v, err = %v; want a forced kill", o.forced, o.err)
+	}
+	if abort.InteractiveHeld() {
+		t.Error("the runner still holds the child after it exited")
 	}
 }

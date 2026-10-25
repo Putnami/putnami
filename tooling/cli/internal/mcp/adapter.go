@@ -873,27 +873,34 @@ func (s *Server) abortedRunError(a runJobsArgs, exitCode int) error {
 const serveWorkloadHazard = "is promoted to watch mode by the engine, so it never returns — not even when its child exits"
 
 // rejectLongLivedCommands refuses every command whose resolved traits in
-// extensions declare the serve workload, and every command that extensions
-// carry only under interactive subcommands (extension.InteractiveOnlyCarrier):
-// interactive dispatch hands the child the terminal's streams and the host
-// channel, and a run_jobs call has neither, so the refusal names the
-// subcommand to type in a terminal. It refuses no command by its name.
+// extensions declare the serve workload, and every command whose traits
+// declare a workload and that extensions carry only under interactive
+// subcommands (extension.InteractiveOnlyCarrier): such a subcommand runs its
+// workload in the terminal it shares with the user, and a run_jobs call has
+// none, so the refusal names the subcommand to type in a terminal. It refuses
+// no command by its name.
 //
-// A command of the once workload is not refused for its workload: it is not
-// promoted to watch, so it terminates, and forwarding a workload's exit code
-// (a migration returning 3) is a legitimate agent use. qualify-run declares the
-// once workload and is refused because only an interactive subcommand carries
-// it.
+// A command of the once workload is not refused for its workload alone: it is
+// not promoted to watch, so it terminates, and forwarding a workload's exit
+// code (a migration returning 3) is a legitimate agent use. qualify-run
+// declares the once workload and is refused because only an interactive
+// subcommand carries it. A command without a workload that only interactive
+// subcommands carry is finite work that runs as a planned job, as any job
+// does, so it is not refused: sdd-contracts-generate is one.
 func rejectLongLivedCommands(extensions []*extension.ExtensionDescription, commands []string) error {
 	for _, command := range commands {
-		if jobs.CommandWorkload(extensions, command) == extension.WorkloadServe {
+		workload := jobs.CommandWorkload(extensions, command)
+		if workload == extension.WorkloadServe {
 			return fmt.Errorf("run_jobs cannot run %q: it %s, and one MCP tool call blocks the whole session. "+
 				"Run it in a terminal instead", command, serveWorkloadHazard)
 		}
+		if workload == "" {
+			continue
+		}
 		if path, interactive := extension.InteractiveOnlyCarrier(extensions, command); interactive {
-			return fmt.Errorf("run_jobs cannot run %q: an extension runs it only as the interactive subcommand "+
-				"`putnami %s`, which needs a terminal and a host channel, and an MCP tool call has neither. "+
-				"Run `putnami %s` in a terminal instead", command, path, path)
+			return fmt.Errorf("run_jobs cannot run %q: an extension runs its %s workload only as the interactive "+
+				"subcommand `putnami %s`, which runs it in the terminal, and an MCP tool call has none. "+
+				"Run `putnami %s` in a terminal instead", command, workload, path, path)
 		}
 	}
 	return nil

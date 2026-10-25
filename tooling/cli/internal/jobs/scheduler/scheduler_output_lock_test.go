@@ -550,6 +550,47 @@ func TestScheduler_AFiniteStepWaitsForAnotherSessionsFiniteStep(t *testing.T) {
 	}
 }
 
+// TestScheduler_AServeStepThatDeclaresACommandOutputKeepsIt is the other side
+// of the release: a serve-workload step whose task declares a command-output
+// output keeps that key until its capture, because a retry empties that
+// output and the capture stores it. Another session's finite step of the same
+// command therefore waits for the serving step and names it.
+func TestScheduler_AServeStepThatDeclaresACommandOutputKeepsIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
+		"a-serve-step-that-declares-a-command-output-keeps-it-until-capture")
+	f := newOutputRaceFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	served := filepath.Join(f.root, ".putnami", "out", "proj", "serve", "serve.txt")
+	serving := f.serveJob("serve~serve", f.blockingWriter(t, "blocking-serve.sh", served), map[string]extension.DeclaredOutput{
+		"state": fileDeclaration(extension.OutputRootCommandOutput, "serve.txt", false),
+	})
+	first := runAsync(ctx, f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, serving))
+	f.awaitFirstStarted(t, first)
+
+	waits := make(chan string, 1)
+	generate := f.serveJob("serve~generate", f.serveGenerateScript(t, "b"), serveGenerateOutputs())
+	secondScheduler := f.servePlan("20260925-192013-000001", nil, nil, generate)
+	secondScheduler.onOutputLockWait = func(message string) { waits <- message }
+	second := runAsync(ctx, secondScheduler)
+
+	message := awaitSecondWaits(t, waits, second)
+	want := fmt.Sprintf("%s waits for session %s (pid %d, task %s), which is writing .putnami/out/proj/serve",
+		generate.Key(), outputRaceSessionA, os.Getpid(), serving.Key())
+	if message != want {
+		t.Errorf("wait line = %q, want %q", message, want)
+	}
+	if err := os.WriteFile(f.release, []byte("release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	requireSuccess(t, "serving", <-first, serving.Key())
+	requireSuccess(t, "second", <-second, generate.Key())
+	if got := readFileAt(t, f.endState); got != "a-begin\na-end\n" {
+		t.Fatalf("the serving step ended holding %q: another session wrote its command output while it served", got)
+	}
+}
+
 // genData is proj's generated file the gen writers of these cases own.
 func (f *outputRaceFixture) genData() string {
 	return filepath.Join(f.root, "proj", ".gen", "data.txt")

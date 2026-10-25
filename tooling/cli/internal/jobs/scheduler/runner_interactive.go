@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/abort"
@@ -20,6 +21,60 @@ import (
 // that is no file once the child exited; the terminal streams of a dispatch are
 // files and need none.
 var interactiveStopBudget = abort.InteractiveStopBudget
+
+// interactiveHold is the abort.HoldInteractive record of one interactive
+// child. It holds the child from before its start, so a first signal that
+// lands while the child starts gets the interactive shutdown bound, and a
+// second one that lands then ends the child as soon as it started.
+type interactiveHold struct {
+	mu      sync.Mutex
+	kill    func()
+	started bool
+	killed  bool
+	release func()
+}
+
+// holdInteractive records an interactive child that kill ends at once. The
+// caller starts the child through start and calls release once the child is
+// gone or failed to start; release is harmless to call more than once.
+func holdInteractive(kill func()) *interactiveHold {
+	h := &interactiveHold{kill: kill}
+	h.release = abort.HoldInteractive(h.killNow)
+	return h
+}
+
+// killNow ends the child at once when it started, and otherwise marks it for
+// start to end.
+func (h *interactiveHold) killNow() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.killed = true
+	if h.started {
+		h.kill()
+	}
+}
+
+// start calls start, which starts the child, and ends the child at once when
+// a kill landed before it started. A kill waits for the start to return.
+func (h *interactiveHold) start(start func() error) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err := start(); err != nil {
+		return err
+	}
+	h.started = true
+	if h.killed {
+		h.kill()
+	}
+	return nil
+}
+
+// forced reports that a kill reached the hold.
+func (h *interactiveHold) forced() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.killed
+}
 
 // RunJobInteractive runs a job as an interactive subprocess, inheriting the
 // parent's stdin/stdout/stderr. Unlike RunJob, no JSONL parsing happens — the

@@ -599,6 +599,45 @@ func TestTaskOutputLockServeKeys(t *testing.T) {
 	releaseServeOutputLocks(withServeStep(t.Context()))
 }
 
+// TestTaskOutputLockServeKeysKeepADeclaredCommandOutput pins the serve key's
+// limit: a serve-workload step whose task declares a command-output output
+// keeps that key until its capture, since its retry empties that output and
+// its capture stores it. The key is no serve key, the subprocess receives it
+// as held, and the process start releases nothing.
+func TestTaskOutputLockServeKeysKeepADeclaredCommandOutput(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
+		"a-serve-step-that-declares-a-command-output-keeps-it-until-capture")
+	root := t.TempDir()
+	serving := outputLockJob("proj", "serve~serve", map[string]extension.DeclaredOutput{
+		"state": fileDeclaration(extension.OutputRootCommandOutput, "serve.txt", false),
+	})
+	session := newTestOutputLocks(t, root, "session", "", nil)
+	session.serveSteps = map[string]bool{serving.Key(): true}
+
+	keys := session.keysFor([]*ScheduledJob{serving}, nil, true)
+	commandOutput := keyNamed(t, keys, "command-output:proj/serve")
+	if commandOutput.serve {
+		t.Fatalf("keys = %+v, want the declared command-output key kept until the capture", keys)
+	}
+	hold, err := session.acquire(t.Context(), []*ScheduledJob{serving}, nil, true)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	ctx := hold.endPreparation(t.Context())
+	if got := heldOutputLocksValue(ctx); !strings.Contains(got, commandOutput.id) {
+		t.Fatalf("subprocess value = %q, want the command-output key the step holds until its capture", got)
+	}
+	releaseServeOutputLocks(withServeStep(ctx))
+	if probeFree(t, session, commandOutput) {
+		t.Fatal("the process start released a command-output key the step declares an output under")
+	}
+	hold.release()
+	if !probeFree(t, session, commandOutput) {
+		t.Fatal("the command-output key is still held after release")
+	}
+}
+
 // TestPreparationWritesProjectTree pins the two preparation writes that take
 // the project key: a preBuild hook until this session started it, whatever
 // this session already stamped, and the version stamp until this session

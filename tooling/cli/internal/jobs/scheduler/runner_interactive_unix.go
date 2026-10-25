@@ -6,10 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"sync/atomic"
 	"syscall"
-
-	"go.putnami.dev/tooling/cli/internal/abort"
 )
 
 // runInteractive runs cmd, an interactive job that shares the CLI's terminal,
@@ -39,18 +36,16 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (for
 	// cancel's SIGTERM reaches it when a supervisor signaled the CLI alone.
 	cmd.WaitDelay = interactiveStopBudget
 
-	if err := startJob(cmd.Start); err != nil {
+	// A second signal to the CLI kills the child at once, from before its
+	// start on (interactiveHold).
+	hold := holdInteractive(func() { _ = cmd.Process.Kill() })
+	defer hold.release()
+	if err := startJob(func() error { return hold.start(cmd.Start) }); err != nil {
 		return false, err
 	}
-	// A second signal to the CLI kills the child at once.
-	var killed atomic.Bool
-	release := abort.HoldInteractive(func() {
-		killed.Store(true)
-		_ = cmd.Process.Kill()
-	})
 	err = cmd.Wait()
-	release()
-	return killed.Load(), err
+	hold.release()
+	return hold.forced(), err
 }
 
 // exitedOnItsOwn reports whether the child ended by its own exit after a

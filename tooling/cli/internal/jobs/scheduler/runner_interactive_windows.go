@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"go.putnami.dev/sdk/extension/proctree"
-	"go.putnami.dev/tooling/cli/internal/abort"
 )
 
 // runInteractive runs cmd, an interactive job that shares the CLI's console,
@@ -35,7 +34,6 @@ import (
 func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (forced bool, err error) {
 	tree := proctree.New(cmd)
 	waitDone := make(chan struct{})
-	var killed atomic.Bool
 	var canceledAt atomic.Int64
 	cmd.Cancel = func() error {
 		canceledAt.Store(time.Now().UnixNano())
@@ -45,23 +43,24 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (for
 	}
 	cmd.WaitDelay = interactiveStopBudget
 
-	if err := startJob(tree.Start); err != nil {
+	// A second signal to the CLI ends the tree at once, from before its start
+	// on (interactiveHold).
+	hold := holdInteractive(func() { _ = tree.Kill() })
+	defer hold.release()
+	if err := startJob(func() error { return hold.start(tree.Start) }); err != nil {
 		return false, err
 	}
 	defer func() { _ = tree.Close() }()
-	release := abort.HoldInteractive(func() {
-		killed.Store(true)
-		_ = tree.Kill()
-	})
-	defer release()
 	err = cmd.Wait()
 	close(waitDone)
+	hold.release()
+	forced = hold.forced()
 	// The budget's kill ends a tree that still ran once the budget passed, so
 	// a wait that outlasted the budget after the cancel ended in that kill.
 	if at := canceledAt.Load(); at != 0 && time.Since(time.Unix(0, at)) >= interactiveStopBudget {
-		killed.Store(true)
+		forced = true
 	}
-	return killed.Load(), err
+	return forced, err
 }
 
 // statusControlCExit is the exit code of a Windows process that a console

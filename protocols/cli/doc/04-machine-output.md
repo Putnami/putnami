@@ -54,6 +54,13 @@ Failure priority is deliberately narrow and stable:
   names the step's process group and its leader's start time. A supervisor
   records them to reap the group if it dies without its teardown.
 
+Every failure-priority record, a `ready` or `process` event included, takes
+the one failure reserve: 256 KiB / 256 records in `normal` and 2 MiB / 2048
+records in `verbose`. A `ready` or `process` event is therefore live only while
+that reserve has room: once the run's failure-priority records spent it, a later
+one is elided whole and counted in `machineOutput.elided.failure`, and the
+complete artifact still retains it.
+
 A `test:case` record is never failure priority, whatever its status. The failed
 task's `task:end` already takes the reserve.
 

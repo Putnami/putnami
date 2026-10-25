@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -128,6 +130,56 @@ func TestReadServeEnvRefusesWithoutQuotingAValue(t *testing.T) {
 	}
 	if _, err := readServeEnv(nil); err == nil {
 		t.Error("readServeEnv accepted a nil stdin")
+	}
+}
+
+// TestReadServeEnvStdinRefusesACharacterDevice pins the refusal of a stdin a
+// read would block on: a character device, such as a terminal, is refused as a
+// usage error before any read, and a pipe or a file is read.
+func TestReadServeEnvStdinRefusesACharacterDevice(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/supervised-serve-run", "a-manifest-env-conflict-is-refused", "a-terminal-stdin-is-refused")
+
+	device, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("open %s: %v", os.DevNull, err)
+	}
+	defer func() { _ = device.Close() }()
+	if info, err := device.Stat(); err != nil || info.Mode()&os.ModeCharDevice == 0 {
+		t.Skipf("%s is no character device on this platform", os.DevNull)
+	}
+	_, err = readServeEnvStdin(device)
+	if err == nil || !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), "--serve-env -: stdin is a character device") {
+		t.Errorf("a character-device stdin: err = %v, want the usage error that names it", err)
+	}
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	defer func() { _ = reader.Close() }()
+	go func() {
+		_, _ = writer.WriteString(`{"PORT":"0"}`)
+		_ = writer.Close()
+	}()
+	if env, err := readServeEnvStdin(reader); err != nil || !slices.Equal(env, []string{"PORT=0"}) {
+		t.Errorf("a piped stdin = %q, %v; want PORT=0", env, err)
+	}
+
+	path := filepath.Join(t.TempDir(), "env.json")
+	if err := os.WriteFile(path, []byte(`{"PORT":"0"}`), 0o600); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer func() { _ = file.Close() }()
+	if env, err := readServeEnvStdin(file); err != nil || !slices.Equal(env, []string{"PORT=0"}) {
+		t.Errorf("a file stdin = %q, %v; want PORT=0", env, err)
+	}
+	if _, err := readServeEnvStdin(nil); err == nil || !errors.Is(err, cmderr.ErrUsage) {
+		t.Errorf("a nil stdin: err = %v, want a usage error", err)
 	}
 }
 

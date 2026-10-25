@@ -477,7 +477,11 @@ A `ready` claim is admitted from the failure reserve too, because it is the
 control event a supervisor waits on: a serve workload that logged past the
 ordinary partition still delivers its claim live. A serve step's `process`
 event is admitted from the reserve for the same reason: it names the group a
-supervisor must reap.
+supervisor must reap. The reserve is shared: failure records, `ready` claims
+and `process` events together get 256 records / 256 KiB in normal mode and
+2048 records / 2 MiB under `--verbose`. Once they spent it, a later one is
+elided and counted in `machineOutput.elided.failure`, and the session's
+`events.jsonl` retains it.
 `machineOutput.elided` reports exact omitted record and byte counts by class,
 including normal-mode debug omissions. The mode never changes execution,
 verdict, or exit status. The complete sanitized sequence is incrementally

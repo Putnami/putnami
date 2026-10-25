@@ -98,7 +98,7 @@ func TestLoadExtension_PositionalDefaultBelowItsContractIsSkipped(t *testing.T) 
 // or that no subcommand carries, does not.
 func TestInteractiveOnlyCarrier(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary",
-		"a-command-carried-only-by-an-interactive-subcommand-is-refused")
+		"a-workload-carried-only-by-an-interactive-subcommand-is-refused")
 	extensions := loadGroupInvocationFixture(t)
 	for command, want := range map[string]string{
 		"stage-up":     "stage up",

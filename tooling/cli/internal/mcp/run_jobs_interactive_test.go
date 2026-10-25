@@ -14,11 +14,12 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// interactiveCarriedFixture is a manifest whose `stage up` and `notes show`
-// subcommands are interactive and whose `stage status` and `notes peek` are
-// not: stage-up is carried only interactively, notes-show by both kinds,
-// notes-draft by a nested subcommand of the interactive `notes add`, and
-// notes-count by none. It is named @acme/demo, outside the first-party scope,
+// interactiveCarriedFixture is a manifest whose `stage up`, `stage sync` and
+// `notes show` subcommands are interactive and whose `stage status` and
+// `notes peek` are not: stage-up, of the once workload, is carried only
+// interactively, stage-sync too but without a workload, notes-show by both
+// kinds, notes-draft, of the once workload, by a nested subcommand of the
+// interactive `notes add`, and notes-count by none. It is named @acme/demo, outside the first-party scope,
 // so the repository's first-party command checks do not read it.
 const interactiveCarriedFixture = "testdata/interactive-carried"
 
@@ -35,18 +36,20 @@ func loadInteractiveCarriedFixture(t *testing.T) []*extension.ExtensionDescripti
 	return []*extension.ExtensionDescription{ext}
 }
 
-// A command that a loaded extension carries only under interactive
-// subcommands is refused with the subcommand to type in a terminal, whatever
-// its name and its workload; a command any non-interactive subcommand carries,
-// or that no subcommand carries, is not refused by that rule.
+// A command whose traits declare a workload and that a loaded extension
+// carries only under interactive subcommands is refused with the subcommand
+// to type in a terminal, whatever its name; a command without a workload, one
+// any non-interactive subcommand carries, and one that no subcommand carries
+// are not refused by that rule.
 func TestRejectLongLivedCommands_RefusesInteractiveOnlyCommands(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary",
-		"a-command-carried-only-by-an-interactive-subcommand-is-refused")
+		"a-workload-carried-only-by-an-interactive-subcommand-is-refused")
 	extensions := loadInteractiveCarriedFixture(t)
 	for command, path := range map[string]string{
 		"stage-up":     "stage up",
 		"notes-draft":  "notes add draft",
+		"stage-sync":   "",
 		"notes-show":   "",
 		"stage-status": "",
 		"notes-count":  "",
@@ -76,7 +79,7 @@ func TestRejectLongLivedCommands_RefusesInteractiveOnlyCommands(t *testing.T) {
 func TestRunJobs_RefusesAnInteractiveOnlyCommand(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary",
-		"a-command-carried-only-by-an-interactive-subcommand-is-refused")
+		"a-workload-carried-only-by-an-interactive-subcommand-is-refused")
 	dir := jobFixture(t)
 	manifest, err := os.ReadFile(filepath.Join(interactiveCarriedFixture, extension.ManifestFilename))
 	if err != nil {

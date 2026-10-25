@@ -372,10 +372,13 @@ func bootstrapFailureExit(ctx context.Context) int {
 
 // ErrHostedExtensionCommand refuses an extension command group on a hosted
 // run (runcredential.Flag), before anything starts. A hosted run supports job
-// commands, such as build, and the built-in commands, such as install.
+// commands, such as build, and the built-in commands, such as install; the
+// extension command itself runs without the flag, from a job that is not a
+// hosted run.
 var ErrHostedExtensionCommand = fmt.Errorf("an extension command group does not accept %s: "+
 	"it resolves its remote cache after the workspace install ran repository code, and a hosted run starts its cache provider before that; "+
-	"run a job command, such as build, or a built-in command, such as install", runcredential.Flag)
+	"run a job command, such as build, or a built-in command, such as install, "+
+	"or run the extension command without %s, from a job that is not a hosted run", runcredential.Flag, runcredential.Flag)
 
 // refuseHostedWatch refuses, as a usage error, a hosted run whose commands
 // watch: global.Watch, or a command whose resolved traits in extensions declare

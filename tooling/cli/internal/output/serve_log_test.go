@@ -41,6 +41,18 @@ func serveLogEvent(t *testing.T, line string) scheduler.RawJobEvent {
 // stream and the session artifact.
 func serveLogRun(t *testing.T, renderer scheduler.Renderer, live *bytes.Buffer, logs int) ([]byte, []byte) {
 	t.Helper()
+	lines := make([]string, 0, logs+1)
+	for i := 0; i < logs; i++ {
+		lines = append(lines, `{"v":2,"type":"log","level":"info","message":"api request `+strings.Repeat("detail ", 140)+`"}`)
+	}
+	lines = append(lines, `{"v":2,"type":"log","level":"info","message":"listening on 127.0.0.1:43120"}`)
+	return serveLogRunLines(t, renderer, live, lines)
+}
+
+// serveLogRunLines is serveLogRun with the step's lines before its ready
+// claim.
+func serveLogRunLines(t *testing.T, renderer scheduler.Renderer, live *bytes.Buffer, lines []string) ([]byte, []byte) {
+	t.Helper()
 	session, err := workspace_state.NewSession(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -50,10 +62,9 @@ func serveLogRun(t *testing.T, renderer scheduler.Renderer, live *bytes.Buffer, 
 	result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
 	renderer.Start([]*scheduler.ScheduledJob{job})
 	renderer.JobStart(job)
-	for i := 0; i < logs; i++ {
-		renderer.JobEvent(job, serveLogEvent(t, `{"v":2,"type":"log","level":"info","message":"api request `+strings.Repeat("detail ", 140)+`"}`))
+	for _, line := range lines {
+		renderer.JobEvent(job, serveLogEvent(t, line))
 	}
-	renderer.JobEvent(job, serveLogEvent(t, `{"v":2,"type":"log","level":"info","message":"listening on 127.0.0.1:43120"}`))
 	renderer.JobEvent(job, serveLogEvent(t, serveLogReadyLine))
 	renderer.JobComplete(job, result)
 	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
@@ -141,5 +152,46 @@ func TestServeLogRendererKeepsAReadyClaimLiveAfterTheOrdinaryPartition(t *testin
 	}
 	if got := strings.Count(serveLog.String(), "api request"); got != 900 {
 		t.Errorf("the serve log carries %d of the 900 log lines, want every one", got)
+	}
+}
+
+// The failure reserve bounds a ready claim: the claim shares it with failure
+// evidence, so once 256 error records spent it in normal mode, a later claim
+// is elided from the live stream, counted as a failure elision, and kept in
+// the session artifact.
+func TestServeLogRendererElidesAReadyClaimOnceTheFailureReserveIsSpent(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "ready-claims-are-never-elided", "a-ready-claim-shares-the-bounded-failure-reserve")
+	budget, ok := protocolcli.MachineOutputBudgetFor(protocolcli.MachineOutputModeNormal)
+	if !ok || budget.FailureReserveRecords != 256 || budget.FailureReserveBytes != 256<<10 {
+		t.Fatalf("normal failure reserve = %d records / %d bytes, want the documented 256 / 256 KiB", budget.FailureReserveRecords, budget.FailureReserveBytes)
+	}
+	verbose, ok := protocolcli.MachineOutputBudgetFor(protocolcli.MachineOutputModeVerbose)
+	if !ok || verbose.FailureReserveRecords != 2048 || verbose.FailureReserveBytes != 2<<20 {
+		t.Fatalf("verbose failure reserve = %d records / %d bytes, want the documented 2048 / 2 MiB", verbose.FailureReserveRecords, verbose.FailureReserveBytes)
+	}
+	var live, serveLog bytes.Buffer
+	renderer := NewRenderer(Config{Output: "jsonl", Command: "serve", Out: &live, NoColor: true, ServeMode: true, ServeLog: &serveLog})
+	lines := make([]string, 0, budget.FailureReserveRecords)
+	for i := 0; i < budget.FailureReserveRecords; i++ {
+		lines = append(lines, `{"v":2,"type":"log","level":"error","message":"api failure"}`)
+	}
+	stream, artifact := serveLogRunLines(t, renderer, &live, lines)
+
+	if violations := protocolcli.ValidateSessionStream(stream, artifact); len(violations) != 0 {
+		t.Fatalf("bounded stream violations: %+v", violations)
+	}
+	streamLines := bytes.Split(bytes.TrimSpace(stream), []byte{'\n'})
+	var final protocolcli.BoundedSessionEndRecord
+	if err := json.Unmarshal(streamLines[len(streamLines)-1], &final); err != nil {
+		t.Fatal(err)
+	}
+	if final.MachineOutput.Elided.Failure.Records != 1 {
+		t.Errorf("failure elisions = %+v, want the one ready claim past the reserve", final.MachineOutput.Elided.Failure)
+	}
+	if bytes.Contains(stream, []byte(`"type":"ready"`)) {
+		t.Error("the live stream carries a ready claim past the spent failure reserve")
+	}
+	if !bytes.Contains(artifact, []byte(`"type":"ready"`)) {
+		t.Error("the session artifact lost the elided ready claim")
 	}
 }

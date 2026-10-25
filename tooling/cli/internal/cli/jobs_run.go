@@ -40,7 +40,7 @@ func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wspro
 	// stdin, here and not in terminalRequest, which stays a pure mapping of the
 	// command line. The document reaches Request.ServeProcessEnv only.
 	if parsed.Global.ServeEnv != "" {
-		env, err := readServeEnv(os.Stdin)
+		env, err := readServeEnvStdin(os.Stdin)
 		if err != nil {
 			iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 			return engine.ExitUsage

@@ -236,7 +236,12 @@ any event the step writes. Its `group` is the process group the step runs in
 that group's leader, an opaque string a reader compares and never parses,
 empty when the platform cannot read it. A producer cannot
 emit it: the CLI drops a producer line of type `process`. A finite step has
-none.
+none. The bounded live stream admits it from the failure reserve, which it
+shares with every other failure-priority record, a `ready` claim included:
+256 KiB / 256 records in `normal` mode and 2 MiB / 2048 records in `verbose`.
+Once those records spent the reserve, a later `process` event is elided and
+counted in `machineOutput.elided.failure`, and the session artifact retains it
+([04-machine-output.md](./04-machine-output.md)).
 
 ```json
 {"protocolVersion":2,"record":"task:event","time":"2026-10-24T10:15:30Z",

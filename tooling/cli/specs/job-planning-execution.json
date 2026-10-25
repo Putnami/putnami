@@ -147,7 +147,7 @@
     },
     {
       "id": "a-serve-step-releases-its-command-output-once-it-started",
-      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline that the engine starts, releases its command-output lock once its process started and does not take it back for its retries or its capture. Another session then runs the finite steps of that project's serve command beside it, as the serve run of a dependent project does from a second terminal or a composition, and they can rewrite that directory while it serves. A finite step keeps the lock until its capture, although its command declares the serve workload, and the serve-workload step keeps every other lock until its capture. The step's process never receives the released lock as held."
+      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline that the engine starts, whose task declares no command-output output, releases its command-output lock once its process started and does not take it back for its retries or its capture. Another session then runs the finite steps of that project's serve command beside it, as the serve run of a dependent project does from a second terminal or a composition, and they can rewrite that directory while it serves. A finite step keeps the lock until its capture, although its command declares the serve workload, and so does a serve-workload step whose task declares a command-output output, which its retry empties and its capture stores. The serve-workload step keeps every other lock until its capture. The step's process never receives the released lock as held."
     },
     {
       "id": "scratch-generation-retention",
@@ -255,7 +255,7 @@
     },
     {
       "id": "an-interactive-command-stops-on-its-own-terms",
-      "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit on its own, and kills it only after that budget; the shutdown bound of the CLI covers the budget. A second signal kills the child at once and exits. A child that exits by itself after the signal keeps its own exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
+      "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit on its own, and kills it only after that budget; the shutdown bound of the CLI covers the budget, from before the child starts. A second signal kills the child at once and exits, and one that lands while the child starts kills it as soon as it started. A child that exits by itself after the signal keeps its own exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
     },
     {
       "id": "project-setup-runs-in-the-project-extension",

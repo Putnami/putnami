@@ -515,17 +515,18 @@ func RunJob(
 type serveStepKey struct{}
 
 // withServeStep returns a context under which runJob, once the step's process
-// started, releases the step's command-output lock (releaseServeOutputLocks)
-// and announces the spawned process group as the step's first event
+// started, releases the step's serve keys (releaseServeOutputLocks) and
+// announces the spawned process group as the step's first event
 // (announceProcessGroup).
 func withServeStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, serveStepKey{}, true)
 }
 
 // serveStepStarted does what a serve-workload step does once its process
-// started: it releases the step's command-output lock
-// (releaseServeOutputLocks) and announces the step's process group
-// (announceProcessGroup). For a finite step it does nothing.
+// started: it releases the step's serve keys, its command-output lock when
+// its task declares no command-output output (releaseServeOutputLocks), and
+// announces the step's process group (announceProcessGroup). For a finite
+// step it does nothing.
 func serveStepStarted(ctx context.Context, group int, onEvent EventHandler) {
 	releaseServeOutputLocks(ctx)
 	announceProcessGroup(ctx, group, onEvent)
