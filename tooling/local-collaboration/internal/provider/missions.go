@@ -182,7 +182,7 @@ func decodeStrict(data []byte, into any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(into); err != nil {
-		return fmt.Errorf("the file is not one JSON object with only the documented members: %v", err)
+		return fmt.Errorf("the file is not one JSON object with only the documented members: %w", err)
 	}
 	if _, err := decoder.Token(); err != io.EOF {
 		return errors.New("the file holds more than one JSON value")

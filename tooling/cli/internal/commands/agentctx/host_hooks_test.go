@@ -723,7 +723,7 @@ func TestHostHookOwnershipByCommand(t *testing.T) {
 		"/usr/local/bin/putnami agent hook":                       false,
 		"putnamiw agent hook":                                     false,
 		"other-tool session hook || true":                         false,
-		"": false,
+		"":                                                        false,
 	} {
 		if got := ownsHostHookCommand(command, paths); got != want {
 			t.Errorf("ownsHostHookCommand(%q) = %v, want %v", command, got, want)
@@ -777,14 +777,16 @@ func TestHostHookGuardsMapExitCodes(t *testing.T) {
 	} {
 		_ = os.Remove(seen)
 		cmd := exec.Command(shell, "-c", tc.command)
-		var env []string
+		// The test's own variables come last, so they win over inherited ones.
+		env := make([]string, 0, len(os.Environ())+3)
 		for _, kv := range os.Environ() {
 			if !strings.HasPrefix(kv, shared.NoAutoInstallEnv+"=") {
 				env = append(env, kv)
 			}
 		}
-		cmd.Env = append(env, "PATH="+stubDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		env = append(env, "PATH="+stubDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 			fmt.Sprintf("STUB_EXIT=%d", tc.exit), "STUB_SEEN="+seen)
+		cmd.Env = env
 		err := cmd.Run()
 		code := 0
 		var exitErr *exec.ExitError

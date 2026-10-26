@@ -169,10 +169,10 @@ func TestTheStoreIsReadableByItsUserOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, want := range map[string]os.FileMode{
-		s.Root():                                   0o700,
-		filepath.Join(s.Root(), lockFile):          0o600,
-		filepath.Join(s.Root(), stateFile):         0o600,
-		filepath.Join(s.Root(), missionsFile):      0o600,
+		s.Root():                                                     0o700,
+		filepath.Join(s.Root(), lockFile):                            0o600,
+		filepath.Join(s.Root(), stateFile):                           0o600,
+		filepath.Join(s.Root(), missionsFile):                        0o600,
 		filepath.Join(s.Root(), MessagesDir, "a.json"+RefusalSuffix): 0o600,
 	} {
 		info, err := os.Stat(path)
