@@ -265,7 +265,9 @@ type FollowResult struct {
 	// Cursor is the highest cursor covered by this answer.
 	Cursor int64 `json:"cursor"`
 	// Records are the output records after the requested cursor, in order,
-	// at most MaxFollowRecords of them.
+	// at most MaxFollowRecords of them. In a terminal state, an answer with
+	// fewer than MaxFollowRecords records carries every remaining record, so
+	// the client stops following on it.
 	Records []OutputRecord `json:"records"`
 	// ExitCode is present only in a terminal state that produced one.
 	ExitCode *int `json:"exitCode,omitempty"`

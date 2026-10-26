@@ -240,8 +240,10 @@ Each output record is `{cursor, stream, line}` where `line` is one unchanged
 line of the executing engine's stdout or stderr; cursors are strictly
 increasing. A `follow` answer carries at most `MaxFollowRecords` (1024)
 records; a client that reconnects passes the last cursor it persisted and
-drops any record at or below it, so a replay never duplicates a line. Control
-envelopes never rewrite canonical `protocols/cli` records.
+drops any record at or below it, so a replay never duplicates a line. An
+answer that reports a terminal state with fewer than `MaxFollowRecords`
+records carries every record after the cursor, so the client stops following
+on it. Control envelopes never rewrite canonical `protocols/cli` records.
 
 ## Session bundle (v1)
 

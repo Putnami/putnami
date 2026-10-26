@@ -1,0 +1,63 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/server-template",
+      "type": "feature",
+      "name": "TypeScript server template",
+      "outcome": "A project created from the typescript-server template is the smallest HTTP server that works: the API routes it serves and a test beside it pass putnami lint, the type-check and their tests as created",
+      "owner": "typescript",
+      "target": "modeled",
+      "relations": [
+        {
+          "kind": "parent",
+          "target": "tooling/project-scaffolding"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "a-rendered-project-passes-lint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-biome-check-reports-nothing"
+            ]
+          }
+        },
+        {
+          "id": "a-rendered-project-type-checks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "it-type-checks-as-build-types-does",
+              "its-prebuild-hooks-certify-their-routes"
+            ]
+          }
+        },
+        {
+          "id": "a-rendered-project-passes-its-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bun-test-passes"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

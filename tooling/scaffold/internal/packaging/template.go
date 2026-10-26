@@ -104,7 +104,7 @@ func Template(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 	// archive, and a Windows CLI refuses a link on extraction.
 	emit.PhaseStart("stage")
 	if err := treearchive.CopyTree(projectDir, stageDir, func(rel string) bool {
-		return !strings.Contains(rel, "/") && (rel[0] == '.' || templateproto.IsTemplateRootPackagingExclusion(rel))
+		return !strings.Contains(rel, "/") && templateproto.IsTemplateRootPackagingExclusion(rel)
 	}); err != nil {
 		var link *treearchive.LinkError
 		if errors.As(err, &link) {

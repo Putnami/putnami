@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	templateproto "go.putnami.dev/protocol/template"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 )
@@ -26,7 +27,10 @@ type RenderVars struct {
 // The putnami.template.json manifest is skipped (it's metadata, not project
 // content), and so is the artifact store's bookkeeping at the template root (an
 // installed template is an artifact store entry; see
-// artifactstore.IsBookkeeping).
+// artifactstore.IsBookkeeping). So are the root entries a template archive
+// leaves out (see templateproto.IsTemplateRootPackagingExclusion): a template
+// rendered from its source directory in a workspace creates the same project
+// as its installed archive, without the declarations of the template project.
 func RenderDir(src, dst string, vars RenderVars) error {
 	// Resolve the link so WalkDir descends into the real directory. WalkDir
 	// uses Lstat for the root entry, so a linked src would report
@@ -60,6 +64,14 @@ func RenderDir(src, dst string, vars RenderVars) error {
 		// Skip the store's recency sidecar and its temporary files: they are
 		// bookkeeping of the store entry the template is installed in.
 		if !d.IsDir() && filepath.Dir(rel) == "." && artifactstore.IsBookkeeping(rel) {
+			return nil
+		}
+		// Skip what the archive leaves out at the root, so a template in the
+		// workspace renders what its archive would.
+		if rel != "." && filepath.Dir(rel) == "." && templateproto.IsTemplateRootPackagingExclusion(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		// Substitute magic directory names in the target path

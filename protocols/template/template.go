@@ -6,18 +6,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // ManifestFilename is the name of the template manifest file.
 const ManifestFilename = "putnami.template.json"
 
 // IsTemplateRootPackagingExclusion reports whether a top-level template entry
-// describes the template project in its source workspace, or is local installed
-// state, rather than content for the rendered project. Nested entries are
-// ordinary template content.
+// stays out of what the template ships: a name that starts with a dot, local
+// installed state, or a declaration that describes the template project in its
+// source workspace rather than content for the rendered project (its project
+// configuration, its feature, its specs and the baseline that protects them).
+// The archive leaves these entries out, and a render from the source directory
+// skips them, so both produce the same project. Nested entries are ordinary
+// template content.
 func IsTemplateRootPackagingExclusion(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
 	switch name {
-	case "node_modules", "putnami.json", "putnami.features.json", "specs":
+	case "node_modules", "putnami.json", "putnami.features.json", "specs", "specs.baseline.json":
 		return true
 	default:
 		return false

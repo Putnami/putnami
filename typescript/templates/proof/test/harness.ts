@@ -38,6 +38,23 @@ const BIOME_PACKAGE = '@biomejs/biome';
 /** The source of the files `putnami init` writes, relative to the workspace root. */
 export const INIT_SOURCE = 'tooling/cli/internal/commands/lifecycle/workspace_init.go';
 
+/** The source of the root entries a template archive leaves out, relative to the workspace root. */
+export const TEMPLATE_PROTOCOL_SOURCE = 'protocols/template/template.go';
+
+/**
+ * The names IsTemplateRootPackagingExclusion in TEMPLATE_PROTOCOL_SOURCE lists,
+ * which a static test compares with this copy. With every name that starts with
+ * a dot, they are the root entries a template archive leaves out and a render
+ * skips: the template project's own declarations and local state.
+ */
+export const TEMPLATE_ROOT_EXCLUSIONS: readonly string[] = [
+  'node_modules',
+  'putnami.json',
+  'putnami.features.json',
+  'specs',
+  'specs.baseline.json',
+];
+
 /**
  * The .gitignore `putnami init` writes: defaultGitignore in INIT_SOURCE, which
  * a static test compares with this copy. The extension's Biome configuration
@@ -65,6 +82,15 @@ export interface Template {
     extension?: string;
     testVariables?: Record<string, string>;
   };
+  /** The features its `putnami.features.json` declares, none without one. */
+  features: TemplateFeature[];
+}
+
+/** A feature a template declares about itself (tooling/scaffold ADR 0003). */
+export interface TemplateFeature {
+  id: string;
+  relations?: { kind: string; target: string }[];
+  requirements: { id: string; verification?: { checks?: string[] } }[];
 }
 
 /** The render variables of the CLI (tooling/cli/internal/template/render.go). */
@@ -131,10 +157,20 @@ export function discoverTemplates(templatesDir: string, extension: string): Temp
     }
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Template['manifest'];
     if (manifest.extension === extension) {
-      templates.push({ name, dir: join(templatesDir, name), manifest });
+      const dir = join(templatesDir, name);
+      templates.push({ name, dir, manifest, features: readFeatures(dir) });
     }
   }
   return templates;
+}
+
+/** Reads the features `<dir>/putnami.features.json` declares, none when it is absent. */
+function readFeatures(dir: string): TemplateFeature[] {
+  const path = join(dir, 'putnami.features.json');
+  if (!existsSync(path)) {
+    return [];
+  }
+  return (JSON.parse(readFileSync(path, 'utf8')) as { features?: TemplateFeature[] }).features ?? [];
 }
 
 /**
@@ -161,19 +197,20 @@ export function testVars(template: Template): RenderVars {
 }
 
 /**
- * Replays template.RenderDir (tooling/cli/internal/template/render.go), whose
- * rules protocols/template/doc/02-variables.md documents: the walk is
- * depth-first in byte order, the root manifest is skipped, `__module__` in a
- * path becomes `projectModule`, and a `.template` file gets `<%= name %>`
- * substitution and loses its suffix. Unlike the CLI, a placeholder left after
- * rendering fails here: it would reach the user as literal text.
+ * Replays template.RenderDir (tooling/cli/internal/template/render.go): the
+ * walk is depth-first in byte order, the root manifest and the root entries a
+ * template archive leaves out are skipped (protocols/template/doc/01-manifest.md),
+ * `__module__` in a path becomes `projectModule`, and a `.template` file gets
+ * `<%= name %>` substitution and loses its suffix
+ * (protocols/template/doc/02-variables.md). Unlike the CLI, a placeholder left after rendering fails
+ * here: it would reach the user as literal text.
  */
 export function renderTemplate(src: string, dst: string, vars: RenderVars): void {
   const walk = (rel: string) => {
     const entries = readdirSync(join(src, rel), { withFileTypes: true }).sort((a, b) => byteOrder(a.name, b.name));
     for (const entry of entries) {
       const childRel = rel === '' ? entry.name : `${rel}/${entry.name}`;
-      if (childRel === 'putnami.template.json') {
+      if (rel === '' && isRootExclusion(entry.name)) {
         continue;
       }
       const target = join(dst, childRel.replaceAll('__module__', vars.projectModule));
@@ -187,6 +224,11 @@ export function renderTemplate(src: string, dst: string, vars: RenderVars): void
   };
   mkdirSync(dst, { recursive: true });
   walk('');
+}
+
+/** Whether a root entry stays out of the rendered project: the manifest, or what the archive leaves out. */
+function isRootExclusion(name: string): boolean {
+  return name === 'putnami.template.json' || name.startsWith('.') || TEMPLATE_ROOT_EXCLUSIONS.includes(name);
 }
 
 function renderFile(source: string, target: string, rel: string, vars: RenderVars): void {

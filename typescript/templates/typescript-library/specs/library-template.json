@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/library-template",
+  "outcomes": [
+    "A new library starts from an exported function and a test beside it, and putnami lint and putnami test report nothing to fix before the user edits a line",
+    "A change to the template or to the framework it uses that breaks this promise fails the template proof, before a user creates a project from it"
+  ],
+  "nonGoals": [
+    "Packaging the template, its archive contents and the render rules, which tooling/project-scaffolding owns",
+    "Resolving packages from a registry: the proof links this repository's framework sources, so a rendered project is proven against the framework it is released with (ADR 0006)"
+  ],
+  "requirements": [
+    {
+      "id": "a-rendered-project-passes-lint",
+      "text": "A project rendered from typescript-library passes the Biome check putnami lint runs, with the TypeScript extension's config/biome.json and the .gitignore putnami init writes, and Biome reports no warning."
+    },
+    {
+      "id": "a-rendered-project-type-checks",
+      "text": "A project rendered from typescript-library type-checks the way build~types does, against the packages its package.json declares and no other."
+    },
+    {
+      "id": "a-rendered-project-passes-its-tests",
+      "text": "A project rendered from typescript-library ships a test beside an exported function, and bun test passes in it against the packages it declares."
+    }
+  ],
+  "decisions": [
+    "tooling/scaffold/doc/adr/0003-what-a-default-template-promises.md",
+    "tooling/scaffold/doc/adr/0006-templates-run-against-the-workspace-framework.md"
+  ]
+}

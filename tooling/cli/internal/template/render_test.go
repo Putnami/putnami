@@ -63,3 +63,56 @@ func TestRenderDirFollowsTheDirectoryLinkATemplateIsInstalledAs(t *testing.T) {
 		t.Errorf("the template manifest was copied into the project (stat error %v)", err)
 	}
 }
+
+// TestRenderDirLeavesOutWhatTheArchiveLeavesOut pins that a template rendered
+// from its source directory, as projects create renders a workspace template,
+// creates the project its archive creates. The template project's own
+// configuration, feature, specs and baseline, its installed state and its
+// root dotfiles stay behind; the same names one level down are content.
+func TestRenderDirLeavesOutWhatTheArchiveLeavesOut(t *testing.T) {
+	src := t.TempDir()
+	for rel, content := range map[string]string{
+		ManifestFilename:          `{"name":"probe"}`,
+		"putnami.json":            `{"name":"probe","type":"template"}`,
+		"putnami.json.template":   `{"name":"<%= projectName %>"}`,
+		"putnami.features.json":   `{"protocolVersion":2,"namespace":"tooling","features":[]}`,
+		"specs/probe.json":        `{"protocolVersion":1,"feature":"tooling/probe"}`,
+		"specs.baseline.json":     `{"protocolVersion":2,"executableRequirements":[]}`,
+		"node_modules/x/index.js": "",
+		".gitignore":              "node_modules\n",
+		"src/specs/fixture.json":  "{}\n",
+		"src/.gitkeep":            "",
+	} {
+		path := filepath.Join(src, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dst := filepath.Join(t.TempDir(), "api")
+	if err := RenderDir(src, dst, RenderVars{ProjectName: "api", ProjectModule: "api"}); err != nil {
+		t.Fatalf("RenderDir: %v", err)
+	}
+
+	for _, absent := range []string{"putnami.features.json", "specs", "specs.baseline.json", "node_modules", ".gitignore"} {
+		if _, err := os.Stat(filepath.Join(dst, absent)); !os.IsNotExist(err) {
+			t.Errorf("rendered project holds %s, which the archive leaves out (stat error %v)", absent, err)
+		}
+	}
+	for rel, want := range map[string]string{
+		"putnami.json":           `{"name":"api"}`,
+		"src/specs/fixture.json": "{}\n",
+		"src/.gitkeep":           "",
+	} {
+		got, err := os.ReadFile(filepath.Join(dst, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatalf("rendered %s: %v", rel, err)
+		}
+		if string(got) != want {
+			t.Errorf("rendered %s = %q, want %q", rel, got, want)
+		}
+	}
+}

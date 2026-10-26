@@ -3,7 +3,8 @@
   "name": "typescript-library",
   "type": "template",
   "extensions": [
-    "@putnami/scaffold"
+    "@putnami/scaffold",
+    "/tooling/sdd-extension"
   ],
   "publish": [
     "template-archives"
@@ -11,6 +12,11 @@
   "options": {
     "publish": {
       "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
   }
 }

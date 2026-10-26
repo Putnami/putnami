@@ -45,7 +45,11 @@ my-template/
 Files with `.template` extension are processed with variable substitution. Files without the extension are copied verbatim.
 
 The manifest itself is skipped during rendering: it is template metadata, not
-project content, so it never lands in the created project.
+project content, so it never lands in the created project. Rendering also skips
+the root entries a template archive leaves out: the template project's own
+`putnami.json`, `putnami.features.json`, `specs/` and `specs.baseline.json`,
+`node_modules/`, and every name that starts with a dot. A template rendered from
+its source directory therefore creates the same project as its archive.
 
 ## Validation
 

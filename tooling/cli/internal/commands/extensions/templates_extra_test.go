@@ -779,6 +779,28 @@ func TestTemplatesTest_RenderedProjectMissingConfig(t *testing.T) {
 	}
 }
 
+// TestTemplatesTest_RootPutnamiJSONIsNotRendered pins the phase 2 message for
+// a template whose only manifest is a root putnami.json: rendering skips it as
+// the template project's own configuration, so the message names the rule and
+// the file to ship instead.
+func TestTemplatesTest_RootPutnamiJSONIsNotRendered(t *testing.T) {
+	dir := t.TempDir()
+	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.template.json"), map[string]any{
+		"name":        "static-manifest-tpl",
+		"description": "a template",
+	})
+	if err := os.WriteFile(filepath.Join(dir, "putnami.json"), []byte(`{"name":"app"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := sharedtest.CaptureStdout(t, func() error {
+		return TemplatesTest(context.Background(), []string{dir, "--skip-build"}, "")
+	})
+	if err == nil || !strings.Contains(err.Error(), "is not rendered") || !strings.Contains(err.Error(), "putnami.json.template") {
+		t.Fatalf("err = %v, want an error that says the root putnami.json is not rendered and names putnami.json.template", err)
+	}
+}
+
 func TestTemplatesTest_InvalidManifest(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "putnami.template.json"), []byte(`{bad json`), 0o644); err != nil {

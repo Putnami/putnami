@@ -1,0 +1,62 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "typescript",
+  "features": [
+    {
+      "id": "typescript/library-template",
+      "type": "feature",
+      "name": "TypeScript library template",
+      "outcome": "A project created from the typescript-library template is the smallest library that works: an exported function and a test beside it pass putnami lint, the type-check and their tests as created",
+      "owner": "typescript",
+      "target": "modeled",
+      "relations": [
+        {
+          "kind": "parent",
+          "target": "tooling/project-scaffolding"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "a-rendered-project-passes-lint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-biome-check-reports-nothing"
+            ]
+          }
+        },
+        {
+          "id": "a-rendered-project-type-checks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "it-type-checks-as-build-types-does"
+            ]
+          }
+        },
+        {
+          "id": "a-rendered-project-passes-its-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bun-test-passes"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

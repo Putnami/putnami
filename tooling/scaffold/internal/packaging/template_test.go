@@ -47,6 +47,7 @@ func writeTemplateProject(t *testing.T, workspaceRoot, manifest string) string {
 	// project must not inherit.
 	writeFile("putnami.features.json", `{"protocolVersion":1,"namespace":"tooling","features":[]}`)
 	writeFile("specs/tpl.json", `{"protocolVersion":1,"feature":"tooling/tpl"}`)
+	writeFile("specs.baseline.json", `{"protocolVersion":2,"executableRequirements":["tooling/tpl#works"]}`)
 	writeFile(".gitignore", "node_modules\n")
 
 	return projectDir
@@ -381,6 +382,13 @@ func TestTemplate_ExcludesWorkspaceSideDeclarations(t *testing.T) {
 		head, _, _ := strings.Cut(name, "/")
 		if templateproto.IsTemplateRootPackagingExclusion(head) {
 			t.Errorf("archive ships %q, a workspace-side declaration", name)
+		}
+	}
+	// Each root entry the fixture writes for the template project, named, so
+	// the test fails when the predicate above stops covering one of them.
+	for _, excluded := range []string{"putnami.json", "putnami.features.json", "specs/tpl.json", "specs.baseline.json", ".gitignore"} {
+		if names[excluded] {
+			t.Errorf("archive ships %q, which configures the template project rather than the scaffolded one", excluded)
 		}
 	}
 	// The template's own content is still there.
