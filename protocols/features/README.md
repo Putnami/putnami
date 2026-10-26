@@ -678,9 +678,10 @@ Go/TypeScript/Python-authored and hand-authored vectors live under
 - **Feature and spec**: `features/feature-contracts`, specified in
   [`specs/feature-contracts.json`](specs/feature-contracts.json). The protocol
   owns the feature of its contract. The Go tests here, the shared fragment
-  merger in `tooling/extension-sdk/specreport`, the Go and Python test jobs, and
-  the TypeScript readers of `@putnami/application` prove its requirements. The
-  TypeScript test binding keeps its own feature, `typescript/spec-test-binding`.
+  merger in `tooling/extension-sdk/specreport`, the Go and Python test jobs, the
+  TypeScript readers of `@putnami/application` and the TypeScript test binding
+  `@putnami/spectest`, whose fragments follow the same contract, prove its
+  requirements.
 - **Boundary**: the feature-intent, evidence, provisional design-graph, spec,
   and verification-report contracts are still evolving, and no consumer outside
   this repository is guaranteed. Those constraints keep the reviewed status at

@@ -123,7 +123,7 @@
           }
         },
         {
-          "id": "go-proof-fragments",
+          "id": "proof-fragments",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -134,7 +134,10 @@
               "a-go-binding-records-the-verdict-testing-recorded",
               "a-go-measurement-is-published-only-by-a-passing-test",
               "a-go-binding-writes-nothing-without-the-adapter-directory",
-              "identical-concurrent-observations-collapse-into-one-fragment"
+              "identical-concurrent-observations-collapse-into-one-fragment",
+              "a-typescript-binding-records-the-verdict-the-runner-recorded",
+              "a-typescript-measurement-carries-its-window-and-no-verdict",
+              "a-typescript-binding-writes-nothing-without-the-adapter-directory"
             ]
           }
         },

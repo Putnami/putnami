@@ -143,6 +143,10 @@ func TestSpecCanonicalSerializationIsDeterministicAndNonMutating(t *testing.T) {
 	if spec == nil || diag.HasErrors(findings) {
 		t.Fatalf("golden: %v", findings)
 	}
+	golden, err := MarshalSpec(spec)
+	if err != nil || !bytes.Equal(golden, data) {
+		t.Fatalf("the parsed golden does not serialize back to its committed bytes: %v", err)
+	}
 	spec.Requirements = append([]SpecRequirement{spec.Requirements[1]}, spec.Requirements[0])
 	spec.Decisions = append(spec.Decisions, "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md")
 	slices.Reverse(spec.Decisions)

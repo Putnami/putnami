@@ -112,6 +112,11 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/spectest",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/typescript/framework/web",
           "producerProject": "/protocols/http-routes"
         }

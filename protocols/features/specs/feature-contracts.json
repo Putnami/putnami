@@ -9,8 +9,7 @@
   ],
   "nonGoals": [
     "Deciding a verdict in a test or a producer: they report observations, and the gate recomputes every verdict from the authored criterion",
-    "Choosing which projects a session runs or which findings fail a command: the spec gate and validate own those choices",
-    "Specifying the TypeScript test binding, which its own feature typescript/spec-test-binding defines"
+    "Choosing which projects a session runs or which findings fail a command: the spec gate and validate own those choices"
   ],
   "requirements": [
     {
@@ -42,8 +41,8 @@
       "text": "A finding names the file position of what it refuses, such as features[0].requirements[1].verification.checks[1], after the file path when a repository validator reports it. A duplicate names the position of its first declaration, and a text over 512 bytes states the bound. A spec without outcomes, with a non-canonical id, blank text, a control character, a duplicate decision or a decision link outside doc/adr is refused. The spec field set matches its published schema."
     },
     {
-      "id": "go-proof-fragments",
-      "text": "A Go test binds itself to one declared check with spectest.Proves. When the test ends, it writes one fragment with the feature, requirement and check, the declaring file and test, and the verdict testing recorded: passed, failed or skipped. spectest.ObserveMeasurement writes the measurement and its observed window instead, with no verdict, and only when the test passed. Without the adapter's fragment directory neither writes anything. Identical observations from concurrent tests collapse into one fragment."
+      "id": "proof-fragments",
+      "text": "A test binds itself to one declared check. When it ends, its binding writes one fragment with the feature, requirement and check, the declaring file and test, and the runner's verdict: passed, failed or skipped. A measurement carries its observed window and no verdict, and only a passing test writes one. Without the adapter's fragment directory nothing is written. Go's spectest.Proves and @putnami/spectest's specTest both hold this; Go collapses identical concurrent observations into one fragment."
     },
     {
       "id": "one-report-per-project",

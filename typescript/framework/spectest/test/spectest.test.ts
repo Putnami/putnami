@@ -163,22 +163,29 @@ const recorded = (): ChildRun => {
   return recordedRun;
 };
 
+// The same suite run without a fragment directory, as the bare runner sees it.
+let bareRun: ChildRun | undefined;
+const bare = (): ChildRun => {
+  bareRun ??= runChildSuite({ fragmentsDir: false });
+  return bareRun;
+};
+
 // This project's own spec bindings. They are registered AFTER the synthetic
-// bindings above restored the inherited fragment directory, so these three —
-// and only these three — land in Putnami's project evidence.
-const bound = (check: string) => ({ feature: 'typescript/spec-test-binding', requirement: '', check });
+// bindings above restored the inherited fragment directory, so these four —
+// and only these four — land in Putnami's project evidence. Three prove the
+// fragment contract of the features protocol; one proves what the wrapper adds.
+const fragmentContract = (check: string) => ({
+  feature: 'features/feature-contracts',
+  requirement: 'proof-fragments',
+  check,
+});
 
 describe('specTest', () => {
   specTest(
     'records the verdict the runner observed, one atomic fragment per check',
-    { ...bound('the-recorded-verdict-is-the-one-the-runner-observed'), requirement: 'honest-verdict' },
+    fragmentContract('a-typescript-binding-records-the-verdict-the-runner-recorded'),
     () => {
       const run = recorded();
-
-      // The deliberately failing case must still fail the child suite: the
-      // helper never alters the standard test verdict.
-      expect(run.exitCode).not.toBe(0);
-
       const byCheck = new Map(run.fragments.map((fragment) => [fragment.check, fragment]));
       // The failing and skipped measuring cases publish nothing: a measurement
       // fragment has no verdict to carry, so absence is the only honest report.
@@ -217,7 +224,7 @@ describe('specTest', () => {
 
   specTest(
     'publishes an acceptance verdict or a measurement, never both',
-    { ...bound('a-fragment-never-carries-both-a-verdict-and-a-measurement'), requirement: 'verdict-or-measurement' },
+    fragmentContract('a-typescript-measurement-carries-its-window-and-no-verdict'),
     () => {
       const run = recorded();
       const byCheck = new Map(run.fragments.map((fragment) => [fragment.check, fragment]));
@@ -250,15 +257,25 @@ describe('specTest', () => {
   );
 
   specTest(
-    'is inert without the fragment directory: same verdicts, nothing written',
+    'writes nothing without the fragment directory',
+    fragmentContract('a-typescript-binding-writes-nothing-without-the-adapter-directory'),
+    () => {
+      expect(bare().fragments).toEqual([]);
+    },
+  );
+
+  specTest(
+    'never changes the verdict the runner gives, with or without the fragment directory',
     {
-      ...bound('no-fragment-directory-means-no-writes-and-the-same-verdicts'),
-      requirement: 'inert-without-the-adapter',
+      feature: 'typescript/spec-test-binding',
+      requirement: 'honest-verdict',
+      check: 'the-runner-verdict-is-unchanged',
     },
     () => {
-      const run = runChildSuite({ fragmentsDir: false });
-      expect(run.exitCode).not.toBe(0);
-      expect(run.fragments).toEqual([]);
+      // The deliberately failing case fails the child suite either way: the
+      // binding reports an observation and never alters the standard verdict.
+      expect(recorded().exitCode).not.toBe(0);
+      expect(bare().exitCode).not.toBe(0);
     },
   );
 });
