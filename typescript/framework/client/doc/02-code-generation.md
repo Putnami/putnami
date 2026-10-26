@@ -66,12 +66,22 @@ The generator produces a publishable client package at `clients/ts/` (configurab
 ```
 clients/ts/
 ├── package.json          → { name: "@myorg/users-client", ... }
+├── putnami.json          → Written once, when the directory has none
 ├── tsconfig.json
 └── src/
     ├── index.ts          → Re-exports all client classes and types
     ├── users-client.ts   → Typed UsersClient class
     └── types.ts          → Request/response interfaces
 ```
+
+`putnami.json` is the client's project document. The generator writes it
+only when the directory has none: it names the package, marks it a
+`library`, tags it `ts` and `generated-client`, selects `@putnami/typescript`,
+and declares `featureAuthority.none`. As a library, the client has no `serve`
+or `run` job. With `featureAuthority.none`, `putnami validate` accepts it
+without a feature of its own. After that the file is yours: no later run rewrites it,
+and `client.putnami.json` does not list it. Its `name` is the project's name in
+Putnami, so when you change `ts.packageName`, change `name` too.
 
 The standalone `generateProjectClients()` path used by `putnami clientgen`
 applies the provider's Biome formatting and lint fixes before writing the
