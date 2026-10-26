@@ -11,6 +11,7 @@
     "extension/manifest-contract#first-party-publishers-emit-what-the-protocol-reads",
     "extension/manifest-contract#lifecycles-validate-and-fail-in-closed-vocabularies",
     "extension/manifest-contract#one-owner-per-ecosystem-profile",
+    "extension/manifest-contract#output-readers-and-publish-channels-follow-their-rules",
     "extension/manifest-contract#publication-events-are-strict",
     "extension/manifest-contract#strict-manifests-and-a-fixture-corpus",
     "extension/manifest-contract#task-contracts-are-exact-owned-and-additive",

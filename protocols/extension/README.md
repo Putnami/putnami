@@ -394,7 +394,7 @@ requirements, and so do the implementations, each under checks of its own:
 
 | Implementation | Where | What its tests prove |
 | --- | --- | --- |
-| CLI | `tooling/cli/internal/extension` | Every manifest in the repository loads at the contract its vocabulary requires; the first-party list passes the strict parser and `FullValidateManifest`. |
+| CLI | `tooling/cli/internal/extension` | Every manifest in the repository loads at the contract its vocabulary requires; the first-party list passes the strict parser and `FullValidateManifest`; a manifest with a registry dependency requires rung 8 and a stamp above the latest contract is refused. |
 | Go extension | `go/extension` | The packager stamps the rung a manifest's vocabulary requires, stamps a dependent at rung 8 and refuses what the protocol refuses; the publisher emits a valid published member, probes the strict reader accepts and an outbox it reads; its own manifest passes `FullValidateManifest`. |
 | TypeScript extension | `typescript/extension` | The npm packager stamps and refuses the same way; the publisher emits a valid published member, probes and an outbox the strict reader accepts; its own manifest passes `FullValidateManifest`. |
 | Python extension | `python/extension` | Its own manifest passes `FullValidateManifest`. |

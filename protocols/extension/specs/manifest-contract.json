@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "the-protocol-version-is-pinned",
-      "text": "ProtocolVersion is 3, so a bump moves this one constant and fails its test. The strict parser refuses any member it does not know, so no member carries the version. ManifestProtocolVersion reports 3 for a manifest that uses a task declaration, a runtime or workspace section, or a finalizer step, and 2 otherwise: every fixture that predates version 3 still reports 2, and each version 3 fixture reports 3."
+      "text": "ProtocolVersion is 3, so a bump moves this one constant and fails its test. ManifestProtocolVersion reports 3 for a manifest that uses a task declaration, a runtime or workspace section, or a finalizer step, and 2 otherwise: every fixture that predates version 3 still reports 2, and each version 3 fixture reports 3."
     },
     {
       "id": "strict-manifests-and-a-fixture-corpus",
@@ -31,7 +31,7 @@
     },
     {
       "id": "a-registry-extension-dependency-requires-rung-8",
-      "text": "A manifest that names a registry extension dependency requires contract 8 in its stamp, and the load floor leaves that rung out. CheckDependencyContract refuses a dependent stamped below 8, naming the rung, and passes a stamp of 8; LoadManifest refuses a stamp above the latest contract. The Go packager stamps a dependent at 8 in a put archive and leaves the rung out of an npm package."
+      "text": "A manifest that names a registry extension dependency requires contract 8 in its stamp, and the load floor leaves that rung out. CheckDependencyContract refuses a dependent stamped below 8, naming the rung, and passes a stamp of 8; LoadManifest refuses a stamp above the latest contract. The Go packager stamps a dependent at 8 in a put archive and leaves the rung out of an npm package. The CLI reports rung 8 for such a manifest and refuses a stamp above its latest contract, asking for a newer putnami."
     },
     {
       "id": "the-schema-and-the-go-types-agree",
@@ -40,6 +40,10 @@
     {
       "id": "task-contracts-are-exact-owned-and-additive",
       "text": "A task declaration names exact output paths under a known root, with effects that do not conflict, and each output has one owner across the manifest: task contract validation refuses an overlap, an escape or a conflicting effect. Every declaration feature appears in a valid fixture. A manifest without a declaration, a runtime or a workspace section gets no verdict from those validators, and a defective declaration added to the same manifest does."
+    },
+    {
+      "id": "output-readers-and-publish-channels-follow-their-rules",
+      "text": "An output that its project's dependents read (readByDependents) is a durable output under the project root, else validation reports invalid-output-read-by-dependents. A publish channel list names at least one channel and each once, and only a task with the registry effect lists one: validation refuses any other list with a code for each rule. Normalization sorts the list, so two orders digest identically."
     },
     {
       "id": "task-digests-move-only-with-the-contract",

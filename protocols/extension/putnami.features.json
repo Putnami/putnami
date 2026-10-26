@@ -84,7 +84,9 @@
             "kind": "acceptance",
             "checks": [
               "extension-dependencies-require-rung-8",
-              "the-go-extension-stamps-a-dependent-at-rung-8"
+              "the-go-extension-stamps-a-dependent-at-rung-8",
+              "the-cli-requires-rung-8-of-a-dependent",
+              "the-cli-refuses-a-stamp-above-its-latest-contract"
             ]
           }
         },
@@ -115,6 +117,21 @@
               "one-owner-per-output",
               "every-declaration-feature-has-a-fixture",
               "the-version-3-vocabulary-is-additive"
+            ]
+          }
+        },
+        {
+          "id": "output-readers-and-publish-channels-follow-their-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-read-output-is-durable-and-under-the-project-root",
+              "a-channel-list-is-non-empty-once-each-and-needs-the-registry-effect",
+              "a-channel-list-normalizes-to-sorted-order"
             ]
           }
         },

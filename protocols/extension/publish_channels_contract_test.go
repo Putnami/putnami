@@ -86,6 +86,7 @@ func TestRequiredCLIContractRaisesToPublishChannelsOnlyForADeclaringTask(t *test
 // A declared list names at least one channel and each channel once, and a task
 // that serves a channel publishes to a registry. Each rule has its own code.
 func TestValidatePublishChannels(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "output-readers-and-publish-channels-follow-their-rules", "a-channel-list-is-non-empty-once-each-and-needs-the-registry-effect")
 	noRegistry := publishTask("npm")
 	noRegistry.Declares.Effects = []string{EffectNetwork}
 
@@ -113,6 +114,7 @@ func TestValidatePublishChannels(t *testing.T) {
 // The channels are a set: normalization sorts them, so two manifests that list
 // the same channels in another order digest identically.
 func TestPublishChannelsNormalizeToSortedOrder(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "output-readers-and-publish-channels-follow-their-rules", "a-channel-list-normalizes-to-sorted-order")
 	authored := publishTask("template-archives", "archives")
 	sorted := publishTask("archives", "template-archives")
 	if TaskContractDigest(authored) != TaskContractDigest(sorted) {

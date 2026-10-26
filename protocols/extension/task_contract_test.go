@@ -1298,6 +1298,7 @@ func TestValidateOutputEmptied(t *testing.T) {
 // and each is refused at the readByDependents field. An unset flag states
 // nothing.
 func TestValidateOutputReadByDependents(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "output-readers-and-publish-channels-follow-their-rules", "a-read-output-is-durable-and-under-the-project-root")
 	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"clientOutput": {}}}
 	const code = "invalid-output-read-by-dependents"
 	cases := []struct {
