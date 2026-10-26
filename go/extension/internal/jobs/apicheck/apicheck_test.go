@@ -328,7 +328,6 @@ func TestAnUncommittedRemovalIsChecked(t *testing.T) {
 
 func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
 	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "go-extension-skips-a-preview-or-experimental-project")
-	spectest.Proves(t, feature, requirement, "a-preview-or-experimental-project-is-not-checked")
 	f := newFixture(t, catalog("package", "experimental"))
 	f.write("lib/greet/greet.go", waveOnlySource)
 	f.commit("feat: drop the greeting")
@@ -348,7 +347,6 @@ func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
 
 func TestAProjectTheCatalogDoesNotListIsSkipped(t *testing.T) {
 	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "go-extension-skips-a-project-the-catalog-does-not-list")
-	spectest.Proves(t, feature, requirement, "an-unlisted-project-is-not-checked-when-a-catalog-exists")
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"go.example.com/other","kind":"package","status":"stable"}]}`)
 	f.write("lib/greet/greet.go", waveOnlySource)
 	f.commit("feat: drop the greeting")

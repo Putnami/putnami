@@ -60,8 +60,7 @@ func TestLease_OneWinnerPublishesForWaiter(t *testing.T) {
 
 // The heartbeat keeps ownership past the expiry the claim stamped. Both store
 // handles read clocks the test sets, so the proof does not depend on when the
-// scheduler runs the heartbeat: with real time on a loaded host, the heartbeat
-// ran later than the TTL allows and the contender won.
+// scheduler runs the heartbeat.
 func TestLease_HeartbeatKeepsOwnershipLive(t *testing.T) {
 	const ttl = 500 * time.Millisecond
 	root := t.TempDir()
