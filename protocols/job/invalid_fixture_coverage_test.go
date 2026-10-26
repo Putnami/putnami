@@ -52,9 +52,12 @@ func TestInvalidFixtureCoverage(t *testing.T) {
 	// asserted, not just the code, so relaxing any single check is caught rather
 	// than being masked by another fixture that happens to raise the same code.
 	requiredFields := []string{
+		"workspaceRoot",
 		"outputPath",
 		"cacheRoot",
 		"extension.name",
+		"job.name",
+		"project.name",
 	}
 	for _, field := range requiredFields {
 		if !fieldTriggered[field] {

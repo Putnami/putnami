@@ -19,7 +19,7 @@
     },
     {
       "id": "version-1-stays-frozen",
-      "text": "A version 1 document refuses the version 2 members identity, staging, the extension runtime path and cache root, the project metadata, type, dependency closure and tags, the invocation, the selection and the workspace options. Every version 1 fixture still validates, reads as version 1 and carries no version 2 member. A parsed version 1 document serializes without protocolVersion, identity or staging, so a producer that has not migrated emits the same bytes."
+      "text": "A version 1 document refuses the version 2 members identity, staging, the extension runtime path and cache root, the project metadata, type, dependency closure and tags, the invocation, the selection and the workspace options. Every version 1 fixture still validates, reads as version 1 and carries no version 2 member. Parsed and written again, a version 1 document still carries no protocolVersion, identity or staging, so a producer that has not migrated writes no version 2 member."
     },
     {
       "id": "strict-producers-lenient-consumers",

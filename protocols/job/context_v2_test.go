@@ -788,26 +788,35 @@ func TestStrictPresencePreservesEmptyAndNullLifecycleMembers(t *testing.T) {
 	}
 }
 
-// TestV1DocumentBytesUnchanged pins that a v1 context still serializes to the
-// v1 wire: protocolVersion, identity and staging are all omitted, so a producer
-// that has not migrated emits byte-identical documents.
+// TestV1DocumentBytesUnchanged pins that every version 1 fixture still
+// serializes to the version 1 wire: protocolVersion, identity and staging are
+// all omitted, so a producer that has not migrated writes no version 2 member.
 func TestV1DocumentBytesUnchanged(t *testing.T) {
 	spectest.Proves(t, "job/execution-context", "version-1-stays-frozen", "a-version-1-document-serializes-without-version-2-members")
-	ctx, err := Parse(readFixture(t, "fixtures", "valid", "minimal.json"))
+	paths, err := filepath.Glob(filepath.Join("fixtures", "valid", "*.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, err := json.Marshal(ctx)
-	if err != nil {
-		t.Fatal(err)
+	if len(paths) == 0 {
+		t.Fatal("no version 1 fixture under fixtures/valid")
 	}
-	var members map[string]json.RawMessage
-	if err := json.Unmarshal(encoded, &members); err != nil {
-		t.Fatal(err)
-	}
-	for _, member := range []string{"protocolVersion", "identity", "staging"} {
-		if _, ok := members[member]; ok {
-			t.Errorf("a v1 document must not serialize %q", member)
+	for _, path := range paths {
+		ctx, err := Parse(readFixture(t, path))
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		encoded, err := json.Marshal(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(encoded, &members); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		for _, member := range []string{"protocolVersion", "identity", "staging"} {
+			if _, ok := members[member]; ok {
+				t.Errorf("%s: a version 1 document must not serialize %q", path, member)
+			}
 		}
 	}
 }
