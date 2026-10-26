@@ -103,6 +103,7 @@ func assertNoPublishedEvents(t *testing.T, events []map[string]any) {
 // tarball and the staged package.json, and the job asks for no credential,
 // spawns nothing but the pack and sends no request to the registry.
 func TestManagedNPMPublishWritesTheOutboxAndUploadsNothing(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-packs-an-outbox-the-strict-reader-accepts")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "managed-publication-packs-only", "the-managed-route-packs-into-the-outbox-and-uploads-nothing")
 	ctx, dir, outboxRoot, requests := managedOutboxNPMContext(t)
 	stubOutboxNPMPack(t)
@@ -161,6 +162,7 @@ func TestManagedNPMPublishWritesTheOutboxAndUploadsNothing(t *testing.T) {
 // managed rules require: --registry over registries.npm.publish over npm's own
 // registry. The engine uploads there and nowhere else.
 func TestManagedNPMOutboxNamesTheResolvedRegistry(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-packs-an-outbox-the-strict-reader-accepts")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "managed-publication-packs-only", "the-managed-route-packs-into-the-outbox-and-uploads-nothing")
 	for name, tc := range map[string]struct {
 		registry   string

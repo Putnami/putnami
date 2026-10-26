@@ -235,7 +235,7 @@ func findRepoRoot(t *testing.T) string {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Skipf("could not find Putnami repo root from %s", start)
+			t.Fatalf("could not find the Putnami repo root from %s: the first-party manifests are read from their real paths", start)
 		}
 		dir = parent
 	}

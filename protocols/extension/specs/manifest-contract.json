@@ -15,11 +15,11 @@
   "requirements": [
     {
       "id": "the-protocol-version-is-pinned",
-      "text": "ProtocolVersion is 3 and the manifest carries no version member, so a bump moves this one constant and fails its test. ManifestProtocolVersion reports 3 for a manifest that uses a task declaration, a runtime or workspace section, or a finalizer step, and 2 otherwise: every fixture that predates version 3 still reports 2, and each version 3 fixture reports 3."
+      "text": "ProtocolVersion is 3, so a bump moves this one constant and fails its test. The strict parser refuses any member it does not know, so no member carries the version. ManifestProtocolVersion reports 3 for a manifest that uses a task declaration, a runtime or workspace section, or a finalizer step, and 2 otherwise: every fixture that predates version 3 still reports 2, and each version 3 fixture reports 3."
     },
     {
       "id": "strict-manifests-and-a-fixture-corpus",
-      "text": "The strict parser refuses invalid JSON and an unknown field. Every valid fixture passes the parser, ValidateManifest and FullValidateManifest, and every invalid fixture draws a diagnostic from one of them. Each task contract and lifecycle counter-example reports exactly the codes a consumer keys on, and every diagnostic of the task contract harness also comes out of ValidateManifest, which the validate command, the package-time gate and the SDK's authoring gate run."
+      "text": "The strict parser refuses invalid JSON and an unknown field. Every valid fixture passes the parser, ValidateManifest and FullValidateManifest, and every invalid fixture draws a diagnostic from one of them. Each task contract and lifecycle counter-example reports exactly the codes a consumer keys on, and every diagnostic of the task contract harness also comes out of ValidateManifest."
     },
     {
       "id": "a-contract-matches-or-the-manifest-does-not-load",
@@ -28,6 +28,10 @@
     {
       "id": "an-additive-vocabulary-raises-the-contract-floor",
       "text": "Agent content, a verb vocabulary, command kinds, publish channels, a provisioned toolchain, a group default that takes positionals, input selectors, a source-bound task and a git or release baseline input each raise the contract a manifest requires, only when the manifest uses them. RequiredCLIContract takes the highest rung across the manifest, and a manifest stamped below the rung its vocabulary requires does not load."
+    },
+    {
+      "id": "a-registry-extension-dependency-requires-rung-8",
+      "text": "A manifest that names a registry extension dependency requires contract 8 in its stamp, and the load floor leaves that rung out. CheckDependencyContract refuses a dependent stamped below 8, naming the rung, and passes a stamp of 8; LoadManifest refuses a stamp above the latest contract. The Go packager stamps a dependent at 8 in a put archive and leaves the rung out of an npm package."
     },
     {
       "id": "the-schema-and-the-go-types-agree",
@@ -59,11 +63,19 @@
     },
     {
       "id": "the-publication-outbox-is-strict-and-bounded",
-      "text": "ParsePublicationOutbox refuses an unknown, duplicate or null member, an escaping, unclean or nested path, an invalid digest, size or identity, an npm registry the managed rules refuse, and a document, member list or put blob list above its bound. ResolveOutboxPath refuses a symbolic link at any step. A member of every ecosystem is accepted, and each invalid fixture is held by a test."
+      "text": "ParsePublicationOutbox refuses an unknown, duplicate or null member, an escaping, unclean or nested path, an invalid digest, size or identity, an npm registry the managed rules refuse, and a document, member list or put blob list above its bound. ResolveOutboxPath refuses a symbolic link at any step. A member of every ecosystem is accepted, every invalid fixture is refused and every valid fixture accepted."
     },
     {
       "id": "every-first-party-manifest-conforms",
-      "text": "Every extension manifest in this repository loads through the CLI's LoadManifest, stamped at the contract its vocabulary requires, or unstamped when it declares no contract surface. It passes the strict parser and FullValidateManifest, as the package-time gate requires, and its task declarations conform. A first-party manifest the protocol refuses fails every test run, not the release."
+      "text": "Every extension manifest in this repository loads through the CLI's LoadManifest, stamped at the contract its vocabulary requires, or unstamped when it declares no contract surface. Every manifest the CLI's first-party list names passes the strict parser and FullValidateManifest, and its task declarations conform. The Go, TypeScript and Python extensions each pass their own manifest through FullValidateManifest. A refused first-party manifest fails every test run, not the release."
+    },
+    {
+      "id": "first-party-packagers-stamp-and-gate-the-contract",
+      "text": "The Go and TypeScript packagers stamp a staged manifest at the rung its vocabulary requires and refuse one the protocol refuses: a defective vocabulary, a reserved flag, a wrong-typed surface or a claim above the latest contract. A refused manifest stays unstamped. The extension SDK's builder and content packager stamp the same rung, and its authoring gate runs FullValidateManifest."
+    },
+    {
+      "id": "first-party-publishers-emit-what-the-protocol-reads",
+      "text": "The Go, TypeScript and Cloud publishers emit a published member that validates. The Go, TypeScript and SDK probes pass the strict reader, and the SDK reader refuses what ParseMemberProbe refuses. The Go, TypeScript, SDK and Cloud outbox writers produce a descriptor ParsePublicationOutbox accepts, and the SDK reader refuses an invalid one."
     }
   ],
   "decisions": [

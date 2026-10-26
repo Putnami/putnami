@@ -454,6 +454,7 @@ func TestFullBootstrapGoModuleStaysPrivateWhenSparseIsOff(t *testing.T) {
 // what makes re-running a partially failed release safe — the coordinator gets
 // a complete set instead of a missing member.
 func TestSparseGoModuleStaysPrivateAndIdempotent(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-emits-a-published-member-the-protocol-validates")
 	spectest.Proves(t, "go/go-project-toolchain", "member-event-per-publication", "conflict-with-equal-digest-is-a-reuse")
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "")
 	originalTokenResolver := registrycred.ResolveToken
@@ -1182,6 +1183,7 @@ const goPublishTestRevision = "0123456789abcdef0123456789abcdef01234567"
 // go.putnami.dev fails with "unknown registry host go.putnami.dev; run
 // `putnami cloud login`", and the run has no session to log in with.
 func TestGoModule_PrivateBrokerCarriesEveryRegistryCallAndSkipsTheToolchainSmoke(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-emits-a-published-member-the-protocol-validates")
 	spectest.Proves(t, "go/go-project-toolchain", "member-event-per-publication", "private-loopback-broker-carries-the-publication")
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "")
 	const capability = "run-capability-token"

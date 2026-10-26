@@ -75,6 +75,20 @@
           }
         },
         {
+          "id": "a-registry-extension-dependency-requires-rung-8",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "extension-dependencies-require-rung-8",
+              "the-go-extension-stamps-a-dependent-at-rung-8"
+            ]
+          }
+        },
+        {
           "id": "the-schema-and-the-go-types-agree",
           "stage": "coded",
           "evidenceKinds": [
@@ -209,7 +223,52 @@
             "checks": [
               "first-party-manifests-load-under-the-current-contract",
               "first-party-manifests-pass-the-publish-gate",
-              "first-party-task-declarations-conform"
+              "first-party-task-declarations-conform",
+              "the-go-extension-manifest-passes-full-validation",
+              "the-typescript-extension-manifest-passes-full-validation",
+              "the-python-extension-manifest-passes-full-validation"
+            ]
+          }
+        },
+        {
+          "id": "first-party-packagers-stamp-and-gate-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-stamps-the-rung-its-vocabulary-requires",
+              "the-go-extension-refuses-what-the-protocol-refuses",
+              "the-typescript-extension-stamps-the-rung-its-vocabulary-requires",
+              "the-typescript-extension-refuses-what-the-protocol-refuses",
+              "the-extension-sdk-stamps-the-rung-its-vocabulary-requires",
+              "the-extension-sdk-authoring-gate-runs-the-full-validator"
+            ]
+          }
+        },
+        {
+          "id": "first-party-publishers-emit-what-the-protocol-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-emits-a-published-member-the-protocol-validates",
+              "the-go-extension-probes-pass-the-strict-reader",
+              "the-go-extension-packs-an-outbox-the-strict-reader-accepts",
+              "the-typescript-extension-emits-a-published-member-the-protocol-parses",
+              "the-typescript-extension-probes-pass-the-strict-reader",
+              "the-typescript-extension-packs-an-outbox-the-strict-reader-accepts",
+              "the-extension-sdk-probes-pass-the-strict-reader",
+              "the-extension-sdk-reader-refuses-what-the-protocol-refuses-in-a-probe",
+              "the-extension-sdk-outbox-reads-back-what-it-writes",
+              "the-extension-sdk-outbox-reader-refuses-an-invalid-descriptor",
+              "the-cloud-extension-emits-a-published-member-the-protocol-validates",
+              "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts"
             ]
           }
         }

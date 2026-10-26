@@ -50,6 +50,7 @@ func stagedContract(t *testing.T, stageDir string) int {
 // validating a manifest is a statement about the document; this is the statement
 // about the ARTIFACT, made through the very function a consumer's CLI calls.
 func TestGateAndStampManifestContract_StagedOutputLoadsUnderTheCurrentLoader(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
 	dir := stageManifest(t, conformingManifest)
 	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("gate should pass a conforming manifest: %v", err)
@@ -100,6 +101,7 @@ func TestGateAndStampManifestContract_RatchetsAStaleLowerClaim(t *testing.T) {
 // verified — and the loader, seeing a number it reads, would accept it. The
 // remedy is upgrading putnami.
 func TestGateAndStampManifestContract_RejectsFutureContractClaim(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-refuses-what-the-protocol-refuses")
 	future := strings.Replace(conformingManifest,
 		`"name": "@putnami/testext",`,
 		fmt.Sprintf(`"name": "@putnami/testext",
@@ -131,6 +133,7 @@ func TestGateAndStampManifestContract_RejectsFutureContractClaim(t *testing.T) {
 // to unmarshal in every consumer, which drops the whole extension. The bypass
 // is about what the CONTRACT governs, not about whether the file is usable.
 func TestGateAndStampManifestContract_RejectsUnloadableHookOnlyManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-refuses-what-the-protocol-refuses")
 	for name, manifest := range map[string]string{
 		"hooks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "hooks": []}`,
 		"tasks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "tasks": []}`,

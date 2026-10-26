@@ -28,6 +28,7 @@ const commandKindManifest = `{
 // vocabulary fails the package job unstamped, the same verdicts as the Go
 // packager.
 func TestCopyHookFiles_StampsACommandKind(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "command-kinds-and-traits", "the-npm-packager-stamps-command-kinds")
 	projDir := stageSourceManifest(t, commandKindManifest)
 	outDir := t.TempDir()

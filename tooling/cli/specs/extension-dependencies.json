@@ -77,7 +77,7 @@
     },
     {
       "id": "an-older-cli-refuses-a-dependent",
-      "text": "A manifest whose extensionDependencies names a registry dependency requires CLI contract 8, ExtensionDependenciesContract. A CLI below rung 8 refuses such a manifest loaded from the artifact store or a declared path as requiring a newer putnami."
+      "text": "A CLI that predates the dependency rung refuses a manifest that names a registry dependency as requiring a newer putnami. This CLI skips such a manifest stamped below the rung, whether it loads from the artifact store or from a declared path, with the reason, and follows none of its dependencies."
     }
   ],
   "decisions": [

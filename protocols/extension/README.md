@@ -389,11 +389,22 @@ Evidence behind `stable`:
 
 The module owns the feature of its contract, `extension/manifest-contract`,
 specified in [`specs/manifest-contract.json`](specs/manifest-contract.json). The
-conformance, drift, matrix, digest, ecosystem and outbox tests here and the
-first-party manifest tests of the CLI
-(`tooling/cli/internal/extension/first_party_contract_test.go`) prove its
-requirements. The language extensions and the CLI commands that deliver "my
-language works in Putnami" keep their own features.
+conformance, drift, matrix, digest, ecosystem and outbox tests here prove its
+requirements, and so do the implementations, each under checks of its own:
+
+| Implementation | Where | What its tests prove |
+| --- | --- | --- |
+| CLI | `tooling/cli/internal/extension` | Every manifest in the repository loads at the contract its vocabulary requires; the first-party list passes the strict parser and `FullValidateManifest`. |
+| Go extension | `go/extension` | The packager stamps the rung a manifest's vocabulary requires, stamps a dependent at rung 8 and refuses what the protocol refuses; the publisher emits a valid published member, probes the strict reader accepts and an outbox it reads; its own manifest passes `FullValidateManifest`. |
+| TypeScript extension | `typescript/extension` | The npm packager stamps and refuses the same way; the publisher emits a valid published member, probes and an outbox the strict reader accepts; its own manifest passes `FullValidateManifest`. |
+| Python extension | `python/extension` | Its own manifest passes `FullValidateManifest`. |
+| Extension SDK | `tooling/extension-sdk` | The builder and the content packager stamp the rung; the authoring gate runs `FullValidateManifest`; the probe builders and reader agree with `ParseMemberProbe`; the outbox writer and reader agree with `ParsePublicationOutbox`. |
+| Cloud extension | `cloud/extension` | The publishers emit valid published members and pack outbox descriptors the strict parser accepts. |
+
+The other first-party extensions author manifests that the CLI loads in its
+first-party tests. They are not implementations of this contract and keep their
+own features, as do the CLI commands that deliver "my language works in
+Putnami".
 
 The spec lists every ADR under [`doc/adr`](doc/adr). Two more decisions scope
 `protocols/extension` explicitly:

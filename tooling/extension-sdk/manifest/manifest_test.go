@@ -178,6 +178,7 @@ func TestBuild_DeclarationFeatures(t *testing.T) {
 // breaks exactly one invariant, and each must be rejected with the code a
 // consumer keys on.
 func TestBuild_RejectsContractViolations(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-authoring-gate-runs-the-full-validator")
 	spectest.Proves(t, "tooling/extension-authoring", "manifest-validated-at-build-time", "building-refuses-a-task-contract-violation")
 	cases := []struct {
 		name   string
@@ -386,6 +387,7 @@ func TestBuild_V2TaskStillBuilds(t *testing.T) {
 // structural one: an author still cannot emit a manifest with no surface or a
 // task missing its command.
 func TestBuild_RejectsStructuralDefects(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-authoring-gate-runs-the-full-validator")
 	spectest.Proves(t, "tooling/extension-authoring", "manifest-validated-at-build-time", "building-refuses-a-structurally-defective-manifest")
 	if _, err := New("sample/empty", "1.0.0").Build(); err == nil {
 		t.Error("a manifest with no command or tool must be rejected")
@@ -468,6 +470,7 @@ func TestBuilder_Tool(t *testing.T) {
 // the additive contract its vocabulary requires — the one stamp a reader that
 // predates agent content refuses instead of dropping the content.
 func TestBuilder_AgentContentStampsTheAdditiveContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-stamps-the-rung-its-vocabulary-requires")
 	spectest.Proves(t, "tooling/extension-authoring", "agent-content-packaging", "the-manifest-builder-stamps-the-additive-contract")
 	path := filepath.Join(t.TempDir(), proto.ManifestFilename)
 	builder := New("@sample/contributor", "1.0.0").
@@ -538,6 +541,7 @@ func TestWriteFile_WritesCanonicalJSON(t *testing.T) {
 // TestWriteFile_RefusesInvalidManifest pins that a rejected manifest leaves no
 // file behind for a packager to pick up.
 func TestWriteFile_RefusesInvalidManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-authoring-gate-runs-the-full-validator")
 	spectest.Proves(t, "tooling/extension-authoring", "manifest-validated-at-build-time", "writing-refuses-an-invalid-manifest")
 	builder := validBuilder().Task("build-describe", proto.TaskDefinition{
 		Kind: "command", Command: "echo",
@@ -568,6 +572,7 @@ func TestWriteFile_ReportsIOFailure(t *testing.T) {
 // TestValidate_StandaloneManifest pins the exported entry for authors who
 // assemble a manifest without the builder.
 func TestValidate_StandaloneManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-authoring-gate-runs-the-full-validator")
 	m := &proto.Manifest{
 		Name: "sample/standalone",
 		Commands: map[string]proto.CommandDefinition{

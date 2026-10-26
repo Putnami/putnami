@@ -54,6 +54,7 @@ const conformingToolOnlyManifest = `{
 // a conforming staged manifest earns the cliContract stamp, and the result is
 // byte-deterministic (staged manifests feed content-addressed packages).
 func TestGateAndStampManifestContract_StampsEarnedContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
 	dir := stageManifest(t, conformingManifest)
 	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("gate should pass a conforming manifest: %v", err)
@@ -95,6 +96,7 @@ func TestGateAndStampManifestContract_StampsEarnedContract(t *testing.T) {
 // surface participates in the same package-time lifecycle as commands. This
 // prevents an older CLI from silently loading a tool it cannot understand.
 func TestGateAndStampManifestContract_StampsToolOnlyManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
 	dir := stageManifest(t, conformingToolOnlyManifest)
 	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("gate should pass a conforming tool-only manifest: %v", err)
@@ -185,6 +187,7 @@ func TestValidateStagedRuntimeExecutable(t *testing.T) {
 // manifest shadowing a reserved global flag fails packaging instead of being
 // stamped — strictness moved from load time to package time.
 func TestGateAndStampManifestContract_BlocksReservedShadow(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-refuses-what-the-protocol-refuses")
 	dir := stageManifest(t, `{
 		"name": "@putnami/testext",
 		"commands": {
@@ -279,6 +282,7 @@ func TestGateAndStampManifestContract_UnparseableStagedManifest(t *testing.T) {
 // rather than publishing an unloadable manifest unstamped that every consumer
 // would fail to unmarshal and skip.
 func TestGateAndStampManifestContract_GatesMalformedContractSurface(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-refuses-what-the-protocol-refuses")
 	for _, m := range []string{
 		`{"name": "@putnami/testext", "commands": []}`,
 		`{"name": "@putnami/testext", "commandGroups": "nope"}`,

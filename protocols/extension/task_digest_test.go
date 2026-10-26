@@ -314,7 +314,6 @@ func TestTaskContractDigest_FixtureCorpus(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("wrote %d digests to %s", len(got), goldenPath)
-		return
 	}
 
 	data, err := os.ReadFile(goldenPath)

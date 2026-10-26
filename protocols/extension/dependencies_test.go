@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestIsRegistryName(t *testing.T) {
@@ -49,6 +50,7 @@ func TestRegistryDependenciesAreSortedRegistryNames(t *testing.T) {
 
 // The dependency rung is part of the stamp, not of the origin-free load floor.
 func TestRequiredContractsSplitTheDependencyRung(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "extension-dependencies-require-rung-8")
 	m := &Manifest{
 		Commands:      map[string]CommandDefinition{"lint": {}},
 		ExtensionDeps: Dependencies{List: map[string]string{"@putnami/dev": ""}},
@@ -78,6 +80,7 @@ func writeDependentManifest(t *testing.T, body string) string {
 // check refuses it; a stamp of 8 passes both; a stamp above the latest
 // contract is refused as written for a newer putnami.
 func TestCheckDependencyContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "extension-dependencies-require-rung-8")
 	const manifest = `{"cliContract": %d, "extensionDependencies": ["@putnami/dev"], "commands": {"lint": {}}}`
 
 	path := writeDependentManifest(t, fmt.Sprintf(manifest, protocolcli.ReleaseBaselineInputContract))

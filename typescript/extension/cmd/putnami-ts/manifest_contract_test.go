@@ -136,6 +136,7 @@ func TestPackageDockerReadsGeneratorOwnedGenResource(t *testing.T) {
 // diagnostics under the comprehensive protocol entry point, which includes the
 // v3 task-contract harness (exactness, one owner per output, honest effects).
 func TestExtensionManifestPassesFullValidation(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "the-typescript-extension-manifest-passes-full-validation")
 	m := loadExtensionManifest(t)
 	if diags := proto.FullValidateManifest(m); len(diags) > 0 {
 		t.Fatalf("manifest is not conformant:\n  %s", formatDiagnostics(diags))

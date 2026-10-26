@@ -24,6 +24,7 @@ const hookOnlyDependentManifest = `{
 // takes the dependency stamp without the strict requirement of a command,
 // tool or agent content, and loads.
 func TestGateStampsAHookOnlyDependentPutArchive(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "the-go-extension-stamps-a-dependent-at-rung-8")
 	spectest.Proves(t, "go/go-project-toolchain", "the-packager-stamps-a-dependent", "a-hook-only-dependent-is-stamped")
 	dir := stageManifest(t, hookOnlyDependentManifest)
 	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
@@ -41,6 +42,7 @@ func TestGateStampsAHookOnlyDependentPutArchive(t *testing.T) {
 // A put archive with commands and a registry dependency is stamped with the
 // dependency rung after the full validation.
 func TestGateStampsADependentWithCommands(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "the-go-extension-stamps-a-dependent-at-rung-8")
 	manifest := strings.Replace(conformingManifest, `"version": "1.2.3",`,
 		`"version": "1.2.3", "extensionDependencies": {"@putnami/dev": "^1.0.0"},`, 1)
 	dir := stageManifest(t, manifest)
@@ -55,6 +57,7 @@ func TestGateStampsADependentWithCommands(t *testing.T) {
 // An npm package leaves its extension dependencies out of the stamp: a
 // hook-only framework package stays byte-identical and unstamped.
 func TestGateLeavesNPMDependenciesOutOfTheStamp(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "the-go-extension-stamps-a-dependent-at-rung-8")
 	dir := stageManifest(t, hookOnlyDependentManifest)
 	if err := gateAndStampManifestContract(dir, npmPackage); err != nil {
 		t.Fatal(err)
@@ -81,6 +84,7 @@ func TestGateLeavesNPMDependenciesOutOfTheStamp(t *testing.T) {
 // A dependency list that does not decode is gated, so the strict decode
 // refuses it instead of the archive shipping unstamped.
 func TestGateRefusesAMalformedDependencyList(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-refuses-what-the-protocol-refuses")
 	dir := stageManifest(t, `{"name": "@putnami/testext", "extensionDependencies": 3, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`)
 	if err := gateAndStampManifestContract(dir, putArchive); err == nil {
 		t.Fatal("a malformed dependency list must fail packaging")

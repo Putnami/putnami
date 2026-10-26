@@ -117,6 +117,7 @@ func assertOneZipRead(t *testing.T, server *recorded.Server, wantAuthorization s
 // every verdict, and asks with one GET. Every 404 is a response the production
 // registry sent.
 func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "go-module-probe-is-read-only")
 	cases := []struct {
 		name      string
@@ -229,6 +230,7 @@ func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 // staged zip, because it may predate the source; once package stages other
 // bytes, the same served version is a conflict.
 func TestGoModuleDryRunComparesTheStagedZip(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "identical-names-the-staged-zip")
 	ctx, zipBytes, _, stagedDigest := managedGoPublishTestContext(t)
 	ctx.Params = managedGoBootstrapParams(t)
@@ -267,6 +269,7 @@ func TestGoModuleDryRunComparesTheStagedZip(t *testing.T) {
 // A staged zip that cannot be read is no artifact to compare: the probe is
 // unverified with the read error, and the registry is asked nothing.
 func TestGoModuleDryRunReportsAnUnreadableStagedZip(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "unreadable-staged-zip-is-unverified")
 	for name, planned := range map[string]bool{"outside a release set": false, "under a plan": true} {
 		t.Run(name, func(t *testing.T) {
@@ -295,6 +298,7 @@ func TestGoModuleDryRunReportsAnUnreadableStagedZip(t *testing.T) {
 // A dry run with no network access must not pass in silence: a registry that
 // refuses the connection is an unverified verdict whose reason says so.
 func TestGoModuleDryRunReportsAnUnreachableRegistry(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-probes-pass-the-strict-reader")
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -323,6 +327,7 @@ func TestGoModuleDryRunReportsAnUnreachableRegistry(t *testing.T) {
 // unverified, and the reason carries neither the body's echo of the credential
 // nor an unbounded body.
 func TestGoRegistryAnswerOutsideTheProtocolIsUnverified(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-probes-pass-the-strict-reader")
 	server := recorded.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = fmt.Fprintf(w, "upstream said %s %s", r.Header.Get("Authorization"), strings.Repeat("x", 4096))
@@ -361,6 +366,7 @@ func writeGoChannelRecord(t *testing.T, workspace string) {
 // so it reaches the registry instead of failing on the module it cannot find. A
 // module staged by an earlier run at another version is not compared.
 func TestUnplannedGoDryRunProbesWithoutAStagedModule(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "go/go-project-toolchain", "dry-run-registry-probe", "unplanned-dry-run-probes-without-a-staged-module")
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "test-token")
 

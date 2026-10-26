@@ -54,6 +54,7 @@ func stageSourceManifest(t *testing.T, manifest string) string {
 // manifest is a statement about the document; this is the statement about the
 // npm PACKAGE, made through the very function a consumer's CLI calls.
 func TestCopyHookFiles_StagedOutputLoadsUnderTheCurrentLoader(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "a-staged-package-loads-under-the-claimed-contract")
 	projDir := stageSourceManifest(t, conformingCLIManifest)
 	outDir := t.TempDir()
@@ -103,6 +104,7 @@ func TestCopyHookFiles_RatchetsAStaleLowerClaim(t *testing.T) {
 // higher claim fails the package job instead of being quietly downgraded into a
 // stamp the loader would then believe.
 func TestCopyHookFiles_RejectsFutureContractClaim(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "a-contract-claim-newer-than-the-packager-is-rejected")
 	future := strings.Replace(conformingCLIManifest,
 		`"name": "@putnami/testext",`,
@@ -133,6 +135,7 @@ func TestCopyHookFiles_RejectsFutureContractClaim(t *testing.T) {
 // about what the CONTRACT governs, not about whether the file is usable, and
 // this is the framework-package path where hook-only manifests actually ship.
 func TestCopyHookFiles_RejectsUnloadableHookOnlyManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "an-unloadable-hook-only-manifest-fails-packaging")
 	for name, manifest := range map[string]string{
 		"hooks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "hooks": []}`,

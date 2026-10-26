@@ -818,7 +818,7 @@ func TestConformance_FullValidateManifest_ValidFixtures(t *testing.T) {
 
 			m, pDiags := ParseManifest(data)
 			if diag.HasErrors(pDiags) {
-				t.Skipf("parse error: %v", pDiags)
+				t.Fatalf("valid fixture %s does not parse: %v", path, pDiags)
 			}
 
 			vDiags := FullValidateManifest(m)

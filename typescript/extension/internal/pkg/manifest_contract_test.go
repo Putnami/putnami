@@ -46,6 +46,7 @@ const conformingToolOnlyManifest = `{
 // conforming CLI-surface manifest is validated strictly and the staged copy
 // carries cliContract = CurrentContract; the source manifest is untouched.
 func TestCopyHookFiles_StampsEarnedCLIContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	projDir := t.TempDir()
 	outDir := t.TempDir()
 	srcPath := filepath.Join(projDir, "putnami.extension.json")
@@ -94,6 +95,7 @@ func TestCopyHookFiles_StampsEarnedCLIContract(t *testing.T) {
 // same package-time contract stamp as commands, so older CLIs reject it rather
 // than silently ignoring agent-facing capabilities.
 func TestCopyHookFiles_StampsToolOnlyManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	projDir := t.TempDir()
 	outDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(conformingToolOnlyManifest), 0o644); err != nil {
@@ -194,6 +196,7 @@ func TestValidateStagedRuntimeExecutable(t *testing.T) {
 // manifest shadowing a reserved global flag fails the package job — the
 // hard reject moved from load time to package time.
 func TestCopyHookFiles_GateBlocksReservedShadow(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
 	projDir := t.TempDir()
 	outDir := t.TempDir()
 	os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(`{
@@ -259,6 +262,7 @@ func TestCopyHookFiles_HookOnlyManifestNotGated(t *testing.T) {
 // hook-only manifest: it is gated and fails the package job, rather than
 // publishing an unloadable manifest unstamped.
 func TestCopyHookFiles_GatesMalformedContractSurface(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
 	for _, m := range []string{`{"commands": []}`, `{"commandGroups": "nope"}`, `{"tools": []}`} {
 		projDir := t.TempDir()
 		outDir := t.TempDir()

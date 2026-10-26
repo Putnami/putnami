@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -116,17 +115,12 @@ func TestOutboxDescriptorRefusesEscapingPathsAndSymlinks(t *testing.T) {
 		t.Fatalf("ResolveOutboxPath(file root) error = %v, want a refusal", err)
 	}
 
-	if runtime.GOOS == "windows" {
-		t.Skip("creating a symbolic link needs a privilege a Windows test host lacks")
-	}
 	for link, target := range map[string]string{
 		"leaf.tgz":       filepath.Join(outside, "secret"),
 		"linked-dir":     outside,
 		"oci/app/blobs2": filepath.Join(root, "npm"),
 	} {
-		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(link))); err != nil {
-			t.Fatal(err)
-		}
+		mustSymlink(t, target, filepath.Join(root, filepath.FromSlash(link)))
 	}
 	for _, rel := range []string{"leaf.tgz", "linked-dir/secret", "linked-dir", "oci/app/blobs2/web.tgz"} {
 		if _, err := ResolveOutboxPath(root, rel); err == nil || !strings.Contains(err.Error(), "symbolic link") {
@@ -134,11 +128,19 @@ func TestOutboxDescriptorRefusesEscapingPathsAndSymlinks(t *testing.T) {
 		}
 	}
 	linkedRoot := filepath.Join(t.TempDir(), "outbox")
-	if err := os.Symlink(root, linkedRoot); err != nil {
-		t.Fatal(err)
-	}
+	mustSymlink(t, root, linkedRoot)
 	if _, err := ResolveOutboxPath(linkedRoot, "npm/web.tgz"); err == nil || !strings.Contains(err.Error(), "not a directory") {
 		t.Fatalf("ResolveOutboxPath(linked root) error = %v, want a refusal", err)
+	}
+}
+
+// mustSymlink creates the link or fails the test: the symbolic-link refusals
+// are part of the requirement, so a host that cannot create a link does not
+// get to skip them.
+func mustSymlink(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatalf("cannot create the symbolic link %s -> %s: %v; on Windows, enable Developer Mode or run the tests with administrator rights", link, target, err)
 	}
 }
 
