@@ -10,11 +10,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const testPreparedBootReference = "pcb_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 func TestPreparedBootSourcePinsOriginPathTokenAndExactIntegers(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "keeps-large-integers-exact")
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "pins-path-token-and-reference")
 	var requestPath, authorization, requestReference string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestPath = r.URL.RequestURI()
@@ -51,6 +55,7 @@ func TestPreparedBootSourcePinsOriginPathTokenAndExactIntegers(t *testing.T) {
 }
 
 func TestPreparedBootSourceDoesNotRedirectCredentials(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "does-not-follow-redirects")
 	var destinationCalls atomic.Int32
 	destination := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		destinationCalls.Add(1)
@@ -75,6 +80,7 @@ func TestPreparedBootSourceDoesNotRedirectCredentials(t *testing.T) {
 }
 
 func TestPreparedBootSourceBoundsAndHidesResponseFailures(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "oversized-response-fails-without-leak")
 	secret := "provider-secret-must-not-leak"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(append(bytes.Repeat([]byte("x"), maxPreparedBootBody), []byte(secret)...))
@@ -91,6 +97,7 @@ func TestPreparedBootSourceBoundsAndHidesResponseFailures(t *testing.T) {
 }
 
 func TestPreparedBootSourceRetriesOnlyOutageClassFailure(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "retries-an-outage-failure")
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if calls.Add(1) == 1 {
@@ -111,6 +118,8 @@ func TestPreparedBootSourceRetriesOnlyOutageClassFailure(t *testing.T) {
 }
 
 func TestPreparedBootDiscoveryIsExclusiveAndPinsMetadataAudience(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "discovery-pins-metadata-audience")
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "discovery-replaces-ordinary-sources")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv(PreparedBootBindingEnv, testPreparedBootReference)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.example.test/untrusted/path")
@@ -137,6 +146,7 @@ func TestPreparedBootDiscoveryIsExclusiveAndPinsMetadataAudience(t *testing.T) {
 }
 
 func TestPreparedBootSourceFailsClosedWhenFixedConfigurationIsMissing(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "prepared-boot", "fails-closed-on-incomplete-configuration")
 	for _, cfg := range []PreparedBootSourceConfig{
 		{Audience: "https://config.example.test", Reference: testPreparedBootReference, Token: "token", RetryBudget: -1},
 		{ServerURL: "https://config.example.test", Reference: testPreparedBootReference, Token: "token", RetryBudget: -1},
@@ -146,5 +156,25 @@ func TestPreparedBootSourceFailsClosedWhenFixedConfigurationIsMissing(t *testing
 		if tree, err := NewPreparedBootSource(cfg).Load(); tree != nil || err == nil {
 			t.Fatalf("cfg=%+v tree=%#v err=%v", cfg, tree, err)
 		}
+	}
+}
+
+func TestPreparedBootSourceSendsNothingWithoutToken(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "prepared-boot-never-sends-without-token")
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		calls.Add(1)
+	}))
+	defer server.Close()
+
+	source := NewPreparedBootSource(PreparedBootSourceConfig{
+		ServerURL: server.URL, Audience: "https://config.example.test", Reference: testPreparedBootReference,
+		Timeout: time.Second, RetryBudget: -1,
+	})
+	if tree, err := source.Load(); tree != nil || err == nil {
+		t.Fatalf("tree=%#v err=%v", tree, err)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("the server received %d requests without a token", calls.Load())
 	}
 }

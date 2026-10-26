@@ -1,0 +1,174 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cloud",
+  "features": [
+    {
+      "id": "cloud/typescript-runtime-destination",
+      "type": "feature",
+      "name": "Putnami Cloud runtime destination for TypeScript",
+      "outcome": "A TypeScript workload reads its config and secrets from Putnami Cloud and publishes events through the managed Event Server, authenticated with an operator token or Google workload identity",
+      "owner": "cloud",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "config-source-resolves-remote-config",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-404-retries-through-the-audience-origin",
+              "a-base-url-resolves-with-a-post-and-a-bearer",
+              "an-exact-url-resolves-with-a-get",
+              "config-version-pins-the-resolve",
+              "the-environment-name-is-sent-as-configured"
+            ]
+          }
+        },
+        {
+          "id": "event-server-destination-publishes-safely",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cancelled-credential-request-fails-closed-without-sending",
+              "a-publish-sends-the-canonical-request-with-an-audience-bearer",
+              "a-retry-resends-identical-bytes-with-one-credential",
+              "a-stale-generation-is-refused-before-any-token-or-network-call",
+              "an-incomplete-binding-is-rejected-before-any-credential-call",
+              "an-unavailable-metadata-identity-fails-closed-without-sending",
+              "credential-and-provider-failures-are-redacted",
+              "the-route-is-captured-at-construction"
+            ]
+          }
+        },
+        {
+          "id": "event-server-tokens-are-cached-and-checked",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stuck-provider-times-out-with-a-redacted-failure",
+              "a-stuck-source-never-starts-repeated-refreshes",
+              "an-oversized-metadata-response-is-rejected",
+              "concurrent-callers-share-one-refresh",
+              "invalid-tokens-are-rejected",
+              "one-token-is-cached-per-audience-until-near-expiry",
+              "the-metadata-request-names-the-exact-audience"
+            ]
+          }
+        },
+        {
+          "id": "register-activates-the-sources",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-base-url-enables-the-config-and-secrets-sources",
+              "an-exact-url-enables-only-the-config-source",
+              "blank-and-sentinel-urls-count-as-unset",
+              "no-url-enables-no-source",
+              "register-forwards-the-cache-reset-hooks",
+              "registration-adds-the-two-discoverers-in-priority-order"
+            ]
+          }
+        },
+        {
+          "id": "required-sources-retry-within-a-budget",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-required-config-source-retries-until-ready",
+              "a-required-secrets-source-retries-until-ready",
+              "a-terminal-config-status-fails-without-a-retry",
+              "a-terminal-secrets-status-fails-without-a-retry",
+              "a-zero-retry-budget-allows-one-attempt",
+              "the-timeout-comes-from-the-environment"
+            ]
+          }
+        },
+        {
+          "id": "required-sources-stop-startup",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-startup-load-logs-one-json-error-line",
+              "cloud-run-makes-the-config-source-required",
+              "production-makes-the-config-source-required",
+              "production-makes-the-secrets-source-required"
+            ]
+          }
+        },
+        {
+          "id": "secrets-source-resolves-remote-secrets",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-resolve-posts-the-bearer-and-schema-hash",
+              "an-unresolved-response-yields-no-secrets",
+              "later-loads-reuse-the-first-resolve"
+            ]
+          }
+        },
+        {
+          "id": "snapshot-fallback-boots-a-required-source",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-forbidden-response-never-falls-back",
+              "a-resolved-config-wins-over-the-snapshot",
+              "a-snapshot-that-cannot-load-warns-and-rethrows",
+              "an-unreachable-server-boots-on-the-snapshot",
+              "an-unresolved-response-never-falls-back",
+              "no-snapshot-means-the-failure-stands",
+              "the-config-tree-round-trips",
+              "the-snapshot-loads-once",
+              "the-snapshot-requests-carry-an-access-token"
+            ]
+          }
+        },
+        {
+          "id": "synchronous-fetch-serves-boot",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-unreachable-url-throws", "the-worker-is-reused-across-requests"]
+          }
+        },
+        {
+          "id": "token-sources-supply-the-bearer",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-metadata-fetch-yields-no-token",
+              "a-metadata-token-is-cached-within-its-lifetime",
+              "a-token-source-wins-over-a-static-token",
+              "an-operator-token-wins-over-workload-identity",
+              "cloud-run-selects-workload-identity",
+              "google-cloud-project-selects-workload-identity",
+              "no-token-sends-no-authorization-header",
+              "off-google-cloud-the-token-comes-from-the-environment",
+              "the-audience-variable-sets-the-id-token-audience",
+              "the-metadata-request-carries-the-audience-and-a-timeout"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

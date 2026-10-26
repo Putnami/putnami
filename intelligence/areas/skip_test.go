@@ -1,8 +1,17 @@
 package areas
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestSkipped(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "ignores-build-output")
+	spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "ignores-lockfiles")
+	spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "ignores-minified-bundles")
+	spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "ignores-vendored-dependencies")
+	spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "keeps-files-whose-names-only-resemble-excluded-ones")
 	for file, want := range map[string]bool{
 		"api/main.go":                             false,
 		"web/node_modules/x/a.js":                 true,

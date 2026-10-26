@@ -7,7 +7,8 @@
     "go"
   ],
   "extensions": [
-    "/go/extension"
+    "/go/extension",
+    "/tooling/sdd-extension"
   ],
   "dependencies": [
     "/go/framework/config"
@@ -23,6 +24,11 @@
   "options": {
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
   }
 }

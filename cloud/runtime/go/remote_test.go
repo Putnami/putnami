@@ -9,9 +9,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestRemoteConfigSource(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "config-source-resolves-config")
 	// Mock config server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/configs/resolve" {
@@ -93,6 +96,7 @@ func TestRemoteConfigSourceSendsConfigVersion(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("exact URL GET appends version and pinned query", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "pinned-version-in-exact-url-query")
 		gotVersionQ, gotPinnedQ = "", ""
 		source := NewRemoteConfigSource(RemoteSourceConfig{
 			URL:         ts.URL + "/api/configs/resolve?appName=a&environment=prod&secretsMode=reveal",
@@ -111,6 +115,7 @@ func TestRemoteConfigSourceSendsConfigVersion(t *testing.T) {
 	})
 
 	t.Run("POST body carries version and pinned", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "pinned-version-in-post-body")
 		gotBodyVersion, gotBodyPinned = "", false
 		source := NewRemoteConfigSource(RemoteSourceConfig{
 			ServerURL:   ts.URL,
@@ -129,6 +134,7 @@ func TestRemoteConfigSourceSendsConfigVersion(t *testing.T) {
 	})
 
 	t.Run("a bare version without Pinned is additive (no pinned sent)", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "bare-version-is-not-pinned")
 		gotBodyVersion, gotBodyPinned = "", false
 		source := NewRemoteConfigSource(RemoteSourceConfig{
 			ServerURL:   ts.URL,
@@ -153,6 +159,7 @@ func TestRemoteConfigSourceSendsConfigVersion(t *testing.T) {
 // CONFIG_VERSION leaves the source unpinned (version="", Pinned=false), even when
 // APP_VERSION is set. Secrets discovery is deliberately not touched here.
 func TestDiscoverRemoteSourceUsesConfigVersionOnly(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "config-version-env-pins-config")
 	t.Setenv("CONFIG_SERVER_URL", "https://config.putnami.test")
 	t.Setenv("APP_NAME", "a")
 	t.Setenv("APP_VERSION", "1.2.3")
@@ -169,6 +176,7 @@ func TestDiscoverRemoteSourceUsesConfigVersionOnly(t *testing.T) {
 }
 
 func TestRemoteConfigSourceExactURL(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "exact-url-is-a-get-with-its-query")
 	var gotMethod, gotPath, gotQuery string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
@@ -233,6 +241,7 @@ func TestRemoteConfigSourceExactURL(t *testing.T) {
 // and 403s genuinely different environments. No client-side normalization
 // exists — the client sends `production` verbatim.
 func TestRemoteConfigSourceServerCanonicalizesProductionAlias(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "environment-is-sent-as-given")
 	canonicalEnv := func(env string) string {
 		env = strings.ToLower(strings.TrimSpace(env))
 		if env == "production" {
@@ -299,6 +308,7 @@ func TestRemoteConfigSourceServerCanonicalizesProductionAlias(t *testing.T) {
 }
 
 func TestRemoteConfigSourceUnreachable(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-failure", "optional-source-returns-no-values-when-unreachable")
 	source := NewRemoteConfigSource(RemoteSourceConfig{
 		ServerURL:   "http://127.0.0.1:1", // unreachable port
 		AppName:     "test-app",
@@ -316,6 +326,7 @@ func TestRemoteConfigSourceUnreachable(t *testing.T) {
 }
 
 func TestRemoteConfigSourceUnreachableRequired(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-failure", "required-source-fails-when-unreachable")
 	source := NewRemoteConfigSource(RemoteSourceConfig{
 		URL:         "http://127.0.0.1:1/api/configs/resolve?appName=test-app&environment=prod&secretsMode=reveal",
 		AppName:     "test-app",
@@ -335,6 +346,7 @@ func TestRemoteConfigSourceUnreachableRequired(t *testing.T) {
 }
 
 func TestRemoteConfigSourceRetriesStaleRawURLThroughAudienceAfterNotFound(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "retries", "not-found-retries-through-audience")
 	var staleCalls, fallbackCalls int
 	stale := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		staleCalls++
@@ -380,6 +392,7 @@ func TestRemoteConfigSourceRetriesStaleRawURLThroughAudienceAfterNotFound(t *tes
 }
 
 func TestRemoteConfigSourceRetriesRequiredUntilReady(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "retries", "required-config-source-retries-outage")
 	calls := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
@@ -422,6 +435,7 @@ func TestRemoteConfigSourceRetriesRequiredUntilReady(t *testing.T) {
 }
 
 func TestRemoteConfigSourceNotResolved(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-failure", "unresolved-config-returns-no-values")
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
@@ -477,6 +491,7 @@ func TestRemoteConfigSourceEmptySchemaMatch(t *testing.T) {
 }
 
 func TestRemoteConfigSourceCaching(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "single-fetch", "config-source-fetches-once")
 	calls := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
@@ -504,6 +519,7 @@ func TestRemoteConfigSourceCaching(t *testing.T) {
 }
 
 func TestRemoteConfigSourceLogsServerWarnings(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "warnings", "schema-mismatch-is-logged")
 	var logs bytes.Buffer
 	oldLogger := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelWarn})))
@@ -544,6 +560,7 @@ func TestRemoteConfigSourceLogsServerWarnings(t *testing.T) {
 }
 
 func TestServerURLIsSecure(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "warnings", "url-security-classification")
 	cases := []struct {
 		url  string
 		want bool
@@ -567,6 +584,7 @@ func TestServerURLIsSecure(t *testing.T) {
 }
 
 func TestWarnIfInsecureServerURL(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "warnings", "insecure-url-warning-hides-the-url")
 	var buf bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))

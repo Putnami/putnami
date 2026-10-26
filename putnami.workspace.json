@@ -47,9 +47,6 @@
       },
       "featureCoverage": {
         "debt": [
-          "/cloud/runtime/go",
-          "/cloud/runtime/typescript",
-          "/intelligence/areas",
           "/protocols/doccov"
         ]
       }

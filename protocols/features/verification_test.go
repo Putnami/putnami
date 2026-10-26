@@ -214,6 +214,12 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("typescript", "templates", "typescript-library", ManifestFilename): true,
 		filepath.Join("typescript", "templates", "typescript-server", ManifestFilename):  true,
 		filepath.Join("typescript", "templates", "typescript-web", ManifestFilename):     true,
+
+		// The Cloud runtimes and the area detector name the acceptance checks
+		// their own tests observe in the verification block.
+		filepath.Join("cloud", "runtime", "go", ManifestFilename):         true,
+		filepath.Join("cloud", "runtime", "typescript", ManifestFilename): true,
+		filepath.Join("intelligence", "areas", ManifestFilename):          true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized

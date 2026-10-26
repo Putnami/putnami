@@ -8,12 +8,15 @@ import (
 	// Blank-import under test: its init() must register the config-server
 	// source discoverer with the framework loader.
 	_ "go.putnami.dev/cloud/runtime/activate"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestActivationRegistersConfigServerSource proves the blank-import wires the
 // remote config source into the framework loader: with CONFIG_SERVER_URL set,
 // DiscoverSources must include the "config-server" source.
 func TestActivationRegistersConfigServerSource(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-discovery", "activation-registers-config-server-source")
 	t.Setenv("CONFIG_SERVER_URL", "https://config.example.test/api/configs/resolve?appName=x&environment=prod&secretsMode=reveal")
 
 	if !hasSourceNamed(config.DiscoverSources(), "config-server") {
@@ -25,6 +28,7 @@ func TestActivationRegistersConfigServerSource(t *testing.T) {
 // CONFIG_SERVER_URL the discoverer must contribute nothing (a boxed nil source
 // would panic on Load), so local-only workloads are unaffected by the import.
 func TestActivationInertWithoutConfigServerURL(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-discovery", "activation-is-inert-without-server-url")
 	t.Setenv("CONFIG_SERVER_URL", "")
 
 	if hasSourceNamed(config.DiscoverSources(), "config-server") {

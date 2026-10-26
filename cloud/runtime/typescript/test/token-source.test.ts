@@ -11,6 +11,7 @@ import {
 import { setSyncFetchForTest, type SyncFetchRequest } from '../src/runtime/sync-fetch';
 import { resetDefaultLogger } from '@putnami/runtime';
 import { resetLoggerConfig } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 
 function jwtWithExp(exp: number): string {
   const header = Buffer.from('{"alg":"RS256","typ":"JWT"}').toString('base64url');
@@ -52,49 +53,73 @@ describe('GcpMetadataTokenSource', () => {
     resetDefaultLogger();
   });
 
-  it('fetches the token via in-process sync fetch', () => {
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
-      };
-    });
+  specTest(
+    'fetches the token via in-process sync fetch',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'the-metadata-request-carries-the-audience-and-a-timeout',
+    },
+    () => {
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
+        };
+      });
 
-    const src = new GcpMetadataTokenSource('https://control.putnami.test');
-    const tok = src.token();
+      const src = new GcpMetadataTokenSource('https://control.putnami.test');
+      const tok = src.token();
 
-    expect(tok).toBeDefined();
-    expect(captured?.url).toContain('metadata.google.internal');
-    expect(captured?.url).toContain('audience=https%3A%2F%2Fcontrol.putnami.test');
-    expect(captured?.timeoutMs).toBe(2000);
-  });
+      expect(tok).toBeDefined();
+      expect(captured?.url).toContain('metadata.google.internal');
+      expect(captured?.url).toContain('audience=https%3A%2F%2Fcontrol.putnami.test');
+      expect(captured?.timeoutMs).toBe(2000);
+    },
+  );
 
-  it('caches the token within TTL', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      return {
-        status: 200,
-        body: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
-      };
-    });
+  specTest(
+    'caches the token within TTL',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'a-metadata-token-is-cached-within-its-lifetime',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        return {
+          status: 200,
+          body: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
+        };
+      });
 
-    const src = new GcpMetadataTokenSource('https://control.putnami.test');
-    src.token();
-    src.token();
-    expect(calls).toBe(1);
-  });
+      const src = new GcpMetadataTokenSource('https://control.putnami.test');
+      src.token();
+      src.token();
+      expect(calls).toBe(1);
+    },
+  );
 
-  it('returns undefined when metadata fetch fails', () => {
-    setSyncFetchForTest(() => {
-      throw new Error('metadata unavailable');
-    });
+  specTest(
+    'returns undefined when metadata fetch fails',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'a-failed-metadata-fetch-yields-no-token',
+    },
+    () => {
+      setSyncFetchForTest(() => {
+        throw new Error('metadata unavailable');
+      });
 
-    const src = new GcpMetadataTokenSource('https://control.putnami.test');
-    expect(src.token()).toBeUndefined();
-  });
+      const src = new GcpMetadataTokenSource('https://control.putnami.test');
+      expect(src.token()).toBeUndefined();
+    },
+  );
 });
 
 describe('parseJWTExpiry', () => {
@@ -175,50 +200,90 @@ describe('discoverTokenSource', () => {
     resetDefaultLogger();
   });
 
-  it('prefers CONFIG_SERVER_TOKEN over GCP workload identity', () => {
-    // An operator override always wins.
-    process.env.CONFIG_SERVER_TOKEN = 'operator-override';
-    process.env.K_SERVICE = 'task-api'; // pretend Cloud Run
-    const src = discoverTokenSource('https://control.putnami.test');
-    expect(src).toBeInstanceOf(EnvVarTokenSource);
-  });
+  specTest(
+    'prefers CONFIG_SERVER_TOKEN over GCP workload identity',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'an-operator-token-wins-over-workload-identity',
+    },
+    () => {
+      // An operator override always wins.
+      process.env.CONFIG_SERVER_TOKEN = 'operator-override';
+      process.env.K_SERVICE = 'task-api'; // pretend Cloud Run
+      const src = discoverTokenSource('https://control.putnami.test');
+      expect(src).toBeInstanceOf(EnvVarTokenSource);
+    },
+  );
 
-  it('picks GcpMetadataTokenSource when K_SERVICE is set and CONFIG_SERVER_TOKEN is unset', () => {
-    process.env.K_SERVICE = 'task-api';
-    const src = discoverTokenSource('https://control.putnami.test');
-    expect(src).toBeInstanceOf(GcpMetadataTokenSource);
-  });
+  specTest(
+    'picks GcpMetadataTokenSource when K_SERVICE is set and CONFIG_SERVER_TOKEN is unset',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'cloud-run-selects-workload-identity',
+    },
+    () => {
+      process.env.K_SERVICE = 'task-api';
+      const src = discoverTokenSource('https://control.putnami.test');
+      expect(src).toBeInstanceOf(GcpMetadataTokenSource);
+    },
+  );
 
-  it('uses CONFIG_SERVER_AUDIENCE for GCP metadata identity when set', () => {
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
-      };
-    });
-    process.env.K_SERVICE = 'task-api';
-    process.env.CONFIG_SERVER_AUDIENCE = 'https://api.putnami.test';
-    const src = discoverTokenSource(
-      'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal',
-    );
-    expect(src).toBeInstanceOf(GcpMetadataTokenSource);
-    src.token();
-    expect(captured?.url).toContain('audience=https%3A%2F%2Fapi.putnami.test');
-  });
+  specTest(
+    'uses CONFIG_SERVER_AUDIENCE for GCP metadata identity when set',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'the-audience-variable-sets-the-id-token-audience',
+    },
+    () => {
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: jwtWithExp(Math.floor(Date.now() / 1000) + 3600),
+        };
+      });
+      process.env.K_SERVICE = 'task-api';
+      process.env.CONFIG_SERVER_AUDIENCE = 'https://api.putnami.test';
+      const src = discoverTokenSource(
+        'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal',
+      );
+      expect(src).toBeInstanceOf(GcpMetadataTokenSource);
+      src.token();
+      expect(captured?.url).toContain('audience=https%3A%2F%2Fapi.putnami.test');
+    },
+  );
 
-  it('picks GcpMetadataTokenSource when GOOGLE_CLOUD_PROJECT is set', () => {
-    process.env.GOOGLE_CLOUD_PROJECT = 'my-project';
-    const src = discoverTokenSource('https://control.putnami.test');
-    expect(src).toBeInstanceOf(GcpMetadataTokenSource);
-  });
+  specTest(
+    'picks GcpMetadataTokenSource when GOOGLE_CLOUD_PROJECT is set',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'google-cloud-project-selects-workload-identity',
+    },
+    () => {
+      process.env.GOOGLE_CLOUD_PROJECT = 'my-project';
+      const src = discoverTokenSource('https://control.putnami.test');
+      expect(src).toBeInstanceOf(GcpMetadataTokenSource);
+    },
+  );
 
-  it('falls back to EnvVarTokenSource off-GCP', () => {
-    // isolateDiscoveryEnv already cleared every signal.
-    const src = discoverTokenSource('https://control.putnami.test');
-    expect(src).toBeInstanceOf(EnvVarTokenSource);
-  });
+  specTest(
+    'falls back to EnvVarTokenSource off-GCP',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'off-google-cloud-the-token-comes-from-the-environment',
+    },
+    () => {
+      // isolateDiscoveryEnv already cleared every signal.
+      const src = discoverTokenSource('https://control.putnami.test');
+      expect(src).toBeInstanceOf(EnvVarTokenSource);
+    },
+  );
 
   // Precedence: PUTNAMI_CLOUD_TOKEN > CONFIG_SERVER_TOKEN > PUTNAMI_TOKEN.
   // Most specific name wins so workspace setup remains predictable when

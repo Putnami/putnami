@@ -1,0 +1,119 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "intelligence",
+  "features": [
+    {
+      "id": "intelligence/repository-areas",
+      "type": "feature",
+      "name": "Repository areas",
+      "outcome": "A repository splits into the areas an agent works in, from its own manifests and without Putnami configuration",
+      "owner": "intelligence",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "area-names",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "folds-long-paths-into-the-parent-area",
+              "ignores-paths-with-unusual-characters",
+              "names-colliding-areas-by-path"
+            ]
+          }
+        },
+        {
+          "id": "area-roles",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "finds-the-test-tree-of-a-file",
+              "marks-documentation-areas",
+              "marks-other-areas-as-code",
+              "marks-test-areas"
+            ]
+          }
+        },
+        {
+          "id": "file-assignment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "assigns-a-file-to-the-area-that-contains-it",
+              "assigns-unowned-files-to-the-root-area",
+              "returns-no-area-when-the-layout-has-no-root-area"
+            ]
+          }
+        },
+        {
+          "id": "ignored-files",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ignores-build-output",
+              "ignores-lockfiles",
+              "ignores-minified-bundles",
+              "ignores-test-data-workspaces",
+              "ignores-vendored-dependencies",
+              "ignores-vendored-workspace-manifests",
+              "keeps-files-whose-names-only-resemble-excluded-ones"
+            ]
+          }
+        },
+        {
+          "id": "inferred-areas",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "infers-areas-from-language-manifests",
+              "infers-areas-from-nested-language-manifests",
+              "infers-top-level-directories-when-no-manifest-owns-the-code",
+              "reports-inferred-areas-without-a-declaring-manifest"
+            ]
+          }
+        },
+        {
+          "id": "nested-workspaces",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "reads-workspaces-declared-in-top-level-directories"
+            ]
+          }
+        },
+        {
+          "id": "workspace-manifests",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "marks-declared-areas-as-manifest",
+              "reads-bazel-packages",
+              "reads-cargo-workspace",
+              "reads-go-work-uses",
+              "reads-lerna-default-packages",
+              "reads-maven-modules",
+              "reads-npm-workspaces",
+              "reads-nx-and-putnami-projects",
+              "reads-pnpm-workspace",
+              "reads-uv-workspace"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

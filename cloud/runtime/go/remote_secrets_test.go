@@ -8,11 +8,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestRemoteSecretsSource(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "secrets-source-resolves-secrets")
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/secrets/resolve" {
 			http.NotFound(w, r)
@@ -63,6 +67,8 @@ func TestRemoteSecretsSource(t *testing.T) {
 }
 
 func TestRemoteSecretsSource_SendsBearerToken(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "resolve-requests", "secrets-request-forwards-schema-hash")
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "secrets-source-sends-bearer-token")
 	var gotAuth, gotHash string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
@@ -103,6 +109,7 @@ func TestRemoteSecretsSource_SendsBearerToken(t *testing.T) {
 }
 
 func TestRemoteSecretsSource_NotResolved(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-failure", "unresolved-secrets-return-no-values")
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
@@ -127,6 +134,7 @@ func TestRemoteSecretsSource_NotResolved(t *testing.T) {
 }
 
 func TestRemoteSecretsSourceRetriesRequiredUntilReady(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "retries", "required-secrets-source-retries-outage")
 	calls := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
@@ -189,6 +197,7 @@ func isolateDiscoveryEnv(t *testing.T, metadataReachable bool) {
 }
 
 func TestDiscoverRemoteSource_ReadsToken(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "discovery-forwards-token-to-config-source")
 	// Both endpoints share one identity; the auto-discovery path must
 	// forward CONFIG_SERVER_TOKEN to RemoteConfigSource so config calls
 	// aren't silently unauthenticated when secrets calls are.
@@ -214,6 +223,7 @@ func TestDiscoverRemoteSource_ReadsToken(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_ReadsTimeoutAndRetryBudget(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "retries", "config-discovery-reads-timeout-and-retry-budget")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.putnami.test")
 	t.Setenv("CONFIG_SERVER_TOKEN", "test-token")
@@ -233,6 +243,7 @@ func TestDiscoverRemoteSource_ReadsTimeoutAndRetryBudget(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_DisablesRetriesWhenRetryBudgetIsZero(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "retries", "zero-retry-budget-turns-retries-off")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.putnami.test")
 	t.Setenv("CONFIG_SERVER_TOKEN", "test-token")
@@ -248,6 +259,7 @@ func TestDiscoverRemoteSource_DisablesRetriesWhenRetryBudgetIsZero(t *testing.T)
 }
 
 func TestDiscoverRemoteSecretsSource_ReadsTimeoutAndRetryBudget(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "retries", "secrets-discovery-reads-timeout-and-retry-budget")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.putnami.test")
 	t.Setenv("CONFIG_SERVER_TOKEN", "test-token")
@@ -267,6 +279,7 @@ func TestDiscoverRemoteSecretsSource_ReadsTimeoutAndRetryBudget(t *testing.T) {
 }
 
 func TestDiscoverRemoteSecretsSource_ReadsToken(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "discovery-forwards-token-to-secrets-source")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.putnami.test")
 	t.Setenv("CONFIG_SERVER_TOKEN", "test-token")
@@ -289,6 +302,7 @@ func TestDiscoverRemoteSecretsSource_ReadsToken(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_PrefersEnvVarOverGCP(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "env-token-wins-over-workload-identity")
 	// CONFIG_SERVER_TOKEN is the explicit operator override and must win even on GCP where the
 	// metadata server is reachable.
 	isolateDiscoveryEnv(t, true) // force probe positive too — env var must still win
@@ -306,6 +320,8 @@ func TestDiscoverRemoteSource_PrefersEnvVarOverGCP(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_PicksMetadataOnGCP(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "audience-defaults-to-server-url")
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "service-env-selects-workload-identity")
 	// On GCP without CONFIG_SERVER_TOKEN, workload identity kicks in via
 	// the metadata server. K_SERVICE is the canonical signal.
 	isolateDiscoveryEnv(t, false) // probe disabled — K_SERVICE alone must trigger GCP
@@ -326,6 +342,7 @@ func TestDiscoverRemoteSource_PicksMetadataOnGCP(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_UsesConfiguredAudienceOnGCP(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "configured-audience-is-used")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.example.test/api/configs/resolve?appName=shop%2Fserver&environment=prod&secretsMode=reveal")
 	t.Setenv("CONFIG_SERVER_AUDIENCE", "https://config.example.test")
@@ -361,6 +378,7 @@ func TestDiscoverRemoteSecretsSource_SkipsExactResolveURL(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_PicksMetadataViaProbeFallback(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "probe-selects-workload-identity")
 	// Bare GCE without K_SERVICE / GOOGLE_CLOUD_PROJECT: the TCP probe is
 	// the only signal and must still trigger workload identity.
 	isolateDiscoveryEnv(t, true) // env hints empty, probe forced positive
@@ -376,6 +394,7 @@ func TestDiscoverRemoteSource_PicksMetadataViaProbeFallback(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_FallsBackToEnvOffGCP(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "off-gcp-discovery-wires-environment-token-source")
 	// Off-GCP, no operator override: discovery still wires EnvVarTokenSource
 	// (which will error at request time) plus emits the startup warning.
 	isolateDiscoveryEnv(t, false)
@@ -391,6 +410,7 @@ func TestDiscoverRemoteSource_FallsBackToEnvOffGCP(t *testing.T) {
 }
 
 func TestDiscoverRemoteSource_EnvVarPrecedence(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "env-token-names-have-precedence")
 	// Precedence: PUTNAMI_CLOUD_TOKEN > CONFIG_SERVER_TOKEN > PUTNAMI_TOKEN.
 	// Most specific name wins so workspace setup remains predictable when
 	// operators set more than one (intentionally during migration, or
@@ -461,6 +481,7 @@ func (s staticTokenSource) Token(_ context.Context) (string, error) {
 }
 
 func TestRemoteConfigSource_TokenSource_Override(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "config-token-source-wins-over-static-token")
 	// CONFIG_SERVER_TOKEN must be ignored when TokenSource is set.
 	t.Setenv("CONFIG_SERVER_TOKEN", "from-env")
 
@@ -479,7 +500,7 @@ func TestRemoteConfigSource_TokenSource_Override(t *testing.T) {
 		ServerURL:   ts.URL,
 		AppName:     "test-app",
 		Environment: "production",
-		// Token field intentionally unset to prove TokenSource wins.
+		Token:       "from-static-field",
 		TokenSource: staticTokenSource{tok: "foo"},
 	})
 	if _, err := source.Load(); err != nil {
@@ -520,6 +541,7 @@ func TestRemoteConfigSource_TokenSource_Default(t *testing.T) {
 }
 
 func TestRemoteConfigSource_TokenSource_ErrorSkipsAuthHeader(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "failing-config-token-source-sends-no-authorization-header")
 	// A TokenSource error should not crash the source — it should log
 	// and send the request without Authorization, matching the unset
 	// token behavior.
@@ -548,7 +570,41 @@ func TestRemoteConfigSource_TokenSource_ErrorSkipsAuthHeader(t *testing.T) {
 	}
 }
 
+func TestRemoteSecretsSource_TokenSource_ErrorSkipsAuthHeader(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "failing-secrets-token-source-sends-no-authorization-header")
+	var gotAuth string
+	var requests atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"secrets":     map[string]any{},
+			"resolved":    true,
+			"schemaMatch": true,
+		})
+	}))
+	defer ts.Close()
+
+	source := NewRemoteSecretsSource(RemoteSecretsSourceConfig{
+		ServerURL:   ts.URL,
+		AppName:     "test-app",
+		Environment: "production",
+		TokenSource: staticTokenSource{err: errors.New("metadata unreachable")},
+	})
+	if _, err := source.Load(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("expected one secrets request, got %d", got)
+	}
+	if gotAuth != "" {
+		t.Errorf("expected no Authorization header on token error, got %q", gotAuth)
+	}
+}
+
 func TestRemoteSecretsSource_TokenSource_Override(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "secrets-token-source-wins-over-static-token")
 	var gotAuth string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
@@ -577,6 +633,7 @@ func TestRemoteSecretsSource_TokenSource_Override(t *testing.T) {
 }
 
 func TestRemoteConfigSource_SendsBearerToken(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "config-source-sends-bearer-token")
 	var gotAuth string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")

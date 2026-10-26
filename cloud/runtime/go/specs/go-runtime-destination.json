@@ -1,0 +1,64 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/go-runtime-destination",
+  "outcomes": [
+    "A Go workload on Putnami Cloud receives remote configuration and secrets through the go.putnami.dev/config loader once its main package imports the activate package",
+    "Each request carries the workload identity of the process, or no credential at all when the contract allows it",
+    "A required source stops startup on failure, while an optional source leaves local configuration in place"
+  ],
+  "nonGoals": [
+    "Serving or storing configuration, which the platform's configuration service owns",
+    "Reading a snapshot after a revoked or unresolved answer, because the workload no longer has the right to that configuration"
+  ],
+  "requirements": [
+    {
+      "id": "cancellation",
+      "text": "Every remote source stops its requests, its retry waits and its snapshot fallback when the load context ends, and returns an error that wraps the context error. A caller that waits on a load already in flight honors its own context. A canceled snapshot read logs no outage."
+    },
+    {
+      "id": "prepared-boot",
+      "text": "A prepared boot binding makes the prepared boot source the only remote source. The source posts the reference with the bearer token to one fixed path on the server origin, pins the workload identity audience, never follows a redirect, rejects an oversized response without echoing it, keeps 64-bit integers exact, retries an outage and fails when its configuration is incomplete."
+    },
+    {
+      "id": "requests-without-credentials",
+      "text": "A config or secrets request still goes out without an Authorization header when the token source fails, and off GCP discovery wires the environment token source without a configured token. The prepared boot source never sends a request without a token."
+    },
+    {
+      "id": "resolve-requests",
+      "text": "The config source resolves config at the config resolve path, and the secrets source resolves secrets at the secrets resolve path. An exact resolve URL is requested with GET and its query intact. The config version pins the request in the query or body, a bare version does not pin, the environment is sent as given, and the secrets request forwards the schema hash."
+    },
+    {
+      "id": "retries",
+      "text": "A required source retries a failed attempt such as a 503 answer and succeeds once the service is ready. On a 404 the config source retries once through the audience origin. Discovery reads the attempt timeout and the retry budget from the environment, and a retry budget of zero turns retries off."
+    },
+    {
+      "id": "single-fetch",
+      "text": "The config source fetches once and shares the result with every later load. A completed load is reused. Discovery returns the same remote source each time, so the retry budget is spent once. A load canceled in the middle of a fetch is not cached: the next load fetches again."
+    },
+    {
+      "id": "snapshot-fallback",
+      "text": "A required config source whose service is unreachable reads the encrypted snapshot named by its gs URI and decrypts it with the KMS key. A required source without a snapshot fails. A terminal failure such as a 403 never falls back to the snapshot, and an empty snapshot URI turns the fallback off."
+    },
+    {
+      "id": "source-discovery",
+      "text": "Importing the activate package registers the remote source discoverers. Discovery yields the config source at priority 50 and the secrets source at priority 55 when CONFIG_SERVER_URL is set, and only the config source when that URL is an exact resolve URL. Without CONFIG_SERVER_URL, discovery and the activate import yield no source."
+    },
+    {
+      "id": "source-failure",
+      "text": "An optional config source that cannot reach the service returns no values and no error, so local config applies. A required one returns an error instead. A response that the service did not resolve gives no values for config and for secrets."
+    },
+    {
+      "id": "token-sources",
+      "text": "A source sends its token as a bearer token. A token source wins over a static token. Discovery forwards the configured token to the config and secrets sources, takes the first set name of PUTNAMI_CLOUD_TOKEN, CONFIG_SERVER_TOKEN and PUTNAMI_TOKEN, and prefers it to workload identity. The environment token source trims the value and fails when the name is empty or the value is unset."
+    },
+    {
+      "id": "warnings",
+      "text": "A non-HTTPS server URL to a host other than loopback logs a warning that leaves the URL out, and an HTTPS or loopback URL logs nothing. A schema mismatch reported by the service is logged as a warning with the service's messages."
+    },
+    {
+      "id": "workload-identity",
+      "text": "On GCP, discovery gives the config source a metadata server token for an audience that defaults to CONFIG_SERVER_URL and that CONFIG_SERVER_AUDIENCE overrides. The environment variable K_SERVICE or a reachable metadata server marks GCP. The token source requires an audience, fails on an error status or an empty body, reads the expiry from the token and reuses the token until it expires."
+    }
+  ]
+}

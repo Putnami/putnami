@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { resetSyncFetchForTest, syncFetch } from '../src/runtime/sync-fetch';
 
 describe('syncFetch', () => {
@@ -12,27 +13,43 @@ describe('syncFetch', () => {
     resetSyncFetchForTest();
   });
 
-  it('reuses the synchronous fetch worker across small bootstrap requests', () => {
-    // Reset again inside the synchronous body: the hook above can run while an
-    // interleaved test from another file still has its mock installed. Nothing
-    // can install a mock between this line and the fetches below.
-    resetSyncFetchForTest();
-    const body = encodeURIComponent(JSON.stringify({ ok: true }));
-    const url = `data:application/json,${body}`;
+  specTest(
+    'reuses the synchronous fetch worker across small bootstrap requests',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'synchronous-fetch-serves-boot',
+      check: 'the-worker-is-reused-across-requests',
+    },
+    () => {
+      // Reset again inside the synchronous body: the hook above can run while an
+      // interleaved test from another file still has its mock installed. Nothing
+      // can install a mock between this line and the fetches below.
+      resetSyncFetchForTest();
+      const body = encodeURIComponent(JSON.stringify({ ok: true }));
+      const url = `data:application/json,${body}`;
 
-    expect(JSON.parse(syncFetch({ url }).body)).toEqual({ ok: true });
-    const rssAfterFirstFetch = process.memoryUsage().rss;
-
-    for (let i = 0; i < 5; i += 1) {
       expect(JSON.parse(syncFetch({ url }).body)).toEqual({ ok: true });
-    }
+      const rssAfterFirstFetch = process.memoryUsage().rss;
 
-    const rssGrowth = process.memoryUsage().rss - rssAfterFirstFetch;
-    expect(rssGrowth).toBeLessThan(32 * 1024 * 1024);
-  });
+      for (let i = 0; i < 5; i += 1) {
+        expect(JSON.parse(syncFetch({ url }).body)).toEqual({ ok: true });
+      }
 
-  it('fails boundedly for unsuccessful fetches', () => {
-    resetSyncFetchForTest();
-    expect(() => syncFetch({ url: 'http://127.0.0.1:1', timeoutMs: 50 })).toThrow();
-  });
+      const rssGrowth = process.memoryUsage().rss - rssAfterFirstFetch;
+      expect(rssGrowth).toBeLessThan(32 * 1024 * 1024);
+    },
+  );
+
+  specTest(
+    'fails boundedly for unsuccessful fetches',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'synchronous-fetch-serves-boot',
+      check: 'an-unreachable-url-throws',
+    },
+    () => {
+      resetSyncFetchForTest();
+      expect(() => syncFetch({ url: 'http://127.0.0.1:1', timeoutMs: 50 })).toThrow();
+    },
+  );
 });

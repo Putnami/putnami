@@ -1,0 +1,245 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cloud",
+  "features": [
+    {
+      "id": "cloud/go-runtime-destination",
+      "type": "feature",
+      "name": "Putnami Cloud runtime destination for Go",
+      "outcome": "A Go workload on Putnami Cloud loads its configuration and secrets from the platform's configuration service, signed with its workload identity, and falls back to local configuration or a snapshot only where the contract allows it",
+      "owner": "cloud",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "cancellation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "canceled-context-aborts-in-flight-request",
+              "canceled-context-ends-retry-wait",
+              "canceled-load-skips-snapshot-fallback",
+              "canceled-snapshot-read-logs-no-outage",
+              "load-context-returns-deadline-error",
+              "retry-wait-returns-on-cancellation",
+              "waiter-honors-its-own-cancellation"
+            ]
+          }
+        },
+        {
+          "id": "prepared-boot",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-pins-metadata-audience",
+              "discovery-replaces-ordinary-sources",
+              "does-not-follow-redirects",
+              "fails-closed-on-incomplete-configuration",
+              "keeps-large-integers-exact",
+              "oversized-response-fails-without-leak",
+              "pins-path-token-and-reference",
+              "retries-an-outage-failure"
+            ]
+          }
+        },
+        {
+          "id": "requests-without-credentials",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "failing-config-token-source-sends-no-authorization-header",
+              "failing-secrets-token-source-sends-no-authorization-header",
+              "off-gcp-discovery-wires-environment-token-source",
+              "prepared-boot-never-sends-without-token"
+            ]
+          }
+        },
+        {
+          "id": "resolve-requests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bare-version-is-not-pinned",
+              "config-source-resolves-config",
+              "config-version-env-pins-config",
+              "environment-is-sent-as-given",
+              "exact-url-is-a-get-with-its-query",
+              "pinned-version-in-exact-url-query",
+              "pinned-version-in-post-body",
+              "secrets-request-forwards-schema-hash",
+              "secrets-source-resolves-secrets"
+            ]
+          }
+        },
+        {
+          "id": "retries",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "config-discovery-reads-timeout-and-retry-budget",
+              "not-found-retries-through-audience",
+              "required-config-source-retries-outage",
+              "required-secrets-source-retries-outage",
+              "secrets-discovery-reads-timeout-and-retry-budget",
+              "zero-retry-budget-turns-retries-off"
+            ]
+          }
+        },
+        {
+          "id": "single-fetch",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "canceled-load-is-fetched-again",
+              "completed-load-is-reused",
+              "config-source-fetches-once",
+              "discovery-shares-one-source-and-retry-budget"
+            ]
+          }
+        },
+        {
+          "id": "snapshot-fallback",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "empty-snapshot-uri-turns-fallback-off",
+              "gs-uris-parse-into-bucket-and-object",
+              "kms-key-is-required",
+              "required-source-without-snapshot-fails",
+              "snapshot-is-decrypted-with-kms",
+              "terminal-failure-skips-snapshot-read",
+              "terminal-forbidden-does-not-fall-back",
+              "unreachable-required-source-uses-snapshot"
+            ]
+          }
+        },
+        {
+          "id": "source-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "activation-is-inert-without-server-url",
+              "activation-registers-config-server-source",
+              "discovers-config-and-secrets-sources",
+              "exact-resolve-url-skips-secrets-source",
+              "no-source-without-server-url"
+            ]
+          }
+        },
+        {
+          "id": "source-failure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "optional-source-returns-no-values-when-unreachable",
+              "required-source-fails-when-unreachable",
+              "unresolved-config-returns-no-values",
+              "unresolved-secrets-return-no-values"
+            ]
+          }
+        },
+        {
+          "id": "token-sources",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "config-source-sends-bearer-token",
+              "config-token-source-wins-over-static-token",
+              "discovery-forwards-token-to-config-source",
+              "discovery-forwards-token-to-secrets-source",
+              "env-token-names-have-precedence",
+              "env-token-source-errors-when-name-empty",
+              "env-token-source-errors-when-unset",
+              "env-token-source-returns-value",
+              "env-token-source-trims-whitespace",
+              "env-token-wins-over-workload-identity",
+              "secrets-source-sends-bearer-token",
+              "secrets-token-source-wins-over-static-token"
+            ]
+          }
+        },
+        {
+          "id": "warnings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "insecure-url-warning-hides-the-url",
+              "schema-mismatch-is-logged",
+              "url-security-classification"
+            ]
+          }
+        },
+        {
+          "id": "workload-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "audience-defaults-to-server-url",
+              "configured-audience-is-used",
+              "jwt-expiry-is-read-from-exp",
+              "jwt-without-exp-has-zero-expiry",
+              "malformed-jwt-has-zero-expiry",
+              "metadata-empty-body-fails",
+              "metadata-error-status-fails",
+              "metadata-expiry-comes-from-token",
+              "metadata-token-is-cached-until-expiry",
+              "metadata-token-refetches-after-expiry",
+              "metadata-token-requests-audience-and-flavor",
+              "metadata-token-requires-audience",
+              "probe-selects-workload-identity",
+              "service-env-selects-workload-identity"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

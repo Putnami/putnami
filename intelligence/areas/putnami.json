@@ -3,8 +3,15 @@
   "name": "go.putnami.dev/intelligence/areas",
   "description": "Area detector: splits a repository into the parts an agent works in, from its workspace manifests.",
   "tags": ["go"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "disable": {
     "jobs": ["serve"]
+  },
+  "options": {
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
   }
 }

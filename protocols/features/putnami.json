@@ -11,6 +11,9 @@
   "options": {
     "publish": {
       "archives": false
+    },
+    "test": {
+      "filePatterns": ["fixtures/**", "git:**/putnami.features.json"]
     }
   },
   "featureAuthority": {

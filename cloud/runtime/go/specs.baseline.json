@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cloud/go-runtime-destination#cancellation",
+    "cloud/go-runtime-destination#prepared-boot",
+    "cloud/go-runtime-destination#requests-without-credentials",
+    "cloud/go-runtime-destination#resolve-requests",
+    "cloud/go-runtime-destination#retries",
+    "cloud/go-runtime-destination#single-fetch",
+    "cloud/go-runtime-destination#snapshot-fallback",
+    "cloud/go-runtime-destination#source-discovery",
+    "cloud/go-runtime-destination#source-failure",
+    "cloud/go-runtime-destination#token-sources",
+    "cloud/go-runtime-destination#warnings",
+    "cloud/go-runtime-destination#workload-identity"
+  ]
+}
