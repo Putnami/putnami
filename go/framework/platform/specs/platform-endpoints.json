@@ -16,10 +16,6 @@
   ],
   "requirements": [
     {
-      "id": "endpoint-set",
-      "text": "The plugin mounts liveness, health, readiness, and version paths under the configured prefix, and mounts profiling handlers only when the workload enables them explicitly."
-    },
-    {
       "id": "self-mounting",
       "text": "A platform plugin added to an application mounts its endpoints on the application's single server when the application configures, in any plugin order, and mounts them once however often the application configures. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin mounted through RegisterOn registers nothing more."
     },

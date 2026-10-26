@@ -43,23 +43,6 @@
           }
         },
         {
-          "id": "endpoint-set",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "core-endpoints-mount-at-the-root",
-              "the-configured-prefix-applies-to-the-core-endpoints",
-              "profiling-handlers-are-off-by-default",
-              "profiling-handlers-mount-when-the-workload-enables-them",
-              "the-configured-prefix-applies-to-the-profiling-handlers"
-            ]
-          }
-        },
-        {
           "id": "error-redaction",
           "stage": "coded",
           "evidenceKinds": [

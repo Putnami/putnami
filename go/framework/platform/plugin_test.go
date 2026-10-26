@@ -1312,7 +1312,7 @@ func TestConformance_ReadyzEnvelopeMatchesProtocol(t *testing.T) {
 // --- RegisterOn / routing (via http.ServerPlugin.TestServer) ---
 
 func TestRegisterOn_MountsCoreEndpointsAtRoot(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "core-endpoints-mount-at-the-root")
+	spectest.Proves(t, "platform/operational-endpoints", "the-endpoint-set-is-canonical", "core-endpoints-mount-at-the-root")
 	p := NewPlugin(Config{})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1332,7 +1332,7 @@ func TestRegisterOn_MountsCoreEndpointsAtRoot(t *testing.T) {
 }
 
 func TestRegisterOn_AppliesPrefix(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "the-configured-prefix-applies-to-the-core-endpoints")
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "the-configured-prefix-applies-to-the-core-endpoints")
 	p := NewPlugin(Config{Prefix: "/_"})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1353,7 +1353,7 @@ func TestRegisterOn_AppliesPrefix(t *testing.T) {
 // --- pprof ---
 
 func TestPprof_DisabledByDefault(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "profiling-handlers-are-off-by-default")
+	spectest.Proves(t, "platform/operational-endpoints", "pprof-is-opt-in", "profiling-handlers-are-off-by-default")
 	p := NewPlugin(Config{})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1368,7 +1368,7 @@ func TestPprof_DisabledByDefault(t *testing.T) {
 }
 
 func TestPprof_EnabledMountsIndexAndProfile(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "profiling-handlers-mount-when-the-workload-enables-them")
+	spectest.Proves(t, "platform/operational-endpoints", "pprof-is-opt-in", "profiling-handlers-mount-when-the-workload-enables-them")
 	p := NewPlugin(Config{EnablePprof: true})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1396,7 +1396,7 @@ func TestPprof_EnabledMountsIndexAndProfile(t *testing.T) {
 }
 
 func TestPprof_AppliesPrefix(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "the-configured-prefix-applies-to-the-profiling-handlers")
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "the-configured-prefix-applies-to-the-profiling-handlers")
 	p := NewPlugin(Config{Prefix: "/_", EnablePprof: true})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)

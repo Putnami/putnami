@@ -20,11 +20,11 @@
     },
     {
       "id": "the-endpoint-set-is-canonical",
-      "text": "The canonical paths are /livez, /healthz, /readyz and /version, served with GET. /healthz and /readyz aggregate probes and report unavailable until the workload starts; /livez and /version do neither. /debug/pprof/ is the one opt-in endpoint, and an unknown endpoint kind resolves to nothing."
+      "text": "The canonical paths are /livez, /healthz, /readyz and /version, served with GET. /healthz and /readyz aggregate probes and report unavailable until the workload starts; /livez and /version do neither. /debug/pprof/ is the one opt-in endpoint, and an unknown endpoint kind resolves to nothing. The Go runtime serves the four paths."
     },
     {
       "id": "pprof-is-opt-in",
-      "text": "The contract declares /debug/pprof/ opt-in only, so a runtime leaves it off unless the workload enables it. Its sub-paths are the index, /cmdline, /profile, /symbol, /trace and /{name}."
+      "text": "The contract declares /debug/pprof/ opt-in only, so a runtime leaves it off unless the workload enables it. Its sub-paths are the index, /cmdline, /profile, /symbol, /trace and /{name}. The Go runtime answers 404 there by default and serves the index and the named profiles once the workload enables profiling."
     },
     {
       "id": "the-envelope-states-one-status",
@@ -40,7 +40,7 @@
     },
     {
       "id": "prefixes-normalize-to-one-form",
-      "text": "A mount prefix drops ASCII whitespace and slashes at both ends and gains one leading slash, so an empty, / or // prefix becomes empty and /admin/ becomes /admin, while an interior doubled slash is kept. Joining a prefix and an endpoint path yields one canonical path, and the Go runtime serves its endpoints only under it."
+      "text": "A mount prefix drops ASCII whitespace and slashes at both ends and gains one leading slash, so an empty, / or // prefix becomes empty and /admin/ becomes /admin, while an interior doubled slash is kept. Joining a prefix and an endpoint path yields one canonical path, and the Go runtime serves its endpoints, profiling included, only under it."
     },
     {
       "id": "the-error-codes-are-a-closed-set",

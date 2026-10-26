@@ -179,7 +179,9 @@ commitment, not a maturity stage.
 The module owns the feature of its contract, `platform/operational-endpoints`,
 specified in [`specs/operational-endpoints.json`](specs/operational-endpoints.json).
 The tests here prove its requirements, and so does the Go platform plugin
-(`go/framework/platform`), whose served envelopes, status codes, startup gating
-and prefix mounting are checked against this package. The plugin keeps the
-feature of what it delivers, `go/platform-endpoints`. The design intent lives in
+(`go/framework/platform`), whose mounted paths, profiling handlers, prefix,
+served envelopes, status codes and startup gating are checked against this
+package. The endpoint set moved here from the plugin's own feature,
+`go/platform-endpoints`, which keeps self-mounting, the lifecycle and probe
+discovery. The design intent lives in
 [`doc/adr/0001-no-metrics-scrape-endpoint.md`](doc/adr/0001-no-metrics-scrape-endpoint.md).

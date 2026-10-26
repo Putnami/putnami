@@ -35,7 +35,8 @@
             "checks": [
               "the-canonical-paths-are-fixed",
               "each-endpoint-kind-carries-its-flags",
-              "a-runtime-gates-the-aggregates-and-not-liveness"
+              "a-runtime-gates-the-aggregates-and-not-liveness",
+              "core-endpoints-mount-at-the-root"
             ]
           }
         },
@@ -48,7 +49,9 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-contract-declares-pprof-opt-in"
+              "the-contract-declares-pprof-opt-in",
+              "profiling-handlers-are-off-by-default",
+              "profiling-handlers-mount-when-the-workload-enables-them"
             ]
           }
         },
@@ -110,7 +113,9 @@
             "checks": [
               "a-prefix-normalizes",
               "a-prefix-joins-an-endpoint",
-              "a-runtime-mounts-under-the-prefix"
+              "a-runtime-mounts-under-the-prefix",
+              "the-configured-prefix-applies-to-the-core-endpoints",
+              "the-configured-prefix-applies-to-the-profiling-handlers"
             ]
           }
         },

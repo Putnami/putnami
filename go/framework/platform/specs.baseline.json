@@ -4,7 +4,6 @@
   "executableRequirements": [
     "go/platform-endpoints#bounded-probes",
     "go/platform-endpoints#deferred-discovery",
-    "go/platform-endpoints#endpoint-set",
     "go/platform-endpoints#error-redaction",
     "go/platform-endpoints#lifecycle-state",
     "go/platform-endpoints#liveness-is-trivial",
