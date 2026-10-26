@@ -176,8 +176,7 @@
         {
           "id": "generate",
           "task": "build-generate",
-          "dependsOn": ["^generate", "config-merge"],
-          "with": { "mode": { "value": "test" } }
+          "dependsOn": ["^generate", "config-merge"]
         },
         {
           "id": "describe",
@@ -932,6 +931,8 @@
         "readonly": { "from": "params" },
         "installsuffix": { "from": "params" },
         "p": { "from": "params" },
+        "describe-entrypoint": { "from": "params" },
+        "entrypoint": { "from": "params" },
         "extensionVersion": { "from": "runtime" }
       },
       "outputs": {
@@ -1122,7 +1123,7 @@
       }
     },
     "build-infra": {
-      "description": "Aggregate the workload's deployability requirements into <project>/.gen/requirements.json: every project in the workload's dependency closure contributes its committed infra/requirements.json, the workload's infra/overrides.json suppresses what it does not want, and its infra/runtime.json, or the framework runtime defaults, supplies the runtime block. Without an authored infra/runtime.json it also writes those defaults to <project>/.gen/infra/runtime.json for operators to read; a run with one removes that file. A cache hit with one restores nothing at that path and removes nothing, so a defaults file an earlier build left there stays until build-infra runs again; the runtime block of .gen/requirements.json is the value that applies. Nothing reads the file back. Extension-owned since an earlier migration — the CLI used to gate and write this artifact itself. Libraries are skipped: they are consumed, never deployed. Cached, and the key holds everything a run reads: the closure input folds every closure project's committed infra/requirements.json with that project's path, seed included, so a requirements-only change in a dependency, or a project that joins or leaves the closure, moves the key; the intent input folds the workload's infra/runtime.json and infra/overrides.json; the project metadata digest carries the project type the library skip reads; the extension implementation digest carries the runtime defaults and the merge code; and the upstream generate, describe and compile keys cover the sources the committed requirements are generated from. No param or environment input reaches the key, so no commit, ref or checkout path does. Ownership decision: build-generate cedes .gen/requirements.json and .gen/infra/runtime.json because this task writes them after generate's snapshot, and this task declares both. The manifest is REQUIRED, and only a run that writes it reports OK: a library, a workload that declares nothing (its run removes an earlier manifest) and a run whose write or removal failed report SKIP, and a skip with a required output caches nothing, so a cache hit never restores a manifest the current inputs do not produce. The runtime defaults file is optionalEmpty, because a workload that authors its runtime has none. Findings are warnings and never fail the build; a cache hit does not replay them.",
+      "description": "Aggregate the workload's deployability requirements into <project>/.gen/requirements.json: every project in the workload's dependency closure contributes its committed infra/requirements.json, the workload's infra/overrides.json suppresses what it does not want, and its infra/runtime.json, or the framework runtime defaults, supplies the runtime block. Without an authored infra/runtime.json it also writes those defaults to <project>/.gen/infra/runtime.json for operators to read; a run with one removes that file. A cache hit with one restores nothing at that path and removes nothing, so a defaults file an earlier build left there stays until build-infra runs again; the runtime block of .gen/requirements.json is the value that applies. Nothing reads the file back. Extension-owned since an earlier migration — the CLI used to gate and write this artifact itself. Libraries are skipped: they are consumed, never deployed. Cached, and the key holds everything a run reads: the closure input folds every closure project's committed infra/requirements.json with that project's path, seed included, so a requirements-only change in a dependency, or a project that joins or leaves the closure, moves the key; the intent input folds the workload's infra/runtime.json and infra/overrides.json; the project metadata digest carries the project type the library skip reads; the extension implementation digest carries the runtime defaults and the merge code; and the upstream generate, describe and compile keys cover the sources the committed requirements are generated from. No param or environment input reaches the key, so no commit, ref or checkout path does. Ownership decision: build-generate cedes .gen/requirements.json and .gen/infra/runtime.json because this task writes them after generate's snapshot, and this task declares both. It declares the project's gen write resource, so the planner orders it against every other task of the run that reads or writes the project's .gen, a test step included. The manifest is REQUIRED, and only a run that writes it reports OK: a library, a workload that declares nothing (its run removes an earlier manifest) and a run whose write or removal failed report SKIP, and a skip with a required output caches nothing, so a cache hit never restores a manifest the current inputs do not produce. The runtime defaults file is optionalEmpty, because a workload that authors its runtime has none. Findings are warnings and never fail the build; a cache hit does not replay them.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build-infra"],
@@ -1138,6 +1139,7 @@
           "description": "Aggregation outcome (emitted, cleared, skipped), the project-relative manifest path, and the number of contributing projects"
         }
       },
+      "writes": ["gen"],
       "cache": {
         "enabled": true,
         "deterministic": true
@@ -1161,7 +1163,7 @@
       }
     },
     "package-deployment": {
-      "description": "Write the workload's deployment declaration to <project>/.gen/deployment.json: the aggregate build-infra resolves from the same committed files (every closure project's infra/requirements.json, the workload's infra/overrides.json, and its infra/runtime.json or the framework runtime defaults), in the canonical bytes of infra.MarshalDeployment. It is the payload of a release-set member of kind deployment, so its key is that member's selection fingerprint. Scheduled only when the deployment channel is enabled (params.deployment), so no other package plan changes. Cached like build-infra: the closure input folds every closure project's committed infra/requirements.json into the key, so a requirements-only change in a dependency moves it, and the upstream generate and describe keys cover the sources those files are generated from. The output is REQUIRED: a library (skipped) and an aggregate with an error finding (withheld, its findings reported as warnings) write no declaration and remove an earlier one, so such a run caches nothing and a cache hit never restores a declaration the current inputs do not produce. build-generate cedes the path because this task writes it after generate's snapshot. It never writes or removes the runtime defaults sidecar build-infra keeps.",
+      "description": "Write the workload's deployment declaration to <project>/.gen/deployment.json: the aggregate build-infra resolves from the same committed files (every closure project's infra/requirements.json, the workload's infra/overrides.json, and its infra/runtime.json or the framework runtime defaults), in the canonical bytes of infra.MarshalDeployment. It is the payload of a release-set member of kind deployment, so its key is that member's selection fingerprint. Scheduled only when the deployment channel is enabled (params.deployment), so no other package plan changes. It declares the project's gen write resource, so the planner orders it against every other task of the run that reads or writes the project's .gen. Cached like build-infra: the closure input folds every closure project's committed infra/requirements.json into the key, so a requirements-only change in a dependency moves it, and the upstream generate and describe keys cover the sources those files are generated from. The output is REQUIRED: a library (skipped) and an aggregate with an error finding (withheld, its findings reported as warnings) write no declaration and remove an earlier one, so such a run caches nothing and a cache hit never restores a declaration the current inputs do not produce. build-generate cedes the path because this task writes it after generate's snapshot. It never writes or removes the runtime defaults sidecar build-infra keeps.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["package-deployment"],
@@ -1177,6 +1179,7 @@
           "description": "Declaration outcome (emitted, withheld, skipped), the project-relative declaration path, and the number of contributing projects"
         }
       },
+      "writes": ["gen"],
       "cache": {
         "enabled": true,
         "deterministic": true

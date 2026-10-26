@@ -1372,3 +1372,50 @@ func TestTaskOutputLockInheritedReaderKeyCountsAsHeld(t *testing.T) {
 		t.Fatalf("canceled writer returned %v", got.err)
 	}
 }
+
+// TestTaskOutputLockFollowerCaptureHoldsItsKeysShared pins the keys a follower
+// of a plan-level shared node holds until its capture: every key an execution
+// of its task holds except the command-output key, shared. It settles while its
+// session's reader holds the project key, which an execution of the same task
+// drains first, and it keeps another session's writer out until it releases.
+func TestTaskOutputLockFollowerCaptureHoldsItsKeysShared(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	follower := genWriter("test~generate")
+	reader := genReader("build~compile")
+	session := newTestOutputLocks(t, root, "session", "", noWaitLine(t))
+	session.onOwnSessionWait = func(task string) { t.Errorf("%s waited for its session's reader", task) }
+	project := keyNamed(t, session.keysFor([]*ScheduledJob{follower}, nil, true), "project:proj")
+
+	readHold, err := session.acquire(t.Context(), []*ScheduledJob{reader}, nil, true)
+	if err != nil {
+		t.Fatalf("reader acquire: %v", err)
+	}
+	capture, err := session.acquireCapture(t.Context(), follower)
+	if err != nil {
+		t.Fatalf("follower capture: %v", err)
+	}
+	var names []string
+	for _, key := range capture.keys {
+		names = append(names, key.name)
+		if key.exclusive || key.preparation {
+			t.Errorf("follower key %s is exclusive %v, preparation %v; want shared", key.name, key.exclusive, key.preparation)
+		}
+	}
+	if !slices.Equal(names, []string{project.name}) {
+		t.Fatalf("follower keys = %v, want only %s", names, project.name)
+	}
+	exclusive, tasks, ok := heldEntry(session, project)
+	if !ok || exclusive || !slices.Equal(tasks, []string{reader.Key(), follower.Key()}) {
+		t.Fatalf("session entry = exclusive %v, tasks %v, want the reader's shared hold joined by the follower", exclusive, tasks)
+	}
+
+	readHold.release()
+	if !probeShared(t, session, project) || probeFree(t, session, project) {
+		t.Fatal("while the follower captures, another session must read the key and its writer must wait")
+	}
+	capture.release()
+	if !probeFree(t, session, project) {
+		t.Fatal("the key is still held after every release")
+	}
+}

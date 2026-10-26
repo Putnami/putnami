@@ -58,8 +58,9 @@ type Generation struct {
 	// GenDir is <ProjectRoot>/.gen, guaranteed to exist before visitors run.
 	GenDir string
 
-	// Mode is "build", "serve", or "test" — the lifecycle phase that triggered
-	// generation. Visitors can use it to skip expensive work in serve mode.
+	// Mode is the lifecycle phase that triggered generation. The Go pipelines
+	// pass "build", under `test` too, or "serve". Visitors can use it to skip
+	// expensive work in serve mode.
 	Mode string
 
 	// Project carries orchestrator-supplied project metadata.

@@ -11,12 +11,13 @@ import (
 //
 // The shape is deliberately the one runPreBuildHook already uses: the first
 // member to reach the point of executing takes the slot and becomes the LEADER;
-// every later member blocks on the leader's result and adopts it. Nothing about
-// the plan decides who leads — whichever member the DAG makes ready first does,
-// which is what keeps the mechanism correct when a member is skipped, canceled
-// or served from its own cache entry. If the leader is skipped by a failed
-// dependency it never takes the slot at all, so the other command's node
-// executes exactly as it would have alone.
+// every later member blocks on the leader's result and adopts it. The plan
+// runs a group's first member first and the others after it (plan_shared.go),
+// but the slot does not rely on that order: whichever member reaches it first
+// leads, which is what keeps the mechanism correct when a member is skipped,
+// canceled or served from its own cache entry. If the leader is skipped by a
+// failed dependency it never takes the slot at all, so the other command's
+// node executes exactly as it would have alone.
 //
 // What a follower is, precisely: a task whose own cache lookup MISSED and whose
 // work another node in this same run is doing or has done. That is the same
@@ -26,6 +27,13 @@ import (
 // hash for its dependents' keys, and emits its own session row. The steady
 // (warm) state of the workspace is therefore bit-identical to the state before
 // this slice; only a COLD run loses the duplicate subprocess.
+//
+// A follower that adopts writes nothing to the tree: it captures what its
+// leader wrote. It holds its task's output keys shared until its capture
+// (lockFollowerOutputs), and it skips the version refresh and the preBuild
+// hook, which its leader ran in the same project. The plan makes every reader
+// of the leader's write wait for the follower, so the tree it captures is the
+// tree its leader left.
 //
 // Three properties are load-bearing and pinned by tests:
 //

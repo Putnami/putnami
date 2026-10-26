@@ -96,10 +96,8 @@ package scheduler
 // only wait the locks add to the session's own schedule, and the only way a
 // key changes mode within a session. The planner orders a resource's writer
 // before the readers that derive from it, so the drain is met by a writer the
-// planner lets overlap the session's readers, such as a build's infra step,
-// which follows the build's readers but runs beside the session's test step,
-// and by a preparation that writes the project tree, which only the run
-// decides.
+// planner does not order against the session's readers, and by a preparation
+// that writes the project tree, which only the run decides.
 //
 // Across sessions a shared flock coexists with other shared ones and an
 // exclusive flock with none: the readers of one resource in several sessions
@@ -113,7 +111,12 @@ package scheduler
 // preBuild hook, the subprocess and its retries, the capture into the cache
 // and the drift judgement (executeJobGroup). The reader keys span the same
 // stretch, since the subprocess reads the resource and the capture stores
-// what it read. A finalizer takes no lock: it reclaims invocation-scoped
+// what it read. A follower of a plan-level shared node (scheduler_shared.go)
+// executes nothing and writes nothing: it captures the outputs its leader
+// wrote. It holds the project and workspace keys an execution of its task
+// holds, all shared, and no command-output key (acquireCapture), so its
+// session's readers never delay it, and another session's writer waits for
+// its capture. A finalizer takes no lock: it reclaims invocation-scoped
 // resources on the cleanup path, and a cleanup never waits for another
 // session.
 //
@@ -611,7 +614,34 @@ func (m *taskOutputLocks) acquire(
 	if m == nil || len(jobs) == 0 {
 		return nil, nil
 	}
-	hold := &outputLockHold{m: m, task: jobs[0].Key(), keys: m.keysFor(jobs, preparing, reading)}
+	return m.acquireKeys(ctx, jobs[0].Key(), m.keysFor(jobs, preparing, reading))
+}
+
+// acquireCapture takes the keys a follower of a plan-level shared node holds
+// until its capture: the keys an execution of its task holds, except the
+// command-output key, all shared. It writes nothing, so it needs no exclusive
+// key and no preparation key, and it never drains its session's readers; the
+// shared hold keeps another session's writer out of the outputs it captures.
+// A command-output directory resolves per command and a follower never
+// declares one (planner.DeclaresCommandOutput).
+func (m *taskOutputLocks) acquireCapture(ctx context.Context, job *ScheduledJob) (*outputLockHold, error) {
+	if m == nil || job == nil {
+		return nil, nil
+	}
+	var keys []outputLockKey
+	for _, key := range m.keysFor([]*ScheduledJob{job}, nil, true) {
+		if strings.HasPrefix(key.name, "command-output:") {
+			continue
+		}
+		key.exclusive = false
+		keys = append(keys, key)
+	}
+	return m.acquireKeys(ctx, job.Key(), keys)
+}
+
+// acquireKeys takes keys, given in the global lock order, for task.
+func (m *taskOutputLocks) acquireKeys(ctx context.Context, task string, keys []outputLockKey) (*outputLockHold, error) {
+	hold := &outputLockHold{m: m, task: task, keys: keys}
 	for _, key := range hold.keys {
 		if m.inherited[key.id] {
 			continue
@@ -1101,6 +1131,17 @@ func (s *Scheduler) lockTaskOutputs(
 	reading bool,
 ) (context.Context, *outputLockHold, error) {
 	hold, err := s.outputLocks.acquire(ctx, jobs, preparing, reading)
+	if err != nil {
+		return ctx, nil, err
+	}
+	return withHeldOutputLocks(ctx, hold.value()), hold, nil
+}
+
+// lockFollowerOutputs acquires the keys a follower of a plan-level shared node
+// holds until its capture (acquireCapture), and returns ctx as lockTaskOutputs
+// does.
+func (s *Scheduler) lockFollowerOutputs(ctx context.Context, job *ScheduledJob) (context.Context, *outputLockHold, error) {
+	hold, err := s.outputLocks.acquireCapture(ctx, job)
 	if err != nil {
 		return ctx, nil, err
 	}

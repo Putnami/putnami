@@ -259,10 +259,11 @@ added the edges.
 ### Cross-Command Shared Executions
 
 Several commands can schedule separate DAG nodes over the **same** manifest
-task, project, declared inputs and functional producer chain. The cache cannot
-collapse that duplication: a task-owned entry is addressed partly by the job
-name, so one command's node cannot reach another's entry no matter how
-identical the work is.
+task, project, declared inputs and functional producer chain: `putnami
+test,build` plans the Go `generate` and `describe` steps under `build` and
+again under `test`. The cache cannot collapse that duplication: a task-owned
+entry is addressed partly by the job name, so one command's node cannot reach
+another's entry no matter how identical the work is.
 
 `attachSharedExecutions` (`internal/jobs/planner/plan_shared.go`) groups those nodes at
 plan time and stamps each group with a shared id, visible in `--plan` as
@@ -271,11 +272,33 @@ every later member adopts its result instead of spawning an identical subprocess
 and reports the outcome as `coalesced`.
 
 What the grouping does **not** touch: the plan has the same nodes, the same
-`dependsOn`/`serializeAfter` edges and the same cache keys it had without it. Each
-member still computes its own key, publishes its own entry and emits its own
-session row, so a **warm** run is exactly what it was before — only a **cold** run
-loses the duplicate subprocess. The shared subprocess appears once in the session's
+`dependsOn` edges and the same cache keys it had without it. Each member still
+computes its own key, publishes its own entry and emits its own session row, so
+a **warm** run is exactly what it was before — only a **cold** run loses the
+duplicate subprocess. The shared subprocess appears once in the session's
 physical execution ledger, referenced by every logical row that came out of it.
+
+What the grouping orders, through `serializeAfter` edges only. A group's first
+member by key leads, and the others follow it:
+
+- The leader runs after every member's **ordering producers**: the producers in
+  the member's project that declare no `writes` resource, such as build's
+  `tidy` and test's config merge. What they leave in the tree reaches the
+  member through files its own key reads, so they are not part of the shared
+  identity.
+- Each follower runs after its leader. A follower that adopts writes nothing to
+  the tree, so it takes its leader's place in write serialization instead of a
+  later one, and every reader in that place waits for it. In a Go `test,build`
+  run, `test~generate` no longer waits for `build~compile`, and the project's
+  test steps start when the shared `generate` and `describe` finish.
+- A follower that adopts holds its task's output locks for reading until its
+  capture, and skips the version-stamp refresh and the preBuild hook, which its
+  leader ran in the same project.
+
+Write serialization orders each resource on its own, so the edges a group adds
+can close a cycle across two resources that no single group predicts. When the
+ordering cannot be scheduled, the plan keeps no shared execution and is
+serialized as if none had been found.
 
 A node joins a shared group only when all of the following hold, and each
 condition removes a way one physical run could fail to be what the second node
@@ -284,20 +307,22 @@ would have produced:
 | Condition | Why |
 |-----------|-----|
 | Same project, extension, manifest task and task-contract digest | The identity of the work itself. |
-| Same recursive functional-producer identity | Downstream nodes are not unified when any direct or transitive producer has different declared work or literal task params. |
-| No `with:` binding on the candidate step | Literal values are live task params; context/result bindings are not reducible to one plan-time value, so input-bound candidates stay separate. |
+| Same recursive functional-producer identity, ordering producers left out | Downstream nodes are not unified when any direct or transitive producer has different declared work or literal task params. |
+| No `with:` binding on the candidate step | Literal values are live task params; context/result bindings are not reducible to one plan-time value, so input-bound candidates stay separate. TypeScript's `test` binds `mode: "test"` on its `generate`, so that pair stays separate. |
 | Task declares `cache.deterministic` | The manifest's own statement that identical inputs give identical outputs. |
 | Task declares a complete `inputs` contract | "The same declared inputs" is only a complete statement when the task declares them; contract-declared params and explicit step literals are compared. |
-| Task declares at least one `writes` resource, and none of them is the project `gen` tree | A shared run's side effects must be ones the planner can serialize, and `.gen` is a subtree other tasks write into without owning it. |
+| Task declares at least one `writes` resource | A shared run's side effects must be ones the planner can serialize. |
 | Task declares no `command-output` output | That directory resolves per command: the leader never writes the follower's, and the follower runs nothing, so it never empties it and would capture an earlier run's files. |
-| Same resolved deadline, file/env patterns, runtime inputs, selected projects | Everything else a cache key would have distinguished, minus the command name. |
+| Same resolved deadline, task file and env patterns, runtime inputs, selected projects | Everything else a cache key would have distinguished, minus the command name. A project's per-command `filePatterns` and `envInputs` are left out: they widen every key of one command and reach no task process. |
+| No node of another command reads or writes a resource the group writes while it declares a write of its own | A follower takes its leader's earlier place in the write order, which would move it, and its dependents, ahead of that node. The `clientgen` generators read the project's `.gen` after the build and rewrite a committed client the project's tests compile. |
 
-Nothing designates a leader in advance, which is what keeps the mechanism correct
-on partial plans: a member served from its own cache entry takes no slot, and a
-member skipped by a failed dependency never arrives, so the surviving node
-executes exactly as it would have alone. A failure is adopted like a success —
-two nodes over identical inputs fail identically, and each command's dependents
-then behave exactly as they would have without the sharing.
+The plan orders the members, but the runtime designates no leader in advance,
+which is what keeps the mechanism correct on partial plans: a member served
+from its own cache entry takes no slot, and a member skipped by a failed
+dependency never arrives, so the surviving node executes exactly as it would
+have alone. A failure is adopted like a success — two nodes over identical
+inputs fail identically, and each command's dependents then behave exactly as
+they would have without the sharing.
 
 ### Scheduled Job Structure
 

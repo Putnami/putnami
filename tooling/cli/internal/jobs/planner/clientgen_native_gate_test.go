@@ -324,3 +324,73 @@ func TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite(t *testing.T) {
 		}
 	}
 }
+
+// TestProviderGenerationNeverOverlapsATestOfItsClient pins the order between a
+// generator and the test steps that compile its committed client: the
+// provider's own and a consumer's. The generator rewrites the client inside the
+// provider's tree, after the build, and reads the provider's .gen. The
+// provider's test generate is the later .gen writer that waits for the
+// generator, and the consumer's test generate follows it. A shared execution
+// would move that generate to its leader's earlier place, but the generator is
+// a writing node of another command, so the pair stays apart. The build's
+// infra step declares the project's gen write, so it is ordered against the
+// provider's test steps that read .gen.
+func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
+	root := t.TempDir()
+	writeProjectFile(t, root, "provider", "go.mod",
+		"module example.com/provider\n\ngo 1.25\n\nrequire go.putnami.dev/app v0.0.0\n")
+	writeProjectFile(t, root, "provider", "provider.go", "package main\n\nfunc main() {}\n")
+	writeProjectFile(t, root, "provider", wsproto.ConfigFilename, `{}`)
+	writeProjectFile(t, root, "consumer", "go.mod", "module example.com/consumer\n\ngo 1.25\n")
+	writeProjectFile(t, root, "consumer", "consumer.go", "package consumer\n")
+	writeProjectFile(t, root, "consumer", wsproto.ConfigFilename, `{}`)
+	provider := &workspace.Project{
+		ID: "/provider", Name: "provider", Path: "provider", Type: "application",
+		Extensions: []string{"@putnami/go", clientgenExtensionName},
+		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "provider")),
+	}
+	consumer := &workspace.Project{
+		ID: "/consumer", Name: "consumer", Path: "consumer", Type: "library",
+		Extensions:   []string{"@putnami/go"},
+		Dependencies: []string{"provider"},
+		Config:       wsproto.LoadProjectConfig(filepath.Join(root, "consumer")),
+	}
+	planned, err := Plan(testWorkspace(root, provider, consumer), []string{"lint", "test", "build", "clientgen"},
+		[]*workspace.Project{provider, consumer},
+		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("plan lint,test,build,clientgen: %v", err)
+	}
+	byKey := JobsByPlanKey(planned)
+	requirePlanKey(t, byKey, "/provider:test~generate")
+	ordered := func(a, b *jobmodel.ScheduledJob) bool {
+		return planAncestors(byKey, a)[b.Key()] || planAncestors(byKey, b)[a.Key()]
+	}
+	var providerReaders []*jobmodel.ScheduledJob
+	for _, job := range planned {
+		if job.Project.ID == provider.ID && job.CommandName() == "test" && slices.ContainsFunc(job.JobDef.Reads, func(ref extension.ResourceRef) bool {
+			return ref.ID == cachekey.GenResourceID
+		}) {
+			providerReaders = append(providerReaders, job)
+		}
+	}
+	if len(providerReaders) == 0 {
+		t.Fatal("control: no test step of /provider reads .gen")
+	}
+	consumerTest := requirePlanKey(t, byKey, "/consumer:test~test")
+	for _, key := range []string{"/provider:clientgen~generate-go", "/provider:clientgen~generate-ts"} {
+		generator := requirePlanKey(t, byKey, key)
+		for _, reader := range append(append([]*jobmodel.ScheduledJob(nil), providerReaders...), consumerTest) {
+			if !ordered(generator, reader) {
+				t.Errorf("%s and %s are unordered: the test can compile the client while the generator rewrites it",
+					generator.Key(), reader.Key())
+			}
+		}
+	}
+	infra := requirePlanKey(t, byKey, "/provider:build~infra")
+	for _, reader := range providerReaders {
+		if !ordered(infra, reader) {
+			t.Errorf("%s and %s are unordered: the infra step can write .gen while the test reads it", infra.Key(), reader.Key())
+		}
+	}
+}

@@ -16,14 +16,12 @@ import (
 
 // The plan half of deciding which nodes are ONE shared execution.
 //
-// The fixture mirrors the shape the Go extension actually ships, because that
-// shape is the whole decision: `build` and `test` schedule the same
-// `probe-describe` and `probe-generate` tasks with byte-identical definitions,
-// while generate owns the project `gen` subtree. An earlier audit found the
-// first pair is safe to unify and the second is not until the TypeScript
-// capability-manifest clobber is fixed, so the tests below pin exactly that
-// split rather than the mechanism in the abstract. A focused variant adds the
-// now-live test-mode literal to pin producer-chain identity.
+// The fixture mirrors the shape the Go extension actually ships: `build` and
+// `test` schedule the same `probe-describe` and `probe-generate` tasks with
+// byte-identical definitions, while generate owns the project `gen` subtree.
+// Both pairs are one shared execution. A focused variant adds the test-mode
+// literal to pin producer-chain identity. plan_shared_pipeline_test.go covers
+// the Go pipelines' own shape and the order a shared plan keeps.
 
 func sharedProbeExtension() *extension.ExtensionDescription {
 	enabled := true
@@ -267,21 +265,29 @@ func TestSharedExecutions_ProducerIdentityFailsClosedOnCycle(t *testing.T) {
 	}
 }
 
-// TestSharedExecutions_LeaveGenerateAlone pins the W2a audit's blocker. The
-// project `gen` subtree is written by tasks that do not own it — on TypeScript
-// applications `test~test` rewrites `.gen/schema/capabilities.json` after
-// generate finished, and deletes it when the suite fails — so a shared node
-// there would publish a capture of somebody else's writes. It stays split until
-// that ownership violation is fixed.
-func TestSharedExecutions_LeaveGenerateAlone(t *testing.T) {
+// TestSharedExecutions_ShareGenerate pins that a task writing the project `gen`
+// subtree shares. Other tasks write into that subtree without owning it, so a
+// follower's capture of it is its own output only when no such task runs
+// between its leader's write and the capture: the follower runs after its
+// leader, writes nothing, and every reader of the leader's gen waits for it.
+func TestSharedExecutions_ShareGenerate(t *testing.T) {
 	t.Parallel()
 	planned := planSharedProbe(t, t.TempDir())
-	for _, job := range planned {
-		if job.StepID() != "generate" {
-			continue
-		}
-		if id := job.SharedExecution(); id != "" {
-			t.Errorf("%s was unified into %q; generate must stay split", job.DisplayName(), id)
+	byName := plannedByName(planned)
+	byKey := JobsByPlanKey(planned)
+	leader, follower := byName["build~generate"], byName["test~generate"]
+	if leader == nil || follower == nil {
+		t.Fatalf("fixture did not plan both generate nodes: %v", plannedNames(planned))
+	}
+	if leader.SharedExecution() == "" || leader.SharedExecution() != follower.SharedExecution() {
+		t.Fatalf("generate nodes are not one shared execution: %q, %q", leader.SharedExecution(), follower.SharedExecution())
+	}
+	if !containsStr(follower.SerializeAfter, leader.Key()) {
+		t.Errorf("test~generate does not run after its leader: serializeAfter %v", follower.SerializeAfter)
+	}
+	for _, reader := range []string{"build~describe", "test~describe"} {
+		if !planAncestors(byKey, byName[reader])[follower.Key()] {
+			t.Errorf("%s reads the gen tree without waiting for the follower %s", reader, follower.Key())
 		}
 	}
 }
@@ -383,8 +389,11 @@ func TestSharedExecutions_SeparateDifferentProjects(t *testing.T) {
 }
 
 // TestSharedExecutions_DoNotMoveThePlan is acceptance criterion 3, at the plan
-// level: unification adds NO edge and changes NO cache key. The shared id is an
-// execution grouping and nothing derived from it may reach an address.
+// level: the shared id changes NO cache key and NO edge. The shared id is an
+// execution grouping and nothing derived from it may reach an address. The
+// ordering edges a shared plan adds are pinned apart, by
+// TestSharedExecutions_KeysMatchEachCommandAlone: they move no key and no
+// functional edge.
 //
 // Clearing the stamp reconstructs the plan exactly as it was before this slice,
 // which is what makes the comparison a regression test rather than a tautology:

@@ -944,7 +944,11 @@ execution from the output preparation through the capture into the cache:
 the version-stamp refresh, the preBuild hook, the subprocess with its
 retries, and the capture. A serve-workload step is the one exception, below.
 A cache restore takes no shared lock: it writes the task's own outputs and
-reads nothing another task writes.
+reads nothing another task writes. A task that adopts the result of another
+command's identical task in the same run (a shared execution) executes
+nothing and writes nothing: it holds the project and workspace locks an
+execution of the task holds, for reading only, while it captures the outputs
+the other task wrote.
 
 An executing task also locks its project for its preparation alone when the
 preparation writes the project tree: the session has not yet started its
@@ -984,11 +988,9 @@ the order within a session, with one exception: a task that needs a lock
 exclusively while its own session holds it only for reading waits until
 those readers finished, and the session's tasks that need the lock meanwhile
 wait behind it. That wait prints nothing, and it is the only way a lock
-changes mode within a session. A build's `infra` step, which writes
-`.gen/requirements.json` after the build steps, waits this way for the
-session's test step that still reads `.gen`. When another session holds a lock,
-the task prints one line to stderr that names that session and its tasks
-that hold the lock, then waits:
+changes mode within a session. When another session holds a lock, the task
+prints one line to stderr that names that session and its tasks that hold the
+lock, then waits:
 
 ```
 putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 4242, task /tooling/cli:test~test), which is writing .putnami/out/tooling/cli/test
