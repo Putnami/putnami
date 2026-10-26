@@ -82,6 +82,19 @@ func TestCollaborationCommandProviderHelperProcess(t *testing.T) {
 		key("memory", "checkpoint"): func(context.Context, collab.Call) (any, *collab.Failure) {
 			return nil, collab.Fail(collab.OutcomeConflict, collab.ReasonRevisionConflict, "moved")
 		},
+		key("missions", "sync"): func(_ context.Context, call collab.Call) (any, *collab.Failure) {
+			input := call.Input.(*collab.MissionsSyncInput)
+			return &collab.MissionsSyncResult{
+				Session: collab.SessionStatus{State: input.State}, Mission: collab.MissionView{Key: input.Mission.Key},
+				MinIntervalMs: collab.MinSyncIntervalMs, Now: now,
+			}, nil
+		},
+		key("missions", "ask"): func(context.Context, collab.Call) (any, *collab.Failure) {
+			return &collab.MissionsAskResult{Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateOpen}}, nil
+		},
+		key("missions", "reply"): func(_ context.Context, call collab.Call) (any, *collab.Failure) {
+			return nil, collab.Fail(collab.OutcomeNotFound, "message.unknown", "no message %s", call.Input.(*collab.MissionsReplyInput).Message)
+		},
 	}
 	if err := collab.Serve(context.Background(), os.Stdin, os.Stdout, handlers); err != nil {
 		os.Exit(2)

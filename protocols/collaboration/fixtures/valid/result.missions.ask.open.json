@@ -1,0 +1,4 @@
+{
+  "decision": { "id": "dec_01", "state": "open", "url": "https://example.com/decisions/dec_01" },
+  "replayed": false
+}

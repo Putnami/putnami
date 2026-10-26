@@ -3034,7 +3034,7 @@
       "id": "cli/collaboration-providers",
       "type": "feature",
       "name": "Collaboration provider contracts",
-      "outcome": "A workspace binds its task, change-proposal and memory backends independently, and a user, a script or an agent calls the same versioned operations through the CLI or MCP without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
+      "outcome": "A workspace binds its task, change-proposal, memory and missions backends independently, and a user, a script or an agent calls the same versioned operations through the CLI or MCP without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -3139,6 +3139,41 @@
               "provider-stderr-never-reaches-an-envelope",
               "credential-values-are-redacted",
               "credential-settings-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "host-only-operations",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-host-only-operation-has-no-mcp-tool",
+              "the-cli-and-the-host-channel-route-a-host-only-operation"
+            ]
+          }
+        },
+        {
+          "id": "missions-identity-and-reconciliation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missions-answer-for-another-mission-or-message-is-unresolved",
+              "an-unresolved-missions-write-names-its-repeat"
+            ]
+          }
+        },
+        {
+          "id": "contract-names-never-shadow-commands",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-contract-name-is-a-built-in-command"
             ]
           }
         }

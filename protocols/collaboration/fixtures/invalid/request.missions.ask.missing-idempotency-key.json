@@ -1,0 +1,5 @@
+{
+  "mission": { "key": "issue-596" },
+  "question": "Ship now?",
+  "options": [{ "id": "yes", "label": "Ship" }, { "id": "no", "label": "Wait" }]
+}

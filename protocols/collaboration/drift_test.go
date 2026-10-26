@@ -112,6 +112,7 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 	tasks := readSchemaNode(t, ContractSchemaFile(ContractTasks, 1))
 	proposals := readSchemaNode(t, ContractSchemaFile(ContractProposals, 1))
 	memory := readSchemaNode(t, ContractSchemaFile(ContractMemory, 1))
+	missions := readSchemaNode(t, ContractSchemaFile(ContractMissions, 1))
 	cases := []struct {
 		name   string
 		node   *schemaNode
@@ -142,6 +143,22 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 		{"Provenance", memory.Defs["record"].Properties["provenance"], Provenance{}},
 		{"Freshness", memory.Defs["record"].Properties["freshness"], Freshness{}},
 		{"Precondition", memory.Defs["precondition"], Precondition{}},
+		{"MissionName", missions.Defs["missionName"], MissionName{}},
+		{"SessionRef", missions.Defs["session"], SessionRef{}},
+		{"PlanStep", missions.Defs["planStep"], PlanStep{}},
+		{"MissionPlan", missions.Defs["plan"], MissionPlan{}},
+		{"MessageReply", missions.Defs["messageReply"], MessageReply{}},
+		{"SessionStatus", missions.Defs["syncResult"].Properties["session"], SessionStatus{}},
+		{"OpenDecision", missions.Defs["openDecision"], OpenDecision{}},
+		{"MissionView", missions.Defs["missionView"], MissionView{}},
+		{"InboxDecision", missions.Defs["inboxDecision"], InboxDecision{}},
+		{"InboxMessage", missions.Defs["inboxMessage"], InboxMessage{}},
+		{"DecisionStatus", missions.Defs["decisionStatus"], DecisionStatus{}},
+		{"ReplyStatus", missions.Defs["replyStatus"], ReplyStatus{}},
+		{"DecisionOption", missions.Defs["decisionOption"], DecisionOption{}},
+		{"DecisionRecommendation", missions.Defs["askInput"].Properties["recommendation"], DecisionRecommendation{}},
+		{"MissionDecision", missions.Defs["askResult"].Properties["decision"], MissionDecision{}},
+		{"RepliedMessage", missions.Defs["replyResult"].Properties["message"], RepliedMessage{}},
 	}
 	for _, tc := range cases {
 		if tc.node == nil {
@@ -165,6 +182,7 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 	tasks := readSchemaNode(t, ContractSchemaFile(ContractTasks, 1))
 	proposals := readSchemaNode(t, ContractSchemaFile(ContractProposals, 1))
 	memory := readSchemaNode(t, ContractSchemaFile(ContractMemory, 1))
+	missions := readSchemaNode(t, ContractSchemaFile(ContractMissions, 1))
 	cases := []struct {
 		name string
 		enum []string
@@ -182,6 +200,12 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 		{"mergeInput.method", proposals.Defs["mergeInput"].Properties["method"].Enum, stringsOf(ValidMergeMethods)},
 		{"memory kind", memory.Defs["kind"].Enum, stringsOf(ValidMemoryKinds)},
 		{"evidence kind", memory.Defs["evidence"].Properties["kind"].Enum, stringsOf(ValidEvidenceKinds)},
+		{"sessionState", missions.Defs["sessionState"].Enum, stringsOf(ValidSessionStates)},
+		{"planStep status", missions.Defs["planStep"].Properties["status"].Enum, stringsOf(ValidPlanStepStatuses)},
+		{"inbox kind", missions.Defs["inboxMessage"].Properties["kind"].Enum, stringsOf(ValidInboxKinds)},
+		{"decisionState", missions.Defs["decisionState"].Enum, stringsOf(ValidDecisionStates)},
+		{"replyState", missions.Defs["replyState"].Enum, stringsOf(ValidReplyStates)},
+		{"replyResult message state", missions.Defs["replyResult"].Properties["message"].Properties["state"].Enum, []string{string(ReplyStateReplied)}},
 	}
 	for _, tc := range cases {
 		if !slices.Equal(tc.enum, tc.want) {

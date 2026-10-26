@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-collaboration-missions.v1.json",
+  "title": "Putnami missions contract, version 1",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every missions v1 operation. Required: sync, ask, reply. sync is host-only: the host that runs an agent calls it, and the MCP server lists no tool for it. Message and decision ids are bare tokens, not refs: an agent types them, and they never leave their provider. Lengths count characters.",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$",
+      "description": "A message or decision id, as the provider issued it."
+    },
+    "utcTimestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+      "description": "An RFC 3339 timestamp in UTC."
+    },
+    "missionName": {
+      "type": "object",
+      "description": "Names a mission. repository and key follow the memory identity's repository and mission rules.",
+      "additionalProperties": false,
+      "required": ["key"],
+      "properties": {
+        "repository": { "$ref": "collaboration.json#/$defs/token" },
+        "key": { "$ref": "collaboration.json#/$defs/token", "description": "The mission's key inside its repository, such as 'issue-596'. Opaque to the contract." },
+        "title": { "type": "string", "maxLength": 256, "description": "One line." }
+      }
+    },
+    "session": {
+      "type": "object",
+      "description": "One agent session on its host.",
+      "additionalProperties": false,
+      "required": ["engine", "id"],
+      "properties": {
+        "engine": { "type": "string", "pattern": "^[a-z0-9-]{1,32}$", "description": "The host that runs the agent, in lowercase letters, digits and hyphens." },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^\\S+$" }
+      }
+    },
+    "sessionState": {
+      "type": "string",
+      "enum": ["failed", "handed_back", "waiting", "working"]
+    },
+    "planStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "status", "text"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^\\S+$", "description": "Unique inside its plan." },
+        "status": { "type": "string", "enum": ["doing", "done", "todo"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 300, "description": "One line." }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["steps"],
+      "properties": {
+        "steps": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/planStep" } }
+      }
+    },
+    "messageReply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "reply"],
+      "properties": {
+        "message": { "$ref": "#/$defs/id" },
+        "reply": { "type": "string", "minLength": 1, "maxLength": 4000 }
+      }
+    },
+    "syncInput": {
+      "type": "object",
+      "description": "What a session publishes. Its natural key is session and observedAt: a provider ignores a sync older than the last one it applied for the session.",
+      "additionalProperties": false,
+      "required": ["session", "mission", "event", "state", "observedAt"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session" },
+        "mission": { "$ref": "#/$defs/missionName" },
+        "event": { "type": "string", "pattern": "^[a-z_]{1,32}$", "description": "The host event that caused the sync, for display. A provider never branches on it." },
+        "state": { "$ref": "#/$defs/sessionState" },
+        "observedAt": { "$ref": "#/$defs/utcTimestamp" },
+        "model": { "type": "string", "maxLength": 128, "description": "One line." },
+        "branch": { "type": "string", "maxLength": 256, "description": "One line." },
+        "lastMessage": { "type": "string", "maxLength": 4096 },
+        "error": { "type": "string", "maxLength": 1024, "description": "Only when state is failed." },
+        "waitUntil": { "$ref": "collaboration.json#/$defs/timestamp", "description": "Only when state is waiting." },
+        "plan": { "$ref": "#/$defs/plan", "description": "Replaces the plan. Absent keeps it; an empty list of steps clears it." },
+        "delivered": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/id" }, "description": "Inbox messages the host gave the agent. A provider ignores an unknown or foreign id." },
+        "decisions": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/id" }, "description": "Decisions this session asked. A provider ignores an unknown or foreign id." },
+        "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/messageReply" }, "description": "One reply per message. A refused reply gets its own entry in the result and never refuses the sync." }
+      }
+    },
+    "openDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "question": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "missionView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "title", "plan", "openDecisions"],
+      "properties": {
+        "key": { "$ref": "collaboration.json#/$defs/token", "description": "The key the sync named." },
+        "title": { "type": "string", "maxLength": 256 },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "plan": { "$ref": "#/$defs/plan" },
+        "openDecisions": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/openDecision" } }
+      }
+    },
+    "inboxDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "answer"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "answer": { "type": "string", "minLength": 1, "maxLength": 8192 }
+      }
+    },
+    "inboxMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text", "createdAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string", "enum": ["answer", "info", "prompt"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 8192 },
+        "createdAt": { "$ref": "collaboration.json#/$defs/timestamp" },
+        "decision": { "$ref": "#/$defs/inboxDecision", "description": "Present exactly when kind is answer." }
+      }
+    },
+    "decisionState": {
+      "type": "string",
+      "enum": ["acknowledged", "answered", "open"]
+    },
+    "decisionStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "state"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "state": { "$ref": "#/$defs/decisionState" }
+      }
+    },
+    "replyState": {
+      "type": "string",
+      "enum": ["refused", "replied"]
+    },
+    "replyStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "state"],
+      "properties": {
+        "message": { "$ref": "#/$defs/id" },
+        "state": { "$ref": "#/$defs/replyState" },
+        "reason": { "$ref": "collaboration.json#/$defs/token", "description": "Present exactly when state is refused, such as 'message.closed'." }
+      }
+    },
+    "syncResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "mission", "inbox", "decisions", "replies", "minIntervalMs", "now"],
+      "properties": {
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "$ref": "#/$defs/sessionState" }
+          }
+        },
+        "mission": { "$ref": "#/$defs/missionView" },
+        "inbox": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/inboxMessage" },
+          "description": "Messages no session received yet, oldest first. Their texts, questions and answers total at most 65536 bytes."
+        },
+        "decisions": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/decisionStatus" } },
+        "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/replyStatus" }, "description": "One entry per reply the sync carried." },
+        "minIntervalMs": { "type": "integer", "minimum": 5000, "maximum": 600000, "description": "The least time between two syncs of one session." },
+        "now": { "$ref": "collaboration.json#/$defs/timestamp" }
+      }
+    },
+    "decisionOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^\\S+$", "description": "Unique inside its decision." },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200, "description": "One line." },
+        "consequences": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "askInput": {
+      "type": "object",
+      "description": "Asks the mission's owner to decide. The answer reaches the session as an inbox message of kind answer.",
+      "additionalProperties": false,
+      "required": ["mission", "question", "options", "idempotencyKey"],
+      "properties": {
+        "mission": { "$ref": "#/$defs/missionName" },
+        "session": { "$ref": "#/$defs/session" },
+        "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "context": { "type": "string", "maxLength": 4000 },
+        "options": { "type": "array", "minItems": 2, "maxItems": 5, "items": { "$ref": "#/$defs/decisionOption" } },
+        "recommendation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["option"],
+          "properties": {
+            "option": { "type": "string", "minLength": 1, "maxLength": 32, "description": "The id of one of the options." },
+            "reason": { "type": "string", "maxLength": 1000 }
+          }
+        },
+        "blocks": { "type": "string", "maxLength": 1000, "description": "What waits for the answer." },
+        "idempotencyKey": { "$ref": "collaboration.json#/$defs/idempotencyKey" }
+      }
+    },
+    "askResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "replayed"],
+      "properties": {
+        "decision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "state"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "state": { "$ref": "#/$defs/decisionState" },
+            "url": { "$ref": "collaboration.json#/$defs/url" },
+            "answer": { "type": "string", "maxLength": 8192, "description": "Absent while the decision is open." }
+          }
+        },
+        "replayed": { "type": "boolean", "description": "True when the idempotency key matched a decision already recorded with the same content, so nothing was asked again." }
+      }
+    },
+    "replyInput": {
+      "type": "object",
+      "description": "Replies to one inbox message. Its natural key is the message: the same reply again replays, another reply is a conflict.",
+      "additionalProperties": false,
+      "required": ["message", "reply"],
+      "properties": {
+        "message": { "$ref": "#/$defs/id" },
+        "reply": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "session": { "$ref": "#/$defs/session" }
+      }
+    },
+    "replyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "replayed"],
+      "properties": {
+        "message": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "state"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "state": { "type": "string", "enum": ["replied"] }
+          }
+        },
+        "replayed": { "type": "boolean", "description": "True when the message already held this reply, so nothing was written again." }
+      }
+    }
+  }
+}

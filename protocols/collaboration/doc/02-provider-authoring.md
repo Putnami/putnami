@@ -183,8 +183,8 @@ write.
 
 - Run the shared contract scenarios: build a `providertest.Target` from your
   handlers and settings and call `providertest.RunTasks`,
-  `providertest.RunProposals` or `providertest.RunMemory`
-  ([`providertest`](../providertest/providertest.go)). They drive the
+  `providertest.RunProposals`, `providertest.RunMemory` or
+  `providertest.RunMissions` ([`providertest`](../providertest/providertest.go)). They drive the
   handlers through `collab.Serve` and check idempotent replays, stale
   revisions, exact proposal identity and pages against any backend, including
   a shared one. The local provider runs the tasks and proposals scenarios
@@ -202,6 +202,13 @@ write.
   (`providertest.MaximalCheckpoint`) is read back unchanged, so a store's own
   size bound can never be below the contract's. [`@putnami/memory-store`](../../../tooling/memory-store/README.md)
   runs it against each of its backends.
+- A missions target also names `Post`, which writes one inbox message to a
+  mission as its owner does outside the contract. `RunMissions` checks that a
+  repeated `ask` replays and a changed one is `idempotency.mismatch`, that a
+  repeated `reply` replays, that another reply is `message.closed` and a reply
+  to an unknown message is `not_found`, that a delivered message leaves the
+  inbox, that a sync ignores ids it does not know, that each refused reply
+  has its own entry, and that an older sync never overwrites a newer one.
 - Drive your handlers through `collab.Serve` with the request a routed call
   carries (`tooling/local-collaboration/internal/provider/provider_test.go`),
   so every answer passes the same validation a real call does.

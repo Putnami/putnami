@@ -87,7 +87,7 @@ type ProviderIdentity struct {
 // Contract, Version, Operation and Provider are the orchestrator's statement of
 // what was routed where; a provider cannot set them.
 type Envelope struct {
-	// Contract is the operation contract's name (tasks, proposals, memory).
+	// Contract is the operation contract's name (tasks, proposals, memory, missions).
 	Contract string `json:"contract"`
 	// Version is the contract version the orchestrator routed against.
 	Version int `json:"version,omitempty"`
@@ -128,6 +128,9 @@ const (
 	ReasonRevisionConflict        = "revision.conflict"
 	ReasonAlreadyExists           = "record.exists"
 	ReasonClaimHeld               = "claim.held"
+	// ReasonMessageClosed is the conflict of a reply to a message that
+	// already holds another reply.
+	ReasonMessageClosed = "message.closed"
 )
 
 // BindingStatus is the state of one contract's binding in a workspace.
@@ -153,7 +156,7 @@ var ValidBindingStatuses = []BindingStatus{BindingStatusBound, BindingStatusInva
 // produces it from the binding and the provider's manifest, without running
 // the provider.
 type Capabilities struct {
-	// Contract is the contract this report describes (tasks, proposals, memory).
+	// Contract is the contract this report describes (tasks, proposals, memory, missions).
 	Contract string `json:"contract"`
 	// SupportedVersions are the contract versions this orchestrator speaks.
 	SupportedVersions []int `json:"supportedVersions"`

@@ -92,6 +92,91 @@ func maximalStatus() ProposalStatusResult {
 	return status
 }
 
+// maximalID is the longest bare missions id, ending in i.
+func maximalID(i int) string {
+	suffix := strconv.Itoa(i)
+	return strings.Repeat("a", 64-len(suffix)) + suffix
+}
+
+const maximalUTC = "2026-09-24T08:00:00.123456789Z"
+
+func maximalSession() SessionRef {
+	return SessionRef{Engine: strings.Repeat("e", 32), ID: fill(MaxSessionIDLength)}
+}
+
+func maximalMissionName() MissionName {
+	return MissionName{Repository: fill(MaxTokenLength), Key: fill(MaxTokenLength), Title: fill(MaxTitleLength)}
+}
+
+func maximalPlan() MissionPlan {
+	plan := MissionPlan{Steps: []PlanStep{}}
+	for i := range MaxListMembers {
+		plan.Steps = append(plan.Steps, PlanStep{Key: numbered(i, MaxPlanStepKeyLength), Status: PlanStepDoing, Text: fill(MaxPlanStepTextLength)})
+	}
+	return plan
+}
+
+// maximalSyncResult fills every list to its bound. The inbox texts share
+// MaxContentBytes evenly.
+func maximalSyncResult() *MissionsSyncResult {
+	result := &MissionsSyncResult{
+		Session: SessionStatus{State: SessionStateWaiting},
+		Mission: MissionView{Key: fill(MaxTokenLength), Title: fill(MaxTitleLength), URL: maximalURL(0), Plan: maximalPlan(), OpenDecisions: []OpenDecision{}},
+		Inbox:   []InboxMessage{}, Decisions: []DecisionStatus{}, Replies: []ReplyStatus{},
+		MinIntervalMs: MaxSyncIntervalMs, Now: maximalTimestamp,
+	}
+	for i := range MaxOpenDecisions {
+		result.Mission.OpenDecisions = append(result.Mission.OpenDecisions, OpenDecision{ID: maximalID(i), Question: fill(MaxQuestionLength)})
+	}
+	share := MaxContentBytes / MaxInboxMessages
+	text := (share - MaxQuestionLength) / 2
+	for i := range MaxInboxMessages {
+		result.Inbox = append(result.Inbox, InboxMessage{
+			ID: maximalID(i), Kind: InboxKindAnswer, Text: fill(text), CreatedAt: maximalTimestamp,
+			Decision: &InboxDecision{ID: maximalID(i), Question: fill(MaxQuestionLength), Answer: fill(share - MaxQuestionLength - text)},
+		})
+	}
+	for i := range MaxListMembers {
+		result.Decisions = append(result.Decisions, DecisionStatus{ID: maximalID(i), State: DecisionStateAcknowledged})
+	}
+	for i := range MaxSyncReplies {
+		result.Replies = append(result.Replies, ReplyStatus{Message: maximalID(i), State: ReplyStateRefused, Reason: fill(MaxTokenLength)})
+	}
+	return result
+}
+
+func maximalSyncInput() *MissionsSyncInput {
+	plan := maximalPlan()
+	input := &MissionsSyncInput{
+		Session: maximalSession(), Mission: maximalMissionName(), Event: strings.Repeat("e", 32),
+		State: SessionStateFailed, ObservedAt: maximalUTC, Model: fill(MaxModelLength), Branch: fill(MaxBranchLength),
+		LastMessage: fill(MaxLastMessageLength), Error: fill(MaxErrorLength), Plan: &plan,
+	}
+	for i := range MaxListMembers {
+		input.Delivered = append(input.Delivered, maximalID(i))
+	}
+	for i := range MaxSyncDecisions {
+		input.Decisions = append(input.Decisions, maximalID(i))
+	}
+	for i := range MaxSyncReplies {
+		input.Replies = append(input.Replies, MessageReply{Message: maximalID(i), Reply: fill(MaxReplyLength)})
+	}
+	return input
+}
+
+func maximalAskInput() *MissionsAskInput {
+	session := maximalSession()
+	input := &MissionsAskInput{
+		Mission: maximalMissionName(), Session: &session, Question: fill(MaxQuestionLength), Context: fill(MaxContextLength),
+		Recommendation: &DecisionRecommendation{Option: numbered(0, MaxOptionIDLength), Reason: fill(MaxExplanationLength)},
+		Blocks:         fill(MaxExplanationLength), IdempotencyKey: strings.Repeat("a", 128),
+	}
+	for i := range MaxDecisionOptions {
+		input.Options = append(input.Options, DecisionOption{ID: numbered(i, MaxOptionIDLength), Label: fill(MaxOptionLabelLength), Consequences: fill(MaxExplanationLength)})
+	}
+	return input
+}
+
 // TestMaxDocumentBytesHoldsEveryMaximalDocument: a request, and a result of
 // one item, whose members are all within their bounds always parse, so only a
 // list page can outgrow the bound, and a page of one item never does.
@@ -112,6 +197,10 @@ func TestMaxDocumentBytesHoldsEveryMaximalDocument(t *testing.T) {
 		"memory.mission":    &MemoryRecordResult{Record: record},
 		"memory.checkpoint": &MemoryCheckpointResult{Record: record, Replayed: true},
 		"memory.context":    &MemoryListResult{Items: []MemoryRecord{record}, Page: Page{Next: cursor}},
+		"missions.sync":     maximalSyncResult(),
+		"missions.ask": &MissionsAskResult{Decision: MissionDecision{
+			ID: maximalID(0), State: DecisionStateAnswered, URL: maximalURL(0), Answer: fill(MaxInboxTextLength),
+		}, Replayed: true},
 	}
 	for name, result := range results {
 		t.Run(name, func(t *testing.T) {
@@ -143,6 +232,17 @@ func TestMaxDocumentBytesHoldsEveryMaximalDocument(t *testing.T) {
 			t.Fatalf("the maximal checkpoint request (%d bytes) does not parse: %v", len(encoded), diags)
 		}
 	})
+	for operation, input := range map[string]any{OperationSync: maximalSyncInput(), OperationAsk: maximalAskInput()} {
+		t.Run("missions."+operation+" request", func(t *testing.T) {
+			encoded, err := json.Marshal(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, diags := ParseRequest(ContractMissions, 1, operation, encoded); diags != nil {
+				t.Fatalf("the maximal %s request (%d bytes) does not parse: %v", operation, len(encoded), diags)
+			}
+		})
+	}
 }
 
 // pagedTasks is a list handler over n tasks with bodies of the given size,

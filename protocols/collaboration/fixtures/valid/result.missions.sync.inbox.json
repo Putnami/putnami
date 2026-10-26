@@ -1,0 +1,32 @@
+{
+  "session": { "state": "handed_back" },
+  "mission": {
+    "key": "issue-596",
+    "title": "Agent sessions report to their mission",
+    "url": "https://example.com/missions/issue-596",
+    "plan": {
+      "steps": [
+        { "key": "contract", "status": "done", "text": "Add the missions contract" }
+      ]
+    },
+    "openDecisions": [{ "id": "dec_02", "question": "Ship the hooks now?" }]
+  },
+  "inbox": [
+    { "id": "msg_03", "kind": "info", "text": "The review is in.", "createdAt": "2026-10-26T09:10:00Z" },
+    { "id": "msg_04", "kind": "prompt", "text": "Does the gate pass?", "createdAt": "2026-10-26T09:11:00Z" },
+    {
+      "id": "msg_05",
+      "kind": "answer",
+      "text": "Use bytes.",
+      "createdAt": "2026-10-26T09:12:00Z",
+      "decision": { "id": "dec_01", "question": "Which bound does the inbox use?", "answer": "bytes" }
+    }
+  ],
+  "decisions": [{ "id": "dec_01", "state": "acknowledged" }],
+  "replies": [
+    { "message": "msg_02", "state": "replied" },
+    { "message": "msg_09", "state": "refused", "reason": "message.closed" }
+  ],
+  "minIntervalMs": 15000,
+  "now": "2026-10-26T09:30:01Z"
+}

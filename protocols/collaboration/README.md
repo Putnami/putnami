@@ -1,20 +1,20 @@
 # Collaboration provider contracts
 
-This package owns the three collaboration contracts — **tasks**, **change
-proposals** and **memory** — that a workspace binds to provider extensions,
-and every document they exchange: the request and result of each operation,
-the provider's response, the envelope every caller reads, the binding block,
-and the capability document.
+This package owns the four collaboration contracts — **tasks**, **change
+proposals**, **memory** and **missions** — that a workspace binds to provider
+extensions, and every document they exchange: the request and result of each
+operation, the provider's response, the envelope every caller reads, the
+binding block, and the capability document.
 
 ## Why
 
 Contributor workflows find and update work items, open and review change
-proposals, and keep a mission's memory between sessions. Calling a hosting
-service or a storage layout directly from a skill ties the workflow to that
-backend. The contracts put a versioned, provider-neutral operation surface in
-between: skills call `tasks.find` or `putnami proposals upsert`, and the
-extension the workspace bound owns the backend calls, authentication,
-identifiers and mappings.
+proposals, keep a mission's memory between sessions, and report an agent
+session to its mission. Calling a hosting service or a storage layout directly
+from a skill ties the workflow to that backend. The contracts put a
+versioned, provider-neutral operation surface in between: skills call
+`tasks.find` or `putnami proposals upsert`, and the extension the workspace
+bound owns the backend calls, authentication, identifiers and mappings.
 
 ## What
 
@@ -30,14 +30,19 @@ describes every operation.
 | `tasks` v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
 | `proposals` v1 | `find`, `upsert`, `status`, `review` | `merge` |
 | `memory` v1 | `context`, `mission`, `checkpoint` | `search` |
+| `missions` v1 | `sync`, `ask`, `reply` | — |
 
 `capabilities` is reserved in every contract: the orchestrator answers it from
 the binding and the provider's manifest, without running the provider.
+`missions.sync` is host-only: the host that runs an agent calls it through the
+CLI or the host channel, and the MCP server lists no tool for it.
 
 Every result carries source-qualified opaque references (`{"source":
 "<kind>:<locator>", "id": "…"}`), optional display URLs, revision tokens,
 provider-neutral semantic states, and — for proposals — the exact
-repository/base/head. Lists are bounded pages with an opaque cursor.
+repository/base/head. Missions messages and decisions are the one exception:
+they carry bare ids, which an agent types. Lists are bounded pages with an
+opaque cursor.
 
 ### Envelope and outcomes
 
@@ -84,8 +89,9 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
 
 - `schemas/collaboration.json` (envelope, response, binding, declaration,
   capabilities, shared definitions) and one schema per contract version
-  (`tasks.v1.json`, `proposals.v1.json`, `memory.v1.json`) with an
-  `<operation>Input` and `<operation>Result` definition per operation.
+  (`tasks.v1.json`, `proposals.v1.json`, `memory.v1.json`,
+  `missions.v1.json`) with an `<operation>Input` and `<operation>Result`
+  definition per operation.
   `InputSchema` inlines one operation's request schema for an MCP tool.
 - `fixtures/valid/` and `fixtures/invalid/` hold the corpus, named
   `<kind>.<…>.json`; `fixtures/expectations.json` pins the codes of every
@@ -98,12 +104,14 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   as the worked example;
   [`@putnami/github-collaboration`](../../tooling/github-collaboration/README.md)
   implements the same contracts on GitHub.
-- [`providertest`](providertest/providertest.go) holds the tasks, proposals
-  and memory scenarios every provider runs (`RunTasks`, `RunProposals`,
-  `RunMemory`); it names nothing a particular backend defines, so a provider
-  can run it against a shared one. `@putnami/memory-store` runs `RunMemory`
-  against its file backend, its Git backend and its Git backend behind a bare
-  remote.
+- [`providertest`](providertest/providertest.go) holds the tasks, proposals,
+  memory and missions scenarios every provider runs (`RunTasks`,
+  `RunProposals`, `RunMemory`, `RunMissions`); it names nothing a particular
+  backend defines, so a provider can run it against a shared one.
+  `@putnami/memory-store` runs `RunMemory` against its file backend, its Git
+  backend and its Git backend behind a bare remote. No provider in this
+  repository implements missions yet: `RunMissions` runs against an in-test
+  store.
 - The CLI routes calls: [`tooling/cli/doc/25-collaboration-providers.md`](../../tooling/cli/doc/25-collaboration-providers.md).
 - [`@putnami/memory-store`](../../tooling/memory-store/README.md) implements
   the memory contract with a file or a Git backend.
@@ -122,6 +130,9 @@ Run `./putnamiw test --projects go.putnami.dev/protocol/collaboration --enforce-
 - [ADR 0002 — The contracts are published as preview](doc/adr/0002-the-contracts-are-published-as-preview.md):
   publication, the `preview` status, the task `key` and `createdAt`, and why the
   version 1 documents are fixed from the first published module.
+- [ADR 0003 — The missions contract](doc/adr/0003-missions-contract.md): the
+  missions operations, host-only operations, natural keys for `sync` and
+  `reply`, and bare ids. It amends ADR 0001 decisions 5 and 6.
 
 ## Support
 

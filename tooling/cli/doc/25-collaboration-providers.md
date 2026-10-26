@@ -1,7 +1,7 @@
 # Collaboration providers
 
-A workspace chooses where its work items, change proposals and agent memory
-live, one contract at a time, and every tool and script calls the same
+A workspace chooses where its work items, change proposals, agent memory and
+agent missions live, one contract at a time, and every tool and script calls the same
 operations whatever the backend is. Putnami routes each call to the provider
 extension the workspace binds; the provider owns the backend, its
 credentials, its identifiers and its mappings.
@@ -79,6 +79,11 @@ paths answer `unavailable` (`binding.provider_missing`) and never run an
 earlier release left behind the stable link. An operation the bound provider
 does not offer has no MCP tool; on the command line it answers
 `unsupported`.
+
+A host-only operation, such as `missions.sync`, has no MCP tool either. The
+host that runs an agent calls it with `putnami missions sync` or through the
+host channel's `collaboration.call`, and gets the same envelope; the agent
+never sees it as a tool. `putnami missions` marks it `host-only`.
 
 ## Outcomes
 

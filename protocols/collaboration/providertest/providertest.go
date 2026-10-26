@@ -1,10 +1,12 @@
 // Package providertest runs the shared contract scenarios of the tasks,
-// proposals and memory collaboration contracts against one provider.
+// proposals, memory and missions collaboration contracts against one
+// provider.
 //
 // A provider's test builds a Target — its handlers, the settings a binding
 // passes, the workspace root and name, the branches proposal scenarios may
-// use, and for memory a second instance on the same store — and calls
-// RunTasks, RunProposals or RunMemory. Every call goes through
+// use, for memory a second instance on the same store, and for missions a way
+// to post an inbox message — and calls RunTasks, RunProposals, RunMemory or
+// RunMissions. Every call goes through
 // collaboration.Serve with the request a routed call carries, so every answer
 // has passed the request and result validation a real call passes; the
 // scenarios then check what validation cannot: that an answer is about the
@@ -16,7 +18,11 @@
 // lands, that a repeated idempotency key replays the write that landed, that
 // another provider instance resumes from the store alone, that a record
 // stays within its workspace, and that the largest checkpoint the contract
-// accepts (MaximalCheckpoint) is read back unchanged.
+// accepts (MaximalCheckpoint) is read back unchanged. The missions scenarios
+// check that a repeated ask replays and a changed one is a conflict, that a
+// message takes one reply, that a sync ignores ids it does not know and
+// answers each reply it carries, and that an older sync never overwrites a
+// newer one.
 //
 // The scenarios name nothing a particular backend defines: they scope what
 // they create with labels, titles and mission names unique to the run, so
@@ -56,7 +62,9 @@ type Target struct {
 	// Zero means every read observes every acknowledged write at once.
 	Settle time.Duration
 	// Track, when set, is told every item a scenario creates, so a test
-	// against a real backend can clean up after it.
+	// against a real backend can clean up after it. RunMissions tells it
+	// nothing: a missions item has a bare id, not a reference, and every
+	// missions scenario works in a mission of its own.
 	Track func(contract string, ref collab.Ref)
 	// Workspace is the workspace name the orchestrator fills into a memory
 	// identity that names none. RunMemory requires it.
@@ -65,6 +73,10 @@ type Target struct {
 	// shares nothing with Handlers but the stored state, as a second provider
 	// process does. RunMemory requires it.
 	Reopen func(t *testing.T) map[collab.OperationKey]collab.Handler
+	// Post writes one message of kind info or prompt to a mission's inbox, as
+	// the mission's owner does outside the contract, and returns the
+	// message's id. RunMissions requires it.
+	Post func(t *testing.T, mission collab.MissionName, kind collab.InboxKind, text string) string
 }
 
 // Session drives one Target from one test.

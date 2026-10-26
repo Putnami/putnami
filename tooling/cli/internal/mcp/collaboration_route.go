@@ -300,6 +300,12 @@ func ReconcileHint(contract, operation string) string {
 		return "read the proposal with proposals.status before any retry"
 	case "memory.checkpoint":
 		return "read the mission with memory.mission; repeat the checkpoint with the same idempotencyKey and precondition, which replays a write that landed"
+	case "missions.sync":
+		return "repeat missions.sync with the same document: a repeat changes nothing the first call applied"
+	case "missions.ask":
+		return "repeat missions.ask with the same idempotencyKey and content: the provider returns the decision that key recorded, or records it once"
+	case "missions.reply":
+		return "repeat missions.reply with the same message and reply: the provider returns the reply it recorded, or records it once"
 	}
 	return "read the task with tasks.get and compare its revision before any retry"
 }
@@ -332,7 +338,70 @@ func identityMismatch(input, result any) string {
 	if mismatch, handled := proposalMismatch(input, result); handled {
 		return mismatch
 	}
+	if mismatch, handled := missionsMismatch(input, result); handled {
+		return mismatch
+	}
 	return memoryMismatch(input, result)
+}
+
+// missionsMismatch checks that a missions answer is about the mission, the
+// message and the decisions the request named. It reports handled false for
+// a request of another contract.
+func missionsMismatch(input, result any) (string, bool) {
+	switch in := input.(type) {
+	case *collab.MissionsSyncInput:
+		return syncMismatch(in, result), true
+	case *collab.MissionsAskInput:
+		ask, wrong := resultAs[*collab.MissionsAskResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if decision := ask.Decision; !ask.Replayed && (decision.State != collab.DecisionStateOpen || decision.Answer != "") {
+			return fmt.Sprintf("a new decision %s is %s; a decision asked now is open", decision.ID, decision.State), true
+		}
+		return "", true
+	case *collab.MissionsReplyInput:
+		reply, wrong := resultAs[*collab.MissionsReplyResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if reply.Message.ID != in.Message {
+			return fmt.Sprintf("message %s, requested message %s", reply.Message.ID, in.Message), true
+		}
+		return "", true
+	}
+	return "", false
+}
+
+// syncMismatch checks a sync answer: it is about the mission the sync named,
+// it reports only decisions the sync named, and it answers each reply the
+// sync carried exactly once.
+func syncMismatch(in *collab.MissionsSyncInput, result any) string {
+	sync, wrong := resultAs[*collab.MissionsSyncResult](result)
+	if wrong != "" {
+		return wrong
+	}
+	if sync.Mission.Key != in.Mission.Key {
+		return fmt.Sprintf("mission %q, requested mission %q", sync.Mission.Key, in.Mission.Key)
+	}
+	for _, decision := range sync.Decisions {
+		if !slices.Contains(in.Decisions, decision.ID) {
+			return fmt.Sprintf("decision %s, which the sync did not name", decision.ID)
+		}
+	}
+	answered := make(map[string]bool, len(sync.Replies))
+	for _, reply := range sync.Replies {
+		if !slices.ContainsFunc(in.Replies, func(sent collab.MessageReply) bool { return sent.Message == reply.Message }) {
+			return fmt.Sprintf("a reply to message %s, which the sync did not carry", reply.Message)
+		}
+		answered[reply.Message] = true
+	}
+	for _, sent := range in.Replies {
+		if !answered[sent.Message] {
+			return fmt.Sprintf("no answer for the reply to message %s", sent.Message)
+		}
+	}
+	return ""
 }
 
 // resultAs asserts a parsed result's type. ParseResult allocates the type the
