@@ -84,7 +84,7 @@
     },
     {
       "id": "a-reference-socket-server",
-      "text": "objectcachetest serves the socket contract from memory. It stores a put only when the exchange directory holds bytes that match its digest, places them back on a get, and stamps its own channel. A get filtered by channel misses a filtered object. Namespaces are disjoint, a session op gets unsupported-op, and concurrent connections share one store. The socket lives in the exchange directory, or under a short path when it is too long. Close is idempotent, and Start refuses an empty exchange directory."
+      "text": "objectcachetest serves the socket contract from memory. It stores a put only when the exchange directory holds bytes that match its digest, places them back on a get, and stamps its own channel. A get filtered by channel misses a filtered object. Namespaces are disjoint, a session op gets unsupported-op, and concurrent connections share one store. The socket lives in the exchange directory, or under a short path when it is too long. Close is idempotent, and Start refuses an empty exchange directory path."
     },
     {
       "id": "every-op-is-best-effort",
