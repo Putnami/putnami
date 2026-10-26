@@ -186,7 +186,7 @@ func TestProbe_RefusesPathsOutsideTheWorkspace(t *testing.T) {
 	}
 }
 
-// The reserved control call must answer on stdout and claim only its own argv.
+// The reserved control call answers on stdout.
 func TestHandleWorkspaceProbe_ServesTheControlCall(t *testing.T) {
 	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-python-extension-answers-the-probe")
 	root := probeWorkspace(t)
@@ -213,9 +213,13 @@ func TestHandleWorkspaceProbe_ServesTheControlCall(t *testing.T) {
 	if result.Extension != pythonExtensionName || len(result.Projects) != 1 {
 		t.Fatalf("answer = %+v, want one project attributed to %s", result, pythonExtensionName)
 	}
+}
 
-	stdout.Reset()
-	if handled, _ := handleWorkspaceProbe([]string{"test"}, bytes.NewReader(nil), &stdout); handled {
+// The reserved control call claims only its own argv.
+func TestHandleWorkspaceProbe_DeclinesAnOrdinarySubcommand(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-python-extension-claims-only-the-reserved-call")
+	var stdout bytes.Buffer
+	if handled, _ := handleWorkspaceProbe([]string{"test"}, bytes.NewReader(nil), &stdout); handled || stdout.Len() != 0 {
 		t.Error("the probe claimed an ordinary subcommand's argv")
 	}
 }

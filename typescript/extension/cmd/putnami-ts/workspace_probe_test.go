@@ -673,7 +673,7 @@ func TestHandleWorkspaceProbe_ServesTheReservedInvocation(t *testing.T) {
 }
 
 func TestHandleWorkspaceProbe_DeclinesOrdinarySubcommands(t *testing.T) {
-	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-typescript-extension-answers-the-probe")
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-typescript-extension-leaves-other-calls-to-their-owner")
 	handled, err := handleWorkspaceProbe([]string{"build"})
 	if handled || err != nil {
 		t.Fatalf("handleWorkspaceProbe(build) = (%v, %v), want (false, nil)", handled, err)

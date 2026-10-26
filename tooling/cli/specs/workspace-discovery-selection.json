@@ -40,11 +40,11 @@
     },
     {
       "id": "version-lines-are-scopes",
-      "text": "A scope that declares a line block versions and tags its projects together under the line's tag pattern; a project's line is its nearest ancestor line, exactly one; a workspace without a line block is one line."
+      "text": "A scope that declares a line block versions and tags its projects together under the line's tag pattern."
     },
     {
       "id": "registries-keyed-by-ecosystem",
-      "text": "The workspace declares one registries entry per ecosystem, overridable per project, and every registry endpoint an extension needs comes from that entry."
+      "text": "Every registry endpoint an extension needs comes from the registries entry of its ecosystem."
     },
     {
       "id": "registry-pin-wins",

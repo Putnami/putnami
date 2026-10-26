@@ -259,7 +259,10 @@ func TestCloudWorkspaceProbeTransportIsReservedStrictAndBounded(t *testing.T) {
 	if len(diagnostics) != 0 || parsed.Extension != cloudRuntimeIdentity || len(parsed.Projects) != 1 {
 		t.Fatalf("transport result = %+v diagnostics=%+v", parsed, diagnostics)
 	}
+}
 
+func TestCloudWorkspaceProbeDeclinesAnOrdinaryCommand(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-cloud-extension-claims-only-the-reserved-call")
 	var ordinary bytes.Buffer
 	if handled, err := HandleWorkspaceProbe([]string{"packages", "publish"}, strings.NewReader("{}"), &ordinary); handled || err != nil || ordinary.Len() != 0 {
 		t.Fatalf("ordinary command handled=%v err=%v stdout=%q", handled, err, ordinary.String())

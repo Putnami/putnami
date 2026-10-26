@@ -126,7 +126,7 @@ func TestHandleInputResolve_RefusesAMisroutedRequest(t *testing.T) {
 }
 
 func TestHandleInputResolve_DeclinesOrdinarySubcommands(t *testing.T) {
-	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-go-extension-refuses-a-misrouted-request")
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-go-extension-claims-only-the-reserved-calls")
 	handled, err := handleInputResolve([]string{"build"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if handled || err != nil {
 		t.Fatalf("handleInputResolve(build) = (%v, %v), want (false, nil)", handled, err)

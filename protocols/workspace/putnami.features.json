@@ -338,9 +338,13 @@
             "checks": [
               "the-go-extension-answers-the-probe",
               "the-go-extension-refuses-a-misrouted-request",
+              "the-go-extension-claims-only-the-reserved-calls",
               "the-typescript-extension-answers-the-probe",
+              "the-typescript-extension-leaves-other-calls-to-their-owner",
               "the-cloud-extension-answers-the-probe",
+              "the-cloud-extension-claims-only-the-reserved-call",
               "the-python-extension-answers-the-probe",
+              "the-python-extension-claims-only-the-reserved-call",
               "the-python-extension-writes-nothing-it-cannot-answer"
             ]
           }

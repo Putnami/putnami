@@ -120,7 +120,7 @@ func TestManifestResolvesTheGoLockIdentity(t *testing.T) {
 }
 
 func TestHandleToolchainResolve_DeclinesOrdinarySubcommands(t *testing.T) {
-	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-go-extension-refuses-a-misrouted-request")
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-go-extension-claims-only-the-reserved-calls")
 	handled, err := handleToolchainResolve([]string{"build"}, &bytes.Buffer{}, &bytes.Buffer{}, os.Getenv)
 	if handled || err != nil {
 		t.Fatalf("handleToolchainResolve(build) = (%v, %v), want (false, nil)", handled, err)

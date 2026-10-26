@@ -19,7 +19,7 @@
   "requirements": [
     {
       "id": "source-workspace-declaration",
-      "text": "A workspace that builds its own CLI records the reserved literal \"workspace\" as its lock cli.source, with no version and no per-platform digests. Reading, refreshing, and rewriting that lock leaves the entry byte-identical: a metadata refresh stamps no protocolVersion on it and never erases it. `putnami pin <version>` replaces it with a real pin and `putnami pin --remove` clears it."
+      "text": "A workspace that builds its own CLI records the reserved literal \"workspace\" as its lock cli.source. A metadata refresh stamps no protocolVersion on it and never erases it. `putnami pin <version>` replaces it with a real pin and `putnami pin --remove` clears it."
     },
     {
       "id": "foreign-engine-refused",

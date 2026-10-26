@@ -26,17 +26,26 @@ func writeBasisTree(t *testing.T, root string, files map[string]string) {
 	}
 }
 
-// symlinkOrSkip creates a link at rel below root, or skips the test on a host
-// that cannot create one.
-func symlinkOrSkip(t *testing.T, root, target, rel string) {
+// symlinkOrFail creates a link at rel below root. A host that cannot create
+// one fails the test: the tests that observe how the digest treats links must
+// not pass, or skip, without running. On Windows, enable Developer Mode or run
+// the tests with administrator rights.
+func symlinkOrFail(t *testing.T, root, target, rel string) {
 	t.Helper()
 	abs := filepath.Join(root, filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, abs); err != nil {
+	osSymlinkOrFail(t, target, abs)
+}
+
+// osSymlinkOrFail links name to target, and fails the test with the privilege
+// to enable when the host cannot create the link.
+func osSymlinkOrFail(t *testing.T, target, name string) {
+	t.Helper()
+	if err := os.Symlink(target, name); err != nil {
 		if runtime.GOOS == "windows" {
-			t.Skipf("symlinks unavailable: %v", err)
+			t.Fatalf("this test needs symbolic links, and the host cannot create one: %v; enable Developer Mode or run with administrator rights", err)
 		}
 		t.Fatal(err)
 	}
@@ -98,13 +107,13 @@ func TestInputBasisDigestBindsWhatTheBasisSelects(t *testing.T) {
 		}, true},
 		{"content file becomes a link", func(t *testing.T, root string) {
 			mustRemove(t, root, "main.go")
-			symlinkOrSkip(t, root, "internal/a.go", "main.go")
+			symlinkOrFail(t, root, "internal/a.go", "main.go")
 		}, true},
 		{"content link changes target", func(t *testing.T, root string) {
-			symlinkOrSkip(t, root, "internal/a.go", "link.go")
+			symlinkOrFail(t, root, "internal/a.go", "link.go")
 			before := basisDigest(t, root, goLikeBasis)
 			mustRemove(t, root, "link.go")
-			symlinkOrSkip(t, root, "main.go", "link.go")
+			symlinkOrFail(t, root, "main.go", "link.go")
 			if basisDigest(t, root, goLikeBasis) == before {
 				t.Fatal("retargeting a content link left the digest unchanged")
 			}
@@ -123,10 +132,10 @@ func TestInputBasisDigestBindsWhatTheBasisSelects(t *testing.T) {
 			mustMkdir(t, root, "assets/app.css")
 		}, true},
 		{"listing link changes target", func(t *testing.T, root string) {
-			symlinkOrSkip(t, root, "../other/target.css", "assets/link.css")
+			symlinkOrFail(t, root, "../other/target.css", "assets/link.css")
 			before := basisDigest(t, root, goLikeBasis)
 			mustRemove(t, root, "assets/link.css")
-			symlinkOrSkip(t, root, "../other/target2.css", "assets/link.css")
+			symlinkOrFail(t, root, "../other/target2.css", "assets/link.css")
 			if basisDigest(t, root, goLikeBasis) == before {
 				t.Fatal("retargeting a listing link left the digest unchanged")
 			}
@@ -135,7 +144,7 @@ func TestInputBasisDigestBindsWhatTheBasisSelects(t *testing.T) {
 			writeBasisTree(t, root, map[string]string{"assets/app.css": "body{color:red}\n"})
 		}, false},
 		{"listing link referent bytes", func(t *testing.T, root string) {
-			symlinkOrSkip(t, root, "../other/target.css", "assets/link.css")
+			symlinkOrFail(t, root, "../other/target.css", "assets/link.css")
 			before := basisDigest(t, root, goLikeBasis)
 			writeBasisTree(t, root, map[string]string{"other/target.css": "edited\n"})
 			if basisDigest(t, root, goLikeBasis) != before {
@@ -199,8 +208,8 @@ func TestInputBasisDigestNeverFollowsALink(t *testing.T) {
 	writeBasisTree(t, outside, map[string]string{"pkg/x.go": "package x\n", "y.go": "package y\n"})
 	root := t.TempDir()
 	writeBasisTree(t, root, map[string]string{"main.go": "package main\n"})
-	symlinkOrSkip(t, root, filepath.Join(outside, "pkg"), "pkg")
-	symlinkOrSkip(t, root, filepath.Join(outside, "y.go"), "y.go")
+	symlinkOrFail(t, root, filepath.Join(outside, "pkg"), "pkg")
+	symlinkOrFail(t, root, filepath.Join(outside, "y.go"), "y.go")
 	basis := InputBasis{Content: [][]string{{"**"}}, Listing: [][]string{{"**"}}}
 	before := basisDigest(t, root, basis)
 	writeBasisTree(t, outside, map[string]string{"pkg/x.go": "package x // edited\n", "pkg/new.go": "", "y.go": "package y // edited\n"})
@@ -238,9 +247,9 @@ func basisFixtureTree(t *testing.T) string {
 	})
 	mustMkdir(t, root, "empty/dir")
 	if runtime.GOOS != "windows" {
-		symlinkOrSkip(t, root, "app.css", "assets/link.css")
-		symlinkOrSkip(t, root, "internal", "linkdir")
-		symlinkOrSkip(t, root, "missing.go", "broken.go")
+		symlinkOrFail(t, root, "app.css", "assets/link.css")
+		symlinkOrFail(t, root, "internal", "linkdir")
+		symlinkOrFail(t, root, "missing.go", "broken.go")
 	}
 	return root
 }
@@ -362,9 +371,7 @@ func TestInputBasisDigestRefusesWhatItCannotDigest(t *testing.T) {
 	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "what-cannot-be-digested-is-refused")
 	root := goLikeTree(t)
 	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(root, link); err != nil && runtime.GOOS != "windows" {
-		t.Fatal(err)
-	}
+	osSymlinkOrFail(t, root, link)
 	cases := map[string]struct {
 		root  string
 		basis InputBasis
@@ -381,9 +388,6 @@ func TestInputBasisDigestRefusesWhatItCannotDigest(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if name == "link root" && runtime.GOOS == "windows" {
-				t.Skip("symlinks unavailable")
-			}
 			digest, err := InputBasisDigest(tc.root, tc.basis)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("InputBasisDigest = (%q, %v), want an error naming %q", digest, err, tc.want)
