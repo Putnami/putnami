@@ -15,11 +15,11 @@
   "requirements": [
     {
       "id": "a-rendered-project-builds",
-      "text": "A project rendered from go-server passes go vet and go build with the network off."
+      "text": "A project rendered from go-server passes go vet and go build without downloading a module."
     },
     {
       "id": "a-rendered-project-passes-its-tests",
-      "text": "A project rendered from go-server ships TestHealthEndpoint, a test that starts the application and reads its operational endpoints, and go test runs it and passes with the network off."
+      "text": "A project rendered from go-server ships TestHealthEndpoint, and go test runs it to a pass without downloading a module."
     },
     {
       "id": "a-rendered-project-passes-lint",

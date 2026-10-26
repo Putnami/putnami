@@ -31,7 +31,7 @@ project of its language. For every template in the same directory whose
 | | TypeScript proof | Go proof |
 |---|---|---|
 | Wiring | `node_modules` links to the packages the proof installed: every `@putnami/*` package as `workspace:*` (framework source), every other package at the `bun.lock` version. The workspace `tsconfig.json` extends the extension's config. | A `go.work` listing every module of this repository's `go.work` plus the rendered module. |
-| Steps | The preBuild hooks the rendered `package.json` activates; `biome check` with the extension's `config/biome.json` and the `.gitignore` `putnami init` writes, failing on a warning; the `build~types` type-check; `bun test`. | `go list -deps -test` to fill the module cache, then `go vet`, `go build`, `go test -count=1`, then golangci-lint with the extension's `config/.golangci.yml` and staticcheck, at the versions `go/extension/tools/versions.json` pins. Each step is a top-level test bound to the check the template declares for it, and renders its own copy of the template. |
+| Steps | The preBuild hooks the rendered `package.json` activates; `biome check` with the extension's `config/biome.json` and the `.gitignore` `putnami init` writes, failing on a warning; the `build~types` type-check; `bun test`. | `go list -deps -test` to fill the module cache, then `go vet`, `go build`, `go test -count=1 -json`, which must report a pass for the template's named test, then golangci-lint with the extension's `config/.golangci.yml` and staticcheck, at the versions `go/extension/tools/versions.json` pins. Each step is a top-level test bound to the check the template declares for it, and renders its own copy of the template. |
 | Offline | Reads installed packages only. | The module-cache step uses the proxy settings with `GOFLAGS=-mod=readonly`, so every download is checked against `go.sum`. Other steps run with `GOPROXY=off`, `GOENV=off`, `GOFLAGS=-mod=readonly`, `GOTOOLCHAIN=local`. No step inherits `GOCACHEPROG`, whose helper needs the `PUTNAMI_*` variables the proof drops. |
 
 ### The cache key covers the templates and the framework
@@ -66,8 +66,9 @@ running the proof reads them from the proof's cached test result.
   is proven with no edit to the proof. A template added beside the Go proof
   fails `TestEveryGoTemplateDeclaresTheChecksThisProofObserves` until it is
   listed in `provenTemplates` and declares the three checks; a check no test
-  observes then fails the template's spec gate as check-not-observed. A Go
-  binding names its check literally, in a top-level test.
+  observes then fails the template's spec gate as check-not-observed, because
+  `TestEveryGoTemplateEnforcesItsSpec` requires each template to enforce its
+  spec. A Go binding names its check literally, in a top-level test.
 - **A test holds the key complete.** The TypeScript proof fails when a template
   declares a dependency the proof does not declare with the same specifier, or
   when a framework package's `src/**`, `package.json`, `bin/**` or

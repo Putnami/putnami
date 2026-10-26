@@ -60,14 +60,14 @@ const toolVersionsFile = "go/extension/tools/versions.json"
 
 // provenTemplates maps each Go template beside this project to the feature it
 // declares. Each bound test below renders one template into a throwaway
-// workspace whose go.work is this repository's, and runs one step there with
-// the network off: go vet and go build, go test, or the linters `putnami lint`
-// runs. A template that no longer compiles against the framework, whose own
-// tests fail, or that the linters reject, fails here. A binding names its
-// feature, requirement and check literally, as the first statement of a
-// top-level test, so a template added beside this project fails
-// TestEveryGoTemplateDeclaresTheChecksThisProofObserves until it has its own
-// bound tests.
+// workspace whose go.work is this repository's, and runs one step there
+// without downloading a module: go vet and go build, go test, or the linters
+// `putnami lint` runs. A template that no longer compiles against the
+// framework, whose own tests fail, or that the linters reject, fails here. A
+// binding names its feature, requirement and check literally, as the first
+// statement of a top-level test, so a template added beside this project fails
+// TestEveryGoTemplateDeclaresTheChecksThisProofObserves until provenTemplates
+// lists it and it declares the three checks.
 var provenTemplates = map[string]string{
 	"go-library": "go/library-template",
 	"go-server":  "go/server-template",
@@ -187,6 +187,37 @@ func TestEveryGoTemplateDeclaresOneFeatureUnderProjectScaffolding(t *testing.T) 
 	}
 }
 
+// TestEveryGoTemplateEnforcesItsSpec pins the setting that makes a check no
+// test observes fail the template's spec gate: in report mode, the default,
+// the gate reports check-not-observed without failing.
+func TestEveryGoTemplateEnforcesItsSpec(t *testing.T) {
+	for _, tpl := range discoverTemplates(t, filepath.Dir(workingDirectory(t))) {
+		data, err := os.ReadFile(filepath.Join(tpl.dir, "putnami.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var config struct {
+			Extensions []string `json:"extensions"`
+			Options    struct {
+				SDD struct {
+					Verification struct {
+						Specs string `json:"specs"`
+					} `json:"verification"`
+				} `json:"sdd"`
+			} `json:"options"`
+		}
+		if err := json.Unmarshal(data, &config); err != nil {
+			t.Fatalf("%s/putnami.json: %v", tpl.name, err)
+		}
+		if !slices.Contains(config.Extensions, "/tooling/sdd-extension") {
+			t.Errorf("%s/putnami.json does not list /tooling/sdd-extension in extensions, so no spec gate runs on it", tpl.name)
+		}
+		if got := config.Options.SDD.Verification.Specs; got != "enforce" {
+			t.Errorf("%s/putnami.json sets options.sdd.verification.specs to %q, want \"enforce\"", tpl.name, got)
+		}
+	}
+}
+
 // TestEveryGoTemplateIsADependencyOfThisProof pins the edge the spec gate
 // follows: a session that validates a template without running this proof
 // reads the template's checks from this proof's last test result only when
@@ -215,9 +246,10 @@ func TestEveryGoTemplateIsADependencyOfThisProof(t *testing.T) {
 	}
 }
 
-// TestEveryGoTemplateDeclaresTheChecksThisProofObserves keeps the declared
-// checks and the bound tests equal: each template beside this project is one
-// this proof binds, and it declares the check of each step, and only those.
+// TestEveryGoTemplateDeclaresTheChecksThisProofObserves keeps each template's
+// declared checks equal to provenSteps: each template beside this project is
+// listed in provenTemplates and declares the check of each step, and only
+// those.
 func TestEveryGoTemplateDeclaresTheChecksThisProofObserves(t *testing.T) {
 	want := make([]string, 0, len(provenSteps))
 	for _, step := range provenSteps {
@@ -373,9 +405,9 @@ func vetAndBuild(t *testing.T, p renderedProject) {
 	runGo(t, p.dir, p.env, "build", "./...")
 }
 
-// goTest runs the tests p ships and fails unless each test in want reports a
+// goTest runs the tests p ships and fails unless the test named want reports a
 // pass: go test also exits 0 on a package without test files.
-func goTest(t *testing.T, p renderedProject, want ...string) {
+func goTest(t *testing.T, p renderedProject, want string) {
 	t.Helper()
 	passed := map[string]bool{}
 	dec := json.NewDecoder(strings.NewReader(runGo(t, p.dir, p.env, "test", "-count=1", "-json", "./...")))
@@ -390,10 +422,8 @@ func goTest(t *testing.T, p renderedProject, want ...string) {
 			passed[event.Test] = true
 		}
 	}
-	for _, name := range want {
-		if !passed[name] {
-			t.Errorf("go test reported no pass for %s", name)
-		}
+	if !passed[want] {
+		t.Errorf("go test reported no pass for %s", want)
 	}
 }
 

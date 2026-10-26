@@ -14,11 +14,11 @@
   "requirements": [
     {
       "id": "a-rendered-project-builds",
-      "text": "A project rendered from go-library passes go vet and go build with the network off."
+      "text": "A project rendered from go-library passes go vet and go build without downloading a module."
     },
     {
       "id": "a-rendered-project-passes-its-tests",
-      "text": "A project rendered from go-library ships TestHello, a test of its exported Hello function, and go test runs it and passes with the network off."
+      "text": "A project rendered from go-library ships TestHello, and go test runs it to a pass without downloading a module."
     },
     {
       "id": "a-rendered-project-passes-lint",
