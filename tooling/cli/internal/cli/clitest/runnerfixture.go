@@ -776,6 +776,11 @@ func (p *fixtureProvider) ingest(entry runner.SourceEntry) error {
 	return nil
 }
 
+// betweenFollowReads, when a test sets it, runs in follow between the state
+// read and the output read: the moment a supervisor can write its last output
+// and a terminal state.
+var betweenFollowReads func()
+
 // follow answers from the attempt's durable output log and state: records
 // strictly after the cursor, at most MaxFollowRecords of them, and the state
 // the supervisor last wrote. It blocks briefly for new output so the client
@@ -793,6 +798,9 @@ func (p *fixtureProvider) follow(params runner.FollowParams) (any, error) {
 		// terminal state carries all the output that remains: the client stops
 		// following on a terminal answer that is not full.
 		state = ReadFixtureState(dir)
+		if betweenFollowReads != nil {
+			betweenFollowReads()
+		}
 		records = readFixtureOutput(dir, params.Cursor, runner.MaxFollowRecords)
 		if len(records) > 0 || runner.TerminalState(state.State) || waited >= 200*time.Millisecond {
 			break
