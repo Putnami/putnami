@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // provisionedManifest is a runtime whose compiler toolchain is provisioned
@@ -38,6 +39,7 @@ func provisionedManifest() *Manifest {
 // where its executable is, so a manifest with a provisioned candidate needs
 // rung 13 wherever it loads from, and a lower stamp is refused with the reason.
 func TestAProvisionedCandidateRequiresTheProvisionedToolchainContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	m := provisionedManifest()
 	m.CLIContract = protocolcli.PublishChannelsContract
 	data, err := json.Marshal(m)
@@ -77,6 +79,7 @@ func TestAProvisionedCandidateRequiresTheProvisionedToolchainContract(t *testing
 // runtime.resolves alone, leave it where the manifest's other vocabulary puts
 // it.
 func TestRequiredCLIContractRaisesToProvisionedOnlyForAProvisionedCandidate(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	withoutProvisioned := provisionedManifest()
 	compiler := withoutProvisioned.Runtime.Toolchains["compiler"]
 	compiler.Candidates = []RuntimeToolchainCandidate{{From: RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/compiler/compiler-{version}/bin/compiler"}}

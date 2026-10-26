@@ -10,6 +10,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestLoadManifest_Valid(t *testing.T) {
@@ -147,6 +148,7 @@ func TestLoadManifest_EqualContract_EnforcesReservedShadows(t *testing.T) {
 // from the future is never half-interpreted. The future starts above the
 // latest contract this CLI reads, not above its base contract.
 func TestLoadManifest_NewerContract_FailsLoud(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "the-compatibility-matrix-holds")
 	path := writeShadowManifest(t, fmt.Sprintf(`"cliContract": %d,`, protocolcli.LatestContract+1))
 
 	_, err := LoadManifest(path)
@@ -166,6 +168,7 @@ func TestLoadManifest_NewerContract_FailsLoud(t *testing.T) {
 // declare THIS contract — so the same fixture now pins the rejection, and the
 // message must name both numbers and the command that fixes it.
 func TestLoadManifest_OlderContract_IsAHardError(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "the-compatibility-matrix-holds")
 	for _, contract := range []struct {
 		name  string
 		field string
@@ -202,6 +205,7 @@ func TestLoadManifest_OlderContract_IsAHardError(t *testing.T) {
 // reject exactly the manifests the packager refuses to stamp: every hook-only
 // framework package would vanish from the workspace.
 func TestLoadManifest_HookOnlyManifestIsOutsideTheLadder(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "every-surface-kind-is-governed")
 	dir := t.TempDir()
 	path := filepath.Join(dir, ManifestFilename)
 	hookOnly := `{
@@ -231,6 +235,7 @@ func TestLoadManifest_HookOnlyManifestIsOutsideTheLadder(t *testing.T) {
 // package-time stamper: anything the contract governs makes a manifest subject
 // to it, and nothing else does.
 func TestDeclaresContractSurface(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "every-surface-kind-is-governed")
 	cases := []struct {
 		name string
 		m    *Manifest

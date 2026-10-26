@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_SchemaConditionalsValidateFixtures executes the conditional
@@ -280,6 +281,7 @@ func schemaSubsetMatches(schema, instance map[string]any) bool {
 // which one a given manifest exercises. TestConformance_V2FixturesStayV2 keeps
 // that promise honest.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-protocol-version-is-pinned", "the-protocol-version-stays-3")
 	if ProtocolVersion != 3 {
 		t.Fatalf("ProtocolVersion = %d, want 3 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -446,6 +448,7 @@ var lifecycleInvalidFixtureCodes = map[string][]string{
 // is a checked property rather than a claim. The v3 fixtures must report v3,
 // which keeps the v2 half from passing because the vocabulary stopped working.
 func TestConformance_FixtureProtocolVersions(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-protocol-version-is-pinned", "every-fixture-reports-its-version")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -486,6 +489,7 @@ func TestConformance_FixtureProtocolVersions(t *testing.T) {
 // and port-supplied paths, optional-empty outputs, every effect, and source
 // mutation.
 func TestConformance_TaskContracts_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "every-valid-fixture-validates")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no valid fixtures found: %v", err)
@@ -505,6 +509,7 @@ func TestConformance_TaskContracts_ValidFixtures(t *testing.T) {
 // feature (a root, a kind, an effect) and the harness would still pass it. Each
 // feature must appear in at least one valid fixture.
 func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "every-declaration-feature-has-a-fixture")
 	covered := make(map[string]bool)
 	for name := range v3ValidFixtures {
 		m := loadFixtureManifest(t, filepath.Join("fixtures/valid", name))
@@ -574,6 +579,7 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 // happens to fire in the same file — and with the exact codes a consumer keys
 // on.
 func TestConformance_TaskContracts_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "each-counter-example-reports-its-exact-codes")
 	for name, codes := range v3InvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {
 			m := loadFixtureManifest(t, filepath.Join("fixtures/invalid", name))
@@ -591,6 +597,7 @@ func TestConformance_TaskContracts_InvalidFixtures(t *testing.T) {
 // is what `putnami extensions validate`, the package-time gate and the
 // extension SDK's build-time gate run.
 func TestConformance_TaskContracts_StrictPathAgrees(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "the-harness-and-the-strict-path-agree")
 	for name := range v3InvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {
 			m := loadFixtureManifest(t, filepath.Join("fixtures/invalid", name))
@@ -617,6 +624,7 @@ func TestConformance_TaskContracts_StrictPathAgrees(t *testing.T) {
 // must make the harness fire, so "no diagnostics" means "nothing to say", not
 // "nothing wired up".
 func TestConformance_TaskContracts_AdditiveForV2(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "the-version-3-vocabulary-is-additive")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -666,6 +674,7 @@ func TestConformance_TaskContracts_NilManifest(t *testing.T) {
 // call. Exact-match rather than contains: a fixture that started failing for a
 // second, unrelated reason would stop certifying the rule it was written for.
 func TestConformance_Lifecycles_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "each-counter-example-reports-its-exact-codes")
 	for name, codes := range lifecycleInvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {
 			m := loadFixtureManifest(t, filepath.Join("fixtures/invalid", name))
@@ -682,6 +691,7 @@ func TestConformance_Lifecycles_InvalidFixtures(t *testing.T) {
 // verdict from either validator, and the mutation proves the validators are
 // actually wired rather than silently inert.
 func TestConformance_Lifecycles_AdditiveForV2(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "the-version-3-vocabulary-is-additive")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -733,6 +743,7 @@ func TestConformance_Lifecycles_NilManifest(t *testing.T) {
 }
 
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "every-valid-fixture-validates")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -760,6 +771,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "every-invalid-fixture-is-refused")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -791,6 +803,7 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 }
 
 func TestConformance_FullValidateManifest_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "every-valid-fixture-validates")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)

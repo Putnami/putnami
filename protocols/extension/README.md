@@ -387,16 +387,16 @@ Evidence behind `stable`:
 
 ## Product feature and durable decisions
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcomes it enables — "my language works in Putnami", "my extension's tasks are
-cached correctly" — belong to the extensions and CLI commands that deliver them.
-A feature per protocol module would create one artificial product identity per
-technical boundary, which the [feature protocol's authoring
-boundary](../features/README.md) rules out. With no feature to detail there is
-no spec, since a spec details exactly one already-authored feature and never
-mints one.
+The module owns the feature of its contract, `extension/manifest-contract`,
+specified in [`specs/manifest-contract.json`](specs/manifest-contract.json). The
+conformance, drift, matrix, digest, ecosystem and outbox tests here and the
+first-party manifest tests of the CLI
+(`tooling/cli/internal/extension/first_party_contract_test.go`) prove its
+requirements. The language extensions and the CLI commands that deliver "my
+language works in Putnami" keep their own features.
 
-Durable decisions (both scope `protocols/extension` explicitly):
+The spec lists every ADR under [`doc/adr`](doc/adr). Two more decisions scope
+`protocols/extension` explicitly:
 
 - [ADR 0001 — CLI foundation boundaries: catalog, result, engine](../../tooling/cli/doc/adr/0001-cli-foundation-boundaries.md)
 - [ADR 0002 — CLI vNext: one contract with four surfaces, and the ratchets that hold it](../../tooling/cli/doc/adr/0002-cli-vnext-contracts.md)

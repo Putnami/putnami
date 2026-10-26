@@ -8,6 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // defaultPositionalsFixture is a manifest stamped 15 whose `stage` group
@@ -32,6 +33,7 @@ func readDefaultPositionalsFixture(t *testing.T) *Manifest {
 // A group default that declares positionals requires rung 15 from every
 // origin, and the stamped fixture loads.
 func TestDefaultPositionalsRequireTheirContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	m := readDefaultPositionalsFixture(t)
 	if !DeclaresDefaultPositionals(m) {
 		t.Fatal("DeclaresDefaultPositionals = false for a default that declares a positional")
@@ -54,6 +56,7 @@ func TestDefaultPositionalsRequireTheirContract(t *testing.T) {
 // Stamped below 15, the manifest is refused for its positional default, with
 // the remedy that moves it.
 func TestDefaultPositionalsBelowTheirContractAreRefused(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "a-manifest-below-its-rung-does-not-load")
 	for _, stamp := range []int{protocolcli.CurrentContract, protocolcli.DefaultPositionalsContract - 1} {
 		m := readDefaultPositionalsFixture(t)
 		m.CLIContract = stamp
@@ -75,6 +78,7 @@ func TestDefaultPositionalsBelowTheirContractAreRefused(t *testing.T) {
 // @putnami/dev's `version` group, which defaults to `get` and gives `tag` its
 // positional.
 func TestPositionalsOffTheDefaultKeepTheStamp(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	tagged := []PositionalDefinition{{Name: "tag", Required: true}}
 	cases := map[string]CommandGroupDefinition{
 		"default without positionals": {Default: "get", Subcommands: map[string]SubcommandDefinition{

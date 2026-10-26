@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseManifest_Strict_Valid(t *testing.T) {
@@ -274,6 +275,7 @@ func TestParseManifest_Strict_TaskResourceClaimsRejectNonPositiveUnits(t *testin
 }
 
 func TestParseManifest_Strict_UnknownField(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "the-strict-parser-refuses-unknown-fields-and-invalid-json")
 	data := []byte(`{
 		"commands": {},
 		"unknownField": true
@@ -364,6 +366,7 @@ func TestParseManifest_Strict_OnInstallHook(t *testing.T) {
 }
 
 func TestParseManifest_Strict_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "the-strict-parser-refuses-unknown-fields-and-invalid-json")
 	_, diags := ParseManifest([]byte("{invalid"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for invalid JSON")

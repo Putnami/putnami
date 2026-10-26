@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // publishTask is a registry publication that declares the channels it serves.
@@ -25,6 +26,7 @@ func publishTask(channels ...string) TaskDefinition {
 // declares publishChannels needs rung 12, and a lower stamp is refused with
 // the reason.
 func TestAPublishChannelDeclarationRequiresThePublishChannelsContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	manifest := []byte(`{"name":"@test/npm","cliContract":11,"commands":{"publish":{"run":[{"id":"npm","task":"publish-npm"}]}},"tasks":{"publish-npm":{"kind":"command","command":"echo","cache":false,"declares":{"effects":["network","registry"],"publishChannels":["npm"]}}}}`)
 	_, err := NegotiateManifest("npm.json", manifest)
 	if err == nil {
@@ -55,6 +57,7 @@ func TestAPublishChannelDeclarationRequiresThePublishChannelsContract(t *testing
 // Every task counts, and a task whose declaration lists no channel leaves the
 // floor where its other vocabulary puts it.
 func TestRequiredCLIContractRaisesToPublishChannelsOnlyForADeclaringTask(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	serving := publishTask("docker")
 	silent := publishTask()
 	bound := TaskDefinition{Kind: "command", Command: "echo", Cache: &TaskCachePolicy{SourceBound: true}}

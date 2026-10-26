@@ -9,6 +9,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // vocabularyManifest is a vocabulary-only manifest: verbs, and nothing that
@@ -24,6 +25,7 @@ const vocabularyManifest = `{
 }`
 
 func TestVerbs_AVocabularyOnlyManifestValidatesAndRequiresContract9(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	t.Parallel()
 	m, diags := ParseManifest(fmt.Appendf(nil, vocabularyManifest, protocolcli.VerbVocabularyContract))
 	if diag.HasErrors(diags) {
@@ -51,6 +53,7 @@ func TestVerbs_AVocabularyOnlyManifestValidatesAndRequiresContract9(t *testing.T
 }
 
 func TestVerbs_LoadRefusesAVocabularyStampedBelowContract9(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "a-manifest-below-its-rung-does-not-load")
 	t.Parallel()
 	data := fmt.Appendf(nil, vocabularyManifest, protocolcli.ExtensionDependenciesContract)
 	m, err := NegotiateManifest("putnami.extension.json", data)
@@ -131,6 +134,7 @@ func TestVerbs_AnEmptyVocabularyIsRejected(t *testing.T) {
 // Every manifest written before the section keeps its verdict and its stamp.
 // The mutation is the control that proves the validator is wired.
 func TestVerbs_AdditiveForEveryValidFixture(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	t.Parallel()
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil || len(files) == 0 {

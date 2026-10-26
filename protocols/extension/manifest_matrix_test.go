@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The cliContract compatibility matrix, executable.
@@ -111,6 +112,7 @@ func writeMatrixManifest(t *testing.T, body string) string {
 // different failure from a rejection, and the remediation text is the only part
 // of it they see.
 func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "the-compatibility-matrix-holds")
 	current := protocolcli.CurrentContract
 	latest := protocolcli.LatestContract
 	repackage := func(required int) []string {
@@ -215,6 +217,7 @@ func assertRejected(t *testing.T, m *Manifest, err error, want []string) {
 // capabilities from an extension whose contract was never verified — and the
 // matrix above would still pass its commands rows.
 func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "every-surface-kind-is-governed")
 	cases := map[string]bool{
 		commandsSurface:             true,
 		commandGroupsSurface:        true,

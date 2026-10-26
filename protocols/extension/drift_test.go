@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // schemaProperties extracts property names from a schema $defs entry.
@@ -110,38 +111,46 @@ const schemaPath = "schemas/extension.json"
 // top-level section could be added to one side alone — which is exactly how the
 // runtime and workspace sections could have drifted in.
 func TestDrift_Manifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "Manifest", schemaRootProperties(t), goTypeJSONFields(t, Manifest{}))
 }
 
 func TestDrift_RuntimeDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "runtimeDefinition")
 	goFields := goTypeJSONFields(t, RuntimeDefinition{})
 	assertFieldParity(t, "RuntimeDefinition", schemaFields, goFields)
 }
 
 func TestDrift_RuntimePrepare(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "runtimePrepare")
 	goFields := goTypeJSONFields(t, RuntimePrepare{})
 	assertFieldParity(t, "RuntimePrepare", schemaFields, goFields)
 }
 
 func TestDrift_RuntimeToolchain(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "RuntimeToolchain", schemaDefProperties(t, "runtimeToolchain"), goTypeJSONFields(t, RuntimeToolchain{}))
 }
 
 func TestDrift_RuntimeToolchainCandidate(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "RuntimeToolchainCandidate", schemaDefProperties(t, "runtimeToolchainCandidate"), goTypeJSONFields(t, RuntimeToolchainCandidate{}))
 }
 
 func TestDrift_RuntimeToolchainProbe(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "RuntimeToolchainProbe", schemaDefProperties(t, "runtimeToolchainProbe"), goTypeJSONFields(t, RuntimeToolchainProbe{}))
 }
 
 func TestDrift_RuntimeToolchainEnvironment(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "RuntimeToolchainEnvironment", schemaDefProperties(t, "runtimeToolchainEnvironment"), goTypeJSONFields(t, RuntimeToolchainEnvironment{}))
 }
 
 func TestDrift_WorkspaceAdapter(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "workspaceAdapter")
 	goFields := goTypeJSONFields(t, WorkspaceAdapter{})
 	assertFieldParity(t, "WorkspaceAdapter", schemaFields, goFields)
@@ -151,18 +160,21 @@ func TestDrift_WorkspaceAdapter(t *testing.T) {
 // is defined, so a field on one side alone would let an extension declare a
 // rule the schema cannot express, or the schema promise one Go never reads.
 func TestDrift_EcosystemProfile(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "ecosystemProfile")
 	goFields := goTypeJSONFields(t, EcosystemProfile{})
 	assertFieldParity(t, "EcosystemProfile", schemaFields, goFields)
 }
 
 func TestDrift_PatternRule(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "patternRule")
 	goFields := goTypeJSONFields(t, PatternRule{})
 	assertFieldParity(t, "PatternRule", schemaFields, goFields)
 }
 
 func TestDrift_VersionRule(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "versionRule")
 	goFields := goTypeJSONFields(t, VersionRule{})
 	assertFieldParity(t, "VersionRule", schemaFields, goFields)
@@ -203,6 +215,7 @@ func schemaDefEnum(t *testing.T, defName, property string) []string {
 // alone is a manifest a consumer accepts and a producer cannot write, or the
 // reverse.
 func TestDrift_DeclaredOutputVocabularies(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	if got := schemaDefEnum(t, "declaredOutput", "kind"); !reflect.DeepEqual(got, ValidOutputKinds) {
 		t.Errorf("declared output kind drift: schema %v, Go %v", got, ValidOutputKinds)
 	}
@@ -216,6 +229,7 @@ func TestDrift_DeclaredOutputVocabularies(t *testing.T) {
 // ratchet from staying green while a real lifecycle field is renamed, removed,
 // or no longer observed by ManifestLifecyclePrimitives.
 func TestDrift_LifecyclePrimitiveSurfaces(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	expectedRegistry := []LifecyclePrimitiveID{
 		LifecyclePrimitiveInvocation,
 		LifecyclePrimitiveRuntime,
@@ -330,6 +344,7 @@ func containsString(values []string, want string) bool {
 // field, and a re-added `when` property would fail TestDrift_PipelineStep as an
 // unmatched schema member.
 func TestDrift_StepRunOn(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	if got := schemaDefEnum(t, "pipelineStep", "runOn"); !reflect.DeepEqual(got, ValidStepRunOn) {
 		t.Errorf("step run condition drift: schema %v, Go %v", got, ValidStepRunOn)
 	}
@@ -341,6 +356,7 @@ func TestDrift_StepRunOn(t *testing.T) {
 }
 
 func TestDrift_CommandDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "commandDefinition")
 	goFields := goTypeJSONFields(t, CommandDefinition{})
 	// "activation" is an intentionally undocumented internal field.
@@ -356,52 +372,61 @@ func TestDrift_CommandDefinition(t *testing.T) {
 }
 
 func TestDrift_SessionPrerequisiteDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "SessionPrerequisiteDefinition",
 		schemaDefProperties(t, "sessionPrerequisiteDefinition"),
 		goTypeJSONFields(t, SessionPrerequisiteDefinition{}))
 }
 
 func TestDrift_SessionPrerequisiteParamBinding(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "SessionPrerequisiteParamBinding",
 		schemaDefProperties(t, "sessionPrerequisiteParamBinding"),
 		goTypeJSONFields(t, SessionPrerequisiteParamBinding{}))
 }
 
 func TestDrift_ToolDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "toolDefinition")
 	goFields := goTypeJSONFields(t, ToolDefinition{})
 	assertFieldParity(t, "ToolDefinition", schemaFields, goFields)
 }
 
 func TestDrift_AgentContentContribution(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "agentContentContribution")
 	goFields := goTypeJSONFields(t, AgentContentContribution{})
 	assertFieldParity(t, "AgentContentContribution", schemaFields, goFields)
 }
 
 func TestDrift_VerbDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	assertFieldParity(t, "VerbDefinition", schemaDefProperties(t, "verbDefinition"), goTypeJSONFields(t, VerbDefinition{}))
 }
 
 func TestDrift_ToolAnnotations(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "toolAnnotations")
 	goFields := goTypeJSONFields(t, ToolAnnotations{})
 	assertFieldParity(t, "ToolAnnotations", schemaFields, goFields)
 }
 
 func TestDrift_HookDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "commandHookDefinition")
 	goFields := goTypeJSONFields(t, HookDefinition{})
 	assertFieldParity(t, "HookDefinition", schemaFields, goFields)
 }
 
 func TestDrift_PipelineStep(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "pipelineStep")
 	goFields := goTypeJSONFields(t, PipelineStep{})
 	assertFieldParity(t, "PipelineStep", schemaFields, goFields)
 }
 
 func TestDrift_FinalizesRelation(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "finalizesRelation")
 	goFields := goTypeJSONFields(t, FinalizesRelation{})
 	assertFieldParity(t, "FinalizesRelation", schemaFields, goFields)
@@ -411,12 +436,14 @@ func TestDrift_FinalizesRelation(t *testing.T) {
 // a field could be added to the schema or to Go alone. They have one now.
 
 func TestDrift_StepActivation(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "stepActivation")
 	goFields := goTypeJSONFields(t, StepActivation{})
 	assertFieldParity(t, "StepActivation", schemaFields, goFields)
 }
 
 func TestDrift_TaskInputPort(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "taskInputPort")
 	goFields := goTypeJSONFields(t, TaskInputPort{})
 	assertFieldParity(t, "TaskInputPort", schemaFields, goFields)
@@ -426,6 +453,7 @@ func TestDrift_TaskInputPort(t *testing.T) {
 // against the Go constants and the strict validator's own set, so an input
 // source can never be added to one side alone.
 func TestDrift_TaskInputSourceVocabulary(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatalf("read schema %s: %v", schemaPath, err)
@@ -472,24 +500,28 @@ func TestDrift_TaskInputSourceVocabulary(t *testing.T) {
 }
 
 func TestDrift_TaskCacheKey(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "taskCacheKey")
 	goFields := goTypeJSONFields(t, TaskCacheKey{})
 	assertFieldParity(t, "TaskCacheKey", schemaFields, goFields)
 }
 
 func TestDrift_TaskDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "taskDefinition")
 	goFields := goTypeJSONFields(t, TaskDefinition{})
 	assertFieldParity(t, "TaskDefinition", schemaFields, goFields)
 }
 
 func TestDrift_TaskDeclaration(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "taskDeclaration")
 	goFields := goTypeJSONFields(t, TaskDeclaration{})
 	assertFieldParity(t, "TaskDeclaration", schemaFields, goFields)
 }
 
 func TestDrift_DeclaredOutput(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "declaredOutput")
 	goFields := goTypeJSONFields(t, DeclaredOutput{})
 	assertFieldParity(t, "DeclaredOutput", schemaFields, goFields)
@@ -498,6 +530,7 @@ func TestDrift_DeclaredOutput(t *testing.T) {
 // TestDrift_TaskEffectVocabulary pins the closed effect enum in the schema
 // against the Go vocabulary, so an effect can never be added to one side alone.
 func TestDrift_TaskEffectVocabulary(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatalf("read schema %s: %v", schemaPath, err)
@@ -522,6 +555,7 @@ func TestDrift_TaskEffectVocabulary(t *testing.T) {
 }
 
 func TestDrift_TaskBatchPolicy(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "taskBatchPolicy")
 	goFields := goTypeJSONFields(t, TaskBatchPolicy{})
 	assertFieldParity(t, "TaskBatchPolicy", schemaFields, goFields)
@@ -534,6 +568,7 @@ func TestDrift_TaskBatchPolicy(t *testing.T) {
 // against the schema, so a kind or a workload one side accepts is never one
 // the other refuses.
 func TestDrift_CommandTraits(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "commandTraits")
 	goFields := goTypeJSONFields(t, CommandTraits{})
 	assertFieldParity(t, "CommandTraits", schemaFields, goFields)
@@ -546,24 +581,28 @@ func TestDrift_CommandTraits(t *testing.T) {
 }
 
 func TestDrift_StepCacheOverride(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "stepCacheOverride")
 	goFields := goTypeJSONFields(t, StepCacheOverride{})
 	assertFieldParity(t, "StepCacheOverride", schemaFields, goFields)
 }
 
 func TestDrift_CommandGroupDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "commandGroupDefinition")
 	goFields := goTypeJSONFields(t, CommandGroupDefinition{})
 	assertFieldParity(t, "CommandGroupDefinition", schemaFields, goFields)
 }
 
 func TestDrift_SubcommandDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "subcommandDefinition")
 	goFields := goTypeJSONFields(t, SubcommandDefinition{})
 	assertFieldParity(t, "SubcommandDefinition", schemaFields, goFields)
 }
 
 func TestDrift_ExampleDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "exampleDefinition")
 	goFields := goTypeJSONFields(t, ExampleDefinition{})
 	assertFieldParity(t, "ExampleDefinition", schemaFields, goFields)
@@ -589,6 +628,7 @@ func TestHookDefinition_OutputField(t *testing.T) {
 // highest contract the CLI reads, and its description to every rung up to it,
 // so a new rung cannot ship with a schema that refuses its stamp.
 func TestDrift_CliContractBound(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatalf("read schema %s: %v", schemaPath, err)
