@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "features/feature-contracts#acceptance-verdicts",
+    "features/feature-contracts#canonical-bytes-across-languages",
+    "features/feature-contracts#conformance-corpus",
+    "features/feature-contracts#findings-name-file-positions",
+    "features/feature-contracts#go-proof-fragments",
+    "features/feature-contracts#objective-verdicts",
+    "features/feature-contracts#one-report-per-project",
+    "features/feature-contracts#only-enforce-blocks",
+    "features/feature-contracts#ratchets-and-decisions",
+    "features/feature-contracts#strict-versioned-documents"
+  ]
+}

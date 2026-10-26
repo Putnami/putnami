@@ -93,6 +93,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
           "producerProject": "/protocols/http-routes"
         },
         {

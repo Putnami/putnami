@@ -50,6 +50,7 @@ func readFragments(t *testing.T, directory string) []Fragment {
 }
 
 func TestProvesRecordsTheVerdictTestingRecorded(t *testing.T) {
+	Proves(t, "features/feature-contracts", "go-proof-fragments", "a-go-binding-records-the-verdict-testing-recorded")
 	for name, tc := range map[string]struct {
 		failed, skipped bool
 		want            string
@@ -81,6 +82,7 @@ func TestProvesRecordsTheVerdictTestingRecorded(t *testing.T) {
 }
 
 func TestProvesIsInertWithoutTheAdapter(t *testing.T) {
+	Proves(t, "features/feature-contracts", "go-proof-fragments", "a-go-binding-writes-nothing-without-the-adapter-directory")
 	fake := &fakeOutcome{}
 	proves(fake, "", Fragment{Feature: "go/x", Requirement: "r", Check: "c"})
 	if len(fake.cleanups) != 0 {
@@ -93,6 +95,7 @@ func TestProvesIsInertWithoutTheAdapter(t *testing.T) {
 // fragment is staged and renamed), and byte-identical observations land under
 // one content-derived name instead of multiplying.
 func TestProvesIsConcurrencySafeAndCollapsesDuplicates(t *testing.T) {
+	Proves(t, "features/feature-contracts", "go-proof-fragments", "identical-concurrent-observations-collapse-into-one-fragment")
 	directory := t.TempDir()
 	var wait sync.WaitGroup
 	for worker := 0; worker < 32; worker++ {
@@ -157,6 +160,7 @@ func TestProvesEndToEndWroteTheFragment(t *testing.T) {
 // absent observation resolves as missing), and the fragment carries no
 // verdict of its own.
 func TestObserveMeasurementPublishesOnlyOnAPassingTest(t *testing.T) {
+	Proves(t, "features/feature-contracts", "go-proof-fragments", "a-go-measurement-is-published-only-by-a-passing-test")
 	measurement := Measurement{Name: "logger.flush.duration", Aggregation: "p95", Value: 12.5, Unit: "ms"}
 	start := mustParseInstant(t, "2026-08-18T10:00:00Z")
 
@@ -211,6 +215,7 @@ func TestObserveMeasurementPublishesOnlyOnAPassingTest(t *testing.T) {
 // inertness contract: plain `go test` without the adapter registers no
 // cleanup work and writes nothing.
 func TestObserveMeasurementIsInertWithoutAFragmentDirectory(t *testing.T) {
+	Proves(t, "features/feature-contracts", "go-proof-fragments", "a-go-binding-writes-nothing-without-the-adapter-directory")
 	fake := &fakeOutcome{}
 	observe(fake, "", mustParseInstant(t, "2026-08-18T10:00:00Z"), Fragment{
 		Feature: "gate/example", Requirement: "flush-latency", Check: "flush-benchmark",
