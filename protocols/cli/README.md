@@ -223,7 +223,8 @@ session verdict and its bounded stream follow the contract.
 `@putnami/cli-protocol` proves its TypeScript validator against the same
 schemas and the same conformance corpus, in its `the-typescript-...` checks.
 `@putnami/cli` keeps the features of its commands, and `@putnami/cli-protocol`
-keeps its package API under `typescript/cli-machine-output`.
+keeps its exports, its violation order and, until the `qualify` slice, `qualify-verdict-wire`
+under `typescript/cli-machine-output`.
 
 Durable decisions (both scope `protocols/cli` explicitly):
 
