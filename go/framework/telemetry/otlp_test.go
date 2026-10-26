@@ -205,7 +205,7 @@ func TestOTLPMetricExporter_Export(t *testing.T) {
 }
 
 func TestOTLPMetricReader_FinalFlushOnShutdown(t *testing.T) {
-	spectest.Proves(t, "go/service-telemetry", "final-flush", "the-metric-reader-flushes-once-more-during-provider-shutdown")
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-exporter-never-hurts-the-workload", "the-go-metric-reader-flushes-once-more-on-shutdown")
 	col := &testCollector{}
 	srv := col.server(t)
 	ctx := context.Background()
@@ -232,7 +232,7 @@ func TestOTLPMetricReader_FinalFlushOnShutdown(t *testing.T) {
 }
 
 func TestOTLPMetricExporter_DropsOnCollectorError(t *testing.T) {
-	spectest.Proves(t, "go/service-telemetry", "never-fails-the-workload", "a-collector-error-is-dropped-rather-than-propagated")
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-exporter-never-hurts-the-workload", "the-go-exporter-swallows-a-collector-error")
 	col := &testCollector{status: http.StatusInternalServerError}
 	srv := col.server(t)
 	ctx := context.Background()

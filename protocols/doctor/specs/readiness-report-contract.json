@@ -19,7 +19,7 @@
     },
     {
       "id": "check-codes-are-frozen",
-      "text": "The check-code taxonomy holds 17 codes, each with a baked remediation, and an unknown code has none. A code is frozen once merged: adding one is additive, while renaming, repurposing or removing one bumps the version. Severity is info, warning, high or critical, and profile is dev, test or production."
+      "text": "The check-code taxonomy holds 17 codes, each with a baked remediation, and an unknown code has none. Severity is info, warning, high or critical, and profile is dev, test or production."
     },
     {
       "id": "the-parsers-are-strict",

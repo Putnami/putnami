@@ -197,8 +197,9 @@ func TestCrossLanguage_Logs(t *testing.T) {
 
 // checkGolden marshals input canonically, compares against the committed golden
 // bytes, and asserts the digest matches the pinned constant. With
-// UPDATE_GOLDEN=1 it (re)writes the golden file and prints the digest to copy
-// into the constants above.
+// UPDATE_GOLDEN=1 it first (re)writes the golden file and prints the digest to
+// copy into the constants above; the comparison still runs, so the test fails
+// until the pinned digest matches the bytes it wrote.
 func checkGolden(t *testing.T, name, wantDigest string, input any) {
 	t.Helper()
 	got, err := MarshalCanonical(input)
@@ -212,7 +213,6 @@ func checkGolden(t *testing.T, name, wantDigest string, input any) {
 			t.Fatal(err)
 		}
 		t.Logf("wrote %s digest=%s", name, Digest(got))
-		return
 	}
 
 	want, err := os.ReadFile(path)

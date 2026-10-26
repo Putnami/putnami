@@ -36,7 +36,8 @@
             "checks": [
               "every-valid-fixture-validates",
               "every-invalid-fixture-fails-with-its-code",
-              "every-expected-code-is-registered"
+              "every-expected-code-is-registered",
+              "the-typescript-validator-gives-every-fixture-its-verdict-and-code"
             ]
           }
         },
@@ -64,7 +65,8 @@
             "kind": "acceptance",
             "checks": [
               "the-golden-pins-the-bytes-and-the-digest",
-              "input-order-and-method-case-do-not-matter"
+              "input-order-and-method-case-do-not-matter",
+              "the-typescript-serializer-reproduces-the-golden"
             ]
           }
         },
@@ -80,7 +82,8 @@
               "the-go-server-describes-a-valid-inventory",
               "the-go-server-refuses-a-wildcard",
               "the-typescript-aggregate-validates",
-              "the-typescript-aggregate-refuses-an-unsupported-pattern"
+              "the-typescript-aggregate-refuses-an-unsupported-pattern",
+              "the-web-routes-pass-the-strict-parser"
             ]
           }
         }

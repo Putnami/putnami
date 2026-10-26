@@ -226,9 +226,11 @@ commitment, not a maturity stage.
 
 The module owns the feature of its contract, `http-routes/route-inventory-contract`,
 specified in [`specs/route-inventory-contract.json`](specs/route-inventory-contract.json).
-The tests here prove its requirements, and so do two producers: the Go HTTP
-server (`go/framework/http`), whose `Describe` emits the inventory, and the
-TypeScript extension (`typescript/extension`), which merges the framework
-fragments into it. The workloads that declare routes keep the features of what
+The tests here prove its requirements, and so do four implementations: the Go
+HTTP server (`go/framework/http`), whose `Describe` emits the inventory;
+`@putnami/application`, whose TypeScript validator and serializer replay the
+corpus and the golden; `@putnami/web`, whose page, action and asset routes pass
+the strict parser; and the TypeScript extension (`typescript/extension`), which
+merges the framework fragments into it. The workloads that declare routes keep the features of what
 they deliver. The design intent lives in
 [`doc/adr/0001-route-inventory-is-not-openapi.md`](doc/adr/0001-route-inventory-is-not-openapi.md).

@@ -10,8 +10,7 @@
   "nonGoals": [
     "A /metrics scrape endpoint: telemetry is pushed, as ADR 0001 records",
     "Authentication of the operational endpoints, which workloads put behind an admin port or a sidecar",
-    "A JSON Schema for the envelope: the Go types, the strict validator and the shared fixtures are the contract",
-    "The TypeScript platform() plugin of @putnami/application, which reads the same fixtures under its own tests"
+    "A JSON Schema for the envelope: the Go types, the strict validator and the shared fixtures are the contract"
   ],
   "requirements": [
     {
@@ -28,7 +27,7 @@
     },
     {
       "id": "the-envelope-states-one-status",
-      "text": "An envelope status is ok, unavailable or degraded. ok requires every checks entry to be exactly ok, degraded requires at least one failing entry, and unavailable carries no checks. A probe name matches [a-z0-9][a-z0-9_./-]{0,63}. Every valid envelope fixture validates, every invalid one is refused, and the envelopes the Go runtime serves validate."
+      "text": "An envelope status is ok, unavailable or degraded. ok requires every checks entry to be exactly ok, degraded requires at least one failing entry, and unavailable carries no checks. A probe name matches [a-z0-9][a-z0-9_./-]{0,63}. Every valid envelope fixture validates, every invalid one is refused, and the envelopes the Go runtime serves validate. The TypeScript port of @putnami/application gives every envelope fixture the same verdict."
     },
     {
       "id": "ok-is-200-and-the-rest-is-503",
@@ -36,7 +35,7 @@
     },
     {
       "id": "probes-are-discovered-and-bounded",
-      "text": "Probes are discovered from the module tree and keyed by plugin name, and an explicit registration wins over a discovered probe. A health probe feeds /healthz and a readiness probe feeds /readyz, each with a stated failure consequence. A probe is concurrency-safe, respects cancellation and gets 5 seconds by default, and its failure is reported as its error string."
+      "text": "The contract fixes the probe rules: discovery from the module tree keyed by plugin name, where an explicit registration wins; a health probe feeds /healthz and a readiness probe /readyz, each with a failure consequence; a probe is concurrency-safe, respects cancellation, gets 5 seconds by default and fails with its error string. The Go runtime keeps an explicit probe, feeds both aggregates from a probe with both capabilities, runs each probe under its own timeout and answers when one ignores cancellation."
     },
     {
       "id": "prefixes-normalize-to-one-form",
@@ -44,7 +43,7 @@
     },
     {
       "id": "the-error-codes-are-a-closed-set",
-      "text": "The strict validators register exactly nine platform.* codes. platform.missing_probe names a required probe that is absent; it is reported through a degraded envelope, so it is not a validator code and needs no version bump."
+      "text": "The strict validators register exactly nine platform.* codes. platform.missing_probe, the label of a required probe that is absent, is not one of them, so it needs no version bump."
     }
   ],
   "decisions": [

@@ -61,7 +61,9 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-export-defaults-are-pinned"
+              "the-export-defaults-are-pinned",
+              "the-go-metric-reader-flushes-once-more-on-shutdown",
+              "the-go-exporter-swallows-a-collector-error"
             ]
           }
         },
@@ -101,7 +103,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "each-signal-matches-its-golden"
+              "each-signal-matches-its-golden",
+              "the-typescript-renderer-reproduces-each-digest"
             ]
           }
         },

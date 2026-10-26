@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"fmt"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -428,6 +429,12 @@ func TestEnums_ValuesMatchMaps(t *testing.T) {
 		if !ValidProfiles[p] {
 			t.Errorf("ProfileValues has %q but ValidProfiles does not", p)
 		}
+	}
+	if got, want := fmt.Sprint(SeverityValues), "[info warning high critical]"; got != want {
+		t.Errorf("SeverityValues = %s, want %s", got, want)
+	}
+	if got, want := fmt.Sprint(ProfileValues), "[dev test production]"; got != want {
+		t.Errorf("ProfileValues = %s, want %s", got, want)
 	}
 }
 

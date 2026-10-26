@@ -68,7 +68,8 @@
               "each-status-constrains-its-checks",
               "a-probe-name-is-canonical",
               "every-envelope-fixture-gets-its-verdict",
-              "a-served-readiness-envelope-validates"
+              "a-served-readiness-envelope-validates",
+              "the-typescript-port-gives-every-envelope-fixture-its-verdict"
             ]
           }
         },
@@ -98,7 +99,10 @@
               "the-discovery-rules-are-fixed",
               "each-capability-feeds-its-endpoint",
               "the-probe-rules-are-fixed",
-              "a-probe-with-both-capabilities-feeds-both-aggregates"
+              "a-probe-with-both-capabilities-feeds-both-aggregates",
+              "the-go-runtime-keeps-an-explicit-probe-over-a-discovered-one",
+              "the-go-runtime-runs-each-probe-under-its-own-timeout",
+              "the-go-runtime-answers-when-a-probe-ignores-cancellation"
             ]
           }
         },

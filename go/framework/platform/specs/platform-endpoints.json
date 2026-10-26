@@ -29,15 +29,11 @@
     },
     {
       "id": "deferred-discovery",
-      "text": "Probe discovery walks the module tree on the first aggregate request rather than during configure, so a probe contributed by a plugin configured later is still found, and an explicitly registered probe is never overwritten by a discovered one of the same name."
+      "text": "Probe discovery walks the module tree on the first aggregate request rather than during configure, so a probe contributed by a plugin configured later is still found."
     },
     {
       "id": "probe-names",
       "text": "Probe names are validated against the cross-language probe-name pattern when registered explicitly, and a discovered or required name that violates it fails application start rather than emitting an envelope the protocol's own validator would reject."
-    },
-    {
-      "id": "bounded-probes",
-      "text": "Probes run in parallel, each under its own timeout, and the aggregate answers after a bounded grace period even when a probe ignores cancellation."
     },
     {
       "id": "required-probes",

@@ -612,7 +612,7 @@ func TestHealthz_NilProbeMetrics_NoPanic(t *testing.T) {
 // time out on its own but leave the fast probes free to report their
 // real status (not "context deadline exceeded").
 func TestHealthz_ParallelProbes_PerProbeTimeout(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "bounded-probes", "probes-run-in-parallel-each-under-its-own-timeout")
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-go-runtime-runs-each-probe-under-its-own-timeout")
 	p := NewPlugin(Config{ProbeTimeout: 100 * time.Millisecond})
 
 	slow := &slowHealthPlugin{name: "slow", delay: 2 * time.Second}
@@ -653,7 +653,7 @@ func TestHealthz_ParallelProbes_PerProbeTimeout(t *testing.T) {
 // out, and still surface the fast probe's real status — even though the
 // stubborn probe's goroutine keeps running for the full 2s in the background.
 func TestHealthz_NonCooperativeProbe_DoesNotStall(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "bounded-probes", "a-probe-that-ignores-cancellation-does-not-stall-the-aggregate")
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-go-runtime-answers-when-a-probe-ignores-cancellation")
 	p := NewPlugin(Config{ProbeTimeout: 100 * time.Millisecond})
 
 	stubborn := &stubbornHealthPlugin{name: "stubborn", delay: 2 * time.Second, started: make(chan struct{})}
@@ -713,7 +713,7 @@ func TestHealthz_NoDataRace_OnConcurrentAddAndAggregate(t *testing.T) {
 }
 
 func TestHealthz_ExplicitAddChecker_WinsOverAutoDiscovery(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "deferred-discovery", "an-explicitly-registered-probe-is-not-overwritten-by-a-discovered-one")
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-go-runtime-keeps-an-explicit-probe-over-a-discovered-one")
 	p := NewPlugin(Config{})
 	// Explicit probe registered before Configure.
 	if err := p.AddHealthChecker("db", func(_ context.Context) error { return fmt.Errorf("explicit wins") }); err != nil {

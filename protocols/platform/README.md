@@ -178,10 +178,12 @@ commitment, not a maturity stage.
 
 The module owns the feature of its contract, `platform/operational-endpoints`,
 specified in [`specs/operational-endpoints.json`](specs/operational-endpoints.json).
-The tests here prove its requirements, and so does the Go platform plugin
-(`go/framework/platform`), whose mounted paths, profiling handlers, prefix,
-served envelopes, status codes and startup gating are checked against this
-package. The endpoint set moved here from the plugin's own feature,
-`go/platform-endpoints`, which keeps self-mounting, the lifecycle and probe
-discovery. The design intent lives in
+The tests here prove its requirements, and so do two implementations: the Go
+platform plugin (`go/framework/platform`), whose mounted paths, profiling
+handlers, prefix, served envelopes, status codes, startup gating and probe
+handling are checked against this package, and the TypeScript `platform()`
+plugin of `@putnami/application`, which gives every envelope fixture the same
+verdict. The endpoint set and the probe rules moved here from the Go plugin's
+own feature, `go/platform-endpoints`, which keeps self-mounting, the lifecycle
+and when discovery walks the module tree. The design intent lives in
 [`doc/adr/0001-no-metrics-scrape-endpoint.md`](doc/adr/0001-no-metrics-scrape-endpoint.md).

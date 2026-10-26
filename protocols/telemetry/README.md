@@ -104,11 +104,15 @@ commitment, not a maturity stage.
 The module owns the feature of its contract, `telemetry/otlp-push-contract`,
 specified in [`specs/otlp-push-contract.json`](specs/otlp-push-contract.json).
 The tests here prove its requirements, `cliusage` included. So do the Go
-telemetry framework (`go/framework/telemetry`), whose log sink and OTLP mappings
-are checked against this package, the CLI (`tooling/cli`), whose usage encoder
+telemetry framework (`go/framework/telemetry`), whose log sink, OTLP mappings,
+final flush and dropped collector errors are checked against this package, the
+TypeScript renderer of `@putnami/application`, which reproduces the golden
+digests, the CLI (`tooling/cli`), whose usage encoder
 produces the `cliusage` golden and whose guard records only vocabulary events,
 and the usage receiver
 (`sites/telemetry.putnami.dev`), which keeps a conforming record. Those projects
 keep the features of what they deliver: whether the CLI sends usage telemetry,
-its notice and its opt-out belong to the CLI. The design intent lives in
+its notice and its opt-out belong to the CLI. The final flush and the dropped
+collector error moved here from the Go framework's feature,
+`go/service-telemetry`. The design intent lives in
 [`doc/adr/0001-otlp-json-is-the-only-transport.md`](doc/adr/0001-otlp-json-is-the-only-transport.md).

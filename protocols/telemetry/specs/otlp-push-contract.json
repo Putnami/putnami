@@ -10,8 +10,7 @@
   "nonGoals": [
     "A /metrics scrape endpoint, gRPC OTLP, statsd or a Prometheus push gateway: OTLP/JSON over HTTP is the one transport, as ADR 0001 records",
     "An OpenTelemetry exporter SDK dependency: the envelope is written against the wire format",
-    "Whether the CLI sends usage telemetry, and its notice and opt-out, which the CLI owns",
-    "The TypeScript renderer of @putnami/application, which matches the same digests under its own tests"
+    "Whether the CLI sends usage telemetry, and its notice and opt-out, which the CLI owns"
   ],
   "requirements": [
     {
@@ -28,7 +27,7 @@
     },
     {
       "id": "the-exporter-never-hurts-the-workload",
-      "text": "An exporter flushes every 10 seconds by default with a 5-second timeout, flushes once more on shutdown, drops a batch when the collector fails, and caps its in-memory queue at 10000 records."
+      "text": "The contract pins an exporter's defaults: a flush every 10 seconds with a 5-second timeout, one more flush on shutdown, a batch dropped when the collector fails, and an in-memory queue capped at 10000 records. The Go metric reader flushes once more on shutdown, and the Go exporter swallows a collector error rather than return it."
     },
     {
       "id": "the-parser-is-strict",
@@ -40,7 +39,7 @@
     },
     {
       "id": "equivalent-input-serializes-to-the-same-bytes",
-      "text": "MarshalCanonical turns the fixed input of each signal into exactly the bytes of its committed golden, and those bytes hash to a pinned SHA-256 digest, so a second runtime proves byte equality by reproducing the digests."
+      "text": "MarshalCanonical turns the fixed input of each signal into exactly the bytes of its committed golden, and those bytes hash to a pinned SHA-256 digest. The TypeScript renderer of @putnami/application builds the same input and reproduces the three digests."
     },
     {
       "id": "values-map-to-otlp-numbers",

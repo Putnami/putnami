@@ -243,10 +243,10 @@ the plugin adds, backed by [discover probes on the request path, validate their
 names at start](doc/adr/0001-probe-discovery-happens-on-the-request-path.md) and [a
 route plugin mounts itself on the application's single
 server](../http/doc/adr/0003-a-route-plugin-mounts-itself-on-the-application-server.md).
-The endpoint set, the envelope and the status mapping belong to the feature of the
-[platform protocol](../../../protocols/platform/README.md),
-`platform/operational-endpoints`; the endpoint, profiling and envelope tests here
-prove its checks.
+The endpoint set, the envelope, the status mapping and the probe rules belong to
+the feature of the [platform protocol](../../../protocols/platform/README.md),
+`platform/operational-endpoints`; the endpoint, profiling, envelope and probe
+tests here prove its checks.
 
 Regression evidence covers [endpoint mounting, lifecycle state, probe discovery,
 bounded probes, required probes, redaction, and protocol
