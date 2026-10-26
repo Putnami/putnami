@@ -77,7 +77,7 @@ func TestCopyHookFiles_StagedOutputLoadsUnderTheCurrentLoader(t *testing.T) {
 func TestCopyHookFiles_RatchetsAStaleLowerClaim(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "a-stale-lower-claim-is-ratcheted-to-the-earned-one")
 	if protocolcli.CurrentContract < 2 {
-		t.Skip("no lower contract to ratchet from")
+		t.Fatalf("the ratchet needs a contract below the current one, and CurrentContract is %d", protocolcli.CurrentContract)
 	}
 	stale := strings.Replace(conformingCLIManifest,
 		`"name": "@putnami/testext",`,
