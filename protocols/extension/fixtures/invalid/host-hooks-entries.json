@@ -92,6 +92,10 @@
           "event": "Stop",
           "wake": true,
           "timeoutSeconds": 3601
+        },
+        {
+          "event": "PostToolUse",
+          "timeoutSeconds": 30
         }
       ]
     }

@@ -191,9 +191,25 @@
     },
     "hostHookEntry": {
       "type": "object",
-      "description": "One hook: the host event it runs at and how the command is called there.",
+      "description": "One hook: the host event it runs at and how the command is called there. A PostToolUse hook names at least one tool or MCP tool.",
       "additionalProperties": false,
       "required": ["event", "timeoutSeconds"],
+      "allOf": [
+        {
+          "if": {
+            "required": ["event"],
+            "properties": {
+              "event": { "const": "PostToolUse" }
+            }
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["tools"], "properties": { "tools": { "minItems": 1 } } },
+              { "required": ["mcpTools"], "properties": { "mcpTools": { "minItems": 1 } } }
+            ]
+          }
+        }
+      ],
       "properties": {
         "event": {
           "type": "string",

@@ -274,9 +274,13 @@ func validateHostHookEntry(host string, events []string, field string, entry Hos
 	}
 
 	matches := len(entry.Tools) + len(entry.MCPTools)
-	if matches > 0 && entry.Event != HostHookEventPostToolUse {
+	switch {
+	case matches > 0 && entry.Event != HostHookEventPostToolUse:
 		diags = append(diags, diag.Errorf("invalid-host-hook-matcher", field,
 			"only a %s hook names the tools it runs after", HostHookEventPostToolUse))
+	case matches == 0 && entry.Event == HostHookEventPostToolUse:
+		diags = append(diags, diag.Errorf("invalid-host-hook-matcher", field,
+			"a %s hook names the tools it runs after in tools or mcpTools; without them it runs after every tool", HostHookEventPostToolUse))
 	}
 	if matches > maxHostHookMatcherNames {
 		diags = append(diags, diag.Errorf("invalid-host-hook-matcher", field,

@@ -148,7 +148,7 @@ the command's exit code reaches the host unchanged.
 | `command` names a group and an interactive subcommand of this manifest, and any nested subcommand under it | `required-field`, `invalid-host-hooks-command` |
 | A host is `claude-code` or `codex`, and lists at least one hook | `unknown-host-hooks-host`, `empty-host-hooks` |
 | An event is one its host runs: `SessionStart`, `PostToolUse`, `Stop` and `StopFailure` for Claude Code; `SessionStart`, `PostToolUse` and `Stop` for Codex | `unknown-host-hook-event` |
-| Only `PostToolUse` names `tools` (host tool names) and `mcpTools` (namespaced Putnami MCP tool names, without a hyphen); no name repeats | `invalid-host-hook-matcher` |
+| Only `PostToolUse` names `tools` (host tool names) and `mcpTools` (namespaced Putnami MCP tool names, without a hyphen), and it names at least one of them; no name repeats | `invalid-host-hook-matcher` |
 | Every argument is letters, digits and `_ . / : = -`, so the shell reads it as written | `invalid-host-hook-args` |
 | Only a Claude Code hook declares `wake` | `invalid-host-hook-wake` |
 | `timeoutSeconds` is from 1 to 3600 | `invalid-host-hook-timeout` |

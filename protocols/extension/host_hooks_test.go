@@ -26,8 +26,9 @@ var hostHooksInvalidFixtureCodes = map[string][]string{
 	"host-hooks-command.json": {"invalid-host-hooks-command"},
 	// A host lists hooks, and the hosts are a closed list.
 	"host-hooks-hosts.json": {"empty-host-hooks", "unknown-host-hooks-host"},
-	// Events per host, matchers on PostToolUse only, shell-safe arguments,
-	// a bounded timeout, wake on Claude Code only, no repeated hook.
+	// Events per host, matchers on PostToolUse only and always there,
+	// shell-safe arguments, a bounded timeout, wake on Claude Code only, no
+	// repeated hook.
 	"host-hooks-entries.json": {
 		"unknown-host-hook-event",
 		"invalid-host-hook-matcher",
@@ -38,6 +39,7 @@ var hostHooksInvalidFixtureCodes = map[string][]string{
 		"unknown-host-hook-event",
 		"invalid-host-hook-wake",
 		"invalid-host-hook-timeout",
+		"invalid-host-hook-matcher",
 	},
 }
 

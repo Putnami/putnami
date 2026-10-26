@@ -217,7 +217,8 @@ type ToolCallRequest struct {
 // settings verbatim. The orchestrator writes it from the workspace binding;
 // the arguments member is the operation's validated request document.
 type ToolProviderCall struct {
-	// Contract is the contract name: "tasks", "proposals" or "memory".
+	// Contract is the contract name: "tasks", "proposals", "memory" or
+	// "missions".
 	Contract string `json:"contract"`
 	// Version is the contract version the workspace bound.
 	Version int `json:"version"`
