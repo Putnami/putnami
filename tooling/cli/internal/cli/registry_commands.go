@@ -492,8 +492,6 @@ func cmdDeps(env *CommandEnv) error {
 
 func cmdCache(env *CommandEnv) error {
 	if env.Sub == "" {
-		// Every subcommand of cache deletes or rebuilds shared state, so a bare
-		// `cache`, which a reader types to discover them, runs none of them.
 		return missingSubcommandError("cache")
 	}
 	if env.Global.DryRun && (env.Sub == "clean" || env.Sub == "gc" || env.Sub == "verify") {

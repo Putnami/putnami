@@ -400,7 +400,7 @@ putnami telemetry
 Subcommands:
   on
   off
-  status   (default)
+  status  (default)
   show
 
 Global Options:

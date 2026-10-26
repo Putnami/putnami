@@ -208,7 +208,7 @@ func TestCmdCacheDryRunRefusesBeforeStoreMutationOrExtensionHooks(t *testing.T) 
 // it exits with a usage error that lists clean, gc and verify, and neither the
 // shared store nor an extension cache hook is touched.
 func TestBareCacheListsItsSubcommandsAndTouchesNoStore(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-root-without-a-default-runs-nothing",
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
 		"a-bare-root-exits-with-its-subcommands-and-touches-no-store")
 	invocations := map[string][]string{
 		"bare":    {"cache"},
@@ -282,11 +282,11 @@ func TestBareCacheListsItsSubcommandsAndTouchesNoStore(t *testing.T) {
 	}
 }
 
-// TestBareRootsWithoutADefaultListTheirSubcommands proves every built-in root
-// that runs no default subcommand answers a bare invocation with the same
-// usage error, not an "unknown subcommand" with an empty name.
+// TestBareRootsWithoutADefaultListTheirSubcommands proves a bare `putnami
+// cli` or `putnami tree` answers with the usage error of a bare `putnami
+// cache`, which lists the subcommands.
 func TestBareRootsWithoutADefaultListTheirSubcommands(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-root-without-a-default-runs-nothing",
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
 		"a-bare-root-exits-with-its-subcommands-and-touches-no-store")
 	roots := map[string][]string{
 		"cli":  {"list", "use"},

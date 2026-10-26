@@ -2004,7 +2004,7 @@
           }
         },
         {
-          "id": "a-bare-root-without-a-default-runs-nothing",
+          "id": "a-bare-cache-runs-nothing",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"

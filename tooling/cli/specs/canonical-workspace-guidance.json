@@ -18,8 +18,8 @@
       "text": "Top-level, command, Markdown, man-page, completion, and structured help are derived from the command catalog and cover every public command."
     },
     {
-      "id": "a-bare-root-without-a-default-runs-nothing",
-      "text": "A built-in command root that declares no default subcommand runs nothing when typed bare: it exits with a usage error that lists its subcommands with their summaries, and its help lists them too. A reader who types putnami cache to discover its subcommands cannot wipe the shared cache store."
+      "id": "a-bare-cache-runs-nothing",
+      "text": "putnami cache, putnami cli and putnami tree typed without a subcommand run none: each exits with a usage error that lists its subcommands, so typing putnami cache to discover them cannot wipe the shared cache store. The help of a built-in command root lists the subcommands the command catalog declares for it, each with the summary it declares and the default one marked."
     },
     {
       "id": "onboarding-path",

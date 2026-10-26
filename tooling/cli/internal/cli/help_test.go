@@ -254,7 +254,7 @@ func TestPrintSubcommandHelp_IncludesRootStructuredCommandHelp(t *testing.T) {
 }
 
 func TestPrintSubcommandHelp_RootListsItsSubcommands(t *testing.T) {
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-root-without-a-default-runs-nothing",
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
 		"root-help-lists-its-subcommands")
 	tests := []struct {
 		command string

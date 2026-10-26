@@ -353,7 +353,7 @@ func subcommandLines(command string) []string {
 		entry, _ := commandmeta.Lookup(command + " " + child)
 		summary := entry.Summary
 		if child == root.DefaultSub {
-			summary += " (default)"
+			summary = strings.TrimSpace(summary + " (default)")
 		}
 		lines = append(lines, strings.TrimRight(fmt.Sprintf("  %-*s  %s", width, child, summary), " "))
 	}
