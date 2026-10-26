@@ -118,7 +118,8 @@
               "repository-findings-name-the-file-and-the-position",
               "spec-findings-name-their-position-and-bound",
               "the-spec-validator-refuses-content-outside-its-bounds",
-              "the-spec-field-set-matches-its-published-schema"
+              "the-spec-field-set-matches-its-published-schema",
+              "the-sdd-extension-states-the-bound-of-a-feature-text-finding"
             ]
           }
         },
