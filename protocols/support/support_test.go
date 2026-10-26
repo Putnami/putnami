@@ -148,8 +148,9 @@ func TestCanonicalCatalogSortsACopyAndRoundTrips(t *testing.T) {
 	if !reflect.DeepEqual(input.Entries, original) {
 		t.Fatal("MarshalCatalog mutated caller entry order")
 	}
-	var order []string
-	for _, entry := range CanonicalCatalog(input).Entries {
+	canonical := CanonicalCatalog(input).Entries
+	order := make([]string, 0, len(canonical))
+	for _, entry := range canonical {
 		order = append(order, entry.ID)
 	}
 	if want := []string{"alpha", "@putnami/python", "zeta"}; !reflect.DeepEqual(order, want) {
