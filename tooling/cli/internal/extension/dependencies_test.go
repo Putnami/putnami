@@ -68,7 +68,7 @@ func (f graphFixture) install(t *testing.T, name, manifest string) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(stored, link); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
+		t.Fatalf("cannot create the symbolic link %s -> %s: %v; on Windows, enable Developer Mode or run the tests with administrator rights", link, stored, err)
 	}
 }
 
