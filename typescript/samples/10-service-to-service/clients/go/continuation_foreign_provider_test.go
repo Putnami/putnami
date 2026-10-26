@@ -146,7 +146,7 @@ func sequence(to int) []float64 {
 // terminal.
 func TestTypeScriptProviderChangeFeedContinuesOnAnotherProcessForTheGeneratedGoClient(t *testing.T) {
 	spectest.Proves(t, matrixFeature, continuationRequirement,
-		"a-cursor-stream-continues-on-another-instance-after-the-last-delivered-change")
+		"the-go-consumer-continues-after-the-last-delivered-change-on-another-instance")
 	first, second := startForeignProviderInstance(t), startForeignProviderInstance(t)
 	front := newChangeFront(t, first)
 	generated := boundClientWithKey(t, front.URL, catalogAPIKey)
@@ -237,7 +237,7 @@ func TestTypeScriptProviderChangeFeedContinuesOnAnotherProcessForTheGeneratedGoC
 // runtime never reopens after a typed terminal.
 func TestTypeScriptProviderRefusesAPositionItNeverIssuedAsATypedError(t *testing.T) {
 	spectest.Proves(t, matrixFeature, continuationRequirement,
-		"a-position-the-provider-never-issued-is-its-typed-refusal")
+		"the-go-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal")
 	front := newChangeFront(t, startForeignProviderInstance(t))
 	generated := boundClientWithKey(t, front.URL, catalogAPIKey)
 	forged := "r999999"

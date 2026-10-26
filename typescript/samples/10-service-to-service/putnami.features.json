@@ -86,8 +86,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-cursor-stream-continues-on-another-instance-after-the-last-delivered-change",
-              "a-position-the-provider-never-issued-is-its-typed-refusal"
+              "the-go-consumer-continues-after-the-last-delivered-change-on-another-instance",
+              "the-go-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal",
+              "the-typescript-consumer-continues-after-the-last-delivered-change-on-another-instance",
+              "the-typescript-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal"
             ]
           }
         },
