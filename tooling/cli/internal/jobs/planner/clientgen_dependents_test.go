@@ -288,3 +288,48 @@ func TestPlan_DependentsRuleOrdersOnlyDependentsAndKeepsThePlanADAG(t *testing.T
 		}
 	}
 }
+
+// TestPlan_DependentsRuleOrdersAChainOfGenerators covers a generated client
+// that depends on another generated client: the second generator waits for the
+// first, and a consumer of the second waits for both.
+func TestPlan_DependentsRuleOrdersAChainOfGenerators(t *testing.T) {
+	ext := &extension.ExtensionDescription{
+		Name: "@test/gen",
+		Tasks: map[string]extension.TaskDefinition{
+			"gen": {Kind: "command", Command: "gen", Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+				"client": {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", ReadByDependents: true},
+			}}},
+			"run": {Kind: "command", Command: "run"},
+		},
+	}
+	base := &workspace.Project{ID: "/base", Name: "base", Path: "base"}
+	derived := &workspace.Project{ID: "/derived", Name: "derived", Path: "derived", Dependencies: []string{"/base"}}
+	consumer := &workspace.Project{ID: "/consumer", Name: "consumer", Path: "consumer", Dependencies: []string{"/derived"}}
+	ws := testWorkspace(t.TempDir(), base, derived, consumer)
+
+	generate := &extension.PipelineStep{ID: "generate", Task: "gen"}
+	run := &extension.PipelineStep{ID: "run", Task: "run"}
+	baseWriter := dependentsJob(base, ext, "clientgen~generate", generate)
+	derivedWriter := dependentsJob(derived, ext, "clientgen~generate", generate)
+	compile := dependentsJob(consumer, ext, "build~compile", run)
+	jobs := []*jobmodel.ScheduledJob{compile, derivedWriter, baseWriter}
+
+	orderContractClients(jobs, ws)
+
+	if err := ValidatePlanDAG(jobs); err != nil {
+		t.Fatalf("a chain of generators closed a cycle: %v", err)
+	}
+	edges := planEdges(jobs)
+	for _, pair := range [][2]string{
+		{derivedWriter.Key(), baseWriter.Key()},
+		{compile.Key(), baseWriter.Key()},
+		{compile.Key(), derivedWriter.Key()},
+	} {
+		if !planReaches(edges, pair[0], pair[1]) {
+			t.Errorf("%s does not wait for %s", pair[0], pair[1])
+		}
+	}
+	if planReaches(edges, baseWriter.Key(), derivedWriter.Key()) {
+		t.Errorf("%s waits for %s, a generator of a project that depends on it", baseWriter.Key(), derivedWriter.Key())
+	}
+}

@@ -1387,9 +1387,7 @@ func orderContractClients(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace
 		job.SerializeAfter = jobmodel.DedupeSorted(append(job.SerializeAfter, extra...))
 	}
 
-	if ws != nil {
-		orderDependentReaders(jobs, ws.Graph, idx, predecessors)
-	}
+	orderDependentReaders(jobs, ws.Graph, idx, predecessors)
 }
 
 // orderDependentReaders applies the dependents rule of orderContractClients.

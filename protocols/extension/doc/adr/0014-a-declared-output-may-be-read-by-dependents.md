@@ -48,8 +48,10 @@ read the output.
 6. **The field enters under CLI contract 4**, for the reason in
    [ADR 0002](0002-runtime-toolchains-are-lock-pinned-under-the-current-contract.md)
    decision 7. `RequiredCLIContract` does not change for a manifest that
-   declares it. A CLI that predates the field drops it and plans as before
-   this decision, so it is safe.
+   declares it. A CLI that predates the field decodes manifests permissively:
+   it drops the field and plans as before this decision, race included, but
+   it loads the extension. A strict validator that predates the field, such as
+   an older `extensions validate`, rejects it as an unknown member.
 
 ## Rejected alternatives
 
@@ -81,3 +83,12 @@ read the output.
   task-contract digest.
 - The rule orders the jobs of a dependent project. It does not order the jobs
   of the writer's own project, which declared resources already sequence.
+- A generator that writes a client into another project is not covered: a
+  provider's Go `describe` or TypeScript `generate` step whose `pathFrom`
+  output lands in a client project orders that project's jobs through the
+  contract tree rule, but not the jobs of the projects that depend on the
+  client. No project of this repository has such a dependent today.
+- The rule adds an edge even when another path already implies the order, so a
+  later pass that drops a job in between keeps the order. A generator that
+  produces nothing, such as the TypeScript generator of a Go-only client, still
+  makes the dependents wait for it.
