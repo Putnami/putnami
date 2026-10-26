@@ -246,11 +246,9 @@ func basisFixtureTree(t *testing.T) string {
 		"aXXb/c":                  "star\n",
 	})
 	mustMkdir(t, root, "empty/dir")
-	if runtime.GOOS != "windows" {
-		symlinkOrFail(t, root, "app.css", "assets/link.css")
-		symlinkOrFail(t, root, "internal", "linkdir")
-		symlinkOrFail(t, root, "missing.go", "broken.go")
-	}
+	symlinkOrFail(t, root, "app.css", "assets/link.css")
+	symlinkOrFail(t, root, "internal", "linkdir")
+	symlinkOrFail(t, root, "missing.go", "broken.go")
 	return root
 }
 
