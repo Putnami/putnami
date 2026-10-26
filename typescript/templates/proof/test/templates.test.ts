@@ -215,11 +215,9 @@ describe('every template declares the promise this proof observes', () => {
       const expected = Object.entries(STEPS)
         .filter(([name]) => name !== 'hooks' || hasPreBuildHook(template))
         .map(([, { requirement, check }]) => `${requirement}#${check}`)
-        .sort();
-      expect({ template: template.name, checks: declaredChecks(template).sort() }).toEqual({
-        template: template.name,
-        checks: expected,
-      });
+        .sort((left, right) => left.localeCompare(right));
+      const declared = declaredChecks(template).sort((left, right) => left.localeCompare(right));
+      expect({ template: template.name, checks: declared }).toEqual({ template: template.name, checks: expected });
     }
   });
 });
