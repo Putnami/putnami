@@ -1700,11 +1700,12 @@ priority events together spend it (see
 starts each member as such a run.
 
 A supervisor stops the run with `SIGTERM`. On Unix, the run also watches the
-process that started it, from the moment it starts: once that process exits,
-even killed outright, the run notices within a second and cancels as `SIGTERM`
-cancels it, so its serve steps do not outlive their supervisor. Unlike a
-signal, the loss arms no 10-second forced exit: the serve step's own stop
-budget bounds the teardown. From the time the run plans its steps, a write to a
+process that started it, whose pid it reads as it starts: once that process
+exits, even killed outright, the run cancels as `SIGTERM` cancels it, so its
+serve steps do not outlive their supervisor. A loss while the run plans is seen
+once planning ends, and a later one within a second. Unlike a signal, the loss
+arms no 10-second forced exit: the steps' stop budgets and timeouts bound the
+teardown. From the time the run plans its steps, a write to a
 stdout or stderr whose reader is gone fails instead of ending the run. On
 Windows, putnami's Job Object ends the supervisor's process tree, the run
 included.
