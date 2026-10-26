@@ -7,10 +7,15 @@ import (
 )
 
 // DeclaresChangedFiles reports whether a step of the manifest gates on the
-// run's changed files (activation.changedFiles) or binds a context input, the
-// vocabulary of protocolcli.ChangedFilesContract. A reader at that contract
-// plans such a step only for a project that owns a changed file and binds the
-// files into the step's cache key.
+// run's changed files (activation.changedFiles) or binds them (from
+// InputBindingFromContext, path ContextPathChangedFiles), the vocabulary of
+// protocolcli.ChangedFilesContract. A reader at that contract plans such a
+// step only for a project that owns a changed file and binds the files into
+// the step's cache key.
+//
+// Any other `from` binding is not this vocabulary: stamped below the contract
+// it loads and binds nothing, stamped at the contract NegotiateManifest
+// refuses it, and strict validation refuses it at any stamp.
 func DeclaresChangedFiles(m *Manifest) bool {
 	if m == nil {
 		return false
@@ -21,13 +26,24 @@ func DeclaresChangedFiles(m *Manifest) bool {
 				return true
 			}
 			for _, binding := range step.With {
-				if binding.From != "" {
+				if binding.From == InputBindingFromContext && binding.Path == ContextPathChangedFiles {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+// validateManifestBindingSources runs validateBindingSources over every step.
+func validateManifestBindingSources(m *Manifest) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	for _, name := range sortedKeys(m.Commands) {
+		for i, step := range m.Commands[name].Run {
+			diags = append(diags, validateBindingSources(fmt.Sprintf("commands.%s.run[%d]", name, i), step)...)
+		}
+	}
+	return diags
 }
 
 // validateBindingSources refuses an input binding the planner cannot resolve:

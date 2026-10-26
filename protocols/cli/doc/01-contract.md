@@ -258,7 +258,8 @@ files as a step fact. A step may gate on them (`activation.changedFiles`: the
 step is planned only when a changed file the target project owns matches one
 of the globs) and bind them (`with: {"from": "context", "path":
 "selection.changedFiles"}`: the project-relative changed files the project
-owns, bound into the step's parameters and so into its cache key). A run that
+owns, on a gated step only those its globs select, bound into the step's
+parameters and so into its cache key). A run that
 measured no diff (`--all`, `--projects`) plans no gated step and binds no
 value. A reader below 16 ignores the gate and resolves no context binding, so
 it would plan the step on every run and key it without the files; it refuses

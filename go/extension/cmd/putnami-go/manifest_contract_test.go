@@ -2410,7 +2410,7 @@ func TestHeavyStepsSurfaceTheAuditedDeadlines(t *testing.T) {
 		"test/describe -> build-describe = 900000ms",
 		"test/test -> test-exec = 600000ms",
 		// The race step builds and runs the touched packages' tests under
-		// the detector, so it is heavy beside test and carries its ceiling.
+		// the detector after test, so it is heavy and carries test's ceiling.
 		"test/test-race -> test-race-exec = 600000ms",
 	}
 
@@ -2805,14 +2805,17 @@ func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
 	}
 }
 
-// The race step runs beside test, never instead of it: it depends on what test
-// depends on, so excluding it leaves test planned, and the test environment's
-// teardown waits for both. It is planned only where the project owns a changed
-// Go or testdata file, only while race-changed is on and --race is off, and
-// binds those files as the changed-files input, which keys it. It writes no
-// file, so a hit restores no sibling's output; it reads every file test-exec
-// reads, so a hit answers the same tree; and it declares the rung its gate
-// and binding need.
+// The race step runs after test, never instead of it, and the test
+// environment's teardown waits for both. It is planned only where the project
+// owns a changed Go or testdata file outside .gen, and binds those files as the
+// changed-files input, which keys it. It carries no plan-time `if`: it reads
+// race-changed and --race at run time, so no flag excludes it, and test, the
+// prerequisite only it depends on, stays planned. It writes no file, so a hit
+// restores no sibling's output; it reads every file test-exec reads, so a hit
+// answers the same tree; and it declares the rung its gate and binding need.
+// Its declared inputs leave out the coverage and benchmark parameters, which
+// it never reads; every flag of the test command still keys it, as it keys
+// every step of the command.
 func TestRaceStepIsGatedBoundAndKeyedOnTheChangedFiles(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "race-on-touched-packages",
 		"the-race-step-is-gated-bound-and-keyed-on-the-changed-files")
@@ -2839,14 +2842,14 @@ func TestRaceStepIsGatedBoundAndKeyedOnTheChangedFiles(t *testing.T) {
 	if race.Task != "test-race-exec" || race.Heavy == nil || !*race.Heavy {
 		t.Errorf("race step runs %q, heavy=%v; want the heavy test-race-exec", race.Task, race.Heavy)
 	}
-	if !slices.Equal(race.DependsOn, []string{"describe", "test-env"}) {
-		t.Errorf("race step dependsOn = %v, want test's own prerequisites, so excluding it never drops test", race.DependsOn)
+	if !slices.Equal(race.DependsOn, []string{"test"}) {
+		t.Errorf("race step dependsOn = %v, want test alone", race.DependsOn)
 	}
-	if race.If != "params.race-changed && !params.race" {
-		t.Errorf("race step if = %q", race.If)
+	if race.If != "" {
+		t.Errorf("race step if = %q; an excluded race step would exclude test, the prerequisite only it depends on", race.If)
 	}
-	if race.Activation == nil || !slices.Equal(race.Activation.ChangedFiles, []string{"**/*.go", "**/testdata/**"}) {
-		t.Errorf("race step activation = %+v, want the changed Go and testdata files", race.Activation)
+	if race.Activation == nil || !slices.Equal(race.Activation.ChangedFiles, []string{"**/*.go", "**/testdata/**", "!**/.gen/**"}) {
+		t.Errorf("race step activation = %+v, want the changed Go and testdata files outside .gen", race.Activation)
 	}
 	want := proto.InputBinding{From: proto.InputBindingFromContext, Path: proto.ContextPathChangedFiles}
 	if got := race.With["changed-files"]; !reflect.DeepEqual(got, want) || len(race.With) != 1 {
@@ -2863,9 +2866,14 @@ func TestRaceStepIsGatedBoundAndKeyedOnTheChangedFiles(t *testing.T) {
 	if port, ok := task.Inputs["changed-files"]; !ok || port.From != proto.TaskInputFromParams {
 		t.Errorf("test-race-exec changed-files input = %+v, present=%t; the bound files must key the task", port, ok)
 	}
-	for _, name := range []string{"coverage", "enforce-coverage", "coverage-threshold", "coverprofile", "race", "bench"} {
+	for _, name := range []string{"coverage", "enforce-coverage", "coverage-threshold", "coverprofile", "bench", "timeout"} {
 		if _, ok := task.Inputs[name]; ok {
-			t.Errorf("test-race-exec keys on %q, which the race run never reads", name)
+			t.Errorf("test-race-exec declares the input %q, which the race run never reads", name)
+		}
+	}
+	for _, name := range []string{"race", "race-changed"} {
+		if port, ok := task.Inputs[name]; !ok || port.From != proto.TaskInputFromParams {
+			t.Errorf("test-race-exec input %q = %+v, present=%t; the run reads it to skip itself", name, port, ok)
 		}
 	}
 	reads, raced := proto.DeriveTaskCacheKey(m.Tasks["test-exec"].Inputs), proto.DeriveTaskCacheKey(task.Inputs)

@@ -245,6 +245,11 @@ func recordableFailure(job *ScheduledJob, result *JobResult) bool {
 	if result.Error != nil && result.Error.Code == extensionproto.OutputDriftDiagnosticCode {
 		return false
 	}
+	// A host-unsupported verdict describes the host, such as a missing C
+	// compiler or platform port, and the key describes none of it.
+	if result.Error != nil && result.Error.Code == extensionproto.HostUnsupportedFailureCode {
+		return false
+	}
 	// A source-bound task reads files its key leaves out on purpose, tests and
 	// specs among them, so a failure they cause is not explained by the cache
 	// key this record is stored at.

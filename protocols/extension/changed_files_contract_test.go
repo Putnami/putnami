@@ -118,3 +118,67 @@ func TestNoChangedFilesFormKeepsTheStamp(t *testing.T) {
 		t.Error("DeclaresChangedFiles(nil) = true")
 	}
 }
+
+// bindingManifest is a manifest stamped `stamp` with one step that binds
+// `binding` and no change gate.
+func bindingManifest(stamp int, binding InputBinding) *Manifest {
+	return &Manifest{
+		Name:        "@test/x",
+		Version:     "1.0.0",
+		CLIContract: stamp,
+		Commands: map[string]CommandDefinition{"test": {Run: []PipelineStep{
+			{ID: "a", Task: "t", With: map[string]InputBinding{"config": binding}},
+		}}},
+		Tasks: map[string]TaskDefinition{"t": {Kind: "command", Command: "echo"}},
+	}
+}
+
+// No reader below 16 resolved a `from` binding, so a manifest stamped below it
+// that spells one loads as before and binds nothing: only the changed-files
+// pair is the new form. Strict validation, which gates packaging, refuses each
+// spelling, and the packager therefore never stamps one.
+func TestUnresolvedBindingsBelowTheContractLoadAsBefore(t *testing.T) {
+	for name, binding := range map[string]InputBinding{
+		"command source":     {From: "command", Path: "params.target"},
+		"other context path": {From: InputBindingFromContext, Path: "workspace.name"},
+	} {
+		m := bindingManifest(protocolcli.ChangedFilesContract-1, binding)
+		if DeclaresChangedFiles(m) {
+			t.Errorf("%s: DeclaresChangedFiles = true for a binding that is not the changed files", name)
+		}
+		loaded, err := NegotiateManifest("x.json", marshalManifest(t, m))
+		if err != nil {
+			t.Fatalf("%s: a manifest stamped %d must load as before: %v", name, m.CLIContract, err)
+		}
+		if got := loaded.Commands["test"].Run[0].With["config"]; got.From != binding.From || got.Path != binding.Path {
+			t.Errorf("%s: loaded binding = %+v, want %+v", name, got, binding)
+		}
+		_, diags := ParseAndValidateManifest(marshalManifest(t, m))
+		if !hasCode(diags, "unresolvable-binding") {
+			t.Errorf("%s: strict validation = %v, want unresolvable-binding", name, diags)
+		}
+	}
+}
+
+// Stamped 16, a manifest speaks the binding vocabulary of that rung, so a
+// source the planner does not resolve is refused at load rather than keying
+// the step without the input its author meant to bind.
+func TestUnresolvedBindingsAtTheContractAreRefused(t *testing.T) {
+	for name, binding := range map[string]InputBinding{
+		"command source": {From: "command", Path: "params.target"},
+		"mistyped path":  {From: InputBindingFromContext, Path: "selection.changedFile"},
+		"path only":      {Path: ContextPathChangedFiles},
+	} {
+		_, err := NegotiateManifest("x.json", marshalManifest(t, bindingManifest(protocolcli.ChangedFilesContract, binding)))
+		if err == nil {
+			t.Fatalf("%s: a manifest stamped 16 loaded a binding the planner does not resolve", name)
+		}
+		if !strings.Contains(err.Error(), "commands.test.run[0].with.config") {
+			t.Errorf("%s: error %q does not name the binding", name, err)
+		}
+	}
+	if _, err := NegotiateManifest("x.json", marshalManifest(t, bindingManifest(protocolcli.ChangedFilesContract,
+		InputBinding{From: InputBindingFromContext, Path: ContextPathChangedFiles}))); err != nil {
+		t.Fatalf("the changed-files binding stamped 16 must load: %v", err)
+	}
+}

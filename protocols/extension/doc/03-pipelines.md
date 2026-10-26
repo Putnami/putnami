@@ -67,9 +67,20 @@ Steps can pass data to tasks via `with`:
   "task": "build-transpile",
   "with": {
     "target": { "value": "production" },
-    "changed-files": { "from": "context", "path": "selection.changedFiles" },
     "schemas": { "fromStep": "generate", "output": "schemas" }
   }
+}
+```
+
+A step that reads the run's changed files gates on them and binds them:
+
+```json
+{
+  "id": "test-race",
+  "task": "test-race-exec",
+  "dependsOn": ["test"],
+  "activation": { "changedFiles": ["**/*.go", "!**/.gen/**"] },
+  "with": { "changed-files": { "from": "context", "path": "selection.changedFiles" } }
 }
 ```
 
@@ -85,17 +96,21 @@ A literal and a context binding become the step's own parameters: the task
 receives them after every command, option and CLI layer, and they key the
 step's cache entry. The planner resolves one context path,
 `selection.changedFiles`: the run's changed files that the target project owns,
-as sorted, unique, project-relative slash paths. A run that measured no diff
-(`--all`, `--projects`) binds no value, and the task receives no parameter.
-Strict validation refuses any other `from` or `path`
-(`unresolvable-binding`), and a manifest with a context binding requires
-`cliContract` 16.
+as sorted, unique, project-relative slash paths. On a step with an
+`activation.changedFiles` gate, the binding holds only the files the gate's
+globs select. A run that measured no diff (`--all`, `--projects`) binds no
+value, and the task receives no parameter. A manifest that binds
+`selection.changedFiles` or declares `activation.changedFiles` requires
+`cliContract` 16 ([ADR 0015](adr/0015-a-step-reads-the-changed-files-from-contract-16.md)).
+Strict validation refuses any other `from` or `path` (`unresolvable-binding`),
+and so does loading a manifest stamped 16. Below 16, such a binding loads and
+binds nothing.
 
 ## Conditional Execution
 
 ### `if` (plan-time)
 
-Evaluated before the pipeline runs. Removes the step entirely from the execution graph:
+Evaluated before the pipeline runs. Removes the step entirely from the execution graph, and with it every prerequisite that only removed steps depend on:
 
 ```json
 { "id": "types", "task": "build-types", "if": "params.emitTypes == true" }

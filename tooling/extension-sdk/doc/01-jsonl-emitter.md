@@ -232,6 +232,10 @@ Emits the final `result` event. Must be the last event emitted.
 
 Records that the job's tool enforced its own deadline, such as a test binary that exceeded its timeout. A `"FAILED"` result emitted afterwards carries `error.timedOut: true`, and the CLI does not record that failure in its failure-replay cache: the next run executes the job again. An `"OK"` or `"SKIP"` result never carries it. Detect the timeout from your tool's own output; the CLI never reads messages to decide it.
 
+### `(*Emitter) MarkHostUnsupported()`
+
+Records that this host cannot run the job at all, such as a race detector run on a host without the C compiler it needs. A `"FAILED"` result emitted afterwards carries `error.code: "host-unsupported"`, and the CLI does not record that failure in its failure-replay cache: the next run executes the job again and passes once the host gains what it lacked. Both marks can be set; the result then carries both members. An `"OK"` or `"SKIP"` result never carries it. A TypeScript job writes the same member with `e.result('FAILED', data, { code: 'host-unsupported' })`.
+
 ### `ForwardPipe(emit *Emitter, pipe io.ReadCloser, fallbackLevel string, wg *sync.WaitGroup)`
 
 Reads lines from a pipe and forwards each as a JSONL log event. Calls `wg.Done()` when the pipe is closed. Designed to run as a goroutine.

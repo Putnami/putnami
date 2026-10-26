@@ -134,7 +134,7 @@
         "coverage": { "type": "boolean", "default": true, "description": "Per-project coverage policy. Set false to opt a project out of coverage entirely (authoritative — the validation cadence never overrides it)." },
         "enforce-coverage": { "type": "boolean", "default": true, "description": "Enforce each project's coverage-threshold. On by default so a coverage drop fails the run that caused it. Pass --no-enforce-coverage to keep measuring and reporting coverage without failing on the threshold; to skip instrumentation entirely use --coverage=false, which this never overrides." },
         "race": { "type": "boolean", "default": false, "description": "Enable race detector" },
-        "race-changed": { "type": "boolean", "default": true, "description": "Run the race detector on the packages this change touches: the directories of the changed Go and testdata files the project owns. The step runs beside the test step, only when the run measured a diff and the project owns a changed Go or testdata file, and --race replaces it by running every package under the detector. Off skips it, for a host without race detector support or a C compiler." },
+        "race-changed": { "type": "boolean", "default": true, "description": "Run the race detector on the packages this change touches: the directories of the changed Go and testdata files the project owns, generated .gen code excluded. The step runs after the test step passes, only when the run measured a diff and the project owns such a file, and --race replaces it by running every package under the detector. Off skips it, for a host without race detector support or, off macOS, a C compiler." },
         "timeout": { "type": "string", "description": "Test timeout (e.g., 30s, 5m)" },
         "short": { "type": "boolean", "default": false, "description": "Run only short tests" },
         "run": { "type": "string", "description": "Run only tests matching the pattern" },
@@ -197,9 +197,8 @@
           "id": "test-race",
           "heavy": true,
           "task": "test-race-exec",
-          "dependsOn": ["describe", "test-env"],
-          "if": "params.race-changed && !params.race",
-          "activation": { "changedFiles": ["**/*.go", "**/testdata/**"] },
+          "dependsOn": ["test"],
+          "activation": { "changedFiles": ["**/*.go", "**/testdata/**", "!**/.gen/**"] },
           "with": { "changed-files": { "from": "context", "path": "selection.changedFiles" } }
         },
         {
@@ -680,7 +679,7 @@
       }
     },
     "test-race-exec": {
-      "description": "Run `go test -race` on the packages the change touched: the directory of each changed Go file the project owns, and the package that holds a changed testdata directory. The CLI binds those files, project-relative, as the changed-files input, so the files key the task and a stored verdict answers the same change only. It sets CGO_ENABLED=1 and fails, naming --no-race-changed, on a platform the race detector does not support or, off darwin, when the C compiler go env CC names is not on PATH. It measures no coverage and writes no file: coverage and the feature verification report belong to test-exec.",
+      "description": "Run `go test -race` on the packages the change touched: the directory of each changed Go file the project owns, and the package that holds a changed testdata directory. The CLI binds those files, project-relative, as the changed-files input, so the files key the task and a stored verdict answers the same change only. It runs after test-exec and skips under --race or --no-race-changed. Off darwin it sets CGO_ENABLED=1. It fails host-unsupported, naming --no-race-changed, on a platform the race detector does not support, off darwin when the C compiler go env CC names is not on PATH, and when no test ran. Its go test -timeout sits below this task's deadline; --timeout does not apply. It reports no test counts, coverage or file: those belong to test-exec.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test-race"],
@@ -700,7 +699,8 @@
         },
         "DATABASE_TEST_BINDINGS": { "from": "env" },
         "changed-files": { "from": "params" },
-        "timeout": { "from": "params" },
+        "race": { "from": "params" },
+        "race-changed": { "from": "params" },
         "short": { "from": "params" },
         "run": { "from": "params" },
         "count": { "from": "params" },
@@ -713,7 +713,7 @@
         "extensionVersion": { "from": "runtime" }
       },
       "outputs": {
-        "data": { "description": "Race run result with pass/fail counts" }
+        "data": { "description": "Race run status; its counts are logged, never reported as test totals" }
       },
       "reads": ["gen", "sources", { "id": "workspace-clients", "scope": "workspace" }],
       "cache": {

@@ -408,8 +408,8 @@ func orderingProducer(consumer, producer *jobmodel.ScheduledJob) bool {
 // sharedProducerComparable is narrower than "has a task": cross-command
 // equivalence needs a complete declared input set and a determinism promise.
 // Literal bindings are comparable because BoundParams carries their resolved
-// value. Context/result bindings are not materialized into that bag, so they
-// remain opaque and fail closed.
+// value. A step result binding has no plan-time value and a context binding
+// carries a per-run fact, so a step with either is opaque and fails closed.
 func sharedProducerComparable(job *jobmodel.ScheduledJob) bool {
 	if job == nil || job.Project == nil || job.Extension == nil || job.JobDef == nil || job.Step == nil {
 		return false

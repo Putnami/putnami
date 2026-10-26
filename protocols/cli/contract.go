@@ -50,13 +50,13 @@ package cli
 //	   the change touches in the target project matches one of the globs)
 //	   and bind them (`with: {"from": "context", "path":
 //	   "selection.changedFiles"}`: the project-relative changed files the
-//	   project owns, bound into the step's parameters and so into its cache
-//	   key). A run that measured no diff plans no gated step and binds no
-//	   value. An older reader ignores the gate and resolves no context
-//	   binding, so it would plan the step on every run and key it without the
-//	   files it reads; it must refuse the stamp. Only a manifest with a step
-//	   that declares either form is stamped 16, and the floor binds it from
-//	   every origin.
+//	   project owns, on a gated step only those its globs select, bound into
+//	   the step's parameters and so into its cache key). A run that measured
+//	   no diff plans no gated step and binds no value. An older reader
+//	   ignores the gate and resolves no context binding, so it would plan the
+//	   step on every run and key it without the files it reads; it must
+//	   refuse the stamp. Only a manifest with a step that declares either
+//	   form is stamped 16, and the floor binds it from every origin.
 //	15: ADDITIVE — a command group's default subcommand that declares
 //	   positionals. From 15 on, `putnami <group> <word>` runs the group's
 //	   default when the word names no subcommand of the group and the default

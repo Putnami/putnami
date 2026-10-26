@@ -356,7 +356,7 @@ func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 	}
 	planned, err := Plan(testWorkspace(root, provider, consumer), []string{"lint", "test", "build", "clientgen"},
 		[]*workspace.Project{provider, consumer},
-		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil)
+		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan lint,test,build,clientgen: %v", err)
 	}

@@ -266,6 +266,45 @@ func TestExpandPipeline_ResolvesContextBindings(t *testing.T) {
 	}
 }
 
+// A step with a change gate binds only the changed files its globs select: a
+// README or generated-code edit beside a Go edit neither reaches the task nor
+// keys the step, and the project's list is left intact for the next step.
+func TestExpandPipeline_BindsOnlyTheFilesTheGateSelects(t *testing.T) {
+	ext := &ExtensionDescription{
+		Name:  "@test/context",
+		Tasks: map[string]TaskDefinition{"run": {Kind: "command", Command: "runtime"}},
+	}
+	binding := map[string]InputBinding{
+		"changed-files": {From: proto.InputBindingFromContext, Path: proto.ContextPathChangedFiles},
+	}
+	steps := []PipelineStep{
+		{ID: "race", Task: "run", With: binding,
+			Activation: &StepActivation{ChangedFiles: []string{"**/*.go", "!**/.gen/**"}}},
+		{ID: "all", Task: "run", With: binding},
+	}
+	changed := []string{".gen/client/x.go", "README.md", "a/x.go"}
+
+	expanded, err := ExpandPipelineWithOptions("test", &JobDefinition{Name: "test"}, steps, ext, nil,
+		PipelineExpansionOptions{ChangedFiles: changed})
+	if err != nil {
+		t.Fatalf("ExpandPipelineWithOptions: %v", err)
+	}
+	bound := make(map[string][]string, len(expanded))
+	for _, step := range expanded {
+		files, _ := step.JobDef.BoundParams["changed-files"].([]string)
+		bound[step.Step.ID] = files
+	}
+	if got := bound["race"]; !reflect.DeepEqual(got, []string{"a/x.go"}) {
+		t.Errorf("gated step bound %#v, want only the Go file its globs select", got)
+	}
+	if got := bound["all"]; !reflect.DeepEqual(got, changed) {
+		t.Errorf("ungated step bound %#v, want every changed file %v", got, changed)
+	}
+	if !reflect.DeepEqual(changed, []string{".gen/client/x.go", "README.md", "a/x.go"}) {
+		t.Errorf("expansion mutated the project's changed files: %v", changed)
+	}
+}
+
 // A change gate reads the changed files with the workspace file-pattern
 // grammar: a recursive glob reaches a nested file, an exclusion removes one,
 // and a run without changed files matches nothing.

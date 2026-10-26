@@ -190,8 +190,8 @@ task file pattern that names an input selector,
 `protocols/cli.DefaultPositionalsContract` (15) for a command group whose
 default subcommand declares positionals, or
 `protocols/cli.ChangedFilesContract` (16) for a step that gates on the run's
-changed files (`activation.changedFiles`) or binds them (a `from: context`
-input binding). Rung 6 named the
+changed files (`activation.changedFiles`) or binds them (`from: context`,
+`path: selection.changedFiles`). Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
@@ -246,11 +246,11 @@ wherever it loads from: a reader at 15 runs that default for a word that names
 no subcommand, with the word as its first argument, and an older reader
 answers "unknown subcommand". Positionals on a subcommand that is not the
 group's default keep the base stamp. `RequiredLoadContract` includes that rung
-as well. A manifest with a step that declares `activation.changedFiles` or a
-`from: context` input binding requires contract 16 wherever it loads from: a
-reader at 16 plans the step only for a project that owns a matching changed
-file and binds those files into the step's cache key, and an older reader
-would plan the step on every run and key it without them.
+as well. A manifest with a step that declares `activation.changedFiles` or
+binds `selection.changedFiles` from `context` requires contract 16 wherever it
+loads from: a reader at 16 plans the step only for a project that owns a
+matching changed file and binds those files into the step's cache key, and an
+older reader would plan the step on every run and key it without them.
 `RequiredLoadContract` includes that rung too. The reader loads every stamp
 from the one the manifest's vocabulary requires up to
 `protocols/cli.LatestContract` (16):
@@ -331,6 +331,7 @@ package job.
 | current | manifest whose group default declares positionals, stamped 14 or lower, or unstamped | Rejected for its default subcommand that takes positionals, with `putnami extensions update` as the remedy. |
 | current | contract-16 manifest whose step gates on or binds the changed files | Loads; the step is planned only for a project that owns a matching changed file, and the files key it. A run that measured no diff plans no gated step. |
 | current | manifest whose step gates on or binds the changed files, stamped 15 or lower, or unstamped | Rejected for a step that reads the run's changed files, with `putnami extensions update` as the remedy. |
+| current | contract-16 manifest with an input binding the planner does not resolve: `from: command`, or a context path other than `selection.changedFiles` | Rejected for that binding. Strict validation refuses it at any stamp; a manifest stamped 15 or lower loads, and the binding binds nothing. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
 | current | manifest naming a registry dependency, stamped 7 or lower or unstamped, from the artifact store or a declared path | Rejected: the stamp does not cover the dependencies the CLI would install and load. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |

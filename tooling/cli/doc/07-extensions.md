@@ -929,9 +929,10 @@ run's changed files that the target project holds in its own directory, as
 sorted, unique, project-relative slash paths. A project that holds none, and
 any project on a run that measured no diff (`--all`, `--projects`), binds no
 value, and the task receives no parameter. Pair it with the step gate
-`activation.changedFiles` to plan the step only where a matching file changed.
-Strict validation refuses any other `from` or `path`, and either form requires
-`cliContract` 16.
+`activation.changedFiles` to plan the step only where a matching file changed;
+on a gated step the binding holds only the files the gate's globs select.
+Strict validation refuses any other `from` or `path`, and so does loading a
+manifest stamped 16. Either form requires `cliContract` 16.
 
 ### Step Binding
 

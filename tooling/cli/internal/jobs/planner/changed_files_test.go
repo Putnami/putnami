@@ -3,6 +3,7 @@ package planner
 import (
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
@@ -18,7 +19,7 @@ import (
 const changedFilesRequirement = "a-step-reads-the-changed-files"
 
 // raceExtension mirrors the Go extension's test pipeline: `test` runs every
-// package, and `test-race` runs beside it only where the change touched a Go
+// package, and `test-race` runs after it only where the change touched a Go
 // file the project owns, binding the files it reads.
 func raceExtension() *extension.ExtensionDescription {
 	declared := &extension.TaskDeclaration{}
@@ -36,7 +37,7 @@ func raceExtension() *extension.ExtensionDescription {
 				PipelineSteps: []extension.PipelineStep{
 					{ID: "test", Task: "test-exec"},
 					{
-						ID: "test-race", Task: "test-race-exec", If: "!params.race",
+						ID: "test-race", Task: "test-race-exec", If: "!params.race", DependsOn: []string{"test"},
 						Activation: &extension.StepActivation{ChangedFiles: []string{"**/*.go", "**/testdata/**"}},
 						With: map[string]extension.InputBinding{
 							"changed-files": {From: extensionproto.InputBindingFromContext, Path: extensionproto.ContextPathChangedFiles},
@@ -142,8 +143,9 @@ func TestChangedFilesBinding_BindsTheOwnedFiles(t *testing.T) {
 }
 
 // The bound files key the step: another change gives another key, the same
-// change in any order and spelling gives the same key, and the plain test
-// step's key does not move with the change at all.
+// change in any order and spelling gives the same key, an edit the gate does
+// not select gives the same key, and the plain test step's key does not move
+// with the change at all.
 func TestChangedFilesBinding_KeysTheStepAndOnlyTheStep(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", changedFilesRequirement,
@@ -167,6 +169,7 @@ func TestChangedFilesBinding_KeysTheStepAndOnlyTheStep(t *testing.T) {
 	first := keysFor("lib/a.go", "lib/sub/b.go")
 	again := keysFor("./lib/sub/b.go", "lib/a.go", "lib/a.go")
 	other := keysFor("lib/a.go")
+	readme := keysFor("lib/a.go", "lib/README.md", "lib/sub/b.go")
 	none := keysFor()
 
 	const race, test = "/lib:test~test-race", "/lib:test~test"
@@ -178,6 +181,9 @@ func TestChangedFilesBinding_KeysTheStepAndOnlyTheStep(t *testing.T) {
 	}
 	if first[race] == other[race] {
 		t.Errorf("two changes keyed the race step alike (%q): the bound files are not a key input", first[race])
+	}
+	if readme[race] != first[race] {
+		t.Errorf("a README edit beside the Go edit moved the race step's key: %q, want %q", readme[race], first[race])
 	}
 	for name, keys := range map[string]map[string]string{"same": again, "other": other, "no diff": none} {
 		if keys[test] != first[test] {
@@ -234,9 +240,11 @@ func TestResolveInvocationRelations_TrimsTheFrontierToPlannedConsumers(t *testin
 }
 
 // The shipped Go manifest plans its race step on the project that owns the
-// changed Go file and binds that file, beside the test step. A dependent the
-// change reaches through an edge, a run without a diff, --race and
-// --no-race-changed each plan test alone.
+// changed Go file, after the test step, and binds that file. A dependent the
+// change reaches through an edge and a run without a diff plan test alone.
+// --race and --no-race-changed keep both steps planned: the step skips itself
+// at run time, and test, the prerequisite only the race step depends on,
+// stays planned under every flag.
 func TestGoManifestPlansTheRaceStepOnTheTouchedProject(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", changedFilesRequirement,
@@ -265,7 +273,8 @@ func TestGoManifestPlansTheRaceStepOnTheTouchedProject(t *testing.T) {
 		"--race":            {"race": true},
 		"--no-race-changed": {"race-changed": false},
 	} {
-		planned, err := Plan(ws, []string{"test"}, projects, exts, params, nil, nil, []string{"lib/lib.go"})
+		planned, err := Plan(ws, []string{"test"}, projects, exts, params, nil, nil,
+			[]string{"lib/README.md", "lib/lib.go", "lib/.gen/client/x.go"})
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -274,21 +283,26 @@ func TestGoManifestPlansTheRaceStepOnTheTouchedProject(t *testing.T) {
 			t.Errorf("%s: plan = %v; want test for both projects and no race step for /app", name, keys)
 		}
 		race := findScheduled(planned, "/lib:test~test-race")
-		if params != nil {
-			if race != nil {
-				t.Errorf("%s: plan = %v; want test without the race step", name, keys)
-			}
-			continue
-		}
 		if race == nil {
-			t.Fatalf("/lib:test~test-race is not planned: %v", keys)
+			t.Fatalf("%s: /lib:test~test-race is not planned: %v", name, keys)
+		}
+		if !slices.Contains(race.DependsOn, "/lib:test~test") {
+			t.Errorf("%s: /lib race step depends on %v, want it after /lib:test~test", name, race.DependsOn)
 		}
 		if got := race.JobDef.BoundParams["changed-files"]; !reflect.DeepEqual(got, []string{"lib.go"}) {
-			t.Errorf("/lib race step bound %#v, want [lib.go]", got)
+			t.Errorf("%s: /lib race step bound %#v, want [lib.go] alone", name, got)
 		}
 	}
 
-	planned, err := Plan(ws, []string{"test"}, projects, exts, nil, nil, nil, nil)
+	planned, err := Plan(ws, []string{"test"}, projects, exts, nil, nil, nil, []string{"lib/.gen/client/x.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keys := planKeySet(planned); keys["/lib:test~test-race"] || !keys["/lib:test~test"] {
+		t.Errorf("a generated-code change: plan = %v; want test without a race step", keys)
+	}
+
+	planned, err = Plan(ws, []string{"test"}, projects, exts, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

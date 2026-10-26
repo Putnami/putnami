@@ -228,7 +228,7 @@ func ExpandPipelineWithOptions(
 			CommandDependsOn:     commandDef.CommandDependsOn,
 			SessionPrerequisites: commandDef.SessionPrerequisites,
 			AlsoRuns:             commandDef.AlsoRuns,
-			BoundParams:          stepBindingParams(step.With, opts.ChangedFiles),
+			BoundParams:          stepBindingParams(step.With, stepChangedFiles(step, opts.ChangedFiles)),
 			FilePatterns:         filePatterns,
 			Writes:               task.Writes,
 			Reads:                task.Reads,
@@ -281,6 +281,19 @@ func stepBindingParams(bindings map[string]InputBinding, changedFiles []string) 
 		params[name] = value
 	}
 	return params
+}
+
+// stepChangedFiles narrows the project's changed files to those the step's
+// activation.changedFiles globs select, so a change gate and the binding it
+// guards read the same files: an edit the gate ignores neither reaches the
+// task nor keys the step. A step without a change gate binds them all.
+func stepChangedFiles(step PipelineStep, changedFiles []string) []string {
+	if step.Activation == nil || len(step.Activation.ChangedFiles) == 0 {
+		return changedFiles
+	}
+	return slices.DeleteFunc(slices.Clone(changedFiles), func(file string) bool {
+		return !wsproto.SelectsPath(file, step.Activation.ChangedFiles)
+	})
 }
 
 // SelectsChangedFile reports whether one of changedFiles, project-relative,
