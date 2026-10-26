@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@acme/sessions",
   "version": "1.0.0",
-  "cliContract": 16,
+  "cliContract": 17,
   "commandGroups": {
     "agent": {
       "description": "Report agent sessions.",

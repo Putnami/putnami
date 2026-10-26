@@ -45,7 +45,7 @@ const hostHooksDeclaration = `{
   }
 }`
 
-// hostHooksExtensionManifest is a local extension at contract 16 whose
+// hostHooksExtensionManifest is a local extension at contract 17 whose
 // interactive `agent hook` subcommand the hooks run.
 func hostHooksExtensionManifest(hooks string) string {
 	return fmt.Sprintf(`{

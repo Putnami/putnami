@@ -7,7 +7,7 @@
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`,
   `internal/commands/lifecycle`, `internal/extension`), the extension manifest
   (`protocols/extension`, `hostHooks`), the CLI contract (`protocols/cli`,
-  rung 16), feature `cli/agent-workflow-lifecycle`
+  rung 17), feature `cli/agent-workflow-lifecycle`
 
 ## Context
 
@@ -39,7 +39,7 @@ Two facts make the hooks risky to write:
    a command group of the extension and a top-level subcommand that sets
    `interactive: true`. The hosts are `claude-code` and `codex`, each with a
    closed list of events. Only Claude Code takes a `wake` entry. The member
-   needs `agentContent` and raises the required contract to 16
+   needs `agentContent` and raises the required contract to 17
    (`HostHooksContract`). The validation rules are in
    `protocols/extension/doc/04-validation.md`.
 2. **Only an explicit command writes them.** `putnami install`, `putnami init`
@@ -139,7 +139,7 @@ Two facts make the hooks risky to write:
   `putnami install`.
 - An extension that needs another host, event or field needs a new contract
   rung: the lists are closed, and the strict parse refuses an unknown member.
-- A manifest stamped below 16 that declares `hostHooks` is refused with
+- A manifest stamped below 17 that declares `hostHooks` is refused with
   `putnami extensions update` as the remedy.
 - A Putnami MCP tool named with a hyphen is refused in `mcpTools`: no host
   rendering of the hyphen is confirmed.

@@ -41,7 +41,7 @@ event:
 
 The extension never edits a host file. The core writes the entries when the
 workspace opts into this extension's content and binds `missions`, and removes
-them when either goes away. The manifest's `cliContract` is 16.
+them when either goes away. The manifest's `cliContract` is 17.
 
 ### 2. Two commands in the `agent` group
 
@@ -111,7 +111,7 @@ fits its budget, and a test holds the manifest to these numbers.
   receives the sessions.
 - Host permissions, credentials and model access still stay with the
   workspace.
-- From this release on, the contributor needs a CLI at contract 16 or later:
+- From this release on, the contributor needs a CLI at contract 17 or later:
   an older CLI refuses the whole extension, `change finalize` included,
   whether the workspace binds `missions` or not. A workspace moves its CLI
   and contributor pins together.

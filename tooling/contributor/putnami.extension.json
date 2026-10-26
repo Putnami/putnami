@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/contributor",
-  "cliContract": 16,
+  "cliContract": 17,
   "runtime": {
     "executable": "compiled/putnami-contributor",
     "toolchains": {

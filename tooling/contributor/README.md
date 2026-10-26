@@ -138,7 +138,7 @@ turn: a failure leaves one line in `hook.log` under
 
 ## Publication
 
-From this release on, the contributor needs a CLI at contract 16 or later,
+From this release on, the contributor needs a CLI at contract 17 or later,
 for its host hooks. An older CLI refuses the whole extension. A workspace
 moves its CLI and contributor pins together.
 

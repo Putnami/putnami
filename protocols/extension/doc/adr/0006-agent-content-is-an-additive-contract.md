@@ -4,7 +4,7 @@
   `decisions.json`: `putnami migrate agent-content` is deleted, so
   `supersedes` has one consumer, the refusal. Amended by
   [Host hooks](#amendment-host-hooks-ride-the-same-opt-in): a top-level
-  `hostHooks` member under contract 16.
+  `hostHooks` member under contract 17.
 - **Scope**: `go.putnami.dev/protocol/extension` (`agentContent`),
   `go.putnami.dev/protocol/cli` (`protocols/cli/contract.go`), and the SDK
   package step (`tooling/extension-sdk/agentartifact`)
@@ -145,9 +145,9 @@ extension. The member is top-level, not part of `agentContent`, because the
 content tree is files the CLI copies, and hooks are entries the CLI merges into
 files a person also edits.
 
-- The member follows decision 3. `HostHooksContract = 16` is additive, and
-  `RequiredLoadContract` returns 16 for a manifest that declares it. A reader
-  below 16 refuses the stamp instead of installing the extension without its
+- The member follows decision 3. `HostHooksContract = 17` is additive, and
+  `RequiredLoadContract` returns 17 for a manifest that declares it. A reader
+  below 17 refuses the stamp instead of installing the extension without its
   hooks.
 - The member requires `agentContent`. The `extension:<name>` opt-in that
   installs the content also enables the hooks, and nothing else does.

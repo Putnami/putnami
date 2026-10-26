@@ -10,7 +10,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 )
 
-// hostHooksFixture is a manifest stamped 16 that declares host hooks for both
+// hostHooksFixture is a manifest stamped 17 that declares host hooks for both
 // hosts. It lives outside fixtures/valid, whose tests hold every valid
 // fixture to the base contract and no agent content.
 var hostHooksFixture = filepath.Join("testdata", "host-hooks.extension.json")
@@ -73,7 +73,7 @@ func TestHostHooks_ValidFixtureValidates(t *testing.T) {
 	}
 }
 
-// A manifest that declares host hooks requires rung 16 from every origin, and
+// A manifest that declares host hooks requires rung 17 from every origin, and
 // the stamped fixture loads.
 func TestHostHooks_RequireTheirContract(t *testing.T) {
 	m := loadFixtureManifest(t, hostHooksFixture)
@@ -85,14 +85,14 @@ func TestHostHooks_RequireTheirContract(t *testing.T) {
 	}
 	loaded, err := LoadManifest(hostHooksFixture)
 	if err != nil {
-		t.Fatalf("a manifest stamped 16 must load: %v", err)
+		t.Fatalf("a manifest stamped 17 must load: %v", err)
 	}
 	if loaded.HostHooks == nil || loaded.HostHooks.Requires.Contract != "missions" {
 		t.Fatalf("loaded host hooks = %+v", loaded.HostHooks)
 	}
 }
 
-// Stamped below 16, a host-hooks manifest is refused for its hooks, with the
+// Stamped below 17, a host-hooks manifest is refused for its hooks, with the
 // remedy that moves it. An older reader would install the extension without
 // the hooks the workspace opted into.
 func TestHostHooks_BelowTheirContractAreRefused(t *testing.T) {
@@ -103,7 +103,7 @@ func TestHostHooks_BelowTheirContractAreRefused(t *testing.T) {
 		if err == nil {
 			t.Fatalf("stamp %d loaded a manifest that declares host hooks", stamp)
 		}
-		for _, want := range []string{"requires 16 for its host hooks", "putnami extensions update"} {
+		for _, want := range []string{"requires 17 for its host hooks", "putnami extensions update"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("stamp %d: error %q does not say %q", stamp, err, want)
 			}
