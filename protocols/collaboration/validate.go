@@ -1126,7 +1126,9 @@ func (c *checker) syncResult(r *MissionsSyncResult) {
 	if r.Decisions == nil {
 		c.errorf(ErrorCodeRequired, "decisions", "decisions is required; none is []")
 	}
-	c.listBound("decisions", len(r.Decisions))
+	if len(r.Decisions) > MaxSyncDecisions {
+		c.errorf(ErrorCodeTooLarge, "decisions", "at most %d members: one per decision the sync named", MaxSyncDecisions)
+	}
 	seen := map[string]bool{}
 	for i, decision := range r.Decisions {
 		entry := fmt.Sprintf("decisions[%d]", i)

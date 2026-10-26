@@ -120,7 +120,11 @@ cheap to repeat and must never show the agent a tool it should not call.
    delivery, unknown and repeated ids in a sync, an acknowledgement after
    the session changed mission, one entry for each refused reply, that an
    older sync never overwrites a newer one, and that an older sync still
-   answers the mission it named.
+   answers the mission it named. The scenarios run as one caller, because a
+   `Target` has no way to call as another person. So they do not check that
+   a sync ignores another caller's id, or that `reply` answers
+   `message.denied`. A provider that serves more than one caller tests both
+   itself.
 
 ## Rejected alternatives
 

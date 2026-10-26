@@ -21,6 +21,7 @@ type schemaNode struct {
 	Minimum    *int                   `json:"minimum"`
 	Maximum    *int                   `json:"maximum"`
 	MaxLength  *int                   `json:"maxLength"`
+	MaxItems   *int                   `json:"maxItems"`
 	Pattern    string                 `json:"pattern"`
 }
 
@@ -267,6 +268,64 @@ func TestDrift_MissionsPatternsMatchTheValidator(t *testing.T) {
 		}
 		if schema, validator := repository.MatchString(value), ValidateInput(input) == nil; schema != validator {
 			t.Errorf("repository %q: the schema accepts it %v, the validator %v", value, schema, validator)
+		}
+	}
+}
+
+// TestDrift_MissionsBoundsMatchTheValidator holds every size and range the
+// missions schema publishes on the bound the Go validator enforces, and checks
+// the validator at the result's decisions bound: a sync names at most
+// MaxSyncDecisions decisions, so its result reports at most as many.
+func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
+	defs := readSchemaNode(t, ContractSchemaFile(ContractMissions, 1)).Defs
+	input, result := defs["syncInput"].Properties, defs["syncResult"].Properties
+	for _, tc := range []struct {
+		name string
+		got  *int
+		want int
+	}{
+		{"syncResult.minIntervalMs minimum", result["minIntervalMs"].Minimum, MinSyncIntervalMs},
+		{"syncResult.minIntervalMs maximum", result["minIntervalMs"].Maximum, MaxSyncIntervalMs},
+		{"syncResult.inbox maxItems", result["inbox"].MaxItems, MaxInboxMessages},
+		{"syncResult.decisions maxItems", result["decisions"].MaxItems, MaxSyncDecisions},
+		{"syncResult.replies maxItems", result["replies"].MaxItems, MaxSyncReplies},
+		{"missionView.openDecisions maxItems", defs["missionView"].Properties["openDecisions"].MaxItems, MaxOpenDecisions},
+		{"plan.steps maxItems", defs["plan"].Properties["steps"].MaxItems, MaxListMembers},
+		{"syncInput.delivered maxItems", input["delivered"].MaxItems, MaxListMembers},
+		{"syncInput.decisions maxItems", input["decisions"].MaxItems, MaxSyncDecisions},
+		{"syncInput.replies maxItems", input["replies"].MaxItems, MaxSyncReplies},
+	} {
+		if tc.got == nil || *tc.got != tc.want {
+			t.Errorf("%s is %v in the schema, %d in Go", tc.name, tc.got, tc.want)
+		}
+	}
+
+	syncResult := func(decisions int) *MissionsSyncResult {
+		r := &MissionsSyncResult{
+			Session: SessionStatus{State: SessionStateWorking},
+			Mission: MissionView{Key: "k", Plan: MissionPlan{Steps: []PlanStep{}}, OpenDecisions: []OpenDecision{}},
+			Inbox:   []InboxMessage{}, Decisions: []DecisionStatus{}, Replies: []ReplyStatus{},
+			MinIntervalMs: MinSyncIntervalMs, Now: "2026-10-26T09:00:00Z",
+		}
+		for i := range decisions {
+			r.Decisions = append(r.Decisions, DecisionStatus{ID: fmt.Sprintf("D-%d", i+1), State: DecisionStateOpen})
+		}
+		return r
+	}
+	if diags := ValidateResult(syncResult(MaxSyncDecisions)); diags != nil {
+		t.Errorf("a result with %d decisions is refused: %v", MaxSyncDecisions, diags)
+	}
+	if diags := ValidateResult(syncResult(MaxSyncDecisions + 1)); diags == nil {
+		t.Errorf("a result with %d decisions is accepted; a sync names at most %d", MaxSyncDecisions+1, MaxSyncDecisions)
+	}
+	for _, tc := range []struct {
+		interval int
+		valid    bool
+	}{{MinSyncIntervalMs - 1, false}, {MinSyncIntervalMs, true}, {MaxSyncIntervalMs, true}, {MaxSyncIntervalMs + 1, false}} {
+		r := syncResult(0)
+		r.MinIntervalMs = tc.interval
+		if diags := ValidateResult(r); (diags == nil) != tc.valid {
+			t.Errorf("minIntervalMs %d: valid %v, want %v (%v)", tc.interval, diags == nil, tc.valid, diags)
 		}
 	}
 }

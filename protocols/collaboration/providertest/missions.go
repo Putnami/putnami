@@ -11,7 +11,9 @@ import (
 
 // RunMissions runs the missions v1 scenarios, each against a fresh target and
 // in a mission of its own. A missions target can Post an inbox message and
-// Answer a decision.
+// Answer a decision. Every scenario calls as one caller, so none covers an id
+// that is another caller's or a reply refused as message.denied: a provider
+// with more than one caller tests those itself.
 func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 	t.Helper()
 	scenarios := []struct {

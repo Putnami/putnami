@@ -185,7 +185,7 @@
           "items": { "$ref": "#/$defs/inboxMessage" },
           "description": "Messages no session received yet, oldest first. Their texts, questions and answers total at most 65536 bytes."
         },
-        "decisions": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/decisionStatus" }, "description": "One entry for each decision the sync named that the provider holds for the caller." },
+        "decisions": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/decisionStatus" }, "description": "One entry for each decision the sync named that the provider holds for the caller." },
         "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/replyStatus" }, "description": "One entry per reply the sync carried." },
         "minIntervalMs": { "type": "integer", "minimum": 5000, "maximum": 600000, "description": "The pace of routine syncs, in milliseconds. A host may sync sooner at session start, at stop and during a wait, and a provider does not refuse those syncs." },
         "now": { "$ref": "collaboration.json#/$defs/timestamp" }

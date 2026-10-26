@@ -137,7 +137,7 @@ func maximalSyncResult() *MissionsSyncResult {
 			Decision: &InboxDecision{ID: maximalID(i), Question: fill(MaxQuestionLength), Answer: fill(share - MaxQuestionLength - text), Option: maximalID(i)},
 		})
 	}
-	for i := range MaxListMembers {
+	for i := range MaxSyncDecisions {
 		result.Decisions = append(result.Decisions, DecisionStatus{ID: maximalID(i), State: DecisionStateAcknowledged})
 	}
 	for i := range MaxSyncReplies {
