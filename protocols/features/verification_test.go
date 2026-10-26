@@ -221,9 +221,10 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("cloud", "runtime", "typescript", ManifestFilename): true,
 		filepath.Join("intelligence", "areas", ManifestFilename):          true,
 
-		// The runner protocol names the acceptance checks of its contract,
-		// which its own tests and its implementer observe, in the verification
-		// block.
+		// The runner and CI protocols name the acceptance checks of their
+		// contracts, which their own tests and their implementers observe, in
+		// the verification block.
+		filepath.Join("protocols", "ci", ManifestFilename):     true,
 		filepath.Join("protocols", "runner", ManifestFilename): true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds

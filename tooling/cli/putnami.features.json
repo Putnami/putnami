@@ -3987,9 +3987,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-projection-is-canonical",
-              "the-corpus-is-reproduced",
-              "an-invalid-plan-is-never-emitted"
+              "the-projection-is-canonical"
             ]
           }
         },

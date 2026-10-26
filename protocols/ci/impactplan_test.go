@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // impactPlanExpectations is fixtures/impact-plan/expectations.json, the corpus
@@ -53,6 +55,7 @@ func readImpactPlanFixture(t *testing.T, kind, name string) ImpactPlan {
 }
 
 func TestImpactPlanCorpusMatchesExpectations(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "an-impact-plan-is-validated", "every-impact-plan-fixture-gets-its-verdict")
 	index := readImpactPlanExpectations(t)
 	for kind, listed := range map[string]map[string]string{"valid": index.Valid, "invalid": index.Invalid} {
 		entries, err := os.ReadDir(filepath.Join("fixtures", "impact-plan", kind))
@@ -78,6 +81,7 @@ func TestImpactPlanCorpusMatchesExpectations(t *testing.T) {
 // projected with the repository of the ChangePlan fixture it names, must be
 // that fixture byte for byte, digest included.
 func TestImpactPlanValidCorpusProjectsOntoTheChangePlanCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-projection-is-one-change-plan", "the-valid-corpus-projects-onto-the-change-plan-corpus")
 	index := readImpactPlanExpectations(t)
 	changePlans := readChangePlanExpectations(t)
 	for name, changePlanName := range index.Valid {
@@ -108,6 +112,7 @@ func TestImpactPlanValidCorpusProjectsOntoTheChangePlanCorpus(t *testing.T) {
 }
 
 func TestImpactPlanInvalidCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "an-impact-plan-is-validated", "every-impact-plan-fixture-gets-its-verdict")
 	index := readImpactPlanExpectations(t)
 	for name, refusal := range index.Invalid {
 		t.Run(name, func(t *testing.T) {
@@ -122,6 +127,7 @@ func TestImpactPlanInvalidCorpus(t *testing.T) {
 // TestValidateImpactPlanRefusals holds each refusal to its own defect: every
 // case changes one member of the golden plan.
 func TestValidateImpactPlanRefusals(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "an-impact-plan-is-validated", "each-impact-plan-defect-is-refused")
 	for _, tc := range []struct {
 		name   string
 		mutate func(*ImpactPlan)
@@ -155,6 +161,7 @@ func TestValidateImpactPlanRefusals(t *testing.T) {
 // TestValidateImpactPlanKeepsTheRequestedCommandOrder holds that the command
 // list is ordered by request, not sorted: a reversed list is still valid.
 func TestValidateImpactPlanKeepsTheRequestedCommandOrder(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "an-impact-plan-is-validated", "each-impact-plan-defect-is-refused")
 	plan := readImpactPlanFixture(t, "valid", "golden.json")
 	slices.Reverse(plan.Commands)
 	if err := ValidateImpactPlan(plan); err != nil {
@@ -166,6 +173,7 @@ func TestValidateImpactPlanKeepsTheRequestedCommandOrder(t *testing.T) {
 // its delegation: the impact plan's version and command list are checked as
 // the impact plan's, every shared member as the resulting ChangePlan's.
 func TestChangePlanFromImpactPlanRefusals(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-projection-is-one-change-plan", "the-projection-refuses-what-the-change-plan-refuses")
 	repository := ChangePlanRepository{Remote: "origin", URL: "https://example.test/org/repo.git"}
 	for _, tc := range []struct {
 		name       string
@@ -200,6 +208,7 @@ func TestChangePlanFromImpactPlanRefusals(t *testing.T) {
 // derived from the closure, and a nil list projects exactly like an empty one,
 // so neither can change the digest.
 func TestChangePlanFromImpactPlanDerivesTransitiveDependentsAndEmptyLists(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-projection-is-one-change-plan", "the-projection-is-one-output-per-plan")
 	repository := ChangePlanRepository{Remote: "origin", URL: "https://example.test/org/repo.git"}
 	golden := readImpactPlanFixture(t, "valid", "golden.json")
 	want, err := ChangePlanFromImpactPlan(golden, repository)
@@ -244,6 +253,7 @@ func TestChangePlanFromImpactPlanDerivesTransitiveDependentsAndEmptyLists(t *tes
 // as it was, so a digest stamped on one can never be invalidated through the
 // other.
 func TestChangePlanFromImpactPlanSharesNoListWithItsInput(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-projection-is-one-change-plan", "the-projection-is-one-output-per-plan")
 	plan := readImpactPlanFixture(t, "valid", "golden.json")
 	before, err := json.Marshal(plan)
 	if err != nil {

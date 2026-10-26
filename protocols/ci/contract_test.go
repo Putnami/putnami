@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestValidFixturesParseAndNormalize(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-document-is-version-3-and-strict", "every-document-fixture-gets-its-verdict")
 	entries, err := filepath.Glob(filepath.Join("fixtures", "valid", "*.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -48,6 +50,8 @@ func TestValidFixturesParseAndNormalize(t *testing.T) {
 }
 
 func TestWorkspaceFixtureCarriesEveryMember(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "validating-commands-resolve-the-graph", "provider-sections-are-distribution-and-envs")
+	spectest.Proves(t, "ci/ci-contract", "commands-run-in-order-with-their-flags", "the-workspace-fixture-carries-every-member")
 	document, err := Parse(readFixture(t, "valid", "workspace.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +102,7 @@ func TestWorkspaceFixtureCarriesEveryMember(t *testing.T) {
 // A rule's trigger is exactly one of the three, and Trigger is the single
 // derivation validation, explain, and the runner all read.
 func TestRuleTriggerIsExactlyOne(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "rules-are-first-match", "a-rule-has-exactly-one-trigger")
 	cases := []struct {
 		name  string
 		rule  Rule
@@ -126,6 +131,7 @@ func TestRuleTriggerIsExactlyOne(t *testing.T) {
 // canonicalize back to the shorthand so the file a human wrote is the file
 // `ci fmt` writes.
 func TestAuthoringShorthandsRoundTrip(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "commands-run-in-order-with-their-flags", "authoring-shorthands-round-trip")
 	blocking := true
 	long := Document{Version: Version, Commands: []CommandEntry{{Name: "test", FailOnError: &blocking}},
 		Rules: []Rule{{Branches: Globs{"main"}, Publish: Publish{Channels: []string{"canary"}}}}}
@@ -168,6 +174,7 @@ func TestAuthoringShorthandsRoundTrip(t *testing.T) {
 }
 
 func TestInvalidFixturesFail(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-document-is-version-3-and-strict", "every-document-fixture-gets-its-verdict")
 	entries, err := filepath.Glob(filepath.Join("fixtures", "invalid", "*.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -189,6 +196,7 @@ func TestInvalidFixturesFail(t *testing.T) {
 }
 
 func TestInvalidFixturesReportStableCodes(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-document-is-version-3-and-strict", "every-document-fixture-gets-its-verdict")
 	for fixture, code := range map[string]string{
 		"gate-present.json":              "ci.invalid_json",
 		"deploy-on-rule.json":            "ci.invalid_json",
@@ -214,6 +222,7 @@ func TestInvalidFixturesReportStableCodes(t *testing.T) {
 }
 
 func TestParseRejectsDuplicateKeysAndTrailingJSON(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-document-is-version-3-and-strict", "duplicate-keys-and-trailing-values-are-refused")
 	for _, input := range []string{
 		`{"version":3,"version":3,"commands":["test"]}`,
 		`{"version":3,"commands":["test"]} {}`,
@@ -225,6 +234,7 @@ func TestParseRejectsDuplicateKeysAndTrailingJSON(t *testing.T) {
 }
 
 func TestValidateRejectsBadReferencesAndBounds(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "commands-run-in-order-with-their-flags", "bad-references-and-bounds-are-refused")
 	document := DefaultDocument()
 	document.Commands = append(document.Commands, CommandEntry{Name: "lint"}, CommandEntry{Name: "not a command"})
 	document.Flags = []string{"--enforce-coverage", "-x"}
@@ -258,6 +268,7 @@ func TestValidateRejectsBadReferencesAndBounds(t *testing.T) {
 // The distribution section is the repository's declaration to its provider, so
 // every member of it is validated against a closed vocabulary.
 func TestValidateDistributionVocabulary(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "distribution-is-a-closed-vocabulary", "distribution-vocabulary-is-closed")
 	document := DefaultDocument()
 	document.Distribution = &Distribution{
 		Namespace:  "Putnami Framework",
@@ -280,6 +291,7 @@ func TestValidateDistributionVocabulary(t *testing.T) {
 // same way whether they are declared on the environment or overridden by a
 // workload rule.
 func TestValidateEnvironmentConstraintsAndRollout(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "environments-follow-channels", "environments-are-validated")
 	document := DefaultDocument()
 	document.Envs = map[string]Environment{
 		"prod": {
@@ -319,6 +331,7 @@ func TestValidateEnvironmentConstraintsAndRollout(t *testing.T) {
 }
 
 func TestValidateTaskReferences(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "validating-commands-resolve-the-graph", "task-references-resolve-against-the-graph")
 	document := DefaultDocument()
 	findings := ValidateTaskReferences(document, map[string]string{"lint": "lint", "test": "test"})
 	if len(findings) != 1 || findings[0].Code != "ci.unknown_task" || findings[0].Field != "commands[2]" {
@@ -327,6 +340,7 @@ func TestValidateTaskReferences(t *testing.T) {
 }
 
 func TestGlobDialect(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "branch-globs-are-slash-aware", "the-glob-dialect-is-pinned")
 	cases := []struct {
 		pattern, branch string
 		want            bool
@@ -357,6 +371,7 @@ func TestGlobDialect(t *testing.T) {
 }
 
 func TestCanonicalDigestAndFormatAreStable(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "one-canonical-form-and-digest", "canonical-digest-and-format-are-stable")
 	document := DefaultDocument()
 	first, err := Digest(document)
 	if err != nil {
@@ -400,6 +415,7 @@ func TestCanonicalDigestAndFormatAreStable(t *testing.T) {
 // The runner member is opaque and preserved, but its key order is not part of
 // the intent: two authorings of the same object are one document.
 func TestRunnerIsPreservedAndKeyOrderIsNot(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-runner-object-is-opaque", "the-runner-is-kept-without-its-key-order")
 	first, err := Parse([]byte(`{"version":3,"commands":["test"],"runner":{"timeoutMinutes":45,"lanes":4}}`))
 	if err != nil {
 		t.Fatal(err)
@@ -422,6 +438,7 @@ func TestRunnerIsPreservedAndKeyOrderIsNot(t *testing.T) {
 }
 
 func TestExplainFirstMatchAndPullRequestOptIn(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "rules-are-first-match", "explain-takes-the-first-match")
 	document, err := Parse(readFixture(t, "valid", "workspace.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -462,6 +479,7 @@ func TestExplainFirstMatchAndPullRequestOptIn(t *testing.T) {
 // A tag publishes by convention: only a matching tags rule decides otherwise,
 // and `publish: false` is how a repository opts a tag line out.
 func TestExplainTagPublishesByConvention(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "rules-are-first-match", "a-tag-publishes-by-convention")
 	document, err := Parse(readFixture(t, "valid", "workspace.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -488,6 +506,7 @@ func TestExplainTagPublishesByConvention(t *testing.T) {
 // Explain names the environments that follow each channel a rule advances,
 // including the ones that follow it only through a workload rule.
 func TestExplainListsEnvironmentsPerChannel(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "environments-follow-channels", "explain-lists-environments-per-channel")
 	document, err := Parse(readFixture(t, "valid", "workspace.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -515,6 +534,7 @@ func TestExplainListsEnvironmentsPerChannel(t *testing.T) {
 // would be invisible in the canonical document and in every digest computed
 // from it.
 func TestRuleRetainDeclaresAChannelLifetime(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "retain-declares-a-channel-lifetime", "retain-is-intent")
 	document := mustParse(t, readFixture(t, "valid", "pull-request-lifetime.json"))
 	if len(document.Rules) != 2 {
 		t.Fatalf("rules = %#v", document.Rules)
@@ -562,6 +582,7 @@ func TestRuleRetainDeclaresAChannelLifetime(t *testing.T) {
 // a Go duration, a bare number, a lifetime on a rule that publishes nothing —
 // is refused with one stable, field-addressable code.
 func TestRetainSpellingAndPlacementAreValidated(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "retain-declares-a-channel-lifetime", "retain-spelling-and-placement-are-validated")
 	cases := []struct {
 		name     string
 		rule     Rule
@@ -609,6 +630,7 @@ func TestRetainSpellingAndPlacementAreValidated(t *testing.T) {
 // with the wrong trigger is told about the trigger, and a pull-request rule is
 // told exactly which of its channels several pull requests would share.
 func TestWhileOpenNamesTheOneThingThatIsWrong(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "retain-declares-a-channel-lifetime", "retain-spelling-and-placement-are-validated")
 	onABranch := DefaultDocument()
 	onABranch.Rules = []Rule{{Branches: Globs{"main"}, Publish: Publish{Channels: []string{"canary"}}, Retain: RetainWhileOpen}}
 	triggerFindings := diag.Errors(Validate(onABranch))
@@ -638,6 +660,7 @@ func TestWhileOpenNamesTheOneThingThatIsWrong(t *testing.T) {
 // `ci explain --event pull_request` answers "and when does this channel go
 // away" locally, without resolving anything remote.
 func TestExplainReportsTheDeclaredLifetime(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "retain-declares-a-channel-lifetime", "explain-reports-the-lifetime")
 	document := mustParse(t, readFixture(t, "valid", "pull-request-lifetime.json"))
 	pull, err := Explain(document, ExplainInput{Event: EventPullRequest, Branch: "feature/x", PullRequestNumber: 3612})
 	if err != nil {
@@ -664,6 +687,7 @@ func TestExplainReportsTheDeclaredLifetime(t *testing.T) {
 }
 
 func TestSchemaIsEmbeddedAndClosed(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-document-is-version-3-and-strict", "the-schema-is-closed-and-pinned-to-version-3")
 	var schema map[string]any
 	if err := json.Unmarshal(Schema(), &schema); err != nil {
 		t.Fatal(err)
@@ -689,6 +713,7 @@ func TestSchemaIsEmbeddedAndClosed(t *testing.T) {
 // semantics a document selects — and an author editing one without the other
 // would ship a schema that accepts documents the parser rejects, or the reverse.
 func TestSchemaVersionMatchesContractVersion(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-document-is-version-3-and-strict", "the-schema-is-closed-and-pinned-to-version-3")
 	var schema struct {
 		Properties struct {
 			Version struct {
@@ -740,6 +765,7 @@ func hasCIDiagnostic(findings []diag.Diagnostic, code string) bool {
 // advanced, so it is part of the authored intent exactly like `retain`: it
 // survives canonicalization and changes the digest.
 func TestRuleBaselineNamesTheChannelAPublishMeasuresAgainst(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "baseline-names-a-channel-the-rule-reads", "baseline-is-intent")
 	document := mustParse(t, readFixture(t, "valid", "pull-request-baseline.json"))
 	if len(document.Rules) != 2 {
 		t.Fatalf("rules = %#v", document.Rules)
@@ -784,6 +810,7 @@ func TestRuleBaselineNamesTheChannelAPublishMeasuresAgainst(t *testing.T) {
 // differently, and on a channel the same rule advances. A protected channel is
 // accepted, because protection forbids advancing a channel, not reading it.
 func TestBaselinePlacementAndSpellingAreValidated(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "baseline-names-a-channel-the-rule-reads", "baseline-placement-and-spelling-are-validated")
 	cases := []struct {
 		name     string
 		rule     Rule
@@ -839,6 +866,7 @@ func TestBaselinePlacementAndSpellingAreValidated(t *testing.T) {
 // same report, and a human asking `ci explain` is told which head the first
 // publish of a pull request measures against.
 func TestExplainReportsTheBaselineChannel(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "baseline-names-a-channel-the-rule-reads", "explain-reports-the-baseline")
 	document := mustParse(t, readFixture(t, "valid", "pull-request-baseline.json"))
 	pull, err := Explain(document, ExplainInput{Event: EventPullRequest, Branch: "feature/x", PullRequestNumber: 3677})
 	if err != nil {

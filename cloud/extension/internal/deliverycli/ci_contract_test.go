@@ -10,6 +10,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	ciproto "go.putnami.dev/protocol/ci"
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // writeTestExtension writes an extension manifest that declares the named
@@ -107,6 +108,7 @@ func TestCIInitNeedsAVerificationJob(t *testing.T) {
 }
 
 func TestCIValidateResolvesJobsAndProviderSections(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "validating-commands-resolve-the-graph", "the-cloud-validate-resolves-jobs-and-provider-sections")
 	root := contractWorkspace(t)
 	if _, err := runCIContract(t, root, map[string]any{}, "validate"); clicore.ExitCode(err) != clicore.ExitUsage || !strings.Contains(err.Error(), "ci init") {
 		t.Fatalf("validate without a document error = %v, want a usage error naming ci init", err)
@@ -146,6 +148,7 @@ func TestCIValidateResolvesJobsAndProviderSections(t *testing.T) {
 }
 
 func TestCIFormatRewritesOrChecks(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "one-canonical-form-and-digest", "the-cloud-fmt-writes-or-checks-the-canonical-form")
 	root := contractWorkspace(t)
 	path := filepath.Join(root, ciproto.Filename)
 	if err := os.WriteFile(path, []byte(`{"commands":["lint"],"version":3}`), 0o644); err != nil {
@@ -171,6 +174,7 @@ func TestCIFormatRewritesOrChecks(t *testing.T) {
 }
 
 func TestCIExplainNamesTheRuleAndWhatItPublishes(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "rules-are-first-match", "the-cloud-explain-names-the-rule-and-what-it-publishes")
 	root := contractWorkspace(t)
 	project := filepath.Join(root, "tools", "release")
 	writeContractJSON(t, filepath.Join(project, "putnami.json"), map[string]any{"name": "release"})

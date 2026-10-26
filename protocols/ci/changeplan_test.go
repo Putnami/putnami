@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // changePlanGoldenDigest is the v1 digest of fixtures/change-plan/valid/golden.json.
@@ -61,6 +63,7 @@ func readChangePlanFixture(t *testing.T, kind, name string) ChangePlan {
 }
 
 func TestChangePlanCorpusMatchesExpectations(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-change-plan-v1-is-frozen", "every-valid-change-plan-has-its-digest")
 	index := readChangePlanExpectations(t)
 	for kind, listed := range map[string]map[string]string{"valid": index.Valid, "invalid": index.Invalid} {
 		entries, err := os.ReadDir(filepath.Join("fixtures", "change-plan", kind))
@@ -82,6 +85,7 @@ func TestChangePlanCorpusMatchesExpectations(t *testing.T) {
 }
 
 func TestChangePlanValidCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-change-plan-v1-is-frozen", "every-valid-change-plan-has-its-digest")
 	index := readChangePlanExpectations(t)
 	for name, digest := range index.Valid {
 		t.Run(name, func(t *testing.T) {
@@ -110,6 +114,7 @@ func TestChangePlanValidCorpus(t *testing.T) {
 }
 
 func TestChangePlanInvalidCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-change-plan-is-admitted-only-when-canonical", "every-invalid-change-plan-is-refused")
 	index := readChangePlanExpectations(t)
 	for name, refusal := range index.Invalid {
 		t.Run(name, func(t *testing.T) {
@@ -122,6 +127,7 @@ func TestChangePlanInvalidCorpus(t *testing.T) {
 }
 
 func TestChangePlanV1IdentityIsUnchanged(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-change-plan-v1-is-frozen", "the-change-plan-v1-identity-is-pinned")
 	if ChangePlanVersion != 1 || ChangePlanDigestDomain != "putnami/change-plan/v1" {
 		t.Fatalf("version %d, domain %q: a new canonical form needs a new version", ChangePlanVersion, ChangePlanDigestDomain)
 	}
@@ -145,6 +151,7 @@ func TestChangePlanV1IdentityIsUnchanged(t *testing.T) {
 // case changes one member of the golden plan and re-stamps the digest of the
 // result, so a refusal cannot come from a digest mismatch.
 func TestValidateChangePlanRefusals(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-change-plan-is-admitted-only-when-canonical", "each-change-plan-defect-is-refused-alone")
 	for _, tc := range []struct {
 		name   string
 		mutate func(*ChangePlan)
@@ -192,6 +199,7 @@ func TestValidateChangePlanRefusals(t *testing.T) {
 }
 
 func TestValidateChangePlanRefusesMalformedDigest(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-change-plan-is-admitted-only-when-canonical", "each-change-plan-defect-is-refused-alone")
 	for _, digest := range []string{"", changePlanGoldenDigest[len("sha256:"):], "sha256:" + strings.Repeat("z", 64), changePlanGoldenDigest + "00"} {
 		plan := readChangePlanFixture(t, "valid", "golden.json")
 		plan.Digest = digest
@@ -202,6 +210,7 @@ func TestValidateChangePlanRefusesMalformedDigest(t *testing.T) {
 }
 
 func TestDerivedTransitiveDependentsKeepsClosureOrder(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-change-plan-is-admitted-only-when-canonical", "transitive-dependents-keep-closure-order")
 	impact := ChangePlanImpact{
 		DirectProjects: []ChangePlanProject{{ID: "/b", Name: "b"}},
 		Projects:       []ChangePlanProject{{ID: "/a", Name: "a"}, {ID: "/b", Name: "b"}, {ID: "/c", Name: "c"}},
