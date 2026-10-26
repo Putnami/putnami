@@ -116,6 +116,16 @@ Add the library to your consumer's `putnami.json` dependencies:
 
 The build job automatically syncs workspace dependencies into `go.mod` as `replace` directives — no manual `go.mod` editing required.
 
+## What each template promises
+
+Each template declares its own feature in its `putnami.features.json`:
+`go/library-template` and `go/server-template`, each with
+`tooling/project-scaffolding` as parent. Its spec states the promise: a project
+created from it passes `go vet`, `go build`, its own tests and the linters of
+`putnami lint`, before you edit a line. The `go/templates/proof` project renders
+each template against this repository's framework and observes those checks
+whenever a template or the framework changes.
+
 ## Manual setup (no template)
 
 ### 1. Create the project directory and register it

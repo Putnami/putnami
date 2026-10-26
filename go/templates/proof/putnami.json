@@ -3,7 +3,8 @@
   "name": "@putnami/go-templates-proof",
   "tags": ["go"],
   "extensions": ["/go/extension"],
-  "featureAuthority": {"owner": "go/project-setup"},
+  "featureAuthority": {"owner": "tooling/project-scaffolding"},
+  "dependencies": ["/go/templates/go-library", "/go/templates/go-server"],
   "disable": {
     "jobs": ["serve"]
   },

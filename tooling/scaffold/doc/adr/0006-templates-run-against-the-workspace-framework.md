@@ -31,7 +31,7 @@ project of its language. For every template in the same directory whose
 | | TypeScript proof | Go proof |
 |---|---|---|
 | Wiring | `node_modules` links to the packages the proof installed: every `@putnami/*` package as `workspace:*` (framework source), every other package at the `bun.lock` version. The workspace `tsconfig.json` extends the extension's config. | A `go.work` listing every module of this repository's `go.work` plus the rendered module. |
-| Steps | The preBuild hooks the rendered `package.json` activates; `biome check` with the extension's `config/biome.json` and the `.gitignore` `putnami init` writes, failing on a warning; the `build~types` type-check; `bun test`. | `go list -deps -test` to fill the module cache, then `go vet`, `go build`, `go test -count=1`, then golangci-lint with the extension's `config/.golangci.yml` and staticcheck, at the versions `go/extension/tools/versions.json` pins. |
+| Steps | The preBuild hooks the rendered `package.json` activates; `biome check` with the extension's `config/biome.json` and the `.gitignore` `putnami init` writes, failing on a warning; the `build~types` type-check; `bun test`. | `go list -deps -test` to fill the module cache, then `go vet`, `go build`, `go test -count=1`, then golangci-lint with the extension's `config/.golangci.yml` and staticcheck, at the versions `go/extension/tools/versions.json` pins. Each step is a top-level test bound to the check the template declares for it, and renders its own copy of the template. |
 | Offline | Reads installed packages only. | The module-cache step uses the proxy settings with `GOFLAGS=-mod=readonly`, so every download is checked against `go.sum`. Other steps run with `GOPROXY=off`, `GOENV=off`, `GOFLAGS=-mod=readonly`, `GOTOOLCHAIN=local`. No step inherits `GOCACHEPROG`, whose helper needs the `PUTNAMI_*` variables the proof drops. |
 
 ### The cache key covers the templates and the framework
@@ -48,14 +48,25 @@ under `--impacted`.
   source holding the `.gitignore` `putnami init` writes, and the `bin/**` and
   `putnami.extension.json` of every package whose preBuild hook the proof runs.
 - **Go.** A Go module cannot keep a `require` it does not import, so the proof
-  declares no module edges. `options.test.filePatterns` declares each template
-  directory, every framework and protocol module the rendered projects compile,
-  the extension's `.golangci.yml` and `tools/versions.json`.
+  declares no module edge to the framework. Its `go.mod` requires only what its
+  tests import: `go.putnami.dev/protocol/features` for `spectest` and
+  `go.putnami.dev/protocol/template` for the render rule.
+  `options.test.filePatterns` declares each template directory, every framework
+  and protocol module the rendered projects compile, the extension's
+  `.golangci.yml` and `tools/versions.json`.
+
+Each proof lists every template in its `putnami.json` `dependencies`. A
+template's spec gate reads the checks the proof observed only from a project
+connected to the template, so a session that validates a template without
+running the proof reads them from the proof's cached test result.
 
 ## Invariants
 
-- **Discovery is by manifest.** A template added beside a proof is proven with
-  no edit to the proof.
+- **Discovery is by manifest.** A template added beside the TypeScript proof
+  is proven with no edit to the proof. A template added beside the Go proof
+  fails `TestEveryGoTemplateDeclaresTheChecksThisProofObserves` until the proof
+  binds its checks: a Go binding names its check literally, in a top-level
+  test.
 - **A test holds the key complete.** The TypeScript proof fails when a template
   declares a dependency the proof does not declare with the same specifier, or
   when a framework package's `src/**`, `package.json`, `bin/**` or
@@ -67,8 +78,8 @@ under `--impacted`.
   proof fetches only the third-party modules the rendered project compiles, at
   the `go.sum` versions, because nothing orders it after a task that fills the
   module cache. No step needs credentials; every build step runs offline.
-- **Nothing is left behind.** Every write lands under one temporary directory,
-  removed after each template. The Go build and module caches and the linters'
+- **Nothing is left behind.** Every write lands under a temporary directory,
+  removed after each template or test. The Go build and module caches and the linters'
   caches are the shared user caches.
 - **A linter it cannot run fails.** The Go proof resolves each pinned linter as
   the lint job does (PATH, the machine tool home, the workspace's legacy tool
@@ -77,18 +88,23 @@ under `--impacted`.
   same way when `@biomejs/biome` is not installed. Neither skips. On a machine
   missing a linter, the first `lint,test` run can fail the proof and the next
   passes, because the lint task installs it.
-- **A lint that reads nothing fails.** Before the templates, the Go proof lints
-  planted findings in packages named `build` and `bin`, in a module under
+- **A lint that reads nothing fails.** Before its first lint step, the Go proof
+  lints planted findings in packages named `build` and `bin`, in a module under
   directories named like each excluded path, from the module directory and
-  through a symlink. It fails when golangci-lint misses one: exclusions matched
-  against the directories above the project would pass every lint unread.
+  through a symlink. Every lint step fails when golangci-lint misses one:
+  exclusions matched against the directories above the project would pass
+  every lint unread.
 - **A leftover placeholder fails.** A `<%= name %>` surviving render fails.
 
 ## What the proofs do not prove
 
 - **Rendering is replayed, not called.** The renderer is internal to
   `@putnami/cli`; each proof replays `protocols/template/doc/02-variables.md`.
-  A change to those rules needs both replays updated.
+  A change to those rules needs both replays updated. The root entries the
+  archive leaves out are the exception: the Go proof calls
+  `IsTemplateRootPackagingExclusion` from `protocols/template`, and the
+  TypeScript proof copies its list, which a static test compares with the
+  source.
 - **Generated serve entries and packaging are not run.** The TypeScript proof
   does not generate `.gen/src/serve.bundled.ts`, which needs the `build~describe`
   capability manifest. The scaffold requirement
@@ -107,8 +123,9 @@ under `--impacted`.
   extensions from the registry: a network, credentials and a nested CLI session.
 - **Put the proof in `@putnami/scaffold`.** Its Go tests would need bun and tsc,
   and every framework edit would rerun the packaging tests.
-- **Declare Go module edges.** `go mod tidy` removes them, and a blank import
-  would be a fake dependency. The completeness check states the real closure.
+- **Declare Go module edges to the framework.** `go mod tidy` removes them, and
+  a blank import would be a fake dependency. The completeness check states the
+  real closure.
 
 ## Consequences
 

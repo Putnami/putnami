@@ -215,6 +215,11 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("typescript", "templates", "typescript-server", ManifestFilename):  true,
 		filepath.Join("typescript", "templates", "typescript-web", ManifestFilename):     true,
 
+		// The Go templates name the acceptance checks their template proof
+		// observes in the verification block.
+		filepath.Join("go", "templates", "go-library", ManifestFilename): true,
+		filepath.Join("go", "templates", "go-server", ManifestFilename):  true,
+
 		// The Cloud runtimes and the area detector name the acceptance checks
 		// their own tests observe in the verification block.
 		filepath.Join("cloud", "runtime", "go", ManifestFilename):         true,

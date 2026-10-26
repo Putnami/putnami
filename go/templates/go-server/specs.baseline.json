@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "go/server-template#a-rendered-project-builds",
+    "go/server-template#a-rendered-project-passes-its-tests",
+    "go/server-template#a-rendered-project-passes-lint"
+  ]
+}

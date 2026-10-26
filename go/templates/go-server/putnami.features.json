@@ -1,0 +1,62 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "go",
+  "features": [
+    {
+      "id": "go/server-template",
+      "type": "feature",
+      "name": "Go server template",
+      "outcome": "A project created from the go-server template is the smallest Go HTTP server that works: the server with its operational endpoints and a test beside it pass go vet, go build, go test and the linters putnami lint runs as created",
+      "owner": "go",
+      "target": "modeled",
+      "relations": [
+        {
+          "kind": "parent",
+          "target": "tooling/project-scaffolding"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "a-rendered-project-builds",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-vet-and-go-build-pass"
+            ]
+          }
+        },
+        {
+          "id": "a-rendered-project-passes-its-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-test-passes"
+            ]
+          }
+        },
+        {
+          "id": "a-rendered-project-passes-lint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-linters-putnami-lint-runs-report-nothing"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
