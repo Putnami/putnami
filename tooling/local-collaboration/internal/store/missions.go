@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
@@ -33,6 +34,11 @@ const (
 // MaxOwnerFileBytes bounds an owner file the store reads. A larger file is
 // never read, so it is never taken.
 const MaxOwnerFileBytes = 256 << 10
+
+// RefusalSuffix ends the note the provider writes beside an owner file it
+// does not take: answers/D-3.json.refused says why answers/D-3.json is not
+// taken. A note does not end in .json, so it is never read as an owner file.
+const RefusalSuffix = ".refused"
 
 // Missions is the missions document: the missions, sessions, decisions and
 // messages of one store directory. Ids only grow and are never reused.
@@ -132,6 +138,9 @@ type OwnerFile struct {
 	// Name is the file name, ending in .json.
 	Name string
 	Data []byte
+	// TooLarge reports a file of more than MaxOwnerFileBytes, which is not
+	// read: Data is nil.
+	TooLarge bool
 }
 
 func emptyMissions() *Missions {
@@ -202,10 +211,11 @@ func (s *Store) UpdateMissions(change func(*Missions) error) (*Missions, error) 
 }
 
 // OwnerFiles returns the files of one owner directory in name order: the
-// regular files whose name ends in .json and does not start with a dot, of
-// at most MaxOwnerFileBytes. A directory that does not exist holds none. A
-// file that disappears or cannot be read between the listing and the read is
-// left out; it is read again on the next call.
+// regular files whose name ends in .json and does not start with a dot. A
+// file of more than MaxOwnerFileBytes comes without its data, as TooLarge. A
+// directory that does not exist holds none. A file that disappears or cannot
+// be read between the listing and the read is left out; it is read again on
+// the next call.
 func (s *Store) OwnerFiles(dir string) ([]OwnerFile, error) {
 	path := filepath.Join(s.root, dir)
 	entries, err := os.ReadDir(path)
@@ -221,25 +231,77 @@ func (s *Store) OwnerFiles(dir string) ([]OwnerFile, error) {
 		if strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".json") || !entry.Type().IsRegular() {
 			continue
 		}
-		data, ok := readBounded(filepath.Join(path, name))
-		if !ok {
-			continue
+		data, err := readBounded(filepath.Join(path, name))
+		switch {
+		case errors.Is(err, errTooLarge):
+			files = append(files, OwnerFile{Name: name, TooLarge: true})
+		case err == nil:
+			files = append(files, OwnerFile{Name: name, Data: data})
 		}
-		files = append(files, OwnerFile{Name: name, Data: data})
 	}
 	return files, nil
 }
 
+var errTooLarge = errors.New("the file holds more than the bound")
+
 // readBounded reads a file of at most MaxOwnerFileBytes.
-func readBounded(path string) ([]byte, bool) {
+func readBounded(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
 	defer file.Close()
 	data, err := io.ReadAll(io.LimitReader(file, MaxOwnerFileBytes+1))
-	if err != nil || len(data) > MaxOwnerFileBytes {
-		return nil, false
+	if err != nil {
+		return nil, err
 	}
-	return data, true
+	if len(data) > MaxOwnerFileBytes {
+		return nil, errTooLarge
+	}
+	return data, nil
+}
+
+// WriteRefusals brings the notes of an owner directory in line with
+// refused, which maps the name of each owner file the provider does not take
+// to the line that says why. It writes each note whose text changed, by
+// atomic rename and readable by the store's user only, and removes every
+// other note, such as the note of a file taken or removed since. It never
+// changes or removes an owner file. The caller holds the store lock.
+func (s *Store) WriteRefusals(dir string, refused map[string]string) error {
+	path := filepath.Join(s.root, dir)
+	entries, err := os.ReadDir(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var failures []error
+	for _, entry := range entries {
+		owner, ok := strings.CutSuffix(entry.Name(), RefusalSuffix)
+		if !ok || !strings.HasSuffix(owner, ".json") || !entry.Type().IsRegular() {
+			continue
+		}
+		if _, keep := refused[owner]; keep {
+			continue
+		}
+		if err := os.Remove(filepath.Join(path, entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {
+			failures = append(failures, err)
+		}
+	}
+	names := make([]string, 0, len(refused))
+	for name := range refused {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		note := []byte(refused[name] + "\n")
+		if current, err := os.ReadFile(filepath.Join(path, name+RefusalSuffix)); err == nil && bytes.Equal(current, note) {
+			continue
+		}
+		if err := writeAtomically(path, name+RefusalSuffix, note); err != nil {
+			failures = append(failures, err)
+		}
+	}
+	return errors.Join(failures...)
 }

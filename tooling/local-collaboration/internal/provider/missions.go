@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strconv"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/tooling/local-collaboration/internal/store"
 )
 
@@ -22,32 +25,44 @@ import (
 // refused as message.denied.
 //
 // The owner answers a decision and writes a message outside the contract, as
-// files of the store directory (store.AnswersDir, store.MessagesDir) that the
-// provider only reads. Every missions operation first takes the owner files
-// it has not taken yet, under the store lock and in the same write as the
-// operation, so two provider processes never take one file twice.
+// files of the store directory (store.AnswersDir, store.MessagesDir). Every
+// missions operation first takes the owner files it has not taken yet, under
+// the store lock and in the same write as the operation, so two provider
+// processes never take one file twice.
+//
+// The provider never changes or removes an owner file. Beside a file it does
+// not take, it writes a note, <name>.refused, that says why, and it removes
+// the note once the file is taken or gone. The note is the only report: a
+// sync result has no member for the owner's mistakes, and the agent session
+// that calls is not the person who wrote the file. The directory is where
+// that person looks.
 //
 // Decision ids are D-<n> and message ids M-<n>, in the order the store
 // issued them; the inbox lists a mission's messages in that order.
 
 // takeOwnerFiles takes the answers, then the messages, the owner wrote since
-// the last call. A file it cannot take stays untaken, and is read again on
-// every call until the owner fixes or removes it.
+// the last call. A file it cannot take stays untaken, with a note that says
+// why, and is read again on every call until the owner fixes or removes it.
+// A note that cannot be written never fails the call: the file stays
+// untaken all the same.
 func (p *Provider) takeOwnerFiles(s *store.Store, m *store.Missions) error {
 	now := p.timestamp()
-	answers, err := s.OwnerFiles(store.AnswersDir)
-	if err != nil {
-		return refuse(collab.Fail(collab.OutcomeUnavailable, "store.unreadable", "%v", err))
-	}
-	for _, file := range answers {
-		takeAnswer(m, file, now)
-	}
-	messages, err := s.OwnerFiles(store.MessagesDir)
-	if err != nil {
-		return refuse(collab.Fail(collab.OutcomeUnavailable, "store.unreadable", "%v", err))
-	}
-	for _, file := range messages {
-		takeMessage(m, file, now)
+	for _, dir := range []string{store.AnswersDir, store.MessagesDir} {
+		files, err := s.OwnerFiles(dir)
+		if err != nil {
+			return refuse(collab.Fail(collab.OutcomeUnavailable, "store.unreadable", "%v", err))
+		}
+		take := takeMessage
+		if dir == store.AnswersDir {
+			take = takeAnswer
+		}
+		refused := map[string]string{}
+		for _, file := range files {
+			if reason := take(m, file, now); reason != "" {
+				refused[file.Name] = file.Name + " is not taken: " + reason
+			}
+		}
+		_ = s.WriteRefusals(dir, refused)
 	}
 	return nil
 }
@@ -60,23 +75,35 @@ type ownerAnswer struct {
 }
 
 // takeAnswer answers the open decision an answer file names and writes the
-// answer message. The first answer taken stands: a file for a decision that
-// is no longer open is not taken.
-func takeAnswer(m *store.Missions, file store.OwnerFile, now string) {
-	index := decisionIndex(m, strings.TrimSuffix(file.Name, ".json"))
-	if index < 0 || m.Decisions[index].State != collab.DecisionStateOpen {
-		return
+// answer message. It answers why it does not take the file, or "". The first
+// answer taken stands: a file for a decision that is no longer open is not
+// taken, and needs no note.
+func takeAnswer(m *store.Missions, file store.OwnerFile, now string) string {
+	id := strings.TrimSuffix(file.Name, ".json")
+	index := decisionIndex(m, id)
+	if index < 0 {
+		return "this store holds no decision " + id
+	}
+	if m.Decisions[index].State != collab.DecisionStateOpen {
+		return ""
+	}
+	if file.TooLarge {
+		return tooLargeReason
 	}
 	var answer ownerAnswer
-	if !decodeStrict(file.Data, &answer) {
-		return
+	if err := decodeStrict(file.Data, &answer); err != nil {
+		return err.Error()
 	}
 	decision := &m.Decisions[index]
 	text := answer.Text
 	if answer.Option != "" {
 		option := slices.IndexFunc(decision.Options, func(option collab.DecisionOption) bool { return option.ID == answer.Option })
 		if option < 0 {
-			return
+			ids := make([]string, 0, len(decision.Options))
+			for _, option := range decision.Options {
+				ids = append(ids, option.ID)
+			}
+			return fmt.Sprintf("decision %s has no option %q; option takes one of the ids %s", id, answer.Option, strings.Join(ids, ", "))
 		}
 		if text == "" {
 			text = decision.Options[option].Label
@@ -86,8 +113,8 @@ func takeAnswer(m *store.Missions, file store.OwnerFile, now string) {
 		ID: "M-1", Kind: collab.InboxKindAnswer, Text: text, CreatedAt: now,
 		Decision: &collab.InboxDecision{ID: decision.ID, Question: decision.Question, Answer: text, Option: answer.Option},
 	}
-	if !validInboxEntry(entry) {
-		return
+	if err := validInboxEntry(entry); err != nil {
+		return err.Error()
 	}
 	decision.State, decision.Answer, decision.Option, decision.AnsweredAt = collab.DecisionStateAnswered, text, answer.Option, now
 	m.Next.Message++
@@ -95,7 +122,12 @@ func takeAnswer(m *store.Missions, file store.OwnerFile, now string) {
 		ID: "M-" + strconv.Itoa(m.Next.Message), Mission: decision.Mission, Kind: collab.InboxKindAnswer,
 		Text: text, Decision: decision.ID, CreatedAt: now,
 	})
+	return ""
 }
+
+// tooLargeReason says why a file of more than store.MaxOwnerFileBytes is not
+// taken.
+const tooLargeReason = "the file holds more than 256 KiB"
 
 // ownerMessage is the content of a message file. Kind is info or prompt, and
 // info when absent.
@@ -106,69 +138,92 @@ type ownerMessage struct {
 }
 
 // takeMessage writes the message a message file holds to its mission's
-// inbox. A file is taken once for each content: the same name with the same
-// content again is the message already taken.
-func takeMessage(m *store.Missions, file store.OwnerFile, now string) {
+// inbox. It answers why it does not take the file, or "". A file is taken
+// once for each content: the same name with the same content again is the
+// message already taken.
+func takeMessage(m *store.Missions, file store.OwnerFile, now string) string {
+	if file.TooLarge {
+		return tooLargeReason
+	}
 	sum := sha256.Sum256(file.Data)
 	source := store.MessageSource{File: file.Name, Digest: hex.EncodeToString(sum[:])}
 	if slices.ContainsFunc(m.Messages, func(message store.Message) bool {
 		return message.Source != nil && *message.Source == source
 	}) {
-		return
+		return ""
 	}
 	var message ownerMessage
-	if !decodeStrict(file.Data, &message) {
-		return
+	if err := decodeStrict(file.Data, &message); err != nil {
+		return err.Error()
 	}
 	if message.Kind == "" {
 		message.Kind = collab.InboxKindInfo
 	}
 	if message.Kind != collab.InboxKindInfo && message.Kind != collab.InboxKindPrompt {
-		return
+		return fmt.Sprintf("kind %q is not info or prompt", message.Kind)
 	}
-	if !validMissionName(message.Mission) || !validInboxEntry(collab.InboxMessage{ID: "M-1", Kind: message.Kind, Text: message.Text, CreatedAt: now}) {
-		return
+	if err := validMissionName(message.Mission); err != nil {
+		return err.Error()
+	}
+	if err := validInboxEntry(collab.InboxMessage{ID: "M-1", Kind: message.Kind, Text: message.Text, CreatedAt: now}); err != nil {
+		return err.Error()
 	}
 	m.Next.Message++
 	m.Messages = append(m.Messages, store.Message{
 		ID: "M-" + strconv.Itoa(m.Next.Message), Mission: message.Mission, Kind: message.Kind,
 		Text: message.Text, Source: &source, CreatedAt: now,
 	})
+	return ""
 }
 
 // decodeStrict decodes one JSON object and refuses unknown members and
 // trailing data.
-func decodeStrict(data []byte, into any) bool {
+func decodeStrict(data []byte, into any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(into); err != nil {
-		return false
+		return fmt.Errorf("the file is not one JSON object with only the documented members: %v", err)
 	}
-	_, err := decoder.Token()
-	return err == io.EOF
+	if _, err := decoder.Token(); err != io.EOF {
+		return errors.New("the file holds more than one JSON value")
+	}
+	return nil
 }
 
 // validMissionName holds a mission named in an owner file to the rules a
 // request's mission follows.
-func validMissionName(key store.MissionKey) bool {
+func validMissionName(key store.MissionKey) error {
 	probe := collab.MissionsSyncInput{
 		Session: collab.SessionRef{Engine: "local", ID: "owner"}, Mission: collab.MissionName{Repository: key.Repository, Key: key.Key},
 		Event: "owner", State: collab.SessionStateWorking, ObservedAt: "2026-01-01T00:00:00Z",
 	}
-	return collab.ValidateInput(&probe) == nil
+	return firstDiagnostic(collab.ValidateInput(&probe), "")
 }
 
 // validInboxEntry holds a message the owner wrote to the rules of the inbox
 // it will be answered in, alone: a message the store takes always fits a
 // sync's result.
-func validInboxEntry(entry collab.InboxMessage) bool {
+func validInboxEntry(entry collab.InboxMessage) error {
 	probe := collab.MissionsSyncResult{
 		Session: collab.SessionStatus{State: collab.SessionStateWorking},
 		Mission: collab.MissionView{Key: "probe", Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}},
 		Inbox:   []collab.InboxMessage{entry}, Decisions: []collab.DecisionStatus{}, Replies: []collab.ReplyStatus{},
 		MinIntervalMs: collab.MinSyncIntervalMs, Now: "2026-01-01T00:00:00Z",
 	}
-	return collab.ValidateResult(&probe) == nil
+	return firstDiagnostic(collab.ValidateResult(&probe), "inbox[0].")
+}
+
+// firstDiagnostic states the first diagnostic as the member of the owner file
+// it names, without the probe's prefix, or nil when there is none.
+func firstDiagnostic(diags []diag.Diagnostic, prefix string) error {
+	if len(diags) == 0 {
+		return nil
+	}
+	first := diags[0]
+	if field := strings.TrimPrefix(first.Field, prefix); field != "" {
+		return fmt.Errorf("%s: %s", field, first.Message)
+	}
+	return errors.New(first.Message)
 }
 
 // updateMissions takes the owner files, then runs change, under the store

@@ -32,12 +32,14 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// writerPlan is what one writer process does: the ask both writers send,
-// a reply of its own to the message both reply to, then asks of its own.
+// writerPlan is what one writer process does: syncs of its own session,
+// which take the owner files both see, the ask both writers send, a reply of
+// its own to the message both reply to, then asks of its own.
 type writerPlan struct {
 	Workspace string `json:"workspace"`
 	Role      string `json:"role"`
 	Message   string `json:"message"`
+	Syncs     int    `json:"syncs"`
 	Asks      int    `json:"asks"`
 }
 
@@ -50,6 +52,7 @@ type writerOutcome struct {
 }
 
 type writerReport struct {
+	Syncs  []writerOutcome `json:"syncs"`
 	Shared writerOutcome   `json:"shared"`
 	Reply  writerOutcome   `json:"reply"`
 	Asks   []writerOutcome `json:"asks"`
@@ -91,6 +94,15 @@ func writeMissions(p *Provider, plan writerPlan) (writerReport, error) {
 			return writerOutcome{}, err
 		}
 		return writerOutcome{Outcome: response.Outcome, ID: result.Decision.ID, Replayed: result.Replayed}, nil
+	}
+	for i := 0; i < plan.Syncs; i++ {
+		arguments := `{"session":{"engine":"host-a","id":"writer-` + plan.Role + `"},"mission":` + missionArguments +
+			`,"event":"post_tool_use","state":"working","observedAt":"2026-09-24T07:00:0` + strconv.Itoa(i) + `Z"}`
+		response, err := serveMissions(p, plan.Workspace, collab.OperationSync, arguments)
+		if err != nil {
+			return report, err
+		}
+		report.Syncs = append(report.Syncs, outcomeOf(response))
 	}
 	var err error
 	if report.Shared, err = ask("shared"); err != nil {
@@ -152,20 +164,29 @@ func serveMissions(p *Provider, workspace, operation, arguments string) (collab.
 }
 
 // TestConcurrentProcessesAskAndReplyOnce runs two writer processes against
-// one store at once: this test and a copy of its binary. Both ask the same
-// decision under one key, both reply to one message with different texts,
-// and each asks decisions of its own. Exactly one ask records the shared
-// decision and the other replays it, exactly one reply lands and the other
-// is message.closed, and no decision is lost or issued twice.
+// one store at once: this test and a copy of its binary. Both sync while the
+// owner's message files and an answer file wait, both ask the same decision
+// under one key, both reply to one message with different texts, and each
+// asks decisions of its own. Each owner file is taken once, exactly one ask
+// records the shared decision and the other replays it, exactly one reply
+// lands and the other is message.closed, and no decision or message is lost
+// or issued twice.
 func TestConcurrentProcessesAskAndReplyOnce(t *testing.T) {
 	spectest.Proves(t, "cli/collaboration-providers", "missions-provider-semantics", "concurrent-processes-on-one-local-store-ask-and-reply-once")
 	h := newMissionsHarness(t)
 	writeOwnerFile(t, h.store, store.MessagesDir, "gate.json",
 		ownerMessage{Mission: store.MissionKey{Repository: "acme/app", Key: "issue-7"}, Kind: collab.InboxKindPrompt, Text: "Does the gate pass?"})
 	message := takenMessage(t, h.provider, h.store, "gate.json")
-	const asks = 20
+	answered := h.ask("answered").Decision.ID
+	writeOwnerFile(t, h.store, store.AnswersDir, answered+".json", ownerAnswer{Option: "yes"})
+	const files = 12
+	for i := 0; i < files; i++ {
+		writeOwnerFile(t, h.store, store.MessagesDir, "note-"+strconv.Itoa(i)+".json",
+			ownerMessage{Mission: store.MissionKey{Repository: "acme/app", Key: "issue-7"}, Text: "Note " + strconv.Itoa(i) + "."})
+	}
+	const asks, syncs = 20, 3
 
-	plan, _ := json.Marshal(writerPlan{Workspace: h.workspace, Role: "b", Message: message, Asks: asks})
+	plan, _ := json.Marshal(writerPlan{Workspace: h.workspace, Role: "b", Message: message, Syncs: syncs, Asks: asks})
 	other := exec.Command(os.Args[0], "-test.run=^$")
 	other.Env = append(os.Environ(), missionsWriterVariable+"="+string(plan))
 	start, err := other.StdinPipe()
@@ -188,7 +209,7 @@ func TestConcurrentProcessesAskAndReplyOnce(t *testing.T) {
 	if _, err := io.WriteString(start, "go\n"); err != nil {
 		t.Fatal(err)
 	}
-	ours, err := writeMissions(New(), writerPlan{Workspace: h.workspace, Role: "a", Message: message, Asks: asks})
+	ours, err := writeMissions(New(), writerPlan{Workspace: h.workspace, Role: "a", Message: message, Syncs: syncs, Asks: asks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,6 +221,14 @@ func TestConcurrentProcessesAskAndReplyOnce(t *testing.T) {
 		t.Fatalf("the other writer: %v", err)
 	}
 
+	for _, outcome := range append(ours.Syncs, theirs.Syncs...) {
+		if outcome.Outcome != collab.OutcomeOK {
+			t.Fatalf("a sync answered %+v", outcome)
+		}
+	}
+	if len(ours.Syncs) != syncs || len(theirs.Syncs) != syncs {
+		t.Fatalf("the writers synced %d and %d times, want %d each", len(ours.Syncs), len(theirs.Syncs), syncs)
+	}
 	if ours.Shared.Outcome != collab.OutcomeOK || theirs.Shared.Outcome != collab.OutcomeOK || ours.Shared.ID != theirs.Shared.ID ||
 		ours.Shared.Replayed == theirs.Shared.Replayed {
 		t.Fatalf("the shared ask answered %+v and %+v; want one decision, recorded once and replayed once", ours.Shared, theirs.Shared)
@@ -220,8 +249,35 @@ func TestConcurrentProcessesAskAndReplyOnce(t *testing.T) {
 		ids[outcome.ID] = true
 	}
 	held := h.missions()
-	if len(held.Decisions) != 2*asks+1 || held.Next.Decision != 2*asks+1 || len(ids) != 2*asks+1 {
-		t.Fatalf("the store holds %d decisions, counter %d, after %d distinct asks", len(held.Decisions), held.Next.Decision, len(ids))
+	if len(held.Decisions) != 2*asks+2 || held.Next.Decision != 2*asks+2 || len(ids) != 2*asks+1 {
+		t.Fatalf("the store holds %d decisions, counter %d, after %d distinct asks and one before", len(held.Decisions), held.Next.Decision, len(ids))
+	}
+	taken := map[string]int{}
+	answers := 0
+	messageIDs := map[string]bool{}
+	for _, message := range held.Messages {
+		if messageIDs[message.ID] {
+			t.Fatalf("the message id %s was issued twice", message.ID)
+		}
+		messageIDs[message.ID] = true
+		if message.Source != nil {
+			taken[message.Source.File]++
+		}
+		if message.Decision == answered {
+			answers++
+		}
+	}
+	if len(held.Messages) != files+2 || held.Next.Message != files+2 || answers != 1 || len(taken) != files+1 {
+		t.Fatalf("the store holds %d messages, counter %d, %d answers to %s and %d files taken; want each file and the answer once",
+			len(held.Messages), held.Next.Message, answers, answered, len(taken))
+	}
+	for file, count := range taken {
+		if count != 1 {
+			t.Fatalf("the owner file %s was taken %d times", file, count)
+		}
+	}
+	if decision := held.Decisions[decisionIndex(held, answered)]; decision.State != collab.DecisionStateAnswered || decision.Option != "yes" {
+		t.Fatalf("the answered decision is %+v", decision)
 	}
 	if reply := held.Messages[messageIndex(held, message)].Reply; reply != text {
 		t.Fatalf("the message holds the reply %q; the reply that landed was %q", reply, text)

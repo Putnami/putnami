@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -145,5 +146,81 @@ func TestAStoreThatCannotBeCreatedIsAnError(t *testing.T) {
 	write.Err = errors.New("x")
 	if write.Error() != "x" || write.Unwrap() == nil {
 		t.Error("WriteError")
+	}
+}
+
+// The store is its user's alone: its directory is 0700, and its files, the
+// lock and every document or note written by rename, 0600.
+func TestTheStoreIsReadableByItsUserOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX mode bits")
+	}
+	s := Open(filepath.Join(t.TempDir(), "store"))
+	if _, err := s.Update(func(*State) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateMissions(func(m *Missions) error { m.Next.Message = 1; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(s.Root(), MessagesDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WriteRefusals(MessagesDir, map[string]string{"a.json": "a.json is not taken: a test"}); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]os.FileMode{
+		s.Root():                                   0o700,
+		filepath.Join(s.Root(), lockFile):          0o600,
+		filepath.Join(s.Root(), stateFile):         0o600,
+		filepath.Join(s.Root(), missionsFile):      0o600,
+		filepath.Join(s.Root(), MessagesDir, "a.json"+RefusalSuffix): 0o600,
+	} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := info.Mode().Perm(); got != want {
+			t.Errorf("%s has mode %o, want %o", filepath.Base(path), got, want)
+		}
+	}
+}
+
+// A note is written once for each text, and removed once its file is no
+// longer refused; other files of the directory stay as they are.
+func TestRefusalNotesFollowTheRefusedFiles(t *testing.T) {
+	s := Open(filepath.Join(t.TempDir(), "store"))
+	if err := s.WriteRefusals(AnswersDir, nil); err != nil {
+		t.Fatalf("a directory that does not exist: %v", err)
+	}
+	dir := filepath.Join(s.Root(), MessagesDir)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{"a.json": "{}", "keep.refused": "mine", "b.json" + RefusalSuffix: "old\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.WriteRefusals(MessagesDir, map[string]string{"a.json": "a.json is not taken: why"}); err != nil {
+		t.Fatal(err)
+	}
+	read := func(name string) string {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if errors.Is(err, os.ErrNotExist) {
+			return "<none>"
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	if got := read("a.json" + RefusalSuffix); got != "a.json is not taken: why\n" {
+		t.Errorf("the note says %q", got)
+	}
+	if read("b.json"+RefusalSuffix) != "<none>" || read("keep.refused") != "mine" || read("a.json") != "{}" {
+		t.Errorf("notes and files: b %q, keep %q, a %q", read("b.json"+RefusalSuffix), read("keep.refused"), read("a.json"))
+	}
+	if err := s.WriteRefusals(MessagesDir, nil); err != nil || read("a.json"+RefusalSuffix) != "<none>" {
+		t.Errorf("the note of a file taken since stays: %v", err)
 	}
 }

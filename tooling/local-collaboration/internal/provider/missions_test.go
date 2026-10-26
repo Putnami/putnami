@@ -67,10 +67,24 @@ func inboxIDs(inbox []collab.InboxMessage) []string {
 	return ids
 }
 
+// refusal answers the note beside an owner file, or "" when it has none.
+func refusal(t *testing.T, s *store.Store, dir, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(s.Root(), dir, name+store.RefusalSuffix))
+	if os.IsNotExist(err) {
+		return ""
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 // TestTheOwnerAnswersAndWritesMessagesAsFiles drives the file format the
 // README documents: a message file reaches its mission's inbox once, an
 // answer file answers its decision once, and a file the store cannot take
-// stays untaken without failing any call.
+// stays untaken, as it is, with a note that says why, without failing any
+// call.
 func TestTheOwnerAnswersAndWritesMessagesAsFiles(t *testing.T) {
 	spectest.Proves(t, "cli/collaboration-providers", "missions-provider-semantics", "the-local-owner-answers-and-writes-messages-as-files")
 	h := newMissionsHarness(t)
@@ -107,6 +121,29 @@ func TestTheOwnerAnswersAndWritesMessagesAsFiles(t *testing.T) {
 	held := h.missions()
 	if len(held.Messages) != 3 || held.Messages[0].Source == nil || held.Messages[0].Source.File != "gate.json" {
 		t.Fatalf("the store took %+v; want gate, note and other", held.Messages)
+	}
+	for name, reason := range map[string]string{
+		"broken.json":    "not one JSON object",
+		"unknown.json":   `unknown field "color"`,
+		"trailing.json":  "more than one JSON value",
+		"answer.json":    `kind "answer" is not info or prompt`,
+		"upper.json":     "mission.repository: ",
+		"blank.json":     "text: ",
+		"too-long.json":  "text: ",
+		"oversized.json": "more than 256 KiB",
+	} {
+		note := refusal(t, h.store, store.MessagesDir, name)
+		if !strings.HasPrefix(note, name+" is not taken: ") || !strings.Contains(note, reason) || !strings.HasSuffix(note, "\n") {
+			t.Errorf("the note beside %s says %q; want why: %q", name, note, reason)
+		}
+	}
+	for _, name := range []string{"gate.json", "note.json", "other.json", ".hidden.json", "draft.txt", "folder.json"} {
+		if note := refusal(t, h.store, store.MessagesDir, name); note != "" {
+			t.Errorf("%s has the note %q", name, note)
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(h.store.Root(), store.MessagesDir, "broken.json")); err != nil || string(data) != `{"mission":` {
+		t.Errorf("a refused file changed: %q, %v", data, err)
 	}
 
 	again := h.sync(1, "")
@@ -148,9 +185,42 @@ func TestTheOwnerAnswersAndWritesMessagesAsFiles(t *testing.T) {
 		t.Fatalf("the open decisions are %+v; want only %s, whose answer names no option of it", answered.Mission.OpenDecisions, other.ID)
 	}
 
+	if note := refusal(t, h.store, store.AnswersDir, other.ID+".json"); !strings.Contains(note, `has no option "maybe"; option takes one of the ids yes, no`) {
+		t.Errorf("the note beside %s.json says %q", other.ID, note)
+	}
+	if note := refusal(t, h.store, store.AnswersDir, "D-99.json"); !strings.Contains(note, "this store holds no decision D-99") {
+		t.Errorf("the note beside D-99.json says %q", note)
+	}
+	for _, id := range []string{asked.ID, free.ID} {
+		if note := refusal(t, h.store, store.AnswersDir, id+".json"); note != "" {
+			t.Errorf("a taken answer has the note %q", note)
+		}
+	}
+
 	writeOwnerFile(t, h.store, store.AnswersDir, asked.ID+".json", ownerAnswer{Option: "no"})
 	if replay := h.ask("ship"); replay.Decision.Answer != "Ship it" || replay.Decision.Option != "yes" {
 		t.Fatalf("a second answer file changed the answer: %+v", replay.Decision)
+	}
+	if note := refusal(t, h.store, store.AnswersDir, asked.ID+".json"); note != "" {
+		t.Errorf("an answer to a decision no longer open has the note %q", note)
+	}
+
+	// A fixed file is taken and loses its note; a removed file loses it too.
+	writeRaw(t, h.store, store.MessagesDir, "broken.json", []byte(`{"mission":{"repository":"acme/app","key":"issue-7"},"text":"Fixed."}`))
+	if err := os.Remove(filepath.Join(h.store.Root(), store.MessagesDir, "unknown.json")); err != nil {
+		t.Fatal(err)
+	}
+	fixed := h.sync(4, "")
+	if last := fixed.Inbox[len(fixed.Inbox)-1]; last.Text != "Fixed." {
+		t.Errorf("the fixed file was not taken: %+v", fixed.Inbox)
+	}
+	for _, name := range []string{"broken.json", "unknown.json"} {
+		if note := refusal(t, h.store, store.MessagesDir, name); note != "" {
+			t.Errorf("%s keeps the note %q", name, note)
+		}
+	}
+	if note := refusal(t, h.store, store.MessagesDir, "blank.json"); note == "" {
+		t.Error("a file still refused lost its note")
 	}
 }
 

@@ -184,10 +184,11 @@ func (s *Store) Update(change func(*State) error) (*State, error) {
 }
 
 // locked runs one read-modify-write under the store's exclusive lock,
-// creating the store directory first. A lock another writer holds longer
-// than LockTimeout fails with ErrBusy before run starts.
+// creating the store directory first, readable by the store's user only. A
+// lock another writer holds longer than LockTimeout fails with ErrBusy before
+// run starts.
 func (s *Store) locked(run func() error) error {
-	if err := os.MkdirAll(s.root, 0o755); err != nil {
+	if err := os.MkdirAll(s.root, 0o700); err != nil {
 		return &WriteError{Err: fmt.Errorf("create the local store: %w", err)}
 	}
 	lock, err := acquire(filepath.Join(s.root, lockFile), s.LockTimeout)
