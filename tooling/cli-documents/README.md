@@ -2,8 +2,8 @@
 
 The gates that read this repository's own documents: the governance surface, the
 neutral-contributor recipe, the release plan and its recorded verdict, the
-public-cut candidate, and the shipped manifests. It also holds the Windows
-compile gate, which reads every Go source of the repository.
+public-cut candidate, and the shipped manifests. The Windows compile gate lives
+in [`@putnami/windows-vet`](../windows-vet/README.md).
 
 ## Why this is a separate project
 
@@ -23,16 +23,6 @@ project under `--impacted` and invalidates its verdict. Ignored local state in
 `.context`, worktrees and caches is outside this declaration. The previous fixed
 document list could miss new inputs; a filesystem-wide glob would read ignored
 state the scanner never reads.
-
-## The Windows compile gate
-
-`TestEveryGoWorkModuleVetsForWindows` runs `GOOS=windows GOARCH=amd64 go vet work`
-from the repository root (D-W11). The `work` pattern matches every package of
-every `go.work` module, test files included, so a Unix-only symbol anywhere in the
-workspace fails the contributor gate without a Windows host. It lives here because
-this project's key already covers the whole tracked tree, so every change selects
-it. The test also fails when a `go.work` module has no package that builds for
-Windows, since vet would then check nothing in it.
 
 ## How it reaches the CLI
 
