@@ -286,19 +286,32 @@ member by key leads, and the others follow it:
   `tidy` and test's config merge. What they leave in the tree reaches the
   member through files its own key reads, so they are not part of the shared
   identity.
-- Each follower runs after its leader. A follower that adopts writes nothing to
-  the tree, so it takes its leader's place in write serialization instead of a
-  later one, and every reader in that place waits for it. In a Go `test,build`
-  run, `test~generate` no longer waits for `build~compile`, and the project's
-  test steps start when the shared `generate` and `describe` finish.
+- Each follower runs after its leader and after every follower before it in
+  key order. A member whose own entry misses while an earlier one hit executes
+  or restores, so no two members of a group run at the same time. In a Go
+  `build,test,package` run, `package~generate` follows `build~generate` and
+  `test~generate` follows both.
+- A follower that adopts writes nothing to the tree, so it takes its leader's
+  place in write serialization instead of a later one, and every reader in
+  that place waits for it. In a Go `test,build` run, `test~generate` no longer
+  waits for `build~compile`, and the project's test steps start when the
+  shared `generate` and `describe` finish.
 - A follower that adopts holds its task's output locks for reading until its
   capture, and skips the version-stamp refresh and the preBuild hook, which its
-  leader ran in the same project.
+  leader ran in the same project. It stores its own entry only when it
+  captures exactly the files of its leader's entry, and stores none when its
+  leader stored none: another session can write the outputs between the
+  leader's release of its locks and the follower's capture. The follower
+  still adopts the result; it only loses its entry, and its next run executes
+  it again.
 
 Write serialization orders each resource on its own, so the edges a group adds
 can close a cycle across two resources that no single group predicts. When the
 ordering cannot be scheduled, the plan keeps no shared execution and is
-serialized as if none had been found.
+serialized as if none had been found. The run then reports a
+`plan.shared_executions_dropped` warning, as a `putnami: warning:` line and in
+the `workspaceWarnings` member of its result envelope: its results are the
+same, and it repeats the work sharing would have saved.
 
 A node joins a shared group only when all of the following hold, and each
 condition removes a way one physical run could fail to be what the second node

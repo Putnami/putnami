@@ -740,13 +740,15 @@ type ResultV2 struct {
 	// carries code "signal".
 	Error *ResultError `json:"error,omitempty"`
 	// WorkspaceWarnings are the non-fatal warnings the command's workspace load
-	// recorded, in the order it recorded them. Absent when the load recorded
-	// none or the command loads no workspace; never an empty array.
+	// recorded, in the order it recorded them, then those the plan of its run
+	// recorded. Absent when there are none or the command loads no workspace;
+	// never an empty array.
 	WorkspaceWarnings []WorkspaceWarning `json:"workspaceWarnings,omitempty"`
 }
 
-// WorkspaceWarning is one non-fatal warning a workspace load recorded. A reader
-// branches on Code, never on Message: the code is stable, the prose is not.
+// WorkspaceWarning is one non-fatal warning a workspace load, or the plan of a
+// run, recorded. A reader branches on Code, never on Message: the code is
+// stable, the prose is not.
 type WorkspaceWarning struct {
 	// Code is the stable machine reason, for example
 	// "workspace.provider_view_unavailable". The set is open: a reader ignores

@@ -253,8 +253,8 @@ counted in `machineOutput.elided.failure`, and the session artifact retains it
 
 `workspaceWarnings` is an additive optional member of the result envelope. It
 lists the non-fatal warnings the command's workspace load recorded, in load
-order. These are the same warnings the command writes to stderr as
-`putnami: warning: <message>` lines:
+order, then the warnings the plan of its run recorded. These are the same
+warnings the command writes to stderr as `putnami: warning: <message>` lines:
 
 ```json
 {"protocolVersion":2,"command":"projects list","status":"success","exitCode":0,
@@ -268,7 +268,10 @@ order. These are the same warnings the command writes to stderr as
 - The code set is open. A reader ignores a code it does not know. The current
   codes are `workspace.provider_view_unavailable`, `workspace.probe_view_rejected`,
   `workspace.index_unreadable`, `workspace.name_divergence` and
-  `workspace.jobs_ignored`.
+  `workspace.jobs_ignored`, which a load records, and
+  `plan.shared_executions_dropped`, which the plan of a run records when it
+  cannot order the tasks several commands would run once, so it runs each of
+  them on its own.
 - The member is absent when the load recorded no warning or the command loads
   no workspace. An empty array is invalid.
 - It is allowed beside any status, because a load that warned can still end in

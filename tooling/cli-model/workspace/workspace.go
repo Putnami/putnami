@@ -33,10 +33,14 @@ const (
 	// WarningCodeJobsIgnored means a project declares `jobs`, which the
 	// workspace parses and ignores.
 	WarningCodeJobsIgnored WarningCode = "workspace.jobs_ignored"
+	// WarningCodeSharedExecutionsDropped means the plan of a run found nodes
+	// several commands could share but could not order them, so each node runs
+	// on its own. It is the one code a plan records rather than a load.
+	WarningCodeSharedExecutionsDropped WarningCode = "plan.shared_executions_dropped"
 )
 
-// Warning is one non-fatal finding a workspace load recorded: its stable
-// machine code and its human message.
+// Warning is one non-fatal finding a workspace load, or the plan of a run over
+// it, recorded: its stable machine code and its human message.
 type Warning struct {
 	Code    WarningCode
 	Message string

@@ -581,14 +581,16 @@ export interface ResultV2 {
   error?: ResultErrorV2;
   /**
    * The non-fatal warnings the command's workspace load recorded, in load
-   * order. Absent when there are none; never an empty array.
+   * order, then those the plan of its run recorded. Absent when there are
+   * none; never an empty array.
    */
   workspaceWarnings?: WorkspaceWarning[];
 }
 
 /**
- * One non-fatal warning a workspace load recorded. Branch on `code`, never on
- * `message`. The code set is open: ignore a code you do not know.
+ * One non-fatal warning a workspace load, or the plan of a run, recorded.
+ * Branch on `code`, never on `message`. The code set is open: ignore a code
+ * you do not know.
  */
 export interface WorkspaceWarning {
   /** Stable machine reason, for example `workspace.provider_view_unavailable`. */

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 
@@ -61,6 +62,15 @@ type TaskEntrySpec struct {
 	// pathFrom port already turned into a literal path. It is a contract, not a
 	// wish list — the ingest fails unless the staging root satisfies all of it.
 	Outputs []DeclaredEntryOutput
+
+	// Expect, when non-nil, is the file set the staging root must hold: every
+	// path, content digest and mode, and no other file. It lists its files by
+	// path, as the manifest of a stored entry does. The ingest fails with
+	// ErrCaptureMismatch otherwise. A follower of a shared execution captures a
+	// tree it did not write, and passes the file set its leader stored from that
+	// tree, so it never stores bytes the tree came to hold after its leader's
+	// capture.
+	Expect *cache.Manifest
 }
 
 // TaskStagingPath returns where the ingest expects one declared output's bytes
@@ -131,6 +141,14 @@ func (s *LocalStore) IngestTaskEntry(stagingRoot string, spec TaskEntrySpec) (*T
 	}
 
 	cache.NormalizeManifestFiles(manifest)
+	// Size follows from the digest, so the path, the digest and the mode name a
+	// file.
+	sameFile := func(a, b cache.FileEntry) bool {
+		return a.Path == b.Path && a.Digest == b.Digest && a.Mode == b.Mode
+	}
+	if spec.Expect != nil && !slices.EqualFunc(manifest.Files, spec.Expect.Files, sameFile) {
+		return nil, fmt.Errorf("ingest task entry %s: %w", spec.Key, ErrCaptureMismatch)
+	}
 
 	address := TaskEntryAddress(spec.Key)
 	descriptor := &TaskEntry{

@@ -948,7 +948,10 @@ reads nothing another task writes. A task that adopts the result of another
 command's identical task in the same run (a shared execution) executes
 nothing and writes nothing: it holds the project and workspace locks an
 execution of the task holds, for reading only, while it captures the outputs
-the other task wrote.
+the other task wrote. The other task releases its locks before this one takes
+them, so another session can write the outputs in between. The task therefore
+stores its entry only when it captures exactly the files, content and mode of
+the other task's entry, and stores none when the other task stored none.
 
 An executing task also locks its project for its preparation alone when the
 preparation writes the project tree: the session has not yet started its

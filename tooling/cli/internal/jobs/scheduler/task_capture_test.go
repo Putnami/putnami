@@ -1178,7 +1178,7 @@ func TestCleanSourceRewriterPublishesReusableStatusEntry(t *testing.T) {
 	// formatter result. The old whole-key comparison marked this as a mutation.
 	hashes := map[string]string{"/workspace-install": "dependency-after"}
 	result := f.sched.finalizeExecutedJob(t.Context(), job, capturedResult(nil),
-		true, hash, sourceHash, &mu, hashes)
+		true, hash, sourceHash, nil, &mu, hashes)
 	if result.SourceMutated {
 		t.Fatal("an unchanged source tree was marked as mutated")
 	}
@@ -1210,7 +1210,7 @@ func TestMutatingSourceRewriterEntryIsNeverReused(t *testing.T) {
 
 	var mu sync.Mutex
 	result := f.sched.finalizeExecutedJob(t.Context(), job, capturedResult(nil),
-		true, hash, sourceHash, &mu, map[string]string{})
+		true, hash, sourceHash, nil, &mu, map[string]string{})
 	if !result.SourceMutated {
 		t.Fatal("a changed source tree was recorded as clean")
 	}
@@ -1250,7 +1250,7 @@ func TestPatternlessSourceRewriterIsNeverProvenClean(t *testing.T) {
 	}
 	var mu sync.Mutex
 	result := f.sched.finalizeExecutedJob(t.Context(), job, capturedResult(nil),
-		true, hash, "", &mu, map[string]string{})
+		true, hash, "", nil, &mu, map[string]string{})
 	if !result.SourceMutated {
 		t.Fatal("an unprovable source-rewriter result was published as clean")
 	}
@@ -1294,7 +1294,7 @@ func TestSourceRewriterDetectsWorkspaceKeyedRewrite(t *testing.T) {
 
 	var mu sync.Mutex
 	result := f.sched.finalizeExecutedJob(t.Context(), job, capturedResult(nil),
-		true, hash, sourceHash, &mu, map[string]string{})
+		true, hash, sourceHash, nil, &mu, map[string]string{})
 	if !result.SourceMutated {
 		t.Fatal("a rewrite of a keyed workspace file was recorded as clean")
 	}
@@ -1335,7 +1335,7 @@ func TestSourceRewritersStillInvalidateMemoizedInputDigests(t *testing.T) {
 
 	var mu sync.Mutex
 	f.sched.finalizeExecutedJob(t.Context(), fixer, capturedResult(nil),
-		false, "", "", &mu, map[string]string{})
+		false, "", "", nil, &mu, map[string]string{})
 
 	after, err := cachekey.ComputeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil)
 	if err != nil {

@@ -504,7 +504,8 @@ var complexityCeilings = []complexityCeiling{
 			"must take its leader's place in the write order, and the seven functions are that " +
 			"ordering: serializeWithSharedExecutions orders the groups with write serialization " +
 			"and drops them when the result cannot be scheduled; orderSharedExecutions runs a " +
-			"leader after every member's ordering producers and each follower after its leader; " +
+			"leader after every member's ordering producers and each follower after every member " +
+			"before it; " +
 			"orderingProducer names a producer that only orders a member; writingAccessors and " +
 			"ordersAnotherCommand keep a group apart when a writing node of another command " +
 			"accesses what it writes; waitForFollowers makes the readers of a leader's write wait " +
@@ -516,8 +517,17 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "scheduler",
 		prefix: "internal/jobs/scheduler/scheduler",
 		files:  6,
-		funcs:  98,
-		why: "RAISED 97→98 (cli/supervised-serve-run): jobProcessEnvFor hands a job the run's " +
+		funcs:  100,
+		why: "RAISED 98→100 (shared-execution capture check): recordCapture and expectedCapture " +
+			"hand a leader's stored file set to its followers, and add no cache route: a follower " +
+			"still stores through the declared-capture route, with one more check. OWNERSHIP — only " +
+			"the leader writes the slot's file set, once, and only from the entry it stored; a " +
+			"follower reads it and writes nothing. ATOMICITY — the leader writes it before it " +
+			"closes the slot's done channel and a follower reads it only after that close, so no " +
+			"lock is needed; the follower's ingest compares its capture with that set and " +
+			"publishes nothing on a mismatch, so bytes another session wrote after the leader's " +
+			"capture never reach the follower's entry. " +
+			"RAISED 97→98 (cli/supervised-serve-run): jobProcessEnvFor hands a job the run's " +
 			"process environment plus the supervisor's when the engine names the job a " +
 			"serve-workload step. It adds no cache route and no branch to dispatch: the entries " +
 			"reach cmd.Env only, never a key, and the batch attempt keeps jobProcessEnv. " +

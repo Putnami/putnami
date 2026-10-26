@@ -277,7 +277,7 @@ func recordThrough(t *testing.T, f *captureFixture, result *JobResult, cacheEnab
 	t.Helper()
 	var mu sync.Mutex
 	f.sched.finalizeExecutedJob(context.Background(), failureFixtureJob(), result,
-		cacheEnabled, hash, "", &mu, map[string]string{})
+		cacheEnabled, hash, "", nil, &mu, map[string]string{})
 	return f.cache.LookupTaskFailure(hash)
 }
 

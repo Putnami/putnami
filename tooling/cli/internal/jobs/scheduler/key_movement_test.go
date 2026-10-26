@@ -73,7 +73,7 @@ func TestAnExecutedOutputMovesTheKeyOfAJobThatReadsIt(t *testing.T) {
 
 			var mu sync.Mutex
 			f.sched.finalizeExecutedJob(t.Context(), producer, &JobResult{Status: status},
-				false, "", "", &mu, map[string]string{})
+				false, "", "", nil, &mu, map[string]string{})
 
 			if got, want := keyOf(t, f, check, f.cache), keyOf(t, f, check, store.NewCacheManager(nil)); got != want {
 				t.Fatalf("after the producer ran, the check keys %q, want %q: the key of the layers it reads", got, want)
@@ -374,7 +374,7 @@ func TestAPrecomputedKeyAnEarlierWriteMovesIsNeverLookedUpNorUploaded(t *testing
 
 	writeFileAt(t, layerPath(f), "new layer\n")
 	var mu sync.Mutex
-	f.sched.finalizeExecutedJob(t.Context(), producer, capturedResult(nil), false, "", "", &mu, map[string]string{})
+	f.sched.finalizeExecutedJob(t.Context(), producer, capturedResult(nil), false, "", "", nil, &mu, map[string]string{})
 	fresh := keyOf(t, f, check, store.NewCacheManager(nil))
 
 	hash, served := f.declaredLookup(t.Context(), check)
@@ -384,7 +384,7 @@ func TestAPrecomputedKeyAnEarlierWriteMovesIsNeverLookedUpNorUploaded(t *testing
 	if served != nil {
 		t.Fatalf("the check was served %+v with no entry at its key", served)
 	}
-	f.sched.finalizeExecutedJob(t.Context(), check, capturedResult(nil), true, hash, "", &mu, map[string]string{})
+	f.sched.finalizeExecutedJob(t.Context(), check, capturedResult(nil), true, hash, "", nil, &mu, map[string]string{})
 	remote.DrainUploads()
 
 	for _, op := range []cache.ProviderOp{cache.OpRestore, cache.OpUpload} {
@@ -725,7 +725,7 @@ func TestAWrittenLinkTargetMovesTheKeyOfAJobThatReadsThroughTheLink(t *testing.T
 
 	var mu sync.Mutex
 	f.sched.finalizeExecutedJob(t.Context(), writer, &JobResult{Status: "success"},
-		false, "", "", &mu, map[string]string{})
+		false, "", "", nil, &mu, map[string]string{})
 
 	got, want := keyOf(t, f, reader, f.cache), keyOf(t, f, reader, store.NewCacheManager(nil))
 	if got != want || got == stale {

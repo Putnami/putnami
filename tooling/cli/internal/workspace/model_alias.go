@@ -19,7 +19,8 @@ type Workspace = model.Workspace
 // WarningCode is a stable machine-readable workspace warning reason.
 type WarningCode = model.WarningCode
 
-// Warning is one non-fatal finding a workspace load recorded.
+// Warning is one non-fatal finding a workspace load, or the plan of a run over
+// it, recorded.
 type Warning = model.Warning
 
 // The stable workspace warning codes.
@@ -29,6 +30,7 @@ const (
 	WarningCodeIndexUnreadable         = model.WarningCodeIndexUnreadable
 	WarningCodeNameDivergence          = model.WarningCodeNameDivergence
 	WarningCodeJobsIgnored             = model.WarningCodeJobsIgnored
+	WarningCodeSharedExecutionsDropped = model.WarningCodeSharedExecutionsDropped
 )
 
 // Project represents a discovered project within a workspace.

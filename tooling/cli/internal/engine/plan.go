@@ -99,6 +99,10 @@ func buildPlan(
 		iox.Fprintf(os.Stderr, "putnami: plan: %v\n", err)
 		return nil, ExitError
 	}
+	// The plan records its own warnings on the workspace, such as shared
+	// executions it had to drop. The run reports them with the warnings of its
+	// load, on the same stream and in the same envelope member.
+	req.workspaceWarnings.Report(ws)
 	// An --impacted selection can hold a project for the tasks of a changed
 	// extension only; the planner plans the project whole, and the narrowing
 	// happens here, on the plan, where the predecessor closure is visible.

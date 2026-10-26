@@ -572,11 +572,23 @@ func pipelineProbeWithInfra() (*extension.ExtensionDescription, []*workspace.Pro
 
 // TestSharedExecutions_DroppedWhenTheirPlanCannotBeScheduled pins that sharing
 // never turns a plan that schedules into one that does not: the plan of
-// pipelineProbeWithInfra keeps no shared execution, and schedules.
+// pipelineProbeWithInfra keeps no shared execution, schedules, and records one
+// warning that says so. A plan that keeps its sharing records none.
 func TestSharedExecutions_DroppedWhenTheirPlanCannotBeScheduled(t *testing.T) {
 	t.Parallel()
 	ext, projects := pipelineProbeWithInfra()
-	planned := planPipelineProbe(t, []string{"build", "test"}, ext, projects)
+	plan := func() ([]*jobmodel.ScheduledJob, *workspace.Workspace) {
+		ws := testWorkspace(t.TempDir(), projects...)
+		planned, err := Plan(ws, []string{"build", "test"}, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("Plan: %v", err)
+		}
+		return planned, ws
+	}
+	planned, ws := plan()
+	if len(ws.Warnings) != 1 || ws.Warnings[0].Code != workspace.WarningCodeSharedExecutionsDropped {
+		t.Errorf("warnings = %+v, want the one shared-executions-dropped warning", ws.Warnings)
+	}
 	byKey := JobsByPlanKey(planned)
 	requirePlanKey(t, byKey, "/lib:build~infra")
 	for _, job := range planned {
@@ -593,8 +605,11 @@ func TestSharedExecutions_DroppedWhenTheirPlanCannotBeScheduled(t *testing.T) {
 	infra := ext.Tasks["probe-infra"]
 	infra.Writes = []extension.ResourceRef{{ID: cachekey.GenResourceID}}
 	ext.Tasks["probe-infra"] = infra
-	requireShared(t, JobsByPlanKey(planPipelineProbe(t, []string{"build", "test"}, ext, projects)),
-		"/lib:build~generate", "/lib:test~generate")
+	planned, ws = plan()
+	requireShared(t, JobsByPlanKey(planned), "/lib:build~generate", "/lib:test~generate")
+	if len(ws.Warnings) != 0 {
+		t.Errorf("a plan that keeps its sharing warns %+v", ws.Warnings)
+	}
 }
 
 // planRealGoProjects plans the CLI and an app sample against the real Go
@@ -688,22 +703,7 @@ func TestSharedExecutions_RealGoManifest(t *testing.T) {
 // of the run that reads or writes the project's gen.
 func TestSharedExecutions_RealGoManifestWithPackage(t *testing.T) {
 	t.Parallel()
-	goExtension := loadGoPlannerExtension(t)
-	root := t.TempDir()
-	writeProjectFile(t, root, "subject", "go.mod",
-		"module example.com/subject\n\ngo 1.25\n\nrequire go.putnami.dev/app v0.0.0\n")
-	writeProjectFile(t, root, "subject", "subject.go", "package main\n\nfunc main() {}\n")
-	writeProjectFile(t, root, "subject", wsproto.ConfigFilename, `{}`)
-	project := &workspace.Project{
-		ID: "/subject", Name: "subject", Path: "subject", Type: "application",
-		Extensions: []string{"@putnami/go"},
-		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "subject")),
-	}
-	planned, err := Plan(testWorkspace(root, project), []string{"test", "build", "package"}, []*workspace.Project{project},
-		[]*extension.ExtensionDescription{goExtension}, extension.ParamMap{"deployment": true}, nil, nil)
-	if err != nil {
-		t.Fatalf("Plan: %v", err)
-	}
+	planned := planRealGoApplication(t, []string{"test", "build", "package"}, extension.ParamMap{"deployment": true})
 	byKey := JobsByPlanKey(planned)
 	requireShared(t, byKey, "/subject:build~generate", "/subject:test~generate")
 	requireShared(t, byKey, "/subject:build~generate", "/subject:package~generate")
@@ -722,5 +722,100 @@ func TestSharedExecutions_RealGoManifestWithPackage(t *testing.T) {
 	}
 	if accessors == 0 {
 		t.Fatal("control: no other step of the plan reads or writes the project's gen")
+	}
+}
+
+// planRealGoApplication plans one Go application against the real Go
+// extension manifest.
+func planRealGoApplication(t *testing.T, commands []string, params extension.ParamMap) []*jobmodel.ScheduledJob {
+	t.Helper()
+	goExtension := loadGoPlannerExtension(t)
+	root := t.TempDir()
+	writeProjectFile(t, root, "subject", "go.mod",
+		"module example.com/subject\n\ngo 1.25\n\nrequire go.putnami.dev/app v0.0.0\n")
+	writeProjectFile(t, root, "subject", "subject.go", "package main\n\nfunc main() {}\n")
+	writeProjectFile(t, root, "subject", wsproto.ConfigFilename, `{}`)
+	project := &workspace.Project{
+		ID: "/subject", Name: "subject", Path: "subject", Type: "application",
+		Extensions: []string{"@putnami/go"},
+		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "subject")),
+	}
+	planned, err := Plan(testWorkspace(root, project), commands, []*workspace.Project{project},
+		[]*extension.ExtensionDescription{goExtension}, params, nil, nil)
+	if err != nil {
+		t.Fatalf("Plan %v: %v", commands, err)
+	}
+	return planned
+}
+
+// TestSharedExecutions_RealGoManifestLeavesNoConflictUnordered plans the real
+// Go manifest under `build,test,package`, where the generate of each command is
+// one shared execution of three members. A member that misses its own entry
+// executes or restores while another one captures, so every two members of a
+// group are ordered, and so are every two steps of the plan that access one
+// resource when either of them writes it.
+func TestSharedExecutions_RealGoManifestLeavesNoConflictUnordered(t *testing.T) {
+	t.Parallel()
+	for _, params := range []extension.ParamMap{{"archives": true}, {"deployment": true}} {
+		planned := planRealGoApplication(t, []string{"build", "test", "package"}, params)
+		byKey := JobsByPlanKey(planned)
+		requireShared(t, byKey, "/subject:build~generate", "/subject:package~generate")
+		requireShared(t, byKey, "/subject:build~generate", "/subject:test~generate")
+
+		groups := make(map[string][]*jobmodel.ScheduledJob)
+		for _, job := range planned {
+			if id := job.SharedExecution(); id != "" {
+				groups[id] = append(groups[id], job)
+			}
+		}
+		largest := 0
+		for _, members := range groups {
+			largest = max(largest, len(members))
+			for i, a := range members {
+				for _, b := range members[i+1:] {
+					if !planOrdered(byKey, a, b) {
+						t.Errorf("%v: the members %s and %s of %s are unordered", params, a.Key(), b.Key(), a.SharedExecution())
+					}
+				}
+			}
+		}
+		if largest < 3 {
+			t.Fatalf("%v: control: no shared execution has three members", params)
+		}
+
+		type access struct {
+			job   *jobmodel.ScheduledJob
+			write bool
+		}
+		accesses := make(map[string][]access)
+		for _, job := range planned {
+			for _, ref := range job.JobDef.Reads {
+				key := ResourceConflictKey(job.Project.ID, ref)
+				accesses[key] = append(accesses[key], access{job: job})
+			}
+			for _, ref := range job.JobDef.Writes {
+				key := ResourceConflictKey(job.Project.ID, ref)
+				accesses[key] = append(accesses[key], access{job: job, write: true})
+			}
+		}
+		genWriters := 0
+		for key, list := range accesses {
+			for i, a := range list {
+				if a.write && key == ResourceConflictKey("/subject", extension.ResourceRef{ID: cachekey.GenResourceID}) {
+					genWriters++
+				}
+				for _, b := range list[i+1:] {
+					if a.job == b.job || (!a.write && !b.write) {
+						continue
+					}
+					if !planOrdered(byKey, a.job, b.job) {
+						t.Errorf("%v: %s and %s both access %s, one writes it, and they are unordered", params, a.job.Key(), b.job.Key(), key)
+					}
+				}
+			}
+		}
+		if genWriters < 3 {
+			t.Fatalf("%v: control: %d steps write the project's gen, want the three generates at least", params, genWriters)
+		}
 	}
 }

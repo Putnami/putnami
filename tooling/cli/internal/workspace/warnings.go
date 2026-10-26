@@ -8,9 +8,10 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
-// WarningReport reports the warnings Load recorded on a workspace. Report
-// writes each one as a "putnami: warning: <message>" line and keeps it, so a
-// structured command also carries it in its result envelope. Every command that
+// WarningReport reports the warnings Load, and the plan of a run, recorded on
+// a workspace. Report writes each one as a "putnami: warning: <message>" line
+// and keeps it, so a structured command also carries it in its result
+// envelope. Every command that
 // reads the workspace reports its warnings through a WarningReport, so the same
 // state reads the same on every surface.
 type WarningReport struct {
@@ -24,8 +25,9 @@ func NewWarningReport(w io.Writer) *WarningReport {
 	return &WarningReport{w: w}
 }
 
-// Report writes and keeps each warning Load recorded on ws, in order, except a
-// warning the report already holds: it holds each warning once. A nil report or
+// Report writes and keeps each warning recorded on ws, in order, except a
+// warning the report already holds: it holds each warning once, so a run that
+// reports after its load and again after its plan writes each warning once. A nil report or
 // a nil ws does nothing.
 func (r *WarningReport) Report(ws *Workspace) {
 	if r == nil || ws == nil {

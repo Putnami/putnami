@@ -36,11 +36,12 @@ import (
 //
 // A group's first member by key LEADS and the others FOLLOW. A follower that
 // adopts its leader's result executes nothing and writes nothing: it captures
-// its own entry from the tree its leader left. So the follower runs right after
-// its leader, takes its leader's place in the write order, and every reader in
-// that place waits for it (serializeWriteResources). That is what lets a task
-// that writes the project `gen` subtree share: no other declared access to the
-// subtree runs between the leader's write and the follower's capture.
+// its own entry from the tree its leader left. So the followers run right after
+// their leader, one after another, take its place in the write order, and every
+// reader in that place waits for them (serializeWriteResources). That is what
+// lets a task that writes the project `gen` subtree share: no other declared
+// access to the subtree runs between the leader's write and a follower's
+// capture.
 //
 // Deliberately NOT stamped here:
 //
@@ -130,16 +131,18 @@ func attachSharedExecutions(
 // writer.
 //
 // A group's first member by key LEADS: it runs after every member's ordering
-// producers. The other members FOLLOW it: they run after it and adopt its
-// result. A follower writes nothing to the tree, so it takes its leader's place
-// in the write order, and a reader of a follower's output reads what the
-// leader wrote.
+// producers. The other members FOLLOW it, one after another in key order, and
+// adopt its result. A follower writes nothing to the tree, so it takes its
+// leader's place in the write order, and a reader of a follower's output reads
+// what the leader wrote.
 //
 // Write serialization orders each resource on its own, so these edges can
 // close a cycle across two resources that no single group predicts. When the
 // ordering cannot be scheduled, the plan keeps no shared execution and is
 // serialized as if none had been found: sharing never stops a plan from
-// scheduling.
+// scheduling. The plan then records a plan.shared_executions_dropped warning
+// on the workspace, which the run reports with the warnings of its load: the
+// results are the same, and the run repeats the work sharing would have saved.
 func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.ScheduledJob) {
 	saved := make([][]string, len(jobs))
 	for i, job := range jobs {
@@ -157,10 +160,25 @@ func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.Sch
 	}
 	serializeWriteResources(jobs, nil)
 	orderContractClients(jobs, ws)
+	// A plan that cannot be scheduled without sharing either has a cycle of its
+	// own, which Plan reports as an error, so only a plan that sharing broke
+	// warns.
+	if ValidatePlanDAG(jobs) != nil || ws.HasWarningCode(workspace.WarningCodeSharedExecutionsDropped) {
+		return
+	}
+	ws.AddWarning(workspace.WarningCodeSharedExecutionsDropped, fmt.Sprintf(
+		"the plan found %d groups of tasks that several commands could run once, could not order them, and runs each task on its own: the results are the same, and the run repeats that work",
+		len(groups)))
 }
 
-// orderSharedExecutions adds the edges that make each group's leader run first,
-// and returns each follower's leader.
+// orderSharedExecutions adds the edges that make each group's leader run first
+// and its followers one after another, in key order, and returns each
+// follower's leader. At run time any member can write the outputs: a member
+// whose own entry hits restores it, and the first member that misses executes.
+// So no two members are left unordered, or one could write the outputs while
+// another restores or captures them. Each follower waits for every member
+// before it, not only the previous one, so a pass that removes a planned member
+// later keeps the others ordered.
 func orderSharedExecutions(jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.ScheduledJob) map[string]string {
 	if len(groups) == 0 {
 		return nil
@@ -173,9 +191,12 @@ func orderSharedExecutions(jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.S
 		for _, dep := range leader.DependsOn {
 			own[dep] = true
 		}
-		for _, follower := range members[1:] {
+		for i, follower := range members[1:] {
 			leaders[follower.Key()] = leader.Key()
-			follower.SerializeAfter = jobmodel.DedupeSorted(append(follower.SerializeAfter, leader.Key()))
+			for _, earlier := range members[:i+1] {
+				follower.SerializeAfter = append(follower.SerializeAfter, earlier.Key())
+			}
+			follower.SerializeAfter = jobmodel.DedupeSorted(follower.SerializeAfter)
 			for _, dep := range follower.DependsOn {
 				if producer := byKey[dep]; producer != nil && !own[dep] && orderingProducer(follower, producer) {
 					leader.SerializeAfter = jobmodel.DedupeSorted(append(leader.SerializeAfter, dep))
@@ -236,13 +257,14 @@ func ordersAnotherCommand(members []*jobmodel.ScheduledJob, accessors map[string
 // agree on, and whether this node may join one at all.
 //
 // The identity is deliberately built from DECLARED facts — the manifest task,
-// its contract digest, the file and env patterns the project adds for this
-// command, the declared params, the resolved deadline — and never from file
-// CONTENT. Two nodes that agree on all of it run the same tool over the same
-// project with the same inputs and the same recursively resolved producer
-// identities. That producer fold is what prevents two downstream nodes from
-// being unified after behaviorally different upstream steps while still
-// letting equivalent command-qualified producer chains compare equal.
+// its contract digest, the task's own file and env patterns, the declared
+// params, the resolved deadline — and never from file CONTENT. Two nodes that
+// agree on all of it run the same tool over the same project with the same
+// inputs and the same recursively resolved producer identities, ordering
+// producers left out (orderingProducer). That producer fold is what prevents
+// two downstream nodes from being unified after behaviorally different
+// upstream steps while still letting equivalent command-qualified producer
+// chains compare equal.
 //
 // It intentionally EXCLUDES the command name, which is the only thing the two
 // nodes disagree about and the only reason the cache cannot serve one from the

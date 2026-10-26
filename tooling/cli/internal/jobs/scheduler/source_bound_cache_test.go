@@ -142,7 +142,7 @@ func TestSourceBoundBindingErrorInsideARepositoryExecutesAndStoresNothing(t *tes
 		writeFileAt(t, filepath.Join(g.ws.Root, captureTestProject, "out", "evidence.json"), "executed\n")
 		var mu sync.Mutex
 		hashes := map[string]string{}
-		g.sched.finalizeExecutedJob(context.Background(), job, result, true, key, "", &mu, hashes)
+		g.sched.finalizeExecutedJob(context.Background(), job, result, true, key, "", nil, &mu, hashes)
 		if hashes[job.Key()] != key {
 			t.Fatalf("dependents received %q, want the cache key %q", hashes[job.Key()], key)
 		}
@@ -206,7 +206,7 @@ func publishSourceBoundMatrixEntry(t *testing.T, server *fakeCacheServer, job *S
 	result := matrixResult()
 	result.SourceBinding, result.SourceBindingStamped = binding, true
 	var mu sync.Mutex
-	producer.sched.finalizeExecutedJob(t.Context(), job, result, true, key, "", &mu, map[string]string{})
+	producer.sched.finalizeExecutedJob(t.Context(), job, result, true, key, "", nil, &mu, map[string]string{})
 	producerRemote.DrainUploads()
 	if !server.has(store.RemoteTaskEntryKey(cachekey.SourceBoundEntryKey(key, binding))) {
 		t.Fatal("the producer shared no entry at the bound key")
@@ -356,7 +356,7 @@ func TestSourceBoundFailureIsNeverRecordedOrReplayed(t *testing.T) {
 	bound := sourceBoundJob()
 	f := newCaptureFixture(t, bound)
 	var mu sync.Mutex
-	f.sched.finalizeExecutedJob(context.Background(), bound, failed(), true, captureHashA, "", &mu, map[string]string{})
+	f.sched.finalizeExecutedJob(context.Background(), bound, failed(), true, captureHashA, "", nil, &mu, map[string]string{})
 	if record := f.cache.LookupTaskFailure(captureHashA); record != nil {
 		t.Fatalf("a source-bound failure was recorded for replay: %+v", record)
 	}

@@ -3,6 +3,9 @@ package scheduler
 import (
 	"context"
 	"sync"
+
+	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/tooling/cli/internal/store"
 )
 
 // The RUNTIME half of a plan-level shared node. The
@@ -32,8 +35,14 @@ import (
 // leader wrote. It holds its task's output keys shared until its capture
 // (lockFollowerOutputs), and it skips the version refresh and the preBuild
 // hook, which its leader ran in the same project. The plan makes every reader
-// of the leader's write wait for the follower, so the tree it captures is the
-// tree its leader left.
+// of the leader's write wait for the follower, so no task of this run writes
+// the tree between the leader's capture and the follower's.
+//
+// Another session can: the leader releases its keys before the follower takes
+// its own. So the follower stores its entry only when it captures exactly the
+// files of the entry its leader stored (store.TaskEntrySpec.Expect), and
+// stores none when its leader stored none. A mismatch costs the follower its
+// entry, never its result: its next run executes it again.
 //
 // Three properties are load-bearing and pinned by tests:
 //
@@ -54,6 +63,9 @@ import (
 type sharedExecutionSlot struct {
 	done   chan struct{}
 	result *JobResult
+	// capture is the file set of the entry the leader stored, or nil when it
+	// stored none. The leader writes it before it closes done.
+	capture *cache.Manifest
 }
 
 // sharedExecutionLease is one job's participation in a shared node. Only the
@@ -62,7 +74,10 @@ type sharedExecutionSlot struct {
 type sharedExecutionLease struct {
 	slot   *sharedExecutionSlot
 	leader bool
-	once   sync.Once
+	// adopted is true for a follower that adopted its leader's result. A
+	// follower that found nothing to adopt executes as an unshared task does.
+	adopted bool
+	once    sync.Once
 }
 
 // enterSharedExecution registers this job with its shared node, returning nil
@@ -96,6 +111,32 @@ func (l *sharedExecutionLease) publish(result *JobResult) {
 		l.slot.result = result
 		close(l.slot.done)
 	})
+}
+
+// recordCapture keeps the file set of the entry the leader stored, for its
+// followers to compare their own captures with. A nil entry keeps none. The
+// leader calls it before publish; a follower's call does nothing.
+func (l *sharedExecutionLease) recordCapture(entry *store.TaskEntry) {
+	if l == nil || !l.leader || entry == nil {
+		return
+	}
+	capture := entry.Manifest
+	if capture == nil {
+		capture = &cache.Manifest{}
+	}
+	l.slot.capture = capture
+}
+
+// expectedCapture returns the file set this task's own capture must hold, and
+// whether the task may store an entry at all. A leader, an unshared task and a
+// follower that executes have no expectation. A follower that adopted its
+// leader's result expects the file set its leader stored, and stores nothing
+// when its leader stored nothing: no file set then vouches for the tree.
+func (l *sharedExecutionLease) expectedCapture() (*cache.Manifest, bool) {
+	if l == nil || !l.adopted {
+		return nil, true
+	}
+	return l.slot.capture, l.slot.capture != nil
 }
 
 // await blocks until the leader publishes, and returns the result this follower
