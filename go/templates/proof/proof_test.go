@@ -218,7 +218,7 @@ func TestEveryGoTemplateIsADependencyOfThisProof(t *testing.T) {
 // checks and the bound tests equal: each template beside this project is one
 // this proof binds, and it declares the check of each step, and only those.
 func TestEveryGoTemplateDeclaresTheChecksThisProofObserves(t *testing.T) {
-	var want []string
+	want := make([]string, 0, len(provenSteps))
 	for _, step := range provenSteps {
 		want = append(want, step.requirement+"#"+step.check)
 	}
