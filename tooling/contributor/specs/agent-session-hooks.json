@@ -1,0 +1,51 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/agent-session-hooks",
+  "outcomes": [
+    "A Claude Code or Codex session publishes its state, plan, delivered messages, decisions and replies to its mission through the missions contract, from the host hooks @putnami/contributor declares",
+    "The agent receives its mission sheet at session start and the owner's messages and answers at the end of a turn or during a wait"
+  ],
+  "nonGoals": [
+    "Writing the host files: the core writes the hooks the manifest declares",
+    "Choosing or falling back to a missions provider",
+    "Changing host permissions, credentials or model access"
+  ],
+  "requirements": [
+    {
+      "id": "session-start-sheet",
+      "text": "SessionStart syncs the session, reads the mission's checkpoint through memory.mission when memory is bound, and prints the mission sheet: the repository and key missions.ask takes, the title, the plan, the open decisions and the checkpoint, within 4 KiB, with every agent or owner text quoted with \"> \". Waiting messages follow whole while the context stays within 9,500 bytes. A sheet the provider did not refresh says its date; a workspace without missions gets none."
+    },
+    {
+      "id": "tool-use-capture",
+      "text": "PostToolUse records a TodoWrite, TaskCreate, TaskUpdate or update_plan plan change, the id of a decision missions.ask opened, and a marker for a reply missions.reply recorded or found closed. It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock. A recorded reply wins over an ack line for the same message."
+    },
+    {
+      "id": "stop-publication",
+      "text": "Stop sends the state, the plan when it changed, the delivered message ids, the asked decisions and the [ack <id>] lines of the last message in one sync. A waiting message continues the turn once, with additional context on Claude Code and a block on Codex; a sync that answers a new message is followed by one that publishes the delivery. A Codex Stop with an open decision waits up to 180 s. StopFailure publishes the error. A refused reply is dropped for good."
+    },
+    {
+      "id": "idle-wake",
+      "text": "The Claude Code idle wake pairs with the Stop of its own event, waits only when that Stop did not continue the turn, syncs at the provider's pace within 5 s to 10 min, and ends after 10 minutes or when a new turn starts. It exits 75 with the message on stderr only when a message waits, and never waits for an SDK host."
+    },
+    {
+      "id": "fail-open",
+      "text": "Every hook path other than a waking idle wake exits 0. A failure, a missing host channel, a bad payload or an outcome other than ok prints no error and leaves one line in hook.log, which rotates at 1 MiB. A failed call closes the channel so the next one dials again, and what the sync did not deliver stays queued. A plan the provider refuses goes once without it."
+    },
+    {
+      "id": "bounded-calls",
+      "text": "Each event stops 5 s before the timeout its manifest entry declares, each call takes at most 10 s of what is left, and the common longest path of each event, its git commands, calls and waits, fits that budget."
+    },
+    {
+      "id": "mission-target",
+      "text": "A session reports to issue-<n> once agent attach --issue <n> declared it for the checkout and branch, else to branch:<branch>. The repository is the lowercase owner/name of the origin remote, without host or credential; a local path or a remote without an owner names none. The session store lives under the Putnami home, never in the checkout."
+    },
+    {
+      "id": "host-channel",
+      "text": "The executable behind putnami agent hook reaches the missions and memory providers only through the host RPC channel putnami opens for the interactive launch."
+    }
+  ],
+  "decisions": [
+    "tooling/contributor/doc/adr/0007-the-contributor-declares-agent-session-hooks.md"
+  ]
+}

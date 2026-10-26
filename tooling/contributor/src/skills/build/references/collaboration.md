@@ -22,6 +22,12 @@ The MCP server offers the same operations as `<contract>.<operation>` tools
 (`tasks.get`, `proposals.upsert`, `memory.checkpoint`, ...) with the same
 request and envelope. Use whichever entry path the host exposes.
 
+When the workspace binds `missions`, the host hooks publish the session to its
+mission and print the mission sheet at session start: ask the owner with
+`missions.ask` and the repository and key the sheet names, and reply to an
+owner's message with `missions.reply` or an `[ack <message id>] <reply>` line
+in the final message of the turn.
+
 ## Read the envelope
 
 Every call prints one envelope: `outcome`, then `result` or `error`
