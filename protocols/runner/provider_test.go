@@ -7,9 +7,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestProviderEnvelopesAreStrict(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-provider-envelope-is-strict", "envelopes-and-ops-are-strict")
 	t.Parallel()
 	request, err := ParseProviderRequest([]byte(`{"protocolVersion":1,"id":1,"op":"submit","payload":{"a":1}}`))
 	if err != nil || request.Op != OpSubmit || request.ID != 1 {
@@ -58,6 +61,7 @@ func TestProviderEnvelopesAreStrict(t *testing.T) {
 // lookup miss carries no member at all, a cancel acknowledgement carries the
 // state observed once the request was applied.
 func TestLifecycleOpPayloadsRoundTrip(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-provider-envelope-is-strict", "lifecycle-payloads-round-trip")
 	t.Parallel()
 	payload, err := MarshalPayload(LookupParams{IdempotencyKey: strings.Repeat("ab", 16)})
 	if err != nil {
@@ -95,6 +99,7 @@ func TestLifecycleOpPayloadsRoundTrip(t *testing.T) {
 // document, so a task with declared resources reaches depth 9 inside it; the
 // envelope budget admits it while the document budget stays at 8.
 func TestSubmitEnvelopeCarriesDeclaredResources(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-provider-envelope-is-strict", "the-envelope-has-its-own-depth-budget")
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("fixtures", "execution-request", "valid", "resources.json"))
 	if err != nil {
@@ -149,6 +154,7 @@ func TestSubmitEnvelopeCarriesDeclaredResources(t *testing.T) {
 }
 
 func TestSessionBundleFixtures(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-session-bundle-is-closed", "every-session-bundle-fixture-gets-its-verdict")
 	t.Parallel()
 	for _, validity := range []string{"valid", "invalid"} {
 		paths, err := filepath.Glob(filepath.Join("fixtures", "session-bundle", validity, "*.json"))
@@ -178,6 +184,8 @@ func TestSessionBundleFixtures(t *testing.T) {
 }
 
 func TestTerminalStatesAndSessionIDs(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-session-bundle-is-closed", "session-ids-exchange-paths-and-file-names-are-pinned")
+	spectest.Proves(t, "runner/runner-contract", "follow-replays-without-duplicates", "terminal-states-are-pinned")
 	t.Parallel()
 	for _, state := range []string{StateQueued, StatePreparing, StateRunning} {
 		if TerminalState(state) {

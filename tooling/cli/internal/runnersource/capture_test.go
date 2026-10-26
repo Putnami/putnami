@@ -117,6 +117,7 @@ func TestSourceCaptureUsesWorktreeBytesAndSurvivesLaterEdits(t *testing.T) {
 }
 
 func TestSourceDigestIsIndependentOfHeadAndIndex(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "source-identity-is-the-content", "the-cli-source-digest-ignores-head-and-index")
 	repo, store := sourceFixture(t)
 	writeSource(t, repo, "tracked", []byte("changed"), 0o644)
 	dirty := captureSource(t, store, repo)

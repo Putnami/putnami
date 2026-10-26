@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func requestIdentity(project, task, command string) protocolcli.TaskIdentity {
@@ -66,6 +67,7 @@ func validRequest() ExecutionRequest {
 }
 
 func TestExecutionRequestRoundTripsCanonically(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v1-request-is-strict-and-canonical", "the-v1-request-round-trips-canonically")
 	t.Parallel()
 	request := validRequest()
 	canonical, err := CanonicalExecutionRequest(request)
@@ -94,6 +96,7 @@ func TestExecutionRequestRoundTripsCanonically(t *testing.T) {
 }
 
 func TestExecutionInputDigestExcludesPlanAndControl(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "input-digests-name-the-applicable-inputs", "the-v1-input-digest-excludes-plan-and-control")
 	t.Parallel()
 	base := validRequest()
 	digest, err := ExecutionInputDigest(base)
@@ -153,6 +156,7 @@ func TestExecutionInputDigestExcludesPlanAndControl(t *testing.T) {
 }
 
 func TestExecutionRequestRejectsSemanticViolations(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v1-request-is-strict-and-canonical", "the-v1-request-refuses-semantic-violations")
 	t.Parallel()
 	cases := map[string]func(*ExecutionRequest){
 		"version":            func(r *ExecutionRequest) { r.Version = 2 },
@@ -237,6 +241,7 @@ func TestExecutionRequestRejectsSemanticViolations(t *testing.T) {
 // accepts exactly that version's valid fixtures, so a version 1 document parses,
 // encodes and digests as it does without a version 2.
 func TestExecutionRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "versions-never-mix", "every-execution-request-fixture-gets-its-verdict")
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("fixtures", "execution-request", "digests.json"))
 	if err != nil {
@@ -346,6 +351,7 @@ var fixtureRefusals = map[string]string{
 }
 
 func TestExecutionRequestSchemaTracksWireShape(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v1-request-is-strict-and-canonical", "the-v1-schema-tracks-the-wire")
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("schemas", "execution-request-v1.json"))
 	if err != nil {
@@ -409,6 +415,7 @@ func TestExecutionRequestSchemaTracksWireShape(t *testing.T) {
 }
 
 func TestParamProjectionKeepsGoTypes(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v1-request-is-strict-and-canonical", "parameters-keep-their-go-types")
 	t.Parallel()
 	for value, want := range map[any]string{"1": ParamTypeString, true: ParamTypeBool, 1: ParamTypeInt, int64(2): ParamTypeInt, 1.5: ParamTypeFloat} {
 		param, err := NewParam(value)
@@ -445,6 +452,7 @@ func TestParamProjectionKeepsGoTypes(t *testing.T) {
 // enabling no provider and planning no publication encodes exactly as it did
 // before the members existed: the canonical bytes carry neither name.
 func TestInvocationExtensionsKeepAbsentMembersOffTheWire(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "providers-and-publication-are-additive", "absent-invocation-members-stay-off-the-wire")
 	t.Parallel()
 	canonical, err := CanonicalExecutionRequest(validRequest())
 	if err != nil {
@@ -494,6 +502,7 @@ func publicationPlan(publishDependsOn ...string) PlanBlock {
 // task publishes only under the block, and a publication task waits, through
 // transitive edges, for every task of every barrier command.
 func TestValidatePublicationRequiresTheBarrier(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "providers-and-publication-are-additive", "publication-waits-for-the-barrier")
 	t.Parallel()
 	invocation := InvocationBlock{Commands: []string{"test", "publish"}, Publication: &PublicationBlock{Barrier: []string{"test"}}}
 	if err := ValidatePublication(invocation, publicationPlan("/app:test"), IsPublicationTask); err != nil {
@@ -528,6 +537,7 @@ func TestValidatePublicationRequiresTheBarrier(t *testing.T) {
 // invocation.providers: sorted and unique, and nil (an absent member) when
 // nothing remains, so a request that enables no provider keeps its digest.
 func TestCanonicalProvidersOmitsAnEmptyList(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "providers-and-publication-are-additive", "absent-invocation-members-stay-off-the-wire")
 	t.Parallel()
 	for _, providers := range [][]string{nil, {}, {""}} {
 		if got := CanonicalProviders(providers); got != nil {
