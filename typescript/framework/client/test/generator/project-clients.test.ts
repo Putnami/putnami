@@ -608,6 +608,7 @@ describe('generateProjectClients (TypeScript)', () => {
       expect(JSON.parse(document)).toEqual({
         $schema: 'https://putnami.dev/schemas/putnami-project.json',
         name: '@example/widgets-client',
+        type: 'library',
         tags: ['ts', 'generated-client'],
         extensions: ['@putnami/typescript'],
         featureAuthority: {

@@ -166,11 +166,12 @@ export function generateProjectClients(projectRoot: string, selected: ProjectCli
     : undefined;
   // Rendered before any byte is written, so a formatter failure leaves the
   // output as it was.
-  const projectContent = existsSync(resolve(outputDir, PROJECT_FILE))
-    ? undefined
-    : canonicalizeGeneratedFiles(formatProjectRoot, formatOutputDir, [
-        { path: PROJECT_FILE, content: renderClientProject(config.ts.packageName) },
-      ])[0].content;
+  const projectContent = renderMissingClientProject(
+    outputDir,
+    formatProjectRoot,
+    formatOutputDir,
+    config.ts.packageName,
+  );
   preflightOwnedOutput(outputDir, new Set(files.map((file) => file.path)), manifest !== undefined);
 
   const written: string[] = [];
@@ -191,22 +192,48 @@ export function generateProjectClients(projectRoot: string, selected: ProjectCli
   }
   // Not reported in `files`: the build records those as its assets, which must
   // not depend on whether the workspace already had a project document.
-  if (projectContent !== undefined) {
-    writeFileSync(resolve(outputDir, PROJECT_FILE), projectContent);
-  }
+  writeClientProject(outputDir, projectContent);
 
   return { generated: true, outputDir: outputRel, files: written };
 }
 
 /**
+ * Renders the client's project document with the provider's Biome
+ * configuration when the output directory has none. Returns `undefined` when
+ * it has one, which generation never rewrites.
+ */
+function renderMissingClientProject(
+  outputDir: string,
+  formatProjectRoot: string,
+  formatOutputDir: string,
+  packageName: string,
+): string | undefined {
+  if (existsSync(resolve(outputDir, PROJECT_FILE))) {
+    return undefined;
+  }
+  return canonicalizeGeneratedFiles(formatProjectRoot, formatOutputDir, [
+    { path: PROJECT_FILE, content: renderClientProject(packageName) },
+  ])[0].content;
+}
+
+/** Writes the project document {@link renderMissingClientProject} rendered, if any. */
+function writeClientProject(outputDir: string, content: string | undefined): void {
+  if (content !== undefined) {
+    writeFileSync(resolve(outputDir, PROJECT_FILE), content);
+  }
+}
+
+/**
  * The project document of a generated client, the TypeScript counterpart of the
  * one the Go emitter scaffolds. Generated code owns no user outcome of its own,
- * so it declares `featureAuthority.none` instead of a feature.
+ * so it declares `featureAuthority.none` instead of a feature. The client is a
+ * library: it has no entrypoint, so `serve` and `run` skip it.
  */
 function renderClientProject(packageName: string): string {
   const project = {
     $schema: 'https://putnami.dev/schemas/putnami-project.json',
     name: packageName,
+    type: 'library',
     tags: ['ts', 'generated-client'],
     extensions: ['@putnami/typescript'],
     featureAuthority: {

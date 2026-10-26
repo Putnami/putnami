@@ -155,7 +155,7 @@
     },
     {
       "id": "client-project-document",
-      "text": "When the client's output directory has no putnami.json, generation writes one, rendered with the provider's Biome configuration, that names the package, tags it ts and generated-client, selects @putnami/typescript and declares featureAuthority.none. An existing putnami.json is kept byte for byte. Neither the generated manifest nor the files the result reports list it."
+      "text": "When the client's output directory has no putnami.json, generation writes one, rendered with the provider's Biome configuration, that names the package, marks it a library, tags it ts and generated-client, selects @putnami/typescript and declares featureAuthority.none. An existing putnami.json is kept byte for byte. Neither the generated manifest nor the files the result reports list it."
     }
   ],
   "decisions": [
