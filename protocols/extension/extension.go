@@ -78,6 +78,12 @@ type Manifest struct {
 	// AgentContentContract, and a workspace receives the content only when it
 	// opts in.
 	AgentContent *AgentContentContribution `json:"agentContent,omitempty"`
+	// HostHooks declares the hooks this extension asks the agent hosts to run
+	// (see host_hooks.go). Nil means the extension declares none. Declaring it
+	// requires cliContract HostHooksContract, and the CLI writes the hooks only
+	// for a workspace that opts into the extension's agent content and binds
+	// the collaboration contract the hooks require.
+	HostHooks *HostHooksDeclaration `json:"hostHooks,omitempty"`
 	// Verbs is the verb vocabulary this extension declares, in display order:
 	// each verb's description, aliases, default traits and related commands
 	// (see verb_vocabulary.go). Nil means the extension declares none.

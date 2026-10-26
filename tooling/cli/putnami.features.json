@@ -2324,6 +2324,54 @@
               "extensions-install-reports-the-opt-in-and-the-content"
             ]
           }
+        },
+        {
+          "id": "host-hooks-written-on-explicit-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-opted-in-bound-installed-extension-gets-its-hooks",
+              "a-repeated-run-changes-nothing",
+              "no-opt-in-or-no-binding-writes-nothing",
+              "an-explicit-install-writes-the-hooks",
+              "the-implicit-bootstrap-writes-no-hooks"
+            ]
+          }
+        },
+        {
+          "id": "host-hooks-ownership-by-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "putnami-handlers-are-replaced-in-place",
+              "the-person-s-entries-keep-their-bytes",
+              "an-unusable-file-is-left-untouched",
+              "retirement-removes-putnami-handlers"
+            ]
+          }
+        },
+        {
+          "id": "host-hooks-exit-guard",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-exit-75-wakes",
+              "matchers-follow-each-host",
+              "a-source-workspace-runs-its-putnamiw"
+            ]
+          }
         }
       ]
     },

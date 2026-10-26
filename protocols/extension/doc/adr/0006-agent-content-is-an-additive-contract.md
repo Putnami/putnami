@@ -2,7 +2,9 @@
 
 - **Status**: accepted, amended by decision D-013 in the root
   `decisions.json`: `putnami migrate agent-content` is deleted, so
-  `supersedes` has one consumer, the refusal.
+  `supersedes` has one consumer, the refusal. Amended by
+  [Host hooks](#amendment-host-hooks-ride-the-same-opt-in): a top-level
+  `hostHooks` member under contract 16.
 - **Scope**: `go.putnami.dev/protocol/extension` (`agentContent`),
   `go.putnami.dev/protocol/cli` (`protocols/cli/contract.go`), and the SDK
   package step (`tooling/extension-sdk/agentartifact`)
@@ -134,3 +136,23 @@ The workspace opt-in and lifecycle are
   opted in it also fails `putnami install`: it reads the `extension:<name>`
   opt-in as an agent artifact named `extension` that no lock pins, and writes
   nothing. `TestAgentContentOptIn_OlderReaderFailsClosed` pins that reading.
+
+## Amendment: host hooks ride the same opt-in
+
+An extension may also declare `hostHooks`: the hooks it asks the agent hosts
+(Claude Code, Codex) to run, each one an interactive subcommand of the
+extension. The member is top-level, not part of `agentContent`, because the
+content tree is files the CLI copies, and hooks are entries the CLI merges into
+files a person also edits.
+
+- The member follows decision 3. `HostHooksContract = 16` is additive, and
+  `RequiredLoadContract` returns 16 for a manifest that declares it. A reader
+  below 16 refuses the stamp instead of installing the extension without its
+  hooks.
+- The member requires `agentContent`. The `extension:<name>` opt-in that
+  installs the content also enables the hooks, and nothing else does.
+- The member names the collaboration contract the hooks call. The CLI writes
+  the hooks only when the workspace binds it.
+
+[CLI ADR 0081](../../../../tooling/cli/doc/adr/0081-the-core-writes-declared-host-hooks.md)
+records how the CLI writes them.

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/sessions",
+  "version": "1.0.0",
+  "cliContract": 16,
+  "agentContent": {
+    "path": "agent-content",
+    "manifestSha256": "3f6c9a1d2b7e4f8a0c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3"
+  },
+  "commandGroups": {
+    "agent": {
+      "description": "Report agent sessions.",
+      "subcommands": {
+        "hook": {
+          "command": "agent-hook",
+          "description": "Run as an agent host hook.",
+          "interactive": true
+        }
+      }
+    }
+  },
+  "commands": {
+    "agent-hook": {
+      "description": "Run as an agent host hook.",
+      "run": [
+        {
+          "id": "hook",
+          "task": "hook-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "hook-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": [
+        "hook"
+      ]
+    }
+  },
+  "hostHooks": {
+    "requires": {
+      "contract": "missions"
+    },
+    "command": [
+      "agent",
+      "hook"
+    ],
+    "hosts": {
+      "codex": [],
+      "cursor": [
+        {
+          "event": "Stop",
+          "timeoutSeconds": 30
+        }
+      ],
+      "claude-code": [
+        {
+          "event": "Stop",
+          "timeoutSeconds": 30
+        }
+      ]
+    }
+  }
+}

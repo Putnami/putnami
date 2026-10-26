@@ -253,6 +253,14 @@ same name. A reader below 15 answers "unknown subcommand" for that word, so it
 refuses the stamp. The floor binds a manifest wherever it loads from. Only a
 manifest whose group default declares positionals is stamped 15; positionals
 on another subcommand keep the base stamp.
+Contract `16` (`HostHooksContract`) is additive for the `hostHooks` member:
+the hooks an extension asks the agent hosts to run. From 16 on, an explicit
+`putnami install`, `init` or `upgrade` writes them into `.claude/settings.json`
+and `.codex/hooks.json` for a workspace that opts into the extension's agent
+content and binds the collaboration contract the hooks require. A reader below
+16 would install the extension without its hooks, so it refuses the stamp. The
+floor binds a manifest wherever it loads from. Only a manifest that declares
+the member is stamped 16.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

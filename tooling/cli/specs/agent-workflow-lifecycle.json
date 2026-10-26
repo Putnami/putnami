@@ -10,7 +10,8 @@
     "Repeating any of the three commands with the same pin changes nothing on disk",
     "A workspace whose lock is below format 5 can explicitly migrate it to format 5, and one that pins toolchains reaches it through putnami install",
     "A workspace that opts into an extension's agent content receives the instructions of exactly the extension version it installed",
-    "A workspace that still declares or records its workflows as separate artifacts is refused with nothing written and told what to replace or delete"
+    "A workspace that still declares or records its workflows as separate artifacts is refused with nothing written and told what to replace or delete",
+    "A workspace that opts into an extension's agent content and binds the collaboration contract its hooks require gets the extension's host hooks from putnami init, putnami install and putnami upgrade, beside the hooks the person wrote"
   ],
   "nonGoals": [
     "A force-overwrite flag, or any other way to discard a user-owned file",
@@ -18,7 +19,8 @@
     "Adding agent content to a workspace that did not opt into it",
     "Installing agent workflows as an artifact outside an extension",
     "Converting a lock older than format version 5 as a side effect",
-    "Downloading anything during putnami upgrade --dry-run"
+    "Downloading anything during putnami upgrade --dry-run",
+    "Writing host hooks during the first-use bootstrap, context generate or the MCP server start"
   ],
   "requirements": [
     {
@@ -80,12 +82,25 @@
     {
       "id": "starter-agent-content-opt-in",
       "text": "No built-in starter opts into agent content, so `putnami init` declares none. `putnami extensions install @putnami/contributor` declares the extension and materializes only its content, and reports each write; an extension without content, or installed as a dependency, gets no opt-in. A starter that names one has init do the same. When the content step fails, both declarations stay, no agent file is written, and `putnami install` is the next step."
+    },
+    {
+      "id": "host-hooks-written-on-explicit-lifecycle",
+      "text": "An explicit putnami install, init or upgrade writes the host hooks an extension declares (hostHooks) into .claude/settings.json and .codex/hooks.json when the workspace opts into the extension's agent content, binds the collaboration contract the hooks require, and has the extension installed. A repeated run changes nothing. The implicit bootstrap, the first-run pass, context generate and the MCP server never write them. A run that creates or changes .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
+    },
+    {
+      "id": "host-hooks-ownership-by-command",
+      "text": "A hook handler is Putnami's when its command runs a known launcher followed by the command path an installed extension declares; no record says so. A run replaces Putnami's handlers in place and never adds a second one. Every other key, event, group and handler keeps its bytes and its place. When the opt-in or the binding is gone, the run removes Putnami's handlers, and an event, hooks object or file they alone filled. A file that cannot be read, parsed or edited safely, or that is a link, is left untouched with a warning that names it."
+    },
+    {
+      "id": "host-hooks-exit-guard",
+      "text": "No exit code of the CLI reaches the host as is. An ordinary hook ends with || true. A wake hook, which only Claude Code runs, exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are alternations (A|B) and Codex matchers are anchored regular expressions (^(A|B)$); a Putnami MCP tool is named mcp__putnami__<tool> with its dots as underscores. A source workspace runs the hooks through \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0004-agent-artifact-ownership.md",
     "tooling/cli/doc/adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md",
     "tooling/cli/doc/adr/0047-extension-owned-agent-content.md",
-    "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md"
+    "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
+    "tooling/cli/doc/adr/0081-the-core-writes-declared-host-hooks.md"
   ]
 }

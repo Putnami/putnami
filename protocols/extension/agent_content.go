@@ -81,7 +81,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: DefaultPositionalsContract for a command group whose default
+// the manifest: HostHooksContract for a hostHooks member,
+// DefaultPositionalsContract for a command group whose default
 // subcommand declares positionals, ProvisionedToolchainContract for a runtime
 // toolchain that
 // declares a provisioned candidate, PublishChannelsContract for a task that
@@ -159,6 +160,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// there, whatever origin the manifest loads from.
 	if DeclaresDefaultPositionals(m) {
 		required = max(required, protocolcli.DefaultPositionalsContract)
+	}
+	// A host hook reaches the agent host only through a reader that writes
+	// it, whatever origin the manifest loads from.
+	if DeclaresHostHooks(m) {
+		required = max(required, protocolcli.HostHooksContract)
 	}
 	return required
 }
