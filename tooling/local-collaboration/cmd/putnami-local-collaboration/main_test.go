@@ -30,8 +30,9 @@ func readManifest(t *testing.T) *extension.Manifest {
 
 // TestTheManifestPassesBothGates holds the shipped manifest to the extension
 // protocol's strict validation and to the collaboration offer the orchestrator
-// reads when it resolves a binding: the provider offers exactly the tasks and
-// proposals operations this runtime answers, with truthful annotations.
+// reads when it resolves a binding: the provider offers exactly the tasks,
+// proposals and missions operations this runtime answers, with truthful
+// annotations.
 func TestTheManifestPassesBothGates(t *testing.T) {
 	manifest := readManifest(t)
 	if manifest.Name != extensionName {
@@ -45,14 +46,14 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 		t.Fatalf("the provider declarations draw diagnostics: %v", diags)
 	}
 	if !slices.Equal(offer.Versions(collab.ContractTasks), []int{1}) || !slices.Equal(offer.Versions(collab.ContractProposals), []int{1}) ||
-		len(offer.Versions(collab.ContractMemory)) != 0 {
+		!slices.Equal(offer.Versions(collab.ContractMissions), []int{1}) || len(offer.Versions(collab.ContractMemory)) != 0 {
 		t.Fatalf("offer %v", offer)
 	}
 	answered := map[collab.OperationKey]bool{}
 	for key := range newHandlers() {
 		answered[key] = true
 	}
-	for _, contract := range []string{collab.ContractTasks, collab.ContractProposals} {
+	for _, contract := range []string{collab.ContractTasks, collab.ContractProposals, collab.ContractMissions} {
 		operations, _ := offer.Operations(contract, 1)
 		for name, provided := range operations {
 			key := collab.OperationKey{Contract: contract, Version: 1, Operation: name}
@@ -75,6 +76,11 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 	if !strings.Contains(status[collab.OperationStatus].Definition.Description, "no hosted checks") ||
 		!strings.Contains(status[collab.OperationUpsert].Definition.Description, "merge is not offered") {
 		t.Error("the proposals tools must disclose the absence of hosted checks and merge")
+	}
+	missions, _ := offer.Operations(collab.ContractMissions, 1)
+	if !strings.Contains(missions[collab.OperationAsk].Definition.Description, "answers/<decision>.json") ||
+		!strings.Contains(missions[collab.OperationSync].Definition.Description, "files in the store directory") {
+		t.Error("the missions tools must disclose that the owner answers and writes messages as files")
 	}
 }
 

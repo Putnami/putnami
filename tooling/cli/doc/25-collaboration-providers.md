@@ -138,11 +138,13 @@ provider chose.
 ## The local provider
 
 [`@putnami/local-collaboration`](../../local-collaboration/README.md) implements
-tasks and proposals over a store directory inside the workspace
+tasks, proposals and missions over a store directory inside the workspace
 (`.putnami/collaboration/local` unless `settings.root` says otherwise). It
 needs no account and no network. It runs no hosted checks — `proposals status`
 always reports checks `unsupported` — and offers no merge, assignment,
-hierarchy or claim. Memory providers are separate extensions.
+hierarchy or claim. You own its missions: you answer a decision and send a
+message by writing a file in the store directory. Memory providers are
+separate extensions.
 
 ## Other shipped providers
 

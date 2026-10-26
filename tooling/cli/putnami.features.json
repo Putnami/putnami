@@ -3216,6 +3216,19 @@
           }
         },
         {
+          "id": "missions-provider-semantics",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-local-store-passes-the-missions-scenarios",
+              "the-local-owner-answers-and-writes-messages-as-files",
+              "concurrent-processes-on-one-local-store-ask-and-reply-once"
+            ]
+          }
+        },
+        {
           "id": "contract-names-never-shadow-commands",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
