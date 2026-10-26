@@ -197,12 +197,12 @@ export function testVars(template: Template): RenderVars {
 }
 
 /**
- * Replays template.RenderDir (tooling/cli/internal/template/render.go), whose
- * rules protocols/template/doc/02-variables.md documents: the walk is
- * depth-first in byte order, the root manifest and the root entries a template
- * archive leaves out are skipped, `__module__` in a path becomes
- * `projectModule`, and a `.template` file gets `<%= name %>` substitution and
- * loses its suffix. Unlike the CLI, a placeholder left after rendering fails
+ * Replays template.RenderDir (tooling/cli/internal/template/render.go): the
+ * walk is depth-first in byte order, the root manifest and the root entries a
+ * template archive leaves out are skipped (protocols/template/doc/01-manifest.md),
+ * `__module__` in a path becomes `projectModule`, and a `.template` file gets
+ * `<%= name %>` substitution and loses its suffix
+ * (protocols/template/doc/02-variables.md). Unlike the CLI, a placeholder left after rendering fails
  * here: it would reach the user as literal text.
  */
 export function renderTemplate(src: string, dst: string, vars: RenderVars): void {

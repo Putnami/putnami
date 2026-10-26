@@ -294,6 +294,9 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	iox.Fprintf(os.Stdout, "  Phase 2: Validate project structure\n")
 	projectCfg := filepath.Join(projectDir, "putnami.json")
 	if _, err := os.Stat(projectCfg); os.IsNotExist(err) {
+		if _, srcErr := os.Stat(filepath.Join(templateDir, "putnami.json")); srcErr == nil {
+			return fmt.Errorf("rendered template has no putnami.json: the template's root putnami.json configures the template project and is not rendered; ship the created project's manifest as putnami.json.template")
+		}
 		return fmt.Errorf("rendered template has no putnami.json — template may be broken")
 	}
 	iox.Fprintf(os.Stdout, "  ✓ putnami.json present\n\n")

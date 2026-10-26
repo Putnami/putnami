@@ -63,6 +63,7 @@ const STEPS = {
 } as const satisfies Record<string, StepCheck>;
 
 const proofConfig = JSON.parse(readFileSync(join(proofDir, 'putnami.json'), 'utf8')) as {
+  dependencies?: string[];
   options?: { test?: { filePatterns?: string[] } };
 };
 const filePatterns = new Set(proofConfig.options?.test?.filePatterns ?? []);
@@ -135,7 +136,9 @@ describe('the proof keeps its cache key complete', () => {
     const source = readFileSync(join(root, TEMPLATE_PROTOCOL_SOURCE), 'utf8');
     const body = source.split('func IsTemplateRootPackagingExclusion(name string) bool {')[1]?.split('\n}\n')[0] ?? '';
     expect(body).toContain('strings.HasPrefix(name, ".")');
-    const names = [...(body.match(/case ([^:]*):/)?.[1] ?? '').matchAll(/"([^"]*)"/g)].map((match) => match[1]);
+    const names = [...body.matchAll(/case ([^:]*):/g)].flatMap((clause) =>
+      [...(clause[1] ?? '').matchAll(/"([^"]*)"/g)].map((name) => name[1]),
+    );
     expect(names).toEqual([...TEMPLATE_ROOT_EXCLUSIONS]);
   });
 
@@ -191,6 +194,18 @@ describe('every template declares the promise this proof observes', () => {
         template: template.name,
         features: 1,
         relations: [{ kind: 'parent', target: 'tooling/project-scaffolding' }],
+      });
+    }
+  });
+
+  // A session that validates a template without running this proof reads the
+  // checks from this proof's last test result only when the proof depends on it.
+  test('every template is a dependency, so its spec gate finds this proof', () => {
+    for (const template of templates) {
+      const project = `/${relative(root, template.dir).replaceAll('\\', '/')}`;
+      expect({ project, dependency: proofConfig.dependencies?.includes(project) }).toEqual({
+        project,
+        dependency: true,
       });
     }
   });

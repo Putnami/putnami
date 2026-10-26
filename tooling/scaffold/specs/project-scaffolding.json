@@ -32,7 +32,7 @@
     },
     {
       "id": "archive-contents",
-      "text": "The archive contains the template's manifest and every template file, and excludes root putnami.json, putnami.features.json, specs/, specs.baseline.json, and node_modules/ entries that configure or describe the template project rather than the scaffolded project."
+      "text": "The archive contains the template's manifest and every template file. It excludes the root entries that configure or describe the template project rather than the scaffolded project, putnami.json, putnami.features.json, specs/ and specs.baseline.json, as well as a root node_modules/ and every root entry whose name starts with a dot."
     },
     {
       "id": "dry-run-produces-nothing",

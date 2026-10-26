@@ -384,11 +384,11 @@ func TestTemplate_ExcludesWorkspaceSideDeclarations(t *testing.T) {
 			t.Errorf("archive ships %q, a workspace-side declaration", name)
 		}
 	}
-	// Each declaration the fixture writes, named, so the test fails when the
-	// predicate above stops covering one of them.
-	for _, declaration := range []string{"putnami.json", "putnami.features.json", "specs/tpl.json", "specs.baseline.json"} {
-		if names[declaration] {
-			t.Errorf("archive ships %q, a workspace-side declaration", declaration)
+	// Each root entry the fixture writes for the template project, named, so
+	// the test fails when the predicate above stops covering one of them.
+	for _, excluded := range []string{"putnami.json", "putnami.features.json", "specs/tpl.json", "specs.baseline.json", ".gitignore"} {
+		if names[excluded] {
+			t.Errorf("archive ships %q, which configures the template project rather than the scaffolded one", excluded)
 		}
 	}
 	// The template's own content is still there.
