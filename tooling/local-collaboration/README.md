@@ -143,5 +143,7 @@ Run `./putnamiw test --projects @putnami/local-collaboration --enforce-coverage`
 It includes the shared contract scenarios of
 [`providertest`](../../protocols/collaboration/providertest/providertest.go),
 which the GitHub provider runs too, the missions scenarios against a store on
-disk, and two processes that sync, ask and reply on one store at once. The end-to-end proof through the CLI and MCP entry paths is
-`tooling/cli/internal/cli/collaboration_local_provider_test.go`.
+disk, and two processes that sync, ask and reply on one store at once. The
+end-to-end proof of tasks and proposals through the CLI and MCP entry paths is
+`tooling/cli/internal/cli/collaboration_local_provider_test.go`. No test runs
+missions through the CLI yet.
