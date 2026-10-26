@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-version-is-pinned", "the-protocol-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -20,6 +22,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // TestConformance_Signals pins the canonical signal set and their collector
 // paths. Adding or removing a signal is a protocol change.
 func TestConformance_Signals(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "three-signals-on-fixed-paths", "the-signal-paths-are-fixed")
 	want := []struct {
 		signal Signal
 		path   string
@@ -51,6 +54,7 @@ func TestConformance_Signals(t *testing.T) {
 // TestConformance_ResourceAttributes pins the canonical resource attribute keys
 // every runtime populates.
 func TestConformance_ResourceAttributes(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-resource-names-the-service", "the-resource-keys-are-fixed")
 	want := []string{"service.name", "service.version", "putnami.framework"}
 	if len(CanonicalResourceAttrs) != len(want) {
 		t.Fatalf("CanonicalResourceAttrs has %d entries, want %d", len(CanonicalResourceAttrs), len(want))
@@ -65,6 +69,7 @@ func TestConformance_ResourceAttributes(t *testing.T) {
 // TestConformance_ExportContract pins the exporter behavior contract. These
 // values are part of the protocol: every runtime's exporter must honor them.
 func TestConformance_ExportContract(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-exporter-never-hurts-the-workload", "the-export-defaults-are-pinned")
 	e := DefaultContract().Export
 	if e.DefaultFlushIntervalMS != 10000 {
 		t.Errorf("DefaultFlushIntervalMS = %d, want 10000", e.DefaultFlushIntervalMS)
@@ -85,6 +90,7 @@ func TestConformance_ExportContract(t *testing.T) {
 
 // TestConformance_ContentType pins the OTLP/JSON content type.
 func TestConformance_ContentType(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "three-signals-on-fixed-paths", "the-content-type-is-json")
 	if ContentType != "application/json" {
 		t.Errorf("ContentType = %q, want application/json", ContentType)
 	}
@@ -93,6 +99,7 @@ func TestConformance_ContentType(t *testing.T) {
 // TestConformance_ErrorCodes validates that every protocol error code uses the
 // telemetry.* prefix and that the canonical set is complete.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-error-codes-are-a-closed-set", "the-codes-are-fixed")
 	canonical := []string{
 		"telemetry.invalid_metrics",
 		"telemetry.invalid_traces",
@@ -128,6 +135,7 @@ type parseFunc func([]byte) []diag.Diagnostic
 // valid/ must produce no errors, those in invalid/ must produce at least one.
 // Non-Go runtimes validate their envelopes against the same corpus.
 func TestConformance_Fixtures(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-parser-is-strict", "every-signal-fixture-gets-its-verdict")
 	signals := map[string]parseFunc{
 		"metrics": func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateMetrics(b); return d },
 		"traces":  func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateTraces(b); return d },

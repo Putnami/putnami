@@ -1,0 +1,60 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "doctor/readiness-report-contract",
+  "outcomes": [
+    "A team accepts a finding in a committed, reviewed waiver file, and an expired waiver blocks again",
+    "A CI system reads one structured report whose summary it can trust",
+    "A waiver file written today still validates after a release adds a check code"
+  ],
+  "nonGoals": [
+    "The checks themselves and profile resolution, which the putnami doctor command owns",
+    "Carrying a resolved configuration value in a report: evidence names where to look, never what was found",
+    "A second implementation: this Go package is the one parser and the CLI the one evaluator"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-is-pinned",
+      "text": "ProtocolVersion is 1, and the schema accepts exactly that version for both the report and the waiver file. The waiver file is doctor.waivers.json at the workspace root."
+    },
+    {
+      "id": "check-codes-are-frozen",
+      "text": "The check-code taxonomy holds 17 codes, each with a baked remediation, and an unknown code has none. A code is frozen once merged: adding one is additive, while renaming, repurposing or removing one bumps the version. Severity is info, warning, high or critical, and profile is dev, test or production."
+    },
+    {
+      "id": "the-parsers-are-strict",
+      "text": "ParseReport and ParseWaiverFile refuse an unknown member and malformed JSON, and the parse-and-validate entry points stop at a parse error. Validating a missing document is a parse error."
+    },
+    {
+      "id": "a-finding-is-complete",
+      "text": "A report names its protocol version and a known profile. Each finding carries a known check code, severity and profile, a project, a message and a remediation, and each evidence entry names a path or a field. A waivedBy provenance carries an owner, a reason and a parsable expiry."
+    },
+    {
+      "id": "the-summary-agrees",
+      "text": "A summary counts the findings per severity and the findings that carry waivedBy. Validation recomputes it and refuses a summary that disagrees."
+    },
+    {
+      "id": "a-waiver-is-reviewed-and-unique",
+      "text": "A waiver names a known check code, an owner, a reason and a parsable expiry, and may narrow to a project and then to a field. Two waivers with the same code, project and field are duplicates; the same code for another project or another field is not."
+    },
+    {
+      "id": "expiry-is-data-in-the-contract",
+      "text": "The contract checks only the form of an expiry: an RFC 3339 date or timestamp. putnami doctor evaluates it against an injected clock: a timestamp lapses at its instant, a date at the following midnight UTC, and an unparsable value counts as expired."
+    },
+    {
+      "id": "the-serialization-is-canonical",
+      "text": "A report and a waiver file serialize as JSON indented by two spaces, with one trailing newline, in their declared member order. The bytes are stable across 100 marshals and equal the committed full fixtures, and re-serializing a parsed valid fixture yields the same bytes again."
+    },
+    {
+      "id": "the-corpus-is-the-contract",
+      "text": "Every valid report and waiver file fixture validates clean. Every invalid one fails with at least one code from the closed diagnostic taxonomy of 15 codes."
+    },
+    {
+      "id": "putnami-doctor-applies-waivers-by-the-contract",
+      "text": "putnami doctor applies a live waiver by code, project and field: the finding keeps its severity, carries waivedBy and counts in summary.waived. A waiver with no field covers every finding of its code in scope. An expired waiver waives nothing and adds doctor.waiver_expired, an unknown code adds doctor.waiver_unknown_code, an invalid file waives nothing and fails the run, and each report validates."
+    }
+  ],
+  "decisions": [
+    "protocols/doctor/doc/adr/0001-frozen-check-code-taxonomy.md"
+  ]
+}

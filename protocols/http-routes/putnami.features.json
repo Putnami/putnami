@@ -1,0 +1,90 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "http-routes",
+  "features": [
+    {
+      "id": "http-routes/route-inventory-contract",
+      "type": "feature",
+      "name": "Route inventory contract",
+      "outcome": "A framework describes every route an application serves as one canonical, digest-pinned inventory, so a deployment edge builds a default-deny allowlist from it and no public route can admit a private one",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-identifiers-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-identifiers-are-pinned",
+              "the-schema-members-match-the-go-types"
+            ]
+          }
+        },
+        {
+          "id": "an-inventory-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates",
+              "every-invalid-fixture-fails-with-its-code",
+              "every-expected-code-is-registered"
+            ]
+          }
+        },
+        {
+          "id": "visibility-never-widens",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "overlaps-follow-the-policy",
+              "a-catch-all-overlaps-conservatively"
+            ]
+          }
+        },
+        {
+          "id": "the-serialization-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-golden-pins-the-bytes-and-the-digest",
+              "input-order-and-method-case-do-not-matter"
+            ]
+          }
+        },
+        {
+          "id": "producers-emit-valid-inventories",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-server-describes-a-valid-inventory",
+              "the-go-server-refuses-a-wildcard",
+              "the-typescript-aggregate-validates",
+              "the-typescript-aggregate-refuses-an-unsupported-pattern"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

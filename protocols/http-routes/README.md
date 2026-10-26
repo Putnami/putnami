@@ -222,11 +222,13 @@ commitment, not a maturity stage.
   previously-valid manifest byte-identical, and a pre-extension consumer fails
   closed — the compatibility policy above is enforced, not aspirational.
 
-**Owning user feature** — none, deliberately. This is a build-time contract
-between framework producers and a deployment edge; it has no user-facing surface
-of its own, so minting a product feature for it would add a catalog entry no
-user could ask for. The user-visible outcome (a route is reachable, a private
-route is not) belongs to the workload features that declare routes; this
-protocol is the evidence those features cite. Its durable decisions therefore
-live in [`doc/adr/`](doc/adr/) rather than in a spec, which by contract details
-exactly one authored feature.
+## Feature and spec
+
+The module owns the feature of its contract, `http-routes/route-inventory-contract`,
+specified in [`specs/route-inventory-contract.json`](specs/route-inventory-contract.json).
+The tests here prove its requirements, and so do two producers: the Go HTTP
+server (`go/framework/http`), whose `Describe` emits the inventory, and the
+TypeScript extension (`typescript/extension`), which merges the framework
+fragments into it. The workloads that declare routes keep the features of what
+they deliver. The design intent lives in
+[`doc/adr/0001-route-inventory-is-not-openapi.md`](doc/adr/0001-route-inventory-is-not-openapi.md).

@@ -1001,6 +1001,7 @@ func TestReadyz_DegradedWhenProbeFails(t *testing.T) {
 
 // A plugin implementing both interfaces contributes to both endpoints.
 func TestPlugin_BothInterfaces_ContributesToBothEndpoints(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "a-probe-with-both-capabilities-feeds-both-aggregates")
 	p := NewPlugin(Config{})
 	root := rootWithServer()
 	root.Use(p)
@@ -1227,6 +1228,7 @@ func TestVersion_OmitsEmptyFields(t *testing.T) {
 // the protocol's canonical validator. If this fails, the framework's
 // wire shape has drifted from the cross-language contract.
 func TestConformance_HealthzEnvelopeMatchesProtocol(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "ok-is-200-and-the-rest-is-503", "a-served-envelope-carries-its-mapped-code")
 	cases := []struct {
 		name   string
 		setup  func(p *Plugin, root *app.Module)
@@ -1288,6 +1290,7 @@ func TestConformance_HealthzEnvelopeMatchesProtocol(t *testing.T) {
 // TestConformance_ReadyzEnvelopeMatchesProtocol is the readiness twin
 // of the healthz conformance test — identical shape rules apply.
 func TestConformance_ReadyzEnvelopeMatchesProtocol(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "a-served-readiness-envelope-validates")
 	p := NewPlugin(Config{})
 	root := rootWithServer()
 	root.Use(p)

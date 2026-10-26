@@ -1,0 +1,134 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "platform",
+  "features": [
+    {
+      "id": "platform/operational-endpoints",
+      "type": "feature",
+      "name": "Operational endpoints",
+      "outcome": "Every Putnami runtime serves the same liveness, health, readiness and version endpoints with one JSON envelope and one status-code mapping, so a probe, an uptime check or an orchestrator polls any workload the same way",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-1"
+            ]
+          }
+        },
+        {
+          "id": "the-endpoint-set-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-canonical-paths-are-fixed",
+              "each-endpoint-kind-carries-its-flags",
+              "a-runtime-gates-the-aggregates-and-not-liveness"
+            ]
+          }
+        },
+        {
+          "id": "pprof-is-opt-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-contract-declares-pprof-opt-in"
+            ]
+          }
+        },
+        {
+          "id": "the-envelope-states-one-status",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-status-is-one-of-three",
+              "each-status-constrains-its-checks",
+              "a-probe-name-is-canonical",
+              "every-envelope-fixture-gets-its-verdict",
+              "a-served-readiness-envelope-validates"
+            ]
+          }
+        },
+        {
+          "id": "ok-is-200-and-the-rest-is-503",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-mapping-is-fixed",
+              "a-served-envelope-carries-its-mapped-code"
+            ]
+          }
+        },
+        {
+          "id": "probes-are-discovered-and-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-discovery-rules-are-fixed",
+              "each-capability-feeds-its-endpoint",
+              "the-probe-rules-are-fixed",
+              "a-probe-with-both-capabilities-feeds-both-aggregates"
+            ]
+          }
+        },
+        {
+          "id": "prefixes-normalize-to-one-form",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-prefix-normalizes",
+              "a-prefix-joins-an-endpoint",
+              "a-runtime-mounts-under-the-prefix"
+            ]
+          }
+        },
+        {
+          "id": "the-error-codes-are-a-closed-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-validator-codes-are-fixed",
+              "missing-probe-is-a-behavioral-label"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

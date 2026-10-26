@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so
 // any bump is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-version-is-pinned", "the-protocol-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -21,6 +23,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // operational paths every runtime must expose. Adding or removing a
 // path is a protocol change.
 func TestConformance_CanonicalPaths(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-endpoint-set-is-canonical", "the-canonical-paths-are-fixed")
 	want := []string{"/livez", "/healthz", "/readyz", "/version"}
 	if len(CanonicalPaths) != len(want) {
 		t.Fatalf("CanonicalPaths has %d entries, want %d", len(CanonicalPaths), len(want))
@@ -35,6 +38,7 @@ func TestConformance_CanonicalPaths(t *testing.T) {
 // TestConformance_EndpointKinds validates that every canonical endpoint
 // is classified and that gating flags match the documented behavior.
 func TestConformance_EndpointKinds(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-endpoint-set-is-canonical", "each-endpoint-kind-carries-its-flags")
 	c := DefaultContract()
 
 	want := map[EndpointKind]struct {
@@ -84,6 +88,7 @@ func TestConformance_EndpointKinds(t *testing.T) {
 // TestConformance_Capabilities pins the canonical capability set.
 // Adding a capability is a protocol change.
 func TestConformance_Capabilities(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "each-capability-feeds-its-endpoint")
 	c := DefaultContract()
 	want := map[CapabilityKind]string{
 		CapabilityHealth:    PathHealthz,
@@ -112,6 +117,7 @@ func TestConformance_Capabilities(t *testing.T) {
 // name. These are non-negotiable: a runtime that violates any of them
 // breaks the cross-language UX.
 func TestConformance_DiscoveryContract(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-discovery-rules-are-fixed")
 	d := DefaultContract().Discovery
 	if !d.AutoDiscoverFromModuleTree {
 		t.Error("discovery must require AutoDiscoverFromModuleTree")
@@ -128,6 +134,7 @@ func TestConformance_DiscoveryContract(t *testing.T) {
 // timeout is generous on purpose; lower values are fine, higher values
 // break SLOs.
 func TestConformance_ProbeContract(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-probe-rules-are-fixed")
 	p := DefaultContract().Probe
 	if p.DefaultTimeoutMS != 5000 {
 		t.Errorf("default probe timeout = %dms, want 5000ms", p.DefaultTimeoutMS)
@@ -146,6 +153,7 @@ func TestConformance_ProbeContract(t *testing.T) {
 // TestConformance_PprofContract pins the opt-in posture and the
 // sub-paths every runtime must expose when pprof is enabled.
 func TestConformance_PprofContract(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "pprof-is-opt-in", "the-contract-declares-pprof-opt-in")
 	p := DefaultContract().Pprof
 	if !p.OptInOnly {
 		t.Error("pprof must be opt-in only — leaking heap details by default is unacceptable")
@@ -164,6 +172,7 @@ func TestConformance_PprofContract(t *testing.T) {
 // TestConformance_HTTPStatusMapping pins the status-to-HTTP-code rules.
 // 200 for "ok", 503 for everything else — operators key on these.
 func TestConformance_HTTPStatusMapping(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "ok-is-200-and-the-rest-is-503", "the-mapping-is-fixed")
 	cases := []struct {
 		status   Status
 		wantHTTP int
@@ -189,6 +198,7 @@ func TestConformance_HTTPStatusMapping(t *testing.T) {
 // TestConformance_ErrorCodes validates that every protocol error code
 // uses the platform.* prefix and that the canonical set is complete.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-error-codes-are-a-closed-set", "the-validator-codes-are-fixed")
 	canonical := []string{
 		"platform.invalid_probe_name",
 		"platform.duplicate_probe",
@@ -222,6 +232,7 @@ func TestConformance_ErrorCodes(t *testing.T) {
 // only codes the validators emit), and adding it required no protocol
 // bump.
 func TestConformance_MissingProbeCode(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-error-codes-are-a-closed-set", "missing-probe-is-a-behavioral-label")
 	if ErrorCodeMissingProbe != "platform.missing_probe" {
 		t.Errorf("ErrorCodeMissingProbe = %q, want platform.missing_probe", ErrorCodeMissingProbe)
 	}
@@ -238,6 +249,7 @@ func TestConformance_MissingProbeCode(t *testing.T) {
 // those in invalid/ must produce at least one. Non-Go runtimes validate
 // their envelopes against the same corpus.
 func TestConformance_EnvelopeFixtures(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "every-envelope-fixture-gets-its-verdict")
 	valid, err := filepath.Glob(filepath.Join("fixtures", "envelope", "valid", "*.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -281,6 +293,7 @@ func TestConformance_EnvelopeFixtures(t *testing.T) {
 // joining. Workloads with equivalent prefixes must mount on identical
 // final paths.
 func TestConformance_JoinPrefix(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "a-prefix-joins-an-endpoint")
 	cases := []struct {
 		prefix, endpoint, want string
 	}{

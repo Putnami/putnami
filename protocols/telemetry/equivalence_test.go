@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // These tests pin the canonical OTLP/JSON bytes and SHA-256 digests that the
@@ -179,14 +181,17 @@ func goldenLogsInput() LogsRequest {
 }
 
 func TestCrossLanguage_Metrics(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "equivalent-input-serializes-to-the-same-bytes", "each-signal-matches-its-golden")
 	checkGolden(t, "metrics.golden.json", goldenMetricsDigest, goldenMetricsInput())
 }
 
 func TestCrossLanguage_Traces(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "equivalent-input-serializes-to-the-same-bytes", "each-signal-matches-its-golden")
 	checkGolden(t, "traces.golden.json", goldenTracesDigest, goldenTracesInput())
 }
 
 func TestCrossLanguage_Logs(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "equivalent-input-serializes-to-the-same-bytes", "each-signal-matches-its-golden")
 	checkGolden(t, "logs.golden.json", goldenLogsDigest, goldenLogsInput())
 }
 

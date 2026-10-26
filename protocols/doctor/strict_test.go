@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // findCode returns true if diags contains a diagnostic with the given code.
@@ -61,6 +62,7 @@ func recount(r *Report) Summary {
 }
 
 func TestParseReport_UnknownField(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "an-unknown-member-is-refused")
 	r, diags := ParseReport([]byte(`{"protocolVersion":1,"profile":"production","bogus":true}`))
 	if r != nil {
 		t.Error("report should be nil on parse error")
@@ -71,6 +73,7 @@ func TestParseReport_UnknownField(t *testing.T) {
 }
 
 func TestParseReport_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "malformed-json-is-a-parse-error")
 	_, diags := ParseReport([]byte("{not json"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected parse error")
@@ -81,6 +84,7 @@ func TestParseReport_InvalidJSON(t *testing.T) {
 }
 
 func TestParseWaiverFile_UnknownField(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "an-unknown-member-is-refused")
 	w, diags := ParseWaiverFile([]byte(`{"protocolVersion":1,"bogus":true}`))
 	if w != nil {
 		t.Error("waiver file should be nil on parse error")
@@ -91,6 +95,7 @@ func TestParseWaiverFile_UnknownField(t *testing.T) {
 }
 
 func TestValidateReport_ProtocolVersionAndProfile(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-finding-is-complete", "the-report-header-is-checked")
 	badVersion := &Report{ProtocolVersion: 99, Profile: ProfileProduction}
 	if !findCode(ValidateReport(badVersion), ErrorCodeInvalidProtocolVersion) {
 		t.Errorf("want %s", ErrorCodeInvalidProtocolVersion)
@@ -102,12 +107,14 @@ func TestValidateReport_ProtocolVersionAndProfile(t *testing.T) {
 }
 
 func TestValidateReport_NilIsParseError(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "a-missing-document-is-a-parse-error")
 	if !findCode(ValidateReport(nil), ErrorCodeParseError) {
 		t.Errorf("want %s for nil report", ErrorCodeParseError)
 	}
 }
 
 func TestValidateReport_FindingFields(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-finding-is-complete", "a-finding-lacks-nothing")
 	cases := []struct {
 		name   string
 		mutate func(*Finding)
@@ -134,6 +141,7 @@ func TestValidateReport_FindingFields(t *testing.T) {
 }
 
 func TestValidateReport_WaivedByProvenance(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-finding-is-complete", "a-waived-finding-names-its-waiver")
 	cases := []struct {
 		name string
 		prov WaiverProvenance
@@ -156,6 +164,7 @@ func TestValidateReport_WaivedByProvenance(t *testing.T) {
 }
 
 func TestValidateReport_SummaryMismatch(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-summary-agrees", "a-disagreeing-summary-is-refused")
 	r := &Report{
 		ProtocolVersion: ProtocolVersion,
 		Profile:         ProfileProduction,
@@ -168,6 +177,7 @@ func TestValidateReport_SummaryMismatch(t *testing.T) {
 }
 
 func TestValidateReport_SummaryAgrees(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-summary-agrees", "an-agreeing-summary-passes")
 	r := sampleReport()
 	if diags := ValidateReport(r); diag.HasErrors(diags) {
 		t.Errorf("sampleReport should validate clean, got %v", diags)
@@ -175,6 +185,7 @@ func TestValidateReport_SummaryAgrees(t *testing.T) {
 }
 
 func TestValidateWaiverFile_WaiverFields(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-waiver-is-reviewed-and-unique", "a-waiver-lacks-nothing")
 	valid := func() Waiver {
 		return Waiver{Code: CheckLocalRateLimit, Owner: "o", Reason: "r", Expires: "2027-01-01"}
 	}
@@ -201,12 +212,14 @@ func TestValidateWaiverFile_WaiverFields(t *testing.T) {
 }
 
 func TestValidateWaiverFile_NilIsParseError(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "a-missing-document-is-a-parse-error")
 	if !findCode(ValidateWaiverFile(nil), ErrorCodeParseError) {
 		t.Errorf("want %s for nil waiver file", ErrorCodeParseError)
 	}
 }
 
 func TestValidateWaiverFile_DuplicateScopedWaiver(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-waiver-is-reviewed-and-unique", "a-duplicate-waiver-is-refused")
 	w := &WaiverFile{
 		ProtocolVersion: ProtocolVersion,
 		Waivers: []Waiver{
@@ -220,6 +233,7 @@ func TestValidateWaiverFile_DuplicateScopedWaiver(t *testing.T) {
 }
 
 func TestValidateWaiverFile_DuplicateWorkspaceWideWaiver(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-waiver-is-reviewed-and-unique", "a-duplicate-waiver-is-refused")
 	w := &WaiverFile{
 		ProtocolVersion: ProtocolVersion,
 		Waivers: []Waiver{
@@ -233,6 +247,7 @@ func TestValidateWaiverFile_DuplicateWorkspaceWideWaiver(t *testing.T) {
 }
 
 func TestValidateWaiverFile_SameCodeDifferentProjectIsNotDuplicate(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-waiver-is-reviewed-and-unique", "a-narrower-scope-is-not-a-duplicate")
 	w := &WaiverFile{
 		ProtocolVersion: ProtocolVersion,
 		Waivers: []Waiver{
@@ -246,6 +261,7 @@ func TestValidateWaiverFile_SameCodeDifferentProjectIsNotDuplicate(t *testing.T)
 }
 
 func TestValidateWaiverFile_SameCodeAndProjectDifferentFieldIsNotDuplicate(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-waiver-is-reviewed-and-unique", "a-narrower-scope-is-not-a-duplicate")
 	// The whole point of field scoping: accepting several findings of one code
 	// in one project one field at a time must be allowed, not rejected as a
 	// duplicate.
@@ -262,6 +278,7 @@ func TestValidateWaiverFile_SameCodeAndProjectDifferentFieldIsNotDuplicate(t *te
 }
 
 func TestValidateWaiverFile_SameCodeProjectAndFieldIsDuplicate(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "a-waiver-is-reviewed-and-unique", "a-duplicate-waiver-is-refused")
 	w := &WaiverFile{
 		ProtocolVersion: ProtocolVersion,
 		Waivers: []Waiver{
@@ -275,6 +292,7 @@ func TestValidateWaiverFile_SameCodeProjectAndFieldIsDuplicate(t *testing.T) {
 }
 
 func TestValidExpires_AcceptsDateAndTimestamp(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "expiry-is-data-in-the-contract", "an-expiry-is-a-date-or-a-timestamp")
 	ok := []string{"2027-06-30", "2027-06-30T12:00:00Z", "2027-06-30T12:00:00+02:00"}
 	for _, s := range ok {
 		if !validExpires(s) {
@@ -290,6 +308,7 @@ func TestValidExpires_AcceptsDateAndTimestamp(t *testing.T) {
 }
 
 func TestParseAndValidateReport_StopsAtParseError(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "validation-stops-at-a-parse-error")
 	r, diags := ParseAndValidateReport([]byte(`{"protocolVersion":1,"profile":"production","bogus":1}`))
 	if r != nil {
 		t.Error("report should be nil when parsing fails")
@@ -300,6 +319,7 @@ func TestParseAndValidateReport_StopsAtParseError(t *testing.T) {
 }
 
 func TestParseAndValidateWaiverFile_StopsAtParseError(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-parsers-are-strict", "validation-stops-at-a-parse-error")
 	w, diags := ParseAndValidateWaiverFile([]byte("{not json"))
 	if w != nil {
 		t.Error("waiver file should be nil when parsing fails")
@@ -316,6 +336,7 @@ func TestParseAndValidateWaiverFile_StopsAtParseError(t *testing.T) {
 // every repository that already accepted a finding — see
 // doc/adr/0001-frozen-check-code-taxonomy.md.
 func TestCheckCodeTaxonomy_Frozen(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "check-codes-are-frozen", "every-code-has-its-remediation")
 	required := []CheckCode{
 		CheckIncompleteCapability,
 		CheckMissingRequiredConfig,
@@ -360,6 +381,7 @@ func TestCheckCodeTaxonomy_Frozen(t *testing.T) {
 // TestDiagnosticTaxonomy_Membership asserts every constant is registered in
 // ValidDiagnosticCodes so tooling can trust the map is exhaustive.
 func TestDiagnosticTaxonomy_Membership(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-corpus-is-the-contract", "the-diagnostic-codes-are-closed")
 	required := []string{
 		ErrorCodeParseError,
 		ErrorCodeUnknownField,
@@ -390,6 +412,7 @@ func TestDiagnosticTaxonomy_Membership(t *testing.T) {
 // TestEnums_ValuesMatchMaps keeps the ordered value slices and the Valid* maps
 // in agreement.
 func TestEnums_ValuesMatchMaps(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "check-codes-are-frozen", "the-enums-are-closed")
 	if len(SeverityValues) != len(ValidSeverities) {
 		t.Errorf("SeverityValues/ValidSeverities length mismatch: %d vs %d", len(SeverityValues), len(ValidSeverities))
 	}
@@ -411,6 +434,7 @@ func TestEnums_ValuesMatchMaps(t *testing.T) {
 // TestWaiverFilename pins the committed waiver file name; the CLI engine reads
 // exactly this path at the workspace root.
 func TestWaiverFilename(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-version-is-pinned", "the-waiver-file-name-is-fixed")
 	if WaiverFilename != "doctor.waivers.json" {
 		t.Errorf("WaiverFilename = %q, want doctor.waivers.json", WaiverFilename)
 	}

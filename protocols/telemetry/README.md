@@ -99,11 +99,16 @@ commitment, not a maturity stage.
   The envelope is defined, tested, and byte-pinned; nothing about it changes
   when a span producer appears.
 
-**Owning user feature** — none in this repository. The wire itself is
-infrastructure: a workload's observability is delivered by the framework and CLI
-packages that produce it, and the one genuinely user-facing surface here — CLI
-usage telemetry, its notice, and its opt-out — is owned by the CLI's own vertical
-scope, which is where a user chooses anything at all. Declaring a product
-feature for the envelope would claim a user outcome this package cannot deliver
-alone. Its durable decisions live in [`doc/adr/`](doc/adr/) rather than in a
-spec, which by contract details exactly one authored feature.
+## Feature and spec
+
+The module owns the feature of its contract, `telemetry/otlp-push-contract`,
+specified in [`specs/otlp-push-contract.json`](specs/otlp-push-contract.json).
+The tests here prove its requirements, `cliusage` included. So do the Go
+telemetry framework (`go/framework/telemetry`), whose log sink and OTLP mappings
+are checked against this package, the CLI (`tooling/cli`), whose usage encoder
+produces the `cliusage` golden and whose guard records only vocabulary events,
+and the usage receiver
+(`sites/telemetry.putnami.dev`), which keeps a conforming record. Those projects
+keep the features of what they deliver: whether the CLI sends usage telemetry,
+its notice and its opt-out belong to the CLI. The design intent lives in
+[`doc/adr/0001-otlp-json-is-the-only-transport.md`](doc/adr/0001-otlp-json-is-the-only-transport.md).

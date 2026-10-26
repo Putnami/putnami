@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "platform/operational-endpoints",
+  "outcomes": [
+    "A Kubernetes probe or an uptime check reads any Putnami workload with the same paths and status codes",
+    "Liveness never fails during startup or shutdown, so an orchestrator does not restart a healthy workload",
+    "An operator reads a failing probe's own error message in the readiness envelope"
+  ],
+  "nonGoals": [
+    "A /metrics scrape endpoint: telemetry is pushed, as ADR 0001 records",
+    "Authentication of the operational endpoints, which workloads put behind an admin port or a sidecar",
+    "A JSON Schema for the envelope: the Go types, the strict validator and the shared fixtures are the contract",
+    "The TypeScript platform() plugin of @putnami/application, which reads the same fixtures under its own tests"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-is-pinned",
+      "text": "ProtocolVersion is 1, and a test pins it, so a change to the endpoint paths, the envelope, the status-code rules or the probe semantics is a reviewed version bump."
+    },
+    {
+      "id": "the-endpoint-set-is-canonical",
+      "text": "The canonical paths are /livez, /healthz, /readyz and /version, served with GET. /healthz and /readyz aggregate probes and report unavailable until the workload starts; /livez and /version do neither. /debug/pprof/ is the one opt-in endpoint, and an unknown endpoint kind resolves to nothing."
+    },
+    {
+      "id": "pprof-is-opt-in",
+      "text": "The contract declares /debug/pprof/ opt-in only, so a runtime leaves it off unless the workload enables it. Its sub-paths are the index, /cmdline, /profile, /symbol, /trace and /{name}."
+    },
+    {
+      "id": "the-envelope-states-one-status",
+      "text": "An envelope status is ok, unavailable or degraded. ok requires every checks entry to be exactly ok, degraded requires at least one failing entry, and unavailable carries no checks. A probe name matches [a-z0-9][a-z0-9_./-]{0,63}. Every valid envelope fixture validates, every invalid one is refused, and the envelopes the Go runtime serves validate."
+    },
+    {
+      "id": "ok-is-200-and-the-rest-is-503",
+      "text": "ok maps to HTTP 200, and unavailable and degraded map to 503. No other status maps to a code. The Go runtime answers /healthz with the code of its envelope status before start, while running and when a probe fails."
+    },
+    {
+      "id": "probes-are-discovered-and-bounded",
+      "text": "Probes are discovered from the module tree and keyed by plugin name, and an explicit registration wins over a discovered probe. A health probe feeds /healthz and a readiness probe feeds /readyz, each with a stated failure consequence. A probe is concurrency-safe, respects cancellation and gets 5 seconds by default, and its failure is reported as its error string."
+    },
+    {
+      "id": "prefixes-normalize-to-one-form",
+      "text": "A mount prefix drops ASCII whitespace and slashes at both ends and gains one leading slash, so an empty, / or // prefix becomes empty and /admin/ becomes /admin, while an interior doubled slash is kept. Joining a prefix and an endpoint path yields one canonical path, and the Go runtime serves its endpoints only under it."
+    },
+    {
+      "id": "the-error-codes-are-a-closed-set",
+      "text": "The strict validators register exactly nine platform.* codes. platform.missing_probe names a required probe that is absent; it is reported through a degraded envelope, so it is not a validator code and needs no version bump."
+    }
+  ],
+  "decisions": [
+    "protocols/platform/doc/adr/0001-no-metrics-scrape-endpoint.md"
+  ]
+}

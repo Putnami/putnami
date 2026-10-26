@@ -252,6 +252,7 @@ func TestOTLPMetricExporter_DropsOnCollectorError(t *testing.T) {
 }
 
 func TestOTLPTemporalityMapping(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "values-map-to-otlp-numbers", "the-go-runtime-maps-to-otlp-numbers")
 	// SDK Cumulative=1 must map to OTLP Cumulative=2, not a raw cast.
 	if got := otlpTemporality(metricdata.CumulativeTemporality); got != otlp.TemporalityCumulative {
 		t.Errorf("cumulative → %d, want %d", got, otlp.TemporalityCumulative)
@@ -301,6 +302,7 @@ func TestOTLPSpanExporter_Export(t *testing.T) {
 }
 
 func TestOTLPStatusCodeMapping(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "values-map-to-otlp-numbers", "the-go-runtime-maps-to-otlp-numbers")
 	if got := otlpStatusCode(codes.Ok); got != otlp.StatusOK {
 		t.Errorf("codes.Ok → %d, want %d", got, otlp.StatusOK)
 	}
@@ -315,6 +317,7 @@ func TestOTLPStatusCodeMapping(t *testing.T) {
 // --- logs -------------------------------------------------------------------
 
 func TestOTLPLogSink_Export(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "three-signals-on-fixed-paths", "the-go-log-sink-posts-a-valid-logs-request")
 	col := &testCollector{}
 	srv := col.server(t)
 
@@ -596,6 +599,7 @@ func stringAttr(attrs []otlp.KeyValue, key string) (string, bool) {
 }
 
 func TestOTLPSeverityMapping(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "values-map-to-otlp-numbers", "the-go-runtime-maps-to-otlp-numbers")
 	cases := []struct {
 		level logger.Level
 		num   otlp.SeverityNumber
