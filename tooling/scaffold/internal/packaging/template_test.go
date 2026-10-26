@@ -363,7 +363,8 @@ func TestStampManifestVersion_InvalidJSONIsAnError(t *testing.T) {
 // intent behind it, and specs linking decision records that exist only here.
 // Staging any of them hands the user declarations about somebody else's repo.
 func TestTemplate_ExcludesWorkspaceSideDeclarations(t *testing.T) {
-	spectest.Proves(t, "tooling/project-scaffolding", "archive-contents", "workspace-side-declarations-are-excluded-from-the-archive")
+	spectest.Proves(t, "template/manifest-contract", "root-declarations-stay-out",
+		"the-scaffold-archive-leaves-out-the-root-exclusions")
 	tmp := t.TempDir()
 	writeTemplateProject(t, tmp, validManifest)
 	ctx := newCtx(tmp)

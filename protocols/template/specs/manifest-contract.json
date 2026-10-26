@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "template/manifest-contract",
+  "outcomes": [
+    "A manifest one tool accepts, every tool accepts.",
+    "An installed template keeps its identity when a stricter gate refuses its manifest.",
+    "A template packaged and the same template rendered from its source create the same project."
+  ],
+  "nonGoals": [
+    "The render syntax, the variable vocabulary, discovery, the archive format and the install layout, which the CLI owns as engine behaviour.",
+    "A protocol version: the manifest carries no version member and the parser accepts one shape.",
+    "The schema's name pattern in the Go validator."
+  ],
+  "requirements": [
+    {
+      "id": "the-strict-parser-refuses-undeclared-members",
+      "text": "The strict parser decodes a manifest and refuses a member the manifest does not declare with an error and no manifest. The strict parser, parsing with validation, and the strict load of a manifest file each refuse input that is not JSON."
+    },
+    {
+      "id": "name-and-description-are-required",
+      "text": "Validation requires name and description, reports each missing one as its own error, refuses a nil manifest and accepts a manifest that has both. Every reader that validates a manifest refuses an empty one, or one with a version alone, and accepts one with a name and a description."
+    },
+    {
+      "id": "every-fixture-gets-its-verdict",
+      "text": "Every valid fixture parses and validates to a manifest: the minimal one, and the full one with $schema, name, version, description, extension and testVariables. Every invalid fixture is refused: a missing name, a missing description and a workspaceDevDependencies member."
+    },
+    {
+      "id": "the-lenient-read-answers-identity",
+      "text": "The lenient read loads a manifest file's name, description and extension, also from a manifest with a member the strict parser refuses, such as workspaceDevDependencies, and fails on a missing file and on input that is not JSON."
+    },
+    {
+      "id": "root-declarations-stay-out",
+      "text": "A template's top-level entry stays out of what it ships and of what a render creates when its name starts with a dot or is node_modules, putnami.json, putnami.features.json, specs or specs.baseline.json. Every other entry, and those names below the root, are template content."
+    }
+  ],
+  "decisions": [
+    "protocols/template/doc/adr/0001-manifest-declares-identity-only.md"
+  ]
+}

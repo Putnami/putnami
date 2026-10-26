@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseManifestStrict_Valid(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-strict-parser-refuses-undeclared-members", "a-declared-manifest-parses")
 	data := []byte(`{
 		"name": "my-template",
 		"description": "A test template"
@@ -22,6 +24,7 @@ func TestParseManifestStrict_Valid(t *testing.T) {
 }
 
 func TestParseManifestStrict_UnknownField(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-strict-parser-refuses-undeclared-members", "an-undeclared-member-is-refused-with-no-manifest")
 	data := []byte(`{
 		"name": "t",
 		"description": "d",
@@ -38,6 +41,7 @@ func TestParseManifestStrict_UnknownField(t *testing.T) {
 }
 
 func TestParseManifestStrict_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-strict-parser-refuses-undeclared-members", "input-that-is-not-json-is-refused")
 	_, diags := ParseManifestStrict([]byte("{bad"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for invalid JSON")
@@ -45,6 +49,7 @@ func TestParseManifestStrict_InvalidJSON(t *testing.T) {
 }
 
 func TestValidateManifest_Nil(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "a-nil-manifest-is-refused")
 	diags := ValidateManifest(nil)
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for nil manifest")
@@ -52,6 +57,7 @@ func TestValidateManifest_Nil(t *testing.T) {
 }
 
 func TestValidateManifest_MissingRequired(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "each-missing-member-is-its-own-error")
 	m := &Manifest{}
 	diags := ValidateManifest(m)
 	errors := diag.Errors(diags)
@@ -61,6 +67,7 @@ func TestValidateManifest_MissingRequired(t *testing.T) {
 }
 
 func TestValidateManifest_Valid(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "name-and-description-suffice")
 	m := &Manifest{Name: "t", Description: "d"}
 	diags := ValidateManifest(m)
 	if diag.HasErrors(diags) {
@@ -69,6 +76,7 @@ func TestValidateManifest_Valid(t *testing.T) {
 }
 
 func TestParseAndValidateManifest_Valid(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "name-and-description-suffice")
 	data := []byte(`{"name": "t", "description": "d"}`)
 	m, diags := ParseAndValidateManifest(data)
 	if diag.HasErrors(diags) {
@@ -80,6 +88,7 @@ func TestParseAndValidateManifest_Valid(t *testing.T) {
 }
 
 func TestParseAndValidateManifest_ParseError(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-strict-parser-refuses-undeclared-members", "input-that-is-not-json-is-refused")
 	_, diags := ParseAndValidateManifest([]byte("{bad"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected parse error")
@@ -87,6 +96,7 @@ func TestParseAndValidateManifest_ParseError(t *testing.T) {
 }
 
 func TestParseAndValidateManifest_ValidationError(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "an-empty-manifest-is-refused")
 	data := []byte(`{}`)
 	_, diags := ParseAndValidateManifest(data)
 	if !diag.HasErrors(diags) {
@@ -95,6 +105,7 @@ func TestParseAndValidateManifest_ValidationError(t *testing.T) {
 }
 
 func TestStrictLoadManifest_PrefixesPath(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-strict-parser-refuses-undeclared-members", "input-that-is-not-json-is-refused")
 	_, diags := StrictLoadManifest("templates/my.json", []byte("{bad"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error")

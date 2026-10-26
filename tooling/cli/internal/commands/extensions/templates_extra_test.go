@@ -196,6 +196,7 @@ func TestFindTemplateFiles_NoTemplates(t *testing.T) {
 }
 
 func TestTemplatesValidate_Success(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "the-cli-validate-accepts-a-manifest-with-a-name-and-a-description")
 	dir := t.TempDir()
 	manifest := map[string]any{
 		"name":        "sample-template",
@@ -240,6 +241,7 @@ func TestTemplatesValidate_NoTemplateFilesOK(t *testing.T) {
 }
 
 func TestTemplatesValidate_InvalidManifest(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "the-cli-validate-refuses-a-manifest-without-a-name")
 	dir := t.TempDir()
 	// Missing required "name" should fail strict validation.
 	if err := os.WriteFile(filepath.Join(dir, "putnami.template.json"), []byte(`{"version":"1.0.0"}`), 0o644); err != nil {

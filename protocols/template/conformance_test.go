@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "every-fixture-gets-its-verdict", "every-valid-fixture-validates")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -36,6 +38,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "every-fixture-gets-its-verdict", "every-invalid-fixture-is-refused")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)

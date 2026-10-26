@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // makeTemplateDir lays out a minimal valid template on disk: a manifest,
@@ -142,6 +144,7 @@ func TestPackage_MissingManifest(t *testing.T) {
 }
 
 func TestPackage_ExcludesWorkspaceDeclarationsAndKeepsTemplateContent(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "root-declarations-stay-out", "the-cli-archive-leaves-out-the-root-exclusions")
 	templateDir := makeTemplateDir(t, "clean-tpl", "1.0.0")
 	if err := os.WriteFile(filepath.Join(templateDir, "putnami.json"), []byte(`{"name":"template-project"}`), 0o644); err != nil {
 		t.Fatal(err)

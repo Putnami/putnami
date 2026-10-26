@@ -67,7 +67,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "workspace-side-declarations-are-excluded-from-the-archive",
               "the-archive-carries-the-manifest-and-every-template-file"
             ]
           }

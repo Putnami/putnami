@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestIsTemplateRootPackagingExclusion(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "root-declarations-stay-out", "the-root-exclusions-are-pinned")
 	for _, test := range []struct {
 		name string
 		want bool
@@ -32,6 +34,7 @@ func TestIsTemplateRootPackagingExclusion(t *testing.T) {
 }
 
 func TestLoadManifest_Valid(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-lenient-read-answers-identity", "the-lenient-read-returns-the-identity")
 	dir := t.TempDir()
 	path := filepath.Join(dir, ManifestFilename)
 
@@ -61,6 +64,7 @@ func TestLoadManifest_Valid(t *testing.T) {
 }
 
 func TestLoadManifest_FileNotFound(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-lenient-read-answers-identity", "the-lenient-read-fails-without-a-json-file")
 	_, err := LoadManifest("/nonexistent/manifest.json")
 	if err == nil {
 		t.Error("expected error for missing file")
@@ -68,6 +72,7 @@ func TestLoadManifest_FileNotFound(t *testing.T) {
 }
 
 func TestLoadManifest_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-lenient-read-answers-identity", "the-lenient-read-fails-without-a-json-file")
 	dir := t.TempDir()
 	path := filepath.Join(dir, ManifestFilename)
 	os.WriteFile(path, []byte("{invalid}"), 0o644)
@@ -81,6 +86,7 @@ func TestLoadManifest_InvalidJSON(t *testing.T) {
 // The lenient read answers the identity question for any archive, including
 // one that declares a field the strict parser refuses.
 func TestLoadManifest_IgnoresAFieldTheStrictParserRefuses(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "the-lenient-read-answers-identity", "the-lenient-read-keeps-a-manifest-the-strict-parser-refuses")
 	dir := t.TempDir()
 	path := filepath.Join(dir, ManifestFilename)
 

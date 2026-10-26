@@ -3,17 +3,22 @@
   "name": "go.putnami.dev/protocol/template",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
   },
   "options": {
+    "test": {
+      "filePatterns": ["fixtures/**"]
+    },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "A template manifest declares identity only; the scaffolding outcome belongs to `@putnami/scaffold`."
   }
 }
