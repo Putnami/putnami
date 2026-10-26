@@ -11,10 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/cache/objectcachetest"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -75,6 +77,11 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 	opsOut := getenv("FAKE_OPS_OUT")
 	runCredentialEcho := getenv("FAKE_RUN_CREDENTIAL_ECHO") == "1"
 	authenticateFail := getenv("FAKE_AUTHENTICATE_FAIL") == "1"
+	// FAKE_ACTION_EVENTS_ECHO advertises action-events in the initialize
+	// result. FAKE_UPLOAD_EVENTS_OUT receives the number of cached events the
+	// last upload carried.
+	actionEventsEcho := getenv("FAKE_ACTION_EVENTS_ECHO") == "1"
+	uploadEventsOut := getenv("FAKE_UPLOAD_EVENTS_OUT")
 	// FAKE_PROVIDER_MODE is the mode the fake resolves: it echoes
 	// provider-configuration with it when core lists the capability.
 	// FAKE_INIT_MODE_OUT receives the mode core sent in initialize.
@@ -187,6 +194,9 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			if runCredentialEcho && p != nil && slices.Contains(p.Capabilities, cache.CapabilityRunCredential) {
 				capabilities = append(capabilities, cache.CapabilityRunCredential)
 			}
+			if actionEventsEcho {
+				capabilities = append(capabilities, cache.CapabilityActionEvents)
+			}
 			var mode cache.Mode
 			if providerMode != "" && p != nil && slices.Contains(p.Capabilities, cache.CapabilityProviderConfiguration) {
 				capabilities = append(capabilities, cache.CapabilityProviderConfiguration)
@@ -284,6 +294,11 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 					if _, err := os.Stat(path); err != nil {
 						accepted = false
 					}
+				}
+			}
+			if uploadEventsOut != "" {
+				if p, _ := cache.ParseAndValidateUploadParams(req.Payload); p != nil && p.Result != nil {
+					_ = os.WriteFile(uploadEventsOut, []byte(strconv.Itoa(len(p.Result.Events))), 0o644)
 				}
 			}
 			if uploadOut != "" {
@@ -781,6 +796,49 @@ func TestLoadRemoteCacheProvider_RefusedAuthenticateBuildsLocally(t *testing.T) 
 	remote.Close()
 	if ops := readProviderOps(t, opsOut); strings.Join(ops, ",") != "initialize,authenticate "+secret+",shutdown" {
 		t.Fatalf("ops = %q, want one initialize, one authenticate, then shutdown", ops)
+	}
+}
+
+// The CLI reads the provider's initialize answer: a provider that advertises
+// action-events receives the cached events with an upload, and one that does
+// not receives none.
+func TestLoadRemoteCacheProvider_UploadCarriesEventsOnlyWhenTheProviderAdvertisesThem(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-cli-uploads-cached-events-only-when-advertised")
+	useInProcessFakeProvider(t)
+	events := []cache.ActionEvent{
+		{Version: 1, Type: jobmodel.EventTypeMetric, Data: map[string]any{"name": "lint-warnings", "value": float64(2), "unit": "count"}},
+		{Version: 1, Type: jobmodel.EventTypeSummary, Data: map[string]any{"message": "2 warnings"}},
+	}
+	uploadedEvents := func(t *testing.T, echo string) string {
+		t.Helper()
+		wsRoot := t.TempDir()
+		eventsOut := filepath.Join(wsRoot, "events.txt")
+		ext := fakeProviderExtension(t, map[string]string{"FAKE_ACTION_EVENTS_ECHO": echo, "FAKE_UPLOAD_EVENTS_OUT": eventsOut})
+		remote, notice := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, fakeProviderLaunch)
+		if remote == nil || !remote.IsProviderBacked() || notice != "" {
+			t.Fatalf("expected a provider-backed remote cache, got %+v, notice %q", remote, notice)
+		}
+		cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(wsRoot, ".putnami", "store")))
+		hash := "ce" + strings.Repeat("2", cache.KeyLength-2)
+		meta := &store.EntryMetadata{Extension: "@test/ext", Task: "lint", Project: "proj", DurationMs: 1500}
+		if err := cm.Save(hash, &store.EntryResult{Status: "success", Events: events}, meta, ""); err != nil {
+			t.Fatalf("Save: %v", err)
+		}
+		remote.Upload(context.Background(), hash, cacheableJob("lint", "/proj", "proj", "proj"), cm)
+		remote.DrainUploads()
+		remote.Close()
+		got, err := os.ReadFile(eventsOut)
+		if err != nil {
+			t.Fatalf("the provider received no upload: %v", err)
+		}
+		return string(got)
+	}
+
+	if got := uploadedEvents(t, "1"); got != "2" {
+		t.Errorf("events uploaded to a provider that advertises action-events = %q, want 2", got)
+	}
+	if got := uploadedEvents(t, "0"); got != "0" {
+		t.Errorf("events uploaded to a provider that does not advertise action-events = %q, want 0", got)
 	}
 }
 

@@ -243,8 +243,28 @@ func TestConcurrentConnections(t *testing.T) {
 	for err := range errs {
 		t.Fatalf("concurrent client: %v", err)
 	}
-	if gets, puts := server.Stats(); gets != clients || puts != clients {
-		t.Fatalf("stats = %d gets / %d puts, want %d each", gets, puts, clients)
+
+	// One more client reads every object the others stored: a store per
+	// connection would hold none of them.
+	reader, err := Dial(server.Path())
+	if err != nil {
+		t.Fatalf("dial reader: %v", err)
+	}
+	defer func() { _ = reader.Close() }()
+	ids := make([]string, clients)
+	for i := range ids {
+		ids[i] = strings.Repeat("d", 60) + string(rune('0'+i))
+	}
+	shared, err := reader.Get(&cache.ObjectGetParams{Namespace: "go-build", IDs: ids})
+	if err != nil {
+		t.Fatalf("reader get: %v", err)
+	}
+	if len(shared.Objects) != clients {
+		t.Fatalf("reader saw %d objects stored by the other clients, want %d", len(shared.Objects), clients)
+	}
+
+	if gets, puts := server.Stats(); gets != clients+1 || puts != clients {
+		t.Fatalf("stats = %d gets / %d puts, want %d / %d", gets, puts, clients+1, clients)
 	}
 }
 

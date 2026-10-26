@@ -279,7 +279,10 @@
               "a-put-asserts-no-channel",
               "the-cli-lists-the-object-cache",
               "the-cli-uses-only-an-echoed-live-socket",
-              "the-cli-exports-the-socket-only-under-a-trust-policy"
+              "the-cli-exports-the-socket-only-under-a-trust-policy",
+              "the-cloud-provider-echoes-the-absolute-path-of-a-live-socket",
+              "the-cloud-provider-refuses-a-session-op-on-the-socket",
+              "the-cloud-provider-stores-no-unverified-bytes"
             ]
           }
         },

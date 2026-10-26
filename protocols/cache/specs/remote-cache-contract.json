@@ -80,11 +80,11 @@
     },
     {
       "id": "the-object-cache-is-a-negotiated-socket",
-      "text": "object-get and object-put address payloads by a namespace and an id from closed alphabets, and a put carries no channel. Only these two ops are valid on the socket, and the feature adds no version. Core lists object-cache, and takes the path only from a provider that echoes it with the absolute path of a live socket. The CLI exports the path to jobs only under a trust policy other than none."
+      "text": "object-get and object-put address payloads by a namespace and an id from closed alphabets, and a put carries no channel. Only these two ops are valid on the socket, and the feature adds no version. Core lists object-cache, and takes the path only from a provider that echoes it with the absolute path of a live socket. The CLI exports the path to jobs only under a trust policy other than none. The Cloud provider echoes the absolute socket path, refuses session ops and stores only verified bytes."
     },
     {
       "id": "a-reference-socket-server",
-      "text": "objectcachetest serves the socket contract from memory. It stores a put only when the exchange directory holds bytes that match its digest, places them back on a get, and stamps its own channel. A get filtered by channel sees a filtered object as a miss. Namespaces are disjoint, a session op is refused with unsupported-op, and concurrent connections share one store. The socket lives in the exchange directory, or under a short path when that one is too long."
+      "text": "objectcachetest serves the socket contract from memory. It stores a put only when the exchange directory holds bytes that match its digest, places them back on a get, and stamps its own channel. A get filtered by channel misses a filtered object. Namespaces are disjoint, a session op gets unsupported-op, and concurrent connections share one store. The socket lives in the exchange directory, or under a short path when it is too long. Close is idempotent, and Start refuses an empty exchange directory."
     },
     {
       "id": "every-op-is-best-effort",

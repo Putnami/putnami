@@ -429,8 +429,9 @@ CLI (`tooling/cli`) proves the version bootstrap, the run credential, the
 result-only restore, the provider configuration, the object cache socket,
 provider selection and the failure fallback. The Cloud cache provider
 (`cloud/extension`) proves the provenance it derives, the exchange directory,
-the write-path and accelerator fallbacks, the run credential and the
-result-only restore. Three checks moved here: the mode the provider returns and
+the write-path and accelerator fallbacks, the run credential, the result-only
+restore and its object cache socket: the echoed absolute path, the refused
+session ops and the verified bytes. Three checks moved here: the mode the provider returns and
 the wire a provider without the result-only capability receives, from the CLI's
 `cli/job-planning-execution`, and the provider-configuration echo, from Cloud's
 `cloud/cache-provider-configuration`; each of those features keeps what its

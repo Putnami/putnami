@@ -185,6 +185,7 @@ func TestProviderSessionRestore_V2ServesAuthenticatedProvenance(t *testing.T) {
 
 func TestProviderSessionUpload_DoesNotForwardAssertedProvenance(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "provenance-is-derived-by-the-provider", "the-cloud-provider-forwards-no-asserted-provenance")
+	enableCacheWritesForTest(t)
 	key := strings.Repeat("f", cache.KeyLength)
 	var commit map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,6 +218,9 @@ func TestProviderSessionUpload_DoesNotForwardAssertedProvenance(t *testing.T) {
 		t.Fatalf("upload response = %+v", resp)
 	}
 	_ = s.summary(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 3, Op: cache.OpSummary})
+	if commit == nil {
+		t.Fatal("no commit reached the server, so the test observed no forwarded field")
+	}
 	if _, ok := commit["producer"]; ok {
 		t.Errorf("commit forwarded untrusted producer: %+v", commit)
 	}

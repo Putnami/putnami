@@ -61,7 +61,8 @@ func TestValidDigest(t *testing.T) {
 		strings.Repeat("d", 64):          false, // no prefix
 		"md5:" + strings.Repeat("d", 64): false, // wrong algorithm
 		"sha256:xyz":                     false, // not hex / wrong length
-		"":                               false,
+		DigestAlgorithm + ":" + strings.Repeat("D", 64): false, // uppercase rejected
+		"": false,
 	}
 	for in, want := range cases {
 		if got := ValidDigest(in); got != want {
@@ -167,8 +168,8 @@ func TestNormalizeRequest_DefaultsAndOrder(t *testing.T) {
 	if r.ProtocolVersion != ProtocolVersion {
 		t.Errorf("ProtocolVersion default = %d, want %d", r.ProtocolVersion, ProtocolVersion)
 	}
-	if r.Mode != DefaultMode {
-		t.Errorf("Mode default = %q, want %q", r.Mode, DefaultMode)
+	if r.Mode != ModeMinimal {
+		t.Errorf("Mode default = %q, want %q", r.Mode, ModeMinimal)
 	}
 	if r.Keys[0].Key != keyA || r.Keys[1].Key != keyB || r.Keys[2].Key != keyC {
 		t.Errorf("keys not sorted: %v", r.Keys)
@@ -337,6 +338,18 @@ func TestValidateCommitRequest_RequiresResult(t *testing.T) {
 	}
 }
 
+func TestValidateCommitRequest_RequiresManifest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-commit-carries-the-whole-entry")
+	r := &CommitRequest{
+		ProtocolVersion: ProtocolVersion,
+		Key:             keyA,
+		Result:          &ActionResult{Status: "success"},
+	}
+	if !codeSet(ValidateCommitRequest(r))[CodeRequiredField] {
+		t.Error("a commit without a manifest should be a required-field error")
+	}
+}
+
 func TestValidateActionResult_AllowsCachedEvents(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-cached-event-has-a-type")
 	r := &CommitRequest{
@@ -494,6 +507,21 @@ func TestNormalizeFindMissingRequest_DefaultsAndOrder(t *testing.T) {
 	}
 }
 
+func TestNormalizeFindMissingResponse_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "find-missing-is-bounded")
+	resp := &FindMissingResponse{Uploads: []BlobTransfer{
+		{Digest: digY, URL: "https://cas/y", Method: TransferPut},
+		{Digest: digX, URL: "https://cas/x", Method: TransferPut},
+	}}
+	NormalizeFindMissingResponse(resp)
+	if resp.ProtocolVersion != ProtocolVersion {
+		t.Errorf("ProtocolVersion = %d, want %d", resp.ProtocolVersion, ProtocolVersion)
+	}
+	if resp.Uploads[0].Digest != digX || resp.Uploads[1].Digest != digY {
+		t.Errorf("uploads not sorted by digest: %+v", resp.Uploads)
+	}
+}
+
 func TestValidateCommitBatchRequest_DuplicateKeyWarns(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "commit-batch-entries-are-self-contained")
 	r := &CommitBatchRequest{
@@ -545,9 +573,24 @@ func TestNormalizeCommitBatchRequest_DefaultsAndOrder(t *testing.T) {
 	}
 }
 
+func TestNormalizeCommitBatchResponse_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "commit-batch-entries-are-self-contained")
+	resp := &CommitBatchResponse{Results: []CommitResult{
+		{Key: keyB, Committed: true},
+		{Key: keyA, Committed: true},
+	}}
+	NormalizeCommitBatchResponse(resp)
+	if resp.ProtocolVersion != ProtocolVersion {
+		t.Errorf("ProtocolVersion = %d, want %d", resp.ProtocolVersion, ProtocolVersion)
+	}
+	if resp.Results[0].Key != keyA || resp.Results[1].Key != keyB {
+		t.Errorf("results not sorted by key: %+v", resp.Results)
+	}
+}
+
 func TestNormalizeCapabilitiesResponse_SortsCapabilities(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "capabilities-are-sorted")
-	resp := &CapabilitiesResponse{Capabilities: []string{CapabilityCommitBatch, CapabilityFindMissing}}
+	resp := &CapabilitiesResponse{Capabilities: []string{CapabilityFindMissing, CapabilityCommitBatch}}
 	NormalizeCapabilitiesResponse(resp)
 	if resp.ProtocolVersion != ProtocolVersion {
 		t.Errorf("ProtocolVersion = %d, want %d", resp.ProtocolVersion, ProtocolVersion)

@@ -10,63 +10,89 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// TestInitialize_ProviderConfiguration pins how the provider resolves the
-// session mode and tells core about it. The mode is core's intent, else the
-// configured mode, else full. The provider echoes provider-configuration and
-// returns the mode only when core listed the capability. Each initialize goes
-// through the wire parse, which leaves an absent mode absent.
-func TestInitialize_ProviderConfiguration(t *testing.T) {
-	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-resolves-the-mode", "provider-configuration-echo-and-mode")
-	spectest.Proves(t, "cloud/cache-provider-configuration", "provider-resolves-its-configuration",
-		"the-session-mode-is-the-intent-else-the-configured-mode-else-full")
-	t.Setenv(remotecache.URLEnv, "")
-	t.Setenv(remotecache.ModeEnv, "")
+type providerConfigurationCase struct {
+	name       string
+	configured string
+	intent     cache.Mode
+	offer      []string
+	wantMode   cache.Mode
+	wantEcho   bool
+}
 
+// providerConfigurationCases is the table both tests below read. The mode is
+// core's intent, else the configured mode, else full. The provider echoes
+// provider-configuration and returns the mode only when core listed the
+// capability.
+func providerConfigurationCases() []providerConfigurationCase {
 	offered := []string{cache.CapabilityProviderConfiguration}
-	cases := []struct {
-		name       string
-		configured string
-		intent     cache.Mode
-		offer      []string
-		wantMode   cache.Mode
-		wantEcho   bool
-	}{
+	return []providerConfigurationCase{
 		{name: "configured mode", configured: "toplevel", offer: offered, wantMode: cache.ModeToplevel, wantEcho: true},
 		{name: "no configured mode", offer: offered, wantMode: cache.ModeFull, wantEcho: true},
 		{name: "core intent wins", configured: "toplevel", intent: cache.ModeMinimal, offer: offered, wantMode: cache.ModeMinimal, wantEcho: true},
 		{name: "not offered", configured: "toplevel", wantMode: cache.ModeToplevel},
 		{name: "not offered, no configured mode", wantMode: cache.ModeFull},
 	}
-	for _, tc := range cases {
+}
+
+// initializeWithConfiguration runs one initialize through the wire parse, which
+// leaves an absent mode absent, and returns the session and the parsed result.
+func initializeWithConfiguration(t *testing.T, tc providerConfigurationCase) (*providerSession, *cache.InitializeResult) {
+	t.Helper()
+	root := t.TempDir()
+	if tc.configured != "" {
+		if err := WriteCacheConfig(root, &CacheConfig{Enabled: false, URL: "https://cache.invalid", Mode: tc.configured}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := newProviderSession(root, io.Discard)
+	t.Cleanup(s.close)
+	payload, err := cache.MarshalPayload(&cache.InitializeParams{
+		ProtocolVersion: cache.ProviderProtocolMinVersion,
+		BlobExchangeDir: t.TempDir(),
+		Mode:            tc.intent,
+		Capabilities:    tc.offer,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := s.handle(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolMinVersion, ID: 1, Op: cache.OpInitialize, Payload: payload})
+	if !resp.OK {
+		t.Fatalf("initialize not OK: %+v", resp.Error)
+	}
+	res, diags := cache.ParseAndValidateInitializeResult(resp.Payload)
+	if res == nil {
+		t.Fatalf("invalid initialize result: %v", diags)
+	}
+	return s, res
+}
+
+// TestInitialize_SessionModePrecedence pins how the provider resolves the
+// session mode: core's intent, else the configured mode, else full.
+func TestInitialize_SessionModePrecedence(t *testing.T) {
+	spectest.Proves(t, "cloud/cache-provider-configuration", "provider-resolves-its-configuration",
+		"the-session-mode-is-the-intent-else-the-configured-mode-else-full")
+	t.Setenv(remotecache.URLEnv, "")
+	t.Setenv(remotecache.ModeEnv, "")
+	for _, tc := range providerConfigurationCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
-			if tc.configured != "" {
-				if err := WriteCacheConfig(root, &CacheConfig{Enabled: false, URL: "https://cache.invalid", Mode: tc.configured}); err != nil {
-					t.Fatal(err)
-				}
-			}
-			s := newProviderSession(root, io.Discard)
-			defer s.close()
-			payload, err := cache.MarshalPayload(&cache.InitializeParams{
-				ProtocolVersion: cache.ProviderProtocolMinVersion,
-				BlobExchangeDir: t.TempDir(),
-				Mode:            tc.intent,
-				Capabilities:    tc.offer,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			resp := s.handle(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolMinVersion, ID: 1, Op: cache.OpInitialize, Payload: payload})
-			if !resp.OK {
-				t.Fatalf("initialize not OK: %+v", resp.Error)
-			}
-			res, diags := cache.ParseAndValidateInitializeResult(resp.Payload)
-			if res == nil {
-				t.Fatalf("invalid initialize result: %v", diags)
-			}
+			s, _ := initializeWithConfiguration(t, tc)
 			if s.mode != tc.wantMode {
 				t.Errorf("session mode = %q, want %q", s.mode, tc.wantMode)
 			}
+		})
+	}
+}
+
+// TestInitialize_ProviderConfigurationEcho pins what the provider tells core:
+// it echoes provider-configuration and returns the resolved mode only when core
+// listed the capability.
+func TestInitialize_ProviderConfigurationEcho(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-resolves-the-mode", "provider-configuration-echo-and-mode")
+	t.Setenv(remotecache.URLEnv, "")
+	t.Setenv(remotecache.ModeEnv, "")
+	for _, tc := range providerConfigurationCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			_, res := initializeWithConfiguration(t, tc)
 			echoed := slices.Contains(res.Capabilities, cache.CapabilityProviderConfiguration)
 			if echoed != tc.wantEcho {
 				t.Errorf("provider-configuration echoed = %v, want %v (capabilities %v)", echoed, tc.wantEcho, res.Capabilities)
