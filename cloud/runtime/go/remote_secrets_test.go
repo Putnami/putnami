@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -499,7 +500,7 @@ func TestRemoteConfigSource_TokenSource_Override(t *testing.T) {
 		ServerURL:   ts.URL,
 		AppName:     "test-app",
 		Environment: "production",
-		// Token field intentionally unset to prove TokenSource wins.
+		Token:       "from-static-field",
 		TokenSource: staticTokenSource{tok: "foo"},
 	})
 	if _, err := source.Load(); err != nil {
@@ -540,7 +541,7 @@ func TestRemoteConfigSource_TokenSource_Default(t *testing.T) {
 }
 
 func TestRemoteConfigSource_TokenSource_ErrorSkipsAuthHeader(t *testing.T) {
-	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "failing-token-source-sends-no-authorization-header")
+	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "failing-config-token-source-sends-no-authorization-header")
 	// A TokenSource error should not crash the source — it should log
 	// and send the request without Authorization, matching the unset
 	// token behavior.
@@ -563,6 +564,39 @@ func TestRemoteConfigSource_TokenSource_ErrorSkipsAuthHeader(t *testing.T) {
 	})
 	if _, err := source.Load(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotAuth != "" {
+		t.Errorf("expected no Authorization header on token error, got %q", gotAuth)
+	}
+}
+
+func TestRemoteSecretsSource_TokenSource_ErrorSkipsAuthHeader(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "requests-without-credentials", "failing-secrets-token-source-sends-no-authorization-header")
+	var gotAuth string
+	var requests atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"secrets":     map[string]any{},
+			"resolved":    true,
+			"schemaMatch": true,
+		})
+	}))
+	defer ts.Close()
+
+	source := NewRemoteSecretsSource(RemoteSecretsSourceConfig{
+		ServerURL:   ts.URL,
+		AppName:     "test-app",
+		Environment: "production",
+		TokenSource: staticTokenSource{err: errors.New("metadata unreachable")},
+	})
+	if _, err := source.Load(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("expected one secrets request, got %d", got)
 	}
 	if gotAuth != "" {
 		t.Errorf("expected no Authorization header on token error, got %q", gotAuth)

@@ -25,7 +25,7 @@
     },
     {
       "id": "register-activates-the-sources",
-      "text": "register adds the config and secrets source discoverers and forwards the cache-reset hooks. A base CONFIG_SERVER_URL enables both sources, at priority 50 and 55, between the .secrets file (35) and CONFIG_DATA (60). An exact resolve URL enables only the config source. An unset, blank, undefined or null URL enables none."
+      "text": "register adds the config and secrets source discoverers and forwards the cache-reset hooks. A base CONFIG_SERVER_URL enables both sources, at priority 50 and 55. An exact resolve URL enables only the config source. An unset, blank, undefined or null URL enables none."
     },
     {
       "id": "required-sources-retry-within-a-budget",
@@ -49,7 +49,7 @@
     },
     {
       "id": "token-sources-supply-the-bearer",
-      "text": "An operator token from the environment wins over Google workload identity. Without one, K_SERVICE or GOOGLE_CLOUD_PROJECT selects a Google metadata ID token for the CONFIG_SERVER_AUDIENCE or the server URL, cached within its lifetime. A failed metadata fetch yields no token. A configured token source wins over a static token. With no token, the request carries no Authorization header."
+      "text": "An operator token from the environment wins over Google workload identity. Without one, K_SERVICE or GOOGLE_CLOUD_PROJECT selects a Google metadata ID token, cached within its lifetime, and CONFIG_SERVER_AUDIENCE sets its audience. A failed metadata fetch yields no token. A configured token source wins over a static token. With no token, the request carries no Authorization header."
     }
   ]
 }

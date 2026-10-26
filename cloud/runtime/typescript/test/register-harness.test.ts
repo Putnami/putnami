@@ -76,23 +76,15 @@ describe('register() activation contract', () => {
     },
   );
 
-  specTest(
-    'places config(50) and secrets(55) between the .secrets(35) and CONFIG_DATA(60) built-ins',
-    {
-      feature: 'cloud/typescript-runtime-destination',
-      requirement: 'register-activates-the-sources',
-      check: 'the-sources-sit-between-the-secrets-file-and-config-data',
-    },
-    () => {
-      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-      process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-      process.env.APP_NAME = 'task-api';
+  it('places config(50) and secrets(55) between the .secrets(35) and CONFIG_DATA(60) built-ins', () => {
+    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+    process.env.CONFIG_SERVER_TOKEN = 'unit-token';
+    process.env.APP_NAME = 'task-api';
 
-      const builtinPriorities = [10, 20, 30, 35, 60]; // the 5 framework file/env sources
-      const merged = [...builtinPriorities, ...discoveredSources().map((s) => s.priority)].sort((a, b) => a - b);
-      expect(merged).toEqual([10, 20, 30, 35, 50, 55, 60]);
-    },
-  );
+    const builtinPriorities = [10, 20, 30, 35, 60]; // the 5 framework file/env sources
+    const merged = [...builtinPriorities, ...discoveredSources().map((s) => s.priority)].sort((a, b) => a - b);
+    expect(merged).toEqual([10, 20, 30, 35, 50, 55, 60]);
+  });
 
   specTest(
     'contributes only the config source for an exact /api/configs/resolve URL (secrets merged server-side)',

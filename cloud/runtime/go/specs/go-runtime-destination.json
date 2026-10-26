@@ -34,7 +34,7 @@
     },
     {
       "id": "single-fetch",
-      "text": "A source fetches once and shares the result with every later load, and a completed load is reused. Discovery returns the same remote source each time, so the retry budget is spent once. A load canceled in the middle of a fetch is not cached: the next load fetches again."
+      "text": "The config source fetches once and shares the result with every later load. A completed load is reused. Discovery returns the same remote source each time, so the retry budget is spent once. A load canceled in the middle of a fetch is not cached: the next load fetches again."
     },
     {
       "id": "snapshot-fallback",
@@ -46,7 +46,7 @@
     },
     {
       "id": "source-failure",
-      "text": "An optional source that cannot reach the service returns no values and no error, so local config applies. A required source returns an error instead. A response that the service did not resolve gives no values for config and for secrets."
+      "text": "An optional config source that cannot reach the service returns no values and no error, so local config applies. A required one returns an error instead. A response that the service did not resolve gives no values for config and for secrets."
     },
     {
       "id": "token-sources",
@@ -58,7 +58,7 @@
     },
     {
       "id": "workload-identity",
-      "text": "On GCP the sources use a metadata server token for an audience that defaults to CONFIG_SERVER_URL and that CONFIG_SERVER_AUDIENCE overrides. The environment variable K_SERVICE or a reachable metadata server marks GCP. The token source requires an audience, fails on an error status or an empty body, reads the expiry from the token and reuses the token until it expires."
+      "text": "On GCP, discovery gives the config source a metadata server token for an audience that defaults to CONFIG_SERVER_URL and that CONFIG_SERVER_AUDIENCE overrides. The environment variable K_SERVICE or a reachable metadata server marks GCP. The token source requires an audience, fails on an error status or an empty body, reads the expiry from the token and reuses the token until it expires."
     }
   ]
 }

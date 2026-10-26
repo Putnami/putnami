@@ -59,7 +59,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "failing-token-source-sends-no-authorization-header",
+              "failing-config-token-source-sends-no-authorization-header",
+              "failing-secrets-token-source-sends-no-authorization-header",
               "off-gcp-discovery-wires-environment-token-source",
               "prepared-boot-never-sends-without-token"
             ]

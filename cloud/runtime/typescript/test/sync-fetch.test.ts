@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
 import { resetSyncFetchForTest, syncFetch } from '../src/runtime/sync-fetch';
 

@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noConsole: Captures JsonSink output written through console.log.
 import { application, bootstrapServe } from '@putnami/application';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock } from 'bun:test';
 import { resetDefaultLogger, resetLoggerConfig } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { RemoteConfigSource, resetRemoteConfigSourceCacheForTest } from '../src/runtime/remote-config-source';

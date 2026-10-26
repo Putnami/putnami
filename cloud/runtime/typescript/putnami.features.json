@@ -73,8 +73,7 @@
               "blank-and-sentinel-urls-count-as-unset",
               "no-url-enables-no-source",
               "register-forwards-the-cache-reset-hooks",
-              "registration-adds-the-two-discoverers-in-priority-order",
-              "the-sources-sit-between-the-secrets-file-and-config-data"
+              "registration-adds-the-two-discoverers-in-priority-order"
             ]
           }
         },
