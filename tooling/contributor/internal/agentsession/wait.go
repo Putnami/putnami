@@ -36,13 +36,14 @@ const (
 // message or answer, and answers its text, or "" when none came. Claude Code
 // runs it as a wake Stop entry beside the Stop hook, so it first reads that
 // Stop's decision: a turn the Stop continued has no idle time. It finds the
-// decision of its own Stop by the Stop key, never by time.
-func (e *Env) idleWake(ctx context.Context, engine string, input hookInput) (string, error) {
+// decision of its own Stop by the Stop key, never by time. The messages count
+// as delivered once Hook wrote the text.
+func (e *Env) idleWake(ctx context.Context, engine string, input hookInput) (string, pendingDelivery, error) {
 	if engine != sessionEngineClaudeCode || input.Event != hookEventStop {
-		return "", errors.New("--idle-wake runs on the Claude Code Stop event only")
+		return "", pendingDelivery{}, errors.New("--idle-wake runs on the Claude Code Stop event only")
 	}
 	if input.PromptID == "" {
-		return "", errors.New("the Stop payload names no prompt_id, so the idle wake cannot find its Stop: no idle wait")
+		return "", pendingDelivery{}, errors.New("the Stop payload names no prompt_id, so the idle wake cannot find its Stop: no idle wait")
 	}
 	// The transcript is watched from its length at this Stop: a user entry
 	// past it is a turn that started after the Stop.
@@ -53,19 +54,20 @@ func (e *Env) idleWake(ctx context.Context, engine string, input hookInput) (str
 	for {
 		cache, err := files.read()
 		if err != nil {
-			return "", err
+			return "", pendingDelivery{}, err
 		}
 		if cache != nil && cache.StopKey == key {
 			if cache.StopContinued {
-				return "", nil
+				return "", pendingDelivery{}, nil
 			}
-			return e.waitForOwner(ctx, files, ownerWait{window: sessionIdleWakeWindow, baseline: cache.StopDecidedAt, turns: turns})
+			text, messages, err := e.waitForOwner(ctx, files, ownerWait{window: sessionIdleWakeWindow, baseline: cache.StopDecidedAt, turns: turns})
+			return text, pendingDelivery{files: files, messages: messages, continues: true}, err
 		}
 		if !e.Now().Before(start.Add(idleWakeStopWait)) {
-			return "", errors.New("the Stop hook of this turn did not decide: no idle wait")
+			return "", pendingDelivery{}, errors.New("the Stop hook of this turn did not decide: no idle wait")
 		}
 		if err := e.Sleep(ctx, idleWakeStopPoll); err != nil {
-			return "", err
+			return "", pendingDelivery{}, err
 		}
 	}
 }
@@ -80,8 +82,8 @@ func stopKey(input hookInput) string {
 }
 
 // ownerWait is one wait for the owner: how long, after which Stop, and what
-// ends it early. forDecision ends it once the mission has no open decision;
-// turns ends it once a new turn starts.
+// ends it early. forDecision ends it once no decision this session asked is
+// open; turns ends it once a new turn starts.
 type ownerWait struct {
 	window      time.Duration
 	baseline    time.Time
@@ -91,17 +93,19 @@ type ownerWait struct {
 
 // waitForOwner publishes the session as waiting until window ends and syncs
 // at the pace the provider set, until a message or an answer arrives. It
-// answers the delivered text, or "" when the wait ended without one.
+// answers the text that gives the messages, with those messages, or "" when
+// the wait ended without one. The messages stay in the inbox until the
+// caller wrote the text (pendingDelivery.confirm).
 //
 // One wait runs per session: a newer wait takes the name in the cache, and
 // an older one that finds another name ends without a write. A wait also ends
 // once the session is active after the Stop it waits after, and, with a
 // transcript to watch, once a new turn started, even one that runs no hooked
 // tool: then it publishes the working state once, see workingAgain.
-func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWait) (string, error) {
+func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWait) (string, []inboxMessage, error) {
 	token, err := waiterToken()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	until, baseline, forDecision := e.Now().Add(wait.window), wait.baseline, wait.forDecision
 	started := false
@@ -114,7 +118,7 @@ func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWa
 		started = true
 		return cache, nil
 	}); err != nil || !started {
-		return "", err
+		return "", nil, err
 	}
 	var firstErr error
 	for {
@@ -130,7 +134,7 @@ func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWa
 			if err == nil && publish {
 				err = e.syncSession(ctx, files)
 			}
-			return "", errors.Join(firstErr, err)
+			return "", nil, errors.Join(firstErr, err)
 		}
 		syncErr := e.syncSession(ctx, files)
 		if syncErr != nil && firstErr == nil {
@@ -138,6 +142,7 @@ func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWa
 		}
 		now := e.Now()
 		var text string
+		var messages []inboxMessage
 		done, early, working := false, false, false
 		interval := sessionSyncInterval
 		if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
@@ -150,16 +155,13 @@ func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWa
 				working, done = workingAgain(cache), true
 				return cache, nil
 			}
-			if delivered := deliverInbox(cache, hookContextMax); len(delivered) > 0 {
-				for _, message := range delivered {
-					cache.ContinuedFor = appendBounded(cache.ContinuedFor, message.ID, sessionSeenMax)
-				}
-				text = deliveredText(delivered)
+			if messages = nextMessages(cache, hookContextMax); len(messages) > 0 {
+				text = deliveredText(messages)
 				cache.Waiter, done = "", true
 				setSessionState(cache, collab.SessionStateWorking, sessionEventWait)
 				return cache, nil
 			}
-			if (forDecision && syncErr == nil && len(cache.Mission.OpenDecisions) == 0) || !now.Before(until) {
+			if (forDecision && syncErr == nil && !ownDecisionOpen(cache)) || !now.Before(until) {
 				// A provider reads a wait whose end passed as handed back; a
 				// wait that ends before is published.
 				cache.Waiter, done, early = "", true, now.Before(until)
@@ -167,21 +169,21 @@ func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWa
 			}
 			return cache, nil
 		}); err != nil {
-			return "", errors.Join(firstErr, err)
+			return "", nil, errors.Join(firstErr, err)
 		}
 		if text != "" {
-			// The acknowledgements and the working state go out before the
-			// new turn starts.
-			return text, errors.Join(firstErr, e.syncSession(ctx, files))
+			// The working state goes out before the new turn starts; the
+			// messages go as delivered with the next sync, once written.
+			return text, messages, errors.Join(firstErr, e.syncSession(ctx, files))
 		}
 		if early || working {
-			return "", errors.Join(firstErr, e.syncSession(ctx, files))
+			return "", nil, errors.Join(firstErr, e.syncSession(ctx, files))
 		}
 		if done {
-			return "", firstErr
+			return "", nil, firstErr
 		}
 		if err := e.Sleep(ctx, min(interval, until.Sub(now))); err != nil {
-			return "", errors.Join(firstErr, err)
+			return "", nil, errors.Join(firstErr, err)
 		}
 	}
 }

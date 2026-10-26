@@ -74,8 +74,10 @@ type sessionCache struct {
 	Replies []messageReply `json:"replies,omitempty"`
 	Replied []string       `json:"replied,omitempty"`
 	// Decisions holds the decisions this session asked, to bind on the next
-	// sync.
+	// sync, and Asked the last ones it asked, kept after the sync bound them:
+	// a Codex Stop waits only for one of those.
 	Decisions []string `json:"decisions,omitempty"`
+	Asked     []string `json:"asked,omitempty"`
 	// ContinuedFor holds the messages a hook already continued a turn for:
 	// no message continues a turn twice.
 	ContinuedFor []string `json:"continued_for,omitempty"`

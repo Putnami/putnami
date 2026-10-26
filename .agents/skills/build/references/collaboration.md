@@ -1,7 +1,7 @@
-# Tasks, proposals and memory
+# Collaboration contracts
 
 Every workflow reaches work items, change proposals and shared memory through
-the three collaboration contracts, never through a backend's own client. The
+the collaboration contracts, never through a backend's own client. The
 workspace binds each contract to a provider extension in the
 `options.collaboration` block of `putnami.workspace.json`; the provider owns
 the backend, its credentials, its identifiers and its label or state mapping.

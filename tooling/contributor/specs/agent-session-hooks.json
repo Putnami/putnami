@@ -22,7 +22,7 @@
     },
     {
       "id": "stop-publication",
-      "text": "Stop sends the state, the plan when it changed, the delivered message ids, the asked decisions and the [ack <id>] lines of the last message in one sync. A waiting message continues the turn once, with additional context on Claude Code and a block on Codex; a sync that answers a new message is followed by one that publishes the delivery. A Codex Stop with an open decision waits up to 180 s. StopFailure publishes the error. A refused reply is dropped for good."
+      "text": "Stop sends the state, the plan when it changed, the delivered message ids, the asked decisions and the [ack <id>] lines of the last message in one sync. A waiting message continues the turn once, with additional context on Claude Code and a block on Codex; a sync that answers a new message is followed by one that publishes the working state. A message counts as delivered once the hook wrote it, and the next sync reports it; a hook stopped before that leaves the message for the next hook. A Codex Stop waits up to 180 s only for an open decision this session asked. StopFailure publishes the error. A refused reply is dropped for good."
     },
     {
       "id": "idle-wake",

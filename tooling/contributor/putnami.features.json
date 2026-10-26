@@ -181,7 +181,8 @@
               "a-subagent-plan-is-not-the-session-plan",
               "a-busy-session-spools-the-tool-call",
               "an-asked-decision-binds-on-the-next-sync",
-              "a-recorded-reply-wins-over-an-ack-line"
+              "a-recorded-reply-wins-over-an-ack-line",
+              "the-manifest-hooks-only-the-session-tools"
             ]
           }
         },
@@ -197,6 +198,7 @@
               "stop-publishes-in-one-sync",
               "a-waiting-message-continues-the-turn-once",
               "codex-waits-for-an-open-decision",
+              "a-message-counts-as-delivered-once-written",
               "stop-failure-publishes-the-error",
               "a-refused-reply-is-dropped"
             ]

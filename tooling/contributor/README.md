@@ -99,8 +99,11 @@ contract. Each hook runs `putnami agent hook`, which the executable serves:
 - At the end of a turn, one sync publishes the state, the plan, the delivered
   messages, the decisions and the `[ack <id>] <reply>` lines of the last
   message. A waiting message continues the turn once.
+- A message counts as delivered once the hook wrote it. A hook the host
+  stops before that leaves the message for the next hook.
 - Claude Code waits up to 10 minutes after a turn for the owner's next
-  message; Codex waits up to 180 seconds for the answer to an open decision.
+  message; Codex waits up to 180 seconds for the answer to a decision the
+  session asked.
 
 A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
 makes `issue-<n>` the mission of the checkout's branch. A hook never fails a
@@ -134,6 +137,10 @@ turn: a failure leaves one line in `hook.log` under
 - [ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)
 
 ## Publication
+
+From this release on, the contributor needs a CLI at contract 16 or later,
+for its host hooks. An older CLI refuses the whole extension. A workspace
+moves its CLI and contributor pins together.
 
 No built-in starter declares this extension: `putnami init` installs nothing of
 it. A workspace asks for it with

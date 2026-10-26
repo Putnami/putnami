@@ -65,21 +65,35 @@ session reports to `branch:<branch>`. The repository is the lowercase
 - `Stop` sends the state, the plan, the delivered message ids, the bound
   decisions and the `[ack <id>] <reply>` lines of the last message in one
   sync. A waiting message continues the turn once. When the sync itself
-  answers a new message, a second sync publishes the delivery. A Codex `Stop`
-  with an open decision waits up to 180 seconds for the answer.
+  answers a new message, a second sync publishes that the session works
+  again. A Codex `Stop` waits up to 180 seconds for the answer to an open
+  decision that this session asked. A decision another session asked never
+  holds it.
 - `StopFailure` publishes the error.
 - The idle wake waits up to 10 minutes after a turn whose `Stop` did not
   continue it. It exits 75 with the message on stderr when one arrives, and
   the core turns that code into the host's wake.
 
-### 4. A hook never fails a turn
+### 4. A message counts as delivered once the hook wrote it
+
+The host reads a hook's output when the hook exits, and drops it when the
+hook runs past its timeout. So a hook takes a message from its inbox only
+after it wrote the text that holds it, and the next sync reports the message
+as delivered. A hook stopped before the write leaves the message for the next
+hook: a message reaches the agent at least once. Until that sync, another
+session of the mission may receive it too. The case left is a host that stops
+the hook after the write, while the launcher ends; each budget leaves the
+launcher 5 seconds for that, and a hook never runs the first-use install
+(CLI ADR 0081, decision 10).
+
+### 5. A hook never fails a turn
 
 Every other path exits 0. A failure, a missing host channel and an outcome
 other than `ok` leave one line in `hook.log`. The session store lives under
 `<Putnami home>/contributor/sessions`, never in the checkout. What a sync
 did not deliver stays queued for the next one; a refused reply is final.
 
-### 5. Each event has a budget
+### 6. Each event has a budget
 
 A call goes through the host channel to the bound provider, which may start
 cold, so a call may take up to 10 seconds. Each event stops 5 seconds before
@@ -97,3 +111,7 @@ fits its budget, and a test holds the manifest to these numbers.
   receives the sessions.
 - Host permissions, credentials and model access still stay with the
   workspace.
+- From this release on, the contributor needs a CLI at contract 16 or later:
+  an older CLI refuses the whole extension, `change finalize` included,
+  whether the workspace binds `missions` or not. A workspace moves its CLI
+  and contributor pins together.

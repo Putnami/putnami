@@ -134,7 +134,8 @@ type hookContext struct {
 // outcome other than ok print nothing, leave one line in hook.log and exit 0.
 // The output is printed last, so a failure never leaves half a document on
 // stdout. Only an idle wake that brings a message exits ExitWake, with the
-// message on stderr.
+// message on stderr. The messages the output holds count as delivered only
+// once it is written (see pendingDelivery).
 func Hook(ctx context.Context, e *Env, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	engine, idleWake, argErr := parseHookArgs(args)
 	event := ""
@@ -166,15 +167,19 @@ func Hook(ctx context.Context, e *Env, args []string, stdin io.Reader, stdout, s
 	ctx, cancel := context.WithTimeout(ctx, eventBudget(engine, input.Event, idleWake))
 	defer cancel()
 	if idleWake {
-		text, err := e.idleWake(ctx, engine, *input)
+		text, delivery, err := e.idleWake(ctx, engine, *input)
 		e.log(engine, "idle_wake", err)
 		if text == "" {
 			return 0
 		}
-		_, _ = io.WriteString(stderr, text+"\n")
+		if _, err := io.WriteString(stderr, text+"\n"); err != nil {
+			e.log(engine, "idle_wake", fmt.Errorf("write the wake text: %w", err))
+			return 0
+		}
+		e.log(engine, "idle_wake", delivery.confirm())
 		return ExitWake
 	}
-	output, err := e.handleHookEvent(ctx, engine, *input)
+	output, delivery, err := e.handleHookEvent(ctx, engine, *input)
 	if err != nil {
 		e.log(engine, event, err)
 		return 0
@@ -187,8 +192,66 @@ func Hook(ctx context.Context, e *Env, args []string, stdin io.Reader, stdout, s
 		e.log(engine, event, err)
 		return 0
 	}
-	_, _ = stdout.Write(append(data, '\n'))
+	if _, err := stdout.Write(append(data, '\n')); err != nil {
+		e.log(engine, event, fmt.Errorf("write the hook output: %w", err))
+		return 0
+	}
+	e.log(engine, event, delivery.confirm())
 	return 0
+}
+
+// pendingDelivery is the messages a hook's output hands the agent. The host
+// reads that output only when the hook exits, and drops it when the hook runs
+// past its timeout. So a message counts as delivered only once the hook wrote
+// it: confirm then takes it from the inbox, and the next sync reports it. A
+// hook stopped before that leaves the message for the next hook, which gives
+// it again: a message reaches the agent at least once. Until that sync,
+// another session of the mission may receive it too. The one case left is a
+// host that stops the hook after the write, while the launcher ends; each
+// event's budget leaves the launcher launcherMargin for that.
+type pendingDelivery struct {
+	files    sessionFiles
+	messages []inboxMessage
+	// continues reports that the messages continue or start a turn: none of
+	// them continues another one.
+	continues bool
+}
+
+// confirm records the messages as delivered. A message another hook
+// confirmed first stays as that hook recorded it.
+func (d pendingDelivery) confirm() error {
+	if len(d.messages) == 0 {
+		return nil
+	}
+	return lockedUpdate(d.files, func(cache *sessionCache) (*sessionCache, error) {
+		if cache == nil {
+			return nil, nil
+		}
+		for _, message := range d.messages {
+			cache.Inbox = withoutMessage(cache.Inbox, message.ID)
+			if !containsString(cache.Seen, message.ID) {
+				markDelivered(cache, message)
+			}
+			if d.continues {
+				cache.ContinuedFor = appendBounded(cache.ContinuedFor, message.ID, sessionSeenMax)
+			}
+		}
+		return cache, nil
+	})
+}
+
+// withoutMessage is inbox without the message id, in order.
+func withoutMessage(inbox []inboxMessage, id string) []inboxMessage {
+	kept := make([]inboxMessage, 0, len(inbox))
+	for _, message := range inbox {
+		if message.ID != id {
+			kept = append(kept, message)
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	return kept
 }
 
 // parseHookArgs reads `--engine <claude-code|codex>` and `--idle-wake`.
@@ -243,18 +306,18 @@ func sessionKey(engine, session string) string {
 	return engine + ":" + session
 }
 
-func (e *Env) handleHookEvent(ctx context.Context, engine string, input hookInput) (*hookOutput, error) {
+func (e *Env) handleHookEvent(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	switch input.Event {
 	case hookEventSessionStart:
 		return e.hookSessionStart(ctx, engine, input)
 	case hookEventPostToolUse:
-		return nil, e.hookPostToolUse(engine, input)
+		return nil, pendingDelivery{}, e.hookPostToolUse(engine, input)
 	case hookEventStop:
 		return e.hookStop(ctx, engine, input)
 	case hookEventStopFailure:
-		return nil, e.hookStopFailure(ctx, engine, input)
+		return nil, pendingDelivery{}, e.hookStopFailure(ctx, engine, input)
 	}
-	return nil, nil
+	return nil, pendingDelivery{}, nil
 }
 
 // sessionIdentity is what a session reads from its checkout: the workspace
@@ -335,7 +398,8 @@ func setSessionState(cache *sessionCache, state collab.SessionState, event strin
 // and, in full, the waiting messages that fit after it (sessionStartText).
 // It syncs every time, and reads the mission's checkpoint when the workspace
 // binds memory; when the sync fails, the cached sheet answers with its date.
-func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInput) (*hookOutput, error) {
+// The messages count as delivered once Hook wrote the text.
+func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
 	identity := e.readSessionIdentity(ctx, input.Cwd)
 	now := e.Now()
@@ -345,23 +409,24 @@ func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInp
 		cache.ActiveAt = now
 		return cache, nil
 	}); err != nil {
-		return nil, err
+		return nil, pendingDelivery{}, err
 	}
 	syncErr := e.syncSession(ctx, files)
 	e.log(engine, input.Event, syncErr)
 	e.log(engine, input.Event, e.readCheckpoint(ctx, files))
 	var text string
+	var messages []inboxMessage
 	err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
 		}
-		text = sessionStartText(cache, missionSheet(cache, syncErr, now))
+		text, messages = sessionStartText(cache, missionSheet(cache, syncErr, now))
 		return cache, nil
 	})
 	if err != nil || text == "" {
-		return nil, err
+		return nil, pendingDelivery{}, err
 	}
-	return contextOutput(hookEventSessionStart, text), nil
+	return contextOutput(hookEventSessionStart, text), pendingDelivery{files: files, messages: messages}, nil
 }
 
 // lockedUpdate reads the cache under the lock, applies change and writes
@@ -492,15 +557,18 @@ func (e *Env) markReplied(input hookInput) error {
 //
 // Claude Code continues with additional context, because a block shows
 // "Stop hook error occurred"; Codex continues with a block. With nothing to
-// deliver and an open decision, Codex waits for the answer. When the sync
-// answers a message that continues the turn, a second sync publishes that the
-// session works again and that the message was delivered.
-func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*hookOutput, error) {
+// deliver and an open decision this session asked, Codex waits for the
+// answer; another session's decision never holds it. When the sync answers a
+// message that continues the turn, a second sync publishes that the session
+// works again. The messages count as delivered once Hook wrote the reason, and
+// the next sync reports them.
+func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
 	identity := e.peekIdentity(ctx, files, input)
 	now := e.Now()
 	dir := e.sessionsDir()
 	var reason string
+	var messages []inboxMessage
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		cache = e.openSession(cache, engine, input, identity)
 		if cache.Model == "" || engine == sessionEngineClaudeCode {
@@ -514,7 +582,7 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 		closeRepliedPrompts(cache, dir)
 		recordAckLines(cache, input.LastMessage, dir)
 		cache.ActiveAt = now
-		reason = stopReason(cache, input.StopHookActive, false)
+		reason, messages = stopReason(cache, input.StopHookActive, false)
 		if reason != "" {
 			setSessionState(cache, collab.SessionStateWorking, sessionEventStop)
 		} else {
@@ -522,7 +590,7 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 		}
 		return cache, nil
 	}); err != nil {
-		return nil, err
+		return nil, pendingDelivery{}, err
 	}
 	syncErr := e.syncSession(ctx, files)
 	e.log(engine, input.Event, syncErr)
@@ -534,14 +602,14 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 		}
 		if reason == "" {
 			// The sync answered new messages: the turn continues with them.
-			if reason = stopReason(cache, input.StopHookActive, true); reason != "" {
+			if reason, messages = stopReason(cache, input.StopHookActive, true); reason != "" {
 				setSessionState(cache, collab.SessionStateWorking, sessionEventStop)
 				republish = true
 			}
 		}
 		cache.ActiveAt, cache.StopDecidedAt, cache.StopContinued = decidedAt, decidedAt, reason != ""
 		cache.StopKey = stopKey(input)
-		wait = engine == sessionEngineCodex && reason == "" && syncErr == nil && len(cache.Mission.OpenDecisions) > 0
+		wait = engine == sessionEngineCodex && reason == "" && syncErr == nil && ownDecisionOpen(cache)
 		return cache, nil
 	}); err != nil {
 		e.log(engine, input.Event, err)
@@ -552,10 +620,10 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 	if wait {
 		// Codex holds the turn while its Stop hook runs, so no turn starts
 		// during this wait: it watches no transcript.
-		text, err := e.waitForOwner(ctx, files, ownerWait{window: sessionDecisionWait, baseline: decidedAt, forDecision: true})
+		text, waited, err := e.waitForOwner(ctx, files, ownerWait{window: sessionDecisionWait, baseline: decidedAt, forDecision: true})
 		e.log(engine, input.Event, err)
 		if text != "" {
-			reason = text
+			reason, messages = text, waited
 			err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 				if cache == nil {
 					return nil, nil
@@ -567,12 +635,24 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 		}
 	}
 	if reason == "" {
-		return nil, nil
+		return nil, pendingDelivery{}, nil
 	}
+	delivery := pendingDelivery{files: files, messages: messages, continues: true}
 	if engine == sessionEngineClaudeCode {
-		return contextOutput(hookEventStop, reason), nil
+		return contextOutput(hookEventStop, reason), delivery, nil
 	}
-	return &hookOutput{Decision: "block", Reason: reason}, nil
+	return &hookOutput{Decision: "block", Reason: reason}, delivery, nil
+}
+
+// ownDecisionOpen reports whether a decision this session asked is open in
+// the mission's view.
+func ownDecisionOpen(cache *sessionCache) bool {
+	for _, decision := range cache.Mission.OpenDecisions {
+		if containsString(cache.Asked, decision.ID) {
+			return true
+		}
+	}
+	return false
 }
 
 // hookStopFailure publishes that the turn ended on an API error, with the
@@ -670,20 +750,18 @@ func repliedMarkerPath(dir, message string) string {
 const repliedMarkersDir = "replied"
 
 // stopReason applies the Stop continuation rules to the cache and answers the
-// text to continue with, or "" to let the turn end. newOnly limits it to rule
-// 1, after a sync answered. Reminders go in order while their text stays
-// within hookContextMax; the first always goes, and fits, since a prompt
-// keeps at most promptReminderMax characters. A prompt whose reminder does
-// not fit waits for the next turn end.
-func stopReason(cache *sessionCache, stopHookActive, newOnly bool) string {
-	if delivered := deliverInbox(cache, hookContextMax); len(delivered) > 0 {
-		for _, message := range delivered {
-			cache.ContinuedFor = appendBounded(cache.ContinuedFor, message.ID, sessionSeenMax)
-		}
-		return deliveredText(delivered)
+// text to continue with, or "" to let the turn end, with the waiting messages
+// the text gives. newOnly limits it to rule 1, after a sync answered.
+// Reminders go in order while their text stays within hookContextMax; the
+// first always goes, and fits, since a prompt keeps at most promptReminderMax
+// characters. A prompt whose reminder does not fit waits for the next turn
+// end.
+func stopReason(cache *sessionCache, stopHookActive, newOnly bool) (string, []inboxMessage) {
+	if messages := nextMessages(cache, hookContextMax); len(messages) > 0 {
+		return deliveredText(messages), messages
 	}
 	if newOnly || stopHookActive {
-		return ""
+		return "", nil
 	}
 	var reminders []string
 	size := len(sessionReplyWays)
@@ -699,9 +777,9 @@ func stopReason(cache *sessionCache, stopHookActive, newOnly bool) string {
 		reminders = append(reminders, reminder)
 	}
 	if len(reminders) == 0 {
-		return ""
+		return "", nil
 	}
-	return joinParagraphs(strings.Join(reminders, "\n\n"), sessionReplyWays)
+	return joinParagraphs(strings.Join(reminders, "\n\n"), sessionReplyWays), nil
 }
 
 // sessionReplyWays names both ways a reply reaches the owner. A text the hook
@@ -745,7 +823,11 @@ func observeToolUse(cache *sessionCache, toolName string, input, response json.R
 		return false
 	}
 	var answer collab.MissionsAskResult
-	if json.Unmarshal(envelope.Result, &answer) != nil || !missionIDPattern.MatchString(answer.Decision.ID) || containsString(cache.Decisions, answer.Decision.ID) {
+	if json.Unmarshal(envelope.Result, &answer) != nil || !missionIDPattern.MatchString(answer.Decision.ID) {
+		return false
+	}
+	cache.Asked = appendBounded(cache.Asked, answer.Decision.ID, collab.MaxOpenDecisions)
+	if containsString(cache.Decisions, answer.Decision.ID) {
 		return false
 	}
 	cache.Decisions = appendBounded(cache.Decisions, answer.Decision.ID, collab.MaxSyncDecisions)
@@ -795,61 +877,51 @@ func toolEnvelope(response json.RawMessage) (collab.Envelope, bool) {
 	return collab.Envelope{}, false
 }
 
-// deliverInbox moves waiting messages from the inbox to the delivered ones,
-// in order, while their text, deliveredText of them, stays within budget
-// bytes. The first message always goes: renderMessage keeps one message
-// within messageRenderMax, so it fits hookContextMax, the budget of a turn
-// end, with the reply ways. The next sync reports them as delivered, and a
-// prompt waits for its reply.
-func deliverInbox(cache *sessionCache, budget int) []inboxMessage {
-	var delivered []inboxMessage
+// nextMessages answers the waiting messages a text gives, in order, while
+// their text, deliveredText of them, stays within budget bytes. The first
+// message always goes: renderMessage keeps one message within
+// messageRenderMax, so it fits hookContextMax, the budget of a turn end, with
+// the reply ways. They stay in the inbox until pendingDelivery.confirm.
+func nextMessages(cache *sessionCache, budget int) []inboxMessage {
+	var messages []inboxMessage
 	text, prompt := "", false
-	for len(cache.Inbox) > 0 {
-		message := cache.Inbox[0]
+	for _, message := range cache.Inbox {
 		next, nextPrompt := joinParagraphs(text, renderMessage(message)), prompt || message.Kind == collab.InboxKindPrompt
 		whole := next
 		if nextPrompt {
 			whole = joinParagraphs(next, sessionReplyWays)
 		}
-		if len(delivered) > 0 && len(whole) > budget {
+		if len(messages) > 0 && len(whole) > budget {
 			break
 		}
 		text, prompt = next, nextPrompt
-		cache.Inbox = cache.Inbox[1:]
-		delivered = append(delivered, message)
-		markDelivered(cache, message)
+		messages = append(messages, message)
 	}
-	if len(cache.Inbox) == 0 {
-		cache.Inbox = nil
-	}
-	return delivered
+	return messages
 }
 
 // sessionStartText is the SessionStart context: the sheet, then each waiting
 // message in full, rendered as at the end of a turn, then the ways a reply
-// reaches the owner. The sheet carries no message, so a message is delivered
-// only when this text holds the whole of it. Messages go in order while the
-// whole text stays within hookContextMax; the first one that does not fit,
-// even the first message, stays in the inbox with the ones after it, for the
-// end of the turn.
-func sessionStartText(cache *sessionCache, sheet string) string {
+// reaches the owner, with the messages it gives. The sheet carries no
+// message, so a message is given only when this text holds the whole of it.
+// Messages go in order while the whole text stays within hookContextMax; the
+// first one that does not fit, even the first message, stays in the inbox
+// with the ones after it, for the end of the turn.
+func sessionStartText(cache *sessionCache, sheet string) (string, []inboxMessage) {
 	text := sheet
-	for len(cache.Inbox) > 0 {
-		next := joinParagraphs(text, renderMessage(cache.Inbox[0]))
+	var messages []inboxMessage
+	for _, message := range cache.Inbox {
+		next := joinParagraphs(text, renderMessage(message))
 		if len(joinParagraphs(next, sessionReplyWays)) > hookContextMax {
 			break
 		}
-		markDelivered(cache, cache.Inbox[0])
-		cache.Inbox = cache.Inbox[1:]
+		messages = append(messages, message)
 		text = next
 	}
-	if len(cache.Inbox) == 0 {
-		cache.Inbox = nil
-	}
 	if text == "" {
-		return ""
+		return "", nil
 	}
-	return joinParagraphs(text, sessionReplyWays)
+	return joinParagraphs(text, sessionReplyWays), messages
 }
 
 func markDelivered(cache *sessionCache, message inboxMessage) {

@@ -33,11 +33,13 @@ func TestTheIdleWakeExitsOnlyOnAWaitingMessage(t *testing.T) {
 	if first := syncs[2]; first.State != collab.SessionStateWaiting || first.WaitUntil != "2026-10-21T10:10:00Z" {
 		t.Errorf("the wait published %+v", first)
 	}
-	if last := syncs[len(syncs)-1]; last.State != collab.SessionStateWorking || !slices.Equal(last.Delivered, []string{infoID}) {
+	// The wake publishes the working state; the message goes as delivered
+	// with the next sync, once the wake wrote it.
+	if last := syncs[len(syncs)-1]; last.State != collab.SessionStateWorking || last.Delivered != nil {
 		t.Errorf("the wake published %+v", last)
 	}
-	if cache := h.cache(claude, claudeSession); !containsString(cache.ContinuedFor, infoID) || cache.Waiter != "" {
-		t.Errorf("continued for %v, waiter %q", cache.ContinuedFor, cache.Waiter)
+	if cache := h.cache(claude, claudeSession); !containsString(cache.ContinuedFor, infoID) || cache.Waiter != "" || !slices.Equal(cache.Acks, []string{infoID}) {
+		t.Errorf("continued for %v, waiter %q, acks %v", cache.ContinuedFor, cache.Waiter, cache.Acks)
 	}
 }
 

@@ -1,9 +1,11 @@
 package agentsession
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -444,20 +446,27 @@ func TestAWaitingMessageContinuesTheTurnOnce(t *testing.T) {
 		t.Errorf("context\n%s\nwant\n%s", got, want)
 	}
 	// The sync answered the message: a second one publishes that the session
-	// works again and that the message was delivered.
+	// works again. The message counts as delivered once the hook wrote it,
+	// and the next sync reports it.
 	syncs := h.provider.recordedSyncs()
 	if got := h.provider.recordedCalls()[calls:]; len(got) != 2 {
 		t.Fatalf("calls %v, want two syncs", got)
 	}
-	if republish := syncs[len(syncs)-1]; republish.State != collab.SessionStateWorking || !slices.Equal(republish.Delivered, []string{promptID}) {
+	if republish := syncs[len(syncs)-1]; republish.State != collab.SessionStateWorking || republish.Delivered != nil {
 		t.Errorf("republish %+v", republish)
 	}
-	for _, edit := range []func(map[string]any){
+	if cache := h.cache(claude, claudeSession); !slices.Equal(cache.Acks, []string{promptID}) || cache.Inbox != nil {
+		t.Errorf("after the write: acks %v, inbox %v", cache.Acks, cache.Inbox)
+	}
+	for i, edit := range []func(map[string]any){
 		func(payload map[string]any) { payload["stop_hook_active"] = true },
 		nil,
 	} {
 		if out := h.hook(claude, "stop", claudeSession, edit); out != nil {
 			t.Errorf("a message continued a second turn: %+v", out)
+		}
+		if sync := h.provider.lastSync(t); i == 0 && !slices.Equal(sync.Delivered, []string{promptID}) {
+			t.Errorf("the next sync reported %v as delivered", sync.Delivered)
 		}
 	}
 
@@ -491,19 +500,28 @@ func TestCodexContinuesWithABlock(t *testing.T) {
 
 func TestCodexWaitsForAnOpenDecision(t *testing.T) {
 	spectest.Proves(t, sessionFeature, stopRequirement, "codex-waits-for-an-open-decision")
-	open := []collab.OpenDecision{{ID: decisionID, Question: "Which color should the logo be?"}}
+	// The Codex ask fixture opens dec-codex.
+	const asked = "dec-codex"
+	open := []collab.OpenDecision{{ID: asked, Question: "Which color should the logo be?"}}
+	answer := answerMessage()
+	answer.Decision.ID = asked
+	rendered := strings.Replace(answerRendered, decisionID, asked, 1)
+	start := func(h *harness) {
+		h.hook(codex, "session-start", codexSession, nil)
+		h.hook(codex, "post-tool-use-ask", codexSession, nil)
+	}
 
 	h := newHarness(t)
 	h.provider.open = open
-	h.hook(codex, "session-start", codexSession, nil)
+	start(h)
 	h.onSleep = func(index int) {
 		if index == 1 {
 			h.provider.open = nil
-			h.provider.post(answerMessage())
+			h.provider.post(answer)
 		}
 	}
 	out := h.hook(codex, "stop", codexSession, lastMessage("I asked which color the logo takes."))
-	if out == nil || out.Decision != "block" || out.Reason != answerRendered {
+	if out == nil || out.Decision != "block" || out.Reason != rendered {
 		t.Errorf("output %+v", out)
 	}
 	if !slices.Equal(h.slept, []time.Duration{30 * time.Second, 30 * time.Second}) {
@@ -514,14 +532,23 @@ func TestCodexWaitsForAnOpenDecision(t *testing.T) {
 	if waiting.State != collab.SessionStateWaiting || waiting.WaitUntil != "2026-10-21T10:03:00Z" || waiting.Event != sessionEventWait {
 		t.Errorf("the wait published %+v", waiting)
 	}
-	if last := syncs[len(syncs)-1]; last.State != collab.SessionStateWorking || !slices.Equal(last.Delivered, []string{answerID}) {
+	// The wait publishes the working state; the answer goes as delivered with
+	// the next sync, once the hook wrote it.
+	if last := syncs[len(syncs)-1]; last.State != collab.SessionStateWorking || last.Delivered != nil {
 		t.Errorf("the answer was published as %+v", last)
+	}
+	if cache := h.cache(codex, codexSession); !slices.Equal(cache.Acks, []string{answerID}) || cache.Inbox != nil {
+		t.Errorf("after the write: acks %v, inbox %v", cache.Acks, cache.Inbox)
+	}
+	h.hook(codex, "stop-active", codexSession, nil)
+	if sync := h.provider.lastSync(t); !slices.Equal(sync.Delivered, []string{answerID}) {
+		t.Errorf("the next sync reported %v as delivered", sync.Delivered)
 	}
 
 	// No answer: the wait ends with its window, handed back.
 	h = newHarness(t)
 	h.provider.open = open
-	h.hook(codex, "session-start", codexSession, nil)
+	start(h)
 	if out := h.hook(codex, "stop", codexSession, lastMessage("Asked.")); out != nil {
 		t.Errorf("output %+v", out)
 	}
@@ -536,20 +563,99 @@ func TestCodexWaitsForAnOpenDecision(t *testing.T) {
 	// and publishes the handback.
 	h = newHarness(t)
 	h.provider.open = open
-	h.hook(codex, "session-start", codexSession, nil)
+	start(h)
 	h.onSleep = func(int) { h.provider.open = nil }
 	h.hook(codex, "stop", codexSession, lastMessage("Asked."))
 	if last := h.provider.lastSync(t); last.State != collab.SessionStateHandedBack || len(h.slept) != 1 {
 		t.Errorf("last sync %+v after %v", last, h.slept)
 	}
 
+	// Another session's decision never holds this one, even when this
+	// session asked one that is no longer open.
+	for _, ask := range []bool{false, true} {
+		h = newHarness(t)
+		h.provider.open = []collab.OpenDecision{{ID: decisionID, Question: "Which font?"}}
+		h.hook(codex, "session-start", codexSession, nil)
+		if ask {
+			h.hook(codex, "post-tool-use-ask", codexSession, nil)
+		}
+		if out := h.hook(codex, "stop", codexSession, lastMessage("Done.")); out != nil || h.slept != nil {
+			t.Errorf("asked %v: output %+v after waiting %v for another session's decision", ask, out, h.slept)
+		}
+	}
+
 	// Claude Code never holds a Stop for a decision: its idle wake waits.
 	h = newHarness(t)
-	h.provider.open = open
+	h.provider.open = []collab.OpenDecision{{ID: decisionID, Question: "Which color should the logo be?"}}
 	h.hook(claude, "session-start", claudeSession, nil)
+	h.hook(claude, "post-tool-use-ask", claudeSession, nil)
 	h.hook(claude, "stop", claudeSession, nil)
 	if h.slept != nil {
 		t.Errorf("a Claude Code stop waited %v", h.slept)
+	}
+}
+
+// failingWriter refuses every write, as a pipe the host closed does.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+
+// A message counts as delivered once the hook wrote it. A hook stopped
+// before, or whose write fails, leaves it waiting for the next hook.
+func TestAMessageCountsAsDeliveredOnceWritten(t *testing.T) {
+	spectest.Proves(t, sessionFeature, stopRequirement, "a-message-counts-as-delivered-once-written")
+	// The host stops the hook after it decided and before it wrote.
+	h := newHarness(t)
+	h.provider.post(promptMessage())
+	input, err := readHookInput(bytes.NewReader(h.payload(claude, "session-start", claudeSession, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, delivery, err := h.env.handleHookEvent(context.Background(), claude, *input)
+	if err != nil || !strings.Contains(contextOf(t, out), promptRendered) || len(delivery.messages) != 1 {
+		t.Fatalf("output %+v, delivery %+v, %v", out, delivery, err)
+	}
+	if cache := h.cache(claude, claudeSession); cache.Acks != nil || cache.Seen != nil || cache.Prompts != nil || len(cache.Inbox) != 1 {
+		t.Errorf("before the write: acks %v, seen %v, prompts %v, inbox %v", cache.Acks, cache.Seen, cache.Prompts, cache.Inbox)
+	}
+	// The next hook gives the message again, and the sync after it reports
+	// it once.
+	if text := contextOf(t, h.hook(claude, "stop", claudeSession, nil)); !strings.Contains(text, promptRendered) {
+		t.Errorf("the stop did not give the message again:\n%s", text)
+	}
+	if cache := h.cache(claude, claudeSession); !slices.Equal(cache.Acks, []string{promptID}) || cache.Inbox != nil || len(cache.Prompts) != 1 {
+		t.Errorf("after the write: acks %v, inbox %v, prompts %v", cache.Acks, cache.Inbox, cache.Prompts)
+	}
+	h.hook(claude, "stop", claudeSession, nil)
+	if sync := h.provider.lastSync(t); !slices.Equal(sync.Delivered, []string{promptID}) {
+		t.Errorf("delivered %v", sync.Delivered)
+	}
+
+	// A write that fails leaves the message waiting, on stdout and for the
+	// idle wake on stderr.
+	for _, wake := range []bool{false, true} {
+		h := newHarness(t)
+		h.hook(claude, "session-start", claudeSession, nil)
+		args := []string{"--engine", claude}
+		stdout, stderr := io.Writer(failingWriter{}), io.Writer(&bytes.Buffer{})
+		want := "write the hook output"
+		if wake {
+			h.hook(claude, "stop", claudeSession, nil)
+			h.onSleep = func(int) { h.provider.post(infoMessage()) }
+			args = append(args, "--idle-wake")
+			stdout, stderr = stderr, stdout
+			want = "write the wake text"
+		} else {
+			h.provider.post(infoMessage())
+		}
+		code := Hook(context.Background(), h.env, args, bytes.NewReader(h.payload(claude, "stop", claudeSession, nil)), stdout, stderr)
+		cache := h.cache(claude, claudeSession)
+		if code != 0 || cache.Acks != nil || len(cache.Inbox) != 1 || cache.Inbox[0].ID != infoID {
+			t.Errorf("wake %v: exit %d, acks %v, inbox %v", wake, code, cache.Acks, cache.Inbox)
+		}
+		if !logSays(h.hookLog(), want) {
+			t.Errorf("wake %v: hook.log %v", wake, h.hookLog())
+		}
 	}
 }
 
@@ -808,7 +914,9 @@ func TestTheTranscriptNamesTheModel(t *testing.T) {
 	}
 }
 
-func TestNoTextNamesAProductOrAPath(t *testing.T) {
+// No text a hook gives the agent names the provider, an address or a store
+// path: the provider is whatever the workspace binds.
+func TestNoTextNamesAProviderOrAPath(t *testing.T) {
 	spectest.Proves(t, sessionFeature, startRequirement, "the-sheet-quotes-agent-text-within-4-kib")
 	h := newHarness(t)
 	h.provider.post(promptMessage(), infoMessage())
@@ -823,7 +931,7 @@ func TestNoTextNamesAProductOrAPath(t *testing.T) {
 	}
 	texts := []string{start, reminder, answer, sessionReplyWays, messageCutNote}
 	for _, text := range texts {
-		for _, banned := range []string{"missions/", "Cloud", "putnami.app", "Intelligence", "http"} {
+		for _, banned := range []string{"missions/", "@acme/missions", "http", "://"} {
 			if strings.Contains(text, banned) {
 				t.Errorf("a hook text names %q:\n%s", banned, text)
 			}

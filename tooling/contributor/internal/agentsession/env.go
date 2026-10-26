@@ -99,7 +99,8 @@ const (
 	callTimeout = 10 * time.Second
 	// launcherMargin is what each budget leaves of the declared timeout to
 	// the launcher, which loads the workspace before the hook runs and stops
-	// the host channel after it.
+	// the host channel after it. The core starts every hook command with the
+	// first-use install off, so the launcher never installs in this margin.
 	launcherMargin = 5 * time.Second
 	// The timeouts the hook entries of putnami.extension.json declare.
 	hookTimeout      = 30 * time.Second

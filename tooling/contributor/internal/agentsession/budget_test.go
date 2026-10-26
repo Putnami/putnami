@@ -85,18 +85,51 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 		// the branch, the origin, sync and memory.mission.
 		{"session start", eventBudget(claude, hookEventSessionStart, false), 2*gitTimeout + 2*callTimeout},
 		// the identity of a session no start opened, sync and the
-		// republish of a message the sync answered.
+		// republish after a message the sync answered.
 		{"stop", eventBudget(claude, hookEventStop, false), 2*gitTimeout + 2*callTimeout},
 		{"stop failure", eventBudget(claude, hookEventStopFailure, false), 2*gitTimeout + callTimeout},
 		// the identity, sync, the wait, the sync in flight at its end and
-		// the sync that publishes the answer.
+		// the sync that publishes the working state.
 		{"codex stop", eventBudget(codex, hookEventStop, false), 2*gitTimeout + callTimeout + sessionDecisionWait + 2*callTimeout},
 		// the wait for the Stop, the window, the sync in flight at its end
-		// and the sync that publishes the message.
+		// and the sync that publishes the working state.
 		{"idle wake", eventBudget(claude, hookEventStop, true), idleWakeStopWait + sessionIdleWakeWindow + 2*callTimeout},
 	} {
 		if path.cost > path.budget {
 			t.Errorf("%s: the longest path takes %v, more than the budget %v", path.name, path.cost, path.budget)
+		}
+	}
+}
+
+// TestTheManifestHooksOnlyTheSessionTools holds the shipped manifest to the
+// tools the hook reads: each host has one PostToolUse entry, after exactly
+// its plan tools and the two missions tools, and no other entry names a tool.
+func TestTheManifestHooksOnlyTheSessionTools(t *testing.T) {
+	spectest.Proves(t, sessionFeature, toolRequirement, "the-manifest-hooks-only-the-session-tools")
+	want := map[string][]string{
+		claude: {"TodoWrite", "TaskCreate", "TaskUpdate"},
+		codex:  {"update_plan"},
+	}
+	hosts := loadManifest(t).HostHooks.Hosts
+	if len(hosts) != len(want) {
+		t.Errorf("hooks for %d hosts, want %d", len(hosts), len(want))
+	}
+	for engine, tools := range want {
+		var postToolUse []ext.HostHookEntry
+		for _, entry := range hosts[engine] {
+			if entry.Event == hookEventPostToolUse {
+				postToolUse = append(postToolUse, entry)
+			} else if len(entry.Tools)+len(entry.MCPTools) > 0 {
+				t.Errorf("%s %s names tools %v %v", engine, entry.Event, entry.Tools, entry.MCPTools)
+			}
+		}
+		if len(postToolUse) != 1 {
+			t.Errorf("%s: %d PostToolUse entries, want 1", engine, len(postToolUse))
+			continue
+		}
+		entry := postToolUse[0]
+		if !slices.Equal(entry.Tools, tools) || !slices.Equal(entry.MCPTools, []string{toolAsk, toolReply}) {
+			t.Errorf("%s: PostToolUse runs after %v and %v, want %v and %v", engine, entry.Tools, entry.MCPTools, tools, []string{toolAsk, toolReply})
 		}
 	}
 }
