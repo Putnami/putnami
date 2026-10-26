@@ -320,6 +320,40 @@ func assertEnumSync(t *testing.T, label string, schemaVals, goVals []string) {
 	}
 }
 
+// TestDrift_CoverageGranularities holds the coverage summary's granularity
+// enum in the payload schema against the Go constants.
+func TestDrift_CoverageGranularities(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
+	data, err := os.ReadFile("schemas/payloads.json")
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	var schema struct {
+		Defs map[string]struct {
+			Properties map[string]struct {
+				Enum []string `json:"enum"`
+			} `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatalf("parse schema: %v", err)
+	}
+	granularity, ok := schema.Defs["CoverageSummary"].Properties["granularity"]
+	if !ok || len(granularity.Enum) == 0 {
+		t.Fatal("no granularity enum in $defs/CoverageSummary")
+	}
+	goGranularities := []string{CoverageStatements, CoverageLines, CoverageFunctions, CoverageBranches}
+	assertEnumSync(t, "coverage granularity", granularity.Enum, goGranularities)
+	for _, g := range goGranularities {
+		if !validCoverageGranularities[g] {
+			t.Errorf("coverage granularity %q is a constant the validator refuses", g)
+		}
+	}
+	if len(validCoverageGranularities) != len(goGranularities) {
+		t.Errorf("the validator admits %d granularities, the constants declare %d", len(validCoverageGranularities), len(goGranularities))
+	}
+}
+
 // TestDrift_JobErrorMembers keeps the result error's members the same in Go
 // and in both event schemas, with the type each schema declares.
 func TestDrift_JobErrorMembers(t *testing.T) {

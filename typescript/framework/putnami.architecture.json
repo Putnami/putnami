@@ -107,6 +107,11 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/runtime",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/typescript/framework/web",
           "producerProject": "/protocols/http-routes"
         }

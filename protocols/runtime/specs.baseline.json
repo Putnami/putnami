@@ -14,6 +14,7 @@
     "runtime/event-stream#the-emitter-writes-lines-the-parser-reads",
     "runtime/event-stream#the-extension-sdk-emits-a-conforming-stream",
     "runtime/event-stream#the-schemas-and-the-go-types-agree",
+    "runtime/event-stream#the-typescript-runtime-emits-and-validates-a-conforming-stream",
     "runtime/event-stream#the-versions-are-pinned",
     "runtime/event-stream#this-module-owns-only-the-inner-event",
     "runtime/event-stream#version-2-adds-only-ready"

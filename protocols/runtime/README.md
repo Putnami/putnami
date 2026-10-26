@@ -176,7 +176,8 @@ the other.
   against the schema rather than asserted in prose (`TestDrift_EventTypes`,
   `TestDrift_LogLevels`, `TestDrift_ResultStatuses`,
   `TestDrift_DiagnosticSeverities`, `TestDrift_PhaseActions`,
-  `TestDriftV2_EventTypes`, `TestDriftV2_ReadyVocabularies`), and
+  `TestDrift_CoverageGranularities`, `TestDriftV2_EventTypes`,
+  `TestDriftV2_ReadyVocabularies`), and
   `TestDriftV2_V1SchemaFrozen` pins that v1's schema still fixes `v` to 1 and
   still excludes the v2-only `ready` type — so v2 cannot widen v1. The
   corpus is 6 v1 streams and 14 v2 streams, with
@@ -190,8 +191,9 @@ the other.
 
 The module owns the feature of its contract, `runtime/event-stream`, specified
 in [`specs/event-stream.json`](specs/event-stream.json). The tests here prove
-its requirements, and so do two implementations: the extension SDK's emitter
-(`tooling/extension-sdk/jsonl`) and the CLI's serve watcher. The emitter's wire
+its requirements, and so do three implementations: the extension SDK's emitter
+(`tooling/extension-sdk/jsonl`), the TypeScript emitter and parser of
+`@putnami/runtime`, and the CLI's serve watcher. The emitter's wire
 conformance moved here from the SDK's own feature, `tooling/extension-authoring`,
 which keeps log forwarding and the rest of the authoring library. The CLI
 commands whose output these events become keep the features of what they

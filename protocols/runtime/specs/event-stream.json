@@ -9,8 +9,7 @@
   ],
   "nonGoals": [
     "The outer session-stream record the CLI writes around these events: protocols/cli owns it",
-    "The fields of a release-set outcome: the distribution protocol owns and validates them",
-    "The TypeScript emitter and parser of @putnami/runtime, which read the same fixtures under their own tests"
+    "The fields of a release-set outcome: the distribution protocol owns and validates them"
   ],
   "requirements": [
     {
@@ -31,7 +30,7 @@
     },
     {
       "id": "a-stream-ends-with-one-result",
-      "text": "A valid stream carries exactly one result event, as its last line: a stream without one, with two, or with a line after it is invalid. A ready event may repeat, once per serve iteration, so a restarted workload announces readiness again in a valid stream."
+      "text": "A valid stream carries exactly one result event, as its last line: a stream without one, with two, or with a line after it is invalid. A ready event may repeat, so a restarted workload announces readiness again in a valid stream."
     },
     {
       "id": "the-emitter-writes-lines-the-parser-reads",
@@ -39,7 +38,7 @@
     },
     {
       "id": "readiness-is-typed-and-canonical",
-      "text": "A ready event names a known target, and a server target names its endpoints, each with a known scheme, a host and a port; a missing or malformed payload is refused. An endpoint's URL derives from its members, endpoints sort canonically, and the same readiness facts produce the same bytes whatever order the listeners bound in. ExtractReadyData reads the payload back."
+      "text": "A ready event names a known target, and a server target names its endpoints, each with a known scheme, a host and a port; a missing or malformed payload is refused. An endpoint's URL derives from its scheme, host, port and path, endpoints sort canonically, and the same readiness facts produce the same bytes whatever order the listeners bound in. ExtractReadyData reads the payload back."
     },
     {
       "id": "a-workload-announces-readiness-in-a-log-line",
@@ -55,7 +54,7 @@
     },
     {
       "id": "the-schemas-and-the-go-types-agree",
-      "text": "Every closed vocabulary, the event types of both versions, the log levels, the result and phase statuses, the diagnostic severities and the ready vocabularies, is held against its schema by a drift test, and so are the result error's members. The exported vocabularies are sorted, so a harness that enumerates them prints one order."
+      "text": "Every closed vocabulary, the event types of both versions, the log levels, the result and phase statuses, the diagnostic severities, the coverage granularities and the ready vocabularies, is held against its schema by a drift test, and so are the result error's members. The exported vocabularies are sorted, so a harness that enumerates them prints one order."
     },
     {
       "id": "a-fixture-corpus-holds-both-versions",
@@ -68,6 +67,10 @@
     {
       "id": "the-extension-sdk-emits-a-conforming-stream",
       "text": "The extension SDK's emitter writes this wire shape at the version the CLI advertises, resolved through this module, and falls back to version 1 for an unknown one. A typed ready marker appears only from version 2. It never writes an invalid line: it drops a value the protocol cannot represent, reports a ready event it cannot write at version 1, keeps the log line of a malformed marker, and writes a timed-out result that parses. It announces readiness again on every restart."
+    },
+    {
+      "id": "the-typescript-runtime-emits-and-validates-a-conforming-stream",
+      "text": "@putnami/runtime implements this wire in TypeScript. It gives every fixture of both versions the Go verdict, and refuses a ready event at version 1 and a stream that mixes versions. Its emitter writes the Go SDK's line shapes, a timed-out result and a ready event included, drops a non-finite metric, stamps one version on every line and writes no ready event at version 1. It resolves PUTNAMI_RUNTIME_EVENTS as the Go helper does, sorts endpoints by byte order, and a malformed readiness marker yields none."
     },
     {
       "id": "the-cli-arms-on-typed-readiness",

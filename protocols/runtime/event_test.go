@@ -407,6 +407,35 @@ func TestValidateEvent_ArtifactMissingFields(t *testing.T) {
 	}
 }
 
+func TestValidateEvent_DiagnosticMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
+	e := &Event{V: 1, Type: EventDiagnostic}
+	assertRequiredFields(t, ValidateEvent(e), "severity", "message")
+}
+
+func TestValidateEvent_SummaryMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
+	e := &Event{V: 1, Type: EventSummary}
+	assertRequiredFields(t, ValidateEvent(e), "message")
+}
+
+// assertRequiredFields fails unless diags hold a required-field error for each
+// named member.
+func assertRequiredFields(t *testing.T, diags []diag.Diagnostic, fields ...string) {
+	t.Helper()
+	missing := make(map[string]bool, len(fields))
+	for _, d := range diag.Errors(diags) {
+		if d.Code == "required-field" {
+			missing[d.Field] = true
+		}
+	}
+	for _, field := range fields {
+		if !missing[field] {
+			t.Errorf("expected a required-field error for %q, got %v", field, diags)
+		}
+	}
+}
+
 func TestValidateEventStream_Valid(t *testing.T) {
 	spectest.Proves(t, "runtime/event-stream", "a-stream-ends-with-one-result", "one-result-closes-the-stream")
 	events := []*Event{

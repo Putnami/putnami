@@ -275,7 +275,7 @@ func TestValidateEventStream_SingleVersionAccepted(t *testing.T) {
 }
 
 func TestReadyEndpoint_URL(t *testing.T) {
-	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "readiness-bytes-do-not-depend-on-bind-order")
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "an-endpoint-url-derives-from-its-members")
 	cases := []struct {
 		endpoint ReadyEndpoint
 		want     string
@@ -421,7 +421,7 @@ func TestEmitter_ReadyDeterministic(t *testing.T) {
 }
 
 func TestReadyPayload_AbsentAndNil(t *testing.T) {
-	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "the-ready-payload-reads-back")
 	payload, err := ReadyPayload(nil)
 	if err != nil || payload != nil {
 		t.Errorf("ReadyPayload(nil) = %v, %v; want nil, nil", payload, err)
@@ -436,7 +436,7 @@ func TestReadyPayload_AbsentAndNil(t *testing.T) {
 }
 
 func TestExtractReadyData(t *testing.T) {
-	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "the-ready-payload-reads-back")
 	payload, err := ExtractReadyData(nil)
 	if err != nil || payload != nil {
 		t.Errorf("ExtractReadyData(nil) = %v, %v; want nil, nil", payload, err)

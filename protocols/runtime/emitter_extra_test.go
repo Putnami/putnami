@@ -89,7 +89,7 @@ func TestEmitWithExtra_TypedFieldsWinAndExtrasSurvive(t *testing.T) {
 // TestLogContext covers LogContext, which forwards structured context and
 // optional error details from child processes.
 func TestLogContext(t *testing.T) {
-	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "typed-fields-win-and-extras-survive")
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "an-emitted-line-round-trips")
 	var buf bytes.Buffer
 	em := NewEmitter(&buf)
 	if err := em.LogContext(LevelError, "child failed",

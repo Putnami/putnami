@@ -107,7 +107,9 @@
             "kind": "acceptance",
             "checks": [
               "a-ready-payload-is-validated",
-              "readiness-bytes-do-not-depend-on-bind-order"
+              "readiness-bytes-do-not-depend-on-bind-order",
+              "an-endpoint-url-derives-from-its-members",
+              "the-ready-payload-reads-back"
             ]
           }
         },
@@ -214,6 +216,22 @@
               "the-sdk-emits-at-the-negotiated-version",
               "the-sdk-never-writes-an-invalid-line",
               "the-sdk-announces-readiness-on-every-restart"
+            ]
+          }
+        },
+        {
+          "id": "the-typescript-runtime-emits-and-validates-a-conforming-stream",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-validator-gives-every-fixture-the-go-verdict",
+              "the-typescript-emitter-writes-the-go-wire-shape",
+              "the-typescript-runtime-holds-one-version-per-stream",
+              "the-typescript-readiness-is-canonical-and-fails-closed"
             ]
           }
         },
