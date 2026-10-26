@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { resetConfigLoader } from '@putnami/runtime';
 import { specTest } from '@putnami/spectest';
 import {
@@ -26,6 +28,18 @@ const baseConfig = {
   maxLifetime: 0,
 };
 
+// The binding fixtures of the database protocol: valid/ holds the documents every
+// implementation accepts, invalid/ the documents every implementation refuses.
+const BINDING_FIXTURES = join(__dirname, '../../../../protocols/database/fixtures/binding');
+
+function fixtures(verdict: 'valid' | 'invalid'): Array<{ name: string; raw: string }> {
+  const dir = join(BINDING_FIXTURES, verdict);
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => ({ name, raw: readFileSync(join(dir, name), 'utf8') }));
+}
+
 function binding(databases: Record<string, unknown>): string {
   return JSON.stringify({ protocolVersion: 1, databases });
 }
@@ -36,6 +50,97 @@ afterEach(() => {
 });
 
 describe('parseDatabaseBinding', () => {
+  specTest(
+    'gives every valid fixture of the protocol the accept verdict',
+    {
+      feature: 'database/datasource-contract',
+      requirement: 'the-typescript-adapter-reads-the-binding',
+      check: 'the-typescript-parser-gives-each-binding-the-protocol-verdict',
+    },
+    () => {
+      const valid = fixtures('valid');
+      expect(valid.length).toBeGreaterThan(0);
+      const refused: string[] = [];
+      for (const { name, raw } of valid) {
+        try {
+          parseDatabaseBinding(raw);
+        } catch (err) {
+          refused.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      expect(refused).toEqual([]);
+    },
+  );
+
+  specTest(
+    'gives every invalid fixture of the protocol the refuse verdict, with a database error code',
+    {
+      feature: 'database/datasource-contract',
+      requirement: 'the-typescript-adapter-reads-the-binding',
+      check: 'the-typescript-parser-gives-each-binding-the-protocol-verdict',
+    },
+    () => {
+      const invalid = fixtures('invalid');
+      expect(invalid.length).toBeGreaterThan(0);
+      const accepted: string[] = [];
+      const uncoded: string[] = [];
+      for (const { name, raw } of invalid) {
+        try {
+          parseDatabaseBinding(raw);
+          accepted.push(name);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (!/: database\.[a-z_]+: /.test(message)) {
+            uncoded.push(`${name}: ${message}`);
+          }
+        }
+      }
+      expect(accepted).toEqual([]);
+      expect(uncoded).toEqual([]);
+    },
+  );
+
+  specTest(
+    'refuses an unknown member at the document, entry and connection levels with database.unknown_field',
+    {
+      feature: 'database/datasource-contract',
+      requirement: 'the-typescript-adapter-reads-the-binding',
+      check: 'the-typescript-parser-gives-each-binding-the-protocol-verdict',
+    },
+    () => {
+      const entry = { engine: 'postgres', schema: 'iam', connection: { host: 'h', database: 'auth' } };
+      const document = JSON.stringify({ protocolVersion: 1, pool: 10, databases: { auth: entry } });
+      const inEntry = binding({ auth: { ...entry, pool: 10 } });
+      const inConnection = binding({ auth: { ...entry, connection: { ...entry.connection, pool: 10 } } });
+      for (const raw of [document, inEntry, inConnection]) {
+        expect(() => parseDatabaseBinding(raw)).toThrow(/database\.unknown_field/);
+      }
+    },
+  );
+
+  specTest(
+    'refuses a schema outside the identifier pattern with database.invalid_schema',
+    {
+      feature: 'database/datasource-contract',
+      requirement: 'the-typescript-adapter-reads-the-binding',
+      check: 'the-typescript-parser-gives-each-binding-the-protocol-verdict',
+    },
+    () => {
+      for (const schema of ['9iam', 'ia m', 'iam-core', ' iam']) {
+        expect(() =>
+          parseDatabaseBinding(
+            binding({ auth: { engine: 'postgres', schema, connection: { host: 'h', database: 'auth' } } }),
+          ),
+        ).toThrow(/database\.invalid_schema/);
+      }
+      expect(() =>
+        parseDatabaseBinding(
+          binding({ auth: { engine: 'postgres', schema: '_iam$1', connection: { host: 'h', database: 'auth' } } }),
+        ),
+      ).not.toThrow();
+    },
+  );
+
   specTest(
     'accepts a valid multi-datasource binding',
     {

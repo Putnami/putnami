@@ -7,7 +7,11 @@
   "dependencies": ["/protocols/database", "/protocols/transaction"],
   "options": {
     "test": {
-      "filePatterns": ["../../../protocols/database/conformance/**", "../../../protocols/transaction/conformance/**"],
+      "filePatterns": [
+        "../../../protocols/database/conformance/**",
+        "../../../protocols/database/fixtures/**",
+        "../../../protocols/transaction/conformance/**"
+      ],
       "coverage-threshold": 40
     },
     "package": {

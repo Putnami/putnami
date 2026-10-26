@@ -51,7 +51,7 @@
     },
     {
       "id": "the-typescript-adapter-reads-the-binding",
-      "text": "The TypeScript adapter of @putnami/database parses a binding strictly: it accepts a valid binding with several datasources and refuses another protocolVersion, a connection with two transports, a dsn with ssl, an engine other than postgres, a missing schema and a non-canonical datasource name. It reads the binding from DATABASE_BINDINGS, and resolves nothing when the document is absent or blank."
+      "text": "The TypeScript adapter of @putnami/database parses a binding strictly, with the protocol's verdict: it accepts every valid binding fixture and refuses every invalid one, each refusal naming a database error code. It refuses an unknown member at each level and a schema outside the identifier pattern. It reads the binding from DATABASE_BINDINGS, and resolves nothing when the document is absent or blank."
     },
     {
       "id": "the-typescript-test-provider-reads-the-test-binding",
