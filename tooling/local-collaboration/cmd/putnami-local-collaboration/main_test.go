@@ -12,6 +12,7 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 	diag "go.putnami.dev/protocol/diagnostic"
 	extension "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
@@ -33,6 +34,7 @@ func readManifest(t *testing.T) *extension.Manifest {
 // reads when it resolves a binding: the provider offers exactly the tasks and
 // proposals operations this runtime answers, with truthful annotations.
 func TestTheManifestPassesBothGates(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-local-provider-manifest-draws-no-diagnostic")
 	manifest := readManifest(t)
 	if manifest.Name != extensionName {
 		t.Fatalf("manifest name %q, runtime answers as %q", manifest.Name, extensionName)

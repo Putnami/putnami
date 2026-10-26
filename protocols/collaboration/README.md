@@ -113,6 +113,29 @@ MCP server, and providers written in any language speak JSON.
 
 Run `./putnamiw test --projects go.putnami.dev/protocol/collaboration --enforce-coverage`.
 
+## Feature and spec
+
+The module owns the feature of its contracts,
+`collaboration/provider-contract`, specified in
+[`specs/provider-contract.json`](specs/provider-contract.json). The tests here
+prove the catalog, strict parsing and bounds, the fixture corpus, the schemas,
+envelope outcomes, bindings, provider declarations, `Serve`, the document
+bound, and the shared scenarios against a reference provider. Each conforming
+implementation proves the rest in its own tests:
+
+- The CLI (`tooling/cli`) refuses before it starts a provider what the
+  provider cannot serve, checks every answer against its request, reports an
+  uncertain write as unresolved, keeps credentials out of every envelope, and
+  keeps pages within their bounds. The CLI's `cli/collaboration-providers`
+  keeps what the CLI adds: the binding, capabilities, the two entry paths and
+  the routed tools.
+- `@putnami/local-collaboration` and `@putnami/github-collaboration` pass the
+  task and proposal scenarios, and their manifests draw no diagnostic.
+- `@putnami/memory-store` passes the memory scenarios on every backend, and
+  its manifest draws no diagnostic.
+- `@putnami/contributor` stops `putnami change finalize` at an unresolved
+  write without repeating it.
+
 ## Decisions
 
 - [ADR 0001 — Collaboration provider contracts](doc/adr/0001-collaboration-provider-contracts.md):

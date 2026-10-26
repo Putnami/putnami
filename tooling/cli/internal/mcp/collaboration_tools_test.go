@@ -545,7 +545,8 @@ func TestCollaboration_BindingFailuresAreExplicit(t *testing.T) {
 // binding promised stay registered, and each answers why it cannot serve.
 func TestCollaboration_ABrokenBindingStillExposesItsFailure(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "truthful-annotations", "a-provider-whose-annotations-disagree-is-refused")
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-cli-refuses-a-call-to-a-withdrawn-contract-version")
+	spectest.Proves(t, "cli/collaboration-providers", "truthful-annotations", "routed-tools-carry-the-contract-access")
 	fixture := newCollabFixture(t, "ok", `{"tasks":{"provider":"@test/collab","version":1}}`, func(tools map[string]proto.ToolDefinition) {
 		def := tools["fixture.tasks.create"]
 		def.Annotations.ReadOnlyHint = boolPointer(true)
@@ -568,8 +569,8 @@ func TestCollaboration_ABrokenBindingStillExposesItsFailure(t *testing.T) {
 
 func TestCollaboration_OperationsThePathRefusesNeverReachTheProvider(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "capability-discovery", "an-optional-operation-the-provider-lacks-is-unsupported")
-	spectest.Proves(t, "cli/collaboration-providers", "capability-discovery", "a-precondition-the-provider-cannot-enforce-is-refused")
+	spectest.Proves(t, "collaboration/provider-contract", "refused-before-the-provider", "the-cli-refuses-an-operation-the-provider-does-not-offer")
+	spectest.Proves(t, "collaboration/provider-contract", "refused-before-the-provider", "the-cli-refuses-a-precondition-the-provider-cannot-enforce")
 	fixture := newCollabFixture(t, "ok", bindAll, nil)
 	env := ProviderEnvironment{WorkspaceRoot: fixture.root, Extensions: discovered(t, fixture.root)}
 	cases := []struct {
@@ -651,7 +652,7 @@ func TestCollaboration_TheProviderReceivesTheValidatedRequestAndItsSettings(t *t
 
 func TestCollaboration_EmptyAndPaginatedResults(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "bounded-pages", "empty-and-paginated-results")
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-pages", "the-cli-answers-empty-and-paginated-lists")
 	empty := newCollabFixture(t, "empty", bindAll, nil)
 	envelope := callCollab(t, empty.server(t), "tasks.find", `{}`)
 	expectOutcome(t, envelope, collab.OutcomeOK, "")
@@ -689,7 +690,7 @@ func TestCollaboration_EmptyAndPaginatedResults(t *testing.T) {
 
 func TestCollaboration_AnOversizedPageIsRefused(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "bounded-pages", "an-oversized-page-is-refused")
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-pages", "the-cli-refuses-a-page-above-the-requested-size")
 	fixture := newCollabFixture(t, "overfull", bindAll, nil)
 	envelope := callCollab(t, fixture.server(t), "tasks.find", `{"page":{"size":2}}`)
 	expectOutcome(t, envelope, collab.OutcomeUnavailable, collab.ReasonProviderIdentity)
@@ -697,8 +698,8 @@ func TestCollaboration_AnOversizedPageIsRefused(t *testing.T) {
 
 func TestCollaboration_AnAnswerForAnotherIdentityIsRefused(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "exact-identity", "a-proposal-for-another-head-is-refused")
-	spectest.Proves(t, "cli/collaboration-providers", "exact-identity", "a-mutation-answering-for-another-item-is-unresolved")
+	spectest.Proves(t, "collaboration/provider-contract", "exact-identity", "the-cli-refuses-a-read-that-answers-for-something-else")
+	spectest.Proves(t, "collaboration/provider-contract", "exact-identity", "the-cli-makes-a-mutation-that-answers-for-something-else-unresolved")
 	fixture := newCollabFixture(t, "wrong-identity", bindAll, nil)
 	srv := fixture.server(t)
 
@@ -731,8 +732,8 @@ func TestCollaboration_AnAnswerForAnotherIdentityIsRefused(t *testing.T) {
 
 func TestCollaboration_TimeoutsAndCancellation(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "uncertain-writes-are-unresolved", "a-timed-out-read-is-unavailable-and-retryable")
-	spectest.Proves(t, "cli/collaboration-providers", "uncertain-writes-are-unresolved", "a-timed-out-or-canceled-mutation-is-unresolved")
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-read-unavailable-and-retryable")
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-or-canceled-mutation-unresolved")
 	fixture := newCollabFixture(t, "sleep", bindAll, func(tools map[string]proto.ToolDefinition) {
 		for name, def := range tools {
 			// The canceled checkpoint keeps the default timeout, so its
@@ -804,7 +805,8 @@ func TestCollaboration_TimeoutsAndCancellation(t *testing.T) {
 
 func TestCollaboration_ACrashedOrGarbledProviderNeverReportsSuccess(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "uncertain-writes-are-unresolved", "a-crashed-mutation-is-unresolved-with-a-reconciliation")
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-crashed-mutation-unresolved-with-a-reconcile")
+	spectest.Proves(t, "collaboration/provider-contract", "invalid-answers-are-refused", "the-cli-keeps-a-provider-failure-outcome")
 	for _, mode := range []string{"crash", "garbage"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()
@@ -836,9 +838,9 @@ func TestCollaboration_ACrashedOrGarbledProviderNeverReportsSuccess(t *testing.T
 // its error message, to a URL's userinfo and to a result. None of it may reach
 // what the orchestrator emits.
 func TestCollaboration_NoCredentialReachesAnEnvelope(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "no-credential-leakage", "provider-stderr-never-reaches-an-envelope")
-	spectest.Proves(t, "cli/collaboration-providers", "no-credential-leakage", "credential-values-are-redacted")
-	spectest.Proves(t, "cli/collaboration-providers", "no-credential-leakage", "credential-settings-are-refused")
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-an-envelope", "the-cli-keeps-provider-stderr-out-of-envelopes")
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-an-envelope", "the-cli-redacts-every-credential-value")
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-a-binding", "the-cli-reports-a-credential-setting-without-echoing-it")
 	t.Setenv(collabSecretEnv, collabSecretValue)
 	for _, mode := range []string{"crash", "leak"} {
 		fixture := newCollabFixture(t, mode, bindAll, nil)

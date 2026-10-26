@@ -1,0 +1,114 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "collaboration/provider-contract",
+  "outcomes": [
+    "A provider written against the contracts passes the shared scenarios, and the CLI offers it without a change of its own.",
+    "A caller tells a refused, missing, conflicting and uncertain write apart, and knows which read settles an uncertain one.",
+    "No binding, request or envelope carries a credential."
+  ],
+  "nonGoals": [
+    "Provider discovery, routing, the RPC bridge and the CLI commands, which cli/collaboration-providers owns.",
+    "How a provider maps the contracts onto its backend.",
+    "Retrying a provider call on a caller's behalf.",
+    "A TypeScript reader of the contracts."
+  ],
+  "requirements": [
+    {
+      "id": "one-closed-catalog",
+      "text": "Each contract speaks only version 1, and an unknown contract none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers merge; memory requires checkpoint, context and mission and offers search. tasks.create, proposals.review and memory.checkpoint take an idempotencyKey."
+    },
+    {
+      "id": "well-formed-operations",
+      "text": "The catalog is sorted by contract and version, and each version lists its operations sorted and once, never capabilities. Each operation has a summary, read or mutating access and its documents; a read is never destructive, takes no precondition, and alone takes the selection."
+    },
+    {
+      "id": "strict-documents",
+      "text": "A request for an unknown contract, unsupported version or unknown operation is refused as unknown_contract, unsupported_version or unknown_operation. Trailing data, a non-object, invalid JSON or a wrong member type is parse_error, a repeated member duplicate_member and an unknown one unknown_field, at any depth, and a document above 4 MiB too_large. A bad timestamp is invalid_timestamp, a list or title above its bound too_large, a multi-line title invalid_value; an unknown document type has no validator."
+    },
+    {
+      "id": "one-fixture-corpus",
+      "text": "fixtures/expectations.json lists every valid fixture and the exact distinct codes of every invalid one. Each valid bindings, envelope, response, request and result fixture parses without error; each invalid one produces exactly its listed codes, all from the closed code list; a valid request or result re-encodes to a document that parses and encodes to the same bytes. Every code except parse_error, too_large, invalid_timestamp and invalid_declaration is produced by at least one invalid fixture."
+    },
+    {
+      "id": "schemas-track-the-go-types",
+      "text": "The JSON schemas list, for each operation's input and result and for each shared entity and envelope document, exactly the members the Go types encode, and the bindings object names exactly the contracts. Each closed vocabulary's enum equals its Go list, which is sorted. The input schema of every operation, capabilities included, is a closed object with every reference inlined, and an unknown operation has none."
+    },
+    {
+      "id": "one-outcome-per-envelope",
+      "text": "An envelope names a known contract and an operation, and an ok one its version unless it answers capabilities. An outcome other than ok carries an error and no result. current appears only on conflict and reconcile only on unresolved, where it names an operation of the same contract; ReconcileOperation returns the first catalog operation a hint names. A negative version, a nameless provider, and a capabilities result missing what its status needs or naming an unknown access or precondition rule are refused."
+    },
+    {
+      "id": "independent-bindings",
+      "text": "A bindings block binds each contract to one provider and one version on its own: an unbound contract stays unbound, and an invalid contract binding is reported under its contract's field and drops only itself. A block that is not a JSON object, repeats a member, pads a provider name, has no version, requires a required or repeated operation, has settings that are not an object, or exceeds its own or its settings' size bound is refused."
+    },
+    {
+      "id": "no-credential-in-a-binding",
+      "text": "A binding whose settings carry a credential-named member at any depth, or a URL value with a password or with any http or https user, whatever the scheme's case, is refused as credential_setting at that setting's path; an SSH account, a scp-like remote, an anonymous URL and a path are accepted. apiToken, API_KEY, api-key, Password and Authorization are credential names, repository and remote are not. The CLI reports such a binding invalid without echoing it."
+    },
+    {
+      "id": "truthful-provider-declarations",
+      "text": "A provider offers a contract version only when its tools declare each required operation once, with safety annotations and contract metadata matching its access and destructiveness, no dry-run, its precondition rule, atomic for claim, and workspaceSelection where it takes the selection. Any error withdraws that version; a tool of an unknown version draws one warning. The local, GitHub and memory providers' manifests draw no diagnostic, and the CLI answers a call to a withdrawn version unsupported."
+    },
+    {
+      "id": "serve-validates-both-sides",
+      "text": "Serve runs a handler only for a routed call the contract accepts, with its settings and operation key; a direct call or refused request is invalid and an operation without a handler unsupported. A handler that panics, returns an invalid or unencodable result, or fails with outcome ok makes a mutation unresolved, not retryable, and a read unavailable. A failure keeps its outcome, reason and message, unresolved is never retryable, a nil page is items [], and an undecodable request writes nothing."
+    },
+    {
+      "id": "bounded-documents",
+      "text": "page.size is 0 to 100 in schema and validator alike, and cursor and next share one length bound. The maximal results of tasks.get and find, proposals.find and status, memory.mission, context and checkpoint, and the maximal checkpoint request, fit the 4 MiB document bound. Serve shortens a page that would exceed it, so a traversal lists each item once with at most two handler calls per page, and answers unavailable with provider.invalid_response, after one repeat, for a handler that ignores the page size."
+    },
+    {
+      "id": "bounded-pages",
+      "text": "The CLI answers a list with no match as items [], and its pages, followed by next, end at the last one. A page above the requested size is unavailable. A list page above the 4 MiB document bound is unavailable with provider.invalid_response, not retryable, and its message asks for a page.size below the one requested; an oversized answer that is no list page, or holds a member above its own bound, gets no such advice. Every list request of the catalog carries the page the advice names."
+    },
+    {
+      "id": "absent-is-not-empty",
+      "text": "A proposal result without labels or assignees keeps them absent, and one with an empty or filled list keeps that list, through a parse and a re-encoding: absent means not reported, [] means none."
+    },
+    {
+      "id": "task-scenarios",
+      "text": "Every tasks provider passes providertest.RunTasks, which reports what it creates to Track: a label nobody carries finds items [] without next; create, get and a repeat with the same idempotencyKey give one task, and that key with other content is a conflict, idempotency.mismatch, not retryable; pages list a label's tasks once, in one order, also when the size changes; state, label and text filters match, every label required; a stale expectedRevision is a conflict; another source's reference is not_found."
+    },
+    {
+      "id": "proposal-scenarios",
+      "text": "Every proposals provider passes providertest.RunProposals, which reports what it creates to Track: a head with no proposal finds items []; upsert opens one proposal per exact base and head, a repeat updates it under a new revision, and a stale expectedRevision is a conflict; each head has its own proposal; a review repeats by its idempotencyKey, other content under it is idempotency.mismatch, and status lists it once; labels and assignees agree between answers; another source's reference is not_found."
+    },
+    {
+      "id": "memory-scenarios",
+      "text": "Every memory provider passes providertest.RunMemory: an unknown mission has no record; a mustNotExist checkpoint is created, repeated by its key, refused as idempotency.mismatch with other content and as record.exists a second time; a stale revision is revision.conflict with current; another instance resumes and repeats; of 6 concurrent checkpoints or creations exactly one lands; pages list records once at any size; a record stays in its workspace; the largest checkpoint reads back unchanged."
+    },
+    {
+      "id": "scenarios-normalize-requests",
+      "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
+    },
+    {
+      "id": "refused-before-the-provider",
+      "text": "The CLI refuses a call before it starts the provider: an optional operation the provider does not offer is unsupported with operation.unsupported, an operation the contract lacks or a request it refuses is invalid with request.invalid, and expectedRevision or mustNotExist sent to a provider whose operation declares preconditions none is unsupported with precondition.unsupported, never dropped. It recognizes every precondition member of the catalog, and no operation that takes none carries one."
+    },
+    {
+      "id": "exact-identity",
+      "text": "A result is about what the request named. The CLI answers unavailable a read that answers for another task, proposal, head or mission, or with a state or kind outside its filter; and unresolved, not retryable, with a reconcile, a mutation that does: an update or upsert for another item, head or head commit, a transition to another state, a claim for another holder or still held after release, a review of another commit, a merge that did not merge, or a checkpoint that kept its revision."
+    },
+    {
+      "id": "uncertain-writes-are-unresolved",
+      "text": "A provider that cannot start is unavailable, not retryable. A read that times out or is canceled, or a call stopped before its provider starts, is unavailable and retryable. A mutation whose provider started, then timed out, was canceled, failed or wrote no valid answer is unresolved, not retryable, and its reconcile names a read or the keyed repeat; a read whose provider failed or wrote no valid answer is unavailable, not retryable."
+    },
+    {
+      "id": "invalid-answers-are-refused",
+      "text": "The CLI refuses a provider answer the contract refuses, with provider.invalid_response: two answer blocks, or a read answering conflict, make the read unavailable; an isError that contradicts the outcome, or an invalid result, makes a mutation unresolved. A provider that answers a failure keeps its outcome."
+    },
+    {
+      "id": "no-credential-in-an-envelope",
+      "text": "The CLI keeps provider standard error out of every envelope. It removes from every message and result each credential-named environment value the provider inherits and any URL userinfo, matching the decoded value whatever its JSON spelling, keeping member order, and leaving a result without the secret unchanged. A result it cannot redact in place is withheld: unavailable for a read, unresolved for a write."
+    },
+    {
+      "id": "callers-never-repeat-an-unresolved-write",
+      "text": "A caller does not repeat a write answered unresolved: putnami change finalize sends a proposal upsert answered unresolved once, then stops with an error before any dependent write, such as a task transition."
+    }
+  ],
+  "decisions": [
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
+    "protocols/collaboration/doc/adr/0002-the-contracts-are-published-as-preview.md"
+  ]
+}

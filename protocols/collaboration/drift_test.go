@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 type schemaNode struct {
@@ -81,6 +83,7 @@ func goMembers(typ reflect.Type) []string {
 // TestDrift_OperationSchemasMatchGoTypes holds every operation's request and
 // result schema on the member set of its Go type, in both directions.
 func TestDrift_OperationSchemasMatchGoTypes(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "schemas-track-the-go-types", "operation-schemas-match-the-go-types")
 	common := readSchemaNode(t, CommonSchemaFile)
 	for _, spec := range Catalog() {
 		document := readSchemaNode(t, ContractSchemaFile(spec.Name, spec.Version))
@@ -108,6 +111,7 @@ func TestDrift_OperationSchemasMatchGoTypes(t *testing.T) {
 // TestDrift_EntitySchemasMatchGoTypes pins the shared entities and the
 // envelope documents.
 func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "schemas-track-the-go-types", "entity-schemas-match-the-go-types")
 	common := readSchemaNode(t, CommonSchemaFile)
 	tasks := readSchemaNode(t, ContractSchemaFile(ContractTasks, 1))
 	proposals := readSchemaNode(t, ContractSchemaFile(ContractProposals, 1))
@@ -161,6 +165,7 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 // TestDrift_EnumsMatchGoVocabularies keeps every closed vocabulary on one
 // member set.
 func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "schemas-track-the-go-types", "enums-match-the-go-vocabularies")
 	common := readSchemaNode(t, CommonSchemaFile)
 	tasks := readSchemaNode(t, ContractSchemaFile(ContractTasks, 1))
 	proposals := readSchemaNode(t, ContractSchemaFile(ContractProposals, 1))
@@ -197,6 +202,7 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 // ones the Go validator enforces, so a client that validates a request against
 // the schema accepts exactly what the orchestrator accepts.
 func TestDrift_PageBoundsMatchTheValidator(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-documents", "page-bounds-match-the-schema")
 	common := readSchemaNode(t, CommonSchemaFile)
 	size := common.Defs["pageRequest"].Properties["size"]
 	bound := func(name string, got *int, want int) {

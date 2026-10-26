@@ -52,6 +52,7 @@ func readOffer(t *testing.T) collab.ProviderOffer {
 // orchestrator reads: the provider offers exactly the operations this runtime
 // answers, through the runtime's provider bridge.
 func TestTheManifestPassesBothGates(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-github-provider-manifest-draws-no-diagnostic")
 	spectest.Proves(t, feature, "truthful-manifest", "the-manifest-passes-both-gates")
 	offer := readOffer(t)
 	if !slices.Equal(offer.Versions(collab.ContractTasks), []int{1}) || !slices.Equal(offer.Versions(collab.ContractProposals), []int{1}) ||
