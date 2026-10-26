@@ -47,7 +47,7 @@ func exitCodeFixture(aborted bool, statuses ...string) *jobs.SessionResult {
 
 func TestSessionExitCode_DerivesFromTheCanonicalReduction(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "session-exit-derives-from-the-canonical-reduction")
+	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "the-cli-session-exit-code-follows-the-run-verdict")
 	for _, test := range []struct {
 		name    string
 		session *jobs.SessionResult
@@ -106,7 +106,7 @@ func TestSessionExitCode_ForwardsRunWorkloadCode(t *testing.T) {
 // earlier change unified the success rule.
 func TestSessionExitCode_ReusedFailureStillFails(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "session-exit-derives-from-the-canonical-reduction")
+	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "the-cli-session-exit-code-follows-the-run-verdict")
 	job := makeExitCodeJob(0)
 	results := map[string]*jobs.JobResult{
 		job.Key(): {Status: "failed", CacheHit: true, Reuse: jobs.ReuseLocalCache},

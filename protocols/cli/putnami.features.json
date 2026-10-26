@@ -22,7 +22,9 @@
             "checks": [
               "the-exit-code-values-stay-fixed",
               "errors-classify-to-exit-codes",
-              "the-innermost-suggested-next-wins"
+              "the-innermost-suggested-next-wins",
+              "the-cli-maps-each-error-class-to-its-exit-code",
+              "the-cli-reports-an-interrupt-as-aborted-with-exit-130"
             ]
           }
         },
@@ -108,7 +110,8 @@
               "every-surface-shares-one-run-summary",
               "a-task-identity-derives-its-key",
               "the-typescript-strict-verdict-gates-run-success",
-              "the-typescript-aborted-run-keeps-failures-visible"
+              "the-typescript-aborted-run-keeps-failures-visible",
+              "the-cli-session-exit-code-follows-the-run-verdict"
             ]
           }
         },
@@ -161,7 +164,9 @@
               "the-typescript-two-mode-budgets-are-fixed",
               "the-typescript-failure-priority-is-classified",
               "the-typescript-controls-strip-and-member-names-remain",
-              "the-typescript-every-credential-family-is-redacted"
+              "the-typescript-every-credential-family-is-redacted",
+              "the-cli-stream-suppresses-debug-detail-in-normal-mode-and-admits-it-in-verbose",
+              "the-cli-stream-keeps-failure-capacity-after-the-ordinary-budget-is-spent"
             ]
           }
         },
