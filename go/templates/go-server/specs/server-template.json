@@ -15,11 +15,11 @@
   "requirements": [
     {
       "id": "a-rendered-project-builds",
-      "text": "A project rendered from go-server passes go vet and go build with the network off. Its go.work lists this repository's modules, so the framework modules its go.mod requires resolve to this repository's source."
+      "text": "A project rendered from go-server passes go vet and go build with the network off."
     },
     {
       "id": "a-rendered-project-passes-its-tests",
-      "text": "A project rendered from go-server ships a test that starts the application and reads its operational endpoints, and go test passes in it with the network off."
+      "text": "A project rendered from go-server ships TestHealthEndpoint, a test that starts the application and reads its operational endpoints, and go test runs it and passes with the network off."
     },
     {
       "id": "a-rendered-project-passes-lint",

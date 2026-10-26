@@ -18,7 +18,7 @@
     },
     {
       "id": "a-rendered-project-passes-its-tests",
-      "text": "A project rendered from go-library ships a test beside an exported function, and go test passes in it with the network off."
+      "text": "A project rendered from go-library ships TestHello, a test of its exported Hello function, and go test runs it and passes with the network off."
     },
     {
       "id": "a-rendered-project-passes-lint",

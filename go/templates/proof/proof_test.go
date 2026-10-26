@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"go/version"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -87,7 +88,7 @@ func TestGoLibraryTemplateBuilds(t *testing.T) {
 
 func TestGoLibraryTemplatePassesItsTests(t *testing.T) {
 	spectest.Proves(t, "go/library-template", "a-rendered-project-passes-its-tests", "go-test-passes")
-	goTest(t, renderProject(t, "go-library"))
+	goTest(t, renderProject(t, "go-library"), "TestHello")
 }
 
 func TestGoLibraryTemplatePassesLint(t *testing.T) {
@@ -102,7 +103,7 @@ func TestGoServerTemplateBuilds(t *testing.T) {
 
 func TestGoServerTemplatePassesItsTests(t *testing.T) {
 	spectest.Proves(t, "go/server-template", "a-rendered-project-passes-its-tests", "go-test-passes")
-	goTest(t, renderProject(t, "go-server"))
+	goTest(t, renderProject(t, "go-server"), "TestHealthEndpoint")
 }
 
 func TestGoServerTemplatePassesLint(t *testing.T) {
@@ -372,10 +373,28 @@ func vetAndBuild(t *testing.T, p renderedProject) {
 	runGo(t, p.dir, p.env, "build", "./...")
 }
 
-// goTest runs the tests p ships.
-func goTest(t *testing.T, p renderedProject) {
+// goTest runs the tests p ships and fails unless each test in want reports a
+// pass: go test also exits 0 on a package without test files.
+func goTest(t *testing.T, p renderedProject, want ...string) {
 	t.Helper()
-	runGo(t, p.dir, p.env, "test", "-count=1", "./...")
+	passed := map[string]bool{}
+	dec := json.NewDecoder(strings.NewReader(runGo(t, p.dir, p.env, "test", "-count=1", "-json", "./...")))
+	for {
+		var event struct{ Action, Test string }
+		if err := dec.Decode(&event); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			t.Fatalf("go test -json: %v", err)
+		}
+		if event.Action == "pass" && event.Test != "" {
+			passed[event.Test] = true
+		}
+	}
+	for _, name := range want {
+		if !passed[name] {
+			t.Errorf("go test reported no pass for %s", name)
+		}
+	}
 }
 
 // lintControl holds the verdict of checkLintControl. It runs once per test
