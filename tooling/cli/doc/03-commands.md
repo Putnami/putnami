@@ -1699,6 +1699,13 @@ priority events together spend it (see
 [Output and Rendering](08-output-and-rendering.md)). [`putnami compose`](../../dev/doc/01-workload-qualification.md#compose)
 starts each member as such a run.
 
+A supervisor stops the run with `SIGTERM`. On Unix, the run also watches the
+process that started it: once that process exits, even killed outright, the run
+notices within a second and stops as `SIGTERM` stops it, so its serve steps do
+not outlive their supervisor. A write to a stdout or stderr whose reader is gone
+fails instead of ending the run. On Windows, putnami's Job Object ends the
+supervisor's process tree, the run included.
+
 ### Structured output
 
 `--output=jsonl` and `--output=json` are accepted only by the commands that
