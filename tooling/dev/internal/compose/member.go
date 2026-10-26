@@ -167,8 +167,9 @@ type memberRuntime struct {
 	stepVerdict bool
 	prepareErr  string
 	// stepOutput is the log of each step that ran before the serve step
-	// started, dropped once the serve step started. failedOutput is the output of the step that failed the
-	// preparation: its log, diagnostics and error.
+	// started, dropped once the serve step started. failedOutput is the
+	// output of the step that failed the preparation: its log, diagnostics
+	// and error.
 	stepOutput   map[string][]string
 	failedOutput []string
 	failedStep   bool
@@ -632,7 +633,7 @@ func (rt *memberRuntime) notReady(id string) error {
 	case <-rt.prepareFailed:
 		rt.mu.Lock()
 		message := rt.prepareErr
-		output := rt.preparationOutput()
+		output := lastLines(rt.preparationOutput(), maxDetailLines)
 		rt.mu.Unlock()
 		err := newError(CodePrepareFailed, id, PhasePrepare, message)
 		err.Detail = output

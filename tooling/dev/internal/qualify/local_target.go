@@ -28,8 +28,8 @@ type LocalOptions struct {
 	// Logs receives the members' serve logs, the text each member's serve run
 	// renders on stderr; nil discards them.
 	Logs io.Writer
-	// Failures receives the text a member's serve run rendered before a
-	// preparation that failed; nil reports none.
+	// Failures receives the report of a preparation that failed: the failed
+	// step's output from the session stream; nil reports none.
 	Failures io.Writer
 	// Verbose, Quiet and NoColor shape the text each member's serve run
 	// renders, as its --verbose, --quiet and --no-color.
