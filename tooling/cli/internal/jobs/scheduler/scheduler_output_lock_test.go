@@ -230,6 +230,26 @@ func (f *outputRaceFixture) awaitFirstStarted(t *testing.T, first <-chan *Schedu
 	}
 }
 
+// awaitServeKeysReleased blocks until the serving step announced its process
+// group. serveStepStarted emits that event right after it releases the step's
+// serve keys, so the release has happened once the event is recorded. The
+// child process writes the start FIFO earlier, before the scheduler returns
+// from the spawn, so the FIFO alone does not prove the release.
+func awaitServeKeysReleased(t *testing.T, s *Scheduler, serving *ScheduledJob) {
+	t.Helper()
+	renderer, ok := s.renderer.(*mockRenderer)
+	if !ok {
+		t.Fatalf("scheduler renderer is %T, want *mockRenderer", s.renderer)
+	}
+	deadline := time.Now().Add(answerWaitBudget)
+	for len(renderer.eventsOfType(serving.Key(), EventTypeProcess)) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the serving step never announced its process group")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // awaitSecondWaits blocks until the second session reports that it waits for
 // the first session's output lock, and fails when it finished without waiting —
 // which is exactly the race: it wrote while the first execution was writing.
@@ -481,8 +501,10 @@ func TestScheduler_AFiniteStepRunsBesideAnotherSessionsServeStep(t *testing.T) {
 	defer cancel()
 
 	serving := f.serveJob("serve~serve", f.servingScript(t), nil)
-	first := runAsync(ctx, f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, serving))
+	firstScheduler := f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, serving)
+	first := runAsync(ctx, firstScheduler)
 	f.awaitFirstStarted(t, first)
+	awaitServeKeysReleased(t, firstScheduler, serving)
 
 	waits := make(chan string, 1)
 	generate := f.serveJob("serve~generate", f.serveGenerateScript(t, "b"), serveGenerateOutputs())
