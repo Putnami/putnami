@@ -632,15 +632,19 @@ describe('generateProjectClients (TypeScript)', () => {
       check: 'an-existing-putnami-json-is-kept-byte-for-byte',
     },
     () => {
-      const existing = '{"name":"@example/items-client","tags":["hand-edited"]}\n';
+      const existing = '{"name":"@example/widgets-client","tags":["hand-edited"]}\n';
       const root = setupProject({
-        '.gen/clientgen/config.json': TS_CONFIG,
-        'schema/openapi.json': MINIMAL_SPEC,
+        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
+        '.gen/schema/openapi.json': firstPartySpec(),
         'clients/ts/putnami.json': existing,
       });
 
-      expect(generateProjectClients(root).generated).toBe(true);
+      const result = generateProjectClients(root);
+      expect(result.generated).toBe(true);
       expect(readFileSync(join(root, 'clients/ts/putnami.json'), 'utf8')).toBe(existing);
+      const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
+      expect(manifest.files.map((file: { path: string }) => file.path)).not.toContain('putnami.json');
+      expect(result.files).not.toContain('clients/ts/putnami.json');
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );

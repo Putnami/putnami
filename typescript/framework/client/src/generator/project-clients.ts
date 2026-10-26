@@ -77,10 +77,10 @@ interface GeneratedClientManifest {
 const MANIFEST_FILE = 'client.putnami.json';
 
 /**
- * The project document that makes the client directory a workspace project.
- * Generation writes it only when the directory has none; the workspace owns it
- * after that, so no run rewrites it and the manifest never lists it
- * (protocols/extension ADR 0005).
+ * The client's project document: its Putnami name, tags, extensions and
+ * feature authority. Generation writes it only when the directory has none;
+ * the workspace owns it after that, so no run rewrites it and the manifest
+ * never lists it (protocols/extension ADR 0005).
  */
 const PROJECT_FILE = 'putnami.json';
 
@@ -101,7 +101,8 @@ const PROJECT_FILE = 'putnami.json';
  * mediated entirely through the shared spec artifact.
  *
  * When the output directory has no `putnami.json`, it also writes one, as the
- * Go emitter does for a Go client, so a new client is a workspace project.
+ * Go emitter does for a Go client, so a new client declares its feature
+ * authority.
  *
  * Returns `generated: false` (no throw) when the project has no clientgen
  * contract, the ts target is disabled, or the spec exposes no services, so
