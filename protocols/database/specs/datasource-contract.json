@@ -1,0 +1,57 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "database/datasource-contract",
+  "outcomes": [
+    "A workload with several datasources is modeled by construction, with no single-DSN convention",
+    "No secret can reach the infra requirements, because a requirement has no member that could carry one",
+    "Go and TypeScript code reach a datasource by its logical name, whatever transport the deployer chose"
+  ],
+  "nonGoals": [
+    "Opening a connection or importing a driver: the framework database adapters build the driver from a binding",
+    "Applying migrations at startup: the migration protocol owns that",
+    "Docker auto-provisioning for mode auto, which no provider implements yet",
+    "The TypeScript adapter and test provider of @putnami/database, which read the same shapes under their own tests"
+  ],
+  "requirements": [
+    {
+      "id": "a-requirement-carries-no-secret",
+      "text": "A requirement manifest names each datasource's engine and schema and has no connection member, so strict parsing refuses one and no host, user, password or DSN can reach a requirement. Every requirement fixture gets its verdict."
+    },
+    {
+      "id": "a-binding-resolves-each-datasource",
+      "text": "A binding gives each logical datasource its engine, its schema and a connection, and a datasource without a connection is refused. Every binding fixture gets its verdict, and a valid binding survives a marshal and a re-parse unchanged."
+    },
+    {
+      "id": "a-connection-declares-exactly-one-transport",
+      "text": "A connection selects exactly one transport: a self-contained dsn; a TCP host with its port, database, user, password, ssl and params; or a cloud socket instance with its database, user, password and params. No transport, two transports, or a member of another transport is refused."
+    },
+    {
+      "id": "a-test-binding-adds-a-closed-policy",
+      "text": "A test binding is a binding plus a policy: mode skip, require or auto; isolation database or schema; reuse none or bundle-template; and the applyMigrations and keepDatabases flags. The engine is postgres. A value outside a set is refused, and every test binding fixture gets its verdict."
+    },
+    {
+      "id": "the-shapes-parse-strictly",
+      "text": "The three shapes parse strictly. Malformed JSON, an unknown member, a protocolVersion other than 1, an invalid datasource name or schema, a missing engine, schema or connection, and a nil document are refused, each with an error code under database."
+    },
+    {
+      "id": "the-projection-is-secret-free-and-sorted",
+      "text": "Project flattens a requirement manifest into a name, an engine and schemas per datasource, sorted by datasource name, and adds no implicit schema. It is the only shape protocol/infra aggregates."
+    },
+    {
+      "id": "the-schemas-and-the-go-types-agree",
+      "text": "The requirement, binding and test binding schemas carry exactly the members of the Go types, connection included, require what the Go validators require, and pin protocolVersion to the Go constant."
+    },
+    {
+      "id": "the-go-adapter-reads-the-binding",
+      "text": "The Go database adapter reads bindings through this module. It builds a named datasource's pool from its one transport, refuses a binding the protocol refuses, resolves the DATABASE_BINDINGS document and falls through when it is unset, and derives its infra entry through the projection."
+    },
+    {
+      "id": "the-go-test-provider-reads-the-test-binding",
+      "text": "The Go test provider reads a test binding through this module: an absent binding follows the mode, which defaults to require. It isolates each datasource by database or by schema, and it passes the datasource selection corpus in conformance/test-provider-datasources.json, provisioning only the datasources a suite names."
+    }
+  ],
+  "decisions": [
+    "protocols/database/doc/adr/0001-one-database-contract-with-a-secret-free-projection.md"
+  ]
+}

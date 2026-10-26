@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "transaction/unit-of-work-contract#a-pack-names-the-corpus",
+    "transaction/unit-of-work-contract#exactly-one-outcome-is-retryable",
+    "transaction/unit-of-work-contract#one-behavioral-corpus-for-every-runner",
+    "transaction/unit-of-work-contract#the-go-adapter-answers-with-an-outcome",
+    "transaction/unit-of-work-contract#the-schemas-and-the-go-types-agree",
+    "transaction/unit-of-work-contract#the-serialization-is-canonical",
+    "transaction/unit-of-work-contract#the-shapes-parse-strictly"
+  ]
+}

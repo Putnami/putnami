@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_Requirements parses + validates every fixture under
 // fixtures/requirement: those in valid/ must produce no errors, those in
 // invalid/ must produce at least one.
 func TestConformance_Requirements(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "a-requirement-carries-no-secret", "every-requirement-fixture-gets-its-verdict")
 	runConformance(t, "fixtures/requirement", func(data []byte) []diag.Diagnostic {
 		_, diags := ParseAndValidateRequirementManifest(data)
 		return diags
@@ -20,6 +22,7 @@ func TestConformance_Requirements(t *testing.T) {
 
 // TestConformance_Bindings does the same for fixtures/binding.
 func TestConformance_Bindings(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "a-binding-resolves-each-datasource", "every-binding-fixture-gets-its-verdict")
 	runConformance(t, "fixtures/binding", func(data []byte) []diag.Diagnostic {
 		_, diags := ParseAndValidateBinding(data)
 		return diags
@@ -28,6 +31,7 @@ func TestConformance_Bindings(t *testing.T) {
 
 // TestConformance_TestBindings does the same for fixtures/test-binding.
 func TestConformance_TestBindings(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "a-test-binding-adds-a-closed-policy", "every-test-binding-fixture-gets-its-verdict")
 	runConformance(t, "fixtures/test-binding", func(data []byte) []diag.Diagnostic {
 		_, diags := ParseAndValidateTestBinding(data)
 		return diags

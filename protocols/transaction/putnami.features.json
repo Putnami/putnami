@@ -1,0 +1,117 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "transaction",
+  "features": [
+    {
+      "id": "transaction/unit-of-work-contract",
+      "type": "feature",
+      "name": "Unit-of-work contract",
+      "outcome": "Code in any language describes how a unit of work runs and reads its result as one closed outcome, so every caller switches on the same four outcomes and retries only what the contract marks retryable",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-shapes-parse-strictly",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-wire-fixture-gets-its-verdict",
+              "every-validator-code-is-registered"
+            ]
+          }
+        },
+        {
+          "id": "exactly-one-outcome-is-retryable",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-a-serialization-failure-is-retryable"
+            ]
+          }
+        },
+        {
+          "id": "the-serialization-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-bytes-are-stable",
+              "the-golden-pins-the-bytes",
+              "a-parsed-fixture-reserializes-to-itself"
+            ]
+          }
+        },
+        {
+          "id": "the-schemas-and-the-go-types-agree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-members-match-the-go-types",
+              "the-schemas-require-and-pin-what-go-requires",
+              "the-schema-enums-match-the-go-enums"
+            ]
+          }
+        },
+        {
+          "id": "one-behavioral-corpus-for-every-runner",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-corpus-holds-the-required-scenarios",
+              "the-corpus-validator-refuses-each-broken-shape",
+              "the-corpus-schema-matches-the-go-enums"
+            ]
+          }
+        },
+        {
+          "id": "a-pack-names-the-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-pack-is-stable-and-resolves"
+            ]
+          }
+        },
+        {
+          "id": "the-go-adapter-answers-with-an-outcome",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-classifier-maps-postgres-errors-to-outcomes",
+              "the-helpers-return-an-outcome",
+              "a-rotation-is-one-outcome-for-two-writes"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

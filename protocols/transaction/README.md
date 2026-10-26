@@ -156,17 +156,16 @@ with the Go types by `drift_test.go`; the corpus under [`fixtures/`](fixtures)
   — why `Outcome` is a closed enum and why the `retryable` advisory is validated
   against it instead of being caller-supplied.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is a contract between application code and a transaction runner; what a
-developer experiences is `WithTx` / `runInTransaction` and the CAS,
-consume-once, and rotate helpers in the framework database packages. Per the
-spec contract in [`protocols/features`](../features/README.md) a spec details an
-already-authored feature and never mints one, so the durable design intent lives
-in [`doc/adr/0001-closed-outcome-taxonomy.md`](doc/adr/0001-closed-outcome-taxonomy.md).
-A product feature that later owns transactional data access links to that record
-rather than restating it.
+The module owns the feature of its contract, `transaction/unit-of-work-contract`,
+specified in [`specs/unit-of-work-contract.json`](specs/unit-of-work-contract.json).
+The tests here prove its requirements, and so does the Go database framework
+(`go/framework/database`), whose compare-and-set, consume-once and rotate
+helpers answer with these outcomes. `WithTx`, `runInTransaction` and the
+framework database packages keep the features of what they deliver. The design
+intent lives in
+[`doc/adr/0001-closed-outcome-taxonomy.md`](doc/adr/0001-closed-outcome-taxonomy.md).
 
 ## Support
 

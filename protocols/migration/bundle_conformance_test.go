@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // tamperFS wraps a base filesystem and overrides the bytes returned for a
@@ -31,6 +32,7 @@ func (t tamperFS) ReadFile(name string) ([]byte, error) {
 // TestConformance_ValidBundleFixtures asserts every golden bundle under
 // fixtures/valid parses and validates with no errors.
 func TestConformance_ValidBundleFixtures(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "every-bundle-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -59,6 +61,7 @@ func TestConformance_ValidBundleFixtures(t *testing.T) {
 // TestConformance_InvalidBundleFixtures asserts every golden bundle under
 // fixtures/invalid is rejected at parse or validate time.
 func TestConformance_InvalidBundleFixtures(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "every-bundle-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +92,7 @@ func TestConformance_InvalidBundleFixtures(t *testing.T) {
 // the manifest validates, its declared digest matches, and every payload file
 // hashes to the pinned reference.
 func TestConformance_PayloadTree(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
 	root := "fixtures/payload-tree"
 	data, err := os.ReadFile(filepath.Join(root, BundleFileName))
 	if err != nil {
@@ -122,6 +126,7 @@ func TestConformance_PayloadTree(t *testing.T) {
 // TestConformance_PayloadTree_TamperDetected confirms payload verification
 // fails loudly when an on-disk payload no longer matches its pinned hash.
 func TestConformance_PayloadTree_TamperDetected(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
 	root := "fixtures/payload-tree"
 	data, err := os.ReadFile(filepath.Join(root, BundleFileName))
 	if err != nil {

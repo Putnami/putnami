@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // goldenBundleDigest pins the bundle digest of fixtures/equivalence/bundle.golden.json.
@@ -27,6 +28,7 @@ const goldenBundleDigest = "6533cedd09aa95f9622ec420f675782c4ad34a7646702ed7ba9a
 const goldenCompatibleBundleDigest = "2884a81ce4de0e7e28f776b46c370c3ec1c7bbd1cb1bf2c8149ce61e2c23a2bc"
 
 func TestCrossLanguage_BundleDigest(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-is-identical-across-languages", "the-golden-digests-are-pinned")
 	data, err := os.ReadFile("fixtures/equivalence/bundle.golden.json")
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +46,7 @@ func TestCrossLanguage_BundleDigest(t *testing.T) {
 }
 
 func TestCrossLanguage_CompatibleBundleDigest(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-is-identical-across-languages", "the-golden-digests-are-pinned")
 	data, err := os.ReadFile("fixtures/equivalence/bundle-compatible.golden.json")
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "database",
+  "features": [
+    {
+      "id": "database/datasource-contract",
+      "type": "feature",
+      "name": "Datasource contract",
+      "outcome": "A workload declares its databases by logical name with no secret, a deployer answers with one resolved connection per datasource, and a test run asks for isolated, migrated databases, through the same three shapes in every language",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "a-requirement-carries-no-secret",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-requirement-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "a-binding-resolves-each-datasource",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-binding-fixture-gets-its-verdict",
+              "a-binding-round-trips"
+            ]
+          }
+        },
+        {
+          "id": "a-connection-declares-exactly-one-transport",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-transport-rule-holds-for-each-shape"
+            ]
+          }
+        },
+        {
+          "id": "a-test-binding-adds-a-closed-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-test-binding-fixture-gets-its-verdict",
+              "the-enums-are-closed"
+            ]
+          }
+        },
+        {
+          "id": "the-shapes-parse-strictly",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-refusal-has-its-code"
+            ]
+          }
+        },
+        {
+          "id": "the-projection-is-secret-free-and-sorted",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-projection-is-sorted-and-adds-nothing"
+            ]
+          }
+        },
+        {
+          "id": "the-schemas-and-the-go-types-agree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-members-match-the-go-types",
+              "the-schemas-require-and-pin-what-go-requires"
+            ]
+          }
+        },
+        {
+          "id": "the-go-adapter-reads-the-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-adapter-builds-a-pool-from-each-transport",
+              "the-adapter-refuses-what-the-protocol-refuses",
+              "the-adapter-resolves-the-injected-binding",
+              "the-adapter-derives-infra-through-the-projection"
+            ]
+          }
+        },
+        {
+          "id": "the-go-test-provider-reads-the-test-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-provider-parses-the-binding-and-honors-the-mode",
+              "the-provider-isolates-each-datasource",
+              "the-provider-passes-the-selection-corpus"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/app"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
 )
 
@@ -163,6 +164,7 @@ func TestEffectivePoolConfig_NoDatasourceUsesPool(t *testing.T) {
 // projection bridge: a single {name, engine} entry, with the schema left to the
 // runtime binding and migration sources.
 func TestPluginDescribe_DatasourceDerivesInfraViaBridge(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-derives-infra-through-the-projection")
 	out := t.TempDir()
 	p := NewPlugin(PluginConfig{Datasource: "auth"})
 

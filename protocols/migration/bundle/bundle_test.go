@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // memFS is an in-memory WriteFS for round-trip tests (no disk).
@@ -50,6 +52,7 @@ func sampleBundle() fstest.MapFS {
 }
 
 func TestPackUnpackRoundTrip(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
 	src := sampleBundle()
 	tarball, err := Pack(src)
 	if err != nil {
@@ -76,6 +79,7 @@ func TestPackUnpackRoundTrip(t *testing.T) {
 }
 
 func TestPackIsDeterministic(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
 	// Two independently-built maps with the same content must pack identically,
 	// so the blob digest is stable across rebuilds (idempotent re-publish).
 	a, err := Pack(sampleBundle())
@@ -92,6 +96,7 @@ func TestPackIsDeterministic(t *testing.T) {
 }
 
 func TestPackPropagatesFilesystemErrors(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "a-filesystem-error-surfaces")
 	if _, err := Pack(failingFS{}); !errors.Is(err, errTestIO) {
 		t.Fatalf("walk error = %v, want %v", err, errTestIO)
 	}
@@ -105,6 +110,7 @@ func TestPackPropagatesFilesystemErrors(t *testing.T) {
 }
 
 func TestUnpackRejectsTraversal(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "unpacking-refuses-an-unsafe-entry")
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 	_ = tw.WriteHeader(&tar.Header{Name: "../escape.sql", Mode: 0o600, Size: 3})
@@ -117,6 +123,7 @@ func TestUnpackRejectsTraversal(t *testing.T) {
 }
 
 func TestUnpackRejectsAbsolute(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "unpacking-refuses-an-unsafe-entry")
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 	_ = tw.WriteHeader(&tar.Header{Name: "/etc/passwd", Mode: 0o600, Size: 1})
@@ -133,6 +140,7 @@ func TestUnpackRejectsAbsolute(t *testing.T) {
 }
 
 func TestUnpackAcceptsDirectoryEntry(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 	if err := tw.WriteHeader(&tar.Header{Name: "payload/", Typeflag: tar.TypeDir, Mode: 0o750}); err != nil {
@@ -158,6 +166,7 @@ func TestUnpackAcceptsDirectoryEntry(t *testing.T) {
 }
 
 func TestUnpackRejectsUnsupportedEntry(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "unpacking-refuses-an-unsafe-entry")
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 	if err := tw.WriteHeader(&tar.Header{Name: "payload/link", Typeflag: tar.TypeSymlink, Linkname: "target"}); err != nil {
@@ -173,6 +182,7 @@ func TestUnpackRejectsUnsupportedEntry(t *testing.T) {
 }
 
 func TestUnpackPropagatesReadAndWriteErrors(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "a-filesystem-error-surfaces")
 	if err := Unpack([]byte("not a tar archive"), memFS{}); err == nil {
 		t.Fatal("Unpack must reject a malformed tar archive")
 	}
@@ -195,6 +205,7 @@ func TestUnpackPropagatesReadAndWriteErrors(t *testing.T) {
 }
 
 func TestSafeRelNormalizesAndRejectsUnsafeNames(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "unpacking-refuses-an-unsafe-entry")
 	for _, name := range []string{"", ".", "/", "../escape", `..\escape`} {
 		if _, err := safeRel(name); err == nil {
 			t.Errorf("safeRel(%q) must fail", name)
@@ -217,6 +228,7 @@ func TestSafeRelNormalizesAndRejectsUnsafeNames(t *testing.T) {
 }
 
 func TestUnpackToDirRoundTrip(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
 	tarball, err := Pack(sampleBundle())
 	if err != nil {
 		t.Fatalf("pack: %v", err)
@@ -235,6 +247,7 @@ func TestUnpackToDirRoundTrip(t *testing.T) {
 }
 
 func TestUnpackToDirPropagatesFilesystemErrors(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "a-filesystem-error-surfaces")
 	root := t.TempDir()
 	blocked := filepath.Join(root, "blocked")
 	if err := os.WriteFile(blocked, []byte("file"), 0o600); err != nil {
@@ -268,6 +281,7 @@ func keys(m memFS) []string {
 }
 
 func TestPackageNameSlugsPathStyleAppNames(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "a-name-holds-one-registry-segment")
 	// Application names are path-style, but a registry package name is a
 	// single path segment.
 	for app, want := range map[string]string{
@@ -282,6 +296,7 @@ func TestPackageNameSlugsPathStyleAppNames(t *testing.T) {
 }
 
 func TestFixtureValidBundlePacksDeterministically(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
 	root := filepath.Join("testdata", "valid")
 	first, err := Pack(os.DirFS(root))
 	if err != nil {
@@ -315,6 +330,7 @@ func TestFixtureValidBundlePacksDeterministically(t *testing.T) {
 // becomes one registry path segment, so a value that adds a segment, climbs out
 // of one, or carries upper case is refused rather than normalized.
 func TestValidNamespaceHoldsOneSegmentBothSidesCanAddress(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "a-name-holds-one-registry-segment")
 	for _, ok := range []string{Namespace, "acme", "acme-corp", "acme.corp", "acme_corp", "a", "0acme", strings.Repeat("a", 128)} {
 		if !ValidNamespace(ok) {
 			t.Errorf("ValidNamespace(%q) = false, want true", ok)

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/migration"
+	"go.putnami.dev/protocol/features/spectest"
 	protocolmigration "go.putnami.dev/protocol/migration"
 )
 
@@ -34,6 +35,7 @@ func writeRoundTripBundle(t *testing.T, sources ...SQLSource) string {
 }
 
 func TestLoadBundleSources_RoundTripsEmission(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-go-sql-runner-emits-and-loads-bundles", "a-written-bundle-loads-back-exactly")
 	root := writeRoundTripBundle(t,
 		NewSQLSource("iam", Datasource{}, nil,
 			Definition{Name: "0001_create_users", SQL: "CREATE TABLE iam.users (id uuid primary key);", Down: "DROP TABLE iam.users;"},
@@ -93,6 +95,7 @@ func TestLoadBundleSources_RoundTripsEmission(t *testing.T) {
 }
 
 func TestLoadBundleSources_RoundTripsDeclaredSchema(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-go-sql-runner-emits-and-loads-bundles", "a-written-bundle-loads-back-exactly")
 	// One migration shape under several schema-owning datasources, plus a
 	// schema-less source. The schema must survive emit → write → load so the
 	// applied bundle sets it as the search_path (the "one bundle → many schemas"
@@ -130,6 +133,7 @@ func TestLoadBundleSources_RoundTripsDeclaredSchema(t *testing.T) {
 }
 
 func TestLoadBundleSources_RejectsTamperedPayload(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-go-sql-runner-emits-and-loads-bundles", "a-written-bundle-loads-back-exactly")
 	root := writeRoundTripBundle(t,
 		NewSQLSource("iam", Datasource{}, nil,
 			Definition{Name: "0001_init", SQL: "CREATE SCHEMA iam;"},

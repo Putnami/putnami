@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestDefaultContract(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "startup-and-reliability-are-contract-defaults", "the-default-contract-holds-every-guarantee")
 	c := DefaultContract()
 
 	if c.Version != ProtocolVersion {
@@ -36,12 +38,14 @@ func TestDefaultContract(t *testing.T) {
 }
 
 func TestQualifiedStateTable(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-state-store-is-canonical", "the-state-table-and-its-columns-are-pinned")
 	if got, want := QualifiedStateTable(), "migration.migrations"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
 
 func TestCanonicalID(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-migration-is-identified-by-datasource-and-name", "the-canonical-id-is-datasource-scoped")
 	if got, want := CanonicalID("", "20260101000000-init"), "default:20260101000000-init"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
@@ -51,6 +55,7 @@ func TestCanonicalID(t *testing.T) {
 }
 
 func TestValidateDefinition(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "definitions-are-validated", "a-definition-is-valid-or-refused")
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	downHash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	def := Definition{
@@ -69,6 +74,7 @@ func TestValidateDefinition(t *testing.T) {
 }
 
 func TestValidateDefinition_NamespaceRoundTrip(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "definitions-are-validated", "a-definition-is-valid-or-refused")
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	def := Definition{
 		Datasource: "default",
@@ -90,6 +96,7 @@ func TestValidateDefinition_NamespaceRoundTrip(t *testing.T) {
 }
 
 func TestValidateDefinition_Invalid(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "definitions-are-validated", "a-definition-is-valid-or-refused")
 	def := Definition{
 		Name:       "",
 		Hash:       "not-a-hash",
@@ -104,6 +111,7 @@ func TestValidateDefinition_Invalid(t *testing.T) {
 }
 
 func TestValidateDefinitions_Duplicate(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "definitions-are-validated", "a-duplicate-definition-is-refused")
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	defs := []Definition{
 		{Name: "20260101000000-init", Hash: hash, SourceKind: SourceSQLFile},
@@ -117,6 +125,7 @@ func TestValidateDefinitions_Duplicate(t *testing.T) {
 }
 
 func TestValidErrorCodes(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-error-codes-are-a-closed-set", "the-error-taxonomy-is-complete-and-closed")
 	required := []string{
 		ErrorCodeInvalidDefinition,
 		ErrorCodeDuplicateDefinition,

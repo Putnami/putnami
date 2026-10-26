@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -34,6 +35,7 @@ func validBundle() Bundle {
 }
 
 func TestValidateBundle_Valid(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "the-validator-refuses-each-broken-manifest")
 	b := validBundle()
 	diags := ValidateBundle(&b)
 	if diag.HasErrors(diags) {
@@ -42,6 +44,7 @@ func TestValidateBundle_Valid(t *testing.T) {
 }
 
 func TestNormalizeBundle_Defaults(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-rollback-needs-reversible-or-compatible", "normalization-infers-only-reversible")
 	b := Bundle{
 		AppName: "svc",
 		Operations: []BundleOperation{
@@ -69,6 +72,7 @@ func TestNormalizeBundle_Defaults(t *testing.T) {
 }
 
 func TestNormalizeOperation_DownImpliesReversible(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-rollback-needs-reversible-or-compatible", "normalization-infers-only-reversible")
 	op := NormalizeOperation(BundleOperation{
 		Kind: KindSQL,
 		Name: "x",
@@ -87,6 +91,7 @@ func TestNormalizeOperation_DownImpliesReversible(t *testing.T) {
 // out of the canonical form, which is what lets every bundle published before
 // the marker existed keep its digest (TestCrossLanguage_BundleDigest).
 func TestComputeBundleDigest_CompatibleChangesDigest(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-rollback-needs-reversible-or-compatible", "compatible-is-part-of-the-content")
 	absent := validBundle()
 	compatible := validBundle()
 	compatible.Operations[0].Capabilities.Compatible = true
@@ -108,6 +113,7 @@ func TestComputeBundleDigest_CompatibleChangesDigest(t *testing.T) {
 // operation that says neither refuses the whole set, because a
 // partially-rolled-back schema is the state nobody can reason about.
 func TestRollbackAllowed(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-rollback-needs-reversible-or-compatible", "a-rollback-is-allowed-only-when-every-operation-allows-it")
 	reversible := Capabilities{Reversible: true}
 	compatible := Capabilities{Compatible: true}
 	both := Capabilities{Reversible: true, Compatible: true}
@@ -141,6 +147,7 @@ func TestRollbackAllowed(t *testing.T) {
 // that also ships a Down payload is the safest kind there is, and validation
 // must not treat saying both as a contradiction.
 func TestValidateBundle_CompatibleAndReversibleCoexist(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-rollback-needs-reversible-or-compatible", "compatible-is-part-of-the-content")
 	b := validBundle()
 	b.Operations[0].Capabilities.Compatible = true
 	b.Operations[0].Capabilities.Reversible = true
@@ -161,6 +168,7 @@ func TestValidateBundle_CompatibleAndReversibleCoexist(t *testing.T) {
 // evidence of itself; nothing on the wire is evidence that the previous image
 // can read the new schema, so only the author may claim it.
 func TestNormalizeLeavesCompatibleUntouched(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-rollback-needs-reversible-or-compatible", "normalization-infers-only-reversible")
 	op := NormalizeOperation(BundleOperation{
 		Kind: KindSQL,
 		Name: "x",
@@ -191,6 +199,7 @@ func TestNormalizeLeavesCompatibleUntouched(t *testing.T) {
 }
 
 func TestComputeBundleDigest_StableAcrossReleaseProvenance(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "provenance-and-order-leave-the-digest-unchanged")
 	a := validBundle()
 	a.Version = "1.4.0"
 	a.Git = &GitMetadata{Revision: "abc", Branch: "main"}
@@ -208,6 +217,7 @@ func TestComputeBundleDigest_StableAcrossReleaseProvenance(t *testing.T) {
 }
 
 func TestComputeBundleDigest_StableAcrossOperationOrder(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "provenance-and-order-leave-the-digest-unchanged")
 	a := validBundle()
 	a.Operations = append(a.Operations, BundleOperation{
 		Kind: KindSQL, Target: "default", Namespace: "billing",
@@ -230,6 +240,7 @@ func TestComputeBundleDigest_StableAcrossOperationOrder(t *testing.T) {
 }
 
 func TestComputeBundleDigest_ChangesWithContent(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "content-changes-the-digest")
 	a := validBundle()
 	b := validBundle()
 	b.Operations[0].Up.Hash = testUpHash2
@@ -240,6 +251,7 @@ func TestComputeBundleDigest_ChangesWithContent(t *testing.T) {
 }
 
 func TestValidateBundle_DigestRoundTrip(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "a-wrong-digest-is-refused")
 	b := validBundle()
 	b.Digest = ComputeBundleDigest(b)
 
@@ -250,6 +262,7 @@ func TestValidateBundle_DigestRoundTrip(t *testing.T) {
 }
 
 func TestValidateBundle_DigestMismatch(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "a-wrong-digest-is-refused")
 	b := validBundle()
 	b.Digest = "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -260,6 +273,7 @@ func TestValidateBundle_DigestMismatch(t *testing.T) {
 }
 
 func TestValidateBundle_Errors(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "the-validator-refuses-each-broken-manifest")
 	tests := []struct {
 		name string
 		want string
@@ -291,6 +305,7 @@ func TestValidateBundle_Errors(t *testing.T) {
 }
 
 func TestValidateBundle_DuplicateOperation(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "the-validator-refuses-each-broken-manifest")
 	b := validBundle()
 	dup := b.Operations[0]
 	dup.Up = PayloadRef{Path: "payload/sql/default/iam/dup.up.sql", Hash: testUpHash2}
@@ -304,6 +319,7 @@ func TestValidateBundle_DuplicateOperation(t *testing.T) {
 }
 
 func TestValidateBundle_SameNameDifferentTargetNotDuplicate(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "the-validator-refuses-each-broken-manifest")
 	b := validBundle()
 	other := b.Operations[0]
 	other.Target = "analytics"
@@ -317,6 +333,7 @@ func TestValidateBundle_SameNameDifferentTargetNotDuplicate(t *testing.T) {
 }
 
 func TestParseBundle_RejectsUnknownFields(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "the-validator-refuses-each-broken-manifest")
 	data := []byte(`{"protocol":"migration-bundle.v1","appName":"x","operations":[],"bogus":true}`)
 	_, diags := ParseBundle(data)
 	if !diag.HasErrors(diags) {
@@ -325,6 +342,7 @@ func TestParseBundle_RejectsUnknownFields(t *testing.T) {
 }
 
 func TestParseAndValidateBundle_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-manifest-is-strict", "the-validator-refuses-each-broken-manifest")
 	src := validBundle()
 	src.Digest = ComputeBundleDigest(src)
 	data, err := json.Marshal(src)
@@ -349,6 +367,7 @@ func TestParseAndValidateBundle_RoundTrip(t *testing.T) {
 }
 
 func TestComputePayloadHash(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "content-changes-the-digest")
 	h := ComputePayloadHash([]byte("CREATE TABLE users (id uuid primary key);\n"))
 	if !sha256HexPattern.MatchString(h) {
 		t.Fatalf("payload hash %q is not canonical sha256 hex", h)

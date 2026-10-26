@@ -276,18 +276,15 @@ closed-enum parity), and the corpus under [`fixtures/`](fixtures) —
   — why this module owns the shared contract, why a connection declares exactly
   one transport, and why a requirement structurally cannot carry secrets.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is an internal cross-language wire contract read by framework adapters, a
-test provider, and deployers; what a developer experiences is
-`database.NewPlugin({Datasource: "auth"})` or `sql({ datasource: 'auth' })`,
-owned by the framework packages. Per the spec contract in
-[`protocols/features`](../features/README.md) a spec details an already-authored
-feature and never mints one, so the durable design intent lives in
-[`doc/adr/0001-one-database-contract-with-a-secret-free-projection.md`](doc/adr/0001-one-database-contract-with-a-secret-free-projection.md)
-instead. A product feature that later owns application data access links to that
-record rather than restating it.
+The module owns the feature of its contract, `database/datasource-contract`,
+specified in [`specs/datasource-contract.json`](specs/datasource-contract.json).
+The tests here prove its requirements, and so does the Go database framework
+(`go/framework/database`): its adapter reads bindings and its test provider
+reads test bindings through this module. `database.NewPlugin` and `sql(...)`
+keep the features of what they deliver. The design intent lives in
+[`doc/adr/0001-one-database-contract-with-a-secret-free-projection.md`](doc/adr/0001-one-database-contract-with-a-secret-free-projection.md).
 
 ## Support
 

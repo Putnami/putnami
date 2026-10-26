@@ -1,0 +1,74 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "migration/migration-contract",
+  "outcomes": [
+    "Go and TypeScript runners keep migration state in the same table and fail startup on the same conditions",
+    "Two builds of the same migrations produce the same bundle digest, so a publication is idempotent by digest",
+    "A deploy can tell whether rolling back across a migration is safe before it runs"
+  ],
+  "nonGoals": [
+    "Opening a connection or applying a migration: the framework runners do",
+    "The authoring format: Go keeps filesystem SQL and TypeScript keeps code-registered migrations",
+    "A JSON Schema for the bundle: the Go types are the source of truth",
+    "The TypeScript @putnami/migration runner, which asserts the same golden digests under its own tests"
+  ],
+  "requirements": [
+    {
+      "id": "the-state-store-is-canonical",
+      "text": "Migration state lives in migration.migrations, with the ten canonical columns in order: id, db_name, name, hash, executed_at, execution_time_ms, success, error_message, down_sql and down_hash."
+    },
+    {
+      "id": "a-migration-is-identified-by-datasource-and-name",
+      "text": "A migration's canonical id is datasource:name, and an empty datasource is default. Normalization fills the default datasource, order key and source kind without overwriting an explicit value, marks a definition with a down hash reversible, and sorts by datasource, then order key, then name, the same way every time."
+    },
+    {
+      "id": "definitions-are-validated",
+      "text": "A definition with a name, a SHA-256 hash and a known source kind is valid, one without them is refused, and its namespace survives normalization. Two definitions with one canonical id are a duplicate and are refused."
+    },
+    {
+      "id": "startup-and-reliability-are-contract-defaults",
+      "text": "The default contract applies migrations before the application is ready and fails startup on error. It requires a dedicated state schema, transactional apply and rollback, recorded failures, a persisted rollback hash, rollback support, drift rejection and an advisory lock."
+    },
+    {
+      "id": "the-error-codes-are-a-closed-set",
+      "text": "The thirteen migration.* error codes are the whole taxonomy: every one is registered and no other code is."
+    },
+    {
+      "id": "a-bundle-manifest-is-strict",
+      "text": "ParseBundle refuses an unknown member. ValidateBundle refuses an unknown protocol, a missing appName, no operation, an unknown kind or safety, a missing name, a missing or malformed payload reference, a path that escapes the bundle, and two operations with one identity in one target. Every bundle fixture gets its verdict."
+    },
+    {
+      "id": "the-digest-addresses-the-migration-content",
+      "text": "ComputeBundleDigest hashes the protocol, the appName and the canonically sorted operations. Release provenance (version, git, imageDigest, generatedAt) and operation order leave the digest unchanged, a content change changes it, and a present digest that does not match is refused."
+    },
+    {
+      "id": "the-digest-is-identical-across-languages",
+      "text": "The digests of the committed equivalence goldens are pinned, including one whose operations claim compatible, so the TypeScript implementation that asserts the same values addresses the same content."
+    },
+    {
+      "id": "a-rollback-needs-reversible-or-compatible",
+      "text": "A down payload makes an operation reversible. Only its author may claim compatible: normalization never infers it, and the claim changes the digest. RollbackAllowed is true when every operation is reversible or compatible, and an empty set is allowed."
+    },
+    {
+      "id": "writing-and-loading-verify-every-payload",
+      "text": "WriteBundle normalizes, digests and validates a bundle and refuses a payload that is missing or does not hash to its reference, so a malformed bundle never reaches disk. LoadBundle reads back what WriteBundle wrote and refuses a missing manifest, a missing payload or a hash mismatch, and payload verification catches a tampered file."
+    },
+    {
+      "id": "a-bundle-packs-to-one-tar",
+      "text": "bundle.Pack writes a bundle directory into one tar, and the same files always pack to the same bytes. Unpack recreates it and refuses an entry that escapes the root, an absolute one, or one that is neither a file nor a directory. A name holds one registry segment, and the package imports only the standard library."
+    },
+    {
+      "id": "a-publication-packs-exactly-the-stored-bytes",
+      "text": "publication.Pack refuses a publication outside its scope: sql operations only, a valid safety and up hash, and one canonical identity each, with a valid application, namespace and package. The same input packs to the same tar, manifest and digests, pinned for a fixture."
+    },
+    {
+      "id": "the-go-sql-runner-emits-and-loads-bundles",
+      "text": "The Go SQL runner contributes its migrations as bundle operations that WriteBundle accepts, with a down payload only for a migration that has one. LoadBundleSources rebuilds the same definitions, hashes and schemas from a written bundle and refuses a tampered payload."
+    }
+  ],
+  "decisions": [
+    "protocols/migration/doc/adr/0001-bundle-digest-excludes-provenance.md",
+    "protocols/migration/doc/adr/0002-compatible-migrations.md"
+  ]
+}

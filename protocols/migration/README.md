@@ -115,9 +115,9 @@ The rule below — and the alternatives that lost — is recorded in
 
 `ComputeBundleDigest` content-addresses a bundle: it normalizes the bundle,
 sorts operations canonically (kind → target → namespace → orderKey → name), and
-hashes only the migration-meaningful subset (`protocol`, `appName`, `version`,
-`operations`). Provenance fields (`git`, `imageDigest`, `generatedAt`, `source`)
-are excluded so two builds of the same migrations from different checkouts
+hashes only the migration-meaningful subset (`protocol`, `appName`, `operations`).
+Release provenance (`version`, `git`, `imageDigest`, `generatedAt`, `source`)
+is excluded so two builds of the same migrations from different checkouts
 produce the **same** digest. This is what makes remote publish idempotent by
 digest. Payload hashes use the same lowercase SHA-256 hex semantics as
 `Definition.Hash`.
@@ -278,17 +278,15 @@ contract asserted from Go (`bundle_equivalence_test.go`) and from TypeScript
   — why an operation may declare that the previous image can still run against
   the schema it leaves, and why only the author may claim it.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is the execution and packaging contract behind schema migrations; what a
-developer experiences is `putnami migrate` and the framework migration packages.
-Per the spec contract in [`protocols/features`](../features/README.md) a spec
-details an already-authored feature and never mints one, so the durable design
-intent lives in
-[`doc/adr/0001-bundle-digest-excludes-provenance.md`](doc/adr/0001-bundle-digest-excludes-provenance.md).
-A product feature that later owns database evolution links to that record rather
-than restating it.
+The module owns the feature of its contract, `migration/migration-contract`,
+specified in [`specs/migration-contract.json`](specs/migration-contract.json).
+The tests here prove its requirements, and so does the Go database framework
+(`go/framework/database`), whose SQL runner emits and loads bundles through
+this module. `putnami migrate` and the framework migration packages keep the
+features of what they deliver. The design intent lives in the two decisions
+above.
 
 ## Support
 

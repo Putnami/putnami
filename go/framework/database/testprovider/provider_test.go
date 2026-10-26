@@ -8,6 +8,7 @@ import (
 
 	"go.putnami.dev/database"
 	pdb "go.putnami.dev/protocol/database"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func tcp(db string) *pdb.Connection {
@@ -48,6 +49,7 @@ func TestScopeSources_FiltersByDatasourceAndStripsSchema(t *testing.T) {
 }
 
 func TestResolveTestBinding(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-parses-the-binding-and-honors-the-mode")
 	t.Run("blank yields nil", func(t *testing.T) {
 		tb, err := ResolveTestBinding("   ")
 		if err != nil || tb != nil {
@@ -75,6 +77,7 @@ func TestResolveTestBinding(t *testing.T) {
 }
 
 func TestEffectiveModeDefaultsToRequire(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-parses-the-binding-and-honors-the-mode")
 	if got := effectiveMode(nil); got != pdb.TestModeRequire {
 		t.Errorf("effectiveMode(nil) = %q, want require", got)
 	}
@@ -87,6 +90,7 @@ func TestEffectiveModeDefaultsToRequire(t *testing.T) {
 }
 
 func TestPlanDatabases_DatabaseIsolation(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-isolates-each-datasource")
 	tb := &pdb.TestBinding{
 		Isolation: pdb.IsolationDatabase,
 		Databases: map[string]pdb.Database{
@@ -138,6 +142,7 @@ func TestPlanDatabases_ThreadsKeepDatabases(t *testing.T) {
 }
 
 func TestPlanDatabases_SchemaIsolation(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-isolates-each-datasource")
 	tb := &pdb.TestBinding{
 		Isolation: pdb.IsolationSchema,
 		Databases: map[string]pdb.Database{
@@ -185,6 +190,7 @@ func TestPlanDatabases_Errors(t *testing.T) {
 }
 
 func TestRuntimeBinding_DatabaseIsolationSwapsDatabase(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-isolates-each-datasource")
 	plans := []plan{{
 		name: "auth", isolation: pdb.IsolationDatabase,
 		entry: pdb.Database{Engine: pdb.EnginePostgres, Schema: "iam", Connection: tcp("auth")},
@@ -207,6 +213,7 @@ func TestRuntimeBinding_DatabaseIsolationSwapsDatabase(t *testing.T) {
 }
 
 func TestRuntimeBinding_SchemaIsolationUsesIsolatedSchema(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-isolates-each-datasource")
 	plans := []plan{{
 		name: "auth", isolation: pdb.IsolationSchema,
 		entry:     pdb.Database{Engine: pdb.EnginePostgres, Schema: "iam", Connection: tcp("auth")},
@@ -352,6 +359,7 @@ func TestScopeSources(t *testing.T) {
 }
 
 func TestProvision_NoBindingHonorsMode(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-parses-the-binding-and-honors-the-mode")
 	t.Run("skip yields ErrSkip", func(t *testing.T) {
 		_, err := Provision(context.Background(), Options{Binding: &pdb.TestBinding{Mode: pdb.TestModeSkip}})
 		if !errors.Is(err, ErrSkip) {

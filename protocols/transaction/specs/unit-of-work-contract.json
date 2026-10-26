@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "transaction/unit-of-work-contract",
+  "outcomes": [
+    "A Go or TypeScript caller switches on the same four outcomes and retries only a serialization failure",
+    "Every database adapter runs the same ordered scenario corpus and must reach the same outcome in each scenario",
+    "A result serializes to the same bytes in every language"
+  ],
+  "nonGoals": [
+    "Running a unit of work: the framework database adapters run it and own WithTx and runInTransaction",
+    "Savepoint-scoped nesting: nested joins the enclosing transaction, and a savepoint mode would be a new value and a protocol version bump",
+    "The TypeScript adapter @putnami/database and the Postgres-backed runners, which execute the corpus under their own tests"
+  ],
+  "requirements": [
+    {
+      "id": "the-shapes-parse-strictly",
+      "text": "A unit of work and a result parse strictly. An unknown member, a protocolVersion other than 1, a missing propagation or outcome, a value outside a closed set, an invalid name, and a retryable member that contradicts the outcome are refused. Every valid fixture parses clean, every invalid one is refused, and every code the validators emit is registered."
+    },
+    {
+      "id": "exactly-one-outcome-is-retryable",
+      "text": "The outcome set is closed: applied, already-consumed-conflict, not-found and retryable-serialization-failure. Only retryable-serialization-failure is retryable; every other outcome is terminal."
+    },
+    {
+      "id": "the-serialization-is-canonical",
+      "text": "A result serializes to the same bytes on every marshal, and those bytes equal the committed equivalence golden that another language must reproduce. Re-serializing a parsed valid fixture yields the same bytes again."
+    },
+    {
+      "id": "the-schemas-and-the-go-types-agree",
+      "text": "The unit-of-work and result schemas carry exactly the members of the Go types, require propagation, outcome and protocolVersion as the Go validators do, pin protocolVersion to the Go constant, and list the same closed enums as the Go types."
+    },
+    {
+      "id": "one-behavioral-corpus-for-every-runner",
+      "text": "conformance/manifest.json is the one ordered scenario corpus of the database adapters. It validates strictly, holds the six required scenarios, and the embedded copy equals the file. Its fixtures get their verdict, each reject branch has a fixture with its own code, and its schema lists the Go enums."
+    },
+    {
+      "id": "a-pack-names-the-corpus",
+      "text": "conformance/pack.json gives the corpus the stable id putnami.transaction.conformance, the languages go and typescript, a corpus pointer that resolves to the embedded corpus, and capability kinds that the capabilities protocol defines."
+    },
+    {
+      "id": "the-go-adapter-answers-with-an-outcome",
+      "text": "The Go database adapter answers with these outcomes. Compare-and-set, consume-once and rotate return applied, already-consumed-conflict or not-found, a serialization failure or a deadlock is the retryable outcome, a unique violation is a conflict, and a genuine I/O error stays an error. A rotation inserts no successor for a predecessor already rotated."
+    }
+  ],
+  "decisions": [
+    "protocols/transaction/doc/adr/0001-closed-outcome-taxonomy.md"
+  ]
+}
