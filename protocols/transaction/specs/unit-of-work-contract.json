@@ -10,7 +10,7 @@
   "nonGoals": [
     "Running a unit of work: the framework database adapters run it and own WithTx and runInTransaction",
     "Savepoint-scoped nesting: nested joins the enclosing transaction, and a savepoint mode would be a new value and a protocol version bump",
-    "The TypeScript adapter @putnami/database and the Postgres-backed runners, which execute the corpus under their own tests"
+    "Executing the corpus against a live PostgreSQL: the adapters' conformance runners do it when a test database is bound"
   ],
   "requirements": [
     {
@@ -19,7 +19,7 @@
     },
     {
       "id": "exactly-one-outcome-is-retryable",
-      "text": "The outcome set is closed: applied, already-consumed-conflict, not-found and retryable-serialization-failure. Only retryable-serialization-failure is retryable; every other outcome is terminal."
+      "text": "Of the four outcomes applied, already-consumed-conflict, not-found and retryable-serialization-failure, only retryable-serialization-failure is retryable; every other outcome is terminal. The TypeScript adapter of @putnami/database exposes exactly these four values and treats only the same one as retryable."
     },
     {
       "id": "the-serialization-is-canonical",
@@ -31,7 +31,7 @@
     },
     {
       "id": "one-behavioral-corpus-for-every-runner",
-      "text": "conformance/manifest.json is the one ordered scenario corpus of the database adapters. It validates strictly, holds the six required scenarios, and the embedded copy equals the file. Its fixtures get their verdict, each reject branch has a fixture with its own code, and its schema lists the Go enums."
+      "text": "conformance/manifest.json is the one ordered scenario corpus of the database adapters. It validates strictly, holds the six required scenarios, and the embedded copy equals the file. Its fixtures get their verdict, each reject branch has a fixture with its own code, and its schema lists the Go enums. @putnami/database ships a byte-identical copy of it."
     },
     {
       "id": "a-pack-names-the-corpus",
@@ -40,6 +40,10 @@
     {
       "id": "the-go-adapter-answers-with-an-outcome",
       "text": "The Go database adapter answers with these outcomes. Compare-and-set, consume-once and rotate return applied, already-consumed-conflict or not-found, a serialization failure or a deadlock is the retryable outcome, a unique violation is a conflict, and a genuine I/O error stays an error. A rotation inserts no successor for a predecessor already rotated."
+    },
+    {
+      "id": "the-typescript-adapter-classifies-postgres-errors",
+      "text": "The TypeScript adapter of @putnami/database classifies a Postgres error by its SQLSTATE: 40001 and 40P01 are retryable-serialization-failure, 23505 is already-consumed-conflict, and any other code, an error that does not come from Postgres and an absent error stay unclassified."
     }
   ],
   "decisions": [

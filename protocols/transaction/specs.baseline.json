@@ -8,6 +8,7 @@
     "transaction/unit-of-work-contract#the-go-adapter-answers-with-an-outcome",
     "transaction/unit-of-work-contract#the-schemas-and-the-go-types-agree",
     "transaction/unit-of-work-contract#the-serialization-is-canonical",
-    "transaction/unit-of-work-contract#the-shapes-parse-strictly"
+    "transaction/unit-of-work-contract#the-shapes-parse-strictly",
+    "transaction/unit-of-work-contract#the-typescript-adapter-classifies-postgres-errors"
   ]
 }

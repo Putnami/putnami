@@ -135,6 +135,34 @@
               "the-provider-passes-the-selection-corpus"
             ]
           }
+        },
+        {
+          "id": "the-typescript-adapter-reads-the-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-parser-gives-each-binding-the-protocol-verdict",
+              "the-typescript-adapter-resolves-the-injected-binding"
+            ]
+          }
+        },
+        {
+          "id": "the-typescript-test-provider-reads-the-test-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-provider-honors-the-mode",
+              "the-typescript-provider-passes-the-selection-corpus"
+            ]
+          }
         }
       ]
     }

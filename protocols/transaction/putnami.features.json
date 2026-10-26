@@ -34,7 +34,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "only-a-serialization-failure-is-retryable"
+              "only-a-serialization-failure-is-retryable",
+              "the-typescript-outcomes-are-the-same-closed-set"
             ]
           }
         },
@@ -79,7 +80,8 @@
             "checks": [
               "the-corpus-holds-the-required-scenarios",
               "the-corpus-validator-refuses-each-broken-shape",
-              "the-corpus-schema-matches-the-go-enums"
+              "the-corpus-schema-matches-the-go-enums",
+              "the-typescript-adapter-vendors-the-corpus-byte-identical"
             ]
           }
         },
@@ -108,6 +110,19 @@
               "the-classifier-maps-postgres-errors-to-outcomes",
               "the-helpers-return-an-outcome",
               "a-rotation-is-one-outcome-for-two-writes"
+            ]
+          }
+        },
+        {
+          "id": "the-typescript-adapter-classifies-postgres-errors",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-classifier-maps-postgres-errors-to-outcomes"
             ]
           }
         }

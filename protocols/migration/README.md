@@ -282,9 +282,10 @@ contract asserted from Go (`bundle_equivalence_test.go`) and from TypeScript
 
 The module owns the feature of its contract, `migration/migration-contract`,
 specified in [`specs/migration-contract.json`](specs/migration-contract.json).
-The tests here prove its requirements, and so does the Go database framework
-(`go/framework/database`), whose SQL runner emits and loads bundles through
-this module. `putnami migrate` and the framework migration packages keep the
+The tests here prove its requirements, and so do its two implementations: the
+Go database framework (`go/framework/database`), whose SQL runner emits and
+loads bundles through this module, and `@putnami/migration`, which builds
+bundles by the same rules and reproduces the golden digests. `putnami migrate` and the framework migration packages keep the
 features of what they deliver. The design intent lives in the two decisions
 above.
 

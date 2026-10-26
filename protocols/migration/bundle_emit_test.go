@@ -9,7 +9,7 @@ import (
 )
 
 func TestWriteBundle_MaterializesValidBundle(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "writing-refuses-a-payload-that-does-not-match")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "writing-accepts-a-matching-payload-and-refuses-a-mismatch")
 	root := t.TempDir()
 
 	up := []byte("CREATE TABLE iam.users (id UUID PRIMARY KEY);\n")
@@ -53,7 +53,7 @@ func TestWriteBundle_MaterializesValidBundle(t *testing.T) {
 }
 
 func TestWriteBundle_RejectsPayloadMismatch(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "writing-refuses-a-payload-that-does-not-match")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "writing-accepts-a-matching-payload-and-refuses-a-mismatch")
 	root := t.TempDir()
 	up := []byte("CREATE TABLE t (id int);\n")
 	upPath := "payload/sql/default/app/0001.up.sql"
@@ -78,7 +78,7 @@ func TestWriteBundle_RejectsPayloadMismatch(t *testing.T) {
 }
 
 func TestWriteBundle_RejectsMissingPayloadBytes(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "writing-refuses-a-payload-that-does-not-match")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "writing-accepts-a-matching-payload-and-refuses-a-mismatch")
 	root := t.TempDir()
 	upPath := "payload/sql/default/app/0001.up.sql"
 	b := Bundle{

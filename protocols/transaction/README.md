@@ -160,9 +160,11 @@ with the Go types by `drift_test.go`; the corpus under [`fixtures/`](fixtures)
 
 The module owns the feature of its contract, `transaction/unit-of-work-contract`,
 specified in [`specs/unit-of-work-contract.json`](specs/unit-of-work-contract.json).
-The tests here prove its requirements, and so does the Go database framework
-(`go/framework/database`), whose compare-and-set, consume-once and rotate
-helpers answer with these outcomes. `WithTx`, `runInTransaction` and the
+The tests here prove its requirements, and so do its two implementations: the
+Go database framework (`go/framework/database`), whose compare-and-set,
+consume-once and rotate helpers answer with these outcomes, and
+`@putnami/database`, which exposes the same outcomes, classifies Postgres
+errors the same way and ships a byte-identical copy of the corpus. `WithTx`, `runInTransaction` and the
 framework database packages keep the features of what they deliver. The design
 intent lives in
 [`doc/adr/0001-closed-outcome-taxonomy.md`](doc/adr/0001-closed-outcome-taxonomy.md).

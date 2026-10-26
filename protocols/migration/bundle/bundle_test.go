@@ -52,7 +52,7 @@ func sampleBundle() fstest.MapFS {
 }
 
 func TestPackUnpackRoundTrip(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips-files-and-directories")
 	src := sampleBundle()
 	tarball, err := Pack(src)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestPackUnpackRoundTrip(t *testing.T) {
 }
 
 func TestPackIsDeterministic(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips-files-and-directories")
 	// Two independently-built maps with the same content must pack identically,
 	// so the blob digest is stable across rebuilds (idempotent re-publish).
 	a, err := Pack(sampleBundle())
@@ -140,7 +140,7 @@ func TestUnpackRejectsAbsolute(t *testing.T) {
 }
 
 func TestUnpackAcceptsDirectoryEntry(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips-files-and-directories")
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 	if err := tw.WriteHeader(&tar.Header{Name: "payload/", Typeflag: tar.TypeDir, Mode: 0o750}); err != nil {
@@ -228,7 +228,7 @@ func TestSafeRelNormalizesAndRejectsUnsafeNames(t *testing.T) {
 }
 
 func TestUnpackToDirRoundTrip(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips-files-and-directories")
 	tarball, err := Pack(sampleBundle())
 	if err != nil {
 		t.Fatalf("pack: %v", err)
@@ -296,7 +296,7 @@ func TestPackageNameSlugsPathStyleAppNames(t *testing.T) {
 }
 
 func TestFixtureValidBundlePacksDeterministically(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips")
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "packing-is-deterministic-and-round-trips-files-and-directories")
 	root := filepath.Join("testdata", "valid")
 	first, err := Pack(os.DirFS(root))
 	if err != nil {

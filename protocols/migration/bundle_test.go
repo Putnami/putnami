@@ -240,7 +240,7 @@ func TestComputeBundleDigest_StableAcrossOperationOrder(t *testing.T) {
 }
 
 func TestComputeBundleDigest_ChangesWithContent(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "content-changes-the-digest")
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "the-payload-hash-and-the-digest-follow-the-content")
 	a := validBundle()
 	b := validBundle()
 	b.Operations[0].Up.Hash = testUpHash2
@@ -367,7 +367,7 @@ func TestParseAndValidateBundle_RoundTrip(t *testing.T) {
 }
 
 func TestComputePayloadHash(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "content-changes-the-digest")
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "the-payload-hash-and-the-digest-follow-the-content")
 	h := ComputePayloadHash([]byte("CREATE TABLE users (id uuid primary key);\n"))
 	if !sha256HexPattern.MatchString(h) {
 		t.Fatalf("payload hash %q is not canonical sha256 hex", h)

@@ -41,27 +41,35 @@ function sampleBundle(): Bundle {
 }
 
 describe('migration bundle', () => {
-  it('normalizes defaults and infers reversibility from a down payload', () => {
-    const op = normalizeOperation({
-      kind: 'sql',
-      target: '',
-      name: 'app/0001',
-      up: { path: 'a.up.sql', hash: UP_HASH },
-      down: { path: 'a.down.sql', hash: DOWN_HASH },
-      safety: '',
-    });
-    expect(op.target).toBe('default');
-    expect(op.orderKey).toBe('app/0001');
-    expect(op.safety).toBe('safe-online');
-    expect(op.capabilities?.reversible).toBe(true);
-  });
+  specTest(
+    'normalizes defaults and infers reversibility from a down payload',
+    {
+      feature: 'migration/migration-contract',
+      requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
+      check: 'the-typescript-normalization-fills-the-same-defaults',
+    },
+    () => {
+      const op = normalizeOperation({
+        kind: 'sql',
+        target: '',
+        name: 'app/0001',
+        up: { path: 'a.up.sql', hash: UP_HASH },
+        down: { path: 'a.down.sql', hash: DOWN_HASH },
+        safety: '',
+      });
+      expect(op.target).toBe('default');
+      expect(op.orderKey).toBe('app/0001');
+      expect(op.safety).toBe('safe-online');
+      expect(op.capabilities?.reversible).toBe(true);
+    },
+  );
 
   specTest(
     'computes a digest that ignores release provenance and input order',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'cross-language-bundle',
-      check: 'the-digest-ignores-release-provenance-and-input-order',
+      feature: 'migration/migration-contract',
+      requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
+      check: 'the-typescript-digest-ignores-provenance-and-order',
     },
     () => {
       const a = sampleBundle();
@@ -96,9 +104,9 @@ describe('migration bundle', () => {
   specTest(
     'writes a self-contained bundle that round-trips',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'cross-language-bundle',
-      check: 'a-bundle-round-trips-self-contained',
+      feature: 'migration/migration-contract',
+      requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
+      check: 'the-typescript-writer-verifies-every-payload',
     },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'bundle-'));
@@ -131,9 +139,9 @@ describe('migration bundle', () => {
   specTest(
     'rejects a payload path that escapes the bundle root',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'cross-language-bundle',
-      check: 'a-payload-path-escaping-the-bundle-root-is-rejected',
+      feature: 'migration/migration-contract',
+      requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
+      check: 'the-typescript-writer-verifies-every-payload',
     },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'bundle-'));
@@ -162,9 +170,9 @@ describe('migration bundle', () => {
   specTest(
     'rejects a payload whose bytes do not match the pinned hash',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'cross-language-bundle',
-      check: 'a-payload-whose-bytes-do-not-match-the-pinned-hash-is-rejected',
+      feature: 'migration/migration-contract',
+      requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
+      check: 'the-typescript-writer-verifies-every-payload',
     },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'bundle-'));

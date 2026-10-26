@@ -35,7 +35,7 @@ func writeReadableBundle(t *testing.T) (root, upPath string) {
 }
 
 func TestLoadBundle_RoundTripsWriteBundle(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one")
 	root := t.TempDir()
 
 	up := []byte("CREATE TABLE iam.users (id uuid primary key);\n")
@@ -74,7 +74,7 @@ func TestLoadBundle_RoundTripsWriteBundle(t *testing.T) {
 }
 
 func TestLoadBundle_MissingManifest(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one")
 	_, _, diags := LoadBundle(os.DirFS(t.TempDir()))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for a directory with no bundle.json")
@@ -85,7 +85,7 @@ func TestLoadBundle_MissingManifest(t *testing.T) {
 // a manifest that references a payload file which is not present on disk must
 // fail to load rather than silently materialize a bundle with missing bytes.
 func TestLoadBundle_MissingPayload(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one")
 	root, upPath := writeReadableBundle(t)
 	if err := os.Remove(filepath.Join(root, filepath.FromSlash(upPath))); err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func TestLoadBundle_MissingPayload(t *testing.T) {
 // content-integrity failure and must be rejected. This is the guarantee that a
 // published bundle cannot be tampered post-hash.
 func TestLoadBundle_HashMismatch(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one")
 	root, upPath := writeReadableBundle(t)
 	// Rewrite the payload with different bytes; the manifest still pins the
 	// original hash, so verification must fail.

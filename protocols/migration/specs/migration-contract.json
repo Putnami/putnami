@@ -10,8 +10,7 @@
   "nonGoals": [
     "Opening a connection or applying a migration: the framework runners do",
     "The authoring format: Go keeps filesystem SQL and TypeScript keeps code-registered migrations",
-    "A JSON Schema for the bundle: the Go types are the source of truth",
-    "The TypeScript @putnami/migration runner, which asserts the same golden digests under its own tests"
+    "A JSON Schema for the bundle: the Go types are the source of truth"
   ],
   "requirements": [
     {
@@ -44,7 +43,7 @@
     },
     {
       "id": "the-digest-is-identical-across-languages",
-      "text": "The digests of the committed equivalence goldens are pinned, including one whose operations claim compatible, so the TypeScript implementation that asserts the same values addresses the same content."
+      "text": "The digests of the committed equivalence goldens are pinned, including one whose operations claim compatible. The TypeScript @putnami/migration runner computes the same two digests from the same goldens, and dropping compatible moves its digest."
     },
     {
       "id": "a-rollback-needs-reversible-or-compatible",
@@ -65,6 +64,10 @@
     {
       "id": "the-go-sql-runner-emits-and-loads-bundles",
       "text": "The Go SQL runner contributes its migrations as bundle operations that WriteBundle accepts, with a down payload only for a migration that has one. LoadBundleSources rebuilds the same definitions, hashes and schemas from a written bundle and refuses a tampered payload."
+    },
+    {
+      "id": "the-typescript-runner-builds-bundles-by-the-same-rules",
+      "text": "The TypeScript @putnami/migration runner builds bundles by the same rules. Normalization defaults the target to default and the safety to safe-online, and infers reversible from a down payload. The digest ignores provenance and operation order. writeBundle writes a self-contained bundle whose manifest carries the digest, and refuses a payload path that escapes the bundle root or bytes that do not match their hash."
     }
   ],
   "decisions": [

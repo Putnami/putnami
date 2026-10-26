@@ -24,31 +24,6 @@
           }
         },
         {
-          "id": "compatible-marker-parity",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["compatible-bundle-digest-matches-go"]
-          }
-        },
-        {
-          "id": "cross-language-bundle",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-bundle-round-trips-self-contained",
-              "a-payload-path-escaping-the-bundle-root-is-rejected",
-              "a-payload-whose-bytes-do-not-match-the-pinned-hash-is-rejected",
-              "the-bundle-digest-matches-the-shared-golden-fixture",
-              "the-digest-ignores-release-provenance-and-input-order",
-              "the-producer-output-matches-the-shared-golden-fixture"
-            ]
-          }
-        },
-        {
           "id": "defensive-reads",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -84,6 +59,7 @@
               "one-sql-source-emits-one-database-entry",
               "re-emitting-the-same-input-yields-identical-bytes",
               "schemas-are-de-duplicated-and-databases-sorted",
+              "the-producer-output-matches-the-shared-golden-fixture",
               "the-sidecar-is-written-atomically-and-parseably",
               "two-sources-for-one-database-union-and-sort-their-schemas",
               "zero-sources-contribute-nothing"

@@ -280,9 +280,11 @@ closed-enum parity), and the corpus under [`fixtures/`](fixtures) —
 
 The module owns the feature of its contract, `database/datasource-contract`,
 specified in [`specs/datasource-contract.json`](specs/datasource-contract.json).
-The tests here prove its requirements, and so does the Go database framework
-(`go/framework/database`): its adapter reads bindings and its test provider
-reads test bindings through this module. `database.NewPlugin` and `sql(...)`
+The tests here prove its requirements, and so do its two implementations: the
+Go database framework (`go/framework/database`), whose adapter reads bindings
+and whose test provider reads test bindings through this module, and
+`@putnami/database`, whose adapter parses the same bindings and whose test
+provider passes the same selection corpus. `database.NewPlugin` and `sql(...)`
 keep the features of what they deliver. The design intent lives in
 [`doc/adr/0001-one-database-contract-with-a-secret-free-projection.md`](doc/adr/0001-one-database-contract-with-a-secret-free-projection.md).
 

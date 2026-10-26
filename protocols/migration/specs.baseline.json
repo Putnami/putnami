@@ -14,6 +14,7 @@
     "migration/migration-contract#the-error-codes-are-a-closed-set",
     "migration/migration-contract#the-go-sql-runner-emits-and-loads-bundles",
     "migration/migration-contract#the-state-store-is-canonical",
+    "migration/migration-contract#the-typescript-runner-builds-bundles-by-the-same-rules",
     "migration/migration-contract#writing-and-loading-verify-every-payload"
   ]
 }

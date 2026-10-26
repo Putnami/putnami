@@ -16,9 +16,9 @@ describe('conformance corpus drift guard', () => {
   specTest(
     'vendored corpus is byte-identical to the canonical protocol corpus',
     {
-      feature: 'typescript/relational-persistence',
-      requirement: 'cross-language-conformance',
-      check: 'the-vendored-corpus-is-byte-identical',
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'one-behavioral-corpus-for-every-runner',
+      check: 'the-typescript-adapter-vendors-the-corpus-byte-identical',
     },
     () => {
       const canonical = readFileSync(CANONICAL_PATH, 'utf8');

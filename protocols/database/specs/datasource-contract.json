@@ -10,8 +10,7 @@
   "nonGoals": [
     "Opening a connection or importing a driver: the framework database adapters build the driver from a binding",
     "Applying migrations at startup: the migration protocol owns that",
-    "Docker auto-provisioning for mode auto, which no provider implements yet",
-    "The TypeScript adapter and test provider of @putnami/database, which read the same shapes under their own tests"
+    "Docker auto-provisioning for mode auto, which no provider implements yet"
   ],
   "requirements": [
     {
@@ -36,7 +35,7 @@
     },
     {
       "id": "the-projection-is-secret-free-and-sorted",
-      "text": "Project flattens a requirement manifest into a name, an engine and schemas per datasource, sorted by datasource name, and adds no implicit schema. It is the only shape protocol/infra aggregates."
+      "text": "Project flattens a requirement manifest into a name, an engine and schemas per datasource, sorted by datasource name, and adds no implicit schema."
     },
     {
       "id": "the-schemas-and-the-go-types-agree",
@@ -49,6 +48,14 @@
     {
       "id": "the-go-test-provider-reads-the-test-binding",
       "text": "The Go test provider reads a test binding through this module: an absent binding follows the mode, which defaults to require. It isolates each datasource by database or by schema, and it passes the datasource selection corpus in conformance/test-provider-datasources.json, provisioning only the datasources a suite names."
+    },
+    {
+      "id": "the-typescript-adapter-reads-the-binding",
+      "text": "The TypeScript adapter of @putnami/database parses a binding strictly: it accepts a valid binding with several datasources and refuses another protocolVersion, a connection with two transports, a dsn with ssl, an engine other than postgres, a missing schema and a non-canonical datasource name. It reads the binding from DATABASE_BINDINGS, and resolves nothing when the document is absent or blank."
+    },
+    {
+      "id": "the-typescript-test-provider-reads-the-test-binding",
+      "text": "The TypeScript test provider of @putnami/database follows the mode when no datasource is bound: skip skips and require fails naming DATABASE_TEST_BINDINGS. It passes the datasource selection corpus in conformance/test-provider-datasources.json: it plans only the datasources a suite names, and a name the binding lacks skips or fails as each case expects."
     }
   ],
   "decisions": [

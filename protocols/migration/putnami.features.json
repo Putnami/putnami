@@ -102,7 +102,7 @@
             "kind": "acceptance",
             "checks": [
               "provenance-and-order-leave-the-digest-unchanged",
-              "content-changes-the-digest",
+              "the-payload-hash-and-the-digest-follow-the-content",
               "a-wrong-digest-is-refused"
             ]
           }
@@ -116,7 +116,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-golden-digests-are-pinned"
+              "the-golden-digests-are-pinned",
+              "the-typescript-runner-reproduces-the-golden-digests"
             ]
           }
         },
@@ -144,8 +145,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "writing-refuses-a-payload-that-does-not-match",
-              "loading-refuses-a-missing-or-tampered-payload"
+              "writing-accepts-a-matching-payload-and-refuses-a-mismatch",
+              "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one"
             ]
           }
         },
@@ -158,7 +159,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "packing-is-deterministic-and-round-trips",
+              "packing-is-deterministic-and-round-trips-files-and-directories",
               "unpacking-refuses-an-unsafe-entry",
               "a-filesystem-error-surfaces",
               "a-name-holds-one-registry-segment",
@@ -191,6 +192,21 @@
             "checks": [
               "the-runner-contributes-a-valid-bundle",
               "a-written-bundle-loads-back-exactly"
+            ]
+          }
+        },
+        {
+          "id": "the-typescript-runner-builds-bundles-by-the-same-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-normalization-fills-the-same-defaults",
+              "the-typescript-digest-ignores-provenance-and-order",
+              "the-typescript-writer-verifies-every-payload"
             ]
           }
         }

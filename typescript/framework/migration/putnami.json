@@ -4,7 +4,11 @@
   "visibility": "public",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/migration"],
   "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/migration/fixtures/**"]
+    },
     "package": {
       "npm": true
     },

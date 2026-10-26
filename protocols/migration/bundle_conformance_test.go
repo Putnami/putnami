@@ -92,7 +92,7 @@ func TestConformance_InvalidBundleFixtures(t *testing.T) {
 // the manifest validates, its declared digest matches, and every payload file
 // hashes to the pinned reference.
 func TestConformance_PayloadTree(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one")
 	root := "fixtures/payload-tree"
 	data, err := os.ReadFile(filepath.Join(root, BundleFileName))
 	if err != nil {
@@ -126,7 +126,7 @@ func TestConformance_PayloadTree(t *testing.T) {
 // TestConformance_PayloadTree_TamperDetected confirms payload verification
 // fails loudly when an on-disk payload no longer matches its pinned hash.
 func TestConformance_PayloadTree_TamperDetected(t *testing.T) {
-	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-refuses-a-missing-or-tampered-payload")
+	spectest.Proves(t, "migration/migration-contract", "writing-and-loading-verify-every-payload", "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one")
 	root := "fixtures/payload-tree"
 	data, err := os.ReadFile(filepath.Join(root, BundleFileName))
 	if err != nil {
