@@ -30,7 +30,7 @@
     },
     {
       "id": "manifest-validated-at-build-time",
-      "text": "Building a manifest runs the same protocol validation the CLI runs and refuses to produce one that violates the task contract or is structurally defective; writing one emits canonical JSON and refuses to write an invalid manifest."
+      "text": "Building a manifest refuses to produce one that violates the task contract or is structurally defective; writing one emits canonical JSON and refuses to write an invalid manifest."
     },
     {
       "id": "go-embed-source-inputs",
@@ -94,7 +94,7 @@
     },
     {
       "id": "agent-content-packaging",
-      "text": "An extension's agent content is built by the same agent-artifact builder as a standalone artifact, under the extension's own name and version and its declared content policy. Packaging a content-only extension writes the built tree and the packaged contribution form, stamps the lowest CLI contract that covers the manifest, refuses what it cannot certify, and returns only a reproducible, platform-independent archive this CLI's own loader reads; the manifest builder stamps the same contract."
+      "text": "An extension's agent content is built by the same agent-artifact builder as a standalone artifact, under the extension's own name and version and its declared content policy. Packaging a content-only extension writes the built tree and the packaged contribution form, refuses what it cannot certify, and returns only a reproducible, platform-independent archive this CLI's own loader reads."
     },
     {
       "id": "agent-content-staging",

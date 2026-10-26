@@ -934,19 +934,6 @@
           }
         },
         {
-          "id": "command-kinds-and-traits",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-go-packager-stamps-command-kinds"
-            ]
-          }
-        },
-        {
           "id": "publish-tasks-declare-their-channels",
           "stage": "coded",
           "evidenceKinds": [
@@ -955,8 +942,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-go-extension-declares-its-publish-channels",
-              "the-go-packager-stamps-publish-channels"
+              "the-go-extension-declares-its-publish-channels"
             ]
           }
         },
@@ -969,7 +955,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-go-packager-stamps-a-vocabulary-only-manifest",
               "the-go-packager-validates-a-vocabulary-next-to-a-dependency"
             ]
           }

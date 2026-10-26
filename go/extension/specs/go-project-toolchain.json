@@ -241,19 +241,15 @@
     },
     {
       "id": "the-packager-stamps-a-dependent",
-      "text": "The Go archive packager stamps contract 8 on every extension it packages with a registry dependency, and an extension that declares only hooks and dependencies takes the stamp without the strict requirement of a command, tool or agent content. The TypeScript npm packager leaves the list out of its stamp decision."
-    },
-    {
-      "id": "command-kinds-and-traits",
-      "text": "The Go packager stamps CLI contract 11 on a manifest that declares a command kind, a workload, or the kind and phase of a batchable task, in both package forms, and fails packaging of a kind outside the vocabulary."
+      "text": "A Go archive of an extension that declares only hooks and a registry dependency takes the dependency stamp without the strict requirement of a command, tool or agent content. The TypeScript npm packager leaves the list out of its stamp decision."
     },
     {
       "id": "publish-tasks-declare-their-channels",
-      "text": "The Go extension's publish-docker task declares the docker channel and publish-go the go channel, and no other task declares one. The Go packager stamps CLI contract 12 on a manifest whose task lists publishChannels, in both package forms, and fails packaging of a list on a task without the registry effect."
+      "text": "The Go extension's publish-docker task declares the docker channel and publish-go the go channel, and no other task declares one."
     },
     {
       "id": "vocabulary-default-traits",
-      "text": "The Go packager validates a verb vocabulary strictly and stamps CLI contract 9 in both package forms, validates one that sits next to a registry dependency in full, and fails packaging of a defective one."
+      "text": "The Go packager validates a verb vocabulary that sits next to a registry dependency in full, not through the stamp-only path a hook-only dependent takes."
     },
     {
       "id": "the-packager-refuses-a-nameless-manifest",

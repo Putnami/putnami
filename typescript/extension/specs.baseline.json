@@ -7,7 +7,6 @@
     "typescript/typescript-project-toolchain#batch-failure-isolation",
     "typescript/typescript-project-toolchain#bounded-test-output",
     "typescript/typescript-project-toolchain#catalog-seeding",
-    "typescript/typescript-project-toolchain#command-kinds-and-traits",
     "typescript/typescript-project-toolchain#committed-client-drift",
     "typescript/typescript-project-toolchain#committed-route-inventory",
     "typescript/typescript-project-toolchain#declared-assets-must-exist",
@@ -33,7 +32,6 @@
     "typescript/typescript-project-toolchain#structured-reports",
     "typescript/typescript-project-toolchain#upgrade-reports-unresolved-packages",
     "typescript/typescript-project-toolchain#upgrade-table-shows-source-revision",
-    "typescript/typescript-project-toolchain#vocabulary-default-traits",
     "typescript/typescript-project-toolchain#workspace-biome-default",
     "typescript/typescript-project-toolchain#workspace-bun-pin",
     "typescript/typescript-project-toolchain#workspace-install-lists-the-members"

@@ -147,9 +147,7 @@
             "kind": "acceptance",
             "checks": [
               "a-staged-package-loads-under-the-claimed-contract",
-              "a-contract-claim-newer-than-the-packager-is-rejected",
-              "a-stale-lower-claim-is-ratcheted-to-the-earned-one",
-              "an-unloadable-hook-only-manifest-fails-packaging"
+              "a-stale-lower-claim-is-ratcheted-to-the-earned-one"
             ]
           }
         },
@@ -644,19 +642,6 @@
           }
         },
         {
-          "id": "command-kinds-and-traits",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-npm-packager-stamps-command-kinds"
-            ]
-          }
-        },
-        {
           "id": "publish-tasks-declare-their-channels",
           "stage": "coded",
           "evidenceKinds": [
@@ -665,21 +650,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-typescript-extension-declares-its-publish-channels",
-              "the-npm-packager-stamps-publish-channels"
-            ]
-          }
-        },
-        {
-          "id": "vocabulary-default-traits",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-npm-packager-validates-and-stamps-a-vocabulary"
+              "the-typescript-extension-declares-its-publish-channels"
             ]
           }
         },

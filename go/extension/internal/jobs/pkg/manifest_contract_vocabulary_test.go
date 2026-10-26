@@ -24,7 +24,6 @@ const vocabularyOnlyManifest = `{
 // and stamps contract 9, in both package forms, so the artifact loads.
 func TestGateStampsAVocabularyOnlyManifest(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
-	spectest.Proves(t, "go/go-project-toolchain", "vocabulary-default-traits", "the-go-packager-stamps-a-vocabulary-only-manifest")
 	for name, form := range map[string]packageForm{"put archive": putArchive, "npm package": npmPackage} {
 		dir := stageManifest(t, vocabularyOnlyManifest)
 		if err := gateAndStampManifestContract(dir, form); err != nil {
@@ -44,7 +43,6 @@ func TestGateStampsAVocabularyOnlyManifest(t *testing.T) {
 // the stamp-only arm of a hook-only dependent: a valid one is stamped 9, and
 // a defective one fails packaging and leaves the staged manifest as it was.
 func TestGateValidatesAVocabularyNextToARegistryDependency(t *testing.T) {
-	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-refuses-what-the-protocol-refuses")
 	spectest.Proves(t, "go/go-project-toolchain", "vocabulary-default-traits", "the-go-packager-validates-a-vocabulary-next-to-a-dependency")
 	valid := `{
 	"name": "@putnami/testverbs",

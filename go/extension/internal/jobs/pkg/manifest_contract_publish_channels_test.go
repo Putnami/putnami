@@ -29,7 +29,6 @@ const publishChannelsManifest = `{
 // the staged manifest as it was.
 func TestGateStampsPublishChannels(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
-	spectest.Proves(t, "go/go-project-toolchain", "publish-tasks-declare-their-channels", "the-go-packager-stamps-publish-channels")
 	for name, form := range map[string]packageForm{"put archive": putArchive, "npm package": npmPackage} {
 		dir := stageManifest(t, publishChannelsManifest)
 		if err := gateAndStampManifestContract(dir, form); err != nil {

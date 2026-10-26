@@ -348,9 +348,8 @@
             "kind": "acceptance",
             "checks": [
               "extension-content-is-built-under-the-extension-identity",
-              "a-content-only-extension-packages-with-the-additive-stamp",
-              "packaging-refuses-what-it-cannot-certify",
-              "the-manifest-builder-stamps-the-additive-contract"
+              "a-content-only-extension-packages-the-built-tree-and-the-contribution-form",
+              "packaging-refuses-what-it-cannot-certify"
             ]
           }
         },

@@ -122,7 +122,7 @@ func TestBuildExtensionContentKeepsThePolicyAndTheClosedLayout(t *testing.T) {
 
 func TestPackageExtensionStampsThePackagedFormAndTheAdditiveContract(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-stamps-the-rung-its-vocabulary-requires")
-	spectest.Proves(t, "tooling/extension-authoring", "agent-content-packaging", "a-content-only-extension-packages-with-the-additive-stamp")
+	spectest.Proves(t, "tooling/extension-authoring", "agent-content-packaging", "a-content-only-extension-packages-the-built-tree-and-the-contribution-form")
 	root := newContentExtension(t, "")
 	pkg, err := PackageExtension(root, "1.2.0")
 	if err != nil {
