@@ -208,6 +208,12 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		// block, which only exists from version 2.
 		filepath.Join("go", "samples", "service-to-service", ManifestFilename):            true,
 		filepath.Join("typescript", "samples", "10-service-to-service", ManifestFilename): true,
+
+		// The TypeScript templates name the acceptance checks their template
+		// proof observes in the verification block.
+		filepath.Join("typescript", "templates", "typescript-library", ManifestFilename): true,
+		filepath.Join("typescript", "templates", "typescript-server", ManifestFilename):  true,
+		filepath.Join("typescript", "templates", "typescript-web", ManifestFilename):     true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized
