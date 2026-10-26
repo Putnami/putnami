@@ -90,8 +90,10 @@ putnami deps
 
 Subcommands:
   install  Install project dependencies (default)
-  add
-  remove
+  add      Add a dependency to a project
+  remove   Remove a dependency from a project
+  prune    Remove declared dependency edges no import backs
+  rm       Same as deps remove
 
 Global Options:
   Common: --verbose, --debug, --help

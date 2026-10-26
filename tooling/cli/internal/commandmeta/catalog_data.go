@@ -692,6 +692,7 @@ var catalog = []Command{
 	{
 		Path:       "deps rm",
 		Kind:       KindStructured,
+		Summary:    "Same as deps remove",
 		DetailFrom: "deps remove",
 		Workspace:  requiredWorkspace(),
 	},
