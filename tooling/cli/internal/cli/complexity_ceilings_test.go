@@ -422,7 +422,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "planner",
 		prefix: "internal/jobs/planner/plan",
 		files:  10,
-		funcs:  88,
+		funcs:  89,
 		why: "internal/jobs/planner/plan*.go: the single planner entrypoint (planner.Plan), its dependency, " +
 			"activation, matching and resource passes, plus the plan contract and its validation. " +
 			"Planning is pure — selection in, typed plan out — and that purity is what lets the " +
@@ -493,7 +493,11 @@ var complexityCeilings = []complexityCeiling{
 			"scheduler reads it too. Both were outside this unit only because they sat in files " +
 			"its prefix did not name. dag_state.go and invocation.go in the new directory hold the " +
 			"plan-time halves of the DAG state and the invocation relation, neither of which this " +
-			"prefix selects, as before the move",
+			"prefix selects, as before the move. 88→89: orderDependentReaders is the dependents " +
+			"rule of orderContractClients (protocols/extension ADR 0014). It reads one declared " +
+			"fact, an output marked readByDependents, and the dependency edges the graph already " +
+			"holds, and it adds only ordering edges (SerializeAfter): no stage, no flag and no " +
+			"cache-key edge. Its helpers are closures, so the rule costs one function",
 	},
 	{
 		unit:   "scheduler",

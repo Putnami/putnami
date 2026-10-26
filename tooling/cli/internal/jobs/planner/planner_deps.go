@@ -1406,6 +1406,60 @@ func orderDependentReaders(
 	if graph == nil {
 		return
 	}
+	// declaresReadByDependents reports whether a planned job's task declares a
+	// project-rooted output that the projects depending on its project read.
+	declaresReadByDependents := func(job *jobmodel.ScheduledJob) bool {
+		if job.JobDef == nil || job.Project == nil || jobmodel.IsFinalizerJob(job) {
+			return false
+		}
+		declaration := jobmodel.TaskDeclarationOf(job)
+		if declaration == nil {
+			return false
+		}
+		for _, output := range declaration.Outputs {
+			if output.ReadByDependents && output.EffectiveRoot() == extension.OutputRootProject {
+				return true
+			}
+		}
+		return false
+	}
+	// dependentsOf returns, sorted, every project that depends on projectID
+	// through declared dependency edges, directly or transitively, without
+	// projectID itself.
+	dependentsOf := func(projectID string) []string {
+		seen := map[string]bool{projectID: true}
+		queue := append([]string(nil), graph.ImpactDependentsOf(projectID)...)
+		var dependents []string
+		for len(queue) > 0 {
+			current := queue[0]
+			queue = queue[1:]
+			if seen[current] {
+				continue
+			}
+			seen[current] = true
+			dependents = append(dependents, current)
+			queue = append(queue, graph.ImpactDependentsOf(current)...)
+		}
+		sort.Strings(dependents)
+		return dependents
+	}
+	// ancestorsOf returns the plan keys that run before key over the edges in
+	// predecessors.
+	ancestorsOf := func(key string) map[string]bool {
+		ancestors := make(map[string]bool)
+		stack := append([]string(nil), predecessors[key]...)
+		for len(stack) > 0 {
+			current := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if ancestors[current] {
+				continue
+			}
+			ancestors[current] = true
+			stack = append(stack, predecessors[current]...)
+		}
+		return ancestors
+	}
+
 	readersOf := make(map[string][]string)
 	added := make(map[*jobmodel.ScheduledJob][]string)
 	for _, writer := range jobs {
@@ -1415,14 +1469,14 @@ func orderDependentReaders(
 		projectID := writer.Project.ID
 		readers, ok := readersOf[projectID]
 		if !ok {
-			readers = transitiveImpactDependents(graph, projectID)
+			readers = dependentsOf(projectID)
 			readersOf[projectID] = readers
 		}
 		if len(readers) == 0 {
 			continue
 		}
 		key := writer.Key()
-		ancestors := planAncestors(key, predecessors)
+		ancestors := ancestorsOf(key)
 		for _, readerProject := range readers {
 			for _, reader := range idx.byProject[readerProject] {
 				readerKey := reader.Key()
@@ -1438,62 +1492,6 @@ func orderDependentReaders(
 	for reader, keys := range added {
 		reader.SerializeAfter = jobmodel.DedupeSorted(append(append([]string(nil), reader.SerializeAfter...), keys...))
 	}
-}
-
-// declaresReadByDependents reports whether a planned job's task declares a
-// project-rooted output that the projects depending on its project read.
-func declaresReadByDependents(job *jobmodel.ScheduledJob) bool {
-	if job.JobDef == nil || job.Project == nil || jobmodel.IsFinalizerJob(job) {
-		return false
-	}
-	declaration := jobmodel.TaskDeclarationOf(job)
-	if declaration == nil {
-		return false
-	}
-	for _, output := range declaration.Outputs {
-		if output.ReadByDependents && output.EffectiveRoot() == extension.OutputRootProject {
-			return true
-		}
-	}
-	return false
-}
-
-// transitiveImpactDependents returns, sorted, every project that depends on
-// projectID through declared dependency edges, directly or transitively,
-// without projectID itself.
-func transitiveImpactDependents(graph *workspace.DependencyGraph, projectID string) []string {
-	seen := map[string]bool{projectID: true}
-	queue := append([]string(nil), graph.ImpactDependentsOf(projectID)...)
-	var dependents []string
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if seen[current] {
-			continue
-		}
-		seen[current] = true
-		dependents = append(dependents, current)
-		queue = append(queue, graph.ImpactDependentsOf(current)...)
-	}
-	sort.Strings(dependents)
-	return dependents
-}
-
-// planAncestors returns the plan keys that run before key over the edges in
-// predecessors.
-func planAncestors(key string, predecessors map[string][]string) map[string]bool {
-	ancestors := make(map[string]bool)
-	stack := append([]string(nil), predecessors[key]...)
-	for len(stack) > 0 {
-		current := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if ancestors[current] {
-			continue
-		}
-		ancestors[current] = true
-		stack = append(stack, predecessors[current]...)
-	}
-	return ancestors
 }
 
 // legacyReference is one dependency reference that no longer resolves, together
