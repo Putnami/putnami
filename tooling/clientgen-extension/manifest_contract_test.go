@@ -377,6 +377,36 @@ func TestProjectGeneratorsReadTheGeneratedTree(t *testing.T) {
 	}
 }
 
+// TestProjectGeneratorsAreReadByTheClientProjectsDependents pins the
+// declaration that orders a client's consumers after its generator. The client
+// directory lies in the client project, and a project that depends on it
+// compiles it. A resource conflicts only within one project, so only
+// readByDependents on the client output makes the planner sequence the
+// generator against those projects' jobs (protocols/extension ADR 0014). The
+// planning half is asserted against the real planner in
+// tooling/cli/internal/jobs/planner/clientgen_dependents_test.go.
+func TestProjectGeneratorsAreReadByTheClientProjectsDependents(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "dynamic-output-ownership", "both-language-targets-are-read-by-the-client-projects-dependents")
+	manifest := loadExtensionManifest(t)
+	for _, name := range []string{"clientgen-go", "clientgen-ts"} {
+		task, ok := manifest.Tasks[name]
+		if !ok || task.Declares == nil {
+			t.Fatalf("manifest task %q is missing or lost its v3 declaration", name)
+		}
+		client, ok := task.Declares.Outputs["client"]
+		if !ok {
+			t.Fatalf("task %q declares no client output", name)
+		}
+		if !client.ReadByDependents {
+			t.Errorf("task %q client output does not declare readByDependents: a project that depends on the client "+
+				"project can compile the client while %s rewrites it", name, name)
+		}
+		if client.EffectiveRoot() != proto.OutputRootProject {
+			t.Errorf("task %q client output root = %q; readByDependents applies only under the project root", name, client.EffectiveRoot())
+		}
+	}
+}
+
 // TestValidateContributesTheWorkspaceGuard is the activation half of the native
 // validation gate, read from the manifest that ships.
 //

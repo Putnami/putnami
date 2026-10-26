@@ -62,6 +62,10 @@
       "text": "Planning produces a deterministic dependency DAG that preserves functional dependencies separately from write-serialization edges, resolves dependent-owned same-session prerequisites across every contributing provider, and rejects missing selected commands. A captured runner AFTER contract adds functional dependencies from every protected write to every required gate leaf before final authorization; missing gates and dependency cycles still fail closed."
     },
     {
+      "id": "dependents-wait-for-an-output-they-read",
+      "text": "A declared output may state readByDependents: the projects that depend on its project read it as part of that project, such as a generated client they compile. Only a durable output under the project root may state it, strict validation refuses any other with invalid-output-read-by-dependents, and stating it requires no CLI contract above 4. Every planned job of a project that depends on the writer's project, directly or through declared dependency edges, runs after the writer over an ordering edge that never reaches a cache key. Finalizers take no edge, nor does a job that already runs before the writer, so the plan stays a DAG."
+    },
+    {
       "id": "preview-no-effects",
       "text": "Plan-only previews and MCP dry runs do not execute subprocesses, update successful-run markers, or write generated workspace state; a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation. For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty; neither shape claims a run, session:end, or persisted session artifact."
     },
@@ -303,6 +307,7 @@
     "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md",
     "tooling/cli/doc/adr/0075-an-interactive-command-knows-the-directory-it-was-typed-in.md",
     "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
-    "tooling/cli/doc/adr/0078-the-core-asks-extensions-to-expand-their-input-selectors.md"
+    "tooling/cli/doc/adr/0078-the-core-asks-extensions-to-expand-their-input-selectors.md",
+    "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md"
   ]
 }

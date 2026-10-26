@@ -1283,6 +1283,45 @@ func TestValidateOutputEmptied(t *testing.T) {
 	}
 }
 
+// An output its owner's dependents read is a durable output under the project
+// root, a file or a directory, at a literal or a reported path. The workspace
+// and command-output roots and the invocation scratch lie outside the project,
+// and each is refused at the readByDependents field. An unset flag states
+// nothing.
+func TestValidateOutputReadByDependents(t *testing.T) {
+	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"clientOutput": {}}}
+	const code = "invalid-output-read-by-dependents"
+	cases := []struct {
+		name   string
+		output DeclaredOutput
+		codes  []string
+	}{
+		{name: "an unset flag states nothing", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootWorkspace, Path: "dist"}},
+		{name: "a reported directory under the default root", output: DeclaredOutput{Kind: OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true, ReadByDependents: true}},
+		{name: "a reported file under the project root", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootProject, PathFrom: "clientOutput", ReadByDependents: true}},
+		{name: "a literal directory under the project root", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootProject, Path: "client", ReadByDependents: true}},
+		{name: "a literal file under the default root", output: DeclaredOutput{Kind: OutputKindFile, Path: "client.gen.go", ReadByDependents: true}},
+		{name: "a durable output under the workspace root", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootWorkspace, Path: "dist/clients", ReadByDependents: true}, codes: []string{code}},
+		{name: "a reported directory under the workspace root", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootWorkspace, PathFrom: "clientOutput", ReadByDependents: true}, codes: []string{code}},
+		{name: "a durable output under the command-output root", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootCommandOutput, Path: "bin", ReadByDependents: true}, codes: []string{code}},
+		{name: "an invocation-scoped output", output: DeclaredOutput{Kind: OutputKindDirectory, Scope: OutputScopeInvocation, Path: "scratch", ReadByDependents: true}, codes: []string{code}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			for _, d := range validateDeclaredOutput("tasks.t.declares.outputs.o", tc.output, task) {
+				if d.Field != "tasks.t.declares.outputs.o.readByDependents" {
+					continue
+				}
+				got = append(got, d.Code)
+			}
+			if !reflect.DeepEqual(got, tc.codes) {
+				t.Fatalf("readByDependents diagnostics = %v, want %v", got, tc.codes)
+			}
+		})
+	}
+}
+
 // A bound rides only on a pathFrom output and names a subtree of the root. A
 // reported path at or under it, spelled as the bound is, lies within it; a
 // sibling that shares its prefix does not.

@@ -331,6 +331,14 @@ type DeclaredOutput struct {
 	// no committed file and no other task's bytes live there. The output then
 	// holds what the task's last execution or restore wrote, and nothing else.
 	Emptied bool `json:"emptied,omitempty"`
+	// ReadByDependents states that the projects which depend on the owning
+	// project read this output as part of that project: a generated client
+	// they compile (ADR 0014). The planner then orders every job of those
+	// projects, direct and transitive, after the task, as an ordering edge that
+	// never reaches a cache key. Only a durable output under the project root
+	// may carry it: the workspace and command-output roots and the invocation
+	// scratch lie outside the project, so its dependents read nothing there.
+	ReadByDependents bool `json:"readByDependents,omitempty"`
 	// Excludes are literal root-relative subpaths STRICTLY inside Path that a
 	// directory output CEDES: they are not captured with it, not restored with
 	// it, and another task may own them.
@@ -747,7 +755,29 @@ func validateDeclaredOutput(field string, output DeclaredOutput, task TaskDefini
 	diags = append(diags, validateOutputExcludes(field, output)...)
 	diags = append(diags, validateOutputPreserves(field, output)...)
 	diags = append(diags, validateOutputEmptied(field, output)...)
+	diags = append(diags, validateOutputReadByDependents(field, output)...)
 	return append(diags, validateOutputDrift(field, output)...)
+}
+
+// validateOutputReadByDependents checks that an output its owner's dependents
+// read lies in the owning project. The rule compares statements the same output
+// makes, so it is decidable from the declaration alone.
+func validateOutputReadByDependents(field string, output DeclaredOutput) []diag.Diagnostic {
+	if !output.ReadByDependents {
+		return nil
+	}
+	readField := field + ".readByDependents"
+	switch {
+	case output.EffectiveScope() != OutputScopeDurable:
+		return []diag.Diagnostic{diag.Errorf("invalid-output-read-by-dependents", readField,
+			"only a %q output is read by dependents: an invocation-scoped output lives in the invocation scratch, which no project holds",
+			OutputScopeDurable)}
+	case output.EffectiveRoot() != OutputRootProject:
+		return []diag.Diagnostic{diag.Errorf("invalid-output-read-by-dependents", readField,
+			"only an output under the %q root is read by dependents: the %q root lies outside the project they depend on",
+			OutputRootProject, output.Root)}
+	}
+	return nil
 }
 
 // validateOutputWithin checks that a bound names a subtree of the root and

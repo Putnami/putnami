@@ -1,0 +1,52 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@test/extension",
+  "commands": {
+    "build": {
+      "run": [
+        { "id": "generate", "task": "build-generate" },
+        { "id": "scratch", "task": "build-scratch" }
+      ]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "declares": {
+        "outputs": {
+          "bin": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "bin",
+            "readByDependents": true,
+            "description": "The command-output root lies outside the project."
+          },
+          "shared": {
+            "kind": "directory",
+            "root": "workspace",
+            "path": "dist/clients",
+            "readByDependents": true,
+            "description": "The workspace root lies outside the project."
+          }
+        }
+      }
+    },
+    "build-scratch": {
+      "kind": "command",
+      "command": "echo",
+      "cache": { "enabled": false },
+      "declares": {
+        "outputs": {
+          "scratch": {
+            "kind": "directory",
+            "scope": "invocation",
+            "path": "scratch",
+            "readByDependents": true,
+            "description": "An invocation-scoped output lives in the invocation scratch."
+          }
+        }
+      }
+    }
+  }
+}
