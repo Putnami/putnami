@@ -118,7 +118,6 @@ func TestMachineStreamIsBoundedFailureFirstSanitizedAndCompletelyRecorded(t *tes
 
 func TestMachineStreamVerboseChangesCapacityNotVerdict(t *testing.T) {
 	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "the-output-mode-never-changes-the-run-verdict")
-	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "the-cli-stream-suppresses-debug-detail-in-normal-mode-and-admits-it-in-verbose")
 	run := func(mode string) ([]byte, protocolcli.BoundedSessionEndRecord) {
 		t.Helper()
 		var out bytes.Buffer
