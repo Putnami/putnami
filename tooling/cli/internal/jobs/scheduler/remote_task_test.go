@@ -966,7 +966,7 @@ func TestDeclaredSourceRewriterRejectsMutatingStatusEntry(t *testing.T) {
 			var mu sync.Mutex
 			hashes := map[string]string{}
 			result := f.sched.finalizeExecutedJob(t.Context(), job, capturedResult(nil),
-				true, captureHashA, "", &mu, hashes)
+				true, captureHashA, "", nil, &mu, hashes)
 			if !result.SourceMutated {
 				t.Fatal("an indeterminate pre-run source digest was not marked as source-mutating")
 			}
@@ -1165,7 +1165,7 @@ func TestFinalizeExecutedJob_SharesDeclaredEntryWithTheProvider(t *testing.T) {
 
 	var mu sync.Mutex
 	hashes := map[string]string{}
-	result := f.sched.finalizeExecutedJob(t.Context(), job, matrixResult(), true, hash, "", &mu, hashes)
+	result := f.sched.finalizeExecutedJob(t.Context(), job, matrixResult(), true, hash, "", nil, &mu, hashes)
 	if result == nil || result.Status != "success" {
 		t.Fatalf("finalizeExecutedJob = %+v, want the executed result", result)
 	}

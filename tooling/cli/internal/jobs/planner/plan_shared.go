@@ -17,87 +17,75 @@ import (
 
 // Plan-level SHARED EXECUTIONS: one physical run serving several commands.
 //
-// `putnami lint,test,build` schedules `build~describe`
-// and `test~describe` as separate DAG nodes over the SAME manifest task, the
-// SAME project and the same declared inputs. Their outputs are byte-identical
-// across an 11-project set, and the duplication costs ~8% of a clean run's
-// physical time. The cache
-// cannot collapse it: a task-owned entry is addressed partly by the JOB NAME
-// (`cachekey.CacheTaskName`), so `test~describe` can never reach `build~describe`'s
+// Two commands can schedule separate DAG nodes over the SAME manifest task, the
+// SAME project and the same declared inputs: `putnami test,build` plans the Go
+// `build-generate` and `build-describe` once for each command. The cache cannot
+// collapse them: a task-owned entry is addressed partly by the JOB NAME
+// (`cachekey.CacheTaskName`), so one command's node can never reach the other's
 // entry no matter how identical the work is.
 //
-// The epic settled the mechanism (refinement decision F3): a plan-level SHARED
-// NODE rather than cache-key normalization. Normalizing the key would have
-// moved every existing entry's address, merged two commands' cache identities
-// permanently, and made the saving invisible to the ledger. A shared node keeps
-// BOTH logical nodes — their keys, their entries, their session rows, their
-// dependents' keys — and only removes the second PHYSICAL execution.
+// A shared node keeps BOTH logical nodes — their keys, their entries, their
+// session rows, their dependents' keys — and only removes the second PHYSICAL
+// execution. Normalizing the cache key instead would move every existing
+// entry's address and hide the saving from the ledger.
 //
-// This file is the plan half: it decides WHICH nodes are one shared execution
-// and stamps them with a shared id. scheduler_shared.go is the runtime half: it
-// makes exactly one member execute and hands its result to the others.
+// This file is the plan half: it decides WHICH nodes are one shared execution,
+// stamps them with a shared id and orders them. scheduler_shared.go is the
+// runtime half: it makes exactly one member execute and hands its result to the
+// others.
 //
-// Deliberately NOT stamped here (see the audit's blocker):
+// A group's first member by key LEADS and the others FOLLOW. A follower that
+// adopts its leader's result executes nothing and writes nothing: it captures
+// its own entry from the tree its leader left. So the followers run right after
+// their leader, one after another, take its place in the write order, and every
+// reader in that place waits for them (serializeWriteResources). That is what
+// lets a task that writes the project `gen` subtree share: no other declared
+// access to the subtree runs between the leader's write and a follower's
+// capture. A follower's dependents then no longer wait, through it, for a
+// later writer of another command, such as a `clientgen` generator. A task
+// whose output the dependent projects read declares it readByDependents, and
+// they wait for that task itself (orderContractClients).
 //
-//   - `build-generate`. It declares the project `gen` subtree as its output and
-//     its own manifest records that describe, config-merge and config-extract
-//     all write inside that subtree without owning it — and on TypeScript
-//     applications `test~test` rewrites `.gen/schema/capabilities.json` after
-//     generate finished, deleting it outright when the suite fails. A shared
-//     node captures each member's entry from the tree as it stands when that
-//     member is served, so a subtree other tasks write into cannot be shared
-//     until that ownership violation is fixed. `cachekey.WritesProjectGen` is the gate.
-//   - Any step carrying literal `with:` bindings (`test`'s `mode: "test"`,
-//     `serve`/`run`'s `mode: "serve"`). Those bindings are inert today — the
-//     planner never merges them into task params — but a manifest that DECLARES
-//     a difference must not be silently unified on the strength of an
-//     implementation gap that a later slice is expected to close.
+// Deliberately NOT stamped here:
 //
-// In this workspace the predicate below therefore admits exactly one task, the
-// Go `build-describe`, which is the (a) payload the audit authorized.
+//   - Any step carrying a `with:` binding (TypeScript `test`'s `mode: "test"`,
+//     `serve`/`run`'s `mode: "serve"`). A literal binding is a live task param,
+//     which the producer identity below accounts for, but a context or result
+//     binding has no single plan-time value, so one conservative gate keeps
+//     every bound step out of direct sharing.
 //
-// ONE RESIDUAL, measured and bounded, from the same `.gen` ownership violation.
-// `build-describe`'s DECLARED output is the generated client tree, and nothing
-// else in a plan writes it — under the declarations, sharing it is exact. It
-// also writes UNDECLARED into `.gen` (its own manifest says so), and one of
-// those writes is a merge into `.gen/generate-result.json` that adds the specs
-// it promoted to that manifest's `exports` and `schemas`. In a multi-command
-// invocation the SECOND command's generate rewrites that manifest afterwards,
-// so those merged entries survive only when the LAST describe of the invocation
-// physically executes — which a shared node makes false, exactly as a cache hit
-// on that last describe already made it false. Measured on
-// /go/samples/simple-api: `putnami build --no-cache` is unchanged (3 exports, 6
-// schemas) before and after; `putnami lint,test,build --no-cache` goes from 3/6
-// to 1/1, which is what the same command already produced on any run with a
-// populated cache. Nothing reads the manifest after the run — describe is its
-// only reader, before it writes — and the committed `schema/*.json` sidecars,
-// the `.gen/schema/*.json` copies and the worktree's git status are identical
-// either way. The proper fix is the ownership violation itself, which the W2a
-// audit filed as its own issue; it is not something a shared node can repair,
-// because the only ordering that would preserve the merge (execute at the LAST
-// member's position) is unreachable — the first command's compile depends on
-// its describe, and the second command's generate is serialized after that
-// compile, so a node running at the last member's position would sit on a
-// cycle.
+// ONE RESIDUAL, from writes into `.gen` that no task declares. `build-describe`
+// also writes UNDECLARED into `.gen`: it merges the specs it promoted into the
+// `exports` and `schemas` of `.gen/generate-result.json`. A follower describe
+// does not repeat that merge, which a cache hit on that describe does not
+// either. Nothing reads the manifest after the run: describe is its only
+// reader, before it writes.
 
 // sharedExecutionPrefix is the readable id every member of one shared node
 // carries. The number is positional within a plan, assigned in deterministic
 // group order, so two Plan calls over one workspace produce the same ids.
 const sharedExecutionPrefix = "shared-"
 
-// attachSharedExecutions groups the plan's content-identical nodes and stamps
-// each group's members with a shared execution id.
+// attachSharedExecutions groups the plan's content-identical nodes, stamps
+// each group's members with a shared execution id, and returns the groups,
+// each sorted by key.
 //
-// It runs after every edge is resolved and after the invocation relations are
-// attached (a node that participates in one is never shared), and BEFORE
+// It runs after every functional edge is resolved, before write serialization
+// orders the groups (serializeWithSharedExecutions), and BEFORE
 // jobmodel.AttachIdentities, so a node's typed identity is stamped on the same
-// value the scheduler later reads. It adds no edge and rewrites no dependency: the DAG,
-// every cache key and every artifact owner are exactly what they were without
-// it. The only thing it changes is how many subprocesses the scheduler spawns.
-func attachSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJob, commandParams map[string]any) {
+// value the scheduler later reads. It attaches the invocation relations first:
+// a node that participates in one is never shared. It adds no edge and
+// rewrites no dependency: every cache key and every artifact owner are exactly
+// what they were without it.
+func attachSharedExecutions(
+	ws *workspace.Workspace,
+	jobs []*jobmodel.ScheduledJob,
+	commandParams map[string]any,
+) [][]*jobmodel.ScheduledJob {
 	if len(jobs) < 2 {
-		return
+		return nil
 	}
+	ResolveInvocationRelations(jobs)
 
 	producers := newSharedProducerIdentityResolver(ws, jobs, commandParams)
 	byIdentity := make(map[string][]*jobmodel.ScheduledJob)
@@ -109,7 +97,7 @@ func attachSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJ
 		byIdentity[identity] = append(byIdentity[identity], job)
 	}
 	if len(byIdentity) == 0 {
-		return
+		return nil
 	}
 
 	identities := make([]string, 0, len(byIdentity))
@@ -123,25 +111,112 @@ func attachSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJ
 	}
 	sort.Strings(identities)
 
+	groups := make([][]*jobmodel.ScheduledJob, 0, len(identities))
 	for i, identity := range identities {
 		id := sharedExecutionPrefix + strconv.Itoa(i+1)
-		for _, job := range byIdentity[identity] {
+		members := byIdentity[identity]
+		sort.Slice(members, func(a, b int) bool { return members[a].Key() < members[b].Key() })
+		for _, job := range members {
 			job.SharedExecutionID = id
 		}
+		groups = append(groups, members)
 	}
+	return groups
+}
+
+// serializeWithSharedExecutions orders every declared resource access with the
+// members of each shared execution group (attachSharedExecutions) as one
+// writer.
+//
+// A group's first member by key LEADS: it runs after every member's ordering
+// producers. The other members FOLLOW it, one after another in key order, and
+// adopt its result. A follower writes nothing to the tree, so it takes its
+// leader's place in the write order, and a reader of a follower's output reads
+// what the leader wrote.
+//
+// Write serialization orders each resource on its own, so these edges can
+// close a cycle across two resources that no single group predicts. When the
+// ordering cannot be scheduled, the plan keeps no shared execution and is
+// serialized as if none had been found: sharing never stops a plan from
+// scheduling. The plan then records a plan.shared_executions_dropped warning
+// on the workspace, which the run reports with the warnings of its load: the
+// results are the same, and the run repeats the work sharing would have saved.
+func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.ScheduledJob) {
+	saved := make([][]string, len(jobs))
+	for i, job := range jobs {
+		saved[i] = append([]string(nil), job.SerializeAfter...)
+	}
+	leaders := orderSharedExecutions(jobs, groups)
+	serializeWriteResources(jobs, leaders)
+	orderContractClients(jobs, ws)
+	if len(groups) == 0 || ValidatePlanDAG(jobs) == nil {
+		return
+	}
+	for i, job := range jobs {
+		job.SerializeAfter = saved[i]
+		job.SharedExecutionID = ""
+	}
+	serializeWriteResources(jobs, nil)
+	orderContractClients(jobs, ws)
+	// A plan that cannot be scheduled without sharing either has a cycle of its
+	// own, which Plan reports as an error, so only a plan that sharing broke
+	// warns.
+	if ValidatePlanDAG(jobs) != nil || ws.HasWarningCode(workspace.WarningCodeSharedExecutionsDropped) {
+		return
+	}
+	ws.AddWarning(workspace.WarningCodeSharedExecutionsDropped, fmt.Sprintf(
+		"the plan found %d groups of tasks that several commands could run once, could not order them, and runs each task on its own: the results are the same, and the run repeats that work",
+		len(groups)))
+}
+
+// orderSharedExecutions adds the edges that make each group's leader run first
+// and its followers one after another, in key order, and returns each
+// follower's leader. At run time any member can write the outputs: a member
+// whose own entry hits restores it, and the first member that misses executes.
+// So no two members are left unordered, or one could write the outputs while
+// another restores or captures them. Each follower waits for every member
+// before it, not only the previous one, so a pass that removes a planned member
+// later keeps the others ordered.
+func orderSharedExecutions(jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.ScheduledJob) map[string]string {
+	if len(groups) == 0 {
+		return nil
+	}
+	byKey := JobsByPlanKey(jobs)
+	leaders := make(map[string]string)
+	for _, members := range groups {
+		leader := members[0]
+		own := make(map[string]bool, len(leader.DependsOn))
+		for _, dep := range leader.DependsOn {
+			own[dep] = true
+		}
+		for i, follower := range members[1:] {
+			leaders[follower.Key()] = leader.Key()
+			for _, earlier := range members[:i+1] {
+				follower.SerializeAfter = append(follower.SerializeAfter, earlier.Key())
+			}
+			follower.SerializeAfter = jobmodel.DedupeSorted(follower.SerializeAfter)
+			for _, dep := range follower.DependsOn {
+				if producer := byKey[dep]; producer != nil && !own[dep] && orderingProducer(follower, producer) {
+					leader.SerializeAfter = jobmodel.DedupeSorted(append(leader.SerializeAfter, dep))
+				}
+			}
+		}
+	}
+	return leaders
 }
 
 // sharedExecutionIdentity returns the value every member of one shared node must
 // agree on, and whether this node may join one at all.
 //
 // The identity is deliberately built from DECLARED facts — the manifest task,
-// its contract digest, the file and env patterns the project adds for this
-// command, the declared params, the resolved deadline — and never from file
-// CONTENT. Two nodes that agree on all of it run the same tool over the same
-// project with the same inputs and the same recursively resolved producer
-// identities. That producer fold is what prevents two downstream nodes from
-// being unified after behaviorally different upstream steps while still
-// letting equivalent command-qualified producer chains compare equal.
+// its contract digest, the task's own file and env patterns, the declared
+// params, the resolved deadline — and never from file CONTENT. Two nodes that
+// agree on all of it run the same tool over the same project with the same
+// inputs and the same recursively resolved producer identities, ordering
+// producers left out (orderingProducer). That producer fold is what prevents
+// two downstream nodes from being unified after behaviorally different
+// upstream steps while still letting equivalent command-qualified producer
+// chains compare equal.
 //
 // It intentionally EXCLUDES the command name, which is the only thing the two
 // nodes disagree about and the only reason the cache cannot serve one from the
@@ -172,7 +247,9 @@ func sharedExecutionIdentity(
 // executionIdentityParts describes one task from declared and resolved plan
 // facts, deliberately excluding the command name. It is shared by the node
 // identity and the recursive producer identity so both answer "same work?"
-// with one vocabulary.
+// with one vocabulary. It leaves out a project's per-command `filePatterns`
+// and `envInputs`: they widen every key of one command and reach no task
+// process, so two commands' nodes over one tree in one run do the same work.
 func executionIdentityParts(
 	ws *workspace.Workspace,
 	job *jobmodel.ScheduledJob,
@@ -201,8 +278,7 @@ func executionIdentityParts(
 		"env=" + canonicalStrings(env),
 		"sideEffects=" + job.JobDef.Traits.SideEffects,
 		"timeout=" + strconv.Itoa(job.EffectiveTimeoutMs()),
-		"files=" + canonicalStrings(append(append([]string(nil), job.JobDef.FilePatterns...), cachekey.ProjectFilePatterns(ws, job)...)),
-		"envInputs=" + canonicalStrings(cachekey.ProjectEnvInputs(ws, job)),
+		"files=" + canonicalStrings(job.JobDef.FilePatterns),
 		"keyEnv=" + canonicalStrings(key.Env),
 		"runtime=" + canonicalStrings(cachekey.TaskRuntimeIdentity(job)),
 		"closure=" + canonicalStrings(key.ClosureFiles),
@@ -262,6 +338,9 @@ func (r *sharedProducerIdentityResolver) upstreamIdentity(job *jobmodel.Schedule
 		if producer == nil {
 			return "", false
 		}
+		if orderingProducer(job, producer) {
+			continue
+		}
 		identity, ok := r.identity(producer)
 		if !ok {
 			return "", false
@@ -307,6 +386,23 @@ func (r *sharedProducerIdentityResolver) identity(job *jobmodel.ScheduledJob) (s
 	identity := sharedIdentityDigest(parts)
 	r.memo[key] = identity
 	return identity, true
+}
+
+// orderingProducer reports whether a producer only orders the consumer: it is
+// in the consumer's project and declares no write resource. What it leaves in
+// the tree reaches the consumer only through files the consumer reads, which
+// the consumer's own key reads too. So it is left out of the producer
+// identity, and orderSharedExecutions runs a group's leader after every
+// member's ordering producers: the leader reads the files each of them left,
+// and keys on them.
+func orderingProducer(consumer, producer *jobmodel.ScheduledJob) bool {
+	if consumer == nil || producer == nil || consumer.Project == nil || producer.Project == nil || producer.JobDef == nil {
+		return false
+	}
+	return producer.Project.ID == consumer.Project.ID &&
+		len(producer.JobDef.Writes) == 0 &&
+		!jobmodel.IsFinalizerJob(producer) &&
+		producer.InvocationProducer == nil && producer.Invocation == nil
 }
 
 // sharedProducerComparable is narrower than "has a task": cross-command
@@ -367,12 +463,6 @@ func sharedExecutionEligible(job *jobmodel.ScheduledJob) bool {
 	// serialize and this mechanism cannot reason about: sharing it would move an
 	// undeclared write to a different point of the run.
 	if len(job.JobDef.Writes) == 0 {
-		return false
-	}
-	// The project `gen` subtree is written by tasks that do not own it (the
-	// manifest says so, and the W2a audit measured the TypeScript instance), so a
-	// capture of it taken on another node's behalf is not that node's output.
-	if cachekey.WritesProjectGen(job) {
 		return false
 	}
 	// A command-output directory resolves per command, so a leader never writes

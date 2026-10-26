@@ -624,7 +624,7 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/workspaceWarning" },
-          "description": "The non-fatal warnings the command's workspace load recorded, in load order: the same warnings the command writes to stderr. Optional and additive: absent when the load recorded none or the command loads no workspace, never an empty array. Allowed beside any status. Unrelated to the per-task diagnostic warning counts of a run."
+          "description": "The non-fatal warnings the command's workspace load recorded, in load order, then those the plan of its run recorded: the same warnings the command writes to stderr. Optional and additive: absent when there are none or the command loads no workspace, never an empty array. Allowed beside any status. Unrelated to the per-task diagnostic warning counts of a run."
         }
       },
       "allOf": [
@@ -667,7 +667,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["code", "message"],
-      "description": "One non-fatal warning a workspace load recorded. A reader branches on code, never on message.",
+      "description": "One non-fatal warning a workspace load, or the plan of a run, recorded. A reader branches on code, never on message.",
       "properties": {
         "code": {
           "type": "string",

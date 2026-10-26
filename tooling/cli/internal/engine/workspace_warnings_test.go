@@ -15,6 +15,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	workspacepb "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -91,6 +92,36 @@ func TestRun_ReturnsTheWarningsOfItsWorkspaceLoad(t *testing.T) {
 	}, nil)
 	if err == nil || result.WorkspaceWarnings != nil {
 		t.Fatalf("a run refused before the load returned %+v, %v; want an error and no warnings", result.WorkspaceWarnings, err)
+	}
+}
+
+// TestBuildPlan_ReportsTheWarningsItsPlanRecords holds planning to reporting
+// the warnings on the workspace once the plan is made, into the report of the
+// load: a warning the planner records, such as shared executions it dropped,
+// reaches the run's stderr and its envelope like a load warning does. The
+// warning is recorded before planning here, so the test does not depend on a
+// plan that makes the planner warn.
+func TestBuildPlan_ReportsTheWarningsItsPlanRecords(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ext := &extension.ExtensionDescription{Name: "@test/build", Jobs: map[string]*extension.JobDefinition{
+		"build": {Name: "build", ExtensionName: "@test/build", Command: "/bin/true"},
+	}}
+	proj := &workspace.Project{ID: "/app", Name: "app", Path: "app", Extensions: []string{"@test/build"}}
+	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{proj})
+	var out bytes.Buffer
+	req := &Request{WorkspaceRoot: root, Commands: []string{"build"}, workspaceWarnings: workspace.NewWarningReport(&out)}
+	ws.AddWarning(workspace.WarningCodeSharedExecutionsDropped, "the plan dropped its shared executions")
+
+	exts := []*extension.ExtensionDescription{ext}
+	if _, code := buildPlan(req, ws, ws.Projects, exts, &extension.DiscoveryResult{Extensions: exts}); code != ExitSuccess {
+		t.Fatalf("buildPlan exit code = %d", code)
+	}
+	if got := req.workspaceWarnings.Warnings(); len(got) != 1 || got[0].Code != workspace.WarningCodeSharedExecutionsDropped {
+		t.Fatalf("the run holds %+v, want the one shared-executions-dropped warning", got)
+	}
+	if want := "putnami: warning: the plan dropped its shared executions\n"; out.String() != want {
+		t.Fatalf("the report wrote %q, want %q", out.String(), want)
 	}
 }
 

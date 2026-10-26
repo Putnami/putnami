@@ -422,7 +422,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "planner",
 		prefix: "internal/jobs/planner/plan",
 		files:  10,
-		funcs:  89,
+		funcs:  94,
 		why: "internal/jobs/planner/plan*.go: the single planner entrypoint (planner.Plan), its dependency, " +
 			"activation, matching and resource passes, plus the plan contract and its validation. " +
 			"Planning is pure — selection in, typed plan out — and that purity is what lets the " +
@@ -497,14 +497,36 @@ var complexityCeilings = []complexityCeiling{
 			"rule of orderContractClients (protocols/extension ADR 0014). It reads one declared " +
 			"fact, an output marked readByDependents, and the dependency edges the graph already " +
 			"holds, and it adds only ordering edges (SerializeAfter): no stage, no flag and no " +
-			"cache-key edge. Its helpers are closures, so the rule costs one function",
+			"cache-key edge. Its helpers are closures, so the rule costs one function. " +
+			"RAISED 10/89→10/94: shared executions now cover " +
+			"the Go generate and describe that `test` plans again beside `build`, so the second " +
+			"one adopts the first one's result instead of running. A follower that writes nothing " +
+			"must take its leader's place in the write order, and the five functions are that " +
+			"ordering: serializeWithSharedExecutions orders the groups with write serialization " +
+			"and drops them when the result cannot be scheduled; orderSharedExecutions runs a " +
+			"leader after every member's ordering producers and each follower after every member " +
+			"before it; " +
+			"orderingProducer names a producer that only orders a member; waitForFollowers makes " +
+			"the readers of a leader's write wait " +
+			"for its followers, which keeps serializeWriteResources under its cyclomatic limit, " +
+			"and functionallyReaches keeps that edge from closing a functional cycle. Each reads a DECLARED fact already in the " +
+			"plan, and none adds a node, a functional edge or a cache-key input",
 	},
 	{
 		unit:   "scheduler",
 		prefix: "internal/jobs/scheduler/scheduler",
 		files:  6,
-		funcs:  98,
-		why: "RAISED 97→98 (cli/supervised-serve-run): jobProcessEnvFor hands a job the run's " +
+		funcs:  100,
+		why: "RAISED 98→100 (shared-execution capture check): recordCapture and expectedCapture " +
+			"hand a leader's stored file set to its followers, and add no cache route: a follower " +
+			"still stores through the declared-capture route, with one more check. OWNERSHIP — only " +
+			"the leader writes the slot's file set, once, and only from the entry it stored; a " +
+			"follower reads it and writes nothing. ATOMICITY — the leader writes it before it " +
+			"closes the slot's done channel and a follower reads it only after that close, so no " +
+			"lock is needed; the follower's ingest compares its capture with that set and " +
+			"publishes nothing on a mismatch, so bytes another session wrote after the leader's " +
+			"capture never reach the follower's entry. " +
+			"RAISED 97→98 (cli/supervised-serve-run): jobProcessEnvFor hands a job the run's " +
 			"process environment plus the supervisor's when the engine names the job a " +
 			"serve-workload step. It adds no cache route and no branch to dispatch: the entries " +
 			"reach cmd.Env only, never a key, and the batch attempt keeps jobProcessEnv. " +

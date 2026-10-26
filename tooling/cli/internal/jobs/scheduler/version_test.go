@@ -625,7 +625,7 @@ func TestSchedulerCapabilitySourceBindingInvalidatedAfterTrackedSidecarWrite(t *
 	writeFileAt(t, filepath.Join(ws.Root, project.Path, "schema", "new.json"), "new untracked sidecar\n")
 	var hashesMu sync.Mutex
 	scheduler.finalizeExecutedJob(
-		t.Context(), describe, &JobResult{Status: "success"}, false, "", "", &hashesMu, map[string]string{},
+		t.Context(), describe, &JobResult{Status: "success"}, false, "", "", nil, &hashesMu, map[string]string{},
 	)
 	entry := &store.TaskEntry{Outputs: []store.TaskEntryOutput{{
 		ID: "gen", Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject,

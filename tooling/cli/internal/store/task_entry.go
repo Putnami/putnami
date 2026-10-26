@@ -192,6 +192,11 @@ var (
 	// declaration promises.
 	ErrIncompleteCapture = errors.New("declared output missing from staging root")
 
+	// ErrCaptureMismatch reports that the staging root does not hold the file
+	// set the ingest was told to expect (TaskEntrySpec.Expect). The ingest
+	// publishes nothing: the bytes are not the ones the caller vouches for.
+	ErrCaptureMismatch = errors.New("captured files differ from the expected files")
+
 	// ErrEntryFormat reports a descriptor this build cannot interpret. It is
 	// returned only by the explicit-format helpers; the lookup path converts the
 	// same condition into a miss.

@@ -78,7 +78,7 @@ func TestSourceRewriterDetectsProjectConfigReformat(t *testing.T) {
 
 			var mu sync.Mutex
 			result := f.sched.finalizeExecutedJob(t.Context(), job, capturedResult(nil),
-				true, hash, sourceHash, &mu, map[string]string{})
+				true, hash, sourceHash, nil, &mu, map[string]string{})
 			if !result.SourceMutated {
 				t.Fatal("a layout-only rewrite of a keyed project config was recorded as clean")
 			}
@@ -118,7 +118,7 @@ func TestSourceRewriterKeysProjectConfigBytes(t *testing.T) {
 	}
 	var mu sync.Mutex
 	result := f.sched.finalizeExecutedJob(t.Context(), rewriter, capturedResult(nil),
-		true, formatted, sourceHash, &mu, map[string]string{})
+		true, formatted, sourceHash, nil, &mu, map[string]string{})
 	if result.SourceMutated {
 		t.Fatal("a formatter that left an already-formatted config unchanged was marked as mutating")
 	}

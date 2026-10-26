@@ -128,6 +128,56 @@ func TestIngestTaskEntry_RefusesPartialCapture(t *testing.T) {
 	}
 }
 
+// TestIngestTaskEntry_PublishesOnlyTheExpectedFiles pins TaskEntrySpec.Expect:
+// a staging root that holds other bytes, another file or one file less than
+// the expected set publishes nothing, and the expected set itself publishes.
+func TestIngestTaskEntry_PublishesOnlyTheExpectedFiles(t *testing.T) {
+	gen := dirOutput("gen", ".gen")
+	leaderStaging := t.TempDir()
+	stage(t, leaderStaging, gen, "out.txt", "leader")
+	stage(t, leaderStaging, gen, "version.json", "{}")
+	leader, err := NewLocalStore(t.TempDir()).IngestTaskEntry(leaderStaging, taskSpec("leader", gen))
+	if err != nil {
+		t.Fatalf("leader ingest: %v", err)
+	}
+
+	for name, files := range map[string]map[string]string{
+		"other bytes":   {"out.txt": "foreign", "version.json": "{}"},
+		"another file":  {"out.txt": "leader", "version.json": "{}", "extra.txt": "x"},
+		"one file less": {"out.txt": "leader"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := NewLocalStore(t.TempDir())
+			staging := t.TempDir()
+			for rel, content := range files {
+				stage(t, staging, gen, rel, content)
+			}
+			spec := taskSpec("follower", gen)
+			spec.Expect = leader.Manifest
+			if _, err := s.IngestTaskEntry(staging, spec); !errors.Is(err, ErrCaptureMismatch) {
+				t.Fatalf("err = %v, want ErrCaptureMismatch", err)
+			}
+			if got, err := s.LookupTaskEntry("follower"); err != nil || got != nil {
+				t.Errorf("a mismatched ingest published an entry: %v (err=%v)", got, err)
+			}
+		})
+	}
+
+	s := NewLocalStore(t.TempDir())
+	staging := t.TempDir()
+	stage(t, staging, gen, "version.json", "{}")
+	stage(t, staging, gen, "out.txt", "leader")
+	spec := taskSpec("follower", gen)
+	spec.Expect = leader.Manifest
+	entry, err := s.IngestTaskEntry(staging, spec)
+	if err != nil {
+		t.Fatalf("the expected files were refused: %v", err)
+	}
+	if !reflect.DeepEqual(entry.Manifest, leader.Manifest) {
+		t.Errorf("follower manifest = %+v, want the leader's %+v", entry.Manifest, leader.Manifest)
+	}
+}
+
 // TestIngestTaskEntry_OptionalEmptyIsAllowedAndRecorded pins the other half:
 // exactly the same missing output is fine when the declaration marks it
 // optionalEmpty, and the entry says so explicitly instead of just carrying less.

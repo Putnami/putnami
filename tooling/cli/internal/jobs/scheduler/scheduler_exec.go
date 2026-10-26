@@ -163,7 +163,15 @@ func (s *Scheduler) executeJobGroup(
 	for i := range opened {
 		lockJobs[i] = opened[i].job
 	}
-	ctx, outputs, err := s.lockTaskOutputs(ctx, lockJobs, s.preparationWritesProjectTree, true)
+	lock := func(ctx context.Context) (context.Context, *outputLockHold, error) {
+		// A follower of a plan-level shared node never batches, and it writes
+		// nothing: it only captures what its leader wrote.
+		if len(opened) == 1 && opened[0].sharedResult != nil {
+			return s.lockFollowerOutputs(ctx, opened[0].job)
+		}
+		return s.lockTaskOutputs(ctx, lockJobs, s.preparationWritesProjectTree, true)
+	}
+	ctx, outputs, err := lock(ctx)
 	if err != nil {
 		for i := range opened {
 			result := spawnFailureResult(ctx, err)
@@ -258,6 +266,7 @@ func (s *Scheduler) openTask(
 	var sharedResult *JobResult
 	if shared != nil && !shared.leader {
 		sharedResult = adoptSharedResult(shared.await(ctx))
+		shared.adopted = sharedResult != nil
 	}
 	return &taskWork{
 		job:          job,
@@ -342,11 +351,16 @@ func (s *Scheduler) prepareTask(
 	// Refresh its version metadata once, using the scheduler-wide build time.
 	// All-hit projects deliberately keep the build time stored with their cached
 	// output and therefore avoid invalidating an otherwise identical .gen tree.
-	s.refreshVersionFile(job)
+	// A follower executes nothing, and its keys admit no write to the project
+	// tree (lockFollowerOutputs): its leader refreshed the stamp and ran the
+	// hook in this project.
+	if item.sharedResult == nil {
+		s.refreshVersionFile(job)
 
-	// Run preBuild hook (once per extension+project pair)
-	if err := s.runPreBuildHook(ctx, job); err != nil {
-		return fail(fmt.Errorf("preBuild hook: %w", err))
+		// Run preBuild hook (once per extension+project pair)
+		if err := s.runPreBuildHook(ctx, job); err != nil {
+			return fail(fmt.Errorf("preBuild hook: %w", err))
+		}
 	}
 
 	// A producer of an invocation-scoped resource is STARTING. Creating its
@@ -672,7 +686,7 @@ func (s *Scheduler) closeTask(
 		result.SourceBinding, result.SourceBindingStamped = item.sourceBinding, item.sourceBindingStamped
 	}
 	result = s.finalizeExecutedJob(
-		ctx, item.job, result, item.cacheEnabled, item.cacheHash, item.sourceInputHash, mu, hashes)
+		ctx, item.job, result, item.cacheEnabled, item.cacheHash, item.sourceInputHash, item.shared, mu, hashes)
 	// Drift is judged AFTER publication on purpose: the entry holds the
 	// successful run the task did, and the failure cache never sees a verdict
 	// that depends on the worktree rather than on the key (task_drift.go). A
@@ -787,6 +801,7 @@ func (s *Scheduler) finalizeExecutedJob(
 	cacheEnabled bool,
 	cacheHash string,
 	sourceInputHash string,
+	shared *sharedExecutionLease,
 	mu *sync.Mutex,
 	hashes map[string]string,
 ) *JobResult {
@@ -837,10 +852,16 @@ func (s *Scheduler) finalizeExecutedJob(
 	// The entry key is the cache key, except for a source-bound task: its key
 	// also binds the binding the execution was stamped with, and a stamp that
 	// named none stores nothing (source_bound.go).
+	//
+	// A follower of a shared node stores only the file set its leader stored
+	// (scheduler_shared.go), and the leader records that set for it before it
+	// publishes its result.
 	entryKey := s.executedEntryKey(job, cacheEnabled, cacheHash, result)
-	if cacheEnabled && s.cache != nil && entryKey != "" && cachekey.IsCacheableResult(job, result) {
-		stored := s.storeDeclaredCapture(job, result, entryKey)
-		if stored && !result.SourceMutated && s.remote != nil {
+	expect, storable := shared.expectedCapture()
+	if storable && cacheEnabled && s.cache != nil && entryKey != "" && cachekey.IsCacheableResult(job, result) {
+		entry := s.storeDeclaredEntry(job, result, entryKey, expect)
+		shared.recordCapture(entry)
+		if entry != nil && !result.SourceMutated && s.remote != nil {
 			s.remote.UploadTaskEntry(ctx, entryKey, job, s.cache)
 		}
 	}

@@ -1469,6 +1469,53 @@ func TestDescribeDeclaresTheClientOutputPort(t *testing.T) {
 	}
 }
 
+// TestDescribeKeysTheEntrypointItRuns pins that the params naming the binary
+// describe builds and runs are inputs of its key. codegen reads them before the
+// project options, so an entry described from one entrypoint must never serve a
+// run that names another.
+func TestDescribeKeysTheEntrypointItRuns(t *testing.T) {
+	m := loadExtensionManifest(t)
+	describe := m.Tasks["build-describe"]
+	derived := proto.DeriveTaskCacheKey(describe.Inputs)
+	for _, name := range []string{"describe-entrypoint", "entrypoint"} {
+		if input, ok := describe.Inputs[name]; !ok || input.From != "params" {
+			t.Errorf("build-describe input %q = %+v, present=%t; describe runs the entrypoint it names", name, input, ok)
+		}
+		if !containsString(derived.Params, name) {
+			t.Errorf("derived build-describe cache key params = %v, missing %q", derived.Params, name)
+		}
+	}
+}
+
+// TestTestPipelineGenerateAndDescribeAreBuilds pins that the test pipeline
+// schedules build's generate and describe tasks with no binding. They are then
+// the same work as build's steps over the same project, and a run that plans
+// both commands executes one of each: the other adopts its result.
+func TestTestPipelineGenerateAndDescribeAreBuilds(t *testing.T) {
+	m := loadExtensionManifest(t)
+	for _, command := range []string{"build", "test"} {
+		for _, id := range []string{"generate", "describe"} {
+			var found bool
+			for _, step := range m.Commands[command].Run {
+				if step.ID != id {
+					continue
+				}
+				found = true
+				if want := "build-" + id; step.Task != want {
+					t.Errorf("%s step %q schedules %q, want %q", command, id, step.Task, want)
+				}
+				if len(step.With) != 0 {
+					t.Errorf("%s step %q binds %v; a binding makes it different work from the other command's step",
+						command, id, sortedKeysOf(step.With))
+				}
+			}
+			if !found {
+				t.Errorf("%s pipeline has no %q step", command, id)
+			}
+		}
+	}
+}
+
 // TestTaskEffectTable pins HONEST EFFECTS per task: what each task does beyond
 // writing its declared outputs, and — for the effects a cache hit cannot
 // reproduce — that the task is not cacheable. A task missing from the table
@@ -1679,7 +1726,10 @@ func TestOnlyTheGolangciFixTaskMutatesSources(t *testing.T) {
 //     runtime defaults sidecar, optionalEmpty, because a workload that authors
 //     infra/runtime.json gets none. The paths are the SDK's, so a hit restores
 //     exactly what infraagg.Aggregate writes
-//     (infraagg.TestAggregate_WritesOnlyTheDeclaredFiles).
+//     (infraagg.TestAggregate_WritesOnlyTheDeclaredFiles). Both files lie in
+//     the project's .gen, which the compile and the test step read, so it
+//     also declares the gen write resource: the planner orders it against
+//     every other task of the run that reads or writes .gen.
 func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -1724,6 +1774,12 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s (required %t)", id, output, want.path, want.required)
 		}
 	}
+	writesGen := slices.ContainsFunc(task.Writes, func(ref proto.ResourceRef) bool {
+		return ref.ID == "gen" && ref.EffectiveScope() == proto.ResourceScopeProject
+	})
+	if !writesGen {
+		t.Errorf("build-infra writes = %+v, want the project's gen: it writes inside .gen, which the compile and the test step read", task.Writes)
+	}
 
 	if cmds := commandsByTask(m)["build-infra"]; len(cmds) != 1 || cmds[0] != "build" {
 		t.Errorf("build-infra commands = %v, want only [build]", cmds)
@@ -1756,6 +1812,9 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 //     dependency moves the key, so the member is republished.
 //   - REQUIRED. The output is the declaration path itself and is not
 //     optionalEmpty, so a run that writes no declaration caches nothing.
+//   - SERIALIZED. The declaration lies in the project's .gen, which other
+//     steps of a run read and write, so the task declares the gen write
+//     resource and the planner orders it against them.
 func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -1779,6 +1838,12 @@ func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	if len(task.Declares.Effects) != 0 || task.Declares.MutatesSources {
 		t.Errorf("package-deployment declares effects %v (mutatesSources %t); it reads committed files and writes one",
 			task.Declares.Effects, task.Declares.MutatesSources)
+	}
+	writesGen := slices.ContainsFunc(task.Writes, func(ref proto.ResourceRef) bool {
+		return ref.ID == "gen" && ref.EffectiveScope() == proto.ResourceScopeProject
+	})
+	if !writesGen {
+		t.Errorf("package-deployment writes = %+v, want the project's gen: it writes %s inside .gen", task.Writes, infraagg.DeploymentFile)
 	}
 	output, ok := task.Declares.Outputs["deployment"]
 	if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||

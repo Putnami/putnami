@@ -163,8 +163,7 @@ func Plan(
 	if err := resolveExternalDeps(allJobs, ws); err != nil {
 		return nil, err
 	}
-	serializeWriteResources(allJobs)
-	orderContractClients(allJobs, ws)
+	serializeWithSharedExecutions(ws, allJobs, attachSharedExecutions(ws, allJobs, commandParams))
 
 	if err := ValidatePlanDAG(allJobs); err != nil {
 		return nil, err
@@ -188,12 +187,6 @@ func Plan(
 	if err := ValidateInvocationFrontiers(allJobs); err != nil {
 		return nil, err
 	}
-
-	// Group the content-identical nodes several commands scheduled over one
-	// manifest task so the scheduler runs each group once. It adds no edge
-	// and moves no key — see plan_shared.go — so it is safe here, after the
-	// graph is final and before identities are stamped.
-	attachSharedExecutions(ws, allJobs, commandParams)
 
 	jobmodel.AttachIdentities(allJobs)
 	return allJobs, nil

@@ -697,6 +697,9 @@ const imageLayersDir = ".gen/layers"
 //     optionalEmpty, because a workload that authors infra/runtime.json gets
 //     none. The paths are the SDK's, so a hit restores exactly what
 //     infraagg.Aggregate writes (infraagg.TestAggregate_WritesOnlyTheDeclaredFiles).
+//     Both files lie in the project's .gen, which the compile and the test
+//     step read, so it also declares the gen write resource: the planner
+//     orders it against every other task of the run that reads or writes .gen.
 func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -740,6 +743,12 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 			output.Path != want.path || output.OptionalEmpty == want.required {
 			t.Errorf("build-infra %s output = %+v, want the project-rooted file %s (required %t)", id, output, want.path, want.required)
 		}
+	}
+	writesGen := slices.ContainsFunc(task.Writes, func(ref proto.ResourceRef) bool {
+		return ref.ID == "gen" && ref.EffectiveScope() == proto.ResourceScopeProject
+	})
+	if !writesGen {
+		t.Errorf("build-infra writes = %+v, want the project's gen: it writes inside .gen, which the compile and the test step read", task.Writes)
 	}
 	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
 	if !slices.Equal(gen.Excludes, cededGenSubpaths) {
@@ -791,6 +800,9 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 //   - OWNED. build-generate cedes the declaration path, and the declaration
 //     is a required output, so a run that writes no declaration caches
 //     nothing and generate's restore never resurrects one.
+//   - SERIALIZED. The declaration lies in the project's .gen, which other
+//     steps of a run read and write, so the task declares the gen write
+//     resource and the planner orders it against them.
 func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -814,6 +826,12 @@ func TestDeploymentDeclarationIsAGatedCachedPackageStep(t *testing.T) {
 	if len(task.Declares.Effects) != 0 || task.Declares.MutatesSources {
 		t.Errorf("package-deployment declares effects %v (mutatesSources %t); it reads committed files and writes one",
 			task.Declares.Effects, task.Declares.MutatesSources)
+	}
+	writesGen := slices.ContainsFunc(task.Writes, func(ref proto.ResourceRef) bool {
+		return ref.ID == "gen" && ref.EffectiveScope() == proto.ResourceScopeProject
+	})
+	if !writesGen {
+		t.Errorf("package-deployment writes = %+v, want the project's gen: it writes %s inside .gen", task.Writes, infraagg.DeploymentFile)
 	}
 	output, ok := task.Declares.Outputs["deployment"]
 	if !ok || output.Kind != proto.OutputKindFile || output.EffectiveRoot() != proto.OutputRootProject ||

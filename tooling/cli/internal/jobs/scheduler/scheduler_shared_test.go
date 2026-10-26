@@ -5,12 +5,16 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	protocache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -641,6 +645,155 @@ func TestSharedExecution_KeepsWarmRunsIdentical(t *testing.T) {
 	}
 	if got := len(warm.Session.Executions); got != 0 {
 		t.Errorf("warm run recorded %d executions, want none", got)
+	}
+}
+
+// sharedGenFixture is sharedRuntimeFixture whose describe declares the
+// project's .gen directory as its output and writes .gen/out.txt. Each run of
+// the script links the build stamp it finds at stampSeen (sharedStampSeen), so
+// a test can tell whether anything replaced the stamp after the leader ran.
+func sharedGenFixture(t *testing.T, logPath string) (*workspace.Workspace, []*ScheduledJob) {
+	t.Helper()
+	ws, planned := sharedRuntimeFixture(t, logPath, "0")
+	writeExecutable(t, filepath.Join(ws.Root, "describe.sh"),
+		"#!/bin/sh\nmkdir -p .gen\nprintf 'leader' > .gen/out.txt\n"+
+			"ln -f "+versionStampRelPath+" "+shellQuote(sharedStampSeen(ws))+"\n"+
+			"printf 'run:%s\\n' \"$PUTNAMI_JOB_NAME\" >> "+shellQuote(logPath)+"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"success\"}}'\n")
+	planned[0].Extension.Tasks["probe-describe"] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+		"gen": dirDeclaration(extension.OutputRootProject, ".gen", false),
+	}}}
+	for _, job := range planned {
+		job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{Deterministic: true}
+	}
+	return ws, planned
+}
+
+// sharedStampSeen is where the describe of sharedGenFixture links the build
+// stamp it finds.
+func sharedStampSeen(ws *workspace.Workspace) string {
+	return filepath.Join(ws.Root, "stamp-seen")
+}
+
+// requireEntryManifest returns the file set of the entry stored at key.
+func requireEntryManifest(t *testing.T, cache *store.CacheManager, name, key string) *protocache.Manifest {
+	t.Helper()
+	entry, err := cache.LookupTaskEntry(key)
+	if err != nil || entry == nil || entry.Manifest == nil {
+		t.Fatalf("%s stored no entry at %s: %v", name, key, err)
+	}
+	return entry.Manifest
+}
+
+// TestSharedExecution_FollowerCapturesTheLeadersTree holds a follower to
+// capturing the tree its leader left without touching it. The leader empties
+// .gen, refreshes the build stamp, runs the preBuild hook and writes
+// .gen/out.txt. The follower empties nothing, runs no hook and writes no
+// stamp, and its entry holds exactly the files of the leader's, the stamp
+// included. Not parallel: withFakeHookRunner swaps a package global.
+func TestSharedExecution_FollowerCapturesTheLeadersTree(t *testing.T) {
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := sharedGenFixture(t, logPath)
+	var hookRuns atomic.Int32
+	withFakeHookRunner(t, func(context.Context, *workspace.Workspace, *extension.ExtensionDescription, *workspace.Project, bool, []string) (*hooks.HookResult, error) {
+		hookRuns.Add(1)
+		return &hooks.HookResult{}, nil
+	})
+	planned[0].Extension.Hooks = &extension.ManifestHooks{PreBuild: &extension.HookDefinition{Kind: "command", Command: "unused"}}
+	cache := sharedRuntimeCache(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result := runSharedScheduler(ctx, ws, planned, SchedulerConfig{MaxParallel: 2}, cache)
+	if !result.Success {
+		t.Fatalf("shared run failed: %+v", result.Results)
+	}
+	if log := invocationLog(t, logPath); len(log) != 1 {
+		t.Fatalf("invocations = %v, want exactly one physical describe", log)
+	}
+	leader := result.Results[planned[0].Key()]
+	follower := result.Results[planned[1].Key()]
+	if follower.ReuseKind() != ReuseCoalesced {
+		t.Fatalf("follower reuse = %q, want coalesced", follower.ReuseKind())
+	}
+	if got := hookRuns.Load(); got != 1 {
+		t.Errorf("the preBuild hook ran %d times, want once", got)
+	}
+	gen := filepath.Join(ws.Root, "app", ".gen")
+	if got := readFileAt(t, filepath.Join(gen, "out.txt")); got != "leader" {
+		t.Errorf(".gen/out.txt = %q after the follower, want the leader's bytes", got)
+	}
+	stamp, err := os.Stat(filepath.Join(ws.Root, "app", filepath.FromSlash(versionStampRelPath)))
+	if err != nil {
+		t.Fatalf("the build stamp is gone: %v", err)
+	}
+	seen, err := os.Stat(sharedStampSeen(ws))
+	if err != nil {
+		t.Fatalf("the describe saw no build stamp: %v", err)
+	}
+	if !os.SameFile(stamp, seen) {
+		t.Error("the build stamp was replaced after the leader ran")
+	}
+
+	leaderFiles := requireEntryManifest(t, cache, "leader", leader.CacheKey)
+	followerFiles := requireEntryManifest(t, cache, "follower", follower.CacheKey)
+	if !reflect.DeepEqual(followerFiles, leaderFiles) {
+		t.Errorf("follower entry holds %+v, want the leader's %+v", followerFiles.Files, leaderFiles.Files)
+	}
+	var paths []string
+	for _, file := range followerFiles.Files {
+		paths = append(paths, file.Path)
+	}
+	if want := []string{"gen/out.txt", "gen/version.json"}; !reflect.DeepEqual(paths, want) {
+		t.Errorf("follower entry paths = %v, want %v", paths, want)
+	}
+}
+
+// TestSharedExecution_FollowerStoresNothingFromAChangedTree holds a follower
+// to storing no entry when the tree it captures no longer holds the files of
+// its leader's entry: here a task between the two writes .gen, as another
+// session can once the leader releases its keys. The follower still adopts
+// its leader's result; only its entry is lost.
+func TestSharedExecution_FollowerStoresNothingFromAChangedTree(t *testing.T) {
+	t.Parallel()
+	requireShell(t)
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := sharedGenFixture(t, logPath)
+	intruderScript := filepath.Join(ws.Root, "intrude.sh")
+	writeExecutable(t, intruderScript, "#!/bin/sh\nprintf 'foreign' > .gen/out.txt\n")
+	intruder := &ScheduledJob{
+		Project:   planned[0].Project,
+		Extension: &extension.ExtensionDescription{Name: "@test/other", Version: "1.0.0", Path: filepath.Join(ws.Root, "other")},
+		JobDef: &extension.JobDefinition{
+			ExtensionName: "@test/other", Name: "lint", CommandName: "lint",
+			Command: intruderScript, Cwd: "{projectRoot}",
+		},
+		SerializeAfter: []string{planned[0].Key()},
+	}
+	planned[1].SerializeAfter = []string{planned[0].Key(), intruder.Key()}
+	cache := sharedRuntimeCache(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result := runSharedScheduler(ctx, ws, append(planned, intruder), SchedulerConfig{MaxParallel: 2}, cache)
+	if !result.Success {
+		t.Fatalf("run failed: %+v", result.Results)
+	}
+	if got := readFileAt(t, filepath.Join(ws.Root, "app", ".gen", "out.txt")); got != "foreign" {
+		t.Fatalf("control: .gen/out.txt = %q, want the intruder's bytes", got)
+	}
+	follower := result.Results[planned[1].Key()]
+	if follower.Status != "success" || follower.ReuseKind() != ReuseCoalesced {
+		t.Fatalf("follower = %q/%q, want an adopted success", follower.Status, follower.ReuseKind())
+	}
+	requireEntryManifest(t, cache, "leader", result.Results[planned[0].Key()].CacheKey)
+	entry, err := cache.LookupTaskEntry(follower.CacheKey)
+	if err != nil {
+		t.Fatalf("look up the follower's entry: %v", err)
+	}
+	if entry != nil {
+		t.Errorf("the follower stored the changed tree at %s", entry.Address)
 	}
 }
 

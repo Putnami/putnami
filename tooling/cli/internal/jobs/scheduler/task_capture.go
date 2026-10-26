@@ -123,6 +123,7 @@ import (
 	"sync"
 	"time"
 
+	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -305,6 +306,13 @@ func (s *Scheduler) outputRoots() cachekey.WorkspaceRoots {
 // task records every output empty and caches its status, while a task with a
 // required output is simply not cached.
 func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, hash string) bool {
+	return s.storeDeclaredEntry(job, result, hash, nil) != nil
+}
+
+// storeDeclaredEntry is storeDeclaredCapture with an expected file set
+// (store.TaskEntrySpec.Expect), and returns the stored entry, or nil when it
+// stored none.
+func (s *Scheduler) storeDeclaredEntry(job *ScheduledJob, result *JobResult, hash string, expect *cache.Manifest) *store.TaskEntry {
 	produced := result.Status == "success"
 	// A capture that finds nothing because the task legitimately produced nothing
 	// is expected; only a SUCCESSFUL run disagreeing with its declaration is a
@@ -318,20 +326,20 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 	if err != nil {
 		report("declared capture skipped: cannot resolve declared outputs",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return false
+		return nil
 	}
 
 	scratch := store.ResolveScratchRoot(s.ws.Root)
 	if err := os.MkdirAll(scratch, 0o755); err != nil {
 		slog.Warn("declared capture skipped: cannot create scratch root",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return false
+		return nil
 	}
 	staging, err := os.MkdirTemp(scratch, "task-capture-")
 	if err != nil {
 		slog.Warn("declared capture skipped: cannot create staging root",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return false
+		return nil
 	}
 	defer os.RemoveAll(staging)
 
@@ -341,7 +349,7 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 			if err := stageDeclaredOutput(plan, store.TaskStagingPath(staging, plan.Spec)); err != nil {
 				slog.Warn("declared capture skipped: cannot stage declared output",
 					"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.Spec.ID, "error", err)
-				return false
+				return nil
 			}
 		}
 		specs = append(specs, plan.Spec)
@@ -358,13 +366,14 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 		Result:   cachekey.EntryResultFromJobResult(result),
 		Metadata: meta,
 		Outputs:  specs,
+		Expect:   expect,
 	})
 	if err != nil {
 		// A required declared output a SUCCESSFUL run did not produce means the
 		// declaration and the task disagree; say so loudly and cache nothing.
 		report("declared capture failed; task not cached",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
-		return false
+		return nil
 	}
 	if s.cfg.Debug {
 		// The CLI installs no debug-level slog handler, so the evidence that a
@@ -372,7 +381,7 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 		slog.Info("declared capture stored",
 			"job", job.Key(), "entry", entry.Address, "outputs", len(entry.Outputs))
 	}
-	return true
+	return entry
 }
 
 // stageDeclaredOutput materializes one declared output inside the ingest's
