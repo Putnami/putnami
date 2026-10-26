@@ -157,7 +157,7 @@ describe('Outcome enum — cross-language byte parity', () => {
     {
       feature: 'transaction/unit-of-work-contract',
       requirement: 'exactly-one-outcome-is-retryable',
-      check: 'the-typescript-outcomes-are-the-same-closed-set',
+      check: 'the-typescript-adapter-retries-only-the-serialization-failure',
     },
     () => {
       expect(outcomeRetryable(Outcome.RetryableSerializationFailure)).toBe(true);

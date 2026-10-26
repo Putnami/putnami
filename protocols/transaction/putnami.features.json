@@ -35,7 +35,8 @@
             "kind": "acceptance",
             "checks": [
               "only-a-serialization-failure-is-retryable",
-              "the-typescript-outcomes-are-the-same-closed-set"
+              "the-typescript-outcomes-are-the-same-closed-set",
+              "the-typescript-adapter-retries-only-the-serialization-failure"
             ]
           }
         },

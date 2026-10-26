@@ -106,7 +106,7 @@ describe('migration bundle', () => {
     {
       feature: 'migration/migration-contract',
       requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
-      check: 'the-typescript-writer-verifies-every-payload',
+      check: 'the-typescript-writer-writes-the-digest-and-the-payload-bytes',
     },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'bundle-'));
@@ -141,7 +141,7 @@ describe('migration bundle', () => {
     {
       feature: 'migration/migration-contract',
       requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
-      check: 'the-typescript-writer-verifies-every-payload',
+      check: 'the-typescript-writer-refuses-a-payload-path-that-escapes-the-bundle',
     },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'bundle-'));
@@ -172,7 +172,7 @@ describe('migration bundle', () => {
     {
       feature: 'migration/migration-contract',
       requirement: 'the-typescript-runner-builds-bundles-by-the-same-rules',
-      check: 'the-typescript-writer-verifies-every-payload',
+      check: 'the-typescript-writer-refuses-bytes-that-do-not-match-their-hash',
     },
     async () => {
       const dir = await mkdtemp(join(tmpdir(), 'bundle-'));

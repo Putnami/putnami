@@ -206,7 +206,9 @@
             "checks": [
               "the-typescript-normalization-fills-the-same-defaults",
               "the-typescript-digest-ignores-provenance-and-order",
-              "the-typescript-writer-verifies-every-payload"
+              "the-typescript-writer-writes-the-digest-and-the-payload-bytes",
+              "the-typescript-writer-refuses-a-payload-path-that-escapes-the-bundle",
+              "the-typescript-writer-refuses-bytes-that-do-not-match-their-hash"
             ]
           }
         }
