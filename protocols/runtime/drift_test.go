@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // schemaEventTypes extracts the enum values from the EventType $defs entry in the schema.
@@ -52,6 +54,7 @@ func goEventTypes() []string {
 }
 
 func TestDrift_EventTypes(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	schemaTypes := schemaEventTypes(t)
 	goTypes := goEventTypes()
 
@@ -112,6 +115,7 @@ func goLogLevels() []string {
 }
 
 func TestDrift_LogLevels(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	schemaLevels := schemaLogLevels(t)
 	goLevels := goLogLevels()
 
@@ -137,6 +141,7 @@ func TestDrift_LogLevels(t *testing.T) {
 }
 
 func TestDrift_ResultStatuses(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	// Extract result statuses from the ResultEvent data.status enum in schema.
 	data, err := os.ReadFile("schemas/event.json")
 	if err != nil {
@@ -201,6 +206,7 @@ func TestDrift_ResultStatuses(t *testing.T) {
 }
 
 func TestDrift_DiagnosticSeverities(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	data, err := os.ReadFile("schemas/event.json")
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
@@ -241,6 +247,7 @@ func TestDrift_DiagnosticSeverities(t *testing.T) {
 }
 
 func TestDrift_PhaseActions(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	data, err := os.ReadFile("schemas/event.json")
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
@@ -316,6 +323,7 @@ func assertEnumSync(t *testing.T, label string, schemaVals, goVals []string) {
 // TestDrift_JobErrorMembers keeps the result error's members the same in Go
 // and in both event schemas, with the type each schema declares.
 func TestDrift_JobErrorMembers(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	goMembers := map[string]string{}
 	jobError := reflect.TypeOf(JobError{})
 	for i := 0; i < jobError.NumField(); i++ {

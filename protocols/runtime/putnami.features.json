@@ -1,0 +1,232 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "runtime",
+  "features": [
+    {
+      "id": "runtime/event-stream",
+      "type": "feature",
+      "name": "Runtime event stream",
+      "outcome": "Every job, whatever its language, reports its logs, progress, diagnostics, metrics, phases, artifacts, readiness and result as one versioned JSONL stream, so the CLI and any other tool read every job the same way",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-versions-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-constants-stay-1-and-2",
+              "the-version-1-schema-stays-frozen"
+            ]
+          }
+        },
+        {
+          "id": "one-stream-one-negotiated-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-resolution-is-total-and-defaults-to-1",
+              "every-line-carries-the-stream-version"
+            ]
+          }
+        },
+        {
+          "id": "version-2-adds-only-ready",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "version-2-is-version-1-plus-ready",
+              "a-version-1-stream-never-carries-ready",
+              "the-version-1-corpus-is-unchanged"
+            ]
+          }
+        },
+        {
+          "id": "events-parse-and-validate-by-type",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-event-type-parses",
+              "each-type-requires-its-members",
+              "the-decoder-reads-one-event-per-line"
+            ]
+          }
+        },
+        {
+          "id": "a-stream-ends-with-one-result",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-result-closes-the-stream",
+              "readiness-repeats-per-serve-iteration"
+            ]
+          }
+        },
+        {
+          "id": "the-emitter-writes-lines-the-parser-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-emitted-line-round-trips",
+              "typed-fields-win-and-extras-survive"
+            ]
+          }
+        },
+        {
+          "id": "readiness-is-typed-and-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-ready-payload-is-validated",
+              "readiness-bytes-do-not-depend-on-bind-order"
+            ]
+          }
+        },
+        {
+          "id": "a-workload-announces-readiness-in-a-log-line",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-marker-key-is-reserved",
+              "a-marker-becomes-a-canonical-ready-event",
+              "a-bad-or-absent-marker-yields-no-readiness"
+            ]
+          }
+        },
+        {
+          "id": "result-payloads-are-typed-and-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "result-payloads-are-extracted",
+              "summaries-refuse-impossible-counts",
+              "test-cases-have-one-definition"
+            ]
+          }
+        },
+        {
+          "id": "a-release-set-outcome-is-one-opaque-payload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-outcome-on-success-and-none-otherwise",
+              "the-outcome-stays-owned-by-distribution",
+              "published-images-are-canonical-strict-and-private"
+            ]
+          }
+        },
+        {
+          "id": "the-schemas-and-the-go-types-agree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-vocabulary-matches-its-schema",
+              "exported-vocabularies-are-sorted"
+            ]
+          }
+        },
+        {
+          "id": "a-fixture-corpus-holds-both-versions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-gets-its-verdict",
+              "every-version-2-reject-branch-has-a-fixture"
+            ]
+          }
+        },
+        {
+          "id": "this-module-owns-only-the-inner-event",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-outer-session-stream-is-not-declared-here"
+            ]
+          }
+        },
+        {
+          "id": "the-extension-sdk-emits-a-conforming-stream",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sdk-emits-at-the-negotiated-version",
+              "the-sdk-never-writes-an-invalid-line",
+              "the-sdk-announces-readiness-on-every-restart"
+            ]
+          }
+        },
+        {
+          "id": "the-cli-arms-on-typed-readiness",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-arms-on-a-ready-event",
+              "the-cli-ignores-readiness-it-cannot-trust"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

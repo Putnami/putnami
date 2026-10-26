@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func readyEvent(t *testing.T, data ReadyData) *Event {
@@ -20,6 +21,7 @@ func readyEvent(t *testing.T, data ReadyData) *Event {
 }
 
 func TestValidateReadyEvent_Valid(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	cases := map[string]ReadyData{
 		"server with one endpoint": {
 			Target:    ReadyTargetServer,
@@ -49,6 +51,7 @@ func TestValidateReadyEvent_Valid(t *testing.T) {
 }
 
 func TestValidateReadyEvent_Rejects(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	cases := []struct {
 		name  string
 		data  ReadyData
@@ -167,6 +170,7 @@ func TestValidateReadyEvent_Rejects(t *testing.T) {
 }
 
 func TestValidateReadyEvent_MissingData(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	diags := ValidateEvent(&Event{V: ProtocolVersion2, Type: EventReady})
 	if !diag.HasErrors(diags) {
 		t.Fatal("ready event without data must be rejected")
@@ -177,6 +181,7 @@ func TestValidateReadyEvent_MissingData(t *testing.T) {
 }
 
 func TestValidateReadyEvent_MalformedData(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	evt := &Event{V: ProtocolVersion2, Type: EventReady, Data: json.RawMessage(`{"target":42}`)}
 	diags := ValidateEvent(evt)
 	if !diag.HasErrors(diags) {
@@ -190,6 +195,7 @@ func TestValidateReadyEvent_MalformedData(t *testing.T) {
 // TestV1RejectsReadyEvent is the additivity guard on the event vocabulary:
 // `ready` exists only at v2, so a v1 emitter cannot smuggle it in.
 func TestV1RejectsReadyEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "version-2-is-version-1-plus-ready")
 	evt := readyEvent(t, ReadyData{Target: ReadyTargetWorkload})
 	evt.V = ProtocolVersion
 
@@ -205,6 +211,7 @@ func TestV1RejectsReadyEvent(t *testing.T) {
 // TestV2AcceptsEveryV1Type pins that v2 is a superset: no v1 event shape is
 // dropped by the version bump.
 func TestV2AcceptsEveryV1Type(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "version-2-is-version-1-plus-ready")
 	for typ := range validEventTypes {
 		if !validEventTypesV2[typ] {
 			t.Errorf("v1 event type %q missing from the v2 vocabulary", typ)
@@ -220,6 +227,7 @@ func TestV2AcceptsEveryV1Type(t *testing.T) {
 }
 
 func TestValidateEvent_UnknownVersion(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "version-2-is-version-1-plus-ready")
 	diags := ValidateEvent(&Event{V: 3, Type: EventSummary, Message: "hi"})
 	if !diag.HasErrors(diags) {
 		t.Fatal("an unknown protocol version must be rejected")
@@ -233,6 +241,7 @@ func TestValidateEvent_UnknownVersion(t *testing.T) {
 }
 
 func TestValidateEventStream_MixedVersions(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "every-line-carries-the-stream-version")
 	events := []*Event{
 		{V: ProtocolVersion, Type: EventLog, Level: "info", Message: "v1"},
 		{V: ProtocolVersion2, Type: EventResult},
@@ -253,6 +262,7 @@ func TestValidateEventStream_MixedVersions(t *testing.T) {
 }
 
 func TestValidateEventStream_SingleVersionAccepted(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "every-line-carries-the-stream-version")
 	for _, version := range []int{ProtocolVersion, ProtocolVersion2} {
 		events := []*Event{
 			{V: version, Type: EventLog, Level: "info", Message: "hello"},
@@ -265,6 +275,7 @@ func TestValidateEventStream_SingleVersionAccepted(t *testing.T) {
 }
 
 func TestReadyEndpoint_URL(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "readiness-bytes-do-not-depend-on-bind-order")
 	cases := []struct {
 		endpoint ReadyEndpoint
 		want     string
@@ -284,6 +295,7 @@ func TestReadyEndpoint_URL(t *testing.T) {
 }
 
 func TestSortReadyEndpoints_Canonical(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "readiness-bytes-do-not-depend-on-bind-order")
 	endpoints := []ReadyEndpoint{
 		{Scheme: ReadySchemeHTTP, Host: "localhost", Port: 3000, Path: "/b"},
 		{Scheme: ReadySchemeHTTP, Host: "localhost", Port: 3000, Path: "/a"},
@@ -321,6 +333,7 @@ func TestSortReadyEndpoints_Canonical(t *testing.T) {
 }
 
 func TestEmitter_Ready(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "readiness-bytes-do-not-depend-on-bind-order")
 	var buf bytes.Buffer
 	unsorted := []ReadyEndpoint{
 		{Scheme: ReadySchemeHTTPS, Host: "localhost", Port: 8443},
@@ -373,6 +386,7 @@ func TestEmitter_Ready(t *testing.T) {
 // TestEmitter_ReadyDeterministic pins the determinism claim: the same readiness
 // facts produce the same bytes no matter what order the listeners bound in.
 func TestEmitter_ReadyDeterministic(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "readiness-bytes-do-not-depend-on-bind-order")
 	emit := func(endpoints []ReadyEndpoint) string {
 		var buf bytes.Buffer
 		if err := NewEmitterForVersion(&buf, ProtocolVersion2).Ready(ReadyData{
@@ -407,6 +421,7 @@ func TestEmitter_ReadyDeterministic(t *testing.T) {
 }
 
 func TestReadyPayload_AbsentAndNil(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	payload, err := ReadyPayload(nil)
 	if err != nil || payload != nil {
 		t.Errorf("ReadyPayload(nil) = %v, %v; want nil, nil", payload, err)
@@ -421,6 +436,7 @@ func TestReadyPayload_AbsentAndNil(t *testing.T) {
 }
 
 func TestExtractReadyData(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	payload, err := ExtractReadyData(nil)
 	if err != nil || payload != nil {
 		t.Errorf("ExtractReadyData(nil) = %v, %v; want nil, nil", payload, err)
@@ -462,6 +478,7 @@ func TestExtractReadyData(t *testing.T) {
 // was removed. A second declaration of them here would mean two packages own the
 // outer record again, which is the state that deletion resolved.
 func TestOuterSessionStreamIsNotOwnedHere(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "this-module-owns-only-the-inner-event", "the-outer-session-stream-is-not-declared-here")
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
@@ -495,6 +512,7 @@ func TestOuterSessionStreamIsNotOwnedHere(t *testing.T) {
 }
 
 func TestValidReadyEndpoint(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "readiness-is-typed-and-canonical", "a-ready-payload-is-validated")
 	cases := map[string]struct {
 		endpoint ReadyEndpoint
 		want     bool

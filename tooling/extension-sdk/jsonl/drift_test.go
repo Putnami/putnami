@@ -178,6 +178,7 @@ func TestDrift_NonNumericMetricDropped(t *testing.T) {
 // Its TypeScript twin is the "carries a tool-enforced timeout" case in
 // typescript/framework/runtime/test/jobs/events.test.ts.
 func TestEmitter_MarkTimedOut(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-sdk-never-writes-an-invalid-line")
 	results := func(mark bool) []string {
 		out := captureStdout(t, func() {
 			e := NewForVersion(runtime.ProtocolVersion)

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "runtime/event-stream#a-fixture-corpus-holds-both-versions",
+    "runtime/event-stream#a-release-set-outcome-is-one-opaque-payload",
+    "runtime/event-stream#a-stream-ends-with-one-result",
+    "runtime/event-stream#a-workload-announces-readiness-in-a-log-line",
+    "runtime/event-stream#events-parse-and-validate-by-type",
+    "runtime/event-stream#one-stream-one-negotiated-version",
+    "runtime/event-stream#readiness-is-typed-and-canonical",
+    "runtime/event-stream#result-payloads-are-typed-and-bounded",
+    "runtime/event-stream#the-cli-arms-on-typed-readiness",
+    "runtime/event-stream#the-emitter-writes-lines-the-parser-reads",
+    "runtime/event-stream#the-extension-sdk-emits-a-conforming-stream",
+    "runtime/event-stream#the-schemas-and-the-go-types-agree",
+    "runtime/event-stream#the-versions-are-pinned",
+    "runtime/event-stream#this-module-owns-only-the-inner-event",
+    "runtime/event-stream#version-2-adds-only-ready"
+  ]
+}

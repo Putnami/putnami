@@ -3,6 +3,8 @@ package runtime
 import (
 	"encoding/json"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // decodeLogRecord round-trips a workload-shaped log record through JSON, which
@@ -22,6 +24,7 @@ func decodeLogRecord(t *testing.T, record map[string]any) map[string]any {
 }
 
 func TestReadyMarkerFromLogRecord_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-workload-announces-readiness-in-a-log-line", "a-marker-becomes-a-canonical-ready-event")
 	record := decodeLogRecord(t, map[string]any{
 		"severity":  "INFO",
 		"message":   "⚡️ listening http://localhost:3000",
@@ -50,6 +53,7 @@ func TestReadyMarkerFromLogRecord_RoundTrip(t *testing.T) {
 // workload, not only at the emitter: the log bytes a served app writes must not
 // depend on the order it happened to bind its listeners in.
 func TestReadyMarker_Canonicalizes(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-workload-announces-readiness-in-a-log-line", "a-marker-becomes-a-canonical-ready-event")
 	unsorted := []ReadyEndpoint{
 		{Scheme: ReadySchemeHTTPS, Host: "localhost", Port: 8443},
 		{Scheme: ReadySchemeGRPC, Host: "localhost", Port: 50051},
@@ -67,6 +71,7 @@ func TestReadyMarker_Canonicalizes(t *testing.T) {
 // canonicalizes before validating, so a workload that writes its endpoints in
 // bind order still produces a valid, deterministic event.
 func TestReadyMarkerFromLogRecord_UnsortedMarkerIsAccepted(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-workload-announces-readiness-in-a-log-line", "a-marker-becomes-a-canonical-ready-event")
 	record := decodeLogRecord(t, map[string]any{
 		"severity": "INFO",
 		"message":  "listening",
@@ -92,6 +97,7 @@ func TestReadyMarkerFromLogRecord_UnsortedMarkerIsAccepted(t *testing.T) {
 // because an invalid line poisons the WHOLE stream for its consumer while a
 // missing one only costs this signal.
 func TestReadyMarkerFromLogRecord_RejectsMalformed(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-workload-announces-readiness-in-a-log-line", "a-bad-or-absent-marker-yields-no-readiness")
 	cases := map[string]any{
 		"no target":           map[string]any{"endpoints": []map[string]any{{"scheme": "http", "host": "h", "port": 1}}},
 		"unknown target":      map[string]any{"target": "database"},
@@ -118,6 +124,7 @@ func TestReadyMarkerFromLogRecord_RejectsMalformed(t *testing.T) {
 }
 
 func TestReadyMarkerFromLogRecord_AbsentMarker(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-workload-announces-readiness-in-a-log-line", "a-bad-or-absent-marker-yields-no-readiness")
 	if _, ok := ReadyMarkerFromLogRecord(nil); ok {
 		t.Error("a nil record carries no marker")
 	}
@@ -135,6 +142,7 @@ func TestReadyMarkerFromLogRecord_AbsentMarker(t *testing.T) {
 // contract two languages and three extensions agree on, so renaming it is a
 // migration, not an edit.
 func TestReadyLogKey_IsNamespaced(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-workload-announces-readiness-in-a-log-line", "the-marker-key-is-reserved")
 	if ReadyLogKey != "putnami.ready" {
 		t.Errorf("ReadyLogKey = %q; renaming it breaks every workload already logging it", ReadyLogKey)
 	}

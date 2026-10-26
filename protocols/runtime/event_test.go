@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseEvent_LogEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"log","level":"info","message":"hello"}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -32,6 +34,7 @@ func TestParseEvent_LogEvent(t *testing.T) {
 }
 
 func TestParseEvent_ProgressEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"progress","current":3,"total":10,"message":"building"}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -49,6 +52,7 @@ func TestParseEvent_ProgressEvent(t *testing.T) {
 }
 
 func TestParseEvent_MetricEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"metric","name":"binary-size","value":4096,"unit":"bytes"}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -66,6 +70,7 @@ func TestParseEvent_MetricEvent(t *testing.T) {
 }
 
 func TestParseEvent_PhaseEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"phase","name":"compile","action":"start"}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -80,6 +85,7 @@ func TestParseEvent_PhaseEvent(t *testing.T) {
 }
 
 func TestParseEvent_DiagnosticEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"diagnostic","severity":"error","message":"type error","code":"TS2304","location":{"file":"main.ts","line":5,"column":10}}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -97,6 +103,7 @@ func TestParseEvent_DiagnosticEvent(t *testing.T) {
 }
 
 func TestParseEvent_ArtifactEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"artifact","id":"bin","name":"app","kind":"binary","path":"dist/app"}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -114,6 +121,7 @@ func TestParseEvent_ArtifactEvent(t *testing.T) {
 }
 
 func TestParseEvent_ResultEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"result","data":{"status":"OK","data":{"key":"val"}}}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -132,6 +140,7 @@ func TestParseEvent_ResultEvent(t *testing.T) {
 }
 
 func TestParseEvent_MetaEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	data := `{"v":1,"type":"meta","data":{"extension":"@putnami/go","job":"build"}}`
 	e, err := ParseEvent([]byte(data))
 	if err != nil {
@@ -150,6 +159,7 @@ func TestParseEvent_MetaEvent(t *testing.T) {
 }
 
 func TestParseEvent_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-event-type-parses")
 	_, err := ParseEvent([]byte("{invalid"))
 	if err == nil {
 		t.Error("expected error for invalid JSON")
@@ -157,6 +167,7 @@ func TestParseEvent_InvalidJSON(t *testing.T) {
 }
 
 func TestDecoder_MultipleEvents(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "the-decoder-reads-one-event-per-line")
 	input := strings.Join([]string{
 		`{"v":1,"type":"log","level":"info","message":"start"}`,
 		`{"v":1,"type":"log","level":"info","message":"end"}`,
@@ -179,6 +190,7 @@ func TestDecoder_MultipleEvents(t *testing.T) {
 }
 
 func TestDecoder_SkipsBlankLines(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "the-decoder-reads-one-event-per-line")
 	input := `{"v":1,"type":"log","level":"info","message":"a"}
 
 {"v":1,"type":"result","data":{"status":"OK"}}
@@ -193,6 +205,7 @@ func TestDecoder_SkipsBlankLines(t *testing.T) {
 }
 
 func TestDecoder_Empty(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "the-decoder-reads-one-event-per-line")
 	events, err := DecodeAll(strings.NewReader(""))
 	if err != nil {
 		t.Fatal(err)
@@ -203,6 +216,7 @@ func TestDecoder_Empty(t *testing.T) {
 }
 
 func TestEmitter_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "an-emitted-line-round-trips")
 	var buf bytes.Buffer
 	em := NewEmitter(&buf)
 
@@ -248,6 +262,7 @@ func TestEmitter_RoundTrip(t *testing.T) {
 }
 
 func TestEmitter_ResultWithError(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "an-emitted-line-round-trips")
 	var buf bytes.Buffer
 	em := NewEmitter(&buf)
 	em.Result(ResultFailed, nil, &JobError{Message: "build failed", Code: "BUILD_ERROR"})
@@ -275,6 +290,7 @@ func TestEmitter_ResultWithError(t *testing.T) {
 // TestEmitter_ResultTimedOut pins the timedOut member on the wire: present
 // only when set, so every stream that does not set it keeps its bytes.
 func TestEmitter_ResultTimedOut(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "an-emitted-line-round-trips")
 	var buf bytes.Buffer
 	em := NewEmitter(&buf)
 	em.Result(ResultFailed, nil, &JobError{TimedOut: true})
@@ -303,6 +319,7 @@ func TestEmitter_ResultTimedOut(t *testing.T) {
 }
 
 func TestValidateEvent_ValidLog(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: EventLog, Level: "info", Message: "hello"}
 	diags := ValidateEvent(e)
 	if diag.HasErrors(diags) {
@@ -311,6 +328,7 @@ func TestValidateEvent_ValidLog(t *testing.T) {
 }
 
 func TestValidateEvent_Nil(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	diags := ValidateEvent(nil)
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for nil event")
@@ -321,6 +339,7 @@ func TestValidateEvent_Nil(t *testing.T) {
 // stopped being "bad" once the v2 event vocabulary was added (event_v2.go); the
 // version-dispatch cases live in event_v2_test.go.
 func TestValidateEvent_BadVersion(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "version-2-is-version-1-plus-ready")
 	for _, version := range []int{0, 3, 99} {
 		e := &Event{V: version, Type: EventLog, Level: "info", Message: "hello"}
 		if diags := ValidateEvent(e); !diag.HasErrors(diags) {
@@ -330,6 +349,7 @@ func TestValidateEvent_BadVersion(t *testing.T) {
 }
 
 func TestValidateEvent_UnknownType(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: "unknown"}
 	diags := ValidateEvent(e)
 	if !diag.HasErrors(diags) {
@@ -338,6 +358,7 @@ func TestValidateEvent_UnknownType(t *testing.T) {
 }
 
 func TestValidateEvent_LogMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: EventLog}
 	diags := ValidateEvent(e)
 	errors := diag.Errors(diags)
@@ -347,6 +368,7 @@ func TestValidateEvent_LogMissingFields(t *testing.T) {
 }
 
 func TestValidateEvent_ProgressMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: EventProgress}
 	diags := ValidateEvent(e)
 	errors := diag.Errors(diags)
@@ -356,6 +378,7 @@ func TestValidateEvent_ProgressMissingFields(t *testing.T) {
 }
 
 func TestValidateEvent_MetricMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: EventMetric}
 	diags := ValidateEvent(e)
 	errors := diag.Errors(diags)
@@ -365,6 +388,7 @@ func TestValidateEvent_MetricMissingFields(t *testing.T) {
 }
 
 func TestValidateEvent_PhaseMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: EventPhase}
 	diags := ValidateEvent(e)
 	errors := diag.Errors(diags)
@@ -374,6 +398,7 @@ func TestValidateEvent_PhaseMissingFields(t *testing.T) {
 }
 
 func TestValidateEvent_ArtifactMissingFields(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "each-type-requires-its-members")
 	e := &Event{V: 1, Type: EventArtifact}
 	diags := ValidateEvent(e)
 	errors := diag.Errors(diags)
@@ -383,6 +408,7 @@ func TestValidateEvent_ArtifactMissingFields(t *testing.T) {
 }
 
 func TestValidateEventStream_Valid(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-stream-ends-with-one-result", "one-result-closes-the-stream")
 	events := []*Event{
 		{V: 1, Type: EventLog, Level: "info", Message: "start"},
 		{V: 1, Type: EventResult},
@@ -394,6 +420,7 @@ func TestValidateEventStream_Valid(t *testing.T) {
 }
 
 func TestValidateEventStream_MissingResult(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-stream-ends-with-one-result", "one-result-closes-the-stream")
 	events := []*Event{
 		{V: 1, Type: EventLog, Level: "info", Message: "hello"},
 	}
@@ -410,6 +437,7 @@ func TestValidateEventStream_MissingResult(t *testing.T) {
 }
 
 func TestValidateEventStream_MultipleResults(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-stream-ends-with-one-result", "one-result-closes-the-stream")
 	events := []*Event{
 		{V: 1, Type: EventResult},
 		{V: 1, Type: EventResult},
@@ -427,6 +455,7 @@ func TestValidateEventStream_MultipleResults(t *testing.T) {
 }
 
 func TestValidateEventStream_ResultNotLast(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-stream-ends-with-one-result", "one-result-closes-the-stream")
 	events := []*Event{
 		{V: 1, Type: EventResult},
 		{V: 1, Type: EventLog, Level: "info", Message: "after result"},
@@ -444,6 +473,7 @@ func TestValidateEventStream_ResultNotLast(t *testing.T) {
 }
 
 func TestDecoder_EOF(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "events-parse-and-validate-by-type", "the-decoder-reads-one-event-per-line")
 	dec := NewDecoder(strings.NewReader(""))
 	_, err := dec.Next()
 	if !errors.Is(err, io.EOF) {
