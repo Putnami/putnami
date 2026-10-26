@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -57,12 +58,25 @@ func TestLease_OneWinnerPublishesForWaiter(t *testing.T) {
 	}
 }
 
+// The heartbeat keeps ownership past the expiry the claim stamped. Both store
+// handles read clocks the test sets, so the proof does not depend on when the
+// scheduler runs the heartbeat: with real time on a loaded host, the heartbeat
+// ran later than the TTL allows and the contender won.
 func TestLease_HeartbeatKeepsOwnershipLive(t *testing.T) {
+	const ttl = 500 * time.Millisecond
 	root := t.TempDir()
 	owner := NewLocalStore(root)
 	contender := NewLocalStore(root)
-	configureFastLease(owner, 500*time.Millisecond)
-	configureFastLease(contender, 500*time.Millisecond)
+	configureFastLease(owner, ttl)
+	configureFastLease(contender, ttl)
+	start := time.Now()
+	var ownerNow atomic.Int64
+	ownerNow.Store(start.UnixNano())
+	owner.leaseClock = func() time.Time { return time.Unix(0, ownerNow.Load()) }
+	// The contender reads an instant after the claim's expiry: without a
+	// heartbeat, the lease is expired for it.
+	afterClaimExpiry := start.Add(ttl + 100*time.Millisecond)
+	contender.leaseClock = func() time.Time { return afterClaimExpiry }
 
 	winner, release := owner.TryClaim(leaseTestKey, time.Second)
 	if !winner {
@@ -70,9 +84,27 @@ func TestLease_HeartbeatKeepsOwnershipLive(t *testing.T) {
 	}
 	defer release()
 
-	// Several original TTL windows elapse. The heartbeat must keep the record
-	// live, so another store handle still cannot take ownership.
-	time.Sleep(1250 * time.Millisecond)
+	// The owner's clock moves inside the claim's TTL, so its next heartbeat
+	// extends the lease one TTL past that instant.
+	beforeClaimExpiry := start.Add(ttl - 100*time.Millisecond)
+	ownerNow.Store(beforeClaimExpiry.UnixNano())
+	extended := beforeClaimExpiry.Add(ttl).UnixNano()
+	path := owner.leasePath(leaseTestKey)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, record, err := owner.leaseSnapshot(path, nil)
+		if err != nil {
+			t.Fatalf("read lease: %v", err)
+		}
+		if record.ExpiresAtNano == extended {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no heartbeat extended the lease: it expires at %d, want %d", record.ExpiresAtNano, extended)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
 	if won, contenderRelease := contender.TryClaim(leaseTestKey, time.Second); won {
 		contenderRelease()
 		t.Fatal("contender stole a heartbeating lease")
