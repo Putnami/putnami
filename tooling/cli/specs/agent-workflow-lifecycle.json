@@ -85,11 +85,11 @@
     },
     {
       "id": "host-hooks-written-on-explicit-lifecycle",
-      "text": "An explicit putnami install, init or upgrade writes the host hooks an extension declares (hostHooks) into .claude/settings.json and .codex/hooks.json when the workspace opts into the extension's agent content, binds the collaboration contract the hooks require, and has the extension installed. A repeated run changes nothing. The implicit bootstrap, the first-run pass, context generate and the MCP server never write them. A run that creates or changes .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
+      "text": "An explicit install, init or upgrade writes an extension's declared hostHooks into .claude/settings.json and .codex/hooks.json when the workspace opts into its agent content, binds the contract the hooks require, and has it installed. A repeated run changes nothing. The implicit bootstrap, the first-run pass, context generate and the MCP server never write them. A change to .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
     },
     {
       "id": "host-hooks-ownership-by-command",
-      "text": "A hook handler is Putnami's when its command runs a known launcher followed by the command path an installed extension declares; no record says so. A run replaces Putnami's handlers in place and never adds a second one. Every other key, event, group and handler keeps its bytes and its place. When the opt-in or the binding is gone, the run removes Putnami's handlers, and an event, hooks object or file they alone filled. A file that cannot be read, parsed or edited safely, or that is a link, is left untouched with a warning that names it."
+      "text": "A handler is Putnami's when its command runs a known launcher and a command path an installed extension declares. A run replaces it in place and never adds a second one; every other entry keeps its bytes and place. When the opt-in or binding is gone, the run removes Putnami's handlers and anything only they filled. A file that cannot be read, parsed or safely edited, or is a link, stays untouched with a warning."
     },
     {
       "id": "host-hooks-exit-guard",

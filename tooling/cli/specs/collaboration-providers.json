@@ -23,7 +23,7 @@
     },
     {
       "id": "capability-discovery",
-      "text": "capabilities reports, without running the provider, the binding status, the provider, and every operation of the bound version with required, supported, preconditions, description and, for a host-only operation, hostOnly. A binding to an unspoken version, or to a provider that lacks a required or binding-required operation or declares against the contract, is invalid. An optional operation the provider lacks is unsupported, and expectedRevision or mustNotExist sent to a provider declaring preconditions none is unsupported, never dropped."
+      "text": "capabilities reports, without running the provider, the binding status, the provider, and each operation of the bound version with required, supported, preconditions, description and hostOnly when set. A binding to an unknown version, or to a provider that lacks a required operation or breaks the contract, is invalid. A missing optional operation is unsupported, and so are preconditions sent to a provider that declares none."
     },
     {
       "id": "one-route-two-entry-paths",

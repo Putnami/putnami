@@ -8,8 +8,8 @@ its stdin and reads one result from its stdout.
 
 The reference implementation is
 [`@putnami/local-collaboration`](../../../tooling/local-collaboration/README.md)
-(`tooling/local-collaboration`), which implements tasks and proposals over a
-file store in about 600 lines of Go. The excerpts below come from it.
+(`tooling/local-collaboration`), which implements tasks, proposals and missions over a
+file store. The excerpts below come from it.
 
 ## 1. Declare the operations
 
