@@ -3,6 +3,7 @@ package agentsession
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,13 +71,17 @@ func TestTheMissionKeyFollowsTheDeclaredIssue(t *testing.T) {
 	}
 	// A declaration that names another checkout is not this one's.
 	path := missionDeclarationPath(dir, root, "feat/z")
-	if err := os.WriteFile(path, []byte(`{"root":"/elsewhere","branch":"feat/z","issue":3}`), 0o600); err != nil {
+	foreign, err := json.Marshal(missionDeclaration{Root: "/elsewhere", Branch: "feat/z", Issue: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, foreign, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if key := sessionMissionKey(dir, root, "feat/z"); key != "branch:feat/z" {
 		t.Errorf("a foreign declaration answered %q", key)
 	}
-	if title := missionTitle("issue-596"); title != "Issue #596" {
+	if title := missionTitle("issue-7"); title != "Issue #7" {
 		t.Errorf("title %q", title)
 	}
 	if title := missionTitle("branch:feat/x"); title != "feat/x" {
@@ -89,10 +94,10 @@ func TestAttachDeclaresTheMissionOfTheBranch(t *testing.T) {
 	h := newHarness(t)
 	h.hook(claude, "session-start", claudeSession, nil)
 	var stdout, stderr bytes.Buffer
-	if code := Attach(context.Background(), h.env, []string{"--issue", "#596"}, &stdout, &stderr); code != 0 || stderr.Len() != 0 {
+	if code := Attach(context.Background(), h.env, []string{"--issue", "#7"}, &stdout, &stderr); code != 0 || stderr.Len() != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr.String())
 	}
-	if want := "The sessions of this checkout on branch feat/session-hooks now report to mission issue-596.\n"; stdout.String() != want {
+	if want := "The sessions of this checkout on branch feat/session-hooks now report to mission issue-7.\n"; stdout.String() != want {
 		t.Errorf("stdout %q, want %q", stdout.String(), want)
 	}
 	if calls := h.provider.recordedCalls(); len(calls) != 2 {
@@ -101,11 +106,11 @@ func TestAttachDeclaresTheMissionOfTheBranch(t *testing.T) {
 	// A session that runs already moves at its next sync, and a new one
 	// starts there.
 	h.hook(claude, "stop", claudeSession, nil)
-	if sync := h.provider.lastSync(t); sync.Mission.Key != "issue-596" || sync.Mission.Title != "Issue #596" {
+	if sync := h.provider.lastSync(t); sync.Mission.Key != "issue-7" || sync.Mission.Title != "Issue #7" {
 		t.Errorf("mission %+v", sync.Mission)
 	}
 	h.hook(codex, "session-start", codexSession, nil)
-	if sync := h.provider.lastSync(t); sync.Mission.Key != "issue-596" || sync.Session.Engine != codex {
+	if sync := h.provider.lastSync(t); sync.Mission.Key != "issue-7" || sync.Session.Engine != codex {
 		t.Errorf("mission %+v", sync.Mission)
 	}
 

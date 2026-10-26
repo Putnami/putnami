@@ -102,7 +102,7 @@ func TestMissions_InputRules(t *testing.T) {
 		{"a last message on two lines", func() any { in := syncInput(); in.LastMessage = "a\nb"; return in }, nil},
 		{"a last message with NUL", func() any { in := syncInput(); in.LastMessage = "a\x00b"; return in }, []string{ErrorCodeInvalidValue}},
 		{"a long last message", func() any { in := syncInput(); in.LastMessage = fill(MaxLastMessageLength + 1); return in }, []string{ErrorCodeTooLarge}},
-		{"a mission key with a space", func() any { in := syncInput(); in.Mission.Key = "issue 596"; return in }, []string{ErrorCodeInvalidValue}},
+		{"a mission key with a space", func() any { in := syncInput(); in.Mission.Key = "issue 7"; return in }, []string{ErrorCodeInvalidValue}},
 		{"a mission without a repository", func() any { in := syncInput(); in.Mission.Repository = ""; return in }, []string{ErrorCodeRequired}},
 		{"a repository with an uppercase letter", func() any { in := syncInput(); in.Mission.Repository = "Putnami/putnami"; return in }, []string{ErrorCodeInvalidValue}},
 		{"an ask without a repository", func() any { in := askInput(); in.Mission.Repository = ""; return in }, []string{ErrorCodeRequired}},
