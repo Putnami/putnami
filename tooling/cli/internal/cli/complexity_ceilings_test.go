@@ -422,7 +422,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "planner",
 		prefix: "internal/jobs/planner/plan",
 		files:  10,
-		funcs:  96,
+		funcs:  94,
 		why: "internal/jobs/planner/plan*.go: the single planner entrypoint (planner.Plan), its dependency, " +
 			"activation, matching and resource passes, plus the plan contract and its validation. " +
 			"Planning is pure — selection in, typed plan out — and that purity is what lets the " +
@@ -498,17 +498,16 @@ var complexityCeilings = []complexityCeiling{
 			"fact, an output marked readByDependents, and the dependency edges the graph already " +
 			"holds, and it adds only ordering edges (SerializeAfter): no stage, no flag and no " +
 			"cache-key edge. Its helpers are closures, so the rule costs one function. " +
-			"RAISED 10/89→10/96: shared executions now cover " +
+			"RAISED 10/89→10/94: shared executions now cover " +
 			"the Go generate and describe that `test` plans again beside `build`, so the second " +
 			"one adopts the first one's result instead of running. A follower that writes nothing " +
-			"must take its leader's place in the write order, and the seven functions are that " +
+			"must take its leader's place in the write order, and the five functions are that " +
 			"ordering: serializeWithSharedExecutions orders the groups with write serialization " +
 			"and drops them when the result cannot be scheduled; orderSharedExecutions runs a " +
 			"leader after every member's ordering producers and each follower after every member " +
 			"before it; " +
-			"orderingProducer names a producer that only orders a member; writingAccessors and " +
-			"ordersAnotherCommand keep a group apart when a writing node of another command " +
-			"accesses what it writes; waitForFollowers makes the readers of a leader's write wait " +
+			"orderingProducer names a producer that only orders a member; waitForFollowers makes " +
+			"the readers of a leader's write wait " +
 			"for its followers, which keeps serializeWriteResources under its cyclomatic limit, " +
 			"and functionallyReaches keeps that edge from closing a functional cycle. Each reads a DECLARED fact already in the " +
 			"plan, and none adds a node, a functional edge or a cache-key input",

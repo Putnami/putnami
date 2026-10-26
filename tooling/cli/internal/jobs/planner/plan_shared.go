@@ -41,7 +41,10 @@ import (
 // reader in that place waits for them (serializeWriteResources). That is what
 // lets a task that writes the project `gen` subtree share: no other declared
 // access to the subtree runs between the leader's write and a follower's
-// capture.
+// capture. A follower's dependents then no longer wait, through it, for a
+// later writer of another command, such as a `clientgen` generator. A task
+// whose output the dependent projects read declares it readByDependents, and
+// they wait for that task itself (orderContractClients).
 //
 // Deliberately NOT stamped here:
 //
@@ -50,10 +53,6 @@ import (
 //     which the producer identity below accounts for, but a context or result
 //     binding has no single plan-time value, so one conservative gate keeps
 //     every bound step out of direct sharing.
-//   - A group whose write another command reads or writes with a write of its
-//     own (ordersAnotherCommand). Taking the leader's place would move the
-//     follower ahead of that command's node, and the follower's dependents
-//     with it.
 //
 // ONE RESIDUAL, from writes into `.gen` that no task declares. `build-describe`
 // also writes UNDECLARED into `.gen`: it merges the specs it promoted into the
@@ -101,12 +100,11 @@ func attachSharedExecutions(
 		return nil
 	}
 
-	accessors := writingAccessors(jobs)
 	identities := make([]string, 0, len(byIdentity))
 	for identity, members := range byIdentity {
 		// A group of one is not a shared node: nothing is saved and the runtime
 		// would take a slot for a member that has no peer.
-		if len(members) < 2 || ordersAnotherCommand(members, accessors) {
+		if len(members) < 2 {
 			continue
 		}
 		identities = append(identities, identity)
@@ -205,52 +203,6 @@ func orderSharedExecutions(jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.S
 		}
 	}
 	return leaders
-}
-
-// writingAccessors indexes, by conflict key, the nodes that read or write a
-// resource and declare a write of their own.
-func writingAccessors(jobs []*jobmodel.ScheduledJob) map[string][]*jobmodel.ScheduledJob {
-	index := make(map[string][]*jobmodel.ScheduledJob)
-	for _, job := range jobs {
-		if job.Project == nil || job.JobDef == nil || len(job.JobDef.Writes) == 0 {
-			continue
-		}
-		seen := make(map[string]bool)
-		for _, refs := range [][]extension.ResourceRef{job.JobDef.Writes, job.JobDef.Reads} {
-			for _, ref := range refs {
-				key := ResourceConflictKey(job.Project.ID, ref)
-				if !seen[key] {
-					seen[key] = true
-					index[key] = append(index[key], job)
-				}
-			}
-		}
-	}
-	return index
-}
-
-// ordersAnotherCommand reports whether a node of a command no member belongs
-// to reads or writes a resource the members write, and declares a write of its
-// own. Without sharing, the later member is a writer that waits for such a
-// node, and the member's dependents follow it: what the node writes can reach
-// them through files they read, which no resource names. A follower takes its
-// leader's earlier place in the write order instead, so the members stay
-// apart. The members' own commands are the pipelines whose order a shared
-// plan is pinned against.
-func ordersAnotherCommand(members []*jobmodel.ScheduledJob, accessors map[string][]*jobmodel.ScheduledJob) bool {
-	commands := make(map[string]bool, len(members))
-	for _, member := range members {
-		commands[member.CommandName()] = true
-	}
-	leader := members[0]
-	for _, ref := range leader.JobDef.Writes {
-		for _, other := range accessors[ResourceConflictKey(leader.Project.ID, ref)] {
-			if !commands[other.CommandName()] {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // sharedExecutionIdentity returns the value every member of one shared node must

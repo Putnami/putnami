@@ -329,12 +329,11 @@ func TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite(t *testing.T) {
 // generator and the test steps that compile its committed client: the
 // provider's own and a consumer's. The generator rewrites the client inside the
 // provider's tree, after the build, and reads the provider's .gen. The
-// provider's test generate is the later .gen writer that waits for the
-// generator, and the consumer's test generate follows it. A shared execution
-// would move that generate to its leader's earlier place, but the generator is
-// a writing node of another command, so the pair stays apart. The build's
-// infra step declares the project's gen write, so it is ordered against the
-// provider's test steps that read .gen.
+// provider's test generate adopts its build generate and takes that earlier
+// place in the write order. The build's infra step declares the project's gen
+// write, so it waits for the provider's test steps that read .gen, and the
+// generator follows the build. The consumer waits for the generator because the
+// generator declares its client readByDependents.
 func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 	root := t.TempDir()
 	writeProjectFile(t, root, "provider", "go.mod",
@@ -362,7 +361,7 @@ func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 		t.Fatalf("plan lint,test,build,clientgen: %v", err)
 	}
 	byKey := JobsByPlanKey(planned)
-	requirePlanKey(t, byKey, "/provider:test~generate")
+	requireShared(t, byKey, "/provider:build~generate", "/provider:test~generate")
 	ordered := func(a, b *jobmodel.ScheduledJob) bool {
 		return planAncestors(byKey, a)[b.Key()] || planAncestors(byKey, b)[a.Key()]
 	}

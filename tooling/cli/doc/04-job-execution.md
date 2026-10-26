@@ -327,7 +327,12 @@ would have produced:
 | Task declares at least one `writes` resource | A shared run's side effects must be ones the planner can serialize. |
 | Task declares no `command-output` output | That directory resolves per command: the leader never writes the follower's, and the follower runs nothing, so it never empties it and would capture an earlier run's files. |
 | Same resolved deadline, task file and env patterns, runtime inputs, selected projects | Everything else a cache key would have distinguished, minus the command name. A project's per-command `filePatterns` and `envInputs` are left out: they widen every key of one command and reach no task process. |
-| No node of another command reads or writes a resource the group writes while it declares a write of its own | A follower takes its leader's earlier place in the write order, which would move it, and its dependents, ahead of that node. The `clientgen` generators read the project's `.gen` after the build and rewrite a committed client the project's tests compile. |
+
+A follower takes its leader's earlier place in the write order, so its
+dependents no longer wait, through it, for a later writer of another command.
+A task whose output other projects read declares that output
+`readByDependents`, and those projects wait for the task itself: the
+`clientgen` generators declare it on the client they rewrite.
 
 The plan orders the members, but the runtime designates no leader in advance,
 which is what keeps the mechanism correct on partial plans: a member served

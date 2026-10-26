@@ -511,38 +511,63 @@ func cutPlanKey(key string) (project, step string, ok bool) {
 	return "", "", false
 }
 
-// TestSharedExecutions_KeepTheOrderOfAnotherCommand pins that a group stays
-// apart when a node of another command reads what it writes and declares a
-// write of its own. The probe's `clientgen` command follows build, as the
-// clientgen command does, and its generator reads the project's gen and writes
-// its own resource. Unshared, test's generate is the later gen writer that
-// waits for the generator, and the test steps follow it.
-func TestSharedExecutions_KeepTheOrderOfAnotherCommand(t *testing.T) {
+// TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator pins, on the
+// real Go and clientgen manifests, that a group shares beside a writer of
+// another command and that the group's dependents still wait for that writer.
+// The clientgen generators read the client's gen after the build and rewrite
+// the client a consumer compiles. The client's test generate adopts its build
+// generate and takes that earlier place, so the consumer no longer waits for
+// the generators through it: it waits because the generators declare their
+// client readByDependents. Without that flag the same shared plan leaves a
+// consumer job unordered with a generator.
+func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T) {
 	t.Parallel()
-	ext := pipelineProbeExtension()
-	ext.Jobs["clientgen"] = &extension.JobDefinition{
-		ExtensionName: "@test/pipeline", Name: "clientgen", Kind: "command", Command: "probe", Cache: true,
-		CommandDependsOn: []string{"build"},
-		PipelineSteps:    []extension.PipelineStep{{ID: "generate-go", Task: "probe-clientgen"}},
-	}
-	generator := ext.Tasks["probe-describe"]
-	generator.Args = []string{"clientgen"}
-	generator.Writes = []extension.ResourceRef{{ID: "clients-go"}}
-	generator.Declares = probeDirectoryOutput("client-go")
-	ext.Tasks["probe-clientgen"] = generator
-	projects := pipelineProbeProjects()[:1]
+	goExtension := loadGoPlannerExtension(t)
+	for _, commands := range [][]string{{"clientgen", "test", "build"}, {"lint", "test", "build", "validate"}} {
+		ws, selected := dependentsWorkspace(t)
+		plan := func(clientgen *extension.ExtensionDescription) []*jobmodel.ScheduledJob {
+			planned, err := Plan(ws, commands, selected, []*extension.ExtensionDescription{goExtension, clientgen}, nil, nil, nil)
+			if err != nil {
+				t.Fatalf("plan %v: %v", commands, err)
+			}
+			return planned
+		}
+		planned := plan(loadClientgenExtension(t))
+		byKey := JobsByPlanKey(planned)
+		requireShared(t, byKey, dependentsClient+":build~generate", dependentsClient+":test~generate")
+		clientTest := requirePlanKey(t, byKey, dependentsClient+":test~test")
+		var generators []*jobmodel.ScheduledJob
+		for _, job := range planned {
+			if job.Project.ID == dependentsClient && job.CommandName() == "clientgen" {
+				generators = append(generators, job)
+			}
+		}
+		if len(generators) == 0 {
+			t.Fatalf("plan %v: control: no clientgen generator planned for %s", commands, dependentsClient)
+		}
 
-	requireShared(t, JobsByPlanKey(planPipelineProbe(t, []string{"build", "test"}, ext, projects)),
-		"/lib:build~generate", "/lib:test~generate")
-
-	byKey := JobsByPlanKey(planPipelineProbe(t, []string{"build", "test", "clientgen"}, ext, projects))
-	if id := requirePlanKey(t, byKey, "/lib:test~generate").SharedExecution(); id != "" {
-		t.Errorf("/lib:test~generate joined %q beside a writing node of another command", id)
-	}
-	test := requirePlanKey(t, byKey, "/lib:test~test")
-	clientgen := requirePlanKey(t, byKey, "/lib:clientgen~generate-go")
-	if !planOrdered(byKey, test, clientgen) {
-		t.Errorf("%s and %s are unordered", clientgen.Key(), test.Key())
+		edges, unflagged := planEdges(planned), planEdges(plan(clientgenWithoutReadByDependents(t)))
+		raced := false
+		for _, generator := range generators {
+			if !planOrdered(byKey, clientTest, generator) {
+				t.Errorf("plan %v: %s and %s are unordered", commands, clientTest.Key(), generator.Key())
+			}
+			for _, job := range planned {
+				if job.Project.ID != dependentsConsumer || jobmodel.IsFinalizerJob(job) {
+					continue
+				}
+				if !planReaches(edges, job.Key(), generator.Key()) {
+					t.Errorf("plan %v: %s does not wait for %s", commands, job.Key(), generator.Key())
+				}
+				if !planReaches(unflagged, job.Key(), generator.Key()) && !planReaches(unflagged, generator.Key(), job.Key()) {
+					raced = true
+				}
+			}
+		}
+		if !raced {
+			t.Errorf("plan %v: control: without readByDependents every consumer job is still ordered with "+
+				"the generators, so the shared plan does not show what the flag orders", commands)
+		}
 	}
 }
 
