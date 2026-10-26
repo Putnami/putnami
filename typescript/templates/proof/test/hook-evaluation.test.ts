@@ -25,7 +25,7 @@ describe('preBuild proof route evaluation', () => {
       const rendered: RenderedProject = {
         workspace,
         project,
-        template: { name: 'fixture', dir: workspace, manifest: { name: 'fixture' } },
+        template: { name: 'fixture', dir: workspace, manifest: { name: 'fixture' }, features: [] },
         vars: {
           projectName: 'consumer',
           projectPath: 'consumer',

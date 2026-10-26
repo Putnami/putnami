@@ -78,9 +78,11 @@ Directory and file **names** support one substitution: the literal segment
 Python templates produce `src/<module>/`.
 
 Files that describe the template as a project *in the workspace it lives in* are
-never staged into the archive, so a generated project does not inherit them:
-`putnami.json`, `putnami.features.json`, `specs/`, `node_modules/`, and anything
-whose name starts with a dot.
+never staged into the archive, and `putnami projects create` skips them when it
+renders a template straight from the workspace, so a generated project does not
+inherit them:
+`putnami.json`, `putnami.features.json`, `specs/`, `specs.baseline.json`,
+`node_modules/`, and anything whose name starts with a dot.
 
 ## Template discovery
 

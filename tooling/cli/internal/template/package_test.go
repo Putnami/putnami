@@ -155,13 +155,16 @@ func TestPackage_ExcludesWorkspaceDeclarationsAndKeepsTemplateContent(t *testing
 	if err := os.WriteFile(filepath.Join(templateDir, "specs", "template.json"), []byte(`{"protocolVersion":1}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(templateDir, "specs.baseline.json"), []byte(`{"protocolVersion":2}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	result, err := Package(context.Background(), templateDir, PackageOptions{OutputDir: filepath.Join(t.TempDir(), "out")})
 	if err != nil {
 		t.Fatalf("Package: %v", err)
 	}
 	entries := archiveEntrySet(t, result.ArchivePath)
-	for _, excluded := range []string{"putnami.json", "putnami.features.json", "specs/template.json"} {
+	for _, excluded := range []string{"putnami.json", "putnami.features.json", "specs/template.json", "specs.baseline.json"} {
 		if entries[excluded] {
 			t.Errorf("archive contains workspace-side declaration %q", excluded)
 		}

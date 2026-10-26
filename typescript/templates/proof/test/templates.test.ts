@@ -5,13 +5,16 @@
  * For each template beside this project, the proof renders it into a throwaway
  * workspace, runs the preBuild hooks, lints it with the Biome check
  * `putnami lint` runs, type-checks it the way `build~types` does and runs the
- * tests the template ships. The static checks below keep this project's cache
- * key complete: every file a rendered project reads is a declared input, so a
- * change to a template or to the framework reruns it.
+ * tests the template ships. Each step observes a check of the feature the
+ * template declares about itself (tooling/scaffold ADR 0003), so the spec gate
+ * sees each template keep its promise. The static checks below keep this
+ * project's cache key complete: every file a rendered project reads is a
+ * declared input, so a change to a template or to the framework reruns it.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   BIOME_CONFIG,
   declaredDependencies,
@@ -26,6 +29,9 @@ import {
   runPreBuildHooks,
   runTests,
   type StepResult,
+  TEMPLATE_PROTOCOL_SOURCE,
+  TEMPLATE_ROOT_EXCLUSIONS,
+  type Template,
   TYPESCRIPT_EXTENSION,
   typeCheck,
   WORKSPACE_GITIGNORE,
@@ -39,7 +45,25 @@ const templates = discoverTemplates(templatesDir, TYPESCRIPT_EXTENSION);
 /** A step can compile the whole framework from source on a loaded host. */
 const STEP_TIMEOUT_MS = 300_000;
 
+/** A check of a template's feature, which one step observes. */
+interface StepCheck {
+  requirement: string;
+  check: string;
+}
+
+/**
+ * The check each step observes. A template whose packages declare no preBuild
+ * hook declares no hook check, so its hook step stays a plain test.
+ */
+const STEPS = {
+  hooks: { requirement: 'a-rendered-project-type-checks', check: 'its-prebuild-hooks-certify-their-routes' },
+  lint: { requirement: 'a-rendered-project-passes-lint', check: 'the-biome-check-reports-nothing' },
+  types: { requirement: 'a-rendered-project-type-checks', check: 'it-type-checks-as-build-types-does' },
+  tests: { requirement: 'a-rendered-project-passes-its-tests', check: 'bun-test-passes' },
+} as const satisfies Record<string, StepCheck>;
+
 const proofConfig = JSON.parse(readFileSync(join(proofDir, 'putnami.json'), 'utf8')) as {
+  dependencies?: string[];
   options?: { test?: { filePatterns?: string[] } };
 };
 const filePatterns = new Set(proofConfig.options?.test?.filePatterns ?? []);
@@ -54,6 +78,37 @@ function expectSuccess(step: string, result: StepResult): void {
 /** The proof-relative path of a directory, with forward slashes. */
 function fromProof(dir: string): string {
   return relative(proofDir, dir).replaceAll('\\', '/');
+}
+
+/** Every check the template's features declare, as `requirement#check`. */
+function declaredChecks(template: Template): string[] {
+  return template.features.flatMap((feature) =>
+    feature.requirements.flatMap((requirement) =>
+      (requirement.verification?.checks ?? []).map((check) => `${requirement.id}#${check}`),
+    ),
+  );
+}
+
+/** Whether a package the template declares runs a preBuild hook. */
+function hasPreBuildHook(template: Template): boolean {
+  const templatePackage = JSON.parse(readFileSync(join(template.dir, 'package.json.template'), 'utf8'));
+  return Object.keys(declaredDependencies(templatePackage)).some((name) => {
+    const manifest = join(proofDir, 'node_modules', name, 'putnami.extension.json');
+    return existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).hooks?.preBuild !== undefined;
+  });
+}
+
+/**
+ * Registers one step of a template's proof: a specTest observing `observes`
+ * when the template's feature declares that check, and a plain test otherwise.
+ */
+function step(template: Template, name: string, observes: StepCheck, body: () => Promise<void>): void {
+  const feature = template.features[0];
+  if (feature && declaredChecks(template).includes(`${observes.requirement}#${observes.check}`)) {
+    specTest(name, { feature: feature.id, ...observes }, body, STEP_TIMEOUT_MS);
+    return;
+  }
+  test(name, body, STEP_TIMEOUT_MS);
 }
 
 describe('the proof keeps its cache key complete', () => {
@@ -74,6 +129,17 @@ describe('the proof keeps its cache key complete', () => {
 
   test('the Biome configuration a rendered project is linted with is a declared input', () => {
     expect(filePatterns.has(fromProof(join(root, BIOME_CONFIG)))).toBe(true);
+  });
+
+  test('a render leaves out the root entries a template archive leaves out', () => {
+    expect(filePatterns.has(fromProof(join(root, TEMPLATE_PROTOCOL_SOURCE)))).toBe(true);
+    const source = readFileSync(join(root, TEMPLATE_PROTOCOL_SOURCE), 'utf8');
+    const body = source.split('func IsTemplateRootPackagingExclusion(name string) bool {')[1]?.split('\n}\n')[0] ?? '';
+    expect(body).toContain('strings.HasPrefix(name, ".")');
+    const names = [...body.matchAll(/case ([^:]*):/g)].flatMap((clause) =>
+      [...(clause[1] ?? '').matchAll(/"([^"]*)"/g)].map((name) => name[1]),
+    );
+    expect(names).toEqual([...TEMPLATE_ROOT_EXCLUSIONS]);
   });
 
   test('the .gitignore a rendered workspace holds is the one putnami init writes', () => {
@@ -117,6 +183,45 @@ describe('the proof keeps its cache key complete', () => {
   });
 });
 
+describe('every template declares the promise this proof observes', () => {
+  test('every template declares one feature of its own, under tooling/project-scaffolding', () => {
+    for (const template of templates) {
+      expect({
+        template: template.name,
+        features: template.features.length,
+        relations: template.features[0]?.relations,
+      }).toEqual({
+        template: template.name,
+        features: 1,
+        relations: [{ kind: 'parent', target: 'tooling/project-scaffolding' }],
+      });
+    }
+  });
+
+  // A session that validates a template without running this proof reads the
+  // checks from this proof's last test result only when the proof depends on it.
+  test('every template is a dependency, so its spec gate finds this proof', () => {
+    for (const template of templates) {
+      const project = `/${relative(root, template.dir).replaceAll('\\', '/')}`;
+      expect({ project, dependency: proofConfig.dependencies?.includes(project) }).toEqual({
+        project,
+        dependency: true,
+      });
+    }
+  });
+
+  test('every template declares the check of each step it runs, and only those', () => {
+    for (const template of templates) {
+      const expected = Object.entries(STEPS)
+        .filter(([name]) => name !== 'hooks' || hasPreBuildHook(template))
+        .map(([, { requirement, check }]) => `${requirement}#${check}`)
+        .sort((left, right) => left.localeCompare(right));
+      const declared = declaredChecks(template).sort((left, right) => left.localeCompare(right));
+      expect({ template: template.name, checks: declared }).toEqual({ template: template.name, checks: expected });
+    }
+  });
+});
+
 for (const template of templates) {
   describe(`the ${template.name} template`, () => {
     let rendered: RenderedProject | undefined;
@@ -135,37 +240,21 @@ for (const template of templates) {
       disposeProject(rendered);
     });
 
-    test(
-      'runs its preBuild hooks',
-      async () => {
-        expectSuccess('the preBuild hooks', await runPreBuildHooks(current(), 'test'));
-      },
-      STEP_TIMEOUT_MS,
-    );
+    step(template, 'runs its preBuild hooks', STEPS.hooks, async () => {
+      expectSuccess('the preBuild hooks', await runPreBuildHooks(current(), 'test'));
+    });
 
     // After the hooks, so the files they write are linted too.
-    test(
-      'passes the Biome check of putnami lint',
-      async () => {
-        expectSuccess('the Biome check', await lint(current()));
-      },
-      STEP_TIMEOUT_MS,
-    );
+    step(template, 'passes the Biome check of putnami lint', STEPS.lint, async () => {
+      expectSuccess('the Biome check', await lint(current()));
+    });
 
-    test(
-      'type-checks the way build~types does',
-      async () => {
-        expectSuccess('the type-check', await typeCheck(current()));
-      },
-      STEP_TIMEOUT_MS,
-    );
+    step(template, 'type-checks the way build~types does', STEPS.types, async () => {
+      expectSuccess('the type-check', await typeCheck(current()));
+    });
 
-    test(
-      'passes the tests it ships',
-      async () => {
-        expectSuccess('bun test', await runTests(current()));
-      },
-      STEP_TIMEOUT_MS,
-    );
+    step(template, 'passes the tests it ships', STEPS.tests, async () => {
+      expectSuccess('bun test', await runTests(current()));
+    });
   });
 }

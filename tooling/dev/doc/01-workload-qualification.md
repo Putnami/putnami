@@ -221,10 +221,13 @@ and `compose` waits for no killed run. Whatever survives is reported as
 On Unix, `compose` and `qualify` also watch the putnami process that launched
 them. A putnami killed outright (`kill -9`, an out-of-memory kill) signals
 nothing, so they notice its loss within a second and run the teardown a signal
-runs; a write to a stdout or stderr whose reader is gone no longer ends them. On
-Windows, putnami runs them in a Job Object that ends them, and every serve run
-they started, with putnami: nothing is torn down, and the next `compose` reaps
-the lease.
+runs; a write to a stdout or stderr whose reader is gone no longer ends them.
+Each member's serve run watches `compose` the same way: when putnami kills
+`compose` outright, after a second `Ctrl-C` or once its 90 seconds pass, each
+run notices within a second, stops its serve step and exits. The databases and
+the lease stay for the next `compose` to reap. On Windows, putnami runs them in
+a Job Object that ends them, and every serve run they started, with putnami:
+nothing is torn down, and the next `compose` reaps the lease.
 
 A composition killed without teardown (`kill -9`, a crash) leaves its lease. The
 next `compose` reaps every lease whose lock is free **and** whose pid is dead:
@@ -398,7 +401,8 @@ start and after `Ctrl-C`. The verdict's `cleanup` records what it released:
 The first `Ctrl-C` cancels the run: the active phase becomes `canceled` and the
 teardown still runs, and the run exits `1` with that verdict. A second
 `Ctrl-C`, or 90 seconds without the run ending, makes putnami kill the run and
-exit `130`. What that leaves behind is reaped by the next `compose`
+exit `130`. On Unix, each member's serve run sees that loss and stops its serve
+step. What the kill leaves behind is reaped by the next `compose`
 or `qualify --target local`, as described in [Recovery](#recovery): a lease whose
 lock is free and whose owner is dead has the process groups it can confirm killed,
 its databases dropped and its directory removed.

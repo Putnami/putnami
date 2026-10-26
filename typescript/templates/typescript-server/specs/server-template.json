@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/server-template",
+  "outcomes": [
+    "A new HTTP server starts from the API routes it serves and a test beside it, and putnami lint and putnami test report nothing to fix before the user edits a line",
+    "A change to the template or to the framework it uses that breaks this promise fails the template proof, before a user creates a project from it"
+  ],
+  "nonGoals": [
+    "Packaging the template, its archive contents and the render rules, which tooling/project-scaffolding owns",
+    "Resolving packages from a registry: the proof links this repository's framework sources, so a rendered project is proven against the framework it is released with (ADR 0006)",
+    "Building the generated serve entry or running putnami serve, which the proof does not run"
+  ],
+  "requirements": [
+    {
+      "id": "a-rendered-project-passes-lint",
+      "text": "A project rendered from typescript-server passes the Biome check putnami lint runs, with the TypeScript extension's config/biome.json and the .gitignore putnami init writes, and Biome reports no warning."
+    },
+    {
+      "id": "a-rendered-project-type-checks",
+      "text": "A project rendered from typescript-server type-checks the way build~types does, against the packages its package.json declares and no other, after the preBuild hooks of those packages have run and each certified a complete route evaluation."
+    },
+    {
+      "id": "a-rendered-project-passes-its-tests",
+      "text": "A project rendered from typescript-server ships a test beside the API routes it serves, and bun test passes in it against the packages it declares."
+    }
+  ],
+  "decisions": [
+    "tooling/scaffold/doc/adr/0003-what-a-default-template-promises.md",
+    "tooling/scaffold/doc/adr/0006-templates-run-against-the-workspace-framework.md"
+  ]
+}

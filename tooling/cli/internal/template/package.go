@@ -79,7 +79,7 @@ func Package(ctx context.Context, templateDir string, opts PackageOptions) (*Pac
 	// The manifest is the only required archive member; README.md and
 	// LICENSE.md are ordinary optional template content.
 	if err := treearchive.CopyTree(templateDir, stageDir, func(rel string) bool {
-		return !strings.Contains(rel, "/") && (rel[0] == '.' || templateproto.IsTemplateRootPackagingExclusion(rel))
+		return !strings.Contains(rel, "/") && templateproto.IsTemplateRootPackagingExclusion(rel)
 	}); err != nil {
 		return nil, stagingError(err)
 	}

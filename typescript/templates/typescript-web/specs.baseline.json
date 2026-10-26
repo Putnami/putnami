@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "typescript/web-template#a-rendered-project-passes-its-tests",
+    "typescript/web-template#a-rendered-project-passes-lint",
+    "typescript/web-template#a-rendered-project-type-checks"
+  ]
+}
