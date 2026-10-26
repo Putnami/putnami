@@ -60,8 +60,10 @@ that owns a changed file, in a step after the test step.**
    the host's cgo setting: the darwin race runtime needs no cgo. Three failures
    name `--no-race-changed` and mark the result `host-unsupported`, which the
    CLI never replays from its failure cache: a refusal of `go list -race`, a
-   compiler check that fails, and a failed run in which no test ran and the
-   detector reported no race.
+   compiler check that fails, and a failed run in which no test ran, the race
+   runtime printed nothing, the `go test -timeout` did not fire and no signal
+   stopped `go test`. A run that hangs past its timeout is a timeout failure,
+   not a host verdict.
 
 ## Invariants
 

@@ -310,3 +310,34 @@ func TestGoManifestPlansTheRaceStepOnTheTouchedProject(t *testing.T) {
 		t.Errorf("no diff: plan = %v; want test without a race step", keys)
 	}
 }
+
+// The CLI project tunes its race step by the step name the scheduler resolves,
+// test~test-race, so the step runs under the CLI test step's deadline rather
+// than the Go manifest's default.
+func TestTheCLIProjectTunesItsRaceStepDeadline(t *testing.T) {
+	t.Parallel()
+	config, diags := wsproto.LoadProjectConfigWithDiagnostics(filepath.Join(findJobsRepoRoot(t), "tooling", "cli"))
+	if len(diags) > 0 {
+		t.Fatalf("tooling/cli/putnami.json: %v", diags)
+	}
+	root := t.TempDir()
+	writeProjectFile(t, root, "cli", "go.mod", "module example.com/cli\n\ngo 1.25\n")
+	writeProjectFile(t, root, "cli", "cli.go", "package cli\n")
+	project := &workspace.Project{
+		ID: "/tooling/cli", Name: "cli", Path: "cli", Type: "library", Extensions: []string{"@putnami/go"}, Config: config,
+	}
+	planned, err := Plan(testWorkspace(root, project), []string{"test"}, []*workspace.Project{project},
+		[]*extension.ExtensionDescription{loadGoPlannerExtension(t)}, nil, nil, nil, []string{"cli/cli.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	race := findScheduled(planned, "/tooling/cli:test~test-race")
+	test := findScheduled(planned, "/tooling/cli:test~test")
+	if race == nil || test == nil {
+		t.Fatalf("plan = %v; want test and test-race on /tooling/cli", planKeySet(planned))
+	}
+	if got, want := race.EffectiveTimeoutMs(), test.EffectiveTimeoutMs(); got != want || got <= race.JobDef.TimeoutMs {
+		t.Errorf("race step deadline = %d ms; want the test step's %d ms, above the manifest's %d ms",
+			got, want, race.JobDef.TimeoutMs)
+	}
+}

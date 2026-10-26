@@ -156,6 +156,13 @@ func diagnosticSays(events []map[string]any, want ...string) bool {
 	return false
 }
 
+// signaledError is the error of a command a signal stopped: like an
+// exec.ExitError for a killed process, it reports exit code -1.
+type signaledError struct{}
+
+func (signaledError) Error() string { return "signal: killed" }
+func (signaledError) ExitCode() int { return -1 }
+
 // The job lists the touched directories under -race and runs the packages
 // they hold, with cgo on and none of the test step's coverage flags, even
 // when the coverage parameters ask for a threshold. It reports the race
@@ -438,31 +445,48 @@ func TestRunRace_RefusesAHostThatCannotRunTheDetector(t *testing.T) {
 
 // A failed race run in which no test ran, such as a race build that does not
 // link or a binary the detector cannot start, names the opt-out and is marked
-// host-unsupported. A failed test, or a race the detector reports before any
-// test, is a verdict on the change and is not.
+// host-unsupported. A failed test, a race or goroutine limit the race runtime
+// reports before any test finished, a test that hangs past the go test timeout
+// and a run a signal stopped are verdicts on the change or the run, and are
+// not. The timed-out run is marked timed out.
 func TestRunRace_ARunInWhichNoTestRanIsAHostFailure(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", raceRequirement, "a-host-that-cannot-run-the-race-detector-fails-naming-the-opt-out")
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "go.mod"), "module racemod\n\ngo 1.21\n")
 	onHost(t, "linux", true)
 	transcript := func(lines ...string) string { return strings.Join(lines, "\n") + "\n" }
+	exitStatus := errors.New("exit status 1")
 	for name, tc := range map[string]struct {
-		output string
-		host   bool
+		output   string
+		runErr   error
+		host     bool
+		timedOut bool
 	}{
-		"a race build that does not link": {host: true, output: transcript(
+		"a race build that does not link": {host: true, runErr: exitStatus, output: transcript(
 			testEvent("output", "racemod", "", "# racemod.test\n"),
 			testEvent("output", "racemod", "", "runtime/race: undefined reference to __libc_stack_end\n"),
 			testEvent("fail", "racemod", "", ""))},
-		"a detector that cannot start": {host: true, output: transcript(
+		"a detector that cannot start": {host: true, runErr: exitStatus, output: transcript(
 			testEvent("output", "racemod", "", "FATAL: ThreadSanitizer: unsupported VMA range\n"),
 			testEvent("fail", "racemod", "", ""))},
-		"a failed test": {output: transcript(
+		"a failed test": {runErr: exitStatus, output: transcript(
 			testEvent("run", "racemod", "TestX", ""),
 			testEvent("fail", "racemod", "TestX", ""),
 			testEvent("fail", "racemod", "", ""))},
-		"a race before any test": {output: transcript(
+		"a race before any test": {runErr: exitStatus, output: transcript(
 			testEvent("output", "racemod", "", "WARNING: DATA RACE\n"),
+			testEvent("fail", "racemod", "", ""))},
+		"a test that hangs past the timeout": {runErr: exitStatus, timedOut: true, output: transcript(
+			testEvent("run", "racemod", "TestHang", ""),
+			testEvent("output", "racemod", "TestHang", "=== RUN   TestHang\n"),
+			testEvent("output", "racemod", "", "panic: test timed out after 2s\n"),
+			testEvent("fail", "racemod", "", ""))},
+		"a run a signal stopped": {runErr: signaledError{}, output: transcript(
+			testEvent("run", "racemod", "TestSlow", ""),
+			testEvent("output", "racemod", "TestSlow", "=== RUN   TestSlow\n"))},
+		"the race runtime's goroutine limit": {runErr: exitStatus, output: transcript(
+			testEvent("run", "racemod", "TestFanOut", ""),
+			testEvent("output", "racemod", "", "race: limit on 8128 simultaneously alive goroutines is exceeded, dying\n"),
 			testEvent("fail", "racemod", "", ""))},
 	} {
 		mockGoCommandRaw(t, func(_ string, args []string, _ string, _ []string) ([]byte, error) {
@@ -472,7 +496,7 @@ func TestRunRace_ARunInWhichNoTestRanIsAHostFailure(t *testing.T) {
 			case "env":
 				return json.Marshal(map[string]string{"GOOS": "linux", "CC": "gcc"})
 			}
-			return []byte(tc.output), errors.New("exit status 1")
+			return []byte(tc.output), tc.runErr
 		})
 		status, events, jobErr := runRaceForResult(t, raceContext(t, dir, []string{"main.go"}, nil))
 		if status != "FAILED" {
@@ -480,6 +504,9 @@ func TestRunRace_ARunInWhichNoTestRanIsAHostFailure(t *testing.T) {
 		}
 		if got := jobErr["code"] == extensionproto.HostUnsupportedFailureCode; got != tc.host {
 			t.Errorf("%s: host-unsupported = %v (error %v), want %v", name, got, jobErr, tc.host)
+		}
+		if got := jobErr["timedOut"] == true; got != tc.timedOut {
+			t.Errorf("%s: timed out = %v (error %v), want %v", name, got, jobErr, tc.timedOut)
 		}
 		if got := diagnosticSays(events, "No test ran under the race detector", raceOptOut); got != tc.host {
 			t.Errorf("%s: opt-out diagnostic = %v, want %v; events = %+v", name, got, tc.host, events)
@@ -540,5 +567,49 @@ func TestRunRace_TheDetectorRunsOnTheTouchedPackageOnly(t *testing.T) {
 	}
 	if !diagnosticSays(events, "race detected") && !diagnosticSays(events, "DATA RACE") {
 		t.Errorf("no error diagnostic reports the race; events = %+v", eventsOfType(events, "diagnostic"))
+	}
+}
+
+// A changed package whose test hangs under the detector fails as timed out,
+// below the step's deadline, and is not reported as a host that cannot run
+// the detector.
+func TestRunRace_AHungTestIsATimeoutNotAHostFailure(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", raceRequirement, "a-host-that-cannot-run-the-race-detector-fails-naming-the-opt-out")
+	goBinary, err := toolchain.ResolveGo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "go.mod"), "module racemod\n\ngo 1.21\n")
+	mustWrite(t, filepath.Join(dir, "hang.go"), "package racemod\n")
+	mustWrite(t, filepath.Join(dir, "hang_test.go"), strings.Join([]string{
+		"package racemod",
+		"",
+		"import (",
+		"\t\"testing\"",
+		"\t\"time\"",
+		")",
+		"",
+		"func TestHang(t *testing.T) { time.Sleep(time.Hour) }",
+		"",
+	}, "\n"))
+	env := append(toolchain.WorkspaceBuildEnv(nil, dir, goBinary), "CGO_ENABLED=1")
+	if _, err := listRacePackages(goBinary, dir, env, []string{"."}); err != nil {
+		t.Skipf("this host cannot run the race detector: %v", err)
+	}
+	if err := checkRaceCompiler(goBinary, dir, env); err != nil {
+		t.Skipf("this host cannot run the race detector: %v", err)
+	}
+	t.Setenv(extensionproto.TaskDeadlineMsEnv, "3000")
+
+	status, events, jobErr := runRaceForResult(t, raceContext(t, dir, []string{"hang_test.go"}, nil))
+	if status != "FAILED" || jobErr["timedOut"] != true {
+		t.Fatalf("a hung test: RunRace = %q, error %v; want FAILED and timed out", status, jobErr)
+	}
+	if jobErr["code"] == extensionproto.HostUnsupportedFailureCode {
+		t.Errorf("a hung test is marked host-unsupported: %v", jobErr)
+	}
+	if diagnosticSays(events, "No test ran under the race detector") {
+		t.Errorf("a hung test names the race detector opt-out; events = %+v", eventsOfType(events, "diagnostic"))
 	}
 }

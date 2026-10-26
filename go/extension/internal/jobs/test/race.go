@@ -2,6 +2,7 @@ package test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,6 +39,10 @@ var lookPath = exec.LookPath
 // Tests replace it.
 var hostOS = goruntime.GOOS
 
+// raceRuntimeReports are lines only the race runtime prints: a run whose
+// transcript holds one ran its tests under the detector.
+var raceRuntimeReports = []string{"WARNING: DATA RACE", "race: limit on "}
+
 // RunRace runs `go test -race` on the packages a change touched: the
 // directory of each changed Go file the project owns, and the package that
 // holds a changed testdata directory. The CLI binds those files,
@@ -46,8 +51,10 @@ var hostOS = goruntime.GOOS
 // step, and reports no test counts, test cases, coverage or feature
 // verification report: the test step owns them, and the race verdict is the
 // step's status and its failure diagnostics. A refusal of `go list -race`,
-// a C compiler check that fails, and a failed run in which no test ran are
-// marked host-unsupported.
+// a C compiler check that fails, and a failed run in which no test ran, the
+// race runtime printed nothing, the go test timeout did not fire and no signal
+// stopped go test are marked host-unsupported. A timed-out run is marked timed
+// out.
 func RunRace(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if reason := raceSkipReason(ctx.Params); reason != "" {
 		emit.Log("info", reason)
@@ -157,7 +164,7 @@ func runRacePackages(ctx *pctx.Context, emit *jsonl.Emitter, goBinary string, en
 	if parse.TestTimedOut(outputStr) {
 		emit.MarkTimedOut()
 	}
-	if raceRunDidNotStart(counts, useJSON, outputStr) {
+	if raceHostFailure(counts, useJSON, outputStr, runErr) {
 		emit.Diagnostic("error", fmt.Sprintf("No test ran under the race detector, and the test step passed on the same files: "+
 			"this host does not build or run -race test binaries. Pass %s to skip the race detector", raceOptOut), "", 0)
 		emit.MarkHostUnsupported()
@@ -183,11 +190,24 @@ func raceSkipReason(params pctx.Params) string {
 // setting, and one without a C compiler still runs the detector.
 func raceNeedsCgo(goos string) bool { return goos != "darwin" }
 
-// raceRunDidNotStart reports whether a failed race run ran no test, from its
-// `go test -json` transcript: no test reported an outcome and the detector
-// reported no race. Without the JSON transcript it cannot tell, and says no.
-func raceRunDidNotStart(counts parse.TestCounts, useJSON bool, output string) bool {
-	return useJSON && counts.Total() == 0 && !strings.Contains(output, "WARNING: DATA RACE")
+// raceHostFailure reports whether a failed race run says this host cannot run
+// the detector. Its `go test -json` transcript holds no test outcome and no
+// line of the race runtime, the go test timeout did not fire, and no signal
+// stopped go test. Without the JSON transcript it cannot tell, and says no.
+func raceHostFailure(counts parse.TestCounts, useJSON bool, output string, runErr error) bool {
+	if !useJSON || counts.Total() > 0 || parse.TestTimedOut(output) || stoppedBySignal(runErr) {
+		return false
+	}
+	return !slices.ContainsFunc(raceRuntimeReports, func(report string) bool {
+		return strings.Contains(output, report)
+	})
+}
+
+// stoppedBySignal reports whether a signal, not the command's own exit, ended
+// it: such a command reports exit code -1.
+func stoppedBySignal(err error) bool {
+	var exit interface{ ExitCode() int }
+	return errors.As(err, &exit) && exit.ExitCode() == -1
 }
 
 // changedFiles reads the changed-files input: the project-relative paths the

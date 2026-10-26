@@ -57,6 +57,10 @@ refuses every result that depends on something the key does not describe:
   artifact paths, byte samples and provisioned process capabilities.
 - **A drift verdict** (`generated-output-drift`). It compares output with the
   worktree ([ADR 0034](0034-a-declared-output-polices-its-own-drift.md)).
+- **A host-unsupported verdict** (`host-unsupported`). It says this host
+  cannot run the task at all, such as a race detector run without a C
+  compiler
+  ([ADR 0013 of `@putnami/go`](../../../../go/extension/doc/adr/0013-the-race-detector-runs-on-the-packages-a-change-touches.md)).
 - **A canceled or skipped result.** Only status `failed` is recorded; a skip
   has its own caching rule (`isCacheableResult`).
 - **A wrapper bail-out.** A job that failed before its own logic ran (an

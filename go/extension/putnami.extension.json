@@ -679,7 +679,7 @@
       }
     },
     "test-race-exec": {
-      "description": "Run `go test -race` on the packages the change touched: the directory of each changed Go file the project owns, and the package that holds a changed testdata directory. The CLI binds those files, project-relative, as the changed-files input, so the files key the task and a stored verdict answers the same change only. It runs after test-exec and skips under --race or --no-race-changed. Off darwin it sets CGO_ENABLED=1. It fails host-unsupported, naming --no-race-changed, on a platform the race detector does not support, off darwin when the C compiler go env CC names is not on PATH, and when no test ran. Its go test -timeout sits below this task's deadline; --timeout does not apply. It reports no test counts, coverage or file: those belong to test-exec.",
+      "description": "Run `go test -race` on the packages the change touched: the directory of each changed Go file the project owns, and the package that holds a changed testdata directory. The CLI binds those files, project-relative, as the changed-files input, so the files key the task and a stored verdict answers the same change only. It runs after test-exec and skips under --race or --no-race-changed. Off darwin it sets CGO_ENABLED=1. It fails host-unsupported, naming --no-race-changed, on a platform the race detector does not support, off darwin when the C compiler go env CC names is not on PATH, and when no test ran without a timeout, a signal or a race runtime report. Its go test -timeout sits below this task's deadline; --timeout does not apply. It reports no test counts, coverage or file: those belong to test-exec.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["test-race"],

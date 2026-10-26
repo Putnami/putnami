@@ -49,10 +49,8 @@ import (
 // Deliberately NOT stamped here:
 //
 //   - Any step carrying a `with:` binding (TypeScript `test`'s `mode: "test"`,
-//     `serve`/`run`'s `mode: "serve"`). A literal binding is a live task param,
-//     which the producer identity below accounts for, but a context or result
-//     binding has no single plan-time value, so one conservative gate keeps
-//     every bound step out of direct sharing.
+//     `serve`/`run`'s `mode: "serve"`, the Go race step's changed files): a
+//     step with any `with` binding is not shared.
 //
 // ONE RESIDUAL, from writes into `.gen` that no task declares. `build-describe`
 // also writes UNDECLARED into `.gen`: it merges the specs it promoted into the
@@ -446,10 +444,7 @@ func sharedExecutionEligible(job *jobmodel.ScheduledJob) bool {
 	if job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil {
 		return false
 	}
-	// Input-bound steps remain outside direct sharing. Literal values are live
-	// task params and producer identities account for them, but context/result
-	// bindings are not reducible to one plan-time value. Keeping one conservative
-	// gate avoids two subtly different sharing rules for the union.
+	// A step with any `with` binding is not shared.
 	if len(job.Step.With) > 0 {
 		return false
 	}
