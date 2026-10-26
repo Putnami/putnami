@@ -28,7 +28,10 @@ export interface ProjectClientResult {
   generated: boolean;
   /** Project-relative output directory (e.g. "clients/ts"), set whenever a ts target is configured. */
   outputDir: string;
-  /** Project-relative paths written this run. */
+  /**
+   * Project-relative paths of the generated files and the manifest written this
+   * run. A `putnami.json` scaffolded this run is not one of them.
+   */
   files: string[];
 }
 
@@ -74,6 +77,14 @@ interface GeneratedClientManifest {
 const MANIFEST_FILE = 'client.putnami.json';
 
 /**
+ * The project document that makes the client directory a workspace project.
+ * Generation writes it only when the directory has none; the workspace owns it
+ * after that, so no run rewrites it and the manifest never lists it
+ * (protocols/extension ADR 0005).
+ */
+const PROJECT_FILE = 'putnami.json';
+
+/**
  * Emit the TypeScript client for a provider from the OpenAPI spec and the
  * generation contract of the project at `projectRoot`, writing it into
  * `projectRoot/<ts.output>` (default `clients/ts`). The contract is the one a
@@ -88,6 +99,9 @@ const MANIFEST_FILE = 'client.putnami.json';
  * language (e.g. a Go service), reading that provider's OWN spec. Cross-language
  * emission therefore needs no running app and no cross-project reads; it is
  * mediated entirely through the shared spec artifact.
+ *
+ * When the output directory has no `putnami.json`, it also writes one, as the
+ * Go emitter does for a Go client, so a new client is a workspace project.
  *
  * Returns `generated: false` (no throw) when the project has no clientgen
  * contract, the ts target is disabled, or the spec exposes no services, so
@@ -149,6 +163,13 @@ export function generateProjectClients(projectRoot: string, selected: ProjectCli
         { path: MANIFEST_FILE, content: `${JSON.stringify(manifest, null, 2)}\n` },
       ])[0].content
     : undefined;
+  // Rendered before any byte is written, so a formatter failure leaves the
+  // output as it was.
+  const projectContent = existsSync(resolve(outputDir, PROJECT_FILE))
+    ? undefined
+    : canonicalizeGeneratedFiles(formatProjectRoot, formatOutputDir, [
+        { path: PROJECT_FILE, content: renderClientProject(config.ts.packageName) },
+      ])[0].content;
   preflightOwnedOutput(outputDir, new Set(files.map((file) => file.path)), manifest !== undefined);
 
   const written: string[] = [];
@@ -167,8 +188,31 @@ export function generateProjectClients(projectRoot: string, selected: ProjectCli
     writeFileSync(resolve(outputDir, MANIFEST_FILE), manifestContent);
     written.push(`${outputRel}/${MANIFEST_FILE}`);
   }
+  // Not reported in `files`: the build records those as its assets, which must
+  // not depend on whether the workspace already had a project document.
+  if (projectContent !== undefined) {
+    writeFileSync(resolve(outputDir, PROJECT_FILE), projectContent);
+  }
 
   return { generated: true, outputDir: outputRel, files: written };
+}
+
+/**
+ * The project document of a generated client, the TypeScript counterpart of the
+ * one the Go emitter scaffolds. Generated code owns no user outcome of its own,
+ * so it declares `featureAuthority.none` instead of a feature.
+ */
+function renderClientProject(packageName: string): string {
+  const project = {
+    $schema: 'https://putnami.dev/schemas/putnami-project.json',
+    name: packageName,
+    tags: ['ts', 'generated-client'],
+    extensions: ['@putnami/typescript'],
+    featureAuthority: {
+      none: 'Generated client code mirrors provider-owned operations and does not own a separate user outcome.',
+    },
+  };
+  return `${JSON.stringify(project, null, 2)}\n`;
 }
 
 function resolveOutputDirectory(projectRoot: string, outputRel: string): string {
