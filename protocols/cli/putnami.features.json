@@ -51,12 +51,13 @@
             "checks": [
               "emitted-documents-carry-version-2",
               "version-1-documents-stay-readable",
-              "released-artifacts-stay-unchanged"
+              "released-artifacts-stay-unchanged",
+              "the-typescript-version-2-token-matches-the-schema-const"
             ]
           }
         },
         {
-          "id": "the-schemas-and-the-go-types-agree",
+          "id": "the-schemas-and-the-types-agree",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -66,7 +67,12 @@
             "checks": [
               "the-version-2-schema-matches-the-go-types",
               "bounds-come-from-the-schema",
-              "the-version-1-schema-matches-its-go-type"
+              "the-version-1-schema-matches-its-go-type",
+              "the-typescript-member-sets-match-the-schema",
+              "the-typescript-every-schema-def-has-a-pinned-member-list",
+              "the-typescript-report-bounds-come-from-the-schema",
+              "the-typescript-machine-output-budgets-come-from-the-schema",
+              "the-typescript-test-case-bounds-come-from-the-schema"
             ]
           }
         },
@@ -82,7 +88,10 @@
               "the-validator-refuses-malformed-documents",
               "violations-are-sorted-with-index-paths",
               "every-corpus-case-meets-its-expectation",
-              "the-corpus-is-complete-and-unique"
+              "the-corpus-is-complete-and-unique",
+              "the-typescript-twin-meets-every-corpus-expectation",
+              "the-typescript-corpus-covers-every-kind-and-code",
+              "the-typescript-validator-sorts-violations-by-path-then-code"
             ]
           }
         },
@@ -96,7 +105,10 @@
             "kind": "acceptance",
             "checks": [
               "the-verdict-is-strict-and-abort-wins",
-              "every-surface-shares-one-run-summary"
+              "every-surface-shares-one-run-summary",
+              "a-task-identity-derives-its-key",
+              "the-typescript-strict-verdict-gates-run-success",
+              "the-typescript-aborted-run-keeps-failures-visible"
             ]
           }
         },
@@ -113,7 +125,8 @@
               "environment-facts-are-exact-or-absent",
               "placement-is-complete-or-absent",
               "preparation-is-a-closed-histogram",
-              "the-tree-member-is-optional-and-strict"
+              "the-tree-member-is-optional-and-strict",
+              "the-typescript-placement-is-optional-and-preserves-fallback"
             ]
           }
         },
@@ -143,7 +156,12 @@
               "budgets-are-fixed-by-mode",
               "selection-keeps-partitions-and-order",
               "classifiers-are-closed-and-agree",
-              "output-is-sanitized-and-valid-utf-8"
+              "output-is-sanitized-and-valid-utf-8",
+              "the-typescript-stream-mode-policy-is-enforced",
+              "the-typescript-two-mode-budgets-are-fixed",
+              "the-typescript-failure-priority-is-classified",
+              "the-typescript-controls-strip-and-member-names-remain",
+              "the-typescript-every-credential-family-is-redacted"
             ]
           }
         },
@@ -219,7 +237,8 @@
             "checks": [
               "the-reporting-wire-passes-its-corpus",
               "an-ack-binds-identity-and-the-credential-stays-in-authenticate",
-              "subscriber-evidence-passes-its-corpus"
+              "subscriber-evidence-passes-its-corpus",
+              "the-typescript-reporter-corpus-and-identity"
             ]
           }
         },
@@ -233,7 +252,8 @@
             "kind": "acceptance",
             "checks": [
               "the-cli-machine-surfaces-validate-and-match-their-goldens",
-              "version-2-is-the-only-contract-the-cli-writes"
+              "version-2-is-the-only-contract-the-cli-writes",
+              "the-goldens-encode-the-strict-verdict-and-abort-precedence"
             ]
           }
         }

@@ -23,7 +23,7 @@
     },
     {
       "id": "ready-claims-are-never-elided",
-      "text": "A ready task:event and a serve step's process event are priority records of the bounded session stream, in Go and TypeScript alike: admitted from the failure reserve, they stay live after ordinary records spent their partition. The reserve, shared with every failure-priority record, holds 256 records and 256 KiB in normal mode, 2048 records and 2 MiB in verbose mode. One arriving once it is spent is elided from the live stream, counted in machineOutput.elided.failure and kept in the session artifact."
+      "text": "A ready task:event and a serve step's process event are priority records of the bounded session stream, in Go and TypeScript alike: admitted from the failure reserve, they stay live after ordinary records spent their partition. The reserve is shared with every failure-priority record. One arriving once it is spent is elided from the live stream, counted as a failure elision and kept in the session artifact."
     },
     {
       "id": "a-supervised-serve-run-splits-its-output",

@@ -49,9 +49,9 @@ function fixture(name: string): string {
 specTest(
   'session reporter shares the Go corpus',
   {
-    feature: 'typescript/cli-machine-output',
-    requirement: 'session-reporter-wire',
-    check: 'shared-reporter-corpus-and-identity',
+    feature: 'cli/machine-contract',
+    requirement: 'the-reporting-wire',
+    check: 'the-typescript-reporter-corpus-and-identity',
   },
   async () => {
     const reporters = new Set<string>();

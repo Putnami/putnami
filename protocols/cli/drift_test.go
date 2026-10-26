@@ -74,7 +74,7 @@ func keys(m map[string]json.RawMessage) []string {
 // TestSchemaIDMatchesConstant keeps ResultSchemaID and the schema's $id in
 // lock-step.
 func TestSchemaIDMatchesConstant(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-1-schema-matches-its-go-type")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-1-schema-matches-its-go-type")
 	if got := loadResultSchema(t).ID; got != ResultSchemaID {
 		t.Errorf("schema $id = %q, ResultSchemaID = %q", got, ResultSchemaID)
 	}
@@ -83,7 +83,7 @@ func TestSchemaIDMatchesConstant(t *testing.T) {
 // TestResultSchemaDrift fails if the Result / ResultError structs and the JSON
 // schema disagree on their field sets — the two must be edited together.
 func TestResultSchemaDrift(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-1-schema-matches-its-go-type")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-1-schema-matches-its-go-type")
 	s := loadResultSchema(t)
 
 	if got, want := keys(s.Properties), jsonFieldNames(t, Result{}); !reflect.DeepEqual(got, want) {

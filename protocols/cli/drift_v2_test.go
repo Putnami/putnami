@@ -44,7 +44,7 @@ func loadResultV2Schema(t *testing.T) resultV2Schema {
 
 // TestResultV2SchemaID keeps ResultV2SchemaID and the schema's $id in lock-step.
 func TestResultV2SchemaID(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	if got := loadResultV2Schema(t).ID; got != ResultV2SchemaID {
 		t.Errorf("schema $id = %q, ResultV2SchemaID = %q", got, ResultV2SchemaID)
 	}
@@ -85,7 +85,7 @@ func TestResultV2ProtocolVersionPinned(t *testing.T) {
 // The validator is what the cross-language corpus exercises, so a schema member
 // nothing validates would be a documented promise no test keeps.
 func TestResultV2ValidatorMatchesSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	schema := loadResultV2Schema(t)
 	for name, fields := range v2FieldSets {
 		t.Run(name, func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestResultV2ValidatorMatchesSchema(t *testing.T) {
 // $def in the schema has a validator. Value-only $defs (enums, scalars) are
 // exempt because they declare no properties.
 func TestResultV2SchemaDefsAreValidated(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	schema := loadResultV2Schema(t)
 	for name, def := range schema.Defs {
 		if len(def.Properties) == 0 {
@@ -193,7 +193,7 @@ var v2StructDefs = map[string]any{
 // the same $defs. Together with the validator test above, the struct, the
 // validator and the schema are one shape.
 func TestResultV2StructsMatchSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	schema := loadResultV2Schema(t)
 	for name, value := range v2StructDefs {
 		t.Run(name, func(t *testing.T) {
@@ -215,7 +215,7 @@ func TestResultV2StructsMatchSchema(t *testing.T) {
 // TestSessionGitMatchesSchema covers the one object the schema inlines rather
 // than naming as a $def.
 func TestSessionGitMatchesSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	schema := loadResultV2Schema(t)
 	def, ok := schema.Defs["sessionFile"]
 	if !ok {
@@ -240,7 +240,7 @@ func TestSessionGitMatchesSchema(t *testing.T) {
 // the git block: the struct, the validator member list, the required set and the
 // mode vocabulary are one shape.
 func TestSessionSelectionMatchesSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	schema := loadResultV2Schema(t)
 	def, ok := schema.Defs["sessionFile"]
 	if !ok {
@@ -279,7 +279,7 @@ func TestSessionSelectionMatchesSchema(t *testing.T) {
 // and which agent session launched it. Every member is optional, so a record
 // written before they existed keeps validating.
 func TestSessionFileCarriesTheOptionalRunContextMembers(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	names := fieldNames(sessionFileFields)
 	required := requiredFieldNames(sessionFileFields)
 	for _, member := range []string{"parentSessionId", "selection", "declarations", "agent"} {
@@ -301,7 +301,7 @@ func TestSessionFileCarriesTheOptionalRunContextMembers(t *testing.T) {
 // same schema). Without this, Go could bound at 64 while the schema published 50
 // and nothing would fail until a consumer rejected a conforming document.
 func TestReportBoundsMatchSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "bounds-come-from-the-schema")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "bounds-come-from-the-schema")
 	data, err := os.ReadFile(resultV2SchemaPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", resultV2SchemaPath, err)
@@ -363,7 +363,7 @@ func TestReportBoundsMatchSchema(t *testing.T) {
 // constants BoundTestCases applies, the schema a non-Go consumer binds to, and
 // the TypeScript mirror (pinned against the same file) cannot disagree.
 func TestTestCaseBoundsMatchSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "bounds-come-from-the-schema")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "bounds-come-from-the-schema")
 	data, err := os.ReadFile(resultV2SchemaPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", resultV2SchemaPath, err)
@@ -430,7 +430,7 @@ func TestTestCaseBoundsMatchSchema(t *testing.T) {
 // TestMachineOutputBudgetsMatchSchema pins the two fixed live profiles across
 // producer constants and the schema conditionals non-Go consumers validate.
 func TestMachineOutputBudgetsMatchSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "bounds-come-from-the-schema")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "bounds-come-from-the-schema")
 	def, ok := loadResultV2Schema(t).Defs["machineOutputSummary"]
 	if !ok {
 		t.Fatal("schema has no $defs/machineOutputSummary")
@@ -500,7 +500,7 @@ func TestMachineOutputBudgetsMatchSchema(t *testing.T) {
 // versions: v2 reuses ResultError deliberately, so a v1 consumer's error
 // handling ports unchanged.
 func TestResultV2ErrorMatchesV1(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	v1 := loadResultSchema(t)
 	v2 := loadResultV2Schema(t)
 	v1Def, ok := v1.Defs["resultError"]

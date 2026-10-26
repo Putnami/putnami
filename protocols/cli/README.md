@@ -214,11 +214,15 @@ Evidence behind `stable`:
 ## Product feature and durable decisions
 
 The module owns the feature of its contract, `cli/machine-contract`, specified
-in [`specs/machine-contract.json`](specs/machine-contract.json). The tests here
-and the CLI's wire goldens (`tooling/cli/internal/cli/wire_golden_v2_test.go`)
-prove its requirements. `@putnami/cli` keeps the features of its commands, and
-`@putnami/cli-protocol` proves its TypeScript twin under
-`typescript/cli-machine-output`.
+in [`specs/machine-contract.json`](specs/machine-contract.json). Three
+implementations prove its requirements, each under checks of its own. The Go
+tests here prove the Go validators, schemas and bounds. `@putnami/cli` proves
+that the documents it writes validate and match the committed goldens, in
+`tooling/cli/internal/cli/wire_golden_v2_test.go`. `@putnami/cli-protocol`
+proves its TypeScript validator against the same schemas and the same
+conformance corpus, in its `the-typescript-...` checks. `@putnami/cli` keeps
+the features of its commands, and `@putnami/cli-protocol` keeps its package
+API under `typescript/cli-machine-output`.
 
 Durable decisions (both scope `protocols/cli` explicitly):
 

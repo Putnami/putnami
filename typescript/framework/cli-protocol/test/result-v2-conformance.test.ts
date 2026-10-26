@@ -95,9 +95,7 @@ function documentText(testCase: ConformanceCase): string {
   return JSON.stringify(testCase.value);
 }
 
-const FEATURE = 'typescript/cli-machine-output';
-
-// Most corpus fixtures prove the shared-corpus requirement; a few named
+// Most corpus fixtures prove that the twin meets the corpus; a few named
 // fixtures are the executable evidence for a more specific clause and are
 // bound there instead, so the gate can tell those clauses apart.
 const STREAM_MODE_POLICY_CASES = new Set([
@@ -112,12 +110,24 @@ const STREAM_MODE_POLICY_CASES = new Set([
 
 function corpusBinding(id: string): { feature: string; requirement: string; check: string } {
   if (id === 'envelope.run.aborted-keeps-failures-visible') {
-    return { feature: FEATURE, requirement: 'strict-verdict', check: 'an-aborted-run-keeps-failures-visible' };
+    return {
+      feature: 'cli/machine-contract',
+      requirement: 'one-run-verdict-on-every-surface',
+      check: 'the-typescript-aborted-run-keeps-failures-visible',
+    };
   }
   if (STREAM_MODE_POLICY_CASES.has(id)) {
-    return { feature: FEATURE, requirement: 'bounded-stream-policy', check: 'the-stream-mode-policy-is-enforced' };
+    return {
+      feature: 'cli/machine-contract',
+      requirement: 'the-bounded-stream-keeps-its-promises',
+      check: 'the-typescript-stream-mode-policy-is-enforced',
+    };
   }
-  return { feature: FEATURE, requirement: 'shared-corpus', check: 'every-fixture-produces-its-pinned-violations' };
+  return {
+    feature: 'cli/machine-contract',
+    requirement: 'one-validator-and-a-shared-corpus',
+    check: 'the-typescript-twin-meets-every-corpus-expectation',
+  };
 }
 
 describe('CLI result v2 conformance corpus', () => {
@@ -160,7 +170,11 @@ describe('CLI result v2 conformance corpus', () => {
 
   specTest(
     'covers every document kind and every violation code',
-    { feature: FEATURE, requirement: 'shared-corpus', check: 'the-corpus-covers-every-kind-and-code' },
+    {
+      feature: 'cli/machine-contract',
+      requirement: 'one-validator-and-a-shared-corpus',
+      check: 'the-typescript-corpus-covers-every-kind-and-code',
+    },
     () => {
       const documents = new Set(corpus.cases.map((testCase) => testCase.document));
       const codes = new Set(
@@ -195,7 +209,11 @@ describe('CLI result v2 schema binding', () => {
 
   specTest(
     'pins protocolVersion against the schema const',
-    { feature: FEATURE, requirement: 'version-token', check: 'version-2-token-matches-the-schema-const' },
+    {
+      feature: 'cli/machine-contract',
+      requirement: 'version-2-is-the-only-machine-contract',
+      check: 'the-typescript-version-2-token-matches-the-schema-const',
+    },
     () => {
       expect((schema.$defs['protocolVersion'] as unknown as { const: number }).const).toBe(RESULT_PROTOCOL_VERSION);
     },
@@ -207,7 +225,11 @@ describe('CLI result v2 schema binding', () => {
   for (const [name, fields] of Object.entries(V2_FIELD_NAMES)) {
     specTest(
       `${name} members match the schema $def`,
-      { feature: FEATURE, requirement: 'schema-pinned-members', check: 'every-document-member-set-is-pinned' },
+      {
+        feature: 'cli/machine-contract',
+        requirement: 'the-schemas-and-the-types-agree',
+        check: 'the-typescript-member-sets-match-the-schema',
+      },
       () => {
         const def = schema.$defs[name];
         expect(def).toBeDefined();
@@ -224,7 +246,11 @@ describe('CLI result v2 schema binding', () => {
   // numbers together.
   specTest(
     'pins the report bounds against the schema',
-    { feature: FEATURE, requirement: 'schema-pinned-bounds', check: 'report-bounds-come-from-the-schema' },
+    {
+      feature: 'cli/machine-contract',
+      requirement: 'the-schemas-and-the-types-agree',
+      check: 'the-typescript-report-bounds-come-from-the-schema',
+    },
     () => {
       const jobs = schema.$defs['reportFile']?.properties?.['jobs'] as { maxItems?: number };
       const diagnostics = schema.$defs['reportJob']?.properties?.['diagnostics'] as {
@@ -243,7 +269,11 @@ describe('CLI result v2 schema binding', () => {
   // they bound.
   specTest(
     'pins the test-case bounds, statuses and members against the schema',
-    { feature: FEATURE, requirement: 'schema-pinned-bounds', check: 'test-case-bounds-come-from-the-schema' },
+    {
+      feature: 'cli/machine-contract',
+      requirement: 'the-schemas-and-the-types-agree',
+      check: 'the-typescript-test-case-bounds-come-from-the-schema',
+    },
     () => {
       const members = (schema.$defs['testCase']?.properties ?? {}) as Record<
         string,
@@ -275,7 +305,11 @@ describe('CLI result v2 schema binding', () => {
 
   specTest(
     'pins both machine-output budgets and the elision zero-pair rule against the schema',
-    { feature: FEATURE, requirement: 'schema-pinned-bounds', check: 'machine-output-budgets-come-from-the-schema' },
+    {
+      feature: 'cli/machine-contract',
+      requirement: 'the-schemas-and-the-types-agree',
+      check: 'the-typescript-machine-output-budgets-come-from-the-schema',
+    },
     () => {
       const rules = schema.$defs['machineOutputSummary']?.allOf ?? [];
       const schemaBudgets = Object.fromEntries(
@@ -294,7 +328,11 @@ describe('CLI result v2 schema binding', () => {
 
   specTest(
     'validates every object $def the schema declares',
-    { feature: FEATURE, requirement: 'schema-pinned-members', check: 'every-schema-def-has-a-pinned-member-list' },
+    {
+      feature: 'cli/machine-contract',
+      requirement: 'the-schemas-and-the-types-agree',
+      check: 'the-typescript-every-schema-def-has-a-pinned-member-list',
+    },
     () => {
       const objectDefs = Object.entries(schema.$defs)
         .filter(([, def]) => Object.keys(def.properties ?? {}).length > 0)

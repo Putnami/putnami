@@ -77,7 +77,7 @@ describe('result guards', () => {
     'accepts a valid success result',
     {
       feature: 'typescript/cli-machine-output',
-      requirement: 'version-token',
+      requirement: 'recorded-output-stays-readable',
       check: 'the-version-1-envelope-stays-exported',
     },
     () => {

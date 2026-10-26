@@ -103,7 +103,7 @@ func TestSessionFilePlacementIsOptional(t *testing.T) {
 }
 
 func TestSessionPlacementEnumsMatchSchema(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	definition := loadResultV2Schema(t).Defs["sessionPlacement"]
 	for _, member := range []string{"requested", "actual"} {
 		var property struct {

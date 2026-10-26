@@ -3,9 +3,15 @@
   "name": "@putnami/cli-protocol",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/cli"],
   "options": {
     "test": {
-      "filePatterns": ["../../../protocols/qualify/fixtures/**", "../../../protocols/qualify/schemas/**"]
+      "filePatterns": [
+        "../../../protocols/cli/conformance/**",
+        "../../../protocols/cli/schemas/**",
+        "../../../protocols/qualify/fixtures/**",
+        "../../../protocols/qualify/schemas/**"
+      ]
     },
     "package": {
       "npm": true

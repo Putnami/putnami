@@ -15,7 +15,7 @@
     "cli/machine-contract#the-command-surface-names-breaking-changes",
     "cli/machine-contract#the-report-is-a-bounded-projection",
     "cli/machine-contract#the-reporting-wire",
-    "cli/machine-contract#the-schemas-and-the-go-types-agree",
+    "cli/machine-contract#the-schemas-and-the-types-agree",
     "cli/machine-contract#version-2-is-the-only-machine-contract"
   ]
 }

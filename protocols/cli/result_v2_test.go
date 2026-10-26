@@ -193,7 +193,7 @@ func TestValidateDocument_IndexPaths(t *testing.T) {
 }
 
 func TestTaskIdentityDerivedKey(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "the-verdict-is-strict-and-abort-wins")
+	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "a-task-identity-derives-its-key")
 	identity := TaskIdentity{
 		Key:     "/tooling/cli:build~compile",
 		Scope:   TaskScopeProject,

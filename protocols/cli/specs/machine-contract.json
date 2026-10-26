@@ -9,7 +9,6 @@
   ],
   "nonGoals": [
     "The CLI's commands and behavior: the features of @putnami/cli own them",
-    "The TypeScript twin of the validators: @putnami/cli-protocol proves it under typescript/cli-machine-output",
     "Producing the bounded JSONL stream by default: this module defines the wire, and the CLI producer adopts it separately"
   ],
   "requirements": [
@@ -23,23 +22,23 @@
     },
     {
       "id": "version-2-is-the-only-machine-contract",
-      "text": "Every emitted document carries protocolVersion 2, the pinned ResultProtocolVersion. The version 1 envelope is read-only: recorded success and failure documents still decode, carry no protocolVersion, and validate against the released version 1 schema. That schema has not drifted since its last release, and the recorded release artifacts stay byte for byte."
+      "text": "Every emitted document carries protocolVersion 2, the pinned ResultProtocolVersion, which equals the schema's protocolVersion constant. The version 1 envelope is read-only: recorded success and failure documents still decode, carry no protocolVersion, and validate against the released version 1 schema. That schema has not drifted since its last release, and the recorded release artifacts stay byte for byte."
     },
     {
-      "id": "the-schemas-and-the-go-types-agree",
-      "text": "The version 2 schema and its Go structs declare the same members and enums, its $id equals its constant, and the validator checks every schema definition. The report, test case and machine output bounds the Go code enforces are the schema's. The retained version 1 schema matches its Go type, and the version 2 error object matches the version 1 one."
+      "id": "the-schemas-and-the-types-agree",
+      "text": "The version 2 schema, the Go structs and the TypeScript member lists declare the same members and enums, and the schema's $id equals its constant. The validators check every schema definition. The report, test case and machine output bounds the code enforces are the schema's. The retained version 1 schema matches its Go type, and the version 2 error object matches the version 1 one."
     },
     {
       "id": "one-validator-and-a-shared-corpus",
-      "text": "ValidateDocument refuses an unknown kind, malformed JSON, a wrong container type, a non-integer where the contract wants an integer, and an inconsistent local cache attribution, and reports violations sorted, with index paths. Every case of the shared conformance corpus and pack, which the TypeScript twin runs too, meets its accept or reject expectation; every document kind and violation code has a case, and case ids are unique."
+      "text": "ValidateDocument refuses an unknown kind, malformed JSON, a wrong container type, a non-integer where the contract wants an integer, and an inconsistent local cache attribution, and reports violations sorted, with index paths. Every case of the shared conformance corpus meets its accept or reject expectation in Go and in TypeScript, and the pack names that corpus; every document kind and violation code has a case, and case ids are unique."
     },
     {
       "id": "one-run-verdict-on-every-surface",
-      "text": "A task identity derives its key from its parts. RunSummary derives one verdict: a reused failure fails the run and an aborted run never succeeds, whatever its counts. The JSON envelope, the session end record, the MCP result and the session file report that same run summary type."
+      "text": "A task identity derives its key from its parts. RunSummary derives one verdict: a reused failure fails the run, and an aborted run never succeeds, whatever its counts, and keeps the failures it accumulated visible. The JSON envelope, the session end record, the MCP result and the session file report that same run summary type."
     },
     {
       "id": "session-members-are-additive",
-      "text": "The session file's executions, environment, placement, preparation and tree members are optional: a document without them still parses, and each round-trips. An execution id resolves, a superseded execution is allowed and counts once. Placement provenance is complete or absent. Preparation phases form a closed histogram that overlaps only under parallelism. An environment fact the run could not measure is absent, and a measured zero stays zero."
+      "text": "The session file's executions, environment, placement, preparation and tree members are optional: a document without them still parses, and each round-trips. An execution id resolves, a superseded execution is allowed and counts once. Placement provenance is complete or absent and leaves the tree member unchanged. Preparation phases form a closed histogram that overlaps only under parallelism. An environment fact the run could not measure is absent, and a measured zero stays zero."
     },
     {
       "id": "the-report-is-a-bounded-projection",
@@ -47,7 +46,7 @@
     },
     {
       "id": "the-bounded-stream-keeps-its-promises",
-      "text": "The bounded JSONL profile has a fixed budget per mode and keeps its hard partitions in arrival order. Normal mode suppresses debug detail, every test case among it, and verbose mode admits it. Failure priority and debug detail are closed vocabularies whose classifiers agree on decoded records. Values are sanitized, and stream validation refuses raw invalid UTF-8 and an unpaired surrogate."
+      "text": "The bounded JSONL profile has a fixed budget per mode and keeps its hard partitions in arrival order. Normal mode suppresses debug detail, every test case among it, and verbose mode admits it. Failure priority and debug detail are closed vocabularies whose classifiers agree on decoded records. Values are sanitized: control characters go, credentials are redacted and member names stay. Stream validation refuses raw invalid UTF-8 and an unpaired surrogate."
     },
     {
       "id": "test-cases-are-bounded",
@@ -63,7 +62,7 @@
     },
     {
       "id": "a-commit-is-read-one-way",
-      "text": "ParseConventionalCommit reads a subject's type, scope and ! marker and a BREAKING CHANGE footer, and refuses any other subject. Where its reading departs from Conventional Commits 1.0.0, the departure is pinned, so the version bump, the changelog and the API checks agree on which commit is breaking."
+      "text": "ParseConventionalCommit reads a subject's type, scope and ! marker and a BREAKING CHANGE footer, and refuses any other subject. Where its reading departs from Conventional Commits 1.0.0, the departure is pinned."
     },
     {
       "id": "the-reporting-wire",

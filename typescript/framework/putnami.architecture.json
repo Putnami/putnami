@@ -75,5 +75,28 @@
       }
     }
   ],
-  "imports": []
+  "imports": [
+    {
+      "id": "typescript-framework.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "typescript-framework.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/cli-protocol",
+          "producerProject": "/protocols/cli"
+        }
+      ],
+      "justification": "The TypeScript framework packages implement wire contracts the protocols domain owns: they write, read or replay a protocol's shapes and fixtures, and their tests prove the protocol's requirements. Each protocol owns its contract; a package holds a reference to it and owns none of its meaning."
+    }
+  ]
 }

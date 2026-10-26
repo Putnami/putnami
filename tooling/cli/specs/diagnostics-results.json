@@ -54,11 +54,11 @@
     },
     {
       "id": "terminal-outcome",
-      "text": "Success, failure, usage, authentication, API, and interruption outcomes map to stable documented exit codes and machine-result statuses. An interactive extension subcommand that passes its deadline prints a line naming the command and exits 1, whatever code its process returned. One whose process ends from a signal exits 1 and prints the signal, except SIGINT, which exits 130 with no line."
+      "text": "An interactive extension subcommand that passes its deadline prints a line naming the command and exits 1, whatever code its process returned. One whose process ends from a signal exits 1 and prints the signal, except SIGINT, which exits 130 with no line."
     },
     {
       "id": "bounded-machine-detail",
-      "text": "Machine JSONL suppresses debug task detail in normal mode, admits it in verbose mode under fixed deterministic budgets, protects failure capacity, reports exact elision, applies terminal-safe redaction, and retains a complete sanitized session artifact without changing task or run semantics."
+      "text": "Machine JSONL retains a complete sanitized session artifact without changing task or run semantics."
     },
     {
       "id": "opening-session-identity",

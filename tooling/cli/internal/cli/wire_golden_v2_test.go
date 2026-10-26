@@ -226,7 +226,7 @@ func TestWireGoldenV2_MCPResult(t *testing.T) {
 // the v1 verdict onto the v2 shape would still produce a schema-valid document
 // and would still pass every structural check.
 func TestWireGoldenV2_EncodesTheSettledSemantics(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "version-2-is-the-only-contract-the-cli-writes")
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-goldens-encode-the-strict-verdict-and-abort-precedence")
 	t.Parallel()
 	t.Run("abort wins over failure", func(t *testing.T) {
 		run := loadWireRun(t, "aborted")
