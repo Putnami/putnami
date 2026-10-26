@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cloud/typescript-runtime-destination#config-source-resolves-remote-config",
+    "cloud/typescript-runtime-destination#event-server-destination-publishes-safely",
+    "cloud/typescript-runtime-destination#event-server-tokens-are-cached-and-checked",
+    "cloud/typescript-runtime-destination#register-activates-the-sources",
+    "cloud/typescript-runtime-destination#required-sources-retry-within-a-budget",
+    "cloud/typescript-runtime-destination#required-sources-stop-startup",
+    "cloud/typescript-runtime-destination#secrets-source-resolves-remote-secrets",
+    "cloud/typescript-runtime-destination#snapshot-fallback-boots-a-required-source",
+    "cloud/typescript-runtime-destination#synchronous-fetch-serves-boot",
+    "cloud/typescript-runtime-destination#token-sources-supply-the-bearer"
+  ]
+}

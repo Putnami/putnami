@@ -1,0 +1,44 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "intelligence/repository-areas",
+  "outcomes": [
+    "An agent gets the parts of a repository it works in from the repository's own manifests",
+    "A repository without a workspace manifest still splits into useful areas",
+    "Every tracked file belongs to one area, and generated or vendored files never shape an area"
+  ],
+  "nonGoals": [
+    "Requiring the repository to be a Putnami workspace",
+    "Reading file contents beyond the manifests that declare workspaces"
+  ],
+  "requirements": [
+    {
+      "id": "area-names",
+      "text": "Each area is named after its directory. When two areas share a directory name, both take their full path, so names stay unique. A path that is too long, or that holds unusual characters, never becomes an area."
+    },
+    {
+      "id": "area-roles",
+      "text": "An area whose path holds a test directory has the tests role. An area whose path holds a documentation directory, or that configures a documentation site, has the docs role. Every other area has the code role."
+    },
+    {
+      "id": "file-assignment",
+      "text": "Assign returns the deepest area that contains a file. A file outside every other area belongs to the root area, and Assign returns -1 when the layout has no root area and none contains the file."
+    },
+    {
+      "id": "ignored-files",
+      "text": "Lockfiles, minified bundles, vendored or installed dependencies, build output, and test data never shape an area, and a name that only resembles an excluded one, such as docs/distribution.md, stays included."
+    },
+    {
+      "id": "inferred-areas",
+      "text": "A directory that owns a language manifest, such as go.mod or package.json, becomes an inferred area when no workspace manifest declares or governs it. When the root area would still hold most of the code, each top-level directory becomes an inferred area too. When every area is inferred, the layout names no manifest."
+    },
+    {
+      "id": "nested-workspaces",
+      "text": "A workspace manifest in a top-level directory declares areas for that directory. Several such manifests, of different kinds, combine in one layout beside the areas that are inferred."
+    },
+    {
+      "id": "workspace-manifests",
+      "text": "Detect reads the areas that pnpm, npm workspaces, Lerna, Nx, go.work, Cargo, uv, Maven, Putnami and Bazel declare. Each such area has the manifest source, and the layout names the manifest that declares them."
+    }
+  ]
+}

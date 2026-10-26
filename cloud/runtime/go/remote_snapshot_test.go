@@ -14,9 +14,12 @@ import (
 	cloudkms "google.golang.org/api/cloudkms/v1"
 	"google.golang.org/api/option"
 	storagev1 "google.golang.org/api/storage/v1"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseGSURI(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "gs-uris-parse-into-bucket-and-object")
 	cases := []struct {
 		name           string
 		uri            string
@@ -110,6 +113,7 @@ func newSnapshotStub(t *testing.T, object []byte) *snapshotStub {
 }
 
 func TestLoadConfigSnapshot(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "snapshot-is-decrypted-with-kms")
 	want := map[string]any{"service": map[string]any{"port": float64(8080)}, "flag": true}
 	plaintext, err := json.Marshal(want)
 	if err != nil {
@@ -132,6 +136,7 @@ func TestLoadConfigSnapshot(t *testing.T) {
 }
 
 func TestLoadConfigSnapshotEmptyKey(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "kms-key-is-required")
 	if _, err := loadConfigSnapshot(context.Background(), "gs://b/o", "", time.Second); err == nil {
 		t.Fatal("expected error for empty KMS key")
 	}
@@ -141,6 +146,7 @@ func TestLoadConfigSnapshotEmptyKey(t *testing.T) {
 // whose config server is unreachable resolves the durable snapshot instead of
 // failing startup.
 func TestFetchFallsBackToSnapshot(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "unreachable-required-source-uses-snapshot")
 	want := map[string]any{"db": map[string]any{"host": "snap"}}
 	plaintext, _ := json.Marshal(want)
 	object := []byte(base64.StdEncoding.EncodeToString(plaintext))
@@ -171,6 +177,7 @@ func TestFetchFallsBackToSnapshot(t *testing.T) {
 // TestFetchNoSnapshotStillFails verifies the unchanged terminal semantics: a
 // required source with no snapshot configured fails exactly as before.
 func TestFetchNoSnapshotStillFails(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "required-source-without-snapshot-fails")
 	src := NewRemoteConfigSource(RemoteSourceConfig{
 		ServerURL:   "http://127.0.0.1:1",
 		AppName:     "orders",
@@ -185,6 +192,7 @@ func TestFetchNoSnapshotStillFails(t *testing.T) {
 }
 
 func TestSnapshotFallbackDisabledWhenURIEmpty(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "empty-snapshot-uri-turns-fallback-off")
 	src := NewRemoteConfigSource(RemoteSourceConfig{SnapshotURI: ""})
 	if _, ok := src.loadSnapshotFallback(context.Background(), terminalRemoteFailure("x", nil)); ok {
 		t.Fatal("loadSnapshotFallback should return ok=false when SnapshotURI is empty")
@@ -196,6 +204,7 @@ func TestSnapshotFallbackDisabledWhenURIEmpty(t *testing.T) {
 // snapshot even when one is configured; it stays terminal exactly as before the
 // feature. The snapshot is only for outage-class (retryable) failures.
 func TestSnapshotFallbackSkippedOnTerminalFailure(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "terminal-failure-skips-snapshot-read")
 	src := NewRemoteConfigSource(RemoteSourceConfig{
 		SnapshotURI:    "gs://snapshots/config-snapshots/ws1/orders/rev.json.enc",
 		SnapshotKMSKey: "projects/p/locations/l/keyRings/putnami/cryptoKeys/ws1",
@@ -211,6 +220,7 @@ func TestSnapshotFallbackSkippedOnTerminalFailure(t *testing.T) {
 // source whose config server returns a terminal 403 (access revoked) fails the
 // boot instead of booting on a stale snapshot.
 func TestFetchTerminalFailureDoesNotFallBack(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "snapshot-fallback", "terminal-forbidden-does-not-fall-back")
 	object := []byte(base64.StdEncoding.EncodeToString([]byte(`{"db":{"host":"snap"}}`)))
 	stub := newSnapshotStub(t, object)
 	defer stub.restore()

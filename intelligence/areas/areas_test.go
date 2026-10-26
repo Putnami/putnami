@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func reader(files map[string]string) Reader {
@@ -28,6 +30,15 @@ func paths(layout Layout) []string {
 }
 
 func TestDetectReadsEveryWorkspaceManifest(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "marks-declared-areas-as-manifest")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-cargo-workspace")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-go-work-uses")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-lerna-default-packages")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-npm-workspaces")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-nx-and-putnami-projects")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-pnpm-workspace")
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-uv-workspace")
+	spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "ignores-test-data-workspaces")
 	for _, tc := range []struct {
 		name     string
 		files    []string
@@ -103,6 +114,11 @@ func TestDetectReadsEveryWorkspaceManifest(t *testing.T) {
 }
 
 func TestDetectInfersAreasWithoutAManifest(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "area-names", "ignores-paths-with-unusual-characters")
+	spectest.Proves(t, "intelligence/repository-areas", "file-assignment", "assigns-unowned-files-to-the-root-area")
+	spectest.Proves(t, "intelligence/repository-areas", "inferred-areas", "infers-areas-from-language-manifests")
+	spectest.Proves(t, "intelligence/repository-areas", "inferred-areas", "infers-top-level-directories-when-no-manifest-owns-the-code")
+	spectest.Proves(t, "intelligence/repository-areas", "inferred-areas", "reports-inferred-areas-without-a-declaring-manifest")
 	layout := Detect([]string{"README.md", "api/go.mod", "api/main.go", "web/app/package.json", "node_modules/x/package.json", "has space/go.mod"}, reader(nil))
 	if got, want := paths(layout), []string{"root=.", "api=api", "app=web/app"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("areas = %v, want %v", got, want)
@@ -120,6 +136,9 @@ func TestDetectInfersAreasWithoutAManifest(t *testing.T) {
 }
 
 func TestDetectKeepsNamesUniqueAndFoldsLongPaths(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "area-names", "folds-long-paths-into-the-parent-area")
+	spectest.Proves(t, "intelligence/repository-areas", "area-names", "names-colliding-areas-by-path")
+	spectest.Proves(t, "intelligence/repository-areas", "file-assignment", "assigns-a-file-to-the-area-that-contains-it")
 	long := strings.Repeat("d", 130) + "/package.json"
 	layout := Detect([]string{"pnpm-workspace.yaml", "apps/api/package.json", "services/api/package.json", "tools/root/package.json", "x.md", long},
 		reader(map[string]string{"pnpm-workspace.yaml": "packages: ['apps/*', 'services/*', 'tools/*', '*']\n"}))
@@ -133,6 +152,7 @@ func TestDetectKeepsNamesUniqueAndFoldsLongPaths(t *testing.T) {
 }
 
 func TestDetectLeavesNoRootAreaWhenAreasCoverEverything(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "file-assignment", "returns-no-area-when-the-layout-has-no-root-area")
 	layout := Detect([]string{"a/go.mod"}, reader(nil))
 	if got := paths(layout); !reflect.DeepEqual(got, []string{"a=a"}) {
 		t.Fatalf("areas = %v", got)
@@ -180,6 +200,7 @@ func TestYamlListReadsTheInlineForm(t *testing.T) {
 }
 
 func TestDetectReadsMavenModules(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-maven-modules")
 	files := []string{
 		"pom.xml", "api/pom.xml", "api/src/A.java", "server/pom.xml", "server/src/S.java", "e2e/pom.xml", "e2e/src/E.java",
 		"support/net/pom.xml", "support/net/src/N.java", "tools/legacy/pom.xml", "tools/legacy/L.java", "README.md",
@@ -224,6 +245,8 @@ func TestWantedAddsEveryPutnamiProjectFile(t *testing.T) {
 
 func TestDetectReadsNestedWorkspacesAndBazel(t *testing.T) {
 	t.Run("workspaces declared in top-level directories", func(t *testing.T) {
+		spectest.Proves(t, "intelligence/repository-areas", "ignored-files", "ignores-vendored-workspace-manifests")
+		spectest.Proves(t, "intelligence/repository-areas", "nested-workspaces", "reads-workspaces-declared-in-top-level-directories")
 		files := []string{
 			"frontend/package.json", "frontend/web/package.json", "frontend/packages/ui/package.json", "frontend/tools/x.js",
 			"backend/package.json", "backend/pnpm-workspace.yaml", "backend/shared/package.json", "backend/apps/api/package.json", "backend/legacy/package.json",
@@ -259,6 +282,7 @@ func TestDetectReadsNestedWorkspacesAndBazel(t *testing.T) {
 	})
 
 	t.Run("bazel packages under a partial pnpm workspace", func(t *testing.T) {
+		spectest.Proves(t, "intelligence/repository-areas", "workspace-manifests", "reads-bazel-packages")
 		files := []string{
 			"MODULE.bazel", "BUILD.bazel", "go.mod", "pnpm-workspace.yaml", "tools/lint/package.json", "tools/lint/BUILD",
 			"lakshmi/cmd/BUILD.bazel", "lakshmi/cmd/main.go", "lakshmi/internal/a.go", "anubis/app/BUILD", "anubis/app/main.py",
@@ -275,6 +299,7 @@ func TestDetectReadsNestedWorkspacesAndBazel(t *testing.T) {
 	})
 
 	t.Run("a deep manifest, then top-level directories", func(t *testing.T) {
+		spectest.Proves(t, "intelligence/repository-areas", "inferred-areas", "infers-areas-from-nested-language-manifests")
 		files := []string{
 			"Makefile", "backend/back/src/pyproject.toml", "backend/back/src/app.py", "backend/back/Dockerfile",
 			"frontend/package.json", "frontend/src/main.ts", "frontend/vendors/gantt/package.json", "frontend/vendors/gantt/a.js",
@@ -292,6 +317,10 @@ func TestDetectReadsNestedWorkspacesAndBazel(t *testing.T) {
 }
 
 func TestDetectGivesSupportingAreasTheirRole(t *testing.T) {
+	spectest.Proves(t, "intelligence/repository-areas", "area-roles", "finds-the-test-tree-of-a-file")
+	spectest.Proves(t, "intelligence/repository-areas", "area-roles", "marks-documentation-areas")
+	spectest.Proves(t, "intelligence/repository-areas", "area-roles", "marks-other-areas-as-code")
+	spectest.Proves(t, "intelligence/repository-areas", "area-roles", "marks-test-areas")
 	layout := Detect([]string{
 		"README.md", "packages/server/package.json", "packages/tests/package.json", "www/package.json",
 		"guide/docusaurus.config.ts", "guide/intro.md", "manual/conf.py", "manual/index.rst", "spec/models/a_spec.rb", "src/a.py",

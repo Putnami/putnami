@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/typescript-runtime-destination",
+  "outcomes": [
+    "A TypeScript workload that sets CONFIG_SERVER_URL boots on config and secrets resolved by Putnami Cloud, and a required source stops startup instead of running on partial config",
+    "A TypeScript workload publishes events through the managed Event Server with a short-lived token bound to the server audience, and no error message carries a token or provider text"
+  ],
+  "nonGoals": [
+    "Serving config, secrets or events: the Cloud server owns the endpoints this package calls",
+    "Parity with the Go runtime destination, which cloud/runtime/go owns"
+  ],
+  "requirements": [
+    {
+      "id": "config-source-resolves-remote-config",
+      "text": "The remote config source resolves config from the server at CONFIG_SERVER_URL. A base URL receives a POST with a bearer token. An exact resolve URL receives a GET that keeps its query string. A 404 on that URL retries once against the CONFIG_SERVER_AUDIENCE origin. CONFIG_VERSION pins the resolve to a frozen version. The environment name goes out as configured."
+    },
+    {
+      "id": "event-server-destination-publishes-safely",
+      "text": "eventServerDestination validates the whole managed binding before it asks for a credential, pins its route at construction, and refuses a stale topology generation before any token or network call. A publish sends the canonical JSON request with a bearer for the exact audience. A retry resends the same bytes with one credential. A cancelled or unavailable credential fails closed, and nothing is sent. Failures never carry token or provider text."
+    },
+    {
+      "id": "event-server-tokens-are-cached-and-checked",
+      "text": "Event Server tokens are JWTs whose audience matches. The cache keeps one token per audience until shortly before expiry and shares one refresh across callers. A stuck provider times out with a redacted failure, and no second refresh starts while it is stuck. A malformed, expired or wrong-audience token is rejected. The Google source asks the metadata server for the exact audience and rejects an oversized response."
+    },
+    {
+      "id": "register-activates-the-sources",
+      "text": "register adds the config and secrets source discoverers and forwards the cache-reset hooks. A base CONFIG_SERVER_URL enables both sources, at priority 50 and 55, between the .secrets file (35) and CONFIG_DATA (60). An exact resolve URL enables only the config source. An unset, blank, undefined or null URL enables none."
+    },
+    {
+      "id": "required-sources-retry-within-a-budget",
+      "text": "A required source retries a network failure until the server is ready, inside the retry budget. A terminal HTTP status such as 401 or 404 fails at once with no retry. A retry budget of 0 allows one attempt. CONFIG_SERVER_TIMEOUT sets the per-request timeout."
+    },
+    {
+      "id": "required-sources-stop-startup",
+      "text": "A source is required when K_SERVICE is set or NODE_ENV is production. When a required source fails, the load throws instead of falling back to local sources. A failed load during startup logs one structured JSON error line and exits with code 1."
+    },
+    {
+      "id": "secrets-source-resolves-remote-secrets",
+      "text": "The remote secrets source sends a POST to /api/secrets/resolve with a bearer token and the schema hash, at priority 55. An unresolved response yields no secrets. A source reuses its first resolve on later loads."
+    },
+    {
+      "id": "snapshot-fallback-boots-a-required-source",
+      "text": "When a required config source exhausts its retries and a snapshot is configured, it boots on the snapshot and logs a warning. It never falls back after a 403 or resolved:false, and it prefers a config the server resolves. With no usable snapshot it throws. The snapshot loads once. The loader downloads the object from Cloud Storage and decrypts it with Cloud KMS."
+    },
+    {
+      "id": "synchronous-fetch-serves-boot",
+      "text": "The synchronous fetch the sources use at startup reuses one worker across small requests. A fetch that cannot complete throws."
+    },
+    {
+      "id": "token-sources-supply-the-bearer",
+      "text": "An operator token from the environment wins over Google workload identity. Without one, K_SERVICE or GOOGLE_CLOUD_PROJECT selects a Google metadata ID token for the CONFIG_SERVER_AUDIENCE or the server URL, cached within its lifetime. A failed metadata fetch yields no token. A configured token source wins over a static token. With no token, the request carries no Authorization header."
+    }
+  ]
+}

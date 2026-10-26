@@ -2,6 +2,7 @@
 import { application, bootstrapServe } from '@putnami/application';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { resetDefaultLogger, resetLoggerConfig } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { RemoteConfigSource, resetRemoteConfigSourceCacheForTest } from '../src/runtime/remote-config-source';
 import { setSyncFetchForTest } from '../src/runtime/sync-fetch';
 
@@ -42,57 +43,65 @@ describe('bootstrapServe', () => {
     setSyncFetchForTest(undefined);
   });
 
-  it('logs a construction-time config-server failure as one structured JSON error line', async () => {
-    const lines: string[] = [];
-    console.log = mock((line?: unknown) => {
-      lines.push(String(line ?? ''));
-    }) as unknown as typeof console.log;
-    process.exit = mock((code?: string | number | null) => {
-      throw new ProcessExitError(code);
-    }) as unknown as typeof process.exit;
+  specTest(
+    'logs a construction-time config-server failure as one structured JSON error line',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-stop-startup',
+      check: 'a-failed-startup-load-logs-one-json-error-line',
+    },
+    async () => {
+      const lines: string[] = [];
+      console.log = mock((line?: unknown) => {
+        lines.push(String(line ?? ''));
+      }) as unknown as typeof console.log;
+      process.exit = mock((code?: string | number | null) => {
+        throw new ProcessExitError(code);
+      }) as unknown as typeof process.exit;
 
-    process.env.K_SERVICE = 'runtime-startup-test';
-    setSyncFetchForTest(() => ({ status: 404, body: 'not found' }));
+      process.env.K_SERVICE = 'runtime-startup-test';
+      setSyncFetchForTest(() => ({ status: 404, body: 'not found' }));
 
-    let exitCode: string | number | null | undefined;
-    try {
-      await bootstrapServe(() => {
-        new RemoteConfigSource({
-          serverUrl: 'https://config.putnami.test',
-          appName: 'task-api',
-          environment: 'prod',
-          token: 'operator-token',
-          required: true,
-        }).load();
-        return application();
-      });
-    } catch (error) {
-      if (!(error instanceof ProcessExitError)) {
-        throw error;
+      let exitCode: string | number | null | undefined;
+      try {
+        await bootstrapServe(() => {
+          new RemoteConfigSource({
+            serverUrl: 'https://config.putnami.test',
+            appName: 'task-api',
+            environment: 'prod',
+            token: 'operator-token',
+            required: true,
+          }).load();
+          return application();
+        });
+      } catch (error) {
+        if (!(error instanceof ProcessExitError)) {
+          throw error;
+        }
+        exitCode = error.code;
       }
-      exitCode = error.code;
-    }
 
-    expect(exitCode).toBe(1);
-    expect(lines).toHaveLength(1);
-    const entry = JSON.parse(lines[0]) as Record<string, unknown>;
-    expect(entry.severity).toBe('ERROR');
-    expect(entry.message).toContain('startup failed: config-server returned non-200: status 404');
-    expect(entry.error).toMatchObject({
-      name: 'RemoteConfigError',
-      message: 'config-server returned non-200: status 404',
-      url: 'https://config.putnami.test/api/configs/resolve',
-      method: 'POST',
-      statusCode: 404,
-      authPresent: true,
-      authMode: 'bearer',
-      appName: 'task-api',
-      environment: 'prod',
-      cause: {
-        name: 'Error',
-        message: 'status 404',
-      },
-    });
-    expect((entry.error as { stack?: unknown }).stack).toEqual(expect.any(String));
-  });
+      expect(exitCode).toBe(1);
+      expect(lines).toHaveLength(1);
+      const entry = JSON.parse(lines[0]) as Record<string, unknown>;
+      expect(entry.severity).toBe('ERROR');
+      expect(entry.message).toContain('startup failed: config-server returned non-200: status 404');
+      expect(entry.error).toMatchObject({
+        name: 'RemoteConfigError',
+        message: 'config-server returned non-200: status 404',
+        url: 'https://config.putnami.test/api/configs/resolve',
+        method: 'POST',
+        statusCode: 404,
+        authPresent: true,
+        authMode: 'bearer',
+        appName: 'task-api',
+        environment: 'prod',
+        cause: {
+          name: 'Error',
+          message: 'status 404',
+        },
+      });
+      expect((entry.error as { stack?: unknown }).stack).toEqual(expect.any(String));
+    },
+  );
 });

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "intelligence/repository-areas#area-names",
+    "intelligence/repository-areas#area-roles",
+    "intelligence/repository-areas#file-assignment",
+    "intelligence/repository-areas#ignored-files",
+    "intelligence/repository-areas#inferred-areas",
+    "intelligence/repository-areas#nested-workspaces",
+    "intelligence/repository-areas#workspace-manifests"
+  ]
+}

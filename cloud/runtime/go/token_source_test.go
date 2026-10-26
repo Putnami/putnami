@@ -11,10 +11,13 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestEnvVarTokenSource(t *testing.T) {
 	t.Run("returns env value", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "env-token-source-returns-value")
 		t.Setenv("CONFIG_TEST_TOKEN", "abc123")
 		ts := NewEnvVarTokenSource("CONFIG_TEST_TOKEN")
 		got, err := ts.Token(context.Background())
@@ -27,6 +30,7 @@ func TestEnvVarTokenSource(t *testing.T) {
 	})
 
 	t.Run("errors when unset", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "env-token-source-errors-when-unset")
 		t.Setenv("CONFIG_TEST_TOKEN", "")
 		ts := NewEnvVarTokenSource("CONFIG_TEST_TOKEN")
 		if _, err := ts.Token(context.Background()); err == nil {
@@ -35,6 +39,7 @@ func TestEnvVarTokenSource(t *testing.T) {
 	})
 
 	t.Run("errors when name empty", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "env-token-source-errors-when-name-empty")
 		ts := NewEnvVarTokenSource("")
 		if _, err := ts.Token(context.Background()); err == nil {
 			t.Fatal("expected error when name empty, got nil")
@@ -42,6 +47,7 @@ func TestEnvVarTokenSource(t *testing.T) {
 	})
 
 	t.Run("trims whitespace", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "token-sources", "env-token-source-trims-whitespace")
 		t.Setenv("CONFIG_TEST_TOKEN", "  spaced  ")
 		ts := NewEnvVarTokenSource("CONFIG_TEST_TOKEN")
 		got, _ := ts.Token(context.Background())
@@ -61,6 +67,9 @@ func jwtWithExp(exp int64) string {
 }
 
 func TestGcpMetadataTokenSource_Token(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-token-is-cached-until-expiry")
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-token-refetches-after-expiry")
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-token-requests-audience-and-flavor")
 	var hits int32
 	var gotAudience, gotFlavor, gotFormat string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +131,7 @@ func TestGcpMetadataTokenSource_Token(t *testing.T) {
 }
 
 func TestGcpMetadataTokenSource_AudienceRequired(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-token-requires-audience")
 	src := &GcpMetadataTokenSource{}
 	if _, err := src.Token(context.Background()); err == nil {
 		t.Fatal("expected error when audience empty, got nil")
@@ -129,6 +139,7 @@ func TestGcpMetadataTokenSource_AudienceRequired(t *testing.T) {
 }
 
 func TestGcpMetadataTokenSource_Non200(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-error-status-fails")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
@@ -147,6 +158,7 @@ func TestGcpMetadataTokenSource_Non200(t *testing.T) {
 }
 
 func TestGcpMetadataTokenSource_EmptyBody(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-empty-body-fails")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -165,6 +177,7 @@ func TestGcpMetadataTokenSource_EmptyBody(t *testing.T) {
 }
 
 func TestGcpMetadataTokenSource_ParseExpiry(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "metadata-expiry-comes-from-token")
 	exp := time.Now().Add(45 * time.Minute).Unix()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprint(w, jwtWithExp(exp))
@@ -192,6 +205,7 @@ func TestGcpMetadataTokenSource_ParseExpiry(t *testing.T) {
 
 func TestParseJWTExpiry(t *testing.T) {
 	t.Run("valid token", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "jwt-expiry-is-read-from-exp")
 		exp := time.Now().Add(time.Hour).Unix()
 		got := parseJWTExpiry(jwtWithExp(exp))
 		if got.Unix() != exp {
@@ -200,6 +214,7 @@ func TestParseJWTExpiry(t *testing.T) {
 	})
 
 	t.Run("missing exp returns zero", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "jwt-without-exp-has-zero-expiry")
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
 		payload := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
 		tok := header + "." + payload + ".sig"
@@ -209,6 +224,7 @@ func TestParseJWTExpiry(t *testing.T) {
 	})
 
 	t.Run("malformed returns zero", func(t *testing.T) {
+		spectest.Proves(t, "cloud/go-runtime-destination", "workload-identity", "malformed-jwt-has-zero-expiry")
 		if got := parseJWTExpiry("not-a-jwt"); !got.IsZero() {
 			t.Errorf("expected zero time, got %v", got)
 		}

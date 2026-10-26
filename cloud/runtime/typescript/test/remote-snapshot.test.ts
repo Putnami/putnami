@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: Captures JsonSink output written through console.log.
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { resetDefaultLogger, resetLoggerConfig } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   RemoteConfigError,
   RemoteConfigSource,
@@ -99,38 +100,56 @@ describe('loadConfigSnapshot', () => {
     resetSnapshotAccessTokenCacheForTest();
   });
 
-  it('round-trips the resolved config tree end to end', () => {
-    const tree = { service: { port: 8080 }, flag: true };
-    setSyncFetchForTest(snapshotStub(encodeSnapshotObject(tree)));
+  specTest(
+    'round-trips the resolved config tree end to end',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'the-config-tree-round-trips',
+    },
+    () => {
+      const tree = { service: { port: 8080 }, flag: true };
+      setSyncFetchForTest(snapshotStub(encodeSnapshotObject(tree)));
 
-    const got = loadConfigSnapshot(
-      'gs://snapshots/config-snapshots/ws1/registry/rev.json.enc',
-      'projects/p/locations/l/keyRings/putnami/cryptoKeys/ws1',
-      5000,
-    );
-    expect(got).toEqual(tree);
-  });
+      const got = loadConfigSnapshot(
+        'gs://snapshots/config-snapshots/ws1/registry/rev.json.enc',
+        'projects/p/locations/l/keyRings/putnami/cryptoKeys/ws1',
+        5000,
+      );
+      expect(got).toEqual(tree);
+    },
+  );
 
-  it('sends the object text verbatim as the KMS ciphertext and access-token bearer', () => {
-    const tree = { db: { host: 'snap' } };
-    const objectText = encodeSnapshotObject(tree);
-    const seen: SyncFetchRequest[] = [];
-    setSyncFetchForTest((request) => {
-      seen.push(request);
-      return snapshotStub(objectText)(request);
-    });
+  specTest(
+    'sends the object text verbatim as the KMS ciphertext and access-token bearer',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'the-snapshot-requests-carry-an-access-token',
+    },
+    () => {
+      const tree = { db: { host: 'snap' } };
+      const objectText = encodeSnapshotObject(tree);
+      const seen: SyncFetchRequest[] = [];
+      setSyncFetchForTest((request) => {
+        seen.push(request);
+        return snapshotStub(objectText)(request);
+      });
 
-    loadConfigSnapshot('gs://snapshots/o.enc', 'projects/p/locations/l/keyRings/r/cryptoKeys/k', 5000);
+      loadConfigSnapshot('gs://snapshots/o.enc', 'projects/p/locations/l/keyRings/r/cryptoKeys/k', 5000);
 
-    const gcs = seen.find((r) => r.url.includes('storage.googleapis.com'));
-    const kms = seen.find((r) => r.url.includes('cloudkms.googleapis.com'));
-    expect(gcs?.headers?.Authorization).toBe('Bearer ya29.access-token');
-    expect(gcs?.url).toContain('/b/snapshots/o/o.enc?alt=media');
-    expect(kms?.headers?.Authorization).toBe('Bearer ya29.access-token');
-    expect(kms?.url).toBe('https://cloudkms.googleapis.com/v1/projects/p/locations/l/keyRings/r/cryptoKeys/k:decrypt');
-    const kmsBody = JSON.parse(kms?.body ?? '{}') as { ciphertext?: string };
-    expect(kmsBody.ciphertext).toBe(objectText);
-  });
+      const gcs = seen.find((r) => r.url.includes('storage.googleapis.com'));
+      const kms = seen.find((r) => r.url.includes('cloudkms.googleapis.com'));
+      expect(gcs?.headers?.Authorization).toBe('Bearer ya29.access-token');
+      expect(gcs?.url).toContain('/b/snapshots/o/o.enc?alt=media');
+      expect(kms?.headers?.Authorization).toBe('Bearer ya29.access-token');
+      expect(kms?.url).toBe(
+        'https://cloudkms.googleapis.com/v1/projects/p/locations/l/keyRings/r/cryptoKeys/k:decrypt',
+      );
+      const kmsBody = JSON.parse(kms?.body ?? '{}') as { ciphertext?: string };
+      expect(kmsBody.ciphertext).toBe(objectText);
+    },
+  );
 
   it('throws for an empty KMS key before any fetch', () => {
     let calls = 0;
@@ -182,83 +201,107 @@ describe('RemoteConfigSource snapshot fallback', () => {
     resetDefaultLogger();
   });
 
-  it('boots on the durable snapshot when a required config server is unreachable', () => {
-    const tree = { db: { host: 'snap' } };
-    const lines: string[] = [];
-    console.log = mock((line?: unknown) => {
-      lines.push(String(line ?? ''));
-    }) as unknown as typeof console.log;
-    setSyncFetchForTest(snapshotStub(encodeSnapshotObject(tree)));
+  specTest(
+    'boots on the durable snapshot when a required config server is unreachable',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'an-unreachable-server-boots-on-the-snapshot',
+    },
+    () => {
+      const tree = { db: { host: 'snap' } };
+      const lines: string[] = [];
+      console.log = mock((line?: unknown) => {
+        lines.push(String(line ?? ''));
+      }) as unknown as typeof console.log;
+      setSyncFetchForTest(snapshotStub(encodeSnapshotObject(tree)));
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1, // fail fast to the fallback
-      timeout: 200,
-      snapshotUri,
-      snapshotKmsKey,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1, // fail fast to the fallback
+        timeout: 200,
+        snapshotUri,
+        snapshotKmsKey,
+      });
 
-    expect(source.load()).toEqual(tree);
+      expect(source.load()).toEqual(tree);
 
-    const staleWarn = lines
-      .map((line) => JSON.parse(line) as Record<string, unknown>)
-      .find(
-        (entry) =>
-          entry.message === 'config server unreachable; booting on durable config snapshot (stale-config mode)',
-      );
-    expect(staleWarn).toBeDefined();
-    expect(staleWarn).toMatchObject({
-      severity: 'WARNING',
-      logger: 'config-server',
-      appName: 'registry',
-      environment: 'prod',
-      snapshotUri,
-    });
-  });
+      const staleWarn = lines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .find(
+          (entry) =>
+            entry.message === 'config server unreachable; booting on durable config snapshot (stale-config mode)',
+        );
+      expect(staleWarn).toBeDefined();
+      expect(staleWarn).toMatchObject({
+        severity: 'WARNING',
+        logger: 'config-server',
+        appName: 'registry',
+        environment: 'prod',
+        snapshotUri,
+      });
+    },
+  );
 
-  it('caches load() so a second call does not re-fetch the snapshot', () => {
-    const tree = { db: { host: 'snap' } };
-    let metadataCalls = 0;
-    setSyncFetchForTest((request) => {
-      if (request.url.includes('metadata.google.internal')) {
-        metadataCalls += 1;
-      }
-      return snapshotStub(encodeSnapshotObject(tree))(request);
-    });
+  specTest(
+    'caches load() so a second call does not re-fetch the snapshot',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'the-snapshot-loads-once',
+    },
+    () => {
+      const tree = { db: { host: 'snap' } };
+      let metadataCalls = 0;
+      setSyncFetchForTest((request) => {
+        if (request.url.includes('metadata.google.internal')) {
+          metadataCalls += 1;
+        }
+        return snapshotStub(encodeSnapshotObject(tree))(request);
+      });
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1,
-      timeout: 200,
-      snapshotUri,
-      snapshotKmsKey,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1,
+        timeout: 200,
+        snapshotUri,
+        snapshotKmsKey,
+      });
 
-    expect(source.load()).toEqual(tree);
-    expect(source.load()).toEqual(tree);
-    expect(metadataCalls).toBe(1);
-  });
+      expect(source.load()).toEqual(tree);
+      expect(source.load()).toEqual(tree);
+      expect(metadataCalls).toBe(1);
+    },
+  );
 
-  it('still throws when the config server is unreachable and no snapshot is configured', () => {
-    setSyncFetchForTest(snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } })));
+  specTest(
+    'still throws when the config server is unreachable and no snapshot is configured',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'no-snapshot-means-the-failure-stands',
+    },
+    () => {
+      setSyncFetchForTest(snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } })));
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1,
-      timeout: 200,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1,
+        timeout: 200,
+      });
 
-    expect(() => source.load()).toThrow(RemoteConfigError);
-  });
+      expect(() => source.load()).toThrow(RemoteConfigError);
+    },
+  );
 
   it('applies the snapshot on a cache-poisoned "failed" entry from a peer instance', () => {
     // First instance has no snapshot: it poisons the module cache with
@@ -283,110 +326,142 @@ describe('RemoteConfigSource snapshot fallback', () => {
     expect(second.load()).toEqual(tree);
   });
 
-  it('does not serve a stale snapshot once the config server resolves (no snapshot poisoning)', () => {
-    const remote = { server: { port: 3000 } };
-    setSyncFetchForTest(
-      snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } }), {
-        onResolve: () => ({
-          status: 200,
-          body: JSON.stringify({ config: remote, resolved: true, schemaMatch: true }),
+  specTest(
+    'does not serve a stale snapshot once the config server resolves (no snapshot poisoning)',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'a-resolved-config-wins-over-the-snapshot',
+    },
+    () => {
+      const remote = { server: { port: 3000 } };
+      setSyncFetchForTest(
+        snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } }), {
+          onResolve: () => ({
+            status: 200,
+            body: JSON.stringify({ config: remote, resolved: true, schemaMatch: true }),
+          }),
         }),
-      }),
-    );
+      );
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1,
-      timeout: 200,
-      snapshotUri,
-      snapshotKmsKey,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1,
+        timeout: 200,
+        snapshotUri,
+        snapshotKmsKey,
+      });
 
-    expect(source.load()).toEqual(remote);
-  });
+      expect(source.load()).toEqual(remote);
+    },
+  );
 
-  it('does not fall back to the snapshot on a terminal 403 (access revoked)', () => {
-    // 403 is terminal, not a retryable outage: even with a snapshot configured the
-    // boot must fail rather than serve stale, secret-bearing config after access
-    // was revoked.
-    setSyncFetchForTest(
-      snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } }), {
-        onResolve: () => ({ status: 403, body: 'Forbidden' }),
-      }),
-    );
+  specTest(
+    'does not fall back to the snapshot on a terminal 403 (access revoked)',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'a-forbidden-response-never-falls-back',
+    },
+    () => {
+      // 403 is terminal, not a retryable outage: even with a snapshot configured the
+      // boot must fail rather than serve stale, secret-bearing config after access
+      // was revoked.
+      setSyncFetchForTest(
+        snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } }), {
+          onResolve: () => ({ status: 403, body: 'Forbidden' }),
+        }),
+      );
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1,
-      timeout: 200,
-      snapshotUri,
-      snapshotKmsKey,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1,
+        timeout: 200,
+        snapshotUri,
+        snapshotKmsKey,
+      });
 
-    expect(() => source.load()).toThrow(RemoteConfigError);
-  });
+      expect(() => source.load()).toThrow(RemoteConfigError);
+    },
+  );
 
-  it('does not fall back to the snapshot when the server reports resolved:false', () => {
-    // Deleted / unresolved config is authoritative and terminal — a stale snapshot
-    // must not resurrect config the control plane no longer resolves.
-    setSyncFetchForTest(
-      snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } }), {
-        onResolve: () => ({ status: 200, body: JSON.stringify({ config: {}, resolved: false, schemaMatch: false }) }),
-      }),
-    );
+  specTest(
+    'does not fall back to the snapshot when the server reports resolved:false',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'an-unresolved-response-never-falls-back',
+    },
+    () => {
+      // Deleted / unresolved config is authoritative and terminal — a stale snapshot
+      // must not resurrect config the control plane no longer resolves.
+      setSyncFetchForTest(
+        snapshotStub(encodeSnapshotObject({ db: { host: 'snap' } }), {
+          onResolve: () => ({ status: 200, body: JSON.stringify({ config: {}, resolved: false, schemaMatch: false }) }),
+        }),
+      );
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1,
-      timeout: 200,
-      snapshotUri,
-      snapshotKmsKey,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1,
+        timeout: 200,
+        snapshotUri,
+        snapshotKmsKey,
+      });
 
-    expect(() => source.load()).toThrow(RemoteConfigError);
-  });
+      expect(() => source.load()).toThrow(RemoteConfigError);
+    },
+  );
 
-  it('emits a quieter warn and rethrows when the snapshot itself cannot be loaded', () => {
-    const lines: string[] = [];
-    console.log = mock((line?: unknown) => {
-      lines.push(String(line ?? ''));
-    }) as unknown as typeof console.log;
-    // GCS returns 404 for the snapshot object; resolve throws.
-    setSyncFetchForTest((request) => {
-      if (request.url.includes('metadata.google.internal')) {
-        return { status: 200, body: JSON.stringify({ access_token: 'ya29.access-token', expires_in: 3600 }) };
-      }
-      if (request.url.includes('storage.googleapis.com')) {
-        return { status: 404, body: 'Not Found' };
-      }
-      throw new Error('connection refused');
-    });
+  specTest(
+    'emits a quieter warn and rethrows when the snapshot itself cannot be loaded',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'snapshot-fallback-boots-a-required-source',
+      check: 'a-snapshot-that-cannot-load-warns-and-rethrows',
+    },
+    () => {
+      const lines: string[] = [];
+      console.log = mock((line?: unknown) => {
+        lines.push(String(line ?? ''));
+      }) as unknown as typeof console.log;
+      // GCS returns 404 for the snapshot object; resolve throws.
+      setSyncFetchForTest((request) => {
+        if (request.url.includes('metadata.google.internal')) {
+          return { status: 200, body: JSON.stringify({ access_token: 'ya29.access-token', expires_in: 3600 }) };
+        }
+        if (request.url.includes('storage.googleapis.com')) {
+          return { status: 404, body: 'Not Found' };
+        }
+        throw new Error('connection refused');
+      });
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'registry',
-      environment: 'prod',
-      required: true,
-      retryBudget: -1,
-      timeout: 200,
-      snapshotUri,
-      snapshotKmsKey,
-    });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'registry',
+        environment: 'prod',
+        required: true,
+        retryBudget: -1,
+        timeout: 200,
+        snapshotUri,
+        snapshotKmsKey,
+      });
 
-    expect(() => source.load()).toThrow(RemoteConfigError);
-    const quietWarn = lines
-      .map((line) => JSON.parse(line) as Record<string, unknown>)
-      .find((entry) => entry.message === 'config snapshot fallback failed; no durable config available');
-    expect(quietWarn).toBeDefined();
-    expect(quietWarn).toMatchObject({ severity: 'WARNING', logger: 'config-server', snapshotUri });
-  });
+      expect(() => source.load()).toThrow(RemoteConfigError);
+      const quietWarn = lines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .find((entry) => entry.message === 'config snapshot fallback failed; no durable config available');
+      expect(quietWarn).toBeDefined();
+      expect(quietWarn).toMatchObject({ severity: 'WARNING', logger: 'config-server', snapshotUri });
+    },
+  );
 });

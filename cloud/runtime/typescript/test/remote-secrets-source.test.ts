@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: Captures JsonSink output written through console.log.
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { resetConfigLoader } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   discoverRemoteSecretsSource,
   RemoteSecretsSource,
@@ -50,146 +51,194 @@ describe('RemoteSecretsSource', () => {
     resetDefaultLogger();
   });
 
-  it('hits /api/secrets/resolve with bearer token and schemaHash', () => {
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
+  specTest(
+    'hits /api/secrets/resolve with bearer token and schemaHash',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'secrets-source-resolves-remote-secrets',
+      check: 'a-resolve-posts-the-bearer-and-schema-hash',
+    },
+    () => {
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: JSON.stringify({
+            secrets: { database: { password: 'shh' } },
+            resolved: true,
+            schemaMatch: true,
+          }),
+        };
+      });
+
+      const source = new RemoteSecretsSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        schemaHash: 'sha256:abcdef0123456789',
+        token: 'test-token',
+      });
+
+      expect(source.name).toBe('secrets-server');
+      expect(source.priority).toBe(55);
+      expect(source.load()).toEqual({ database: { password: 'shh' } });
+
+      expect(captured?.url).toBe('https://config.putnami.test/api/secrets/resolve');
+      expect(captured?.method).toBe('POST');
+      expect(captured?.headers?.Authorization).toBe('Bearer test-token');
+      expect(captured?.body).toContain('sha256:abcdef0123456789');
+    },
+  );
+
+  specTest(
+    'returns undefined when not resolved',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'secrets-source-resolves-remote-secrets',
+      check: 'an-unresolved-response-yields-no-secrets',
+    },
+    () => {
+      setSyncFetchForTest(() => ({
         status: 200,
-        body: JSON.stringify({
-          secrets: { database: { password: 'shh' } },
-          resolved: true,
-          schemaMatch: true,
-        }),
-      };
-    });
+        body: JSON.stringify({ secrets: {}, resolved: false, schemaMatch: false }),
+      }));
 
-    const source = new RemoteSecretsSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      schemaHash: 'sha256:abcdef0123456789',
-      token: 'test-token',
-    });
+      const source = new RemoteSecretsSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'unknown',
+        environment: 'local',
+      });
+      expect(source.load()).toBeUndefined();
+    },
+  );
 
-    expect(source.name).toBe('secrets-server');
-    expect(source.priority).toBe(55);
-    expect(source.load()).toEqual({ database: { password: 'shh' } });
+  specTest(
+    'caches across calls',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'secrets-source-resolves-remote-secrets',
+      check: 'later-loads-reuse-the-first-resolve',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        return {
+          status: 200,
+          body: JSON.stringify({ secrets: {}, resolved: true, schemaMatch: true }),
+        };
+      });
 
-    expect(captured?.url).toBe('https://config.putnami.test/api/secrets/resolve');
-    expect(captured?.method).toBe('POST');
-    expect(captured?.headers?.Authorization).toBe('Bearer test-token');
-    expect(captured?.body).toContain('sha256:abcdef0123456789');
-  });
+      const source = new RemoteSecretsSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+      });
+      source.load();
+      source.load();
+      expect(calls).toBe(1);
+    },
+  );
 
-  it('returns undefined when not resolved', () => {
-    setSyncFetchForTest(() => ({
-      status: 200,
-      body: JSON.stringify({ secrets: {}, resolved: false, schemaMatch: false }),
-    }));
+  specTest(
+    'retries required remote secrets until the server is ready',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-retry-within-a-budget',
+      check: 'a-required-secrets-source-retries-until-ready',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error('connection refused');
+        }
+        return {
+          status: 200,
+          body: JSON.stringify({
+            secrets: { database: { password: 'ready' } },
+            resolved: true,
+            schemaMatch: true,
+          }),
+        };
+      });
 
-    const source = new RemoteSecretsSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'unknown',
-      environment: 'local',
-    });
-    expect(source.load()).toBeUndefined();
-  });
+      const source = new RemoteSecretsSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        timeout: 50,
+        retryBudget: 500,
+        required: true,
+      });
 
-  it('caches across calls', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      return {
-        status: 200,
-        body: JSON.stringify({ secrets: {}, resolved: true, schemaMatch: true }),
-      };
-    });
+      expect(source.load()).toEqual({ database: { password: 'ready' } });
+      expect(calls).toBe(2);
+    },
+  );
 
-    const source = new RemoteSecretsSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-    });
-    source.load();
-    source.load();
-    expect(calls).toBe(1);
-  });
+  specTest(
+    'does not retry terminal HTTP status responses',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-retry-within-a-budget',
+      check: 'a-terminal-secrets-status-fails-without-a-retry',
+    },
+    () => {
+      let calls = 0;
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        calls += 1;
+        captured = request;
+        return { status: 404, body: 'not found' };
+      });
 
-  it('retries required remote secrets until the server is ready', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      if (calls === 1) {
-        throw new Error('connection refused');
-      }
-      return {
-        status: 200,
-        body: JSON.stringify({
-          secrets: { database: { password: 'ready' } },
-          resolved: true,
-          schemaMatch: true,
-        }),
-      };
-    });
+      const source = new RemoteSecretsSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        timeout: 50,
+        retryBudget: 500,
+        required: true,
+      });
 
-    const source = new RemoteSecretsSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      timeout: 50,
-      retryBudget: 500,
-      required: true,
-    });
+      expect(() => source.load()).toThrow(/secrets-server returned non-200: status 404/);
+      expect(calls).toBe(1);
+      expect(captured?.throwOnHttpError).toBe(false);
+    },
+  );
 
-    expect(source.load()).toEqual({ database: { password: 'ready' } });
-    expect(calls).toBe(2);
-  });
+  specTest(
+    'discoverRemoteSecretsSource reads timeout and retry budget env vars',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-retry-within-a-budget',
+      check: 'a-zero-retry-budget-allows-one-attempt',
+    },
+    () => {
+      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
+      process.env.CONFIG_SERVER_TIMEOUT = '2s';
+      process.env.CONFIG_SERVER_RETRY_BUDGET = '0ms';
+      process.env.APP_ENV = 'prod';
 
-  it('does not retry terminal HTTP status responses', () => {
-    let calls = 0;
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      calls += 1;
-      captured = request;
-      return { status: 404, body: 'not found' };
-    });
+      let captured: SyncFetchRequest | undefined;
+      let calls = 0;
+      setSyncFetchForTest((request) => {
+        calls += 1;
+        captured = request;
+        throw new Error('network down');
+      });
 
-    const source = new RemoteSecretsSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      timeout: 50,
-      retryBudget: 500,
-      required: true,
-    });
-
-    expect(() => source.load()).toThrow(/secrets-server returned non-200: status 404/);
-    expect(calls).toBe(1);
-    expect(captured?.throwOnHttpError).toBe(false);
-  });
-
-  it('discoverRemoteSecretsSource reads timeout and retry budget env vars', () => {
-    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.CONFIG_SERVER_TIMEOUT = '2s';
-    process.env.CONFIG_SERVER_RETRY_BUDGET = '0ms';
-    process.env.APP_ENV = 'prod';
-
-    let captured: SyncFetchRequest | undefined;
-    let calls = 0;
-    setSyncFetchForTest((request) => {
-      calls += 1;
-      captured = request;
-      throw new Error('network down');
-    });
-
-    const source = discoverRemoteSecretsSource();
-    expect(source).toBeDefined();
-    expect(() => source?.load()).toThrow(/secrets-server fetch failed: network down/);
-    expect(captured?.timeoutMs).toBe(2000);
-    expect(calls).toBe(1);
-  });
+      const source = discoverRemoteSecretsSource();
+      expect(source).toBeDefined();
+      expect(() => source?.load()).toThrow(/secrets-server fetch failed: network down/);
+      expect(captured?.timeoutMs).toBe(2000);
+      expect(calls).toBe(1);
+    },
+  );
 
   it('discoverRemoteSecretsSource returns undefined when CONFIG_SERVER_URL is unset', () => {
     process.env.CONFIG_SERVER_URL = undefined;
@@ -209,20 +258,28 @@ describe('RemoteSecretsSource', () => {
     expect(discoverRemoteSecretsSource()).toBeUndefined();
   });
 
-  it('treats NODE_ENV=production as a required remote secrets source', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      throw new Error('network down');
-    });
-    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
-    process.env.NODE_ENV = 'production';
+  specTest(
+    'treats NODE_ENV=production as a required remote secrets source',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-stop-startup',
+      check: 'production-makes-the-secrets-source-required',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        throw new Error('network down');
+      });
+      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
+      process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
+      process.env.NODE_ENV = 'production';
 
-    const source = discoverRemoteSecretsSource();
-    expect(source).toBeDefined();
-    expect(() => source?.load()).toThrow(/secrets-server fetch failed: network down/);
-    expect(calls).toBe(1);
-  });
+      const source = discoverRemoteSecretsSource();
+      expect(source).toBeDefined();
+      expect(() => source?.load()).toThrow(/secrets-server fetch failed: network down/);
+      expect(calls).toBe(1);
+    },
+  );
 });

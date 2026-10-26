@@ -4,6 +4,7 @@ go 1.25.7
 
 require (
 	go.putnami.dev/config v0.0.1
+	go.putnami.dev/protocol/features v0.0.0
 	google.golang.org/api v0.276.0
 )
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { ConfigSource } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { cloudSourceDiscoverers, register, type SourceDiscoverer } from '../src/runtime/register';
 import { setSyncFetchForTest } from '../src/runtime/sync-fetch';
 
@@ -45,52 +46,100 @@ function discoveredSources(): ConfigSource[] {
 }
 
 describe('register() activation contract', () => {
-  it('registers exactly the config + secrets discoverers, in priority order', () => {
-    expect(collectDiscoverers()).toEqual([...cloudSourceDiscoverers]);
-  });
+  specTest(
+    'registers exactly the config + secrets discoverers, in priority order',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'registration-adds-the-two-discoverers-in-priority-order',
+    },
+    () => {
+      expect(collectDiscoverers()).toEqual([...cloudSourceDiscoverers]);
+    },
+  );
 
-  it('discovers config(50) and secrets(55) when CONFIG_SERVER_URL is a legacy base URL', () => {
-    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-    process.env.APP_NAME = 'task-api';
+  specTest(
+    'discovers config(50) and secrets(55) when CONFIG_SERVER_URL is a legacy base URL',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'a-base-url-enables-the-config-and-secrets-sources',
+    },
+    () => {
+      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+      process.env.CONFIG_SERVER_TOKEN = 'unit-token';
+      process.env.APP_NAME = 'task-api';
 
-    const sources = discoveredSources();
-    expect(sources.map((s) => s.name)).toEqual(['config-server', 'secrets-server']);
-    expect(sources.map((s) => s.priority)).toEqual([50, 55]);
-  });
+      const sources = discoveredSources();
+      expect(sources.map((s) => s.name)).toEqual(['config-server', 'secrets-server']);
+      expect(sources.map((s) => s.priority)).toEqual([50, 55]);
+    },
+  );
 
-  it('places config(50) and secrets(55) between the .secrets(35) and CONFIG_DATA(60) built-ins', () => {
-    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-    process.env.APP_NAME = 'task-api';
+  specTest(
+    'places config(50) and secrets(55) between the .secrets(35) and CONFIG_DATA(60) built-ins',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'the-sources-sit-between-the-secrets-file-and-config-data',
+    },
+    () => {
+      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+      process.env.CONFIG_SERVER_TOKEN = 'unit-token';
+      process.env.APP_NAME = 'task-api';
 
-    const builtinPriorities = [10, 20, 30, 35, 60]; // the 5 framework file/env sources
-    const merged = [...builtinPriorities, ...discoveredSources().map((s) => s.priority)].sort((a, b) => a - b);
-    expect(merged).toEqual([10, 20, 30, 35, 50, 55, 60]);
-  });
+      const builtinPriorities = [10, 20, 30, 35, 60]; // the 5 framework file/env sources
+      const merged = [...builtinPriorities, ...discoveredSources().map((s) => s.priority)].sort((a, b) => a - b);
+      expect(merged).toEqual([10, 20, 30, 35, 50, 55, 60]);
+    },
+  );
 
-  it('contributes only the config source for an exact /api/configs/resolve URL (secrets merged server-side)', () => {
-    process.env.CONFIG_SERVER_URL =
-      'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-    process.env.CONFIG_SERVER_TOKEN = 'unit-token';
-    process.env.APP_NAME = 'auth/server';
+  specTest(
+    'contributes only the config source for an exact /api/configs/resolve URL (secrets merged server-side)',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'an-exact-url-enables-only-the-config-source',
+    },
+    () => {
+      process.env.CONFIG_SERVER_URL =
+        'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
+      process.env.CONFIG_SERVER_TOKEN = 'unit-token';
+      process.env.APP_NAME = 'auth/server';
 
-    expect(discoveredSources().map((s) => s.name)).toEqual(['config-server']);
-  });
+      expect(discoveredSources().map((s) => s.name)).toEqual(['config-server']);
+    },
+  );
 
-  it('contributes no sources when CONFIG_SERVER_URL is unset', () => {
-    expect(discoveredSources()).toHaveLength(0);
-  });
+  specTest(
+    'contributes no sources when CONFIG_SERVER_URL is unset',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'no-url-enables-no-source',
+    },
+    () => {
+      expect(discoveredSources()).toHaveLength(0);
+    },
+  );
 
-  it('forwards the cache-reset hooks when the registrar accepts them', () => {
-    const resetHooks: Array<() => void> = [];
-    register({
-      registerSourceDiscoverer: () => {},
-      registerConfigLoaderResetHook: (reset) => resetHooks.push(reset),
-    });
-    expect(resetHooks).toHaveLength(3); // config cache, secrets cache, token cache
-    for (const reset of resetHooks) {
-      reset(); // each hook is callable without throwing
-    }
-  });
+  specTest(
+    'forwards the cache-reset hooks when the registrar accepts them',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'register-forwards-the-cache-reset-hooks',
+    },
+    () => {
+      const resetHooks: Array<() => void> = [];
+      register({
+        registerSourceDiscoverer: () => {},
+        registerConfigLoaderResetHook: (reset) => resetHooks.push(reset),
+      });
+      expect(resetHooks).toHaveLength(3); // config cache, secrets cache, token cache
+      for (const reset of resetHooks) {
+        reset(); // each hook is callable without throwing
+      }
+    },
+  );
 });

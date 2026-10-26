@@ -19,6 +19,8 @@ import (
 	storagev1 "google.golang.org/api/storage/v1"
 
 	config "go.putnami.dev/config"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // cancelTestSources builds each remote source against serverURL with a retry
@@ -44,6 +46,7 @@ func cancelTestSources(serverURL string, required bool) map[string]config.Contex
 // After 4 failed attempts the next retry wait is 800ms. Canceling inside that
 // wait must return well before it would have elapsed.
 func TestRemoteSourcesStopRetryWaitWhenCanceled(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "canceled-context-ends-retry-wait")
 	for name := range cancelTestSources("", true) {
 		t.Run(name, func(t *testing.T) {
 			var calls atomic.Int32
@@ -79,6 +82,7 @@ func TestRemoteSourcesStopRetryWaitWhenCanceled(t *testing.T) {
 }
 
 func TestWaitRemoteRetryReturnsWhenCanceled(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "retry-wait-returns-on-cancellation")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if waitRemoteRetry(ctx, time.Hour) {
@@ -90,6 +94,7 @@ func TestWaitRemoteRetryReturnsWhenCanceled(t *testing.T) {
 }
 
 func TestRemoteSourcesAbortInFlightRequestWhenCanceled(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "canceled-context-aborts-in-flight-request")
 	for name := range cancelTestSources("", true) {
 		t.Run(name, func(t *testing.T) {
 			started := make(chan struct{}, 1)
@@ -121,6 +126,7 @@ func TestRemoteSourcesAbortInFlightRequestWhenCanceled(t *testing.T) {
 // must return the cancellation instead of reporting empty local config, and
 // no source may cache it: the next load fetches again and caches that result.
 func TestRemoteSourcesRefetchAfterLoadCanceledMidFetch(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "single-fetch", "canceled-load-is-fetched-again")
 	for _, required := range []bool{true, false} {
 		for name := range cancelTestSources("", required) {
 			if name == "prepared-boot" && !required {
@@ -170,6 +176,7 @@ func TestRemoteSourcesRefetchAfterLoadCanceledMidFetch(t *testing.T) {
 }
 
 func TestRemoteConfigSourceSkipsSnapshotFallbackWhenCanceled(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "canceled-load-skips-snapshot-fallback")
 	var snapshotCalls atomic.Int32
 	prevStorage, prevKMS := newSnapshotStorageService, newSnapshotKMSService
 	newSnapshotStorageService = func(context.Context) (*storagev1.Service, error) {
@@ -211,6 +218,7 @@ func TestRemoteConfigSourceSkipsSnapshotFallbackWhenCanceled(t *testing.T) {
 // Canceling during the snapshot read is a shutdown, not a snapshot outage:
 // the fallback-failure WARN that alerts key on must stay quiet.
 func TestRemoteConfigSourceCanceledSnapshotReadLogsNoOutage(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "canceled-snapshot-read-logs-no-outage")
 	ctx, cancel := context.WithCancel(context.Background())
 	prevStorage := newSnapshotStorageService
 	newSnapshotStorageService = func(context.Context) (*storagev1.Service, error) {
@@ -241,6 +249,7 @@ func TestRemoteConfigSourceCanceledSnapshotReadLogsNoOutage(t *testing.T) {
 }
 
 func TestConfigLoadContextCancelsRemoteSource(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "load-context-returns-deadline-error")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "warming up", http.StatusServiceUnavailable)
 	}))
@@ -262,6 +271,8 @@ func TestConfigLoadContextCancelsRemoteSource(t *testing.T) {
 }
 
 func TestRemoteLoadWaiterHonorsItsOwnCancellation(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "single-fetch", "completed-load-is-reused")
+	spectest.Proves(t, "cloud/go-runtime-destination", "cancellation", "waiter-honors-its-own-cancellation")
 	var load remoteLoad
 	started := make(chan struct{})
 	release := make(chan struct{})

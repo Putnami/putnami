@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: Captures JsonSink output written through console.log.
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { resetConfigLoader } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   discoverRemoteSource,
   RemoteConfigError,
@@ -98,70 +99,94 @@ describe('RemoteConfigSource', () => {
     });
   });
 
-  it('passes Authorization: Bearer <token> to the in-process fetch', () => {
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
-      };
-    });
+  specTest(
+    'passes Authorization: Bearer <token> to the in-process fetch',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'config-source-resolves-remote-config',
+      check: 'a-base-url-resolves-with-a-post-and-a-bearer',
+    },
+    () => {
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
+        };
+      });
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      token: 'test-token',
-    });
-    source.load();
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        token: 'test-token',
+      });
+      source.load();
 
-    expect(captured?.url).toBe('https://config.putnami.test/api/configs/resolve');
-    expect(captured?.method).toBe('POST');
-    expect(captured?.headers?.Authorization).toBe('Bearer test-token');
-  });
+      expect(captured?.url).toBe('https://config.putnami.test/api/configs/resolve');
+      expect(captured?.method).toBe('POST');
+      expect(captured?.headers?.Authorization).toBe('Bearer test-token');
+    },
+  );
 
-  it('TokenSource takes precedence over the static token field', () => {
-    // The resolver is the seam; the static token is a convenience for direct
-    // callers.
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
-      };
-    });
+  specTest(
+    'TokenSource takes precedence over the static token field',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'a-token-source-wins-over-a-static-token',
+    },
+    () => {
+      // The resolver is the seam; the static token is a convenience for direct
+      // callers.
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
+        };
+      });
 
-    new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      token: 'from-static-field',
-      tokenSource: { token: () => 'from-token-source' },
-    }).load();
+      new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        token: 'from-static-field',
+        tokenSource: { token: () => 'from-token-source' },
+      }).load();
 
-    expect(captured?.headers?.Authorization).toBe('Bearer from-token-source');
-  });
+      expect(captured?.headers?.Authorization).toBe('Bearer from-token-source');
+    },
+  );
 
-  it('omits the Authorization header when no token is configured', () => {
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
-      };
-    });
+  specTest(
+    'omits the Authorization header when no token is configured',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'token-sources-supply-the-bearer',
+      check: 'no-token-sends-no-authorization-header',
+    },
+    () => {
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
+        };
+      });
 
-    new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-    }).load();
+      new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+      }).load();
 
-    expect(captured?.headers?.Authorization).toBeUndefined();
-  });
+      expect(captured?.headers?.Authorization).toBeUndefined();
+    },
+  );
 
   it('discoverRemoteSource forwards CONFIG_SERVER_TOKEN to the bearer header', () => {
     // Same identity must reach /api/configs/resolve as reaches /api/secrets/resolve.
@@ -194,65 +219,81 @@ describe('RemoteConfigSource', () => {
     }
   });
 
-  it('fetches an exact CONFIG_SERVER_URL with GET and preserves its query string', () => {
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: JSON.stringify({
-          config: { google: { clientId: 'id', clientSecret: 'secret' } },
-          resolved: true,
-          schemaMatch: true,
-          secretsApplied: true,
-        }),
-      };
-    });
-
-    const exactURL =
-      'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-    const source = new RemoteConfigSource({
-      url: exactURL,
-      appName: 'auth/server',
-      environment: 'prod',
-    });
-
-    expect(source.load()).toEqual({ google: { clientId: 'id', clientSecret: 'secret' } });
-    expect(captured?.url).toBe(exactURL);
-    expect(captured?.method).toBe('GET');
-    expect(captured?.body).toBeUndefined();
-  });
-
-  it('retries a stale raw config URL through CONFIG_SERVER_AUDIENCE after a 404', () => {
-    const staleURL =
-      'https://config-api-abc123-ew.a.run.app/api/configs/resolve?appName=orders%2Fapi&environment=prod&secretsMode=reveal';
-    const expectedFallback =
-      'https://api.putnami.test/api/configs/resolve?appName=orders%2Fapi&environment=prod&secretsMode=reveal';
-    const requests: SyncFetchRequest[] = [];
-    setSyncFetchForTest((request) => {
-      requests.push(request);
-      if (request.url === staleURL) {
-        return { status: 404, body: 'not found' };
-      }
-      if (request.url === expectedFallback) {
+  specTest(
+    'fetches an exact CONFIG_SERVER_URL with GET and preserves its query string',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'config-source-resolves-remote-config',
+      check: 'an-exact-url-resolves-with-a-get',
+    },
+    () => {
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
         return {
           status: 200,
-          body: JSON.stringify({ config: { database: { name: 'marketing' } }, resolved: true, schemaMatch: true }),
+          body: JSON.stringify({
+            config: { google: { clientId: 'id', clientSecret: 'secret' } },
+            resolved: true,
+            schemaMatch: true,
+            secretsApplied: true,
+          }),
         };
-      }
-      throw new Error(`unexpected request: ${request.url}`);
-    });
-    process.env.CONFIG_SERVER_URL = staleURL;
-    process.env.CONFIG_SERVER_AUDIENCE = 'https://api.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.APP_NAME = 'orders/api';
+      });
 
-    expect(discoverRemoteSource()?.load()).toEqual({ database: { name: 'marketing' } });
-    expect(requests).toHaveLength(2);
-    expect(requests.map((request) => request.url)).toEqual([staleURL, expectedFallback]);
-    expect(requests.map((request) => request.method)).toEqual(['GET', 'GET']);
-    expect(requests[1]?.headers?.Authorization).toBe('Bearer discovered-token');
-  });
+      const exactURL =
+        'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
+      const source = new RemoteConfigSource({
+        url: exactURL,
+        appName: 'auth/server',
+        environment: 'prod',
+      });
+
+      expect(source.load()).toEqual({ google: { clientId: 'id', clientSecret: 'secret' } });
+      expect(captured?.url).toBe(exactURL);
+      expect(captured?.method).toBe('GET');
+      expect(captured?.body).toBeUndefined();
+    },
+  );
+
+  specTest(
+    'retries a stale raw config URL through CONFIG_SERVER_AUDIENCE after a 404',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'config-source-resolves-remote-config',
+      check: 'a-404-retries-through-the-audience-origin',
+    },
+    () => {
+      const staleURL =
+        'https://config-api-abc123-ew.a.run.app/api/configs/resolve?appName=orders%2Fapi&environment=prod&secretsMode=reveal';
+      const expectedFallback =
+        'https://api.putnami.test/api/configs/resolve?appName=orders%2Fapi&environment=prod&secretsMode=reveal';
+      const requests: SyncFetchRequest[] = [];
+      setSyncFetchForTest((request) => {
+        requests.push(request);
+        if (request.url === staleURL) {
+          return { status: 404, body: 'not found' };
+        }
+        if (request.url === expectedFallback) {
+          return {
+            status: 200,
+            body: JSON.stringify({ config: { database: { name: 'marketing' } }, resolved: true, schemaMatch: true }),
+          };
+        }
+        throw new Error(`unexpected request: ${request.url}`);
+      });
+      process.env.CONFIG_SERVER_URL = staleURL;
+      process.env.CONFIG_SERVER_AUDIENCE = 'https://api.putnami.test';
+      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
+      process.env.APP_NAME = 'orders/api';
+
+      expect(discoverRemoteSource()?.load()).toEqual({ database: { name: 'marketing' } });
+      expect(requests).toHaveLength(2);
+      expect(requests.map((request) => request.url)).toEqual([staleURL, expectedFallback]);
+      expect(requests.map((request) => request.method)).toEqual(['GET', 'GET']);
+      expect(requests[1]?.headers?.Authorization).toBe('Bearer discovered-token');
+    },
+  );
 
   it('appends version and pinned to the exact-URL GET query', () => {
     let captured: SyncFetchRequest | undefined;
@@ -313,53 +354,61 @@ describe('RemoteConfigSource', () => {
     expect(JSON.parse(captured?.body ?? '{}').pinned).toBeUndefined();
   });
 
-  it('discoverRemoteSource pins from CONFIG_VERSION only, never APP_VERSION', () => {
-    // APP_VERSION carries the build semver at runtime; a pinned resolve is
-    // exclusive + fail-loud, so only the deliberately-stamped CONFIG_VERSION may
-    // become the resolve version. APP_VERSION alone must leave the request
-    // unpinned.
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return { status: 200, body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }) };
-    });
+  specTest(
+    'discoverRemoteSource pins from CONFIG_VERSION only, never APP_VERSION',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'config-source-resolves-remote-config',
+      check: 'config-version-pins-the-resolve',
+    },
+    () => {
+      // APP_VERSION carries the build semver at runtime; a pinned resolve is
+      // exclusive + fail-loud, so only the deliberately-stamped CONFIG_VERSION may
+      // become the resolve version. APP_VERSION alone must leave the request
+      // unpinned.
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return { status: 200, body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }) };
+      });
 
-    const original = {
-      url: process.env.CONFIG_SERVER_URL,
-      app: process.env.APP_NAME,
-      configVersion: process.env.CONFIG_VERSION,
-      appVersion: process.env.APP_VERSION,
-    };
-    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.APP_NAME = 'auth';
-    process.env.APP_VERSION = '1.2.3';
-    try {
-      process.env.CONFIG_VERSION = 'rel_pin';
-      discoverRemoteSource()?.load();
-      {
-        const body = JSON.parse(captured?.body ?? '{}');
-        expect(body.version).toBe('rel_pin');
-        expect(body.pinned).toBe(true);
-      }
+      const original = {
+        url: process.env.CONFIG_SERVER_URL,
+        app: process.env.APP_NAME,
+        configVersion: process.env.CONFIG_VERSION,
+        appVersion: process.env.APP_VERSION,
+      };
+      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+      process.env.APP_NAME = 'auth';
+      process.env.APP_VERSION = '1.2.3';
+      try {
+        process.env.CONFIG_VERSION = 'rel_pin';
+        discoverRemoteSource()?.load();
+        {
+          const body = JSON.parse(captured?.body ?? '{}');
+          expect(body.version).toBe('rel_pin');
+          expect(body.pinned).toBe(true);
+        }
 
-      delete process.env.CONFIG_VERSION;
-      captured = undefined;
-      resetRemoteConfigSourceCacheForTest();
-      discoverRemoteSource()?.load();
-      {
-        const body = JSON.parse(captured?.body ?? '{}');
-        expect(body.version).toBeUndefined();
-        expect(body.pinned).toBeUndefined();
+        delete process.env.CONFIG_VERSION;
+        captured = undefined;
+        resetRemoteConfigSourceCacheForTest();
+        discoverRemoteSource()?.load();
+        {
+          const body = JSON.parse(captured?.body ?? '{}');
+          expect(body.version).toBeUndefined();
+          expect(body.pinned).toBeUndefined();
+        }
+      } finally {
+        process.env.CONFIG_SERVER_URL = original.url;
+        process.env.APP_NAME = original.app;
+        if (original.configVersion === undefined) delete process.env.CONFIG_VERSION;
+        else process.env.CONFIG_VERSION = original.configVersion;
+        if (original.appVersion === undefined) delete process.env.APP_VERSION;
+        else process.env.APP_VERSION = original.appVersion;
       }
-    } finally {
-      process.env.CONFIG_SERVER_URL = original.url;
-      process.env.APP_NAME = original.app;
-      if (original.configVersion === undefined) delete process.env.CONFIG_VERSION;
-      else process.env.CONFIG_VERSION = original.configVersion;
-      if (original.appVersion === undefined) delete process.env.APP_VERSION;
-      else process.env.APP_VERSION = original.appVersion;
-    }
-  });
+    },
+  );
 
   it('discoverRemoteSource uses the exact CONFIG_SERVER_URL contract', () => {
     let captured: SyncFetchRequest | undefined;
@@ -384,12 +433,20 @@ describe('RemoteConfigSource', () => {
     expect(captured?.method).toBe('GET');
   });
 
-  it('treats blank and orchestration sentinel CONFIG_SERVER_URL values as unset', () => {
-    for (const value of ['', '   ', 'undefined', ' UnDeFiNeD ', 'null']) {
-      process.env.CONFIG_SERVER_URL = value;
-      expect(discoverRemoteSource()).toBeUndefined();
-    }
-  });
+  specTest(
+    'treats blank and orchestration sentinel CONFIG_SERVER_URL values as unset',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'register-activates-the-sources',
+      check: 'blank-and-sentinel-urls-count-as-unset',
+    },
+    () => {
+      for (const value of ['', '   ', 'undefined', ' UnDeFiNeD ', 'null']) {
+        process.env.CONFIG_SERVER_URL = value;
+        expect(discoverRemoteSource()).toBeUndefined();
+      }
+    },
+  );
 
   it('treats an empty schema-matching unresolved response as empty config', () => {
     setSyncFetchForTest(() => ({
@@ -455,164 +512,212 @@ describe('RemoteConfigSource', () => {
     expect(calls).toBe(1);
   });
 
-  it('retries required remote config until the server is ready', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      if (calls === 1) {
-        throw new Error('connection refused');
+  specTest(
+    'retries required remote config until the server is ready',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-retry-within-a-budget',
+      check: 'a-required-config-source-retries-until-ready',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error('connection refused');
+        }
+        return {
+          status: 200,
+          body: JSON.stringify({ config: { server: { port: 4100 } }, resolved: true, schemaMatch: true }),
+        };
+      });
+
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        timeout: 50,
+        retryBudget: 500,
+        required: true,
+      });
+
+      expect(source.load()).toEqual({ server: { port: 4100 } });
+      expect(calls).toBe(2);
+    },
+  );
+
+  specTest(
+    'does not retry terminal HTTP status responses',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-retry-within-a-budget',
+      check: 'a-terminal-config-status-fails-without-a-retry',
+    },
+    () => {
+      let calls = 0;
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        calls += 1;
+        captured = request;
+        return { status: 401, body: 'unauthorized' };
+      });
+
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+        timeout: 50,
+        retryBudget: 500,
+        required: true,
+      });
+
+      let thrown: unknown;
+      try {
+        source.load();
+      } catch (error) {
+        thrown = error;
       }
-      return {
-        status: 200,
-        body: JSON.stringify({ config: { server: { port: 4100 } }, resolved: true, schemaMatch: true }),
+
+      expect(thrown).toBeInstanceOf(RemoteConfigError);
+      expect((thrown as RemoteConfigError).message).toBe('config-server returned non-200: status 401');
+      expect((thrown as RemoteConfigError).cause).toBeInstanceOf(Error);
+      expect(((thrown as RemoteConfigError).cause as Error).message).toBe('status 401');
+      expect((thrown as RemoteConfigError).url).toBe('https://config.putnami.test/api/configs/resolve');
+      expect((thrown as RemoteConfigError).method).toBe('POST');
+      expect((thrown as RemoteConfigError).statusCode).toBe(401);
+      expect((thrown as RemoteConfigError).authPresent).toBe(false);
+      expect((thrown as RemoteConfigError).authMode).toBe('none');
+      expect((thrown as RemoteConfigError).appName).toBe('task-api');
+      expect((thrown as RemoteConfigError).environment).toBe('production');
+      expect(calls).toBe(1);
+      expect(captured?.throwOnHttpError).toBe(false);
+    },
+  );
+
+  specTest(
+    'discoverRemoteSource reads timeout and retry budget env vars',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-retry-within-a-budget',
+      check: 'the-timeout-comes-from-the-environment',
+    },
+    () => {
+      process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
+      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
+      process.env.CONFIG_SERVER_TIMEOUT = '1500ms';
+      process.env.CONFIG_SERVER_RETRY_BUDGET = '2s';
+
+      let captured: SyncFetchRequest | undefined;
+      setSyncFetchForTest((request) => {
+        captured = request;
+        return {
+          status: 200,
+          body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
+        };
+      });
+
+      const source = discoverRemoteSource();
+      expect(source).toBeDefined();
+      source?.load();
+      expect(captured?.timeoutMs).toBe(1500);
+    },
+  );
+
+  specTest(
+    'throws on remote fetch failure when discovered in Cloud Run',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-stop-startup',
+      check: 'cloud-run-makes-the-config-source-required',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        throw new Error('network down');
+      });
+      process.env.CONFIG_SERVER_URL =
+        'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
+      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
+      process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
+      process.env.K_SERVICE = 'auth-server';
+
+      const source = discoverRemoteSource();
+      expect(source).toBeDefined();
+      expect(() => source?.load()).toThrow(/config-server fetch failed: network down/);
+      expect(calls).toBe(1);
+    },
+  );
+
+  specTest(
+    'treats NODE_ENV=production as a required remote source',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'required-sources-stop-startup',
+      check: 'production-makes-the-config-source-required',
+    },
+    () => {
+      let calls = 0;
+      setSyncFetchForTest(() => {
+        calls += 1;
+        throw new Error('network down');
+      });
+      process.env.CONFIG_SERVER_URL =
+        'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
+      process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
+      process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
+      process.env.NODE_ENV = 'production';
+
+      const source = discoverRemoteSource();
+      expect(source).toBeDefined();
+      expect(() => source?.load()).toThrow(/config-server fetch failed: network down/);
+      expect(calls).toBe(1);
+    },
+  );
+
+  specTest(
+    'resolves environment=production against a canonical-prod server (server normalizes)',
+    {
+      feature: 'cloud/typescript-runtime-destination',
+      requirement: 'config-source-resolves-remote-config',
+      check: 'the-environment-name-is-sent-as-configured',
+    },
+    () => {
+      // The server canonicalizes environment naming at its boundary
+      // (trim + lowercase + production → prod); the client sends whatever it
+      // was configured with, verbatim. This pins that a TS workload started
+      // with APP_ENV=production keeps config access against a canonical-prod
+      // environment without any client release.
+      const canonicalEnv = (env: string): string => {
+        const normalized = env.trim().toLowerCase();
+        return normalized === 'production' ? 'prod' : normalized;
       };
-    });
+      let sentEnvironment: string | undefined;
+      setSyncFetchForTest((request) => {
+        const body = JSON.parse(request.body ?? '{}') as { environment?: string };
+        sentEnvironment = body.environment;
+        if (canonicalEnv(body.environment ?? '') !== 'prod') {
+          return { status: 403, body: JSON.stringify({ error: 'forbidden' }) };
+        }
+        return {
+          status: 200,
+          body: JSON.stringify({
+            config: { server: { host: 'prod-host' } },
+            resolved: true,
+            schemaMatch: true,
+          }),
+        };
+      });
 
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      timeout: 50,
-      retryBudget: 500,
-      required: true,
-    });
-
-    expect(source.load()).toEqual({ server: { port: 4100 } });
-    expect(calls).toBe(2);
-  });
-
-  it('does not retry terminal HTTP status responses', () => {
-    let calls = 0;
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      calls += 1;
-      captured = request;
-      return { status: 401, body: 'unauthorized' };
-    });
-
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-      timeout: 50,
-      retryBudget: 500,
-      required: true,
-    });
-
-    let thrown: unknown;
-    try {
-      source.load();
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toBeInstanceOf(RemoteConfigError);
-    expect((thrown as RemoteConfigError).message).toBe('config-server returned non-200: status 401');
-    expect((thrown as RemoteConfigError).cause).toBeInstanceOf(Error);
-    expect(((thrown as RemoteConfigError).cause as Error).message).toBe('status 401');
-    expect((thrown as RemoteConfigError).url).toBe('https://config.putnami.test/api/configs/resolve');
-    expect((thrown as RemoteConfigError).method).toBe('POST');
-    expect((thrown as RemoteConfigError).statusCode).toBe(401);
-    expect((thrown as RemoteConfigError).authPresent).toBe(false);
-    expect((thrown as RemoteConfigError).authMode).toBe('none');
-    expect((thrown as RemoteConfigError).appName).toBe('task-api');
-    expect((thrown as RemoteConfigError).environment).toBe('production');
-    expect(calls).toBe(1);
-    expect(captured?.throwOnHttpError).toBe(false);
-  });
-
-  it('discoverRemoteSource reads timeout and retry budget env vars', () => {
-    process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.CONFIG_SERVER_TIMEOUT = '1500ms';
-    process.env.CONFIG_SERVER_RETRY_BUDGET = '2s';
-
-    let captured: SyncFetchRequest | undefined;
-    setSyncFetchForTest((request) => {
-      captured = request;
-      return {
-        status: 200,
-        body: JSON.stringify({ config: {}, resolved: true, schemaMatch: true }),
-      };
-    });
-
-    const source = discoverRemoteSource();
-    expect(source).toBeDefined();
-    source?.load();
-    expect(captured?.timeoutMs).toBe(1500);
-  });
-
-  it('throws on remote fetch failure when discovered in Cloud Run', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      throw new Error('network down');
-    });
-    process.env.CONFIG_SERVER_URL =
-      'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
-    process.env.K_SERVICE = 'auth-server';
-
-    const source = discoverRemoteSource();
-    expect(source).toBeDefined();
-    expect(() => source?.load()).toThrow(/config-server fetch failed: network down/);
-    expect(calls).toBe(1);
-  });
-
-  it('treats NODE_ENV=production as a required remote source', () => {
-    let calls = 0;
-    setSyncFetchForTest(() => {
-      calls += 1;
-      throw new Error('network down');
-    });
-    process.env.CONFIG_SERVER_URL =
-      'https://api.putnami.test/api/configs/resolve?appName=auth%2Fserver&environment=prod&secretsMode=reveal';
-    process.env.CONFIG_SERVER_TOKEN = 'discovered-token';
-    process.env.CONFIG_SERVER_RETRY_BUDGET = '0';
-    process.env.NODE_ENV = 'production';
-
-    const source = discoverRemoteSource();
-    expect(source).toBeDefined();
-    expect(() => source?.load()).toThrow(/config-server fetch failed: network down/);
-    expect(calls).toBe(1);
-  });
-
-  it('resolves environment=production against a canonical-prod server (server normalizes)', () => {
-    // The server canonicalizes environment naming at its boundary
-    // (trim + lowercase + production → prod); the client sends whatever it
-    // was configured with, verbatim. This pins that a TS workload started
-    // with APP_ENV=production keeps config access against a canonical-prod
-    // environment without any client release.
-    const canonicalEnv = (env: string): string => {
-      const normalized = env.trim().toLowerCase();
-      return normalized === 'production' ? 'prod' : normalized;
-    };
-    let sentEnvironment: string | undefined;
-    setSyncFetchForTest((request) => {
-      const body = JSON.parse(request.body ?? '{}') as { environment?: string };
-      sentEnvironment = body.environment;
-      if (canonicalEnv(body.environment ?? '') !== 'prod') {
-        return { status: 403, body: JSON.stringify({ error: 'forbidden' }) };
-      }
-      return {
-        status: 200,
-        body: JSON.stringify({
-          config: { server: { host: 'prod-host' } },
-          resolved: true,
-          schemaMatch: true,
-        }),
-      };
-    });
-
-    const source = new RemoteConfigSource({
-      serverUrl: 'https://config.putnami.test',
-      appName: 'task-api',
-      environment: 'production',
-    });
-    expect(source.load()).toEqual({ server: { host: 'prod-host' } });
-    // No client-side canonicalization: the wire carries the configured
-    // spelling and the server owns the alias mapping.
-    expect(sentEnvironment).toBe('production');
-  });
+      const source = new RemoteConfigSource({
+        serverUrl: 'https://config.putnami.test',
+        appName: 'task-api',
+        environment: 'production',
+      });
+      expect(source.load()).toEqual({ server: { host: 'prod-host' } });
+      // No client-side canonicalization: the wire carries the configured
+      // spelling and the server owns the alias mapping.
+      expect(sentEnvironment).toBe('production');
+    },
+  );
 });

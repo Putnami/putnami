@@ -7,6 +7,8 @@ import (
 	"time"
 
 	config "go.putnami.dev/config"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // collectViaRegister drives Register the way the framework registry does:
@@ -24,6 +26,7 @@ func collectViaRegister() []config.Source {
 }
 
 func TestRegister_DiscoversConfigAndSecrets(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-discovery", "discovers-config-and-secrets-sources")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "https://config.putnami.test")
 	t.Setenv("CONFIG_SERVER_TOKEN", "unit-token")
@@ -42,6 +45,7 @@ func TestRegister_DiscoversConfigAndSecrets(t *testing.T) {
 }
 
 func TestRegister_OnlyConfigForExactResolveURL(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-discovery", "exact-resolve-url-skips-secrets-source")
 	// An exact /api/configs/resolve URL already merges secrets server-side, so
 	// the secrets discoverer must contribute nothing.
 	isolateDiscoveryEnv(t, false)
@@ -56,6 +60,7 @@ func TestRegister_OnlyConfigForExactResolveURL(t *testing.T) {
 }
 
 func TestRegister_EmptyWithoutURL(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "source-discovery", "no-source-without-server-url")
 	isolateDiscoveryEnv(t, false)
 	t.Setenv("CONFIG_SERVER_URL", "")
 
@@ -65,6 +70,7 @@ func TestRegister_EmptyWithoutURL(t *testing.T) {
 }
 
 func TestRegister_SharedRemoteSourcePaysOneRetryBudgetBeforeSnapshot(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "single-fetch", "discovery-shares-one-source-and-retry-budget")
 	isolateDiscoveryEnv(t, false)
 	plaintext, _ := json.Marshal(map[string]any{"oci": map[string]any{"server": map[string]any{"port": 8084}}})
 	stub := newSnapshotStub(t, []byte(base64.StdEncoding.EncodeToString(plaintext)))
