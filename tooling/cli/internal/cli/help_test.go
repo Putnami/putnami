@@ -253,6 +253,41 @@ func TestPrintSubcommandHelp_IncludesRootStructuredCommandHelp(t *testing.T) {
 	}
 }
 
+func TestPrintSubcommandHelp_RootListsItsSubcommands(t *testing.T) {
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
+		"root-help-lists-its-subcommands")
+	tests := []struct {
+		command string
+		want    []string
+	}{
+		{"cache", []string{
+			"Subcommands:",
+			"  clean   Clear this repo's shared build cache\n",
+			"  gc      Garbage-collect global caches to their budgets\n",
+			"  verify  Verify cache determinism and restore equivalence\n",
+		}},
+		{"config", []string{"Subcommands:", "  show  Show effective configuration (default)\n"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.command, func(t *testing.T) {
+			output := captureStructuredHelp(t, func() {
+				PrintSubcommandHelp(tt.command, "")
+			})
+			for _, want := range tt.want {
+				if !strings.Contains(output, want) {
+					t.Errorf("putnami %s --help lacks %q, got:\n%s", tt.command, want, output)
+				}
+			}
+		})
+	}
+	leaf := captureStructuredHelp(t, func() {
+		PrintSubcommandHelp("cache", "clean")
+	})
+	if strings.Contains(leaf, "Subcommands:") {
+		t.Errorf("putnami cache clean --help lists subcommands, got:\n%s", leaf)
+	}
+}
+
 // deployVocabularyScope is the help scope of a workspace whose vocabulary
 // declares deploy with the aliases d and D, and whose language extension
 // declares deploy.

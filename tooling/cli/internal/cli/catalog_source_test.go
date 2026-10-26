@@ -16,8 +16,8 @@ import (
 // the command catalog: which subcommand a bare `putnami <root>` runs
 // (Command.DefaultSub), and the CLI's global-flag vocabulary (GlobalFlag). Both
 // describe code that lives in this package, and neither can be checked by
-// running the command — `putnami cache` really cleans, `putnami telemetry`
-// really reads machine-global consent.
+// running the command — `putnami sessions` really reads the workspace's
+// sessions, `putnami telemetry` really reads machine-global consent.
 //
 // So these tests read the source instead. That is not a trick: the thing being
 // asserted IS a property of the source ("the handler's `case "list", "":` arm

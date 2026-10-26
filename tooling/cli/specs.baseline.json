@@ -17,6 +17,7 @@
     "cli/agent-workflow-lifecycle#starter-agent-content-opt-in",
     "cli/agent-workflow-lifecycle#superseded-owners-refused",
     "cli/agent-workflow-lifecycle#undeclared-artifact-retired",
+    "cli/canonical-workspace-guidance#a-bare-cache-runs-nothing",
     "cli/canonical-workspace-guidance#experimental-python",
     "cli/canonical-workspace-guidance#generated-agent-guidance",
     "cli/canonical-workspace-guidance#generated-help",

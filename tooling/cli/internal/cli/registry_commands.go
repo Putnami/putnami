@@ -406,6 +406,8 @@ func cmdWorkspace(env *CommandEnv) error {
 // `upgrade --global`.
 func cmdCLI(env *CommandEnv) error {
 	switch env.Sub {
+	case "":
+		return missingSubcommandError("cli")
 	case "list":
 		binDir, err := cliBinDir(env)
 		if err != nil {
@@ -489,15 +491,14 @@ func cmdDeps(env *CommandEnv) error {
 }
 
 func cmdCache(env *CommandEnv) error {
-	if env.Global.DryRun && (env.Sub == "" || env.Sub == "clean" || env.Sub == "gc" || env.Sub == "verify") {
-		subcommand := env.Sub
-		if subcommand == "" {
-			subcommand = "clean"
-		}
-		return usageErrorf("cache %s does not support --dry-run; remove --dry-run to run it", subcommand)
+	if env.Sub == "" {
+		return missingSubcommandError("cache")
+	}
+	if env.Global.DryRun && (env.Sub == "clean" || env.Sub == "gc" || env.Sub == "verify") {
+		return usageErrorf("cache %s does not support --dry-run; remove --dry-run to run it", env.Sub)
 	}
 	switch env.Sub {
-	case "clean", "":
+	case "clean":
 		// `clean --all` and `gc` act on the machine-global store and need no
 		// workspace; a bare `clean` targets THIS repo's store and so does. The
 		// extension cacheClean fan-out is a no-op without a workspace, so `clean
@@ -731,6 +732,9 @@ func cmdSessions(env *CommandEnv) error {
 // from the process working directory rather than from env.WsRoot, so a workspace
 // nested in a larger repository still fingerprints the repository it sits in.
 func cmdTree(env *CommandEnv) error {
+	if env.Sub == "" {
+		return missingSubcommandError("tree")
+	}
 	if env.Sub != "fingerprint" {
 		return usageErrorf("unknown subcommand: tree %s\n  Available: fingerprint", env.Sub)
 	}

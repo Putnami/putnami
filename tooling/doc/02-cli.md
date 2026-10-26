@@ -158,7 +158,11 @@ Flags can be combined. When no flags are given, all phases run against the `stab
 
 ### `putnami cache`
 
-- `putnami cache clean` — Delete cached job results
+- `putnami cache clean [--all]` — Delete this repository's shared build cache, which every worktree of the repository reads; `--all` deletes every repository's store
+- `putnami cache gc` — Garbage-collect the machine-global stores down to their byte budgets
+- `putnami cache verify` — Run the workspace gate twice and fail on a cache key or restore that differs
+
+`putnami cache` with no subcommand deletes nothing: it lists these subcommands and exits with a usage error.
 
 ### `putnami sessions`
 

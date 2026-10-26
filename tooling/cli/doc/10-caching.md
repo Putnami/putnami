@@ -1479,6 +1479,9 @@ putnami cache verify --impacted
 
 Because the store is shared across all worktrees of a repo, `cache clean` clears the cache for **every worktree of the current repo**, not just the current one. It runs under the store's exclusive lock, so it waits for in-flight sibling builds to drain.
 
+`putnami cache` with no subcommand runs none of them: it lists the subcommands
+and exits with a usage error, so typing it to discover them deletes nothing.
+
 Cache subcommands do not support `--dry-run`. Passing it returns a usage error
 before any store is mutated, extension cache hook is invoked, or verification
 worktree is created.

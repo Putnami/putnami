@@ -324,8 +324,47 @@ func printSubcommandHelp(command, subcommand string, scope *helpScope) {
 		}
 	}
 
+	if subcommand == "" {
+		if lines := subcommandLines(command); len(lines) > 0 {
+			iox.Fprintln(os.Stdout, "Subcommands:")
+			for _, line := range lines {
+				iox.Fprintln(os.Stdout, line)
+			}
+			iox.Fprintln(os.Stdout)
+		}
+	}
+
 	printGlobalOptions(scope)
 	printRelatedCommands(full, scope)
+}
+
+// subcommandLines returns one help line per catalog subcommand of command, in
+// declaration order: its name and summary, and the subcommand a bare
+// `putnami <command>` runs marked as the default.
+func subcommandLines(command string) []string {
+	root, _ := commandmeta.Lookup(command)
+	children := commandmeta.Subcommands(command)
+	width := 0
+	for _, child := range children {
+		width = max(width, len(child))
+	}
+	lines := make([]string, 0, len(children))
+	for _, child := range children {
+		entry, _ := commandmeta.Lookup(command + " " + child)
+		summary := entry.Summary
+		if child == root.DefaultSub {
+			summary = strings.TrimSpace(summary + " (default)")
+		}
+		lines = append(lines, strings.TrimRight(fmt.Sprintf("  %-*s  %s", width, child, summary), " "))
+	}
+	return lines
+}
+
+// missingSubcommandError is the usage error of a bare `putnami <command>`
+// whose command runs no default subcommand: it lists the subcommands.
+func missingSubcommandError(command string) error {
+	return usageErrorf("%s needs a subcommand\nUsage: putnami %s <subcommand>\n\nSubcommands:\n%s",
+		command, command, strings.Join(subcommandLines(command), "\n"))
 }
 
 // printGlobalOptions prints the abbreviated global-flag listing of scope.

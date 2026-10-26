@@ -2019,6 +2019,20 @@
           }
         },
         {
+          "id": "a-bare-cache-runs-nothing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-root-exits-with-its-subcommands-and-touches-no-store",
+              "root-help-lists-its-subcommands"
+            ]
+          }
+        },
+        {
           "id": "onboarding-path",
           "stage": "coded",
           "evidenceKinds": [

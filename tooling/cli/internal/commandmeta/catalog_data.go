@@ -658,14 +658,11 @@ var catalog = []Command{
 		Workspace: requiredWorkspace(),
 	},
 	{
-		Path:       "cache",
-		Kind:       KindStructured,
-		Summary:    "Manage cache",
-		DefaultSub: "clean",
+		Path:    "cache",
+		Kind:    KindStructured,
+		Summary: "Manage cache",
 		Workspace: WorkspaceNeed{
-			Required:    true,
-			ExemptFlags: []string{"--all"},
-			Note:        "a bare `cache` runs `cache clean`, whose --all form wipes the machine-global store",
+			Note: "a bare `cache` runs nothing: it prints its subcommands, so a reader who types it cannot wipe the shared store",
 		},
 	},
 	{

@@ -18,6 +18,10 @@
       "text": "Top-level, command, Markdown, man-page, completion, and structured help are derived from the command catalog and cover every public command."
     },
     {
+      "id": "a-bare-cache-runs-nothing",
+      "text": "putnami cache, putnami cli and putnami tree typed without a subcommand run none: each exits with a usage error that lists its subcommands, so typing putnami cache to discover them cannot wipe the shared cache store. The help of a built-in command root lists the subcommands the command catalog declares for it, each with the summary it declares and the default one marked."
+    },
+    {
       "id": "onboarding-path",
       "text": "Public guidance presents workspace and project discovery, feature and specification discovery, project selection, plan preview, the validation gate, and diagnostic recall as one usable path."
     },

@@ -1,6 +1,11 @@
 ═══ cache ═══
 putnami cache
 
+Subcommands:
+  clean   Clear this repo's shared build cache
+  gc      Garbage-collect global caches to their budgets
+  verify  Verify cache determinism and restore equivalence
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -18,6 +23,10 @@ Usage:
 Examples:
   putnami cli list --global
   putnami cli use go-dev
+
+Subcommands:
+  list
+  use
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -38,6 +47,11 @@ Examples:
   putnami completion zsh
   putnami completion fish
 
+Subcommands:
+  bash
+  zsh
+  fish
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -46,6 +60,10 @@ Global Options:
 
 ═══ config ═══
 putnami config
+
+Subcommands:
+  show  Show effective configuration (default)
+  set   Set a configuration value
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -56,6 +74,11 @@ Global Options:
 ═══ context ═══
 putnami context
 
+Subcommands:
+  generate  Regenerate AI context (default)
+  map       Print the workspace orientation map
+  pack      Print each project's agent-context document
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -64,6 +87,11 @@ Global Options:
 
 ═══ deps ═══
 putnami deps
+
+Subcommands:
+  install  Install project dependencies (default)
+  add
+  remove
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -103,6 +131,14 @@ Related Commands:
 
 ═══ extensions ═══
 putnami extensions
+
+Subcommands:
+  install   Install extensions from config (default)
+  list      List extensions
+  update    Update extensions
+  remove    Remove an extension
+  prepare   Prepare the provider runtimes of a source workspace
+  validate  Validate an extension manifest
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -224,6 +260,9 @@ Examples:
   putnami mcp
   putnami mcp install
 
+Subcommands:
+  install  Register the MCP server in .mcp.json for Claude Code
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -236,6 +275,9 @@ Related Commands:
 
 ═══ migrate ═══
 putnami migrate
+
+Subcommands:
+  vnext  Migrate putnami.lock.json to the current format
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -270,6 +312,13 @@ Related Commands:
 
 ═══ projects ═══
 putnami projects
+
+Subcommands:
+  list      List canonical workspace projects (default)
+  create    Create a project from template
+  describe  Show project info
+  sync      Sync projects from disk
+  tag       Manage project tags
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -315,6 +364,9 @@ Examples:
   putnami scopes list
   putnami scopes list --output=jsonl
 
+Subcommands:
+  list  List workspace scopes (projects, groups, tags) (default)
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -329,6 +381,13 @@ Related Commands:
 ═══ sessions ═══
 putnami sessions
 
+Subcommands:
+  list     List recent execution sessions (default)
+  inspect  Inspect a specific session
+  replay   Resume delivery of a retained execution session
+  export   Export recorded sessions as JSONL
+  summary  Summarize recorded sessions, one row per run
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -337,6 +396,12 @@ Global Options:
 
 ═══ telemetry ═══
 putnami telemetry
+
+Subcommands:
+  on
+  off
+  status  (default)
+  show
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -347,6 +412,15 @@ Global Options:
 ═══ templates ═══
 putnami templates
 
+Subcommands:
+  install   Install templates from config (default)
+  list      List installed templates
+  update    Update templates
+  remove    Remove a template
+  validate  Validate a template manifest
+  test      Test a template in a temporary workspace
+  package   Package a template into an archive
+
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
@@ -355,6 +429,9 @@ Global Options:
 
 ═══ tree ═══
 putnami tree
+
+Subcommands:
+  fingerprint  Print the digest identifying this worktree's exact state
 
 Global Options:
   Common: --verbose, --debug, --help
@@ -402,6 +479,10 @@ Related Commands:
 
 ═══ workspace ═══
 putnami workspace
+
+Subcommands:
+  init
+  describe  Describe the active workspace (default)
 
 Global Options:
   Common: --verbose, --debug, --help

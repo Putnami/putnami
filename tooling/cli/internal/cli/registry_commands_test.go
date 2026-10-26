@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
@@ -134,7 +135,6 @@ func TestCmdCacheDryRunRefusesBeforeStoreMutationOrExtensionHooks(t *testing.T) 
 		{name: "clean", args: []string{"cache", "clean", "--dry-run"}},
 		{name: "clean-all", args: []string{"cache", "clean", "--all", "--dry-run"}},
 		{name: "gc", args: []string{"cache", "gc", "--dry-run"}},
-		{name: "clean-shortcut", args: []string{"cache", "--dry-run"}},
 	}
 
 	for _, invocation := range invocations {
@@ -198,6 +198,117 @@ func TestCmdCacheDryRunRefusesBeforeStoreMutationOrExtensionHooks(t *testing.T) 
 			}
 			if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
 				t.Fatalf("extension cache hook ran under --dry-run: stat err=%v", statErr)
+			}
+		})
+	}
+}
+
+// TestBareCacheListsItsSubcommandsAndTouchesNoStore proves a bare `putnami
+// cache`, which a reader types to discover its subcommands, deletes nothing:
+// it exits with a usage error that lists clean, gc and verify, and neither the
+// shared store nor an extension cache hook is touched.
+func TestBareCacheListsItsSubcommandsAndTouchesNoStore(t *testing.T) {
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
+		"a-bare-root-exits-with-its-subcommands-and-touches-no-store")
+	invocations := map[string][]string{
+		"bare":    {"cache"},
+		"all":     {"cache", "--all"},
+		"dry-run": {"cache", "--dry-run"},
+	}
+	for name, args := range invocations {
+		t.Run(name, func(t *testing.T) {
+			wsRoot := t.TempDir()
+			storeRoot := filepath.Join(t.TempDir(), "store")
+			t.Setenv("PUTNAMI_STORE_DIR", storeRoot)
+			t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
+			if err := os.WriteFile(filepath.Join(wsRoot, "putnami.workspace.json"), []byte(`{
+				"includes": ["extensions/cache-marker"]
+			}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			marker := filepath.Join(wsRoot, "cache-hook-ran")
+			writeCacheDryRunMarkerExtension(t, wsRoot, marker)
+
+			cacheStore := store.NewLocalStore(storeRoot)
+			source := t.TempDir()
+			if err := os.WriteFile(filepath.Join(source, "kept.bin"), []byte("kept"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			hash := strings.Repeat("b", 64)
+			if err := cacheStore.Put(hash, &store.Entry{
+				Result:   &store.EntryResult{Status: "success"},
+				FilesDir: source,
+			}); err != nil {
+				t.Fatalf("seed cache entry: %v", err)
+			}
+
+			parsed := ParseArgs(args, nil, nil)
+			if parsed.Err != nil {
+				t.Fatalf("ParseArgs(%v): %v", args, parsed.Err)
+			}
+			registered, ok := lookupCommand("cache")
+			if !ok {
+				t.Fatal("cache command is not registered")
+			}
+			err := registered.run(&CommandEnv{
+				Ctx:    context.Background(),
+				Cfg:    wsproto.Load(wsRoot),
+				WsRoot: wsRoot,
+				Sub:    parsed.Subcommand,
+				Args:   parsed.RawJobArgs,
+				Global: parsed.Global,
+			})
+			if !errors.Is(err, cmderr.ErrUsage) {
+				t.Fatalf("putnami %s error = %v, want ErrUsage-classified", strings.Join(args, " "), err)
+			}
+			for _, want := range []string{
+				"cache needs a subcommand",
+				"Usage: putnami cache <subcommand>",
+				"clean   Clear this repo's shared build cache",
+				"gc      Garbage-collect global caches to their budgets",
+				"verify  Verify cache determinism and restore equivalence",
+			} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("putnami %s error = %q, want it to contain %q", strings.Join(args, " "), err, want)
+				}
+			}
+			if entry, getErr := cacheStore.Get(hash); getErr != nil || entry == nil {
+				t.Fatalf("putnami %s deleted a cache entry: entry=%v err=%v", strings.Join(args, " "), entry, getErr)
+			}
+			if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
+				t.Fatalf("putnami %s ran the extension cache hook: stat err=%v", strings.Join(args, " "), statErr)
+			}
+		})
+	}
+}
+
+// TestBareRootsWithoutADefaultListTheirSubcommands proves a bare `putnami
+// cli` or `putnami tree` answers with the usage error of a bare `putnami
+// cache`, which lists the subcommands.
+func TestBareRootsWithoutADefaultListTheirSubcommands(t *testing.T) {
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
+		"a-bare-root-exits-with-its-subcommands-and-touches-no-store")
+	roots := map[string][]string{
+		"cli":  {"list", "use"},
+		"tree": {"fingerprint"},
+	}
+	for root, subcommands := range roots {
+		t.Run(root, func(t *testing.T) {
+			registered, ok := lookupCommand(root)
+			if !ok {
+				t.Fatalf("%s command is not registered", root)
+			}
+			err := registered.run(&CommandEnv{Ctx: context.Background(), Cfg: &wsproto.Config{}})
+			if !errors.Is(err, cmderr.ErrUsage) {
+				t.Fatalf("putnami %s error = %v, want ErrUsage-classified", root, err)
+			}
+			if !strings.Contains(err.Error(), root+" needs a subcommand") {
+				t.Errorf("putnami %s error = %q, want it to name the missing subcommand", root, err)
+			}
+			for _, subcommand := range subcommands {
+				if !strings.Contains(err.Error(), "\n  "+subcommand) {
+					t.Errorf("putnami %s error = %q, want it to list %q", root, err, subcommand)
+				}
 			}
 		})
 	}
