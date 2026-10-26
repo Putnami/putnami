@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	stdexec "os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	registry "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/registrycred"
 )
 
 // emptyDescriptorHelperEnv names the file the workspace-fetch helper of
@@ -25,7 +27,9 @@ const emptyDescriptorHelperEnv = "PUTNAMI_TS_EMPTY_DESCRIPTOR_HELPER_RESULT"
 // TestWorkspaceFetchEmptyDescriptorHelper is the workspace-fetch job process
 // that TestRunWorkspaceFetch_AHandedEmptyCredentialStartsNoCredentialChild
 // starts. It reads the job credential and refreshes the native one with the
-// production functions; only bun is mocked. It does nothing in any other run.
+// production functions; only bun is mocked. It writes the fetch status, then
+// one line per refresh: "skipped" when the refresh started no child, "started"
+// otherwise. It does nothing in any other run.
 func TestWorkspaceFetchEmptyDescriptorHelper(t *testing.T) {
 	resultPath := os.Getenv(emptyDescriptorHelperEnv)
 	if resultPath == "" {
@@ -44,10 +48,25 @@ func TestWorkspaceFetchEmptyDescriptorHelper(t *testing.T) {
 		}
 		return &exec.Result{Success: true}, nil
 	})
+	var refreshes []string
+	orig := ensureNpmRegistryCredential
+	t.Cleanup(func() { ensureNpmRegistryCredential = orig })
+	ensureNpmRegistryCredential = func(ctx context.Context, root, host string) registrycred.Outcome {
+		outcome := orig(ctx, root, host)
+		if outcome.Kind == registrycred.KindSkipped {
+			refreshes = append(refreshes, "skipped")
+		} else {
+			refreshes = append(refreshes, "started")
+		}
+		return outcome
+	}
 	status, _, err := runWorkspaceFetch(ctx, jsonl.New(), nil)
 	result := status
 	if err != nil {
 		result += " " + err.Error()
+	}
+	for _, refresh := range refreshes {
+		result += "\n" + refresh
 	}
 	if err := os.WriteFile(resultPath, []byte(result), 0o600); err != nil {
 		t.Fatal(err)
@@ -59,14 +78,18 @@ func TestWorkspaceFetchEmptyDescriptorHelper(t *testing.T) {
 // `putnami cloud registry-token` child: that child is a CLI without the run
 // credential. Without a handed descriptor the same fetch refreshes the native
 // credential through the child.
+//
+// The refresh outcome tells whether the child started, not the child itself:
+// a loaded host can take longer than the 10s bound of the refresh to start
+// the child, which is then stopped before it runs.
 func TestRunWorkspaceFetch_AHandedEmptyCredentialStartsNoCredentialChild(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		hand        bool
-		wantStarted bool
+		name string
+		hand bool
+		want string
 	}{
-		{name: "no descriptor", wantStarted: true},
-		{name: "an empty descriptor", hand: true},
+		{name: "no descriptor", want: "OK\nstarted"},
+		{name: "an empty descriptor", hand: true, want: "OK\nskipped"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -110,13 +133,14 @@ func TestRunWorkspaceFetch_AHandedEmptyCredentialStartsNoCredentialChild(t *test
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("workspace-fetch process: %v\n%s", err, out)
 			}
-			if result, err := os.ReadFile(resultPath); err != nil || string(result) != "OK" {
-				t.Fatalf("workspace-fetch = %q (%v), want OK", result, err)
+			if result, err := os.ReadFile(resultPath); err != nil || string(result) != tc.want {
+				t.Fatalf("workspace-fetch and its refreshes = %q (%v), want %q", result, err, tc.want)
 			}
-
-			_, err := os.Stat(marker)
-			if started := err == nil; started != tc.wantStarted {
-				t.Fatalf("the credential child started: %v, want %v", started, tc.wantStarted)
+			if !tc.hand {
+				return
+			}
+			if _, err := os.Stat(marker); err == nil {
+				t.Fatal("the credential child started, want none")
 			}
 		})
 	}
