@@ -50,6 +50,8 @@ type completionContext struct {
 	// positional named project: the word after the group also completes the
 	// project IDs (addPositionalDefaultCompletions).
 	projectPositionals map[string]bool
+	// coreAliases are the aliases whose target resolves to a core root.
+	coreAliases []string
 }
 
 // discoverCompletionExtensions returns the extensions that load at wsRoot, the
@@ -317,8 +319,12 @@ func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.V
 			aliases = append(aliases, commandmeta.Alias{Name: name, Command: workspace[name]})
 		}
 	}
+	coreRoots := commandmeta.StructuredRoots()
 	for _, alias := range aliases {
 		addCompletionCommand(ctx, alias.Name, "Alias for "+alias.Command)
+		if resolvesToCoreRoot(alias.Command, workspace, coreRoots) {
+			ctx.coreAliases = shared.AppendUnique(ctx.coreAliases, alias.Name)
+		}
 		if flags := ctx.structuredFlags[alias.Command]; len(flags) > 0 {
 			ctx.structuredFlags[alias.Name] = mergeStructuredCompletionFlags(ctx.structuredFlags[alias.Name], flags)
 		}
@@ -326,6 +332,22 @@ func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.V
 			ctx.knownSubcommandPaths[alias.Name] = true
 		}
 	}
+}
+
+// resolvesToCoreRoot reports whether command, followed through the workspace
+// aliases the way the parser resolves an alias chain, names a core root.
+func resolvesToCoreRoot(command string, workspace map[string]string, roots []commandmeta.Command) bool {
+	for range len(workspace) + 1 {
+		if slices.ContainsFunc(roots, func(root commandmeta.Command) bool { return root.Path == command }) {
+			return true
+		}
+		next, ok := workspace[command]
+		if !ok {
+			return false
+		}
+		command = next
+	}
+	return false
 }
 
 // declaresReachableGroup reports whether a loaded extension declares a command
@@ -525,6 +547,46 @@ func (c completionContext) globalFlagNames() []string {
 	for _, flag := range c.globalFlags {
 		names = append(names, flag.Long)
 	}
+	return names
+}
+
+// sharedGlobalFlagNames returns the "--long" spellings of the global flags every
+// command takes: those no command reads only as a job command.
+func (c completionContext) sharedGlobalFlagNames() []string {
+	var names []string
+	for _, flag := range c.globalFlags {
+		if !flag.JobOnly {
+			names = append(names, flag.Long)
+		}
+	}
+	return names
+}
+
+// jobGlobalFlagNames returns the "--long" spellings of the job-only global
+// flags the scope offers. A core command refuses them unless its own entry
+// declares them (commandmeta.RefusesGlobalFlag), and a declared one is already
+// offered with the command's own flags, so the scripts offer this list on a
+// job command and a command group only.
+func (c completionContext) jobGlobalFlagNames() []string {
+	var names []string
+	for _, flag := range c.globalFlags {
+		if flag.JobOnly {
+			names = append(names, flag.Long)
+		}
+	}
+	return names
+}
+
+// coreRoots returns the roots of the core commands and the aliases that
+// resolve to one, which the scripts offer no job-only global flag after.
+func (c completionContext) coreRoots() []string {
+	roots := commandmeta.StructuredRoots()
+	names := make([]string, 0, len(roots)+len(c.coreAliases))
+	for _, root := range roots {
+		names = append(names, root.Path)
+	}
+	names = append(names, c.coreAliases...)
+	sort.Strings(names)
 	return names
 }
 

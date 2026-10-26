@@ -40,6 +40,16 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_core_root() {
+    case "$1" in
+`)
+	for _, root := range ctx.coreRoots() {
+		iox.Fprintf(w, "        %s) return 0 ;;\n", bashQuote(root))
+	}
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami_takes_project() {
     case "$1" in
 `)
@@ -59,7 +69,7 @@ _putnami_flags_for() {
 }
 
 _putnami() {
-    local -a commands structured_commands global_flags projects project_basenames
+    local -a commands structured_commands global_flags job_global_flags projects project_basenames
 
     commands=(
 `)
@@ -84,8 +94,17 @@ _putnami() {
 
 	iox.Fprintf(w, "    )\n\n    global_flags=(\n")
 	for _, flag := range ctx.globalFlags {
-		iox.Fprintf(w, "        %s\n", bashQuote(zshFlagSpec(
-			flag.Long, flag.Description, flag.ValueName, flag.Values)))
+		if !flag.JobOnly {
+			iox.Fprintf(w, "        %s\n", bashQuote(zshFlagSpec(
+				flag.Long, flag.Description, flag.ValueName, flag.Values)))
+		}
+	}
+	iox.Fprintf(w, "    )\n\n    job_global_flags=(\n")
+	for _, flag := range ctx.globalFlags {
+		if flag.JobOnly {
+			iox.Fprintf(w, "        %s\n", bashQuote(zshFlagSpec(
+				flag.Long, flag.Description, flag.ValueName, flag.Values)))
+		}
 	}
 	iox.Fprintf(w, "    )\n\n")
 
@@ -129,6 +148,10 @@ _putnami() {
             local cur="${words[CURRENT]}"
             local prev="${words[CURRENT-1]}"
             local path="${words[1]}"
+            # A core command takes a job-only flag only as one of its own flags.
+            if ! _putnami_core_root "${path}"; then
+                global_flags=("${global_flags[@]}" "${job_global_flags[@]}")
+            fi
             local i=2
             while (( i < CURRENT )); do
                 local word="${words[i]}"

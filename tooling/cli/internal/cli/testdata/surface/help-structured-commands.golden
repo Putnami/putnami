@@ -9,7 +9,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ cli ═══
@@ -31,7 +31,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ completion ═══
@@ -55,7 +55,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ config ═══
@@ -68,7 +68,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ context ═══
@@ -82,7 +82,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ deps ═══
@@ -96,7 +96,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ doctor ═══
@@ -122,7 +122,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -143,7 +143,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ help ═══
@@ -167,7 +167,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ impact-plan ═══
@@ -189,7 +189,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -221,7 +221,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ install ═══
@@ -241,7 +241,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -266,7 +266,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -282,7 +282,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ pin ═══
@@ -304,7 +304,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -323,7 +323,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ report ═══
@@ -345,7 +345,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -370,7 +370,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -391,7 +391,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ telemetry ═══
@@ -406,7 +406,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ templates ═══
@@ -424,7 +424,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ tree ═══
@@ -436,7 +436,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ upgrade ═══
@@ -445,7 +445,7 @@ putnami upgrade
 Upgrade the CLI, extensions, templates, and framework dependencies in one command; a channel resolves on each ecosystem's own registry
 
 Usage:
-  putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]
+  putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run] [--continue-on-error]
 
 Command Flags:
   --global                     Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g)
@@ -458,6 +458,7 @@ Command Flags:
   --version <version>          Use an exact Putnami release version
   --from-source                Build the CLI from this workspace's source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI)
   --dry-run                    Resolve and print the upgrade plan without modifying files
+  --continue-on-error          Run the remaining upgrade phases after one fails
 
 Examples:
   putnami upgrade
@@ -470,7 +471,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -487,7 +488,7 @@ Subcommands:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ architecture inspect ═══
@@ -496,7 +497,7 @@ putnami architecture inspect
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ architecture snapshot ═══
@@ -505,7 +506,7 @@ putnami architecture snapshot
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ architecture validate ═══
@@ -514,7 +515,7 @@ putnami architecture validate
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ cache clean ═══
@@ -532,7 +533,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ cache gc ═══
@@ -549,7 +550,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ cache verify ═══
@@ -558,7 +559,16 @@ putnami cache verify
 Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
 
 Usage:
-  putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
+  putnami cache verify [--projects <selector> | --impacted | --all] [--exclude <names>] [--impacted-strict] [--profile <profile>] [--retry <n>] [--cpu-policy <policy>] [--trace-profile <path>] [--continue-on-error] [--output <format>]
+
+Command Flags:
+  --exclude <names>            Leave these projects out of the verified runs
+  --impacted-strict            Fail when the --impacted baseline can't be resolved
+  --profile <profile>          Deployment profile the verified runs use: dev | test | production
+  --retry <n>                  Retry transient failures in the verified runs
+  --cpu-policy <policy>        CPU ceiling policy: critical-path | measured
+  --trace-profile <path>       Write the trace events of the last verified run (Chrome trace format)
+  --continue-on-error          Don't abort a verified run on the first failure
 
 Examples:
   putnami cache verify --projects /my/project
@@ -567,7 +577,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -591,7 +601,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ cli use ═══
@@ -612,7 +622,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ config set ═══
@@ -629,7 +639,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -650,7 +660,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -663,7 +673,7 @@ putnami contracts check
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ contracts generate ═══
@@ -672,7 +682,7 @@ putnami contracts generate
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ context generate ═══
@@ -693,7 +703,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -717,7 +727,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -739,7 +749,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -769,7 +779,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -796,7 +806,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -822,7 +832,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -844,7 +854,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -866,7 +876,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -879,7 +889,7 @@ putnami features diff
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ features inspect ═══
@@ -888,7 +898,7 @@ putnami features inspect
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ features snapshot ═══
@@ -897,7 +907,7 @@ putnami features snapshot
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ features validate ═══
@@ -906,7 +916,7 @@ putnami features validate
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ mcp install ═══
@@ -923,7 +933,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -950,7 +960,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -979,7 +989,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1001,7 +1011,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1023,7 +1033,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1042,6 +1052,7 @@ Usage:
 Command Flags:
   --prune                      Drop config entries whose project directory no longer exists
   --skip-install               Do not run dependency installation after syncing
+  --dry-run                    Show the changes without applying them
 
 Examples:
   putnami projects sync
@@ -1050,7 +1061,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1075,7 +1086,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1097,7 +1108,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1123,7 +1134,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1148,7 +1159,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1171,7 +1182,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1184,7 +1195,7 @@ putnami specs init
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ specs inspect ═══
@@ -1193,7 +1204,7 @@ putnami specs inspect
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ specs list ═══
@@ -1202,7 +1213,7 @@ putnami specs list
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ specs validate ═══
@@ -1211,7 +1222,7 @@ putnami specs validate
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 ═══ telemetry off ═══
@@ -1225,7 +1236,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1243,7 +1254,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1261,7 +1272,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1278,7 +1289,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1305,7 +1316,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1328,7 +1339,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1354,7 +1365,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1375,7 +1386,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1402,7 +1413,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1424,7 +1435,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1446,7 +1457,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1470,7 +1481,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:
@@ -1503,7 +1514,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
+  Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
 Related Commands:

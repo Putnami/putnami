@@ -9,7 +9,14 @@ usage: putnami cache gc
 example: putnami cache gc
 ═══ cache verify ═══
 description: Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
-usage: putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
+usage: putnami cache verify [--projects <selector> | --impacted | --all] [--exclude <names>] [--impacted-strict] [--profile <profile>] [--retry <n>] [--cpu-policy <policy>] [--trace-profile <path>] [--continue-on-error] [--output <format>]
+flag: --exclude | <names> | Leave these projects out of the verified runs
+flag: --impacted-strict |  | Fail when the --impacted baseline can't be resolved
+flag: --profile | <profile> | Deployment profile the verified runs use: dev | test | production
+flag: --retry | <n> | Retry transient failures in the verified runs
+flag: --cpu-policy | <policy> | CPU ceiling policy: critical-path | measured
+flag: --trace-profile | <path> | Write the trace events of the last verified run (Chrome trace format)
+flag: --continue-on-error |  | Don't abort a verified run on the first failure
 example: putnami cache verify --projects /my/project
 example: putnami cache verify --all --output=jsonl
 ═══ cli ═══
@@ -64,11 +71,35 @@ flag: --project | <selector> | Project ID, path, or name; default is every works
 example: putnami context pack
 example: putnami context pack --project <project-id>
 example: putnami context pack --output=json
+═══ deps add ═══
+description: Add a dependency to one project's language manifest through the deps-edit job of the project's extension
+usage: putnami deps add <module>[@version] [--projects <name>] [--dry-run]
+flag: --dry-run |  | Print the planned edit and change nothing
+example: putnami deps add golang.org/x/text@latest
+example: putnami deps add golang.org/x/text@latest --projects api --dry-run
 ═══ deps install ═══
 description: Install project dependencies by delegating to extension-provided installers
 usage: putnami deps install [--tag <tags>] [--exclude-tag <tags>]
 example: putnami deps install
 example: putnami deps install --tag go
+═══ deps prune ═══
+description: Remove the dependency edges a project declares and none of its imports uses, from the provider view the last install or build recorded
+usage: putnami deps prune [--projects <name>] [--dry-run]
+flag: --dry-run |  | List the edges to remove and change nothing
+example: putnami deps prune
+example: putnami deps prune --projects api --dry-run
+═══ deps remove ═══
+description: Remove a dependency from one project's language manifest through the deps-edit job of the project's extension
+usage: putnami deps remove <module> [--projects <name>] [--dry-run]
+flag: --dry-run |  | Print the planned edit and change nothing
+example: putnami deps remove golang.org/x/text
+example: putnami deps remove golang.org/x/text --projects api --dry-run
+═══ deps rm ═══
+description: Remove a dependency from one project's language manifest through the deps-edit job of the project's extension
+usage: putnami deps remove <module> [--projects <name>] [--dry-run]
+flag: --dry-run |  | Print the planned edit and change nothing
+example: putnami deps remove golang.org/x/text
+example: putnami deps remove golang.org/x/text --projects api --dry-run
 ═══ doctor ═══
 description: Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted
 usage: putnami doctor [--profile <dev|test|production>] [--project <selector>] [--machine] [--output <format>]
@@ -202,6 +233,7 @@ description: Sync project references from disk into workspace configuration
 usage: putnami projects sync [--prune] [--skip-install] [--dry-run]
 flag: --prune |  | Drop config entries whose project directory no longer exists
 flag: --skip-install |  | Do not run dependency installation after syncing
+flag: --dry-run |  | Show the changes without applying them
 example: putnami projects sync
 example: putnami projects sync --dry-run
 ═══ projects tag ═══
@@ -323,7 +355,7 @@ example: putnami tree fingerprint
 example: putnami tree fingerprint --output=json
 ═══ upgrade ═══
 description: Upgrade the CLI, extensions, templates, and framework dependencies in one command; a channel resolves on each ecosystem's own registry
-usage: putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]
+usage: putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run] [--continue-on-error]
 flag: --global |  | Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g)
 flag: --cli |  | Only upgrade the CLI binary
 flag: --extensions |  | Only upgrade extensions and templates
@@ -334,6 +366,7 @@ flag: --namespace | <namespace> | Release-set namespace that published the --rel
 flag: --version | <version> | Use an exact Putnami release version
 flag: --from-source |  | Build the CLI from this workspace's source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI)
 flag: --dry-run |  | Resolve and print the upgrade plan without modifying files
+flag: --continue-on-error |  | Run the remaining upgrade phases after one fails
 example: putnami upgrade
 example: putnami upgrade --global
 example: putnami upgrade --channel canary

@@ -9,7 +9,7 @@ _putnami_subcommands_for() {
         'completion') printf '%s\n' 'bash fish zsh' ;;
         'config') printf '%s\n' 'set show' ;;
         'context') printf '%s\n' 'generate map pack' ;;
-        'deps') printf '%s\n' 'add install remove' ;;
+        'deps') printf '%s\n' 'add install prune remove rm' ;;
         'extensions') printf '%s\n' 'install list prepare remove update validate' ;;
         'mcp') printf '%s\n' 'install' ;;
         'migrate') printf '%s\n' 'vnext' ;;
@@ -46,7 +46,9 @@ _putnami_path_known() {
         'deps') return 0 ;;
         'deps add') return 0 ;;
         'deps install') return 0 ;;
+        'deps prune') return 0 ;;
         'deps remove') return 0 ;;
+        'deps rm') return 0 ;;
         'doctor') return 0 ;;
         'extensions') return 0 ;;
         'extensions install') return 0 ;;
@@ -108,12 +110,47 @@ _putnami_takes_project() {
     esac
 }
 
+_putnami_core_root() {
+    case "$1" in
+        'cache') return 0 ;;
+        'cli') return 0 ;;
+        'completion') return 0 ;;
+        'config') return 0 ;;
+        'context') return 0 ;;
+        'deps') return 0 ;;
+        'doctor') return 0 ;;
+        'extensions') return 0 ;;
+        'help') return 0 ;;
+        'impact-plan') return 0 ;;
+        'init') return 0 ;;
+        'install') return 0 ;;
+        'mcp') return 0 ;;
+        'migrate') return 0 ;;
+        'pin') return 0 ;;
+        'projects') return 0 ;;
+        'report') return 0 ;;
+        'scopes') return 0 ;;
+        'sessions') return 0 ;;
+        'telemetry') return 0 ;;
+        'templates') return 0 ;;
+        'tree') return 0 ;;
+        'upgrade') return 0 ;;
+        'workspace') return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     case "$1" in
+        'cache verify') printf '%s\n' '--continue-on-error --cpu-policy --exclude --impacted-strict --profile --retry --trace-profile' ;;
         'cli list') printf '%s\n' '--global' ;;
         'cli use') printf '%s\n' '--global' ;;
         'context generate') printf '%s\n' '--force' ;;
         'context pack') printf '%s\n' '--project' ;;
+        'deps add') printf '%s\n' '--dry-run' ;;
+        'deps prune') printf '%s\n' '--dry-run' ;;
+        'deps remove') printf '%s\n' '--dry-run' ;;
+        'deps rm') printf '%s\n' '--dry-run' ;;
         'doctor') printf '%s\n' '--machine --profile --project' ;;
         'extensions install') printf '%s\n' '--dest --latest --platform --user' ;;
         'extensions list') printf '%s\n' '--user' ;;
@@ -125,7 +162,7 @@ _putnami_flags_for() {
         'migrate vnext') printf '%s\n' '--apply --check' ;;
         'pin') printf '%s\n' '--remove' ;;
         'projects create') printf '%s\n' '--channel --force --path --template' ;;
-        'projects sync') printf '%s\n' '--prune --skip-install' ;;
+        'projects sync') printf '%s\n' '--dry-run --prune --skip-install' ;;
         'projects tag') printf '%s\n' '--remove --set' ;;
         'report') printf '%s\n' '--session' ;;
         'sessions export') printf '%s\n' '--since' ;;
@@ -136,7 +173,7 @@ _putnami_flags_for() {
         'templates install') printf '%s\n' '--latest' ;;
         'templates package') printf '%s\n' '--stable --version' ;;
         'templates test') printf '%s\n' '--channel --keep --skip-build' ;;
-        'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
+        'upgrade') printf '%s\n' '--channel --cli --continue-on-error --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
         'workspace init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
     esac
 }
@@ -147,7 +184,8 @@ _putnami_completions() {
 
     local commands="cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace"
     local structured="cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace"
-    local global_flags="--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --continue-on-error --dry-run --output --json --quiet --color --no-color --version"
+    local global_flags="--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --output --json --quiet --color --no-color --version"
+    local job_global_flags=""
     local projects=""
     local project_ids=""
     local project_basenames=""
@@ -162,6 +200,10 @@ _putnami_completions() {
     fi
 
     local cmd="${words[1]}"
+    # A core command takes a job-only flag only as one of its own flags.
+    if ! _putnami_core_root "${cmd}"; then
+        global_flags="${global_flags} ${job_global_flags}"
+    fi
 
     local path="${cmd}"
     local i=2

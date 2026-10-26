@@ -127,79 +127,24 @@ func TestCmdCacheCleanAllUsesParsedGlobalFlag(t *testing.T) {
 	}
 }
 
-func TestCmdCacheDryRunRefusesBeforeStoreMutationOrExtensionHooks(t *testing.T) {
-	invocations := []struct {
-		name string
-		args []string
-	}{
-		{name: "clean", args: []string{"cache", "clean", "--dry-run"}},
-		{name: "clean-all", args: []string{"cache", "clean", "--all", "--dry-run"}},
-		{name: "gc", args: []string{"cache", "gc", "--dry-run"}},
-	}
-
-	for _, invocation := range invocations {
-		t.Run(invocation.name, func(t *testing.T) {
-			wsRoot := t.TempDir()
-			storeRoot := filepath.Join(t.TempDir(), "store")
-			t.Setenv("PUTNAMI_STORE_DIR", storeRoot)
-			t.Setenv("PUTNAMI_STORE_MAX_BYTES", "1")
-			t.Setenv("PUTNAMI_STORE_GC_GRACE", "0s")
-			t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
-
-			if err := os.WriteFile(filepath.Join(wsRoot, "putnami.workspace.json"), []byte(`{
-				"includes": ["extensions/cache-marker"]
-			}`), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			marker := filepath.Join(wsRoot, "cache-hook-ran")
-			writeCacheDryRunMarkerExtension(t, wsRoot, marker)
-
-			cacheStore := store.NewLocalStore(storeRoot)
-			source := t.TempDir()
-			if err := os.WriteFile(filepath.Join(source, "eligible.bin"), make([]byte, 4096), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			hash := strings.Repeat("a", 64)
-			if err := cacheStore.Put(hash, &store.Entry{
-				Result:   &store.EntryResult{Status: "success"},
-				FilesDir: source,
-			}); err != nil {
-				t.Fatalf("seed eligible cache entry: %v", err)
-			}
-
-			parsed := ParseArgs(invocation.args, nil, nil)
-			if parsed.Err != nil {
-				t.Fatalf("ParseArgs(%v): %v", invocation.args, parsed.Err)
-			}
-			if !parsed.Global.DryRun {
-				t.Fatalf("ParseArgs(%v) did not set DryRun", invocation.args)
-			}
-			registered, ok := lookupCommand("cache")
-			if !ok {
-				t.Fatal("cache command is not registered")
-			}
-			err := registered.run(&CommandEnv{
-				Ctx:    context.Background(),
-				Cfg:    wsproto.Load(wsRoot),
-				WsRoot: wsRoot,
-				Sub:    parsed.Subcommand,
-				Args:   parsed.RawJobArgs,
-				Global: parsed.Global,
-			})
-			if !errors.Is(err, cmderr.ErrUsage) {
-				t.Fatalf("cache dry-run error = %v, want ErrUsage-classified", err)
-			}
-			if !strings.Contains(err.Error(), "does not support --dry-run") {
-				t.Errorf("cache dry-run error = %q, want clear unsupported message", err)
-			}
-
-			if entry, getErr := cacheStore.Get(hash); getErr != nil || entry == nil {
-				t.Fatalf("eligible cache entry mutated under --dry-run: entry=%v err=%v", entry, getErr)
-			}
-			if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
-				t.Fatalf("extension cache hook ran under --dry-run: stat err=%v", statErr)
-			}
-		})
+// TestCacheDryRunIsRefusedAtParse locks in that no cache subcommand reads
+// --dry-run: the parse refuses it as a usage error that names the flag.
+func TestCacheDryRunIsRefusedAtParse(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"cache", "clean", "--dry-run"},
+		{"cache", "clean", "--all", "--dry-run"},
+		{"cache", "gc", "--dry-run"},
+		{"cache", "verify", "--dry-run"},
+		{"cache", "--dry-run"},
+	} {
+		parsed := ParseArgs(args, nil, nil)
+		if !errors.Is(parsed.Err, cmderr.ErrUsage) {
+			t.Fatalf("ParseArgs(%v) error = %v, want ErrUsage-classified", args, parsed.Err)
+		}
+		if !strings.Contains(parsed.Err.Error(), "--dry-run") {
+			t.Errorf("ParseArgs(%v) error = %q, want it to name --dry-run", args, parsed.Err)
+		}
 	}
 }
 
@@ -211,9 +156,8 @@ func TestBareCacheListsItsSubcommandsAndTouchesNoStore(t *testing.T) {
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "a-bare-cache-runs-nothing",
 		"a-bare-root-exits-with-its-subcommands-and-touches-no-store")
 	invocations := map[string][]string{
-		"bare":    {"cache"},
-		"all":     {"cache", "--all"},
-		"dry-run": {"cache", "--dry-run"},
+		"bare": {"cache"},
+		"all":  {"cache", "--all"},
 	}
 	for name, args := range invocations {
 		t.Run(name, func(t *testing.T) {

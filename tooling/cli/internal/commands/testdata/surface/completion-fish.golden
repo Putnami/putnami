@@ -40,6 +40,15 @@ function __putnami_seen_path
     return 0
 end
 
+# A core command takes a job-only flag only as one of its own flags.
+function __putnami_core_root
+    set -l tokens (commandline -opc)
+    if test (count $tokens) -lt 2
+        return 1
+    end
+    contains -- $tokens[2] 'cache' 'cli' 'completion' 'config' 'context' 'deps' 'doctor' 'extensions' 'help' 'impact-plan' 'init' 'install' 'mcp' 'migrate' 'pin' 'projects' 'report' 'scopes' 'sessions' 'telemetry' 'templates' 'tree' 'upgrade' 'workspace'
+end
+
 # Job commands
 
 # Structured commands
@@ -84,7 +93,9 @@ complete -c putnami -n '__putnami_complete_children context' -a 'map'
 complete -c putnami -n '__putnami_complete_children context' -a 'pack'
 complete -c putnami -n '__putnami_complete_children deps' -a 'add'
 complete -c putnami -n '__putnami_complete_children deps' -a 'install'
+complete -c putnami -n '__putnami_complete_children deps' -a 'prune'
 complete -c putnami -n '__putnami_complete_children deps' -a 'remove'
+complete -c putnami -n '__putnami_complete_children deps' -a 'rm'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'install'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'list'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'prepare'
@@ -131,8 +142,6 @@ complete -c putnami -l 'exclude-tag' -d 'Exclude by tags'
 complete -c putnami -l 'baseline' -d 'Custom git baseline for --impacted; a job command with no target or --all implies --impacted'
 complete -c putnami -l 'credential-fd' -d 'Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2'
 complete -c putnami -l 'no-cache' -d 'Force re-execution (skip cache)'
-complete -c putnami -l 'continue-on-error' -d 'Don\'t abort on first failure'
-complete -c putnami -l 'dry-run' -d 'Show changes without applying'
 complete -c putnami -l 'output' -d 'Output format: text | json | jsonl | cloud-logging'
 complete -c putnami -l 'json' -d 'Shorthand for --output=json'
 complete -c putnami -l 'quiet' -d 'Suppress non-error output'
@@ -141,10 +150,21 @@ complete -c putnami -l 'no-color' -d 'Disable color output'
 complete -c putnami -l 'version' -d 'Show version'
 
 # Structured command flags
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'continue-on-error' -d 'Don\'t abort a verified run on the first failure'
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'cpu-policy' -d 'CPU ceiling policy: critical-path | measured' -r
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'exclude' -d 'Leave these projects out of the verified runs' -r
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'impacted-strict' -d 'Fail when the --impacted baseline can\'t be resolved'
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'profile' -d 'Deployment profile the verified runs use: dev | test | production' -r
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'retry' -d 'Retry transient failures in the verified runs' -r
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'trace-profile' -d 'Write the trace events of the last verified run (Chrome trace format)' -r
 complete -c putnami -n '__putnami_seen_path cli list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path cli use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
 complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Project ID, path, or name; default is every workspace project' -r
+complete -c putnami -n '__putnami_seen_path deps add' -l 'dry-run' -d 'Print the planned edit and change nothing'
+complete -c putnami -n '__putnami_seen_path deps prune' -l 'dry-run' -d 'List the edges to remove and change nothing'
+complete -c putnami -n '__putnami_seen_path deps remove' -l 'dry-run' -d 'Print the planned edit and change nothing'
+complete -c putnami -n '__putnami_seen_path deps rm' -l 'dry-run' -d 'Print the planned edit and change nothing'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -r
@@ -172,6 +192,7 @@ complete -c putnami -n '__putnami_seen_path projects create' -l 'channel' -d 'Re
 complete -c putnami -n '__putnami_seen_path projects create' -l 'force' -d 'Overwrite an existing project directory'
 complete -c putnami -n '__putnami_seen_path projects create' -l 'path' -d 'Workspace-relative project path' -r
 complete -c putnami -n '__putnami_seen_path projects create' -l 'template' -d 'Template to scaffold from' -r
+complete -c putnami -n '__putnami_seen_path projects sync' -l 'dry-run' -d 'Show the changes without applying them'
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'prune' -d 'Drop config entries whose project directory no longer exists'
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'skip-install' -d 'Do not run dependency installation after syncing'
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'remove' -d 'Remove the given tags from the project'
@@ -192,6 +213,7 @@ complete -c putnami -n '__putnami_seen_path templates test' -l 'keep' -d 'Keep t
 complete -c putnami -n '__putnami_seen_path templates test' -l 'skip-build' -d 'Render the template without running build and test on it'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'cli' -d 'Only upgrade the CLI binary'
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'continue-on-error' -d 'Run the remaining upgrade phases after one fails'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'deps' -d 'Only upgrade framework dependencies'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'dry-run' -d 'Resolve and print the upgrade plan without modifying files'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'extensions' -d 'Only upgrade extensions and templates'

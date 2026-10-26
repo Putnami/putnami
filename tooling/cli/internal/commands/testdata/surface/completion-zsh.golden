@@ -48,7 +48,9 @@ _putnami_subcommands_for() {
             reply=(
                 'add'
                 'install'
+                'prune'
                 'remove'
+                'rm'
             )
             ;;
         'extensions')
@@ -150,7 +152,9 @@ _putnami_path_known() {
         'deps') return 0 ;;
         'deps add') return 0 ;;
         'deps install') return 0 ;;
+        'deps prune') return 0 ;;
         'deps remove') return 0 ;;
+        'deps rm') return 0 ;;
         'doctor') return 0 ;;
         'extensions') return 0 ;;
         'extensions install') return 0 ;;
@@ -206,6 +210,36 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_core_root() {
+    case "$1" in
+        'cache') return 0 ;;
+        'cli') return 0 ;;
+        'completion') return 0 ;;
+        'config') return 0 ;;
+        'context') return 0 ;;
+        'deps') return 0 ;;
+        'doctor') return 0 ;;
+        'extensions') return 0 ;;
+        'help') return 0 ;;
+        'impact-plan') return 0 ;;
+        'init') return 0 ;;
+        'install') return 0 ;;
+        'mcp') return 0 ;;
+        'migrate') return 0 ;;
+        'pin') return 0 ;;
+        'projects') return 0 ;;
+        'report') return 0 ;;
+        'scopes') return 0 ;;
+        'sessions') return 0 ;;
+        'telemetry') return 0 ;;
+        'templates') return 0 ;;
+        'tree') return 0 ;;
+        'upgrade') return 0 ;;
+        'workspace') return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 _putnami_takes_project() {
     case "$1" in
         *) return 1 ;;
@@ -215,6 +249,17 @@ _putnami_takes_project() {
 _putnami_flags_for() {
     reply=()
     case "$1" in
+        'cache verify')
+            reply=(
+                '--continue-on-error[Don'\''t abort a verified run on the first failure]'
+                '--cpu-policy[CPU ceiling policy: critical-path | measured]:policy:'
+                '--exclude[Leave these projects out of the verified runs]:names:'
+                '--impacted-strict[Fail when the --impacted baseline can'\''t be resolved]'
+                '--profile[Deployment profile the verified runs use: dev | test | production]:profile:'
+                '--retry[Retry transient failures in the verified runs]:n:'
+                '--trace-profile[Write the trace events of the last verified run (Chrome trace format)]:path:'
+            )
+            ;;
         'cli list')
             reply=(
                 '--global[List binaries in ~/.putnami/bin instead of the workspace (alias: -g)]'
@@ -233,6 +278,26 @@ _putnami_flags_for() {
         'context pack')
             reply=(
                 '--project[Project ID, path, or name; default is every workspace project]:selector:'
+            )
+            ;;
+        'deps add')
+            reply=(
+                '--dry-run[Print the planned edit and change nothing]'
+            )
+            ;;
+        'deps prune')
+            reply=(
+                '--dry-run[List the edges to remove and change nothing]'
+            )
+            ;;
+        'deps remove')
+            reply=(
+                '--dry-run[Print the planned edit and change nothing]'
+            )
+            ;;
+        'deps rm')
+            reply=(
+                '--dry-run[Print the planned edit and change nothing]'
             )
             ;;
         'doctor')
@@ -308,6 +373,7 @@ _putnami_flags_for() {
             ;;
         'projects sync')
             reply=(
+                '--dry-run[Show the changes without applying them]'
                 '--prune[Drop config entries whose project directory no longer exists]'
                 '--skip-install[Do not run dependency installation after syncing]'
             )
@@ -372,6 +438,7 @@ _putnami_flags_for() {
             reply=(
                 '--channel[Resolve a release channel (stable by default; canary for latest prerelease)]:channel:'
                 '--cli[Only upgrade the CLI binary]'
+                '--continue-on-error[Run the remaining upgrade phases after one fails]'
                 '--deps[Only upgrade framework dependencies]'
                 '--dry-run[Resolve and print the upgrade plan without modifying files]'
                 '--extensions[Only upgrade extensions and templates]'
@@ -396,7 +463,7 @@ _putnami_flags_for() {
 }
 
 _putnami() {
-    local -a commands structured_commands global_flags projects project_basenames
+    local -a commands structured_commands global_flags job_global_flags projects project_basenames
 
     commands=(
     )
@@ -440,14 +507,15 @@ _putnami() {
         '--baseline[Custom git baseline for --impacted; a job command with no target or --all implies --impacted]:branch:'
         '--credential-fd[Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2]:n:'
         '--no-cache[Force re-execution (skip cache)]'
-        '--continue-on-error[Don'\''t abort on first failure]'
-        '--dry-run[Show changes without applying]'
         '--output[Output format: text | json | jsonl | cloud-logging]:format:(text json jsonl cloud-logging)'
         '--json[Shorthand for --output=json]'
         '--quiet[Suppress non-error output]'
         '--color[Force color output]'
         '--no-color[Disable color output]'
         '--version[Show version]'
+    )
+
+    job_global_flags=(
     )
 
     _arguments -C \
@@ -463,6 +531,10 @@ _putnami() {
             local cur="${words[CURRENT]}"
             local prev="${words[CURRENT-1]}"
             local path="${words[1]}"
+            # A core command takes a job-only flag only as one of its own flags.
+            if ! _putnami_core_root "${path}"; then
+                global_flags=("${global_flags[@]}" "${job_global_flags[@]}")
+            fi
             local i=2
             while (( i < CURRENT )); do
                 local word="${words[i]}"

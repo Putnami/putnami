@@ -3,6 +3,7 @@ package completion
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -131,7 +132,7 @@ func TestCompletionOffersTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 				}
 			}
 			// What the core reads stays, with the flag hosted launchers read from help.
-			for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--dry-run", "--output", "--help", "--version"} {
+			for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--output", "--help", "--version"} {
 				if !sharedtest.Contains(names, flag) {
 					t.Errorf("global flags miss %s, which no job command is needed to read", flag)
 				}
@@ -182,5 +183,85 @@ func TestCompletionOffersAProviderFlagOnlyWithItsProvider(t *testing.T) {
 				t.Errorf("global flags offer --providers = %v, want %v", got, c.offered)
 			}
 		})
+	}
+}
+
+// A core command takes a job-only flag only as one of its own flags, so
+// completion offers `--dry-run` after `projects sync`, which declares it, and
+// after a job command, but not after `projects list`.
+func TestCompletionOffersAJobFlagOnlyAfterACommandThatTakesIt(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "a-core-command-refuses-a-job-flag-it-does-not-read")
+	wsRoot := writeExtensionWorkspace(t, "lint-docs")
+
+	for _, command := range [][]string{{"projects", "list"}, {"cache", "clean"}} {
+		path := strings.Join(command, " ")
+		for _, flag := range jobOnlyFlagNames() {
+			if !commandmeta.RefusesGlobalFlag(path, flag) {
+				t.Fatalf("the catalog lets %s take %s: pick another command for this test", path, flag)
+			}
+		}
+	}
+
+	// An alias that resolves to a core command, directly or through another
+	// alias, is a core command; an alias of a job command is not.
+	cfg := &wsproto.Config{Aliases: map[string]string{"pl": "projects", "pl2": "pl", "jl": "lint-docs", "p $l;x": "projects"}}
+	var bash, zsh, fish bytes.Buffer
+	CompletionBash(&bash, wsRoot, cfg, nil)
+	CompletionZsh(&zsh, wsRoot, cfg, nil)
+	CompletionFish(&fish, wsRoot, cfg, nil)
+
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash unavailable on this platform")
+	}
+	offers := func(words ...string) string {
+		return " " + runBashCompletion(t, bash.String(), append([]string{"putnami"}, append(words, "--")...)) + " "
+	}
+	for _, flag := range []string{"--dry-run", "--watch", "--serve-env", "--max-parallel"} {
+		if got := offers("projects", "list"); strings.Contains(got, " "+flag+" ") {
+			t.Errorf("bash offers %s after `projects list`: %s", flag, got)
+		}
+		if got := offers("lint-docs"); !strings.Contains(got, " "+flag+" ") {
+			t.Errorf("bash does not offer %s after a job command: %s", flag, got)
+		}
+	}
+	for _, alias := range []string{"pl", "pl2"} {
+		if got := offers(alias); strings.Contains(got, " --dry-run ") || strings.Contains(got, " --watch ") {
+			t.Errorf("bash offers a job-only flag after the alias %s of a core command: %s", alias, got)
+		}
+	}
+	if got := offers("jl"); !strings.Contains(got, " --dry-run ") {
+		t.Errorf("bash does not offer --dry-run after the alias jl of a job command: %s", got)
+	}
+	if got := offers("projects", "sync"); !strings.Contains(got, " --dry-run ") {
+		t.Errorf("bash does not offer --dry-run after `projects sync`, which declares it: %s", got)
+	}
+	if got := offers("projects", "list"); !strings.Contains(got, " --output ") {
+		t.Errorf("bash does not offer --output after `projects list`: %s", got)
+	}
+
+	if !strings.Contains(zsh.String(), "job_global_flags=(\n        '--watch[") ||
+		!strings.Contains(zsh.String(), `if ! _putnami_core_root "${path}"; then`) {
+		t.Error("zsh does not keep the job-only flags apart from the core commands")
+	}
+	for name, script := range map[string]string{"bash": bash.String(), "zsh": zsh.String()} {
+		for _, alias := range []string{"pl", "pl2"} {
+			if !strings.Contains(script, "'"+alias+"') return 0 ;;") {
+				t.Errorf("%s does not treat the alias %s as a core command", name, alias)
+			}
+		}
+	}
+	if !regexp.MustCompile(`contains -- \$tokens\[2\] .* 'pl' 'pl2' `).MatchString(fish.String()) {
+		t.Error("fish does not treat the aliases of a core command as core commands")
+	}
+	// An alias name is workspace input: fish reads it as one quoted word.
+	if !strings.Contains(fish.String(), ` 'p $l;x'`) {
+		t.Error("fish does not quote an alias name in its core-command check")
+	}
+	if !strings.Contains(fish.String(), `-a 'p $l;x' -d `) {
+		t.Error("fish does not quote an alias name it completes as a command")
+	}
+	if !strings.Contains(fish.String(), "complete -c putnami -n 'not __putnami_core_root' -l 'dry-run'") {
+		t.Error("fish offers --dry-run after a core command")
 	}
 }

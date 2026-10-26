@@ -56,15 +56,24 @@ function __putnami_seen_path
     return 0
 end
 
+# A core command takes a job-only flag only as one of its own flags.
+function __putnami_core_root
+    set -l tokens (commandline -opc)
+    if test (count $tokens) -lt 2
+        return 1
+    end
+    contains -- $tokens[2] %s
+end
+
 # Job commands
-`)
+`, strings.Join(fishQuoteAll(ctx.coreRoots()), " "))
 
 	for _, cmd := range ctx.commands {
 		desc := ctx.commandDesc[cmd]
 		if desc == "" {
 			desc = "Run " + cmd + " job"
 		}
-		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a '%s' -d %s\n", cmd, fishQuote(desc))
+		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a %s -d %s\n", fishQuote(cmd), fishQuote(desc))
 	}
 
 	iox.Fprintf(w, "\n# Structured commands\n")
@@ -99,8 +108,12 @@ end
 	iox.Fprintf(w, "\n# Global flags\n")
 
 	for _, flag := range ctx.globalFlags {
-		iox.Fprintf(w, "complete -c putnami -l '%s' -d %s\n",
-			strings.TrimPrefix(flag.Long, "--"), fishQuote(flag.Description))
+		condition := ""
+		if flag.JobOnly {
+			condition = "-n 'not __putnami_core_root' "
+		}
+		iox.Fprintf(w, "complete -c putnami %s-l '%s' -d %s\n",
+			condition, strings.TrimPrefix(flag.Long, "--"), fishQuote(flag.Description))
 	}
 
 	iox.Fprintf(w, "\n# Structured command flags\n")
@@ -191,4 +204,13 @@ func fishPathArgs(path string) string {
 func fishQuote(value string) string {
 	replacer := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 	return "'" + replacer.Replace(value) + "'"
+}
+
+// fishQuoteAll quotes each value as one fish word (fishQuote).
+func fishQuoteAll(values []string) []string {
+	quoted := make([]string, len(values))
+	for i, value := range values {
+		quoted[i] = fishQuote(value)
+	}
+	return quoted
 }

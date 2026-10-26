@@ -55,12 +55,6 @@ Read the run credential from descriptor <n>; keeps it out of every environment a
 .TP
 .B --no-cache
 Force re-execution (skip cache)
-.TP
-.B --continue-on-error
-Don't abort on first failure
-.TP
-.B --dry-run
-Show changes without applying
 .SH OUTPUT OPTIONS
 .TP
 .B --output " <format>"
@@ -295,6 +289,9 @@ Drop config entries whose project directory no longer exists.
 .TP
 .B --skip-install
 Do not run dependency installation after syncing.
+.TP
+.B --dry-run
+Show the changes without applying them.
 .SS projects tag
 Add or manage tags on a project.
 .PP
@@ -327,7 +324,7 @@ Upgrade the CLI, extensions, templates, and framework dependencies in one comman
 .PP
 .B Usage:
 .br
-putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]
+putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run] [--continue-on-error]
 .TP
 .B --global
 Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g).
@@ -358,6 +355,9 @@ Build the CLI from this workspace's source and install it as the active binary, 
 .TP
 .B --dry-run
 Resolve and print the upgrade plan without modifying files.
+.TP
+.B --continue-on-error
+Run the remaining upgrade phases after one fails.
 .SS pin
 Pin the putnami CLI version this workspace uses, recording its per-platform digest in putnami.lock.json so `putnami` resolves and verifies the exact binary.
 .PP
@@ -541,6 +541,33 @@ Install project dependencies by delegating to extension-provided installers.
 .B Usage:
 .br
 putnami deps install [--tag <tags>] [--exclude-tag <tags>]
+.SS deps add
+Add a dependency to one project's language manifest through the deps-edit job of the project's extension.
+.PP
+.B Usage:
+.br
+putnami deps add <module>[@version] [--projects <name>] [--dry-run]
+.TP
+.B --dry-run
+Print the planned edit and change nothing.
+.SS deps remove
+Remove a dependency from one project's language manifest through the deps-edit job of the project's extension.
+.PP
+.B Usage:
+.br
+putnami deps remove <module> [--projects <name>] [--dry-run]
+.TP
+.B --dry-run
+Print the planned edit and change nothing.
+.SS deps prune
+Remove the dependency edges a project declares and none of its imports uses, from the provider view the last install or build recorded.
+.PP
+.B Usage:
+.br
+putnami deps prune [--projects <name>] [--dry-run]
+.TP
+.B --dry-run
+List the edges to remove and change nothing.
 .SS cache clean
 Delete cached build artifacts from this repo's shared store (affects all worktrees of the repo); --all clears every repo's store.
 .PP
@@ -558,7 +585,28 @@ Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, te
 .PP
 .B Usage:
 .br
-putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
+putnami cache verify [--projects <selector> | --impacted | --all] [--exclude <names>] [--impacted-strict] [--profile <profile>] [--retry <n>] [--cpu-policy <policy>] [--trace-profile <path>] [--continue-on-error] [--output <format>]
+.TP
+.B --exclude
+Leave these projects out of the verified runs.
+.TP
+.B --impacted-strict
+Fail when the --impacted baseline can't be resolved.
+.TP
+.B --profile
+Deployment profile the verified runs use: dev | test | production.
+.TP
+.B --retry
+Retry transient failures in the verified runs.
+.TP
+.B --cpu-policy
+CPU ceiling policy: critical-path | measured.
+.TP
+.B --trace-profile
+Write the trace events of the last verified run (Chrome trace format).
+.TP
+.B --continue-on-error
+Don't abort a verified run on the first failure.
 .SS config show
 Display the fully merged configuration (global + workspace + local scopes).
 .PP

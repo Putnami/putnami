@@ -29,7 +29,7 @@ import (
 // with the accepted list.
 func TestValidateStructuredFlags_RejectsUndeclaredFlag(t *testing.T) {
 	t.Parallel()
-	err := validateStructuredFlags("projects", "create", []string{"my-app", "--templat", "typescript-web"})
+	err := validateStructuredFlags("projects", "create", []string{"my-app", "--templat", "typescript-web"}, nil)
 	if err == nil {
 		t.Fatal("a misspelled --template should be rejected")
 	}
@@ -75,7 +75,7 @@ func TestValidateStructuredFlags_AcceptsDeclaredAndGlobalFlags(t *testing.T) {
 		{"init", "", []string{"--extension", "go", "--force"}},
 	}
 	for _, tc := range cases {
-		if err := validateStructuredFlags(tc.root, tc.sub, tc.args); err != nil {
+		if err := validateStructuredFlags(tc.root, tc.sub, tc.args, nil); err != nil {
 			t.Errorf("validateStructuredFlags(%q, %q, %v): %v", tc.root, tc.sub, tc.args, err)
 		}
 	}
@@ -91,7 +91,7 @@ func TestValidateStructuredFlags_RejectsRemovedPreOSSAliases(t *testing.T) {
 		{root: "upgrade", args: []string{"--local"}},
 		{root: "pin", args: []string{"--unpin"}},
 	} {
-		if err := validateStructuredFlags(tc.root, "", tc.args); err == nil {
+		if err := validateStructuredFlags(tc.root, "", tc.args, nil); err == nil {
 			t.Errorf("validateStructuredFlags(%q, %v) accepted a removed pre-OSS alias", tc.root, tc.args)
 		}
 	}
@@ -102,13 +102,13 @@ func TestValidateStructuredFlags_RejectsRemovedPreOSSAliases(t *testing.T) {
 // flag wrong, so it must not guess.
 func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 	t.Parallel()
-	if err := validateStructuredFlags("context", "uncataloged", []string{"--check"}); err != nil {
+	if err := validateStructuredFlags("context", "uncataloged", []string{"--check"}, nil); err != nil {
 		t.Errorf("an unknown catalog path must stay lenient: %v", err)
 	}
-	if err := validateStructuredFlags("context", "pack", []string{"--project", "web"}); err != nil {
+	if err := validateStructuredFlags("context", "pack", []string{"--project", "web"}, nil); err != nil {
 		t.Errorf("context pack declares --project: %v", err)
 	}
-	if err := validateStructuredFlags("cloud", "deploy", []string{"--env", "prod"}); err != nil {
+	if err := validateStructuredFlags("cloud", "deploy", []string{"--env", "prod"}, nil); err != nil {
 		t.Errorf("an extension group is not a built-in path: %v", err)
 	}
 }
@@ -132,13 +132,13 @@ func TestValidateStructuredFlags_RejectsTheDeletedContextFlags(t *testing.T) {
 		{sub: "map", args: []string{"--print=json"}, flag: "--print"},
 		{sub: "map", args: []string{"--print", "json"}, flag: "--print"},
 	} {
-		err := validateStructuredFlags("context", tc.sub, tc.args)
+		err := validateStructuredFlags("context", tc.sub, tc.args, nil)
 		if err == nil || !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), tc.flag) {
 			t.Errorf("context %s %v = %v, want a usage error naming %s", tc.sub, tc.args, err, tc.flag)
 		}
 	}
 	for _, args := range [][]string{{"--projects", "web,api"}, {"--impacted"}, {"--output=json"}} {
-		if err := validateStructuredFlags("context", "map", args); err != nil {
+		if err := validateStructuredFlags("context", "map", args, nil); err != nil {
 			t.Errorf("context map %v is rejected: %v", args, err)
 		}
 	}
@@ -175,7 +175,7 @@ func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
 // merely starts with a dash out of the flag vocabulary.
 func TestValidateStructuredFlags_IgnoresNegativeNumbers(t *testing.T) {
 	t.Parallel()
-	if err := validateStructuredFlags("config", "set", []string{"retries", "-5"}); err != nil {
+	if err := validateStructuredFlags("config", "set", []string{"retries", "-5"}, nil); err != nil {
 		t.Errorf("-5 is a value, not a flag: %v", err)
 	}
 }
@@ -683,5 +683,67 @@ func TestPromoteProjectSelector_NeverMovesParams(t *testing.T) {
 				t.Errorf("params[%q] = %v with promotion, %v without (args %v)", name, value, withoutPromotion[name], args)
 			}
 		}
+	}
+}
+
+// TestStructuredCommandRefusesAJobFlagItDoesNotRead covers the job-only half of
+// the strictness policy: a core command with a cataloged path refuses a
+// job-only global flag its own entry does not declare, with a usage error that
+// names the flag, and keeps accepting the ones it declares.
+func TestStructuredCommandRefusesAJobFlagItDoesNotRead(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "a-core-command-refuses-a-job-flag-it-does-not-read")
+
+	refused := []struct {
+		args []string
+		flag string
+	}{
+		{[]string{"projects", "list", "--dry-run"}, "--dry-run"},
+		{[]string{"projects", "list", "--serve-env", "-"}, "--serve-env"},
+		{[]string{"projects", "list", "--watch"}, "--watch"},
+		{[]string{"projects", "list", "-w"}, "--watch"},
+		{[]string{"projects", "list", "--continue-on-error"}, "--continue-on-error"},
+		{[]string{"cache", "verify", "--where", "local"}, "--where"},
+		{[]string{"cache", "verify", "--retry-failed"}, "--retry-failed"},
+		{[]string{"cache", "verify", "--resource", "db=1"}, "--resource"},
+		{[]string{"cache", "clean", "--dry-run"}, "--dry-run"},
+		{[]string{"doctor", "--max-parallel", "2"}, "--max-parallel"},
+	}
+	for _, tc := range refused {
+		parsed := ParseArgs(tc.args, nil, nil)
+		if !errors.Is(parsed.Err, cmderr.ErrUsage) {
+			t.Errorf("ParseArgs(%v) error = %v, want a usage error", tc.args, parsed.Err)
+			continue
+		}
+		for _, want := range []string{tc.flag, "does not take", "putnami help "} {
+			if !strings.Contains(parsed.Err.Error(), want) {
+				t.Errorf("ParseArgs(%v) error = %q, want it to contain %q", tc.args, parsed.Err, want)
+			}
+		}
+	}
+
+	accepted := [][]string{
+		{"projects", "sync", "--dry-run"},
+		{"deps", "add", "--dry-run", "left-pad"},
+		{"deps", "remove", "--dry-run", "left-pad"},
+		{"upgrade", "--continue-on-error"},
+		{"upgrade", "--dry-run"},
+		{"doctor", "--profile", "production"},
+		{"cache", "verify", "--exclude", "x"},
+		{"cache", "verify", "--continue-on-error", "--retry", "2"},
+		{"deps", "prune", "--dry-run"},
+		{"deps", "rm", "--dry-run", "left-pad"},
+		{"projects", "list", "--dry-run=false"},
+		{"projects", "list", "--output", "json"},
+	}
+	for _, args := range accepted {
+		if parsed := ParseArgs(args, nil, nil); parsed.Err != nil {
+			t.Errorf("ParseArgs(%v) error = %v, want none", args, parsed.Err)
+		}
+	}
+
+	helped := ParseArgs([]string{"projects", "list", "--dry-run", "--help"}, nil, nil)
+	if helped.Err != nil || !helped.Global.Help {
+		t.Errorf("projects list --dry-run --help: err = %v, help = %v, want help with no error", helped.Err, helped.Global.Help)
 	}
 }

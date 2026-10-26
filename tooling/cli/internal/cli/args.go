@@ -167,9 +167,9 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	// job params and nothing else, so parseJobFlags may keep an inline value on
 	// its flag (splitInlineValues).
 	var globals GlobalFlags
-	var remaining []string
+	var remaining, supplied []string
 	if structured {
-		globals, remaining, err = parseCommandFlags(rest, watchCommands(result, aliases, extensionGroups), aliases.serveWorkloads)
+		globals, remaining, supplied, err = parseCommandFlags(rest, watchCommands(result, aliases, extensionGroups), aliases.serveWorkloads)
 	} else {
 		globals, remaining, err = parseJobFlags(rest, commands, aliases.serveWorkloads)
 	}
@@ -192,7 +192,7 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	// served by manifests and get a deprecation warning from their dispatch path
 	// instead (see parse.go).
 	if structured && !extensionGroups[commands[0]] {
-		result.Err = validateStructuredFlags(commands[0], result.Subcommand, result.RawJobArgs)
+		result.Err = validateStructuredFlags(commands[0], result.Subcommand, result.RawJobArgs, supplied)
 	}
 
 	// --help and --version must keep working on a malformed invocation: a user

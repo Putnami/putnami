@@ -281,7 +281,7 @@ func printCommandHelp(command string, flags map[string]extension.FlagDefinition,
 		iox.Fprintln(os.Stdout)
 	}
 
-	printGlobalOptions(scope)
+	printGlobalOptions(scope.flagCategories())
 	printRelatedCommands(command, scope)
 }
 
@@ -334,7 +334,7 @@ func printSubcommandHelp(command, subcommand string, scope *helpScope) {
 		}
 	}
 
-	printGlobalOptions(scope)
+	printGlobalOptions(scope.flagCategoriesFor(commandmeta.CanonicalPath(command, subcommand)))
 	printRelatedCommands(full, scope)
 }
 
@@ -367,10 +367,10 @@ func missingSubcommandError(command string) error {
 		command, command, strings.Join(subcommandLines(command), "\n"))
 }
 
-// printGlobalOptions prints the abbreviated global-flag listing of scope.
-func printGlobalOptions(scope *helpScope) {
+// printGlobalOptions prints the abbreviated global-flag listing of categories.
+func printGlobalOptions(categories []FlagCategory) {
 	iox.Fprintln(os.Stdout, "Global Options:")
-	for _, cat := range scope.flagCategories() {
+	for _, cat := range categories {
 		iox.Fprintf(os.Stdout, "  %s: ", cat.Name)
 		var names []string
 		for _, f := range cat.Flags {
