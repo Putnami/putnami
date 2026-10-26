@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/cache/objectcachetest"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -805,10 +804,7 @@ func TestLoadRemoteCacheProvider_RefusedAuthenticateBuildsLocally(t *testing.T) 
 func TestLoadRemoteCacheProvider_UploadCarriesEventsOnlyWhenTheProviderAdvertisesThem(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-cli-uploads-cached-events-only-when-advertised")
 	useInProcessFakeProvider(t)
-	events := []cache.ActionEvent{
-		{Version: 1, Type: jobmodel.EventTypeMetric, Data: map[string]any{"name": "lint-warnings", "value": float64(2), "unit": "count"}},
-		{Version: 1, Type: jobmodel.EventTypeSummary, Data: map[string]any{"message": "2 warnings"}},
-	}
+	events := uploadTestEvents()
 	uploadedEvents := func(t *testing.T, echo string) string {
 		t.Helper()
 		wsRoot := t.TempDir()

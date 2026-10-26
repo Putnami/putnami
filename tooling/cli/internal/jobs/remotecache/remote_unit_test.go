@@ -142,41 +142,52 @@ func TestPrepareUpload_SkipsAJobWithExternalEffectsByTrait(t *testing.T) {
 	}
 }
 
-func TestPrepareUpload_IncludesActionEventsOnlyWhenAdvertised(t *testing.T) {
+// uploadTestEvents are the cached events of a lint entry: a metric and a
+// summary, both kinds an upload can carry.
+func uploadTestEvents() []cache.ActionEvent {
+	return []cache.ActionEvent{
+		{Version: 1, Type: jobmodel.EventTypeMetric, Data: map[string]any{"name": "lint-warnings", "value": float64(2), "unit": "count"}},
+		{Version: 1, Type: jobmodel.EventTypeSummary, Data: map[string]any{"message": "2 warnings"}},
+	}
+}
+
+// The prepared input keeps the cached events whatever the provider answered,
+// and the upload drops them unless the provider advertised action-events.
+func TestProviderResult_CarriesEventsOnlyWhenAdvertised(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-cli-uploads-cached-events-only-when-advertised")
 	t.Parallel()
 	ws := makeExecutorTestWorkspace(t)
 	cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
 	job := cacheableJob("lint", "/proj", "proj", "proj")
 	hash := "ce" + strings.Repeat("1", cache.KeyLength-2)
-	events := []cache.ActionEvent{
-		{Version: 1, Type: jobmodel.EventTypeMetric, Data: map[string]any{"name": "lint-warnings", "value": float64(2), "unit": "count"}},
-		{Version: 1, Type: jobmodel.EventTypeSummary, Data: map[string]any{"message": "2 warnings"}},
-	}
+	events := uploadTestEvents()
 	meta := &store.EntryMetadata{Extension: "@test/ext", Task: "lint", Project: "proj", DurationMs: 1500}
 	if err := cm.Save(hash, &store.EntryResult{Status: "success", Events: events}, meta, ""); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-
-	// The provider has not advertised event support: events are dropped.
-	withoutEvents := newUploadTestCache()
-	in, ok := withoutEvents.prepareUpload(hash, job, cm)
+	in, ok := newUploadTestCache().prepareUpload(hash, job, cm)
 	if !ok {
 		t.Fatalf("expected an eligible upload")
 	}
-	if len(in.Result.Events) != 0 {
-		t.Fatalf("events must be omitted when the provider does not advertise support, got %d", len(in.Result.Events))
+	if len(in.Result.Events) != len(events) {
+		t.Fatalf("the prepared input must keep the cached events, got %d want %d", len(in.Result.Events), len(events))
+	}
+
+	// The provider has not advertised event support: events are dropped, and
+	// the prepared input keeps them.
+	withoutEvents := newUploadTestCache()
+	if got := withoutEvents.providerResult(in.Result); len(got.Events) != 0 || got.Status != "success" || got.DurationMs != 1500 {
+		t.Fatalf("without action-events the upload must carry the result without its events, got %+v", got)
+	}
+	if len(in.Result.Events) != len(events) {
+		t.Fatalf("dropping the events must not modify the prepared input, got %d events", len(in.Result.Events))
 	}
 
 	// With support advertised, events ride along.
 	withEvents := newUploadTestCache()
 	withEvents.actionEvents = true
-	in, ok = withEvents.prepareUpload(hash, job, cm)
-	if !ok {
-		t.Fatalf("expected an eligible upload")
-	}
-	if len(in.Result.Events) != len(events) {
-		t.Fatalf("events must be included when advertised, got %d want %d", len(in.Result.Events), len(events))
+	if got := withEvents.providerResult(in.Result); len(got.Events) != len(events) {
+		t.Fatalf("events must be included when advertised, got %d want %d", len(got.Events), len(events))
 	}
 }
 
