@@ -418,16 +418,25 @@ canonical output.
   — why blobs cross the provider boundary through an exchange directory that is
   deliberately not core's CAS.
 
-## Product feature linkage
+## Feature and spec
 
-There is no user-facing product feature for this module, and one should not be
-minted for it. This is an internal wire contract between a build client, a cache
-provider extension, and a cache server; developers experience it as build
-latency, never as a surface they use. Its durable design decisions are recorded
-as ADRs under [`doc/adr/`](doc/adr) rather than as a spec, per the spec contract
-in [`protocols/features`](../features/README.md), which requires a spec to detail
-an already-authored feature. If a product feature later owns remote build
-caching end to end, its spec links to these ADRs instead of restating them.
+The module owns the feature of its contract, `cache/remote-cache-contract`,
+specified in [`specs/remote-cache-contract.json`](specs/remote-cache-contract.json).
+The tests here prove the messages, their validation and normalization, the
+fixture corpus, the eligibility policy and the reference socket server in
+`objectcachetest`. Two implementations prove the rest in their own tests. The
+CLI (`tooling/cli`) proves the version bootstrap, the run credential, the
+result-only restore, the provider configuration, the object cache socket,
+provider selection and the failure fallback. The Cloud cache provider
+(`cloud/extension`) proves the provenance it derives, the exchange directory,
+the write-path and accelerator fallbacks, the run credential and the
+result-only restore. Three checks moved here: the mode the provider returns and
+the wire a provider without the result-only capability receives, from the CLI's
+`cli/job-planning-execution`, and the provider-configuration echo, from Cloud's
+`cloud/cache-provider-configuration`; each of those features keeps what its
+implementation adds. The design intent lives in
+[`doc/adr/0001-provider-selection-by-reserved-command.md`](doc/adr/0001-provider-selection-by-reserved-command.md)
+and [`doc/adr/0002-blob-exchange-directory-boundary.md`](doc/adr/0002-blob-exchange-directory-boundary.md).
 
 ## Support
 

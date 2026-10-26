@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/cache",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -14,9 +14,11 @@
     },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "A cache wire contract is an execution detail of the jobs a user runs, not a feature they choose."
   }
 }

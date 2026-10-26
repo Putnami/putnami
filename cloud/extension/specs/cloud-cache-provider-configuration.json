@@ -12,7 +12,7 @@
   "requirements": [
     {
       "id": "provider-resolves-its-configuration",
-      "text": "The session mode is the core's intent, else the configured mode, else full. When the core lists provider-configuration in initialize, the provider echoes it and returns the session mode in the result. When the core does not list it, the provider echoes nothing and returns no mode."
+      "text": "The session mode is the core's intent, else the configured mode, else full."
     }
   ]
 }

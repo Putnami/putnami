@@ -568,6 +568,7 @@ func TestLoadRemoteCache_RemovedCapabilityNamesThePathExtension(t *testing.T) {
 // that survived: two extensions declaring the reserved command. Picking one
 // silently would make the active provider a function of discovery order.
 func TestLoadRemoteCache_AmbiguousProviderFails(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-reserved-command-selects-the-provider", "the-cli-refuses-two-declarers")
 	first := fakeProviderExtension(t, nil)
 	second := fakeProviderExtension(t, nil)
 	second.Name = "@other/cache"
@@ -588,6 +589,7 @@ func TestLoadRemoteCache_NoneIgnoresTheProvider(t *testing.T) {
 }
 
 func TestLoadRemoteCache_ShaStampedProviderVersionIsAccepted(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-reserved-command-selects-the-provider", "the-cli-loads-any-declarer-without-a-version-floor")
 	// The fake provider's version is a lexically-minimal SHA stamp
 	// (fakeProviderVersion). Every published cloud build carries such a stamp,
 	// and stamps are unordered, so the gate must accept it without a notice: a

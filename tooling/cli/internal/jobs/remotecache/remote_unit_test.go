@@ -143,6 +143,7 @@ func TestPrepareUpload_SkipsAJobWithExternalEffectsByTrait(t *testing.T) {
 }
 
 func TestPrepareUpload_IncludesActionEventsOnlyWhenAdvertised(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-cli-uploads-cached-events-only-when-advertised")
 	t.Parallel()
 	ws := makeExecutorTestWorkspace(t)
 	cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))

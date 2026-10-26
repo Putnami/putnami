@@ -17,6 +17,7 @@ import (
 
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // resultOnlyCacheServer is a fake cache server for the result-only tests. It
@@ -245,6 +246,7 @@ func exchangeFiles(t *testing.T, dir string) int {
 // sends resultOnly and resultOnlyKeys only after the echo, so an older core
 // keeps the wire it already has.
 func TestInitializeEchoesRestoreResultOnlyOnlyWhenCoreAdvertisesIt(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "the-cloud-provider-echoes-result-only-only-when-listed")
 	for _, tc := range []struct {
 		name         string
 		capabilities []string
@@ -341,6 +343,7 @@ func TestPrefetchBatches(t *testing.T) {
 // result, manifest and provenance, and places no file: no negotiate and no blob
 // transfer follow the prefetch.
 func TestAResultOnlyRestorePlacesNoFile(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "the-cloud-provider-places-no-file-for-a-result-only-hit")
 	hit, miss := resultOnlyKey("a"), resultOnlyKey("b")
 	blob := []byte("compiled output bytes")
 	f := newResultOnlyCacheServer(t, map[string][]byte{hit: blob})
@@ -395,6 +398,7 @@ func TestAResultOnlyRestoreOutsideThePrefetchNegotiatesItsKeyInMinimalMode(t *te
 // entry stored under the requested key or reports a miss: an entry the server
 // reports under another key is never returned.
 func TestAResultOnlyRestoreNeverAnswersWithAnotherKeysEntry(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "the-cloud-provider-never-answers-with-another-keys-entry")
 	for _, prefetched := range []bool{true, false} {
 		t.Run("prefetched="+strconv.FormatBool(prefetched), func(t *testing.T) {
 			asked, other := resultOnlyKey("a"), resultOnlyKey("b")

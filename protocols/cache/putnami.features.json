@@ -1,0 +1,336 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cache",
+  "features": [
+    {
+      "id": "cache/remote-cache-contract",
+      "type": "feature",
+      "name": "Remote build cache contract",
+      "outcome": "The CLI, a cache provider and a cache server exchange build results through one versioned, strictly parsed wire and one fixture corpus, so any implementation of the contract serves the Putnami remote cache and a cache failure makes a build slower, never wrong",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-versions-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-http-message-of-another-version-is-refused",
+              "the-provider-rpc-versions-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "keys-and-digests-are-content-addresses",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-key-is-64-lowercase-hex",
+              "a-digest-is-the-sha256-of-its-bytes",
+              "a-token-travels-as-a-bearer-value"
+            ]
+          }
+        },
+        {
+          "id": "negotiate-is-strict-and-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-mode-is-one-of-three",
+              "a-negotiate-request-is-validated",
+              "a-negotiate-response-is-validated",
+              "negotiate-normalizes-to-one-form"
+            ]
+          }
+        },
+        {
+          "id": "the-write-path-is-store-then-commit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-store-is-validated",
+              "a-commit-carries-the-whole-entry",
+              "a-cached-event-has-a-type",
+              "the-write-path-normalizes-to-one-form",
+              "the-cli-uploads-cached-events-only-when-advertised"
+            ]
+          }
+        },
+        {
+          "id": "the-batched-write-path-adds-routes-not-fields",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "capabilities-are-sorted",
+              "find-missing-is-bounded",
+              "commit-batch-entries-are-self-contained",
+              "the-batched-messages-round-trip",
+              "the-cloud-provider-falls-back-to-a-store-and-a-commit-per-entry"
+            ]
+          }
+        },
+        {
+          "id": "accelerators-are-optional",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-upload-grant-is-a-put-template",
+              "an-upload-batch-is-bounded",
+              "the-cloud-provider-falls-back-when-upload-batch-is-not-served",
+              "the-cloud-provider-downloads-what-download-batch-did-not-place"
+            ]
+          }
+        },
+        {
+          "id": "run-markers-are-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-run-marker-request-is-validated",
+              "a-run-marker-response-is-strict"
+            ]
+          }
+        },
+        {
+          "id": "side-effecting-tasks-stay-local",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-is-side-effecting",
+              "every-other-task-is-eligible"
+            ]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-http-fixture-gets-its-verdict",
+              "every-provider-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "the-provider-envelope-is-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-op-set-is-closed",
+              "an-envelope-round-trips-with-its-payload",
+              "a-failed-response-carries-a-code",
+              "a-restore-is-a-hit-a-miss-or-an-error",
+              "the-cloud-provider-answers-concurrent-requests-by-id"
+            ]
+          }
+        },
+        {
+          "id": "the-session-bootstraps-at-version-1",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-bootstraps-at-1-and-follows-the-selected-version",
+              "the-cli-refuses-an-unsupported-version"
+            ]
+          }
+        },
+        {
+          "id": "provenance-is-derived-by-the-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-triple-is-closed-and-whole",
+              "the-cloud-provider-forwards-no-asserted-provenance",
+              "the-cloud-provider-returns-the-servers-provenance"
+            ]
+          }
+        },
+        {
+          "id": "blobs-cross-through-the-exchange-directory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-exchange-path-is-content-addressed",
+              "the-cli-session-exchanges-blobs-through-the-directory",
+              "the-cloud-provider-places-only-the-blobs-core-lacks"
+            ]
+          }
+        },
+        {
+          "id": "the-run-credential-is-authenticated-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-run-credential-rule-is-pinned",
+              "the-credential-is-never-formatted",
+              "the-cli-authenticates-once-after-the-echo",
+              "the-cli-sends-no-authenticate-without-the-echo-or-a-credential",
+              "the-cli-fails-initialize-on-a-refused-authenticate",
+              "the-cli-never-sends-a-malformed-credential",
+              "the-cli-rule-matches-the-registry",
+              "the-cloud-provider-authenticates-once-and-strictly"
+            ]
+          }
+        },
+        {
+          "id": "result-only-restore-is-negotiated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-result-only-wire-is-pinned",
+              "result-only-keys-are-a-subset-of-keys",
+              "a-provider-without-the-capability-sees-no-new-field",
+              "the-cli-sends-the-fields-only-after-the-echo",
+              "the-cloud-provider-echoes-result-only-only-when-listed",
+              "the-cloud-provider-places-no-file-for-a-result-only-hit",
+              "the-cloud-provider-never-answers-with-another-keys-entry"
+            ]
+          }
+        },
+        {
+          "id": "the-provider-resolves-the-mode",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-provider-configuration-wire-is-pinned",
+              "core-materializes-in-the-mode-the-provider-returns",
+              "provider-configuration-echo-and-mode"
+            ]
+          }
+        },
+        {
+          "id": "the-object-cache-is-a-negotiated-socket",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-object-cache-tokens-are-pinned",
+              "only-object-ops-are-valid-on-the-socket",
+              "the-object-cache-is-additive-to-version-2",
+              "object-messages-are-validated",
+              "a-put-asserts-no-channel",
+              "the-cli-lists-the-object-cache",
+              "the-cli-uses-only-an-echoed-live-socket",
+              "the-cli-exports-the-socket-only-under-a-trust-policy"
+            ]
+          }
+        },
+        {
+          "id": "a-reference-socket-server",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reference-server-stores-only-verified-bytes",
+              "the-reference-server-hides-a-filtered-channel",
+              "the-reference-server-keeps-namespaces-apart",
+              "the-reference-server-refuses-session-ops",
+              "the-reference-server-serves-concurrent-connections",
+              "the-reference-socket-lives-in-the-exchange-directory",
+              "the-reference-server-handle-is-safe"
+            ]
+          }
+        },
+        {
+          "id": "every-op-is-best-effort",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-surfaces-every-provider-failure-as-an-error",
+              "the-cloud-provider-never-fails-an-op-on-a-failed-upload"
+            ]
+          }
+        },
+        {
+          "id": "the-reserved-command-selects-the-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-loads-any-declarer-without-a-version-floor",
+              "the-cli-refuses-two-declarers"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

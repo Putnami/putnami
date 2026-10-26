@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // runConformance loads every fixture under fixtures/<kind>/{valid,invalid} and
@@ -49,6 +50,7 @@ func runConformance(t *testing.T, kind string, parse func([]byte) (any, []diag.D
 }
 
 func TestConformance_Request(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateRequest(b)
 		if r == nil {
@@ -59,6 +61,7 @@ func TestConformance_Request(t *testing.T) {
 }
 
 func TestConformance_Response(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateResponse(b)
 		if r == nil {
@@ -69,6 +72,7 @@ func TestConformance_Response(t *testing.T) {
 }
 
 func TestConformance_StoreRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "store-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateStoreRequest(b)
 		if r == nil {
@@ -79,6 +83,7 @@ func TestConformance_StoreRequest(t *testing.T) {
 }
 
 func TestConformance_StoreResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "store-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateStoreResponse(b)
 		if r == nil {
@@ -89,6 +94,7 @@ func TestConformance_StoreResponse(t *testing.T) {
 }
 
 func TestConformance_CommitRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "commit-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateCommitRequest(b)
 		if r == nil {
@@ -99,6 +105,7 @@ func TestConformance_CommitRequest(t *testing.T) {
 }
 
 func TestConformance_CommitResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "commit-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateCommitResponse(b)
 		if r == nil {
@@ -109,6 +116,7 @@ func TestConformance_CommitResponse(t *testing.T) {
 }
 
 func TestConformance_CapabilitiesResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "capabilities-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateCapabilitiesResponse(b)
 		if r == nil {
@@ -119,6 +127,7 @@ func TestConformance_CapabilitiesResponse(t *testing.T) {
 }
 
 func TestConformance_FindMissingRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "find-missing-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateFindMissingRequest(b)
 		if r == nil {
@@ -129,6 +138,7 @@ func TestConformance_FindMissingRequest(t *testing.T) {
 }
 
 func TestConformance_FindMissingResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "find-missing-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateFindMissingResponse(b)
 		if r == nil {
@@ -139,6 +149,7 @@ func TestConformance_FindMissingResponse(t *testing.T) {
 }
 
 func TestConformance_CommitBatchRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "commit-batch-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateCommitBatchRequest(b)
 		if r == nil {
@@ -149,6 +160,7 @@ func TestConformance_CommitBatchRequest(t *testing.T) {
 }
 
 func TestConformance_CommitBatchResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "commit-batch-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateCommitBatchResponse(b)
 		if r == nil {
@@ -159,6 +171,7 @@ func TestConformance_CommitBatchResponse(t *testing.T) {
 }
 
 func TestConformance_UploadGrant(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "upload-grant", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateUploadGrant(b)
 		if r == nil {
@@ -169,6 +182,7 @@ func TestConformance_UploadGrant(t *testing.T) {
 }
 
 func TestConformance_UploadBatchRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "upload-batch-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateUploadBatchRequest(b)
 		if r == nil {
@@ -179,6 +193,7 @@ func TestConformance_UploadBatchRequest(t *testing.T) {
 }
 
 func TestConformance_UploadBatchResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "upload-batch-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateUploadBatchResponse(b)
 		if r == nil {
@@ -189,6 +204,7 @@ func TestConformance_UploadBatchResponse(t *testing.T) {
 }
 
 func TestConformance_DownloadBatchRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "download-batch-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateDownloadBatchRequest(b)
 		if r == nil {
@@ -199,6 +215,7 @@ func TestConformance_DownloadBatchRequest(t *testing.T) {
 }
 
 func TestConformance_DownloadBatchResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "download-batch-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateDownloadBatchResponse(b)
 		if r == nil {
@@ -218,6 +235,7 @@ func TestConformance_DownloadBatchResponse(t *testing.T) {
 // provider_conformance_test.go.
 
 func TestConformance_RunMarkerRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "run-marker-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateRunMarkerRequest(b)
 		if r == nil {
@@ -228,6 +246,7 @@ func TestConformance_RunMarkerRequest(t *testing.T) {
 }
 
 func TestConformance_RunMarkerResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "run-marker-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidateRunMarkerResponse(b)
 		if r == nil {
@@ -238,6 +257,7 @@ func TestConformance_RunMarkerResponse(t *testing.T) {
 }
 
 func TestConformance_PublishRunMarkerRequest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "publish-run-marker-request", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidatePublishRunMarkerRequest(b)
 		if r == nil {
@@ -248,6 +268,7 @@ func TestConformance_PublishRunMarkerRequest(t *testing.T) {
 }
 
 func TestConformance_PublishRunMarkerResponse(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-fixture-corpus-is-the-contract", "every-http-fixture-gets-its-verdict")
 	runConformance(t, "publish-run-marker-response", func(b []byte) (any, []diag.Diagnostic) {
 		r, d := ParseAndValidatePublishRunMarkerResponse(b)
 		if r == nil {

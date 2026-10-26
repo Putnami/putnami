@@ -16,6 +16,7 @@ import (
 	"time"
 
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The prefetch tests: the prefetch fetches the small files of every hit in a
@@ -396,6 +397,7 @@ func TestAFailedPrefetchDownloadLeavesTheFilesToEachRestore(t *testing.T) {
 // A file the server leaves out of the prefetch's answer is not inline: the
 // restore downloads it with its own GET and does not ask download-batch again.
 func TestAFileTheServerLeftOutComesThroughItsOwnDownload(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "the-cloud-provider-downloads-what-download-batch-did-not-place")
 	served, left := smallBlob("served", 10), smallBlob("left out", 20)
 	key := inlineKey(0)
 	f := newInlineCacheServer(t, map[string][][]byte{key: {served, left}})
@@ -420,6 +422,7 @@ func TestAFileTheServerLeftOutComesThroughItsOwnDownload(t *testing.T) {
 // the restore of the bad file downloads it with its own GET, and no restore
 // asks download-batch again.
 func TestAPrefetchAnswerPlacesEveryFileButTheOneThatDoesNotVerify(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "the-cloud-provider-downloads-what-download-batch-did-not-place")
 	bad, good := smallBlob("bad", 10), smallBlob("good", 20)
 	a, b := inlineKey(0), inlineKey(1)
 	f := newInlineCacheServer(t, map[string][][]byte{a: {bad}, b: {good}})

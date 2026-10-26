@@ -16,7 +16,9 @@ import (
 // returns the mode only when core listed the capability. Each initialize goes
 // through the wire parse, which leaves an absent mode absent.
 func TestInitialize_ProviderConfiguration(t *testing.T) {
-	spectest.Proves(t, "cloud/cache-provider-configuration", "provider-resolves-its-configuration", "provider-configuration-echo-and-mode")
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-resolves-the-mode", "provider-configuration-echo-and-mode")
+	spectest.Proves(t, "cloud/cache-provider-configuration", "provider-resolves-its-configuration",
+		"the-session-mode-is-the-intent-else-the-configured-mode-else-full")
 	t.Setenv(remotecache.URLEnv, "")
 	t.Setenv(remotecache.ModeEnv, "")
 

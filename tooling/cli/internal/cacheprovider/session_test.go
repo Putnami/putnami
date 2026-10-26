@@ -352,6 +352,7 @@ func mustInit(t *testing.T, s *Session, exchangeDir string) *cache.InitializeRes
 // TestSession_RoundTrip drives every op against the fake provider, including the
 // hybrid CAS path (restore writes a blob, upload reads it back).
 func TestSession_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "blobs-cross-through-the-exchange-directory", "the-cli-session-exchanges-blobs-through-the-directory")
 	exchangeDir := t.TempDir()
 	s := connectFake(t, fakeProviderConfig{})
 
@@ -425,6 +426,7 @@ func TestSession_RoundTrip(t *testing.T) {
 // The fake selects v2 only after it sees CapabilityProviderProtocolV2 in the
 // v1 initialize payload, so this covers both directions of the negotiation.
 func TestSession_InitialVersionNegotiation(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-1", "the-cli-bootstraps-at-1-and-follows-the-selected-version")
 	versions := make(chan int, 3)
 	s := connectFake(t, fakeProviderConfig{seenVersions: versions})
 
@@ -448,6 +450,7 @@ func TestSession_InitialVersionNegotiation(t *testing.T) {
 // a provider that strictly rejects every envelope and initialize body except
 // v1. It therefore fails if the session ever starts (or later continues) at v2.
 func TestSession_LegacyV1Provider(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-1", "the-cli-bootstraps-at-1-and-follows-the-selected-version")
 	s := spawnFake(t, "FAKE_PROTOCOL_VERSION="+strconv.Itoa(cache.ProviderProtocolMinVersion))
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -473,6 +476,7 @@ func TestSession_LegacyV1Provider(t *testing.T) {
 // TestSession_Timeout verifies a per-op timeout surfaces as an error (the
 // caller's signal to build locally) while leaving the session usable.
 func TestSession_Timeout(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "every-op-is-best-effort", "the-cli-surfaces-every-provider-failure-as-an-error")
 	s := spawnFake(t, "FAKE_HANG_OP=restore")
 	mustInit(t, s, t.TempDir())
 
@@ -495,6 +499,7 @@ func TestSession_Timeout(t *testing.T) {
 // TestSession_Crash verifies a provider crash fails the in-flight op and every
 // subsequent op, so the build falls back locally instead of hanging.
 func TestSession_Crash(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "every-op-is-best-effort", "the-cli-surfaces-every-provider-failure-as-an-error")
 	s := spawnFake(t, "FAKE_CRASH_OP=restore")
 	mustInit(t, s, t.TempDir())
 
@@ -517,6 +522,7 @@ func TestSession_Crash(t *testing.T) {
 // TestSession_OpError verifies a non-OK response becomes an OpError, distinct
 // from a transport failure, and does not kill the session.
 func TestSession_OpError(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "every-op-is-best-effort", "the-cli-surfaces-every-provider-failure-as-an-error")
 	s := connectFake(t, fakeProviderConfig{failOp: "upload"})
 	mustInit(t, s, t.TempDir())
 
@@ -543,6 +549,7 @@ func TestSession_OpError(t *testing.T) {
 // gate: an initialize result advertising an unsupported provider protocol
 // version is rejected.
 func TestSession_InitProtocolMismatch(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-session-bootstraps-at-version-1", "the-cli-refuses-an-unsupported-version")
 	s := connectFake(t, fakeProviderConfig{badInitVersion: true})
 	_, err := s.Initialize(context.Background(), &cache.InitializeParams{
 		ProtocolVersion: cache.ProviderProtocolVersion,
@@ -560,6 +567,7 @@ func TestSession_InitProtocolMismatch(t *testing.T) {
 // capabilities list it uses for the v2 opt-in, so a provider that has never
 // heard of it parses the bootstrap unchanged.
 func TestInitialize_AdvertisesObjectCacheCapability(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cli-lists-the-object-cache")
 	advertised := make(chan []string, 1)
 	s := connectFake(t, fakeProviderConfig{initCapabilities: advertised})
 	mustInit(t, s, t.TempDir())
@@ -581,6 +589,7 @@ func TestInitialize_AdvertisesObjectCacheCapability(t *testing.T) {
 // that echoes the capability and listens on a real socket makes the path
 // available to core, which will export it to every job.
 func TestInitialize_NegotiatesTheObjectCacheSocket(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cli-uses-only-an-echoed-live-socket")
 	s := connectFake(t, fakeProviderConfig{objectCache: objectCacheServe})
 	init := mustInit(t, s, t.TempDir())
 
@@ -601,6 +610,7 @@ func TestInitialize_NegotiatesTheObjectCacheSocket(t *testing.T) {
 // while the session itself stays healthy — the feature fails closed, the run
 // does not fail at all.
 func TestInitialize_RefusesAnUnusableObjectCacheSocket(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cli-uses-only-an-echoed-live-socket")
 	for _, tc := range []struct {
 		name string
 		mode string
@@ -630,6 +640,7 @@ func TestInitialize_RefusesAnUnusableObjectCacheSocket(t *testing.T) {
 // promise: a provider that ignores the capability answers exactly as before and
 // core simply has no object cache to export.
 func TestInitialize_LegacyProviderServesNoObjectCache(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cli-uses-only-an-echoed-live-socket")
 	s := connectFake(t, fakeProviderConfig{})
 	init := mustInit(t, s, t.TempDir())
 	if init.ObjectCacheSocket != "" {
@@ -679,6 +690,7 @@ func initializeLine(t *testing.T, exchangeDir, capabilities string) string {
 // lists no run-credential capability, and nothing follows it even when the
 // provider would take a credential.
 func TestInitialize_WithoutARunCredentialIsUnchanged(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cli-sends-no-authenticate-without-the-echo-or-a-credential")
 	for name, opts := range map[string][]Option{"no option": nil, "empty credential": {WithRunCredential("")}} {
 		t.Run(name, func(t *testing.T) {
 			requests := make(chan string, 16)
@@ -704,6 +716,7 @@ func TestInitialize_WithoutARunCredentialIsUnchanged(t *testing.T) {
 // receives exactly one authenticate carrying the credential, right after
 // initialize and before any other op.
 func TestInitialize_AuthenticatesOnceAfterTheEcho(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cli-authenticates-once-after-the-echo")
 	const secret = "prc_fixture-run-credential"
 	requests := make(chan string, 16)
 	s := connectFake(t, fakeProviderConfig{requests: requests, runCredentialEcho: true}, WithRunCredential(secret))
@@ -734,6 +747,7 @@ func TestInitialize_AuthenticatesOnceAfterTheEcho(t *testing.T) {
 // the provider does not take it: no authenticate, no line carrying the value,
 // and the session serves as before.
 func TestInitialize_NoEchoSendsNoAuthenticate(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cli-sends-no-authenticate-without-the-echo-or-a-credential")
 	const secret = "prc_fixture-run-credential"
 	requests := make(chan string, 16)
 	s := connectFake(t, fakeProviderConfig{requests: requests}, WithRunCredential(secret))
@@ -759,6 +773,7 @@ func TestInitialize_NoEchoSendsNoAuthenticate(t *testing.T) {
 // authenticate the same outcome as a failed initialize, and keeps a message
 // that quotes the credential from carrying it into the error.
 func TestInitialize_RefusedAuthenticateFailsInitialize(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cli-fails-initialize-on-a-refused-authenticate")
 	const secret = "prc_refused-run-credential"
 	s := connectFake(t, fakeProviderConfig{runCredentialEcho: true, refuseAuthenticate: true}, WithRunCredential(secret))
 	_, err := s.Initialize(context.Background(), &cache.InitializeParams{BlobExchangeDir: t.TempDir()})
@@ -776,6 +791,7 @@ func TestInitialize_RefusedAuthenticateFailsInitialize(t *testing.T) {
 // first line the provider reads: the pipe keeps order, so an initialize sent
 // before it would have been read first.
 func TestInitialize_MalformedRunCredentialSendsNothing(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cli-never-sends-a-malformed-credential")
 	for _, credential := range []string{"prc secret", "prc_\xff", strings.Repeat("a", cache.MaxRunCredentialBytes+1)} {
 		requests := make(chan string, 16)
 		s := connectFake(t, fakeProviderConfig{requests: requests, runCredentialEcho: true}, WithRunCredential(credential))
@@ -795,6 +811,7 @@ func TestInitialize_MalformedRunCredentialSendsNothing(t *testing.T) {
 // TestRunCredentialRuleMatchesTheRegistry keeps the two protocols' copies of
 // the run-credential rule in step: the engine hands one value to both.
 func TestRunCredentialRuleMatchesTheRegistry(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cli-rule-matches-the-registry")
 	if cache.MaxRunCredentialBytes != registry.MaxRunCredentialBytes {
 		t.Fatalf("bounds differ: cache %d, registry %d", cache.MaxRunCredentialBytes, registry.MaxRunCredentialBytes)
 	}
@@ -813,6 +830,7 @@ func TestRunCredentialRuleMatchesTheRegistry(t *testing.T) {
 // TestInitialize_AdvertisesRestoreResultOnly lists the result-only opt-in in
 // the forward-tolerant capabilities list, next to the v2 opt-in.
 func TestInitialize_AdvertisesRestoreResultOnly(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "the-cli-sends-the-fields-only-after-the-echo")
 	advertised := make(chan []string, 1)
 	s := connectFake(t, fakeProviderConfig{initCapabilities: advertised})
 	mustInit(t, s, t.TempDir())
@@ -839,7 +857,7 @@ func TestInitialize_AdvertisesRestoreResultOnly(t *testing.T) {
 // when the caller asks for result-only. Its restore hit still places the blob,
 // and the caller's params are left untouched.
 func TestRestoreResultOnly_NoEchoSendsNoField(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "result-only-remote-restore",
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated",
 		"a-provider-without-the-capability-sees-no-new-field")
 	requests := make(chan string, 16)
 	s := connectFake(t, fakeProviderConfig{requests: requests})
@@ -880,6 +898,7 @@ func TestRestoreResultOnly_NoEchoSendsNoField(t *testing.T) {
 // echoed the capability, and a result-only hit still carries the result and
 // manifest without placing a blob.
 func TestRestoreResultOnly_EchoSendsTheFields(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "the-cli-sends-the-fields-only-after-the-echo")
 	requests := make(chan string, 16)
 	s := connectFake(t, fakeProviderConfig{requests: requests, resultOnlyEcho: true})
 	exchangeDir := t.TempDir()

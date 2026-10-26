@@ -1,0 +1,26 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cache/remote-cache-contract#a-reference-socket-server",
+    "cache/remote-cache-contract#accelerators-are-optional",
+    "cache/remote-cache-contract#blobs-cross-through-the-exchange-directory",
+    "cache/remote-cache-contract#every-op-is-best-effort",
+    "cache/remote-cache-contract#keys-and-digests-are-content-addresses",
+    "cache/remote-cache-contract#negotiate-is-strict-and-canonical",
+    "cache/remote-cache-contract#provenance-is-derived-by-the-provider",
+    "cache/remote-cache-contract#result-only-restore-is-negotiated",
+    "cache/remote-cache-contract#run-markers-are-strict",
+    "cache/remote-cache-contract#side-effecting-tasks-stay-local",
+    "cache/remote-cache-contract#the-batched-write-path-adds-routes-not-fields",
+    "cache/remote-cache-contract#the-fixture-corpus-is-the-contract",
+    "cache/remote-cache-contract#the-object-cache-is-a-negotiated-socket",
+    "cache/remote-cache-contract#the-provider-envelope-is-closed",
+    "cache/remote-cache-contract#the-provider-resolves-the-mode",
+    "cache/remote-cache-contract#the-reserved-command-selects-the-provider",
+    "cache/remote-cache-contract#the-run-credential-is-authenticated-once",
+    "cache/remote-cache-contract#the-session-bootstraps-at-version-1",
+    "cache/remote-cache-contract#the-versions-are-pinned",
+    "cache/remote-cache-contract#the-write-path-is-store-then-commit"
+  ]
+}

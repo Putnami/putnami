@@ -1313,8 +1313,7 @@
             "checks": [
               "a-hit-no-job-waits-for-moves-no-bytes",
               "a-hit-a-planned-job-waits-for-keeps-its-files",
-              "a-run-that-reads-the-files-restores-them-or-executes",
-              "a-provider-without-the-capability-sees-no-new-field"
+              "a-run-that-reads-the-files-restores-them-or-executes"
             ]
           }
         },
@@ -1751,7 +1750,6 @@
             "kind": "acceptance",
             "checks": [
               "core-reads-no-cache-configuration",
-              "core-materializes-in-the-mode-the-provider-returns",
               "a-provider-that-is-not-ready-stops-silently",
               "one-provider-per-run"
             ]
