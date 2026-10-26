@@ -64,7 +64,7 @@ func TestNearestAncestorLineWins(t *testing.T) {
 
 func TestWorkspaceWithoutLineBlockIsOneLine(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "version-lines-are-scopes", "the-loader-maps-each-line-to-its-tag-pattern")
-	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "the-cli-loader-puts-each-project-on-its-nearest-ancestor-line")
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "the-cli-loader-makes-a-workspace-without-a-line-one-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{"name":"ws","includes":["app"]}`)
 	writeFile(t, filepath.Join(root, "app", wsproto.ConfigFilename), `{"name":"app"}`)

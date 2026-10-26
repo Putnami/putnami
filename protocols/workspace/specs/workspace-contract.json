@@ -35,7 +35,7 @@
     },
     {
       "id": "registries-are-keyed-by-ecosystem",
-      "text": "registries maps an ecosystem id to a JSON object. This module validates only that outer map, so a key that is not an ecosystem id or a value that is not an object is invalid-registries, and it keeps each entry raw for the profile that owns it. RegistryEntry reads one entry back, and a project file may override an entry under the same rules."
+      "text": "registries maps an ecosystem id to a JSON object. This module validates only that outer map, so a key that is not an ecosystem id or a value that is not an object is invalid-registries, and it keeps each entry raw for the profile that owns it. RegistryEntry reads one entry back, and a project file may override an entry, which replaces it whole."
     },
     {
       "id": "visibility-and-distribution-fail-closed",

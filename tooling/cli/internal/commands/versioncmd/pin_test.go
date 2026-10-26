@@ -389,6 +389,7 @@ func TestCLIPinShowsTheSourceWorkspaceSentinel(t *testing.T) {
 
 // `pin --remove` is the way out of self-hosting, and it must say what it removed.
 func TestCLIPinRemoveClearsTheSourceWorkspaceSentinel(t *testing.T) {
+	spectest.Proves(t, "cli/engine-provenance", "source-workspace-declaration", "pin-remove-clears-the-source-sentinel")
 	ws := t.TempDir()
 	writeSourceWorkspaceLock(t, ws)
 	out := captureCLIPinStdout(t, func() error {
@@ -410,6 +411,7 @@ func TestCLIPinRemoveClearsTheSourceWorkspaceSentinel(t *testing.T) {
 // not carry the sentinel's source forward. `pin` is launcher-exempt, so this is
 // always reachable even inside a source workspace.
 func TestCLIPinReplacesTheSourceWorkspaceSentinel(t *testing.T) {
+	spectest.Proves(t, "cli/engine-provenance", "source-workspace-declaration", "pin-replaces-the-source-sentinel")
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	srv := platformArchiveServer(t, nil)
 	defer srv.Close()

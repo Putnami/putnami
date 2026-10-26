@@ -2627,7 +2627,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "putnami-json-declares-the-member-level"
+              "putnami-json-declares-the-member-level",
+              "publish-refuses-a-members-rule-that-disagrees"
             ]
           }
         },
@@ -2935,7 +2936,9 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-source-sentinel-round-trips-and-a-metadata-refresh-leaves-it-intact"
+              "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it",
+              "pin-remove-clears-the-source-sentinel",
+              "pin-replaces-the-source-sentinel"
             ]
           }
         },

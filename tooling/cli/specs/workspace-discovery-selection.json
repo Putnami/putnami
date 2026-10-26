@@ -40,11 +40,11 @@
     },
     {
       "id": "version-lines-are-scopes",
-      "text": "A scope that declares a line block versions and tags its projects together under the line's tag pattern."
+      "text": "The loader maps each line a scope declares to its tag pattern."
     },
     {
       "id": "registries-keyed-by-ecosystem",
-      "text": "Every registry endpoint an extension needs comes from the registries entry of its ecosystem."
+      "text": "The loader gives each project the registries entry of each ecosystem the workspace or the project declares."
     },
     {
       "id": "registry-pin-wins",

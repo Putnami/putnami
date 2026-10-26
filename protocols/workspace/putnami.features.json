@@ -87,6 +87,7 @@
               "a-tag-pattern-defaults-renders-and-validates",
               "a-project-belongs-to-one-line",
               "the-cli-loader-puts-each-project-on-its-nearest-ancestor-line",
+              "the-cli-loader-makes-a-workspace-without-a-line-one-line",
               "the-cli-loader-refuses-a-nested-line"
             ]
           }
@@ -115,7 +116,8 @@
             "kind": "acceptance",
             "checks": [
               "an-import-boundary-closes-on-anything-but-public",
-              "a-distribution-level-fails-closed"
+              "a-distribution-level-fails-closed",
+              "the-cli-refuses-a-declared-distribution-level-that-is-unknown-or-missing"
             ]
           }
         },
@@ -175,6 +177,7 @@
               "an-agent-artifact-entry-binds-its-archive-and-manifest",
               "a-version-5-toolchain-entry-names-its-archives",
               "the-cli-entry-has-two-exclusive-shapes",
+              "the-cli-lockfile-keeps-the-source-sentinel-byte-for-byte",
               "archives-are-written-before-integrities"
             ]
           }
