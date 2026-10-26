@@ -166,7 +166,8 @@
             "checks": [
               "the-dev-passes-a-sha-that-starts-with-the-expected-one",
               "the-dev-refuses-a-different-or-absent-sha",
-              "the-dev-proves-the-tree-again-once-the-target-is-ready"
+              "the-dev-proves-the-tree-again-once-the-target-is-ready",
+              "the-dev-local-target-refuses-a-worktree-written-before-readiness"
             ]
           }
         }

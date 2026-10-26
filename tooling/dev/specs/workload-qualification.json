@@ -14,9 +14,7 @@
     "Inferring what a workload runs with from its dependency graph",
     "Deploying, scaling or supervising workloads beyond one developer machine",
     "Running migrations on behalf of a workload",
-    "Printing or recording the injected configuration",
-    "Requesting mutating routes, which needs a safety annotation the route inventory does not carry",
-    "Recording the verdict in session.json or adding a member to the result envelope"
+    "Printing or recording the injected configuration"
   ],
   "requirements": [
     {

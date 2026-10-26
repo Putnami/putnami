@@ -284,7 +284,7 @@ type localFixture struct {
 func requireLocalFixtureTools(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not available, and a local target binds to a git worktree")
+		t.Fatal("git is not available: a local target binds to a git worktree, so this test needs git on the PATH")
 	}
 }
 
@@ -524,6 +524,8 @@ func TestLocalTarget_ReadsTheLocalConfigOfAProductionBuild(t *testing.T) {
 }
 
 func TestLocalTarget_TreeThatChangesBeforeReadinessIsDigestMismatch(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-binds-to-the-build-it-proves",
+		"the-dev-local-target-refuses-a-worktree-written-before-readiness")
 	fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureWriteTree})
 
 	verdict := execute(t, context.Background(), contractFor(t, "GET /items"), fixture.target(t, hangDetector), fastOptions())
