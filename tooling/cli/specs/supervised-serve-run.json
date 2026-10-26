@@ -39,7 +39,7 @@
     },
     {
       "id": "a-lost-supervisor-stops-the-run",
-      "text": "On Unix, a supervised serve run watches the process that started it. Once that process exits, killed outright or not, the run stops as SIGTERM stops it: it stops its serve step and exits, and the session records a supervisor's stop. A write to a stdout or stderr whose reader is gone fails instead of ending the run. On Windows, putnami's Job Object ends the supervisor's process tree, the run included."
+      "text": "On Unix, a supervised serve run watches the process that started it, whose pid it reads as it starts. Once that process exits, killed outright or not, even while the run loads its workspace, the run cancels as SIGTERM cancels it, without the forced exit that follows a signal: it stops its serve step and exits, watched or not, and the session records a supervisor's stop. From the time the run plans its steps, a write to a stdout or stderr whose reader is gone fails instead of ending the run. On Windows, putnami's Job Object ends the supervisor's process tree, the run included."
     }
   ]
 }

@@ -26,6 +26,9 @@ const (
 	// supervisedRootEnv names the fixture workspace the helper serves; set
 	// only for the helper process.
 	supervisedRootEnv = "PUTNAMI_SUPERVISED_HELPER_ROOT"
+	// supervisedWatchEnv, set to true, makes the helper's run watch, as compose
+	// runs its target.
+	supervisedWatchEnv = "PUTNAMI_SUPERVISED_HELPER_WATCH"
 	// startBound is how long the helper may take to start its serve step.
 	startBound = 60 * time.Second
 	// stopBound is how long the run may take to see its supervisor's loss and
@@ -99,16 +102,42 @@ func TestSupervisedServeRunHelper(t *testing.T) {
 		t.Fatalf("NewApp: %v", err)
 	}
 	t.Chdir(root)
-	os.Exit(app.Run(context.Background(), serveArgs))
+	os.Exit(app.Run(context.Background(), supervisedArgs(os.Getenv(supervisedWatchEnv) == "true")))
+}
+
+// supervisedArgs are serveArgs, without --no-watch for a watched run.
+func supervisedArgs(watch bool) []string {
+	if !watch {
+		return serveArgs
+	}
+	var args []string
+	for _, arg := range serveArgs {
+		if arg != "--no-watch" {
+			args = append(args, arg)
+		}
+	}
+	return args
 }
 
 // A supervisor killed outright signals nothing to the supervised serve run it
 // started. The run sees the loss, stops its serve step as SIGTERM does, and
-// exits; its writes to the stdout and stderr whose reader died with the
-// supervisor fail without ending it before it stopped the step.
+// exits, watched or not; its writes to the stdout and stderr whose reader died
+// with the supervisor fail without ending it before it stopped the step.
 func TestSupervisedServeRunStopsOnceItsSupervisorIsKilled(t *testing.T) {
 	clitest.RequireShell(t)
 	spectest.Proves(t, "cli/supervised-serve-run", "a-lost-supervisor-stops-the-run", "a-killed-supervisor-stops-the-serve-step")
+	for _, tc := range []struct {
+		name  string
+		watch bool
+	}{
+		{"not watched", false},
+		{"watched", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) { killSupervisorAndWaitForTheStop(t, tc.watch) })
+	}
+}
+
+func killSupervisorAndWaitForTheStop(t *testing.T, watch bool) {
 	root := longServeFixture(t)
 	executable, err := os.Executable()
 	if err != nil {
@@ -119,6 +148,7 @@ func TestSupervisedServeRunStopsOnceItsSupervisorIsKilled(t *testing.T) {
 		executable, filepath.Join(root, "stdin.json"))
 	supervisor.Env = append(os.Environ(),
 		supervisedRootEnv+"="+root,
+		supervisedWatchEnv+"="+strconv.FormatBool(watch),
 		"PUTNAMI_STORE_DIR="+filepath.Join(t.TempDir(), "store"),
 		"DO_NOT_TRACK=1",
 	)
@@ -175,9 +205,14 @@ func TestSupervisedServeRunStopsOnceItsSupervisorIsKilled(t *testing.T) {
 		_ = syscall.Kill(runPID, syscall.SIGKILL)
 		t.Fatalf("the serve step runs in process group %d, want one of its own (run's group %d, %v)", stepGroup, runGroup, err)
 	}
+	// Both ran at the last read, so the ids are still theirs; once the test
+	// saw them end, it signals neither again.
+	stopped := false
 	t.Cleanup(func() {
-		_ = syscall.Kill(-stepGroup, syscall.SIGKILL)
-		_ = syscall.Kill(runPID, syscall.SIGKILL)
+		if !stopped {
+			_ = syscall.Kill(-stepGroup, syscall.SIGKILL)
+			_ = syscall.Kill(runPID, syscall.SIGKILL)
+		}
 	})
 
 	// The supervisor dies outright, and the streams it read close with it.
@@ -189,13 +224,14 @@ func TestSupervisedServeRunStopsOnceItsSupervisorIsKilled(t *testing.T) {
 	_ = stderrReader.Close()
 
 	deadline := time.Now().Add(stopBound)
-	for groupAlive(stepGroup) || processAlive(runPID) {
+	for groupRunning(t, stepGroup) || processRunning(runPID) {
 		if time.Now().After(deadline) {
-			t.Fatalf("%s after the supervisor's loss: serve step group %d alive = %v, run %d alive = %v",
-				stopBound, stepGroup, groupAlive(stepGroup), runPID, processAlive(runPID))
+			t.Fatalf("%s after the supervisor's loss: serve step group %d running = %v, run %d running = %v",
+				stopBound, stepGroup, groupRunning(t, stepGroup), runPID, processRunning(runPID))
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	stopped = true
 	if data, err := os.ReadFile(filepath.Join(root, "example", "serve.stopped")); err != nil || string(data) != "stopped" {
 		t.Errorf("the serve step ended without its SIGTERM stop (serve.stopped: %q, %v)", data, err)
 	}
@@ -224,17 +260,31 @@ func waitForPID(t *testing.T, path string, bound time.Duration, stderr <-chan st
 	}
 }
 
-// groupAlive reports whether any process of the process group runs. A zombie
-// counts until its parent reaps it; the run reaps its step.
-func groupAlive(pgid int) bool {
-	return signalable(syscall.Kill(-pgid, 0))
+// groupRunning reports whether a process of the process group runs. A zombie,
+// which kill(0) still reaches until its adopter reaps it, does not run.
+func groupRunning(t *testing.T, pgid int) bool {
+	t.Helper()
+	if errors.Is(syscall.Kill(-pgid, 0), syscall.ESRCH) {
+		return false
+	}
+	out, err := exec.Command("ps", "-A", "-o", "pgid=,stat=").Output()
+	if err != nil {
+		t.Fatalf("ps: %v", err)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == strconv.Itoa(pgid) && !strings.HasPrefix(fields[1], "Z") {
+			return true
+		}
+	}
+	return false
 }
 
-// processAlive reports whether pid runs. The orphaned run is reaped by init.
-func processAlive(pid int) bool {
-	return signalable(syscall.Kill(pid, 0))
-}
-
-func signalable(err error) bool {
-	return err == nil || errors.Is(err, syscall.EPERM)
+// processRunning reports whether pid runs. A zombie does not run.
+func processRunning(pid int) bool {
+	if errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+		return false
+	}
+	out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
+	return err == nil && !strings.HasPrefix(strings.TrimSpace(string(out)), "Z")
 }

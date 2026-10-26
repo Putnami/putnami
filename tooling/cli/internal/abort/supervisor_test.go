@@ -3,6 +3,7 @@ package abort
 import (
 	"context"
 	"errors"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func TestWatchSupervisorCancelsOnceTheParentPIDChanges(t *testing.T) {
 	t.Cleanup(Reset)
 	parent := &fakeParent{}
 	parent.pid.Store(4242)
-	ctx, stop := watchSupervisor(context.Background(), time.Millisecond, parent.getppid)
+	ctx, stop := watchSupervisor(context.Background(), time.Millisecond, 4242, parent.getppid)
 	defer stop()
 	select {
 	case <-ctx.Done():
@@ -44,6 +45,39 @@ func TestWatchSupervisorCancelsOnceTheParentPIDChanges(t *testing.T) {
 	}
 }
 
+// A supervisor that exited before the watch started, while the run loaded its
+// workspace, cancels the run at the call.
+func TestWatchSupervisorCancelsAtOnceWhenTheSupervisorAlreadyExited(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "a-lost-supervisor-stops-the-run", "a-supervisor-lost-before-the-watch-cancels-the-run")
+	Reset()
+	t.Cleanup(Reset)
+	parent := &fakeParent{}
+	parent.pid.Store(1)
+	ctx, stop := watchSupervisor(context.Background(), time.Hour, 4242, parent.getppid)
+	defer stop()
+	if ctx.Err() == nil {
+		t.Fatal("the watch did not cancel a run whose supervisor exited before it started")
+	}
+	if got := Source(); got != SourceSignal {
+		t.Errorf("Source() = %q, want %q", got, SourceSignal)
+	}
+}
+
+// NoteParent records the parent pid WatchSupervisor compares against.
+func TestNoteParentRecordsTheParentPID(t *testing.T) {
+	Reset()
+	t.Cleanup(Reset)
+	NoteParent()
+	if got, want := int(startParent.Load()), os.Getppid(); got != want {
+		t.Errorf("NoteParent recorded %d, want %d", got, want)
+	}
+	ctx, stop := WatchSupervisor(context.Background())
+	defer stop()
+	if ctx.Err() != nil {
+		t.Errorf("the watch canceled while the test's parent runs: %v", ctx.Err())
+	}
+}
+
 // Ending the watch, or canceling the context it copies, records no stop.
 func TestWatchSupervisorEndsWithoutALoss(t *testing.T) {
 	for _, tc := range []struct {
@@ -60,7 +94,7 @@ func TestWatchSupervisorEndsWithoutALoss(t *testing.T) {
 			parent.pid.Store(4242)
 			base, cancelParent := context.WithCancel(context.Background())
 			defer cancelParent()
-			ctx, stop := watchSupervisor(base, time.Millisecond, parent.getppid)
+			ctx, stop := watchSupervisor(base, time.Millisecond, 4242, parent.getppid)
 			defer stop()
 			tc.end(stop, cancelParent)
 			<-ctx.Done()

@@ -44,6 +44,7 @@ func main() {
 }
 
 func runMain() int {
+	abort.NoteParent()
 	// Git hooks are invoked directly by git (not through the workspace command
 	// pipeline), so handle them before the App, which expects a workspace.
 	//

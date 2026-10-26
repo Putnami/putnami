@@ -4292,6 +4292,7 @@
             "kind": "acceptance",
             "checks": [
               "a-changed-parent-pid-cancels-the-run",
+              "a-supervisor-lost-before-the-watch-cancels-the-run",
               "a-killed-supervisor-stops-the-serve-step"
             ]
           }
