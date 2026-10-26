@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
@@ -91,6 +92,7 @@ func toolchainResolveRequest(extension string) wsproto.ToolchainResolveRequest {
 }
 
 func TestExecProbeProvider_ResolveToolchainsRoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-cli-reads-answers-through-the-contract", "the-cli-reads-each-answer")
 	provider := toolchainResolveHelper(t, "answer")
 	result, err := provider.ResolveToolchains(toolchainResolveRequest(provider.Extension))
 	if err != nil {
@@ -106,6 +108,7 @@ func TestExecProbeProvider_ResolveToolchainsRoundTrip(t *testing.T) {
 // An answer that resolves an identity the request did not ask for passes the
 // result's own validation and fails the check against the request.
 func TestExecProbeProvider_ResolveToolchainsRejectsAnAnswerToAnotherQuestion(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-cli-reads-answers-through-the-contract", "the-cli-refuses-an-answer-the-contract-refuses")
 	provider := toolchainResolveHelper(t, "unasked")
 	_, err := provider.ResolveToolchains(toolchainResolveRequest(provider.Extension))
 	var failure *wsproto.ProbeFailure

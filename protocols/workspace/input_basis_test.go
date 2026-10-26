@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // writeBasisTree writes files, each path to its content, below root.
@@ -75,6 +77,7 @@ func goLikeTree(t *testing.T) string {
 }
 
 func TestInputBasisDigestBindsWhatTheBasisSelects(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-binds-what-the-basis-selects")
 	cases := []struct {
 		name    string
 		mutate  func(t *testing.T, root string)
@@ -174,6 +177,7 @@ func TestInputBasisDigestBindsWhatTheBasisSelects(t *testing.T) {
 // A path both kinds select gets both records, so the basis that selects it
 // twice differs from the one that selects it once.
 func TestInputBasisDigestRecordsBothKindsOfAPath(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-binds-what-the-basis-selects")
 	root := goLikeTree(t)
 	set := []string{"assets/**"}
 	both := basisDigest(t, root, InputBasis{Content: [][]string{set}, Listing: [][]string{set}})
@@ -190,6 +194,7 @@ func TestInputBasisDigestRecordsBothKindsOfAPath(t *testing.T) {
 
 // The walk names a link by its target text and never reads through it.
 func TestInputBasisDigestNeverFollowsALink(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-binds-what-the-basis-selects")
 	outside := t.TempDir()
 	writeBasisTree(t, outside, map[string]string{"pkg/x.go": "package x\n", "y.go": "package y\n"})
 	root := t.TempDir()
@@ -261,6 +266,7 @@ var pruningBases = map[string]InputBasis{
 // Pruning skips only directories no set can select, so the pruned walk
 // records exactly what the full walk records.
 func TestInputBasisDigestPruningKeepsTheRecords(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-binds-what-the-basis-selects")
 	root := basisFixtureTree(t)
 	for name, basis := range pruningBases {
 		t.Run(name, func(t *testing.T) {
@@ -293,6 +299,7 @@ func TestInputBasisDigestPruningKeepsTheRecords(t *testing.T) {
 // The class case is the one where a whole-path match crosses a slash: the
 // pattern x[^a]y selects x/y, so the directory x must be walked.
 func TestInputBasisDigestWalksADirectoryAClassReaches(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-binds-what-the-basis-selects")
 	root := basisFixtureTree(t)
 	records, _, err := walkInputBasis(root, pruningBases["class across a slash"], true)
 	if err != nil {
@@ -304,6 +311,7 @@ func TestInputBasisDigestWalksADirectoryAClassReaches(t *testing.T) {
 }
 
 func TestInputBasisDigestIsDeterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-is-deterministic-and-unambiguous")
 	first := goLikeTree(t)
 	second := t.TempDir()
 	// The same tree, written in another order below another root.
@@ -339,6 +347,7 @@ func TestInputBasisDigestIsDeterministic(t *testing.T) {
 // A record quotes its path and payload, so a name holding the separators
 // cannot spell another record.
 func TestInputBasisRecordIsUnambiguous(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "the-digest-is-deterministic-and-unambiguous")
 	a := inputBasisRecord("l", "a\" symlink \"b", inputBasisKindSymlink, "c")
 	b := inputBasisRecord("l", "a", inputBasisKindSymlink, "b\" symlink \"c")
 	if a == b {
@@ -350,6 +359,7 @@ func TestInputBasisRecordIsUnambiguous(t *testing.T) {
 }
 
 func TestInputBasisDigestRefusesWhatItCannotDigest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-input-basis-digest-is-host-independent", "what-cannot-be-digested-is-refused")
 	root := goLikeTree(t)
 	link := filepath.Join(t.TempDir(), "link")
 	if err := os.Symlink(root, link); err != nil && runtime.GOOS != "windows" {

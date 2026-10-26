@@ -1,0 +1,115 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "workspace/workspace-contract",
+  "outcomes": [
+    "A project's identity, scope, line and visibility resolve the same way in the CLI and in every extension, from the same files",
+    "An install reads one lock whose versions and digests every reader checks alike, and reading a lock never rewrites it",
+    "An extension in any language answers discovery, toolchain pins and input selectors over one bounded exchange that is validated before its answer is trusted"
+  ],
+  "nonGoals": [
+    "Running anything: this module parses, validates, normalizes and merges, and the CLI plans and executes",
+    "Validating what a registry entry or provider metadata holds: the extension that owns the ecosystem declares that shape",
+    "Deciding what a visibility or distribution violation means: @putnami/cli owns that policy"
+  ],
+  "requirements": [
+    {
+      "id": "configuration-loads-in-a-fixed-precedence",
+      "text": "Load merges ~/.putnami/config.json, then putnami.workspace.json, and never the current directory's putnami.json. Command defaults merge *, then the command, the extension, and extension:command. A later layer replaces each scalar and hook contract it authors and keeps the rest; lists and aliases merge without duplicates, hook commands accumulate, and a registry entry is replaced whole."
+    },
+    {
+      "id": "configuration-parsing-is-strict",
+      "text": "The strict parsers refuse an unknown field and invalid JSON, and validation requires a name. A featureAuthority states exactly one thing. A declared jobs block, even empty, parses, is reported and is never rejected. Task tuning is strict, a timeout must be positive, and the rest of a project file stays lenient. Diagnostics and extension names come in one order whatever the map iteration."
+    },
+    {
+      "id": "an-authored-form-survives-a-rewrite",
+      "text": "bin is a string or an object, and exports a string, an object of strings or an object of conditions; a wrong type or an unknown condition is refused. Reading and rewriting a project file keeps the authored form and writes the same bytes each time. extensions accepts the array and the map spelling. An absent sessions block or hook contract member stays distinct from an authored zero."
+    },
+    {
+      "id": "scopes-resolve-through-one-chain",
+      "text": "LoadScopeChain merges the scope files above a project, shallowest first, and names the files it merged. The deepest scope wins the name pattern, the distribution level and each publish channel, which it replaces whole. A file is a scope when it carries a scope field, includes or a line alone included, and {} is not one. ScanAllScopes refuses an alias or a group that two scopes declare."
+    },
+    {
+      "id": "a-line-is-a-scope-that-is-not-inherited",
+      "text": "A line's tag carries exactly one {version} placeholder and no character outside [A-Za-z0-9._/{}-]; it defaults to <scope path>/v{version}, and to v{version} at the root. A line is not inherited: a project belongs to its nearest ancestor line, and a workspace that declares none is one line. A line under another line, or on an activated scope, is refused with invalid-line."
+    },
+    {
+      "id": "registries-are-keyed-by-ecosystem",
+      "text": "registries maps an ecosystem id to a JSON object. This module validates only that outer map, so a key that is not an ecosystem id or a value that is not an object is invalid-registries, and it keeps each entry raw for the profile that owns it. RegistryEntry reads one entry back, and a project file may override an entry under the same rules."
+    },
+    {
+      "id": "visibility-and-distribution-fail-closed",
+      "text": "visibility is scope, the default, or public, and any other value is a validation error rather than a fallback, so a typo never widens an import boundary; a rewrite omits the default. distribution.visibility is internal, private or public, separate from the import boundary: a block without a level and an unknown level are both errors."
+    },
+    {
+      "id": "one-selection-vocabulary",
+      "text": "File patterns are project-relative, with *, ** and ! exclusions. ** matches zero segments, a wildcard of an ordinary include never crosses .., an empty include list selects nothing, and git: changes which candidates are collected, not how a path matches. ParseSelector reads tag:, group:, scope: or a project id; an unknown prefix is a project id, and String renders a selector that parses back to itself."
+    },
+    {
+      "id": "the-agent-artifact-manifest-is-strict",
+      "text": "An agent-artifact manifest carries an identity and the files it may materialize, each at a canonical slash path relative to the workspace root with a lowercase SHA-256. The parser refuses traversal, duplicate paths, bad hashes and trailing documents. ValidAgentArtifactPath is the one path rule, and canonical bytes sort files by path without mutating the authored order. A CLI older than extension:<name> fails closed on it."
+    },
+    {
+      "id": "a-lock-is-read-at-its-recorded-version",
+      "text": "A lock of version 2 to 5 parses at its recorded version, and parsing never migrates it. Vocabulary newer than the version is a field-version error, MarshalLock writes only that version's vocabulary without editing the caller's value, and a trailing document is refused. MigrateLockToCurrent is explicit, deep and deterministic, and refuses each toolchain pin that records no archive."
+    },
+    {
+      "id": "a-lock-entry-binds-what-it-pins",
+      "text": "An agent artifact entry needs an exact version, an archive SHA-256 and a manifest SHA-256. A version 5 toolchain entry names each platform's archive url, format and executable with its integrity, and no source. The cli entry is a published pin or the source-workspace sentinel, each refusing the other's fields, and the sentinel survives a rewrite. Diagnostics come in a fixed order, and archives are written before integrities."
+    },
+    {
+      "id": "a-probe-digest-is-a-function-of-the-facts",
+      "text": "Every probe path is repo-relative and slash-separated. NormalizeProbeResult collapses authoring order, path spelling, list order, duplicates and metadata key order into one form and is idempotent. ProbeResultDigest moves with every contract member and ignores diagnostics, and ProbeWorkspaceDigest ignores provider order."
+    },
+    {
+      "id": "probe-version-1-is-frozen-and-validated",
+      "text": "The probe protocol version stays 1, and a version 1 result keeps the members a strict older consumer decodes, so a new member must be asked for by the request. Validation reports each broken rule of a request or a result by its code, and a valid document round-trips. A failed probe is a ProbeFailure whose kind is one of a closed set and whose message names the provider."
+    },
+    {
+      "id": "probe-results-merge-by-fixed-rules",
+      "text": "Core assigns project paths and ids. An explicit putnami.json value overrides a probe value and settles a conflict; two providers' different non-empty scalars are an error unless settled, and agreeing ones are not. Lists union and provider metadata lands under its extension. A name resolves from putnami.json, the probe identity, the scope pattern, then the directory, and scope tags fill only an empty set."
+    },
+    {
+      "id": "dependency-sources-attribute-each-edge",
+      "text": "dependencySources attributes a reported edge to go-module, package-json or declared, and an edge it does not name is declared. It is answered only to a request that asks for it, and an empty map stays an answer. Normalization drops provenance for an edge the project does not report, the digest moves with provenance, and a merge prefers the import in any provider order."
+    },
+    {
+      "id": "a-reserved-call-exchanges-one-bounded-document",
+      "text": "Core spawns <executable> __putnami workspace-probe, toolchain-resolve or input-resolve, and no other argv is claimed. The call reads one request from stdin and writes one result to stdout; a trailing, empty or over-8-MiB document is refused. The provider side checks its answer against the contract and the core's request and writes nothing when either fails, and one answer always produces the same bytes."
+    },
+    {
+      "id": "a-toolchain-answer-pins-only-what-was-asked",
+      "text": "A toolchain-resolve request names the extension, 1 to 64 unique lock identities, their locked entries, the host os/arch and offline, and no path. A result gives an identity a version 5 pin, held to the lock's entry rules, or a problem, never both. The answer names the asked extension and only asked identities, and each pin covers the host platform with an archive and an integrity. Diagnostics come in a fixed order."
+    },
+    {
+      "id": "an-input-answer-lists-files-and-their-basis",
+      "text": "An input selector is <scheme>:<name>, never git:, at most 128 bytes. A request's inputs name a clean project path, a selector and patterns, and two never repeat all three. The result answers each input in request order with an error, or with sorted unique clean files inside the project and the basis they were read from; each file is one a basis set selects. An error answer omits its basis on the wire."
+    },
+    {
+      "id": "the-input-basis-digest-is-host-independent",
+      "text": "InputBasisDigest records, for each path a content set selects, its kind and the sha256 of a file's bytes or a link's target, and for each path a listing set selects, its kind and a link's target. The walk never follows a link and prunes only directories no set can select. Records are quoted and sorted before hashing, so the digest is the same on every host, and a root or a basis it cannot digest is an error."
+    },
+    {
+      "id": "the-schemas-and-the-go-types-agree",
+      "text": "Each published JSON Schema is held against its Go type by a drift test, so a field that reaches only one of them fails the suite. Where a rule is stated in both a schema and the validator, a test reads the schema constraint back against the validator's constant: the lock's toolchain and cli entries, and the toolchain-resolve and input-resolve grammars."
+    },
+    {
+      "id": "a-fixture-corpus-holds-every-shape",
+      "text": "The workspace protocol version stays 1. Every valid fixture passes its strict parser and every invalid one fails it, for workspace, project, scope, lock, agent artifact, probe, toolchain-resolve and input-resolve documents. Each valid result fixture answers its request fixture, each guarded reject branch is triggered by a fixture, and fixture providers served over the transport are accepted or refused like the corpus."
+    },
+    {
+      "id": "first-party-extensions-answer-the-reserved-calls",
+      "text": "The Go, TypeScript, Python and Cloud extensions answer the workspace-probe call with a result the strict reader accepts, and decline an ordinary subcommand. The Go extension refuses a toolchain-resolve or input-resolve request addressed to another extension and writes nothing. The TypeScript extension leaves every other call to its owner, and the Python extension writes nothing when it cannot answer."
+    },
+    {
+      "id": "the-cli-reads-answers-through-the-contract",
+      "text": "The CLI spawns a provider over each reserved call and reads its answer through the strict reader of this module: a probe, a toolchain-resolve and an input-resolve answer each round-trip. A provider that logs to stdout fails as a transport failure, and an answer to another question, such as an unasked identity or a reordered input, fails as an invalid result."
+    }
+  ],
+  "decisions": [
+    "protocols/workspace/doc/adr/0001-core-owns-identity-providers-own-language.md",
+    "protocols/workspace/doc/adr/0002-lines-are-scopes-registries-by-ecosystem.md",
+    "protocols/workspace/doc/adr/0003-extensions-answer-toolchain-pins.md",
+    "protocols/workspace/doc/adr/0004-extensions-expand-their-input-selectors.md"
+  ]
+}

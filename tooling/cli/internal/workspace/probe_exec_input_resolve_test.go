@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -93,6 +94,7 @@ func inputResolveRequest(extension string) wsproto.InputResolveRequest {
 // The provider returns the answer of every asked input in request order, an
 // error answer included: the caller decides what an error answer fails.
 func TestExecProbeProvider_ResolveInputsRoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-cli-reads-answers-through-the-contract", "the-cli-reads-each-answer")
 	provider := inputResolveHelper(t, "answer", 30*time.Second)
 	result, err := provider.ResolveInputs(inputResolveRequest(provider.Extension))
 	if err != nil {
@@ -112,6 +114,7 @@ func TestExecProbeProvider_ResolveInputsRoundTrip(t *testing.T) {
 // An answer whose inputs are out of request order passes the result's own
 // validation and fails the check against the request.
 func TestExecProbeProvider_ResolveInputsRejectsAnAnswerToAnotherQuestion(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-cli-reads-answers-through-the-contract", "the-cli-refuses-an-answer-the-contract-refuses")
 	provider := inputResolveHelper(t, "reordered", 30*time.Second)
 	_, err := provider.ResolveInputs(inputResolveRequest(provider.Extension))
 	var failure *wsproto.ProbeFailure

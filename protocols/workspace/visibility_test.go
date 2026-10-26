@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestResolveVisibilityClosesOnAnythingButPublic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "visibility-and-distribution-fail-closed", "an-import-boundary-closes-on-anything-but-public")
 	cases := []struct {
 		in   Visibility
 		want Visibility
@@ -27,6 +29,7 @@ func TestResolveVisibilityClosesOnAnythingButPublic(t *testing.T) {
 }
 
 func TestProjectConfigCarriesVisibility(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "visibility-and-distribution-fail-closed", "an-import-boundary-closes-on-anything-but-public")
 	cfg, diags := ParseAndValidateProjectConfig([]byte(`{"name":"x","visibility":"public"}`))
 	if diag.HasErrors(diags) {
 		t.Fatalf("valid visibility rejected: %v", diags)
@@ -42,6 +45,7 @@ func TestProjectConfigCarriesVisibility(t *testing.T) {
 }
 
 func TestVisibilityRoundTripsOmittingTheDefault(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "visibility-and-distribution-fail-closed", "an-import-boundary-closes-on-anything-but-public")
 	encoded, err := json.Marshal(ProjectConfig{Name: "x"})
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +56,7 @@ func TestVisibilityRoundTripsOmittingTheDefault(t *testing.T) {
 }
 
 func TestStrongerDependencySourcePrefersAnImportAndIsOrderIndependent(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "a-merge-prefers-the-import-in-any-order")
 	cases := []struct {
 		a, b DependencySource
 		want DependencySource
@@ -72,6 +77,7 @@ func TestStrongerDependencySourcePrefersAnImportAndIsOrderIndependent(t *testing
 }
 
 func TestDependencySourceClassification(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "an-edge-is-attributed-to-its-manifest-family")
 	if !DependencySourceGoModule.IsImport() || !DependencySourcePackageJSON.IsImport() {
 		t.Error("a go.mod require and a package.json dependency are imports")
 	}
@@ -84,6 +90,7 @@ func TestDependencySourceClassification(t *testing.T) {
 }
 
 func TestNormalizeProbeProjectDropsProvenanceForUnreportedEdges(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "an-edge-is-attributed-to-its-manifest-family")
 	project := ProbeProject{
 		Path:         "./go/framework/http",
 		Dependencies: []string{"./go/framework/app"},
@@ -102,6 +109,7 @@ func TestNormalizeProbeProjectDropsProvenanceForUnreportedEdges(t *testing.T) {
 }
 
 func TestProbeDigestMovesWithEdgeProvenance(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "an-edge-is-attributed-to-its-manifest-family")
 	declared := ProbeProject{
 		Path:              "a",
 		Dependencies:      []string{"b"},
@@ -118,6 +126,7 @@ func TestProbeDigestMovesWithEdgeProvenance(t *testing.T) {
 }
 
 func TestMergeProbeResultsUnionsEdgeProvenanceOrderIndependently(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "a-merge-prefers-the-import-in-any-order")
 	goResult := ProbeResult{
 		Version:   ProbeProtocolVersion,
 		Extension: "@putnami/go",
@@ -153,6 +162,7 @@ func TestMergeProbeResultsUnionsEdgeProvenanceOrderIndependently(t *testing.T) {
 }
 
 func TestMergeProbeResultsLeavesDeclaredEdgesWithoutProvenance(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "a-merge-prefers-the-import-in-any-order")
 	result := ProbeResult{
 		Version:   ProbeProtocolVersion,
 		Extension: "@putnami/go",
@@ -173,6 +183,7 @@ func TestMergeProbeResultsLeavesDeclaredEdgesWithoutProvenance(t *testing.T) {
 // The distribution level is a separate field from the import boundary, and it
 // fails closed: an empty block and an unknown level are both errors.
 func TestProjectConfigCarriesDistributionVisibility(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "visibility-and-distribution-fail-closed", "a-distribution-level-fails-closed")
 	cfg, diags := ParseAndValidateProjectConfig([]byte(`{"name":"x","visibility":"scope","distribution":{"visibility":"public"}}`))
 	if diag.HasErrors(diags) {
 		t.Fatalf("valid distribution level rejected: %v", diags)

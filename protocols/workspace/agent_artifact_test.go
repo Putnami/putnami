@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestAgentArtifactManifestCanonicalBytesAreDeterministicAndNonMutating(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-agent-artifact-manifest-is-strict", "canonical-bytes-are-deterministic-and-non-mutating")
 	manifest := &AgentArtifactManifest{
 		ProtocolVersion: AgentArtifactManifestProtocolVersion,
 		Name:            "@putnami/agent-workflows",
@@ -58,6 +60,7 @@ func TestAgentArtifactManifestCanonicalBytesAreDeterministicAndNonMutating(t *te
 }
 
 func TestAgentArtifactManifestRejectsUnsafeOrAmbiguousFiles(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-agent-artifact-manifest-is-strict", "unsafe-or-ambiguous-files-are-refused")
 	tests := []struct {
 		name string
 		data string
@@ -88,6 +91,7 @@ func TestAgentArtifactManifestRejectsUnsafeOrAmbiguousFiles(t *testing.T) {
 // function, so a relaxed rule here fails both this test and the manifest
 // rejection tests above rather than silently widening one consumer.
 func TestValidAgentArtifactPathIsTheSingleRule(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-agent-artifact-manifest-is-strict", "unsafe-or-ambiguous-files-are-refused")
 	accepted := []string{
 		".agents/skills/fix/SKILL.md",
 		".agents/skills/fix/scripts/finalize-pr.sh",

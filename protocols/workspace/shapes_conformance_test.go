@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The base conformance_test.go covers only the workspace Config shape. This file
@@ -51,6 +52,7 @@ func runShapeConformance(t *testing.T, shape string, parse shapeParser) {
 }
 
 func TestConformance_ProjectConfigFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "project", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateProjectConfig(b)
 		return d
@@ -58,6 +60,7 @@ func TestConformance_ProjectConfigFixtures(t *testing.T) {
 }
 
 func TestConformance_ScopeConfigFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "scope", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateScopeConfig(b)
 		return d
@@ -65,6 +68,7 @@ func TestConformance_ScopeConfigFixtures(t *testing.T) {
 }
 
 func TestConformance_LockFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "lock", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateLock(b)
 		return d
@@ -72,6 +76,7 @@ func TestConformance_LockFixtures(t *testing.T) {
 }
 
 func TestConformance_AgentArtifactFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "agent-artifact", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateAgentArtifactManifest(b)
 		return d

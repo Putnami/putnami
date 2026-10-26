@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestInvalidFixtureCoverage pins that the newly-corpus'd shapes' acute reject
@@ -16,6 +17,7 @@ import (
 // A case that names a field also pins where the code fires, for a fixture
 // whose rule shares its code with other rules of the same shape.
 func TestInvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-guarded-reject-branch-has-a-fixture")
 	lock := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateLock(b); return d }
 	resolveRequest := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateToolchainResolveRequest(b); return d }
 	resolveResult := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateToolchainResolveResult(b); return d }

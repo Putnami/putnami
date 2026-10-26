@@ -1,12 +1,17 @@
 package workspace
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 // TestSelectsPath pins the grammar both readers of `filePatterns` share: the
 // build cache's file hasher and `--impacted`'s project selection. The cases
 // below are the forms real declarations use — an input under the project root,
 // one reaching outside it with "../", a recursive "**", and an exclusion.
 func TestSelectsPath(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	patterns := []string{
 		"doc/**", "internal/cli/testdata/**", "**/*.go", "!**/*_test.go",
 		"putnami.json", "../../**/putnami.json", "../../LICENSE.md", "../../.github/**",
@@ -40,6 +45,7 @@ func TestSelectsPath(t *testing.T) {
 // lists "..". Only a literal ".." reaches outside the project root. A "git:"
 // include and an exclusion keep matching ".." with a wildcard.
 func TestSelectsPath_OrdinaryWildcardStaysInsideItsRoot(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	for _, testCase := range []struct {
 		rel      string
 		patterns []string
@@ -74,6 +80,7 @@ func TestSelectsPath_OrdinaryWildcardStaysInsideItsRoot(t *testing.T) {
 // about a directory: answering true for an arbitrary path would make every
 // project a reader of every file under --impacted.
 func TestSelectsPath_EmptyPatternSetSelectsNothing(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	if SelectsPath("src/main.go", nil) {
 		t.Error("SelectsPath with no patterns = true, want false")
 	}
@@ -83,6 +90,7 @@ func TestSelectsPath_EmptyPatternSetSelectsNothing(t *testing.T) {
 }
 
 func TestSplitFilePatterns(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	includes, excludes := SplitFilePatterns([]string{"src/**", "!src/gen/**", "doc/*.md"})
 	if len(includes) != 2 || includes[0] != "src/**" || includes[1] != "doc/*.md" {
 		t.Errorf("includes = %v, want [src/** doc/*.md]", includes)
@@ -93,6 +101,7 @@ func TestSplitFilePatterns(t *testing.T) {
 }
 
 func TestGitCandidatePatternsUseTheSamePathGrammar(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	for _, path := range []string{"own.go", "../clientgen-extension/doc/new.md", "../../README.md", "../../deleted.txt"} {
 		if !SelectsPath(path, []string{"git:**"}) {
 			t.Errorf("Git candidate input did not select %q", path)
@@ -108,6 +117,7 @@ func TestGitCandidatePatternsUseTheSamePathGrammar(t *testing.T) {
 // "../../**/putnami.json" select a manifest sitting directly at the workspace
 // root and not only ones nested under a directory.
 func TestMatchFilePattern_DoubleStarMatchesZeroSegments(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	for _, testCase := range []struct {
 		rel, pattern string
 		want         bool
@@ -132,6 +142,7 @@ func TestMatchFilePattern_DoubleStarMatchesZeroSegments(t *testing.T) {
 // there: each covered tree below is checked against paths written beneath it,
 // and each uncovered one names a path the exclusions leave selected.
 func TestExcludesTree(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
 	excludes := []string{"**/.gen/**", "!ignored", "**/*_test.go", "build/out/**", "../shared/**"}
 	for _, testCase := range []struct {
 		rel     string

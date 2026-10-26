@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The fixture-provider conformance suite.
@@ -118,6 +119,7 @@ func runProbeProviderConformance(t *testing.T, provider probeProvider) {
 }
 
 func TestConformance_ProbeFixtureProviders(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "fixture-providers-replay-the-corpus")
 	files, err := filepath.Glob("fixtures/probe/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -135,6 +137,7 @@ func TestConformance_ProbeFixtureProviders(t *testing.T) {
 // A provider whose fixture is one of the invalid corpus entries must be
 // REJECTED by the same suite. Without this, the suite above could be vacuous.
 func TestConformance_ProbeFixtureProvidersRejectInvalid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "fixture-providers-replay-the-corpus")
 	files, err := filepath.Glob("fixtures/probe/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -160,6 +163,7 @@ func TestConformance_ProbeFixtureProvidersRejectInvalid(t *testing.T) {
 // A provider must refuse a request it cannot understand rather than answering
 // a question it did not parse.
 func TestConformance_ProbeProviderRejectsUnsupportedRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "fixture-providers-replay-the-corpus")
 	provider := loadFixtureProvider(t, "fixtures/probe/valid/minimal.json")
 	_, err := provider.Probe(ProbeRequest{Version: 99, Extension: provider.Name()})
 	if err == nil {
@@ -176,6 +180,7 @@ func TestConformance_ProbeProviderRejectsUnsupportedRequest(t *testing.T) {
 }
 
 func TestConformance_ProbeResultFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "probe", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateProbeResult(b)
 		return d
@@ -183,6 +188,7 @@ func TestConformance_ProbeResultFixtures(t *testing.T) {
 }
 
 func TestConformance_ProbeRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "probe-request", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateProbeRequest(b)
 		return d
@@ -190,30 +196,35 @@ func TestConformance_ProbeRequestFixtures(t *testing.T) {
 }
 
 func TestDrift_ProbeResult(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ProbeResult",
 		jsonSchemaProperties(t, "schemas/probe.json"),
 		goTypeJSONFields(t, ProbeResult{}))
 }
 
 func TestDrift_ProbeRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ProbeRequest",
 		jsonSchemaDefinitionProperties(t, "schemas/probe.json", "probeRequest"),
 		goTypeJSONFields(t, ProbeRequest{}))
 }
 
 func TestDrift_ProbeProject(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ProbeProject",
 		jsonSchemaDefinitionProperties(t, "schemas/probe.json", "probeProject"),
 		goTypeJSONFields(t, ProbeProject{}))
 }
 
 func TestDrift_MergedProject(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "MergedProject",
 		jsonSchemaDefinitionProperties(t, "schemas/probe.json", "mergedProject"),
 		goTypeJSONFields(t, MergedProject{}))
 }
 
 func TestDrift_ProbeFailure(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ProbeFailure",
 		jsonSchemaDefinitionProperties(t, "schemas/probe.json", "probeFailure"),
 		goTypeJSONFields(t, ProbeFailure{}))

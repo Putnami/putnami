@@ -9,9 +9,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestIsInputResolveInvocationMatchesOnlyTheReservedCall(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	cases := []struct {
 		name string
 		args []string
@@ -38,6 +41,7 @@ func TestIsInputResolveInvocationMatchesOnlyTheReservedCall(t *testing.T) {
 }
 
 func TestInputResolveControlArgsIsTheSpawnShape(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	args := InputResolveControlArgs()
 	if !IsInputResolveInvocation(args) {
 		t.Fatalf("InputResolveControlArgs() = %q, which IsInputResolveInvocation rejects", args)
@@ -61,6 +65,7 @@ func encodedInputResolveRequest(t *testing.T) *bytes.Buffer {
 }
 
 func TestServeInputResolveRoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	var seen InputResolveRequest
 	var stdout bytes.Buffer
 	handled, err := ServeInputResolve(InputResolveControlArgs(), encodedInputResolveRequest(t), &stdout,
@@ -94,6 +99,7 @@ func TestServeInputResolveRoundTrip(t *testing.T) {
 }
 
 func TestServeInputResolveDeclinesOtherInvocations(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	for _, args := range [][]string{{"build"}, ProbeControlArgs(), ToolchainResolveControlArgs()} {
 		var stdout bytes.Buffer
 		handled, err := ServeInputResolve(args, strings.NewReader(""), &stdout,
@@ -111,6 +117,7 @@ func TestServeInputResolveDeclinesOtherInvocations(t *testing.T) {
 }
 
 func TestServeInputResolveRequiresAnAnswerFunction(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var stdout bytes.Buffer
 	handled, err := ServeInputResolve(InputResolveControlArgs(), encodedInputResolveRequest(t), &stdout, nil)
 	if !handled || err == nil {
@@ -122,6 +129,7 @@ func TestServeInputResolveRequiresAnAnswerFunction(t *testing.T) {
 }
 
 func TestServeInputResolveRejectsAnUnreadableRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	// A member this protocol version does not know, a request the contract
 	// rejects, and a document followed by log output are each a question the
 	// extension cannot fully read.
@@ -155,6 +163,7 @@ func TestServeInputResolveRejectsAnUnreadableRequest(t *testing.T) {
 }
 
 func TestServeInputResolveWritesNothingWhenTheAnswerFails(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var stdout bytes.Buffer
 	sentinel := errors.New("go list failed")
 	handled, err := ServeInputResolve(InputResolveControlArgs(), encodedInputResolveRequest(t), &stdout,
@@ -172,6 +181,7 @@ func TestServeInputResolveWritesNothingWhenTheAnswerFails(t *testing.T) {
 // An answer the core would reject is rejected on the extension's side, before
 // a byte reaches stdout.
 func TestServeInputResolveRejectsAnAnswerTheContractRejects(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	cases := map[string]func(*InputResolveResult){
 		"other extension":    func(r *InputResolveResult) { r.Extension = "@putnami/typescript" },
 		"an input left out":  func(r *InputResolveResult) { r.Inputs = r.Inputs[:2] },
@@ -213,6 +223,7 @@ func TestServeInputResolveRejectsAnAnswerTheContractRejects(t *testing.T) {
 // The answer function receives a copy: editing it cannot change the question
 // its answer is checked against.
 func TestServeInputResolveChecksTheAnswerAgainstTheCoreRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var stdout bytes.Buffer
 	handled, err := ServeInputResolve(InputResolveControlArgs(), encodedInputResolveRequest(t), &stdout,
 		func(r InputResolveRequest) (InputResolveResult, error) {
@@ -231,6 +242,7 @@ func TestServeInputResolveChecksTheAnswerAgainstTheCoreRequest(t *testing.T) {
 }
 
 func TestDecodeInputResolveDocumentRejectsTrailingEmptyAndOversized(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	for name, input := range map[string][]byte{
 		"trailing data": []byte(`{"version":1,"extension":"x"}` + "\ninfo: done\n"),
 		"empty":         []byte("   \n"),
@@ -251,6 +263,7 @@ func TestDecodeInputResolveDocumentRejectsTrailingEmptyAndOversized(t *testing.T
 // The core stamps the wire version and keeps its order: the answer follows
 // the request position by position.
 func TestEncodeInputResolveRequestStampsAndKeepsOrder(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	request := validInputResolveRequest()
 	request.Version = 99
 	slices.Reverse(request.Inputs)
@@ -272,6 +285,7 @@ func TestEncodeInputResolveRequestStampsAndKeepsOrder(t *testing.T) {
 }
 
 func TestEncodeInputResolveRequestRejectsAnInvalidRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	request := validInputResolveRequest()
 	request.Inputs[0].Selector = "git:**"
 	var buf bytes.Buffer
@@ -286,6 +300,7 @@ func TestEncodeInputResolveRequestRejectsAnInvalidRequest(t *testing.T) {
 
 // The exchange is byte-stable: one answer produces one document.
 func TestServeInputResolveIsByteStable(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	rendered := make([]string, 0, 2)
 	for i := 0; i < 2; i++ {
 		var stdout bytes.Buffer

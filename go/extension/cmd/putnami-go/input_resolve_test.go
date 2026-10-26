@@ -109,6 +109,7 @@ func TestRunEntrypointAnswersInputResolve(t *testing.T) {
 // A request addressed to another extension is refused, and stdout stays
 // empty.
 func TestHandleInputResolve_RefusesAMisroutedRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-go-extension-refuses-a-misrouted-request")
 	request := inputResolveWorkspace(t)
 	request.Extension = "@putnami/typescript"
 	var stdin, stdout bytes.Buffer
@@ -125,6 +126,7 @@ func TestHandleInputResolve_RefusesAMisroutedRequest(t *testing.T) {
 }
 
 func TestHandleInputResolve_DeclinesOrdinarySubcommands(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-go-extension-refuses-a-misrouted-request")
 	handled, err := handleInputResolve([]string{"build"}, &bytes.Buffer{}, &bytes.Buffer{})
 	if handled || err != nil {
 		t.Fatalf("handleInputResolve(build) = (%v, %v), want (false, nil)", handled, err)

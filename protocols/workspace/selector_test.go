@@ -1,8 +1,13 @@
 package workspace
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestParseSelector(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "a-selector-has-four-kinds-and-round-trips")
 	cases := []struct {
 		raw     string
 		kind    SelectorKind

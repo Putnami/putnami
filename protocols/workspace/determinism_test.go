@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestValidateWorkspaceConfig_Deterministic verifies that ValidateWorkspaceConfig
 // produces diagnostics in a consistent order for maps with multiple entries.
 func TestValidateWorkspaceConfig_Deterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "diagnostics-and-names-come-in-one-order")
 	c := &Config{
 		Name: "ws",
 		Hooks: &HooksConfig{
@@ -42,6 +44,7 @@ func TestValidateWorkspaceConfig_Deterministic(t *testing.T) {
 // Go randomizes map iteration, so the sort in the validator is the only thing
 // standing between a five-job config and five different diagnostic orderings.
 func TestValidateProjectConfig_Deterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "diagnostics-and-names-come-in-one-order")
 	c := &ProjectConfig{
 		Name: "p",
 		Jobs: map[string]json.RawMessage{
@@ -79,6 +82,7 @@ func TestValidateProjectConfig_Deterministic(t *testing.T) {
 // TestExtensionsConfig_Names_Deterministic verifies that Names() returns
 // sorted extension names regardless of map iteration order.
 func TestExtensionsConfig_Names_Deterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "diagnostics-and-names-come-in-one-order")
 	cfg := ExtensionsConfig{
 		List: map[string]string{
 			"@putnami/go":         "^1.0",
@@ -108,6 +112,7 @@ func TestExtensionsConfig_Names_Deterministic(t *testing.T) {
 // TestScopeConfig_ResolveNamePattern_Deterministic verifies deterministic
 // channel iteration in ResolveNamePattern.
 func TestScopeConfig_ResolveNamePattern_Deterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "diagnostics-and-names-come-in-one-order")
 	sc := &ScopeConfig{
 		PublishConfig: map[string]map[string]any{
 			"npm":    {"namePattern": "@putnami/{name}"},

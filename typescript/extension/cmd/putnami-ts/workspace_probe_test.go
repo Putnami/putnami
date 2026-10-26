@@ -645,6 +645,7 @@ func TestProbe_IsDeterministicAcrossRunsAndRequestOrder(t *testing.T) {
 // The reserved control call is what core actually spawns; it must be handled
 // before ordinary subcommand dispatch and must decline everything else.
 func TestHandleWorkspaceProbe_ServesTheReservedInvocation(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-typescript-extension-answers-the-probe")
 	root := probeFixture(t)
 	t.Chdir(root)
 
@@ -672,6 +673,7 @@ func TestHandleWorkspaceProbe_ServesTheReservedInvocation(t *testing.T) {
 }
 
 func TestHandleWorkspaceProbe_DeclinesOrdinarySubcommands(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-typescript-extension-answers-the-probe")
 	handled, err := handleWorkspaceProbe([]string{"build"})
 	if handled || err != nil {
 		t.Fatalf("handleWorkspaceProbe(build) = (%v, %v), want (false, nil)", handled, err)

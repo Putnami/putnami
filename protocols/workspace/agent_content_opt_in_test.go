@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // contract4AgentArtifactReference is how a CLI released at contract 4 reads
@@ -46,6 +48,7 @@ func contract4InstallPin(lock *Lock, name string) error {
 // CLI's install stops with the message below and writes nothing: it never
 // installs the workspace without its content, and never picks a version.
 func TestAgentContentOptIn_OlderReaderFailsClosed(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-agent-artifact-manifest-is-strict", "an-older-reader-fails-closed-on-the-opt-in")
 	cfg, diags := ParseWorkspaceConfig([]byte(`{"name":"consumer","agentArtifacts":["extension:@putnami/contributor"]}`))
 	if diags != nil {
 		t.Fatalf("the migrated workspace document does not parse: %v", diags)

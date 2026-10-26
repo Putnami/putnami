@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -75,6 +76,7 @@ func helperProvider(t *testing.T, mode string) *ExecProbeProvider {
 }
 
 func TestExecProbeProvider_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-cli-reads-answers-through-the-contract", "the-cli-reads-each-answer")
 	provider := helperProvider(t, "answer")
 	result, err := provider.Probe(wsproto.ProbeRequest{
 		Version: wsproto.ProbeProtocolVersion, Extension: provider.Extension, Paths: []string{"web"},
@@ -109,6 +111,7 @@ func TestExecProbeProvider_NonZeroExitCarriesProviderStderr(t *testing.T) {
 }
 
 func TestExecProbeProvider_RejectsAProviderThatLogsToStdout(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-cli-reads-answers-through-the-contract", "the-cli-refuses-an-answer-the-contract-refuses")
 	provider := helperProvider(t, "chatty")
 	_, err := provider.Probe(wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: provider.Extension})
 	if err == nil {

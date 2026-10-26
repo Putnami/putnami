@@ -15,6 +15,7 @@ import (
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	workspaceproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
@@ -230,6 +231,7 @@ func TestArchiveIntentFollowsCommandOptionPrecedence(t *testing.T) {
 }
 
 func TestCloudWorkspaceProbeTransportIsReservedStrictAndBounded(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-cloud-extension-answers-the-probe")
 	root := t.TempDir()
 	writeArchiveProbeProject(t, root, ".", "@putnami/cloud")
 	request := workspaceproto.ProbeRequest{

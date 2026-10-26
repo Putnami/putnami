@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -186,6 +188,7 @@ func TestProbe_RefusesPathsOutsideTheWorkspace(t *testing.T) {
 
 // The reserved control call must answer on stdout and claim only its own argv.
 func TestHandleWorkspaceProbe_ServesTheControlCall(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-python-extension-answers-the-probe")
 	root := probeWorkspace(t)
 	t.Chdir(root)
 
@@ -203,9 +206,9 @@ func TestHandleWorkspaceProbe_ServesTheControlCall(t *testing.T) {
 	if !handled || err != nil {
 		t.Fatalf("handleWorkspaceProbe handled=%t err=%v", handled, err)
 	}
-	var result wsproto.ProbeResult
-	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &result); err != nil {
-		t.Fatalf("decode answer %q: %v", stdout.String(), err)
+	result, diags := wsproto.ParseAndValidateProbeResult(stdout.Bytes())
+	if result == nil || diag.HasErrors(diags) {
+		t.Fatalf("stdout does not carry a conformant result: %v\n%s", diags, stdout.String())
 	}
 	if result.Extension != pythonExtensionName || len(result.Projects) != 1 {
 		t.Fatalf("answer = %+v, want one project attributed to %s", result, pythonExtensionName)
