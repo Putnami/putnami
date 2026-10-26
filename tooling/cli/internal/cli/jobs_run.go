@@ -49,9 +49,13 @@ func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wspro
 		req.ServeProcessEnv = env
 	}
 	// A supervised serve run's supervisor stops it and reports the stop, so the
-	// first signal prints no interrupt notice on its serve log.
+	// first signal prints no interrupt notice on its serve log. A supervisor
+	// killed outright stops it too: the run watches it.
 	if engine.SupervisedServe(&parsed.Global) {
 		abort.Supervise()
+		var stopWatch context.CancelFunc
+		ctx, stopWatch = abort.WatchSupervisor(ctx)
+		defer stopWatch()
 	}
 	req.HostedRemoteCache = hostedCache
 	req.HostedReporters = hostedReporters

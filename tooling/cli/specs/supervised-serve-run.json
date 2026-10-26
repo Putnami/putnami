@@ -36,6 +36,10 @@
     {
       "id": "an-ephemeral-port-waits-on-the-announced-port",
       "text": "Under watch, a serve run with --port 0 waits between restarts on the port of the last ready claim that announced one, the first http or https endpoint, else the first endpoint; before any claim it waits on nothing. A pinned port waits on that port and a run without a port parameter on the default port, and neither consults a claim."
+    },
+    {
+      "id": "a-lost-supervisor-stops-the-run",
+      "text": "On Unix, a supervised serve run watches the process that started it, read at its start. Once that process exits, killed outright or not, the run cancels as SIGTERM cancels it, without a signal's forced exit: it stops its serve step and exits, watched or not, and records a supervisor's stop. Once the run plans, a write to a stdout or stderr whose reader is gone fails instead of ending it. On Windows, putnami's Job Object ends the supervisor's tree, the run included."
     }
   ]
 }

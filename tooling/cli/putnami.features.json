@@ -4283,6 +4283,19 @@
               "the-release-wait-reads-the-announced-port"
             ]
           }
+        },
+        {
+          "id": "a-lost-supervisor-stops-the-run",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-changed-parent-pid-cancels-the-run",
+              "a-supervisor-lost-before-the-watch-cancels-the-run",
+              "a-killed-supervisor-stops-the-serve-step"
+            ]
+          }
         }
       ]
     }

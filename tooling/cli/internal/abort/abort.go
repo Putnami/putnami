@@ -45,9 +45,10 @@ func Source() string {
 	return ""
 }
 
-// Reset clears the recorded source and the supervision record (Supervise), so
-// a test starts from a clean slate.
+// Reset clears the recorded source, the supervision record (Supervise) and the
+// noted parent (NoteParent), so a test starts from a clean slate.
 func Reset() {
 	source.Store(nil)
 	supervised.Store(false)
+	startParent.Store(0)
 }
