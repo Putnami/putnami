@@ -107,6 +107,7 @@ const STREAM_MODE_POLICY_CASES = new Set([
   'stream-sequence.failure-reserve-is-not-reclaimed',
   'stream-sequence.normal-elides-every-test-case',
   'stream-sequence.verbose-admits-every-test-case',
+  'stream-sequence.ready-claim-uses-the-reserve',
 ]);
 
 function corpusBinding(id: string): { feature: string; requirement: string; check: string } {

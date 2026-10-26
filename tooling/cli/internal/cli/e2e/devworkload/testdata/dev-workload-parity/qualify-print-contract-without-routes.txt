@@ -1,0 +1,6 @@
+exit 0
+--- stdout ---
+contract: /provider (sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945)
+requests: 0
+unsupported: no_route_inventory — /provider has no route inventory at schema/http-routes.json or .gen/schema/http-routes.json; run `putnami build --projects /provider` to produce it
+--- stderr ---

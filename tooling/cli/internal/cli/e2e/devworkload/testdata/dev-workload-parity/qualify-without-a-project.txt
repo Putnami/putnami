@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: qualify takes exactly one project: putnami qualify <project> --target <local|url>

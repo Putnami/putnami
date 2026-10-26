@@ -2,11 +2,14 @@ package cli
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // workloadExtensions is one loaded extension whose commands declare the given
@@ -62,6 +65,37 @@ func TestAHostedRunRefusesToWatch(t *testing.T) {
 		}
 		if code := exitCodeForError(err); code != ExitUsage {
 			t.Errorf("%s: exit code %d, want %d", name, code, ExitUsage)
+		}
+	}
+}
+
+// A hosted `putnami qualify <workload> --target <url>` is refused before
+// anything starts, as every extension command group is on a hosted run: a
+// usage error that names the group and says how to run it, without
+// --credential-fd, from a job that is not a hosted run. The same invocation
+// without the run credential is not refused.
+func TestAHostedRunRefusesQualifyWithTheRemedy(t *testing.T) {
+	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "no-credential-after-repository-code")
+	groups := map[string]bool{"qualify": true}
+	parsed := ParseArgs([]string{"qualify", "/apps/web", "--target", "https://pr-1.example"}, nil, groups)
+	if parsed.Err != nil || len(parsed.Commands) == 0 || parsed.Commands[0] != "qualify" {
+		t.Fatalf("parse = %+v, %v; want the qualify group", parsed.Commands, parsed.Err)
+	}
+	if err := resolveCommandCacheTrust(&parsed.Global, nil, nil, parsed.Commands, groups); err != nil {
+		t.Fatalf("a local qualify was refused: %v", err)
+	}
+
+	defer runcredential.SetForTest("run-bearer")()
+	err := resolveCommandCacheTrust(&parsed.Global, nil, nil, parsed.Commands, groups)
+	if !errors.Is(err, ErrHostedExtensionCommand) || !errors.Is(err, cmderr.ErrUsage) {
+		t.Fatalf("hosted qualify = %v, want the usage error ErrHostedExtensionCommand", err)
+	}
+	if code := exitCodeForError(err); code != ExitUsage {
+		t.Errorf("hosted qualify exit code %d, want %d", code, ExitUsage)
+	}
+	for _, want := range []string{"putnami qualify: ", "run the extension command without " + runcredential.Flag + ", from a job that is not a hosted run"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("hosted qualify refusal %q lacks %q", err, want)
 		}
 	}
 }

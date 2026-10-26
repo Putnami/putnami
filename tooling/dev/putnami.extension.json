@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/dev",
-  "cliContract": 11,
+  "cliContract": 15,
   "runtime": {
     "executable": "compiled/putnami-dev",
     "toolchains": {
@@ -105,6 +105,64 @@
           ]
         }
       }
+    },
+    "compose": {
+      "description": "Serve a workload with the workloads it runs with.",
+      "default": "up",
+      "subcommands": {
+        "up": {
+          "description": "Serve the project with the transitive closure of its runsWith workloads, until interrupted.",
+          "command": "compose-up",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "project",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami compose @example/go-items-consumer",
+              "description": "Serve the consumer with the provider it runs with"
+            },
+            {
+              "command": "putnami compose /typescript/samples/06-database --port 0 --output=json",
+              "description": "Serve on an ephemeral port and print the start and exit documents"
+            }
+          ]
+        }
+      }
+    },
+    "qualify": {
+      "description": "Run a workload's derived smoke contract against a target and emit one verdict.",
+      "default": "run",
+      "subcommands": {
+        "run": {
+          "description": "Derive the project's smoke contract, run it against --target and print one fail-closed verdict.",
+          "command": "qualify-run",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "project",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami qualify /go/samples/migrations-feature --target local",
+              "description": "Compose the workload on this machine and qualify the worktree"
+            },
+            {
+              "command": "putnami qualify @example/06-database --target https://pr-123.preview.example --expect-sha 3cc91b658",
+              "description": "Qualify a deployment that must report the given sha"
+            },
+            {
+              "command": "putnami qualify /go/samples/migrations-feature --print-contract --output=json",
+              "description": "Print the derived contract without a target"
+            }
+          ]
+        }
+      }
     }
   },
   "commands": {
@@ -155,6 +213,77 @@
           "task": "version-tag"
         }
       ]
+    },
+    "compose-up": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Start the selected workload and the transitive closure of its runsWith projects in one invocation, each as a serve run of putnami. Every process binds an ephemeral port and answers behind a local reverse proxy whose URL stays stable across restarts; dependency URLs travel through the clients config block and databases declared in infra/requirements.json are provisioned per composition. Dependencies run production-mode without watch; the target watches by default. Stops every owned process, proxy and database on exit; the next invocation reaps what an ungraceful death left behind. --output=json or jsonl prints the start and exit documents as result envelopes.",
+      "traits": {
+        "workload": "serve"
+      },
+      "flags": {
+        "port": {
+          "type": "number",
+          "description": "Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port."
+        },
+        "watch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Watch the target; --no-watch runs it production-mode without watch, like its dependencies."
+        },
+        "ready-timeout": {
+          "type": "string",
+          "description": "Deadline for each member's typed ready event, as a Go duration; default 60s."
+        }
+      },
+      "run": [
+        {
+          "id": "up",
+          "task": "compose-up"
+        }
+      ]
+    },
+    "qualify-run": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Derive the smoke contract from the workload's route inventory, execute it against --target (local composes the workload with compose; a URL is any deployed environment), and print one verdict bound to the tested tree or to the deployed sha. Fails closed: unsupported, not_run, timed_out, canceled, target_unreachable, digest_mismatch and composition_failed are distinct from passed and exit 1; an invalid invocation exits 2.",
+      "traits": {
+        "workload": "once"
+      },
+      "flags": {
+        "target": {
+          "type": "string",
+          "description": "local composes the workload on this machine; an http(s) URL is a running deployment."
+        },
+        "expect-sha": {
+          "type": "string",
+          "description": "Required with a URL target: the git sha the deployment must report on /version."
+        },
+        "platform-prefix": {
+          "type": "string",
+          "description": "Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root."
+        },
+        "ready-timeout": {
+          "type": "string",
+          "description": "Deadline for readiness, as a Go duration; default 60s."
+        },
+        "request-timeout": {
+          "type": "string",
+          "description": "Deadline per smoke request, as a Go duration; default 5s."
+        },
+        "print-contract": {
+          "type": "boolean",
+          "description": "Print the derived contract and exit without a target."
+        }
+      },
+      "run": [
+        {
+          "id": "run",
+          "task": "qualify-run"
+        }
+      ]
     }
   },
   "tasks": {
@@ -181,6 +310,30 @@
       "cache": false,
       "description": "Release one version line.",
       "timeoutMs": 600000
+    },
+    "compose-up": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "compose",
+        "up"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Serve a workload with the workloads it runs with.",
+      "timeoutMs": -1
+    },
+    "qualify-run": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "qualify",
+        "run"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Qualify a workload against a target.",
+      "timeoutMs": -1
     }
   },
   "verbs": [

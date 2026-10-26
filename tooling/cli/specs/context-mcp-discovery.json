@@ -46,7 +46,7 @@
     },
     {
       "id": "mcp-side-effect-boundary",
-      "text": "MCP exposes one workspace-mutating tool for job execution, supports a no-execution dry run, and refuses blocking or externally mutating jobs."
+      "text": "MCP exposes one workspace-mutating tool for job execution, supports a no-execution dry run, and refuses blocking or externally mutating jobs. It also refuses a command whose traits declare a workload and that the loaded extensions carry only under interactive subcommands, and names the subcommand to type in a terminal; a command without a workload runs as a planned job however its subcommands dispatch."
     },
     {
       "id": "read-preparation",

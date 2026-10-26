@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --expect-sha binds a URL target to a deployed build; a local target binds its verdict to the worktree fingerprint instead, so drop --expect-sha

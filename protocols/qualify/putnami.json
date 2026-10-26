@@ -17,6 +17,6 @@
     }
   },
   "featureAuthority": {
-    "owner": "cli/workload-qualification"
+    "owner": "tooling/workload-qualification"
   }
 }

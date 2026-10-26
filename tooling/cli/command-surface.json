@@ -116,6 +116,10 @@
       "type": "bool"
     },
     {
+      "long": "--serve-env",
+      "type": "value"
+    },
+    {
       "long": "--tag",
       "type": "value"
     },
@@ -225,29 +229,6 @@
       "path": "completion zsh",
       "flags": [],
       "positionals": []
-    },
-    {
-      "path": "compose",
-      "flags": [
-        {
-          "long": "--no-watch",
-          "type": "bool"
-        },
-        {
-          "long": "--port",
-          "type": "value"
-        },
-        {
-          "long": "--ready-timeout",
-          "type": "value"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "project",
-          "required": true
-        }
-      ]
     },
     {
       "path": "config",
@@ -624,41 +605,6 @@
         },
         {
           "name": "tag",
-          "required": true
-        }
-      ]
-    },
-    {
-      "path": "qualify",
-      "flags": [
-        {
-          "long": "--expect-sha",
-          "type": "value"
-        },
-        {
-          "long": "--platform-prefix",
-          "type": "value"
-        },
-        {
-          "long": "--print-contract",
-          "type": "bool"
-        },
-        {
-          "long": "--ready-timeout",
-          "type": "value"
-        },
-        {
-          "long": "--request-timeout",
-          "type": "value"
-        },
-        {
-          "long": "--target",
-          "type": "value"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "project",
           "required": true
         }
       ]

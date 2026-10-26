@@ -301,7 +301,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        257,
+		want:        256,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -429,14 +429,25 @@ var structuralPins = []structuralPin{
 			"The final change raises 254→255 for testCasesOf in cli-model/jobs/result_model.go: a test task hands its per-case results to the CLI in the result's untyped data bag, beside testSummary, and this is the one decode that turns them into typed protocolcli.TestCase values. " +
 			"A later change raises 255→256 for jobs.keyInputs, and the line is the ONE payload this pin already names as untypable on one more hop of the path it already travels: the key-movement analysis hands the command params map to keyFilePatterns, exactly as the cache key, the mutation detector and the portable admission do, so the region it bounds is the region the key hashes. Nothing decodes, stores or forwards a new untyped document. " +
 			"A later change takes the count from 255 back to 256, under this ceiling, for jobs.RawJobEvent.RecordPayload: its signature and the one copy it makes to fold an event's type, level and message into the task:event payload, which already was this untyped map. It deletes the inline fold's own make in retainedJobEvents.add. " +
-			"A later change raises 256→257, net of the deleted Go steps of create and deps: lifecycle.setUpProject and lifecycle.runDepsEdit hand the project-setup and deps-edit jobs of an extension their params in the existing untyped params bag of WorkspaceJobRequest, two lines for the project-setup params and the deps-edit params, which the job context carries as every job's params. Each deps-edit entry is a typed struct",
+			"A later change raises 256→257, net of the deleted Go steps of create and deps: lifecycle.setUpProject and lifecycle.runDepsEdit hand the project-setup and deps-edit jobs of an extension their params in the existing untyped params bag of WorkspaceJobRequest, two lines for the project-setup params and the deps-edit params, which the job context carries as every job's params. Each deps-edit entry is a typed struct. " +
+			"A later change raises 257→258 for jobs/scheduler/runner.go announceProcessGroup (cli/supervised-serve-run): the runner states a serve-workload step's process group and its leader's start time in the existing untyped RawJobEvent.Data payload every task event already carries, which the machine renderer copies into the task:event record. Nothing decodes it. " +
+			"A later change lowers 258→256 (cli/workload-qualification): compose requests each member as a serve run " +
+			"of the CLI, which deletes scheduler.RunJobWithProcessEnv's two lines and compose's serveParams; its one new " +
+			"line is compose's memberRuntime.observeEvent, which reads a task:event record's Event, the payload " +
+			"protocols/cli types as an untyped map, and hands a readiness claim on as a typed runtimeproto.ReadyData. " +
+			"A later change lowers 256→255 (ADR 0079): compose and qualify move to @putnami/dev, which deletes " +
+			"compose's memberRuntime.observeEvent line with internal/compose. " +
+			"A later change raises 255→256 for cli.addOutputGlobalParams (tooling/workload-qualification): the " +
+			"interactive launch writes the typed --verbose, --quiet and --color globals into the params map this pin " +
+			"already names as untypable, at a named seam the planned path never calls, so no cache key moves. Nothing " +
+			"decodes, stores or forwards a new untyped document",
 	},
 	{
 		name:        "test lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       testFiles,
 		ceilingOnly: true,
-		want:        655,
+		want:        660,
 		why: "test fixtures built from untyped maps; they shrink as the canonical model lands. " +
 			"A0 pinned 516; A2b's scheduler and profiler tests now assert against typed records. " +
 			"An earlier change took it from 513 to 515: the two auto-selection tests that used to call " +
@@ -583,14 +594,33 @@ var structuralPins = []structuralPin{
 			"fixture Request states that one existing untyped bag; production adds none, because " +
 			"forcesServeWatch reads the CommandParams the Request already carries. " +
 			"A later change lowers 656→655: deleting the core's tree verifier deletes " +
-			"treecmd/verify_test.go and its one fxObj line",
+			"treecmd/verify_test.go and its one fxObj line. " +
+			"A later change raises 655→657 for TWO lines in jobs/scheduler/runner_process_env_test.go " +
+			"(cli/supervised-serve-run): the serve-env fixture's command params, its field and its one " +
+			"literal, which RunPlan and cachekey.ComputeJobCacheHash both take as the existing untyped " +
+			"bag, so the test can prove the supervisor's environment moves no cache key. The rewritten " +
+			"ephemeral-port watch test states its two CommandParams literals in place of the two it " +
+			"replaces; production adds the one line itemized on the production pin above. " +
+			"A later change raises 657→660 (cli/workload-qualification): it deletes the one RunJobWithProcessEnv call " +
+			"line of jobs/scheduler/runner_process_env_test.go and adds FOUR lines in compose/fakecli_test.go, the " +
+			"fake CLI that stands in for a member's serve run. A task:event record carries its Event as the untyped " +
+			"map protocols/cli types, so the fake states the serve step's process event, decodes the fixture " +
+			"workload's runtime event, folds that event's data members beside its type, and writes the record " +
+			"through one helper that takes the map. The --no-watch fixture line moves with its test from " +
+			"engine/serve_withhold_test.go to engine/watch_test.go; production lowers by two, itemized above. " +
+			"A later change (ADR 0079) keeps 660: moving compose and qualify to @putnami/dev deletes SIX lines, " +
+			"four in compose/fakecli_test.go, one in compose/configdata_test.go and one in " +
+			"commands/composecmd/compose_test.go, and the e2e/devworkload parity package adds SIX. Three are the " +
+			"fixture workload's ready events, whose data is the untyped object protocols/runtime types, and three " +
+			"read the shipped @putnami/dev manifest's tasks as a generic document to point the runtime at the " +
+			"test's build of tooling/dev",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        912,
+		want:        916,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -651,7 +681,15 @@ var structuralPins = []structuralPin{
 			"A later change raises 895→911 = 256 production + 655 test for the sixteen test lines of jobs.RawJobEvent.RecordPayload, itemized on the test pin above; production stays at its ceiling. " +
 			"A later change raises 911→912 for the ONE --no-watch serve fixture line itemized on the test pin above. " +
 			"A later change lowers 912→911 for the fxObj line the test pin above names; production adds none. " +
-			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added",
+			"The total then returns to 912 = 257 production + 655 test: the production pin's 256→257 raise for lifecycle.setUpProject and lifecycle.runDepsEdit merged beside that lowering and did not reach this total; no line is added. " +
+			"A later change raises 912→915 = 258 production + 657 test for the serve step's process event and the two serve-env fixture lines itemized on the two scoped pins above. " +
+			"A later change raises 915→916 = 256 production + 660 test (cli/workload-qualification): the production " +
+			"lowering and the four fake-CLI test lines itemized on the two scoped pins above. " +
+			"A later change lowers 916→915 = 255 production + 660 test (ADR 0079): the production line and the " +
+			"six test lines that leave with compose, and the six parity test lines that arrive, itemized on the " +
+			"two scoped pins above. " +
+			"A later change raises 915→916 = 256 production + 660 test for cli.addOutputGlobalParams, itemized on " +
+			"the production pin above; tests add none",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

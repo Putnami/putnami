@@ -35,14 +35,6 @@ usage: putnami completion <bash|zsh|fish>
 example: putnami completion bash
 example: putnami completion zsh
 example: putnami completion fish
-═══ compose ═══
-description: Start the selected workload and the transitive closure of its runsWith projects in one invocation. Every process binds an ephemeral port and answers behind a local reverse proxy whose URL stays stable across restarts; dependency URLs travel through the clients config block and databases declared in infra/requirements.json are provisioned per composition. Dependencies run production-mode without watch; the target watches by default. Stops every owned process, proxy and database on exit; the next invocation reaps what an ungraceful death left behind
-usage: putnami compose <project> [--port <n>] [--no-watch] [--ready-timeout <duration>] [--output <format>]
-flag: --port | <n> | Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port
-flag: --no-watch |  | Run the target production-mode without watch, like its dependencies
-flag: --ready-timeout | <duration> | Deadline for each member's typed ready event; default 60s
-example: putnami compose @example/go-items-consumer
-example: putnami compose /typescript/samples/06-database --port 0 --output=json
 ═══ config set ═══
 description: Set a configuration value in the workspace config
 usage: putnami config set <key> <value>
@@ -218,18 +210,6 @@ usage: putnami projects tag <name> <tag> [--set] [--remove]
 flag: --set |  | Replace the project's tags with the given list
 flag: --remove |  | Remove the given tags from the project
 example: putnami projects tag my-app frontend
-═══ qualify ═══
-description: Derive the smoke contract from the workload's route inventory, execute it against --target (local composes the workload with compose; a URL is any deployed environment), and print one verdict bound to the tested tree or to the deployed sha. Fails closed: unsupported, not_run, timed_out, canceled, target_unreachable, digest_mismatch and composition_failed are distinct from passed and exit non-zero
-usage: putnami qualify <project> --target <local|url> [--expect-sha <sha>] [--platform-prefix <path>] [--ready-timeout <duration>] [--request-timeout <duration>] [--print-contract] [--output <format>]
-flag: --target | <local|url> | local composes the workload on this machine; an http(s) URL is a running deployment
-flag: --expect-sha | <sha> | Required with a URL target: the git sha the deployment must report on /version
-flag: --platform-prefix | <path> | Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root
-flag: --ready-timeout | <duration> | Deadline for readiness; default 60s
-flag: --request-timeout | <duration> | Deadline per smoke request; default 5s
-flag: --print-contract |  | Print the derived contract and exit without a target
-example: putnami qualify /go/samples/migrations-feature --target local
-example: putnami qualify @example/06-database --target https://pr-123.preview.example --expect-sha 3cc91b658
-example: putnami qualify /go/samples/migrations-feature --print-contract --output=json
 ═══ report ═══
 description: Print the bounded synthesis a finished run recorded under .putnami/reports: the newest CLI-driven run's by default, or the one named by --session. With --output=json the recorded document is printed as-is, unwrapped, because it is the contract a consumer binds to. An interrupted run records no report, so a consumer that files a report against a commit verifies its git.sha rather than trusting recency
 usage: putnami report [--session <id>] [--output <format>]

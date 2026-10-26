@@ -1,6 +1,9 @@
 # ADR 0073 — The core declares no development verb
 
-- **Status**: proposed
+- **Status**: proposed, amended by
+  [ADR 0079](0079-compose-and-qualify-move-to-putnami-dev.md): `compose` and
+  `qualify` moved to `@putnami/dev`, so no core literal names them, and the
+  portable, MCP `run_jobs` and `--no-watch` checks read their traits
 - **Scope**: `@putnami/cli` (`internal/commandmeta`, `internal/cli`,
   `internal/commands/completion`, `internal/engine`, `internal/extension`,
   `internal/mcp`), `@putnami/cli-model` (`extension`) and `@putnami/dev`

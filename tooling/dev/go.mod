@@ -4,16 +4,25 @@ go 1.25.7
 
 require (
 	go.putnami.dev/protocol/cli v0.0.0
+	go.putnami.dev/protocol/clientcontract v0.0.0
+	go.putnami.dev/protocol/database v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
+	go.putnami.dev/protocol/http-routes v0.0.0
+	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
+	go.putnami.dev/protocol/platform v0.0.0
+	go.putnami.dev/protocol/qualify v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
+	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 )
 
 require (
-	go.putnami.dev/protocol/workspace v0.0.0 // indirect
+	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
+	go.putnami.dev/protocol/events v0.0.0 // indirect
+	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
 
@@ -21,6 +30,7 @@ replace (
 	go.putnami.dev/protocol/architecture => ../../protocols/architecture
 	go.putnami.dev/protocol/capabilities => ../../protocols/capabilities
 	go.putnami.dev/protocol/cli => ../../protocols/cli
+	go.putnami.dev/protocol/clientcontract => ../../protocols/clientcontract
 	go.putnami.dev/protocol/database => ../../protocols/database
 	go.putnami.dev/protocol/diagnostic => ../../protocols/diagnostic
 	go.putnami.dev/protocol/distribution => ../../protocols/distribution
@@ -28,10 +38,13 @@ replace (
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
 	go.putnami.dev/protocol/gomod => ../../protocols/gomod
+	go.putnami.dev/protocol/http-routes => ../../protocols/http-routes
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
 	go.putnami.dev/protocol/oci => ../../protocols/oci
+	go.putnami.dev/protocol/platform => ../../protocols/platform
 	go.putnami.dev/protocol/put => ../../protocols/put
+	go.putnami.dev/protocol/qualify => ../../protocols/qualify
 	go.putnami.dev/protocol/registry => ../../protocols/registry
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/storage => ../../protocols/storage

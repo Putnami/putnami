@@ -65,6 +65,10 @@ type commandAliases struct {
 	// serve workload: each watches by default and owns --no-watch
 	// (ownsWatchFlag).
 	serveWorkloads []string
+	// groupCommand returns the flat command that `putnami <group> <word>` runs
+	// (extension.GroupInvocationCommand), or "" for none. It is nil when no
+	// extension is loaded.
+	groupCommand func(group, word string) string
 }
 
 // lookup returns the command alias name stands for.
@@ -74,6 +78,21 @@ func (a commandAliases) lookup(name string) (string, bool) {
 	}
 	target, ok := a.user[name]
 	return target, ok
+}
+
+// watchCommands are the commands whose traits decide whether a structured
+// invocation owns --no-watch (ownsWatchFlag): the flat command an extension
+// group's invocation runs, so a group whose subcommand or default serves owns
+// it as the flat command does, and the parsed commands otherwise.
+func watchCommands(result *ParsedArgs, aliases commandAliases, extensionGroups map[string]bool) []string {
+	group := result.Commands[0]
+	if !extensionGroups[group] || aliases.groupCommand == nil {
+		return result.Commands
+	}
+	if command := aliases.groupCommand(group, result.Subcommand); command != "" {
+		return []string{command}
+	}
+	return result.Commands
 }
 
 // parseArgs is ParseArgs with every alias table: App.Run adds the vocabulary
@@ -132,8 +151,8 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	structured := isStructuredCommand(commands[0]) || extensionGroups[commands[0]]
 
 	// Check if this is a structured command (e.g., "extensions install", "projects list").
-	// A structured leaf that takes a positional (qualify <project>) keeps that
-	// argument among its own arguments: see commandmeta.PositionalLeaf.
+	// A structured leaf that takes a positional (impact-plan <commands>) keeps
+	// that argument among its own arguments: see commandmeta.PositionalLeaf.
 	if structured && len(rest) > 0 && !strings.HasPrefix(rest[0], "-") && !commandmeta.PositionalLeaf(commands[0]) {
 		result.Commands = commands
 		result.Subcommand = rest[0]
@@ -150,7 +169,7 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	var globals GlobalFlags
 	var remaining []string
 	if structured {
-		globals, remaining, err = parseCommandFlags(rest, commands, aliases.serveWorkloads)
+		globals, remaining, err = parseCommandFlags(rest, watchCommands(result, aliases, extensionGroups), aliases.serveWorkloads)
 	} else {
 		globals, remaining, err = parseJobFlags(rest, commands, aliases.serveWorkloads)
 	}

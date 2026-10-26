@@ -17,13 +17,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/cachecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/ci"
 	"go.putnami.dev/tooling/cli/internal/commands/completion"
-	"go.putnami.dev/tooling/cli/internal/commands/composecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/configcmd"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/commands/extensions"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/commands/migrate"
-	"go.putnami.dev/tooling/cli/internal/commands/qualifycmd"
 	"go.putnami.dev/tooling/cli/internal/commands/sessions"
 	"go.putnami.dev/tooling/cli/internal/commands/treecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
@@ -52,10 +50,6 @@ func init() {
 	registerCommand("migrate", cmdMigrate)
 	registerCommand("sessions", cmdSessions)
 	registerCommand("tree", cmdTree)
-	// Raw: a composition streams its start document before it runs and its exit
-	// document when it stops, so its stdout cannot be captured until exit.
-	registerRawCommand("compose", cmdCompose)
-	registerCommand("qualify", cmdQualify)
 	registerRawCommand("report", cmdReport)
 	registerCommand("completion", cmdCompletion)
 	registerCommand("install", cmdInstall)
@@ -752,89 +746,6 @@ func cmdTree(env *CommandEnv) error {
 		return fmt.Errorf("resolve the working directory: %w", err)
 	}
 	return treecmd.Fingerprint(workingDirectory, env.OutputFormat)
-}
-
-// cmdCompose serves a workload together with the transitive closure of the
-// workloads it runs with (internal/compose). Exactly one positional names the
-// target, by project id or name; the parser leaves it in env.Args because
-// compose is a positional leaf (commandmeta.PositionalLeaf).
-func cmdCompose(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	parsed, err := parseCatalogCommandFlags("compose", env.Args)
-	if err != nil {
-		return err
-	}
-	selectors := parsed.positionals
-	if len(selectors) != 1 {
-		return usageErrorf("compose takes exactly one project: putnami compose <project> [--port <n>] [--no-watch] [--ready-timeout <duration>]")
-	}
-	return composecmd.Run(composecmd.Request{
-		Ctx:           env.Ctx,
-		WorkspaceRoot: env.WsRoot,
-		Config:        env.Cfg,
-		Selector:      selectors[0],
-		Port:          parsed.value("--port"),
-		NoWatch:       parsed.has("--no-watch"),
-		ReadyTimeout:  parsed.value("--ready-timeout"),
-		OutputFormat:  env.OutputFormat,
-		Verbose:       env.Global.Verbose || env.Global.Debug,
-		Quiet:         env.Global.Quiet,
-		NoColor:       env.Global.Color != nil && !*env.Global.Color,
-		Warnings:      env.WorkspaceWarnings(),
-	})
-}
-
-// cmdQualify runs one workload's derived smoke contract against a target. The
-// project is its single positional; the parser leaves it in env.Args because
-// qualify is a positional leaf (commandmeta.PositionalLeaf).
-func cmdQualify(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	parsed, err := parseCatalogCommandFlags("qualify", env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 1 {
-		return usageErrorf("qualify takes exactly one project: putnami qualify <project> --target <local|url>")
-	}
-	readyTimeout, err := parsePositiveDuration("--ready-timeout", parsed.value("--ready-timeout"))
-	if err != nil {
-		return err
-	}
-	requestTimeout, err := parsePositiveDuration("--request-timeout", parsed.value("--request-timeout"))
-	if err != nil {
-		return err
-	}
-	return qualifycmd.Run(env.Ctx, qualifycmd.Options{
-		WorkspaceRoot:  env.WsRoot,
-		Selector:       parsed.positionals[0],
-		Target:         parsed.value("--target"),
-		ExpectSHA:      parsed.value("--expect-sha"),
-		PlatformPrefix: parsed.value("--platform-prefix"),
-		ReadyTimeout:   readyTimeout,
-		RequestTimeout: requestTimeout,
-		PrintContract:  parsed.has("--print-contract"),
-		OutputFormat:   env.OutputFormat,
-		Config:         env.Cfg,
-		Verbose:        env.Global.Verbose || env.Global.Debug,
-		Quiet:          env.Global.Quiet,
-		Warnings:       env.WorkspaceWarnings(),
-	})
-}
-
-// parsePositiveDuration reads a Go duration flag; empty means the default (0).
-func parsePositiveDuration(flag, raw string) (time.Duration, error) {
-	if strings.TrimSpace(raw) == "" {
-		return 0, nil
-	}
-	value, err := time.ParseDuration(raw)
-	if err != nil || value <= 0 {
-		return 0, usageErrorf("%s must be a positive Go duration such as 30s or 2m", flag)
-	}
-	return value, nil
 }
 
 // cmdSessionsExport streams the recorded session documents. Its output is the

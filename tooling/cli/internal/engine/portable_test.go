@@ -125,8 +125,10 @@ func hostAbs(p string) string {
 
 // workloadCommands are the loaded extensions of a workspace whose serve and
 // daemon commands declare the serve workload, run declares once, format and
-// tidy declare rewritesSources, and whose legacy extension declares lint and
-// fmt with no trait.
+// tidy declare rewritesSources, whose legacy extension declares lint and fmt
+// with no trait, and whose @putnami/dev declares compose-up with the serve
+// workload and qualify-run with the once workload, as the shipped manifest
+// does.
 func workloadCommands() []*internalextension.ExtensionDescription {
 	command := func(name string, traits extension.CommandTraits) *extension.JobDefinition {
 		return &extension.JobDefinition{Name: name, Kind: "command", Traits: traits}
@@ -144,6 +146,10 @@ func workloadCommands() []*internalextension.ExtensionDescription {
 			"lint": command("lint", extension.CommandTraits{}),
 			"fmt":  command("fmt", extension.CommandTraits{}),
 		}},
+		{Name: "@putnami/dev", Jobs: map[string]*extension.JobDefinition{
+			"compose-up":  command("compose-up", extension.CommandTraits{Workload: extension.WorkloadServe}),
+			"qualify-run": command("qualify-run", extension.CommandTraits{Workload: extension.WorkloadOnce}),
+		}},
 	}
 }
 
@@ -159,8 +165,6 @@ func TestRejectUnsupportedRemoteShape(t *testing.T) {
 	}
 	cases := map[string]func(*Request, []*scheduler.ScheduledJob){
 		"watch":   func(r *Request, _ []*scheduler.ScheduledJob) { r.Global.Watch = true },
-		"compose": func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"compose"} },
-		"qualify": func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"qualify"} },
 		"dry-run": func(r *Request, _ []*scheduler.ScheduledJob) { r.ExecutesUnderDryRun = true },
 		"side effects": func(_ *Request, p []*scheduler.ScheduledJob) {
 			p[0].JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
@@ -192,20 +196,24 @@ func TestRejectUnsupportedRemoteShape(t *testing.T) {
 // The submitting side refuses a command whose resolved traits declare a
 // workload or rewritesSources, whatever its name, with the message of its
 // kind, and refuses none by its name alone: a lint or fmt that declares
-// neither, and a serve or format no loaded extension declares, reach the plan
-// checks.
+// neither, a compose or qualify no loaded extension declares, and a serve or
+// format no loaded extension declares, reach the plan checks.
 func TestRejectUnsupportedRemoteShapeFollowsTheDeclaredTraits(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/portable-runner", "portable-request", "a-workload-or-rewriting-command-is-refused-before-submission")
 	extensions := workloadCommands()
 	for command, refusal := range map[string]string{
-		"serve":  `"serve" streams a live workload and is not portable`,
-		"daemon": `"daemon" streams a live workload and is not portable`,
-		"run":    `"run" streams a live workload and is not portable`,
-		"format": `"format" rewrites source and is not portable`,
-		"tidy":   `"tidy" rewrites source and is not portable`,
-		"lint":   "",
-		"fmt":    "",
+		"serve":       `"serve" streams a live workload and is not portable`,
+		"daemon":      `"daemon" streams a live workload and is not portable`,
+		"run":         `"run" streams a live workload and is not portable`,
+		"format":      `"format" rewrites source and is not portable`,
+		"tidy":        `"tidy" rewrites source and is not portable`,
+		"compose-up":  `"compose-up" streams a live workload and is not portable`,
+		"qualify-run": `"qualify-run" streams a live workload and is not portable`,
+		"lint":        "",
+		"fmt":         "",
+		"compose":     "",
+		"qualify":     "",
 	} {
 		req := &Request{WorkspaceRoot: hostAbs("/ws"), Commands: []string{"build", command}}
 		err := rejectUnsupportedRemoteShape(req, extensions, portablePlan())

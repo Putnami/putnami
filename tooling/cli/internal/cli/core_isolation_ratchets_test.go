@@ -381,29 +381,18 @@ func TestTheCoreExpandsNoInputSelector(t *testing.T) {
 // the engine cannot host it because both workspace_state and sessionreporter sit
 // below the engine. It adds no execution stage and no consumer policy.
 //
-// RAISED 56 → 58 (`putnami compose`): internal/compose owns a
+// RAISED 56 → 58 (`putnami compose`): internal/compose owned a
 // composition's lifetime — the runsWith closure, per-member reverse proxies,
 // per-composition databases, the typed-readiness wait, and the lease the next
-// invocation reaps — and internal/commands/composecmd is the vertical that
-// chooses what reaches the terminal. The composition cannot live in the engine
-// (it supervises long-lived processes the engine deliberately withholds, see
-// Request.WithholdServeSteps) nor in internal/watch (a replan trigger, which
-// compose uses for its target), and `qualify --target local` consumes it as a
-// library, which rules out folding it into the command vertical. It plans
-// nothing and schedules nothing: the serve pipelines are planned and their
-// finite steps executed by Engine.Run.
+// invocation reaps — and internal/commands/composecmd was the vertical that
+// chose what reached the terminal. Both left the core when compose moved to
+// @putnami/dev.
 //
-// RAISED 58 → 60 (ADR 0039): internal/qualify derives a workload's
-// smoke contract from its route inventory, runs it against a target and
-// reduces the run to one fail-closed verdict, and internal/commands/qualifycmd
-// is the `qualify` vertical over it. The runner is a package rather than part
-// of the vertical because a second consumer is already contracted: the local
-// target composes workloads through internal/compose, and the verdict
-// rules must stay testable without a CLI invocation. It is not extension-owned
-// for the reason `tree` is not: it names no language, runtime or toolchain,
-// reads only protocol documents (http-routes, platform, qualify) and speaks
-// plain HTTP, and a verdict that depended on which language extension is
-// installed could not be compared across workloads.
+// RAISED 58 → 60 (ADR 0039): internal/qualify derived a workload's smoke
+// contract from its route inventory, ran it against a target and reduced the
+// run to one fail-closed verdict, and internal/commands/qualifycmd was the
+// `qualify` vertical over it. Both left the core when qualify moved to
+// @putnami/dev.
 //
 // RAISED 60 → 61: internal/cli/clitest is the test-only support
 // package of the end-to-end packages under internal/cli/e2e — one real CLI
@@ -555,7 +544,13 @@ func TestTheCoreExpandsNoInputSelector(t *testing.T) {
 // scheduler, as toolchainpins does, so it cannot live in the store or the
 // workspace package, which the scheduler imports. It adds no vertical and no
 // engine stage.
-const internalPackageCountCeiling = 78
+//
+// LOWERED 78 → 74 (ADR 0079): internal/compose, internal/qualify,
+// internal/commands/composecmd and internal/commands/qualifycmd are deleted.
+// `putnami compose` and `putnami qualify` run in the @putnami/dev executable,
+// which requests each member as a serve run of the CLI. The ceiling follows
+// the tree down.
+const internalPackageCountCeiling = 74
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

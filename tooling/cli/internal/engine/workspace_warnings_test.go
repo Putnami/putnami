@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	workspacepb "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -137,5 +139,43 @@ func TestLoadWorkspaceAndExtensions_ReportsIntoTheCallersReport(t *testing.T) {
 	}
 	if out.String() != written {
 		t.Fatalf("the load wrote the warning again: %q", out.String())
+	}
+}
+
+// TestLoadWorkspaceAndExtensions_ASupervisedServeRunWritesNoWarningOnItsServeLog
+// holds a supervised serve run to keeping the warnings of its load off its
+// stderr, which is the serve log its supervisor passes through: the
+// supervisor wrote the warnings of its own load of the workspace. The run
+// still holds them, and a jsonl run without --serve-env writes them as every
+// run does.
+func TestLoadWorkspaceAndExtensions_ASupervisedServeRunWritesNoWarningOnItsServeLog(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "a-supervised-serve-run-splits-its-output", "the-serve-log-carries-no-load-warning")
+	root := rootWithoutRepository(t)
+	cfg := warnedWorkspace(t, root)
+	for _, tc := range []struct {
+		name     string
+		serveEnv string
+		written  int
+	}{
+		{name: "jsonl run", written: 1},
+		{name: "supervised serve run", serveEnv: "-", written: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &Request{
+				WorkspaceRoot: root, Config: cfg, Commands: []string{"build"},
+				Global: GlobalFlags{Output: "jsonl", ServeEnv: tc.serveEnv},
+			}
+			var code int
+			stderr := captureStderr(t, func() { _, _, code = loadWorkspaceAndExtensions(req) })
+			if code != ExitSuccess {
+				t.Fatalf("load exit code = %d", code)
+			}
+			if got := strings.Count(stderr, "putnami: warning: "); got != tc.written {
+				t.Errorf("stderr carries %d warnings, want %d:\n%s", got, tc.written, stderr)
+			}
+			if got := req.workspaceWarnings.Warnings(); len(got) != 1 || got[0].Code != workspace.WarningCodeJobsIgnored {
+				t.Errorf("the run holds %+v, want the one ignored-jobs warning", got)
+			}
+		})
 	}
 }

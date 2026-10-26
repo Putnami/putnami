@@ -3498,8 +3498,11 @@ function checkMachineOutputSanitized(v: Validator, path: string, value: unknown)
 
 /**
  * Reports whether a record consumes the protected failure/control-evidence
- * reserve. A `test:case` record never does: the failed task's `task:end` already
- * is.
+ * reserve. A workload's `ready` claim and a serve step's `process` event do,
+ * because a supervisor acts on them however much ordinary output preceded
+ * them. Every such record shares the one bounded reserve: once it is spent, a
+ * later one is a failure elision. A `test:case` record never does: the failed
+ * task's `task:end` already is.
  */
 export function isMachineOutputFailurePriority(record: SessionStreamRecord): boolean {
   if (record.record === STREAM_RECORD.taskEnd) {
@@ -3553,6 +3556,13 @@ function failurePriorityEvent(event: JsonObject | undefined): boolean {
       return childString(event, 'severity') === 'error';
     case 'phase':
       return childString(event, 'status') === 'failed';
+    case 'ready':
+    case 'process':
+      // A ready claim is the control event a supervisor waits on, and a
+      // process event names the group the supervisor must reap: a workload
+      // that logged past the ordinary partition still delivers both while the
+      // failure reserve has room.
+      return true;
     case 'result': {
       const result = childObject(event, 'data');
       const status = childString(result, 'status') ?? childString(event, 'status');

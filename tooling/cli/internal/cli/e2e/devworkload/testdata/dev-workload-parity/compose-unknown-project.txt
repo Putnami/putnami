@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: compose: "nope" names no project of this workspace; pass a project id (/path/to/project) or name

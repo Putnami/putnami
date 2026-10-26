@@ -577,6 +577,9 @@ func (s *Scheduler) runSharedAttempt(ctx context.Context, work []taskWork) map[s
 // a singleton dispatch runs and what a failed batch member re-executes as.
 func (s *Scheduler) runTaskAttempt(ctx context.Context, job *ScheduledJob) *JobResult {
 	ctx = s.processCapabilities.contextForJob(ctx, job)
+	if s.cfg.ServeSteps[job.Key()] {
+		ctx = withServeStep(ctx)
+	}
 	var before cachekey.VerificationTreeSnapshot
 	var observationErr error
 	if s.cfg.CacheVerification {
@@ -589,7 +592,7 @@ func (s *Scheduler) runTaskAttempt(ctx context.Context, job *ScheduledJob) *JobR
 		s.taskParams,
 		s.commandDefaults(job),
 		s.cfg.VersionInfo,
-		s.jobProcessEnv(),
+		s.jobProcessEnvFor(job),
 		s.invocations.eventSink(job, func(event RawJobEvent) { s.renderer.JobEvent(job, event) }),
 	)
 	if err != nil {
@@ -749,6 +752,19 @@ func (s *Scheduler) jobProcessEnv() []string {
 		env = append(env, s.remote.ObjectCacheJobEnv()...)
 	}
 	return env
+}
+
+// jobProcessEnvFor is jobProcessEnv for one job, plus ServeProcessEnv when the
+// job is one of the run's serve-workload steps (SchedulerConfig.ServeSteps).
+// The serve entries come last, after the run-level ones, and a finite step
+// never receives them. The batch attempt keeps jobProcessEnv: a serve step is
+// never batched, and a step that does not receive the entries fails closed.
+func (s *Scheduler) jobProcessEnvFor(job *ScheduledJob) []string {
+	env := s.jobProcessEnv()
+	if job == nil || !s.cfg.ServeSteps[job.Key()] {
+		return env
+	}
+	return append(env, s.cfg.ServeProcessEnv...)
 }
 
 // commandDefaults resolves the workspace config defaults for a job's command.

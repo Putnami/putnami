@@ -4,15 +4,16 @@ package scheduler
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 	"syscall"
-	"time"
 )
 
 // runInteractive runs cmd, an interactive job that shares the CLI's terminal,
-// and returns what cmd.Run returns. startJob starts it: it calls its argument,
-// which starts cmd, or fails.
-func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) error {
+// and returns what cmd.Run returns. forced reports that a second signal killed
+// the child. startJob starts it: it calls its argument, which starts cmd, or
+// fails.
+func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) (forced bool, err error) {
 	// Do NOT place the child in its own process group (no Setpgid). An
 	// interactive extension inherits the real terminal via os.Stdin, and only
 	// the controlling terminal's foreground process group may read from it. The
@@ -30,12 +31,29 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) erro
 		// also terminate the CLI process itself.
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
-	cmd.WaitDelay = 5 * time.Second
+	// A canceled child stops on its own terms: it has interactiveStopBudget to
+	// exit before Wait kills it. A terminal Ctrl+C reaches it directly, and the
+	// cancel's SIGTERM reaches it when a supervisor signaled the CLI alone.
+	cmd.WaitDelay = interactiveStopBudget
 
-	if err := startJob(cmd.Start); err != nil {
-		return err
+	// A second signal to the CLI kills the child at once, from before its
+	// start on (interactiveHold).
+	hold := holdInteractive(func() { _ = cmd.Process.Kill() })
+	defer hold.release()
+	if err := startJob(func() error { return hold.start(cmd.Start) }); err != nil {
+		return false, err
 	}
-	return cmd.Wait()
+	err = cmd.Wait()
+	hold.release()
+	return hold.forced(), err
+}
+
+// exitedOnItsOwn reports whether the child ended by its own exit after a
+// terminal signal: it exited rather than died by a signal, and no second signal
+// killed it. Every stop this process sends is a signal, so a child that died by
+// one died by the terminal signal or was killed at the stop budget.
+func exitedOnItsOwn(state *os.ProcessState, forced bool) bool {
+	return state != nil && state.Exited() && !forced
 }
 
 // endedByInterrupt reports whether the child ended from SIGINT. A terminal

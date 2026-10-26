@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"golang.org/x/sys/windows"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -161,4 +163,67 @@ func terminateTestProcess(pid int) {
 	}
 	_ = windows.TerminateProcess(process, 1)
 	_ = windows.CloseHandle(process)
+}
+
+// exitCodeHelperEnv names the exit code TestExitCodeHelperProcess exits with.
+const exitCodeHelperEnv = "PUTNAMI_JOBS_EXIT_CODE_HELPER"
+
+// TestExitCodeHelperProcess is not a test: it exits with the code
+// exitCodeHelperEnv names, and returns at once unless a test started it.
+func TestExitCodeHelperProcess(t *testing.T) {
+	code := os.Getenv(exitCodeHelperEnv)
+	if code == "" {
+		return
+	}
+	n, err := strconv.ParseUint(code, 10, 32)
+	if err != nil {
+		os.Exit(2)
+	}
+	os.Exit(int(int32(uint32(n))))
+}
+
+// exitedWith runs a process that exits with code and returns its state.
+func exitedWith(t *testing.T, code uint32) *os.ProcessState {
+	t.Helper()
+	cmd := exec.Command(os.Args[0], "-test.run=^TestExitCodeHelperProcess$")
+	cmd.Env = append(os.Environ(), exitCodeHelperEnv+"="+strconv.FormatUint(uint64(code), 10))
+	_ = cmd.Run()
+	if cmd.ProcessState == nil {
+		t.Fatalf("the helper exiting with %#x never ran", code)
+	}
+	if got := cmd.ProcessState.Sys().(syscall.WaitStatus).ExitCode; got != code {
+		t.Fatalf("the helper exited with %#x, want %#x", got, code)
+	}
+	return cmd.ProcessState
+}
+
+// A child that exits by itself keeps its exit code, 0 included, and a child
+// that the console control event ended (STATUS_CONTROL_C_EXIT) or the runner
+// killed did not exit on its own.
+func TestExitedOnItsOwn_TellsAConsoleControlEventFromAnExit(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code")
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-command-stops-on-its-own-terms",
+		"a-child-that-dies-by-the-signal-or-is-killed-is-interrupted")
+	cases := []struct {
+		name   string
+		code   uint32
+		forced bool
+		want   bool
+	}{
+		{name: "exit 0", code: 0, want: true},
+		{name: "exit 3", code: 3, want: true},
+		{name: "STATUS_CONTROL_C_EXIT", code: statusControlCExit, want: false},
+		{name: "killed by the runner", code: 1, forced: true, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := exitedOnItsOwn(exitedWith(t, tc.code), tc.forced); got != tc.want {
+				t.Errorf("exitedOnItsOwn(exit %#x, forced %v) = %v, want %v", tc.code, tc.forced, got, tc.want)
+			}
+		})
+	}
+	if exitedOnItsOwn(nil, false) {
+		t.Error("exitedOnItsOwn(nil) = true, want false for a child that never ran")
+	}
 }

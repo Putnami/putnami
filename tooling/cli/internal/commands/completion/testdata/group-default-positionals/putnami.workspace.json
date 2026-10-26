@@ -1,0 +1,4 @@
+{
+  "name": "completion-ws",
+  "includes": ["stage-extension", "apps/web", "apps/list"]
+}

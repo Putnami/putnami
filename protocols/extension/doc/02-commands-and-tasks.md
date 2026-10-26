@@ -214,6 +214,40 @@ the group's own subcommands; the strict parser rejects any other value with
 `unresolved-default-subcommand`. A group without `default` prints its help
 when no subcommand is named.
 
+A default subcommand can declare `positionals`. Then a word after the group
+that names none of its subcommands runs the default, with that word as the
+default's first argument:
+
+```json
+{
+  "commandGroups": {
+    "stage": {
+      "default": "up",
+      "subcommands": {
+        "up": {
+          "command": "stage-up",
+          "positionals": [{ "name": "project", "required": true }]
+        },
+        "list": { "command": "stage-list" }
+      }
+    }
+  }
+}
+```
+
+Here `putnami stage /apps/web --keep` runs `putnami stage up /apps/web
+--keep`. A declared subcommand wins over a word of the same name:
+`putnami stage list` runs `list`, so a project named `list` is addressed by
+its id, `putnami stage /apps/list`. The CLI parses no positional value itself:
+the word reaches the default's process first among its arguments, and the
+process validates it. Help prints each positional in the usage line, `<name>`
+when it is required and `[<name>]` otherwise, and shell completion offers the
+workspace's project ids after the group word when the default's first
+positional is named `project`. A word after a group whose default declares no
+positional stays an unknown subcommand. A manifest whose default declares
+positionals requires contract 15 (see [Validation](04-validation.md));
+positionals on another subcommand keep the base stamp.
+
 A subcommand declares whether it needs a workspace with `workspace`: `required`
 (the meaning of an absent value) or `optional`. An `optional` subcommand must
 also be `interactive: true`; the strict parser rejects any other combination
@@ -243,12 +277,18 @@ the caller's directory, and its job context carries a `userScope` member that
 names that directory; see the job context protocol
 (`protocols/job/README.md`). Every interactive launch, inside a workspace or
 outside one, also carries `invocationDir`, the directory the user typed the
-command in, which a command resolves its relative path arguments against.
+command in, which a command resolves its relative path arguments against. The
+CLI consumes the output globals before the subcommand is reached, so the
+launch carries the ones the user typed as job context params: `verbose` for
+`--verbose` or `--debug`, `quiet` for `--quiet`, and `color`, `false` for
+`--no-color` and `true` for `--color`. Each is absent when not typed, beside
+`output`, the resolved output mode. A planned job's params carry none of them.
 Inside a workspace, `workspace` changes nothing: the workspace's own pin of the
 extension runs.
 
 The CLI reads `workspace`, `interactive` and `default` on the group and the
-top-level subcommand it dispatches. A nested subcommand is validated with the
+top-level subcommand it dispatches, and the `positionals` of the subcommand a
+group defaults to. A nested subcommand is validated with the
 same rules and carries no dispatch meaning.
 
 An `interactive` subcommand's process can call the CLI that started it. The
@@ -264,11 +304,15 @@ not decide it. The wire contract is
 `go.putnami.dev/sdk/extension/hostrpc`. No manifest member declares the
 channel, so it does not move the `cliContract`.
 
-Neither member moves the manifest's `cliContract`. A CLI that predates them
-ignores both: it prints the group help where a newer CLI runs the default, and
-it never runs a subcommand outside a workspace. Both readings fail safe, so no
-contract increment is needed (see
+Neither `workspace` nor `default` moves the manifest's `cliContract`. A CLI
+that predates them ignores both: it prints the group help where a newer CLI
+runs the default, and it never runs a subcommand outside a workspace. Both
+readings fail safe, so no contract increment is needed (see
 [ADR 0008](adr/0008-workspace-requirement-and-group-default-need-no-contract.md)).
+A default that declares positionals is different: an older CLI answers
+"unknown subcommand" for the word the default takes, so that manifest requires
+contract 15 (see
+[ADR 0013](adr/0013-a-default-that-takes-positionals-requires-contract-15.md)).
 
 ### Workspace Membership
 
@@ -282,8 +326,13 @@ reads `library`. A command that acts on deployable workloads reads `type` there
 and does not classify projects itself. Inside `workspaceProjects`, whose
 producer resolves every classification, an entry without `type` comes from a
 CLI that predates the member: a command that acts on workloads declines rather
-than reading it as `application`. The job context protocol
-(`protocols/job/README.md`) defines the member.
+than reading it as `application`. Each entry also carries the project's
+resolved `runsWith`: the list its `putnami.json` authors, else the one its
+provider reported, such as the `putnami.runsWith` of a TypeScript
+`package.json`. A command that composes a workload with the workloads it runs
+with reads `runsWith` there, not from `config`, which holds only the authored
+list. An entry without `runsWith` runs with nothing. The job context protocol
+(`protocols/job/README.md`) defines both members.
 
 ## Tasks
 

@@ -70,6 +70,19 @@ func Envelope(command, subcommand string, data any, err error) protocolcli.Resul
 // was written, so a human-mode run and a machine-mode run of the same failure
 // exit the same way.
 func Emit(stdout, stderr io.Writer, mode protocolcli.OutputMode, command, subcommand string, data any, err error) int {
+	return EmitWithWarnings(stdout, stderr, mode, command, subcommand, data, err, nil)
+}
+
+// EmitWithWarnings is Emit for a subcommand whose launch reported workspace
+// load warnings, which putnami hands it in its job context
+// (job.Context.WorkspaceWarnings). A structured envelope carries warnings in
+// workspaceWarnings, as the envelope of a built-in command carries the
+// warnings of its own load. putnami already wrote each of them on stderr,
+// unless --quiet, so this writes none of them. Nil warnings write what Emit
+// writes.
+func EmitWithWarnings(stdout, stderr io.Writer, mode protocolcli.OutputMode, command, subcommand string, data any, err error,
+	warnings []protocolcli.WorkspaceWarning,
+) int {
 	if !mode.IsStructured() {
 		if err == nil {
 			return protocolcli.ExitSuccess
@@ -80,7 +93,9 @@ func Emit(stdout, stderr io.Writer, mode protocolcli.OutputMode, command, subcom
 		}
 		return protocolcli.ExitCodeForError(err)
 	}
-	code, _ := protocolcli.WriteResultV2(stdout, mode, Envelope(command, subcommand, data, err))
+	envelope := Envelope(command, subcommand, data, err)
+	envelope.WorkspaceWarnings = warnings
+	code, _ := protocolcli.WriteResultV2(stdout, mode, envelope)
 	if err != nil {
 		fmt.Fprintf(stderr, "putnami: %v\n", err)
 	}

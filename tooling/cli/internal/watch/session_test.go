@@ -2,7 +2,6 @@ package watch
 
 import (
 	"context"
-	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -10,6 +9,8 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
+	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -204,47 +205,59 @@ func TestWaitForWorkspaceQuiet_ReturnsAfterQuietPeriod(t *testing.T) {
 	}
 }
 
-// A composed serve binds port 0 and learns its real port from the ready event,
-// so the release wait between restarts must ask for the port the previous
-// iteration bound instead of parsing 0 into the default port 3000 — which may
-// belong to an unrelated process and would stall every restart for the whole
-// release deadline.
-func TestWaitForServePortRelease_EphemeralPortWaitsOnTheBoundPort(t *testing.T) {
-	var asked []int
-	bound := 0
-	s := newIterationSession(SessionConfig{
-		ServeMode:     true,
-		CommandParams: map[string]any{"port": 0},
-		BoundPort: func() int {
-			asked = append(asked, bound)
-			return bound
-		},
-	})
-	s.waitForServePortRelease(context.Background())
-	if len(asked) != 1 {
-		t.Fatalf("BoundPort consulted %d times, want once for an ephemeral port", len(asked))
+// A serve on port 0 learns its real port from the ready event, so the release
+// wait between restarts must wait on the port the previous iteration's ready
+// claim announced, read from the stream the renderer saw, instead of parsing 0
+// into the default port 3000, which may belong to an unrelated process and
+// would stall every restart for the whole release deadline. A pinned port never
+// consults the claim.
+func TestWaitForServePortRelease_EphemeralPortWaitsOnTheAnnouncedPort(t *testing.T) {
+	spectest.Proves(t, "cli/supervised-serve-run", "an-ephemeral-port-waits-on-the-announced-port", "the-release-wait-reads-the-announced-port")
+	claim := func(port int) jobs.RawJobEvent {
+		return readyEventFor(t, runtimeproto.ReadyData{
+			Target: runtimeproto.ReadyTargetServer,
+			Endpoints: []runtimeproto.ReadyEndpoint{
+				{Scheme: runtimeproto.ReadySchemeGRPC, Host: "127.0.0.1", Port: port + 1},
+				{Scheme: runtimeproto.ReadySchemeHTTP, Host: "127.0.0.1", Port: port},
+			},
+		})
 	}
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
+	s := newIterationSession(SessionConfig{ServeMode: true, CommandParams: map[string]any{"port": 0}})
+	s.watchRend.ResetServeReadySignal()
+	if port, ok := s.servePortToRelease(); ok {
+		t.Fatalf("port to release = %d before any claim, want none: port 0 names no listener", port)
 	}
-	bound = ln.Addr().(*net.TCPAddr).Port
-	_ = ln.Close()
 	s.waitForServePortRelease(context.Background())
-	if len(asked) != 2 || asked[1] != bound {
-		t.Fatalf("BoundPort answers = %v, want the second wait to use the bound port %d", asked, bound)
+
+	s.watchRend.JobEvent(nil, claim(43120))
+	if port, ok := s.servePortToRelease(); !ok || port != 43120 {
+		t.Fatalf("port to release = %d, %v, want the announced http port 43120", port, ok)
+	}
+	// A later claim of the same iteration wins; a workload claim, which names no
+	// endpoint, says nothing about where the workload listens.
+	s.watchRend.JobEvent(nil, claim(43130))
+	s.watchRend.JobEvent(nil, readyEventFor(t, runtimeproto.ReadyData{Target: runtimeproto.ReadyTargetWorkload}))
+	if port, _ := s.servePortToRelease(); port != 43130 {
+		t.Fatalf("port to release = %d, want the last announced port 43130", port)
+	}
+	// A new iteration forgets the previous one's port.
+	s.watchRend.ResetServeReadySignal()
+	if port, ok := s.servePortToRelease(); ok {
+		t.Fatalf("port to release = %d after a reset, want none", port)
 	}
 
-	pinned := newIterationSession(SessionConfig{
-		ServeMode:     true,
-		CommandParams: map[string]any{"port": bound},
-		BoundPort: func() int {
-			t.Error("BoundPort consulted for a pinned port")
-			return 0
-		},
-	})
-	pinned.waitForServePortRelease(context.Background())
+	for _, pinned := range []any{4310, "4310"} {
+		p := newIterationSession(SessionConfig{ServeMode: true, CommandParams: map[string]any{"port": pinned}})
+		p.watchRend.ResetServeReadySignal()
+		p.watchRend.JobEvent(nil, claim(43120))
+		if port, ok := p.servePortToRelease(); !ok || port != 4310 {
+			t.Errorf("pinned %#v: port to release = %d, %v, want the pinned 4310", pinned, port, ok)
+		}
+	}
+	if port, ok := newIterationSession(SessionConfig{ServeMode: true}).servePortToRelease(); !ok || port != DefaultPort {
+		t.Errorf("no port param: port to release = %d, %v, want DefaultPort", port, ok)
+	}
 }
 
 func TestIsEphemeralPort(t *testing.T) {

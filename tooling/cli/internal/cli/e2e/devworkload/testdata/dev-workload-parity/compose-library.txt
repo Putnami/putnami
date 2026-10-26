@@ -1,0 +1,4 @@
+exit 1
+--- stdout ---
+--- stderr ---
+putnami: compose.not_serveable: /lib: a library project has no workload to serve (phase plan)

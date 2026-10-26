@@ -1,8 +1,10 @@
 # ADR 0006: A commit-addressed request is engine-planned
 
-- **Status**: accepted. Decision 3 is amended in place: the protocol refuses
-  `compose` and `qualify` by name, and the executing engine refuses an
-  extension command by its declared workload or `rewritesSources`
+- **Status**: accepted. Decision 3 is amended in place twice: the executing
+  engine refuses an extension command by its declared workload or
+  `rewritesSources`, and since `compose` and `qualify` moved to
+  `@putnami/dev` ([CLI ADR 0079](../../../../tooling/cli/doc/adr/0079-compose-and-qualify-move-to-putnami-dev.md))
+  the protocol refuses no command by name
 - **Scope**: `go.putnami.dev/protocol/runner` execution request and the
   bound-request channel
 
@@ -44,16 +46,17 @@ error that names the member it mixed in.
 Selectors are sorted and unique, one selector per entry. An explicit empty
 `base` or selector list is refused, so one request has one canonical form.
 
-### 3. The protocol refuses unportable commands
+### 3. The executing engine refuses unportable commands
 
 A version 1 request comes from a CLI submitter, which refuses the commands no
 portable run carries before it freezes a plan. A version 2 request has no such
-submitter, so `ValidateCommitRequest` refuses the core ones: `compose` streams
-live workloads until the deadline, and `qualify` reaches one from the
-executing machine. `UnportableCommands` names them, and the submitting side
-refuses both. An extension command is refused by its declared traits, not its
-name: the executing engine refuses one whose traits declare a workload or
-`rewritesSources`, in both versions. Version 1 validation does not change.
+submitter, so the executing engine refuses them itself, after it loads the
+manifests the checkout pins: a command whose traits declare a workload, which
+streams from the machine that runs it, or `rewritesSources`, whose edits
+would never return to the submitting worktree, in both versions. The protocol
+refuses no command by its name: `compose-up` and `qualify-run`, the commands
+`@putnami/dev` runs `putnami compose` and `putnami qualify` with, declare the
+serve and once workloads. Version 1 validation does not change.
 Declared side effects are not refused: `invocation.publication` authorizes
 them, as on the version 1 executing side.
 

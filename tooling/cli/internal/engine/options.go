@@ -70,6 +70,10 @@ type GlobalFlags struct {
 	// credential, publish for the publish credential. Empty consults no
 	// provider. It is execution policy and never a cache-key input.
 	Providers []string
+	// ServeEnv is --serve-env: "-" when the run reads its serve steps' process
+	// environment from stdin (Request.ServeProcessEnv), "" otherwise. It is the
+	// flag's spelling only; the document it names never reaches GlobalFlags.
+	ServeEnv string
 
 	// Project selection
 	Projects string // raw --projects value or positional "."

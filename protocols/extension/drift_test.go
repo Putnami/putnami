@@ -5,8 +5,11 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
+
+	protocolcli "go.putnami.dev/protocol/cli"
 )
 
 // schemaProperties extracts property names from a schema $defs entry.
@@ -579,5 +582,36 @@ func TestHookDefinition_OutputField(t *testing.T) {
 	}
 	if hook.Output != "jsonl" {
 		t.Errorf("Output = %q, want jsonl", hook.Output)
+	}
+}
+
+// TestDrift_CliContractBound pins the schema's cliContract maximum to the
+// highest contract the CLI reads, and its description to every rung up to it,
+// so a new rung cannot ship with a schema that refuses its stamp.
+func TestDrift_CliContractBound(t *testing.T) {
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("read schema %s: %v", schemaPath, err)
+	}
+	var schema struct {
+		Properties struct {
+			CliContract struct {
+				Minimum     int    `json:"minimum"`
+				Maximum     int    `json:"maximum"`
+				Description string `json:"description"`
+			} `json:"cliContract"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatalf("parse schema %s: %v", schemaPath, err)
+	}
+	bound := schema.Properties.CliContract
+	if bound.Maximum != protocolcli.LatestContract {
+		t.Errorf("cliContract maximum = %d, want protocolcli.LatestContract %d", bound.Maximum, protocolcli.LatestContract)
+	}
+	for rung := bound.Minimum; rung <= protocolcli.LatestContract; rung++ {
+		if !strings.Contains(bound.Description, "ontract "+strconv.Itoa(rung)+" ") {
+			t.Errorf("cliContract description names no contract %d", rung)
+		}
 	}
 }

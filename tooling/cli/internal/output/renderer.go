@@ -50,6 +50,13 @@ type Config struct {
 	// process-global os.Stdout for the duration of the install.
 	Out io.Writer
 	Err io.Writer
+
+	// ServeLog is where a jsonl run also renders itself as text, the way
+	// `putnami serve` renders in text mode, while stdout carries the session
+	// stream unchanged. The engine sets it to stderr for a supervised serve run
+	// (`--serve-env -` with `--output=jsonl`). Nil, or any other output,
+	// renders the stream alone.
+	ServeLog io.Writer
 }
 
 // out returns the renderer's stdout stream: the caller's when it supplied one,
@@ -102,10 +109,16 @@ func NewRenderer(cfg Config) jobs.Renderer {
 		renderer.workspaceWarnings = cfg.WorkspaceWarnings
 		return renderer
 	case "jsonl":
+		var stream *machineV2Renderer
 		if machineOutputMode(cfg) == protocolcli.MachineOutputModeNormal {
-			return newMachineV2Renderer(cfg.out(), cfg.Command, true)
+			stream = newMachineV2Renderer(cfg.out(), cfg.Command, true)
+		} else {
+			stream = newMachineV2RendererMode(cfg.out(), cfg.Command, true, machineOutputMode(cfg))
 		}
-		return newMachineV2RendererMode(cfg.out(), cfg.Command, true, machineOutputMode(cfg))
+		if cfg.ServeLog != nil {
+			return newServeLogRenderer(stream, cfg)
+		}
+		return stream
 	case "cloud-logging":
 		return NewCloudLoggingRenderer(cfg.out())
 	default:

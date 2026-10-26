@@ -2,6 +2,9 @@
 
 - **Status**: accepted
 - **Scope**: `@putnami/cli` (`tooling/cli`), `@putnami/cli-model` (`tooling/cli-model`, module `go.putnami.dev/cli/model`)
+- **Amended**: 2026-10-25, §2: the verticals `composecmd` and `qualifycmd` are
+  deleted. `@putnami/dev` serves `compose` and `qualify`
+  ([ADR 0079](0079-compose-and-qualify-move-to-putnami-dev.md)).
 
 ## Context
 

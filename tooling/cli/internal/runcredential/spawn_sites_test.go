@@ -141,12 +141,6 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only: rev-parse, status"},
 	"commands/versioncmd/version_release.go:lastRelease": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
-	"compose/lease.go:defaultReapDeps": {spawns: 1, verdict: noRepositoryCode,
-		why: "docker with the digest-pinned postgres image of dbtestenv"},
-	"compose/process_start_ps.go:processStartTime": {spawns: 1, verdict: noRepositoryCode,
-		why: "ps"},
-	"compose/up.go:defaultUpDeps": {spawns: 1, verdict: noRepositoryCode,
-		why: "docker with the digest-pinned postgres image of dbtestenv"},
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
 	"git/fingerprint.go:FingerprintTree": {spawns: 1, verdict: noRepositoryCode,
@@ -163,6 +157,8 @@ var spawnSites = map[string]spawnSite{
 		why: "sysctl"},
 	"jobs/machineprobe/environment_memory.go:totalMemoryBytesAt": {spawns: 1, verdict: noRepositoryCode,
 		why: "sysctl"},
+	"jobs/scheduler/runner.go:announceProcessGroup": {spawns: 1, verdict: noRepositoryCode,
+		why: "ps, through proctree.StartTime, on a system without /proc"},
 	"jobs/toolchain/runtime_toolchains.go:probeRuntimeToolchain": {spawns: 1, verdict: noRepositoryCode,
 		why: "the version probe of a pinned toolchain"},
 	"launch/credential_probe.go:credentialProbe": {spawns: 1, verdict: noRepositoryCode,
@@ -181,6 +177,7 @@ var spawnSites = map[string]spawnSite{
 	"cli/clitest/clitest.go:RunGit":                                   {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:(*fixtureProvider).startSupervisor": {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:superviseFixtureAttempt":            {spawns: 1, verdict: testSupport},
+	"fixtureproc/cli.go:buildCLI":                                     {spawns: 1, verdict: testSupport},
 	"fixtureproc/fixtureproc.go:Warm":                                 {spawns: 1, verdict: testSupport},
 	"fixtureproc/fixtureproc.go:buildHelper":                          {spawns: 1, verdict: testSupport},
 	"fixtureproc/fixtureproc.go:startOutputHolder":                    {spawns: 1, verdict: testSupport},
@@ -611,9 +608,10 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 // itself or returns what starts one:
 //   - registrycred starts `putnami cloud registry-token`;
 //   - a releaseset client starts `putnami cloud release-set`;
-//   - a dbtestenv provider or job starts docker;
 //   - linetag.LastRelease starts git with read verbs only;
-//   - treefingerprint.Compute starts git with read verbs only.
+//   - treefingerprint.Compute starts git with read verbs only;
+//   - proctree.StartTime starts ps with fixed arguments on a system without
+//     /proc.
 //
 // TestEveryDependencySpawnHelperIsInventoried keeps the SDK entries complete.
 var spawnCalls = map[string]map[string]bool{
@@ -624,11 +622,9 @@ var spawnCalls = map[string]map[string]bool{
 	"go.putnami.dev/sdk/extension/registrycred": {
 		"ResolveToken": true, "ResolveTokenWithCLI": true, "EnsureNativeCredential": true,
 	},
-	"go.putnami.dev/sdk/extension/releaseset": {"NewClient": true},
-	"go.putnami.dev/sdk/extension/dbtestenv": {
-		"SelectProvider": true, "NewProvisioner": true, "UpJob": true, "DownJob": true,
-	},
+	"go.putnami.dev/sdk/extension/releaseset":      {"NewClient": true},
 	"go.putnami.dev/sdk/extension/linetag":         {"LastRelease": true},
+	"go.putnami.dev/sdk/extension/proctree":        {"StartTime": true},
 	"go.putnami.dev/sdk/extension/treefingerprint": {"Compute": true},
 }
 

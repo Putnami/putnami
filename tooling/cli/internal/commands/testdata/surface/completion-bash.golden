@@ -36,7 +36,6 @@ _putnami_path_known() {
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
         'completion zsh') return 0 ;;
-        'compose') return 0 ;;
         'config') return 0 ;;
         'config set') return 0 ;;
         'config show') return 0 ;;
@@ -71,7 +70,6 @@ _putnami_path_known() {
         'projects list') return 0 ;;
         'projects sync') return 0 ;;
         'projects tag') return 0 ;;
-        'qualify') return 0 ;;
         'report') return 0 ;;
         'scopes') return 0 ;;
         'scopes list') return 0 ;;
@@ -104,11 +102,16 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_takes_project() {
+    case "$1" in
+        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     case "$1" in
         'cli list') printf '%s\n' '--global' ;;
         'cli use') printf '%s\n' '--global' ;;
-        'compose') printf '%s\n' '--no-watch --port --ready-timeout' ;;
         'context generate') printf '%s\n' '--force' ;;
         'context pack') printf '%s\n' '--project' ;;
         'doctor') printf '%s\n' '--machine --profile --project' ;;
@@ -124,7 +127,6 @@ _putnami_flags_for() {
         'projects create') printf '%s\n' '--channel --force --path --template' ;;
         'projects sync') printf '%s\n' '--prune --skip-install' ;;
         'projects tag') printf '%s\n' '--remove --set' ;;
-        'qualify') printf '%s\n' '--expect-sha --platform-prefix --print-contract --ready-timeout --request-timeout --target' ;;
         'report') printf '%s\n' '--session' ;;
         'sessions export') printf '%s\n' '--since' ;;
         'sessions inspect') printf '%s\n' '--run' ;;
@@ -143,8 +145,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade workspace"
-    local structured="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade workspace"
+    local commands="cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace"
+    local structured="cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace"
     local global_flags="--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --continue-on-error --dry-run --output --json --quiet --color --no-color --version"
     local projects=""
     local project_ids=""
@@ -179,6 +181,9 @@ _putnami_completions() {
 
     local nested_subcommands="$(_putnami_subcommands_for "${path}")"
     if [[ -n "${nested_subcommands}" && "${cur}" != -* && ${i} -eq ${cword} ]]; then
+        if _putnami_takes_project "${path}"; then
+            nested_subcommands="${nested_subcommands} ${project_ids}"
+        fi
         COMPREPLY=( $(compgen -W "${nested_subcommands}" -- "${cur}") )
         return
     fi

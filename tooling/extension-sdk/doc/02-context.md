@@ -286,6 +286,7 @@ for _, ref := range ctx.WorkspaceProjects {
 	fmt.Println(ref.Dependencies) // resolved DIRECT dependency ids
 	fmt.Println(string(ref.Config)) // raw authored putnami.json, when supplied
 	fmt.Println(ref.Type)         // resolved classification: "application", "library", ...
+	fmt.Println(ref.RunsWith)     // resolved runsWith: project names or ids
 }
 ```
 
@@ -328,6 +329,14 @@ it can read that way. Inside `WorkspaceProjects`, whose producer resolves every
 classification, an entry without `Type` comes from a producer that predates the
 member. A task that acts on workloads declines rather than reading it as
 `"application"`.
+
+`RunsWith` lists the projects this one runs with, as the orchestrator resolved
+them: the authored `putnami.json` list, else the one the owning provider's
+workspace probe reported, such as the `putnami.runsWith` of a TypeScript
+`package.json`. Each entry names a project by name or by id, as its source
+wrote it; resolve it by name first, then by id. Read it, not `Config`, to
+compose a workload with its providers. Inside `WorkspaceProjects` an entry
+without `RunsWith` runs with nothing.
 
 ### Project Bin Field
 
@@ -377,11 +386,12 @@ Reads and parses a Putnami context JSON file.
 | `Project` | `Project` | Project metadata |
 | `Selection` | `*Selection` | The invocation's resolved project selection (nil if the orchestrator resolved none) |
 | `SelectedProjects` | `[]ProjectRef` | The projects the run acts on; present for jobs that need cross-project context |
-| `WorkspaceProjects` | `[]ProjectRef` | The complete workspace membership with resolved direct dependency edges, resolved types and raw authored project config |
+| `WorkspaceProjects` | `[]ProjectRef` | The complete workspace membership with resolved direct dependency edges, resolved types, resolved runsWith lists and raw authored project config |
 | `Extension` | `Extension` | Extension identity |
 | `Job` | `Job` | Current job identity |
 | `Params` | `Params` | Job parameters |
 | `InvocationDir` | `string` | The directory the user typed an interactive command in (empty for a planned job) |
+| `WorkspaceWarnings` | `[]cliproto.WorkspaceWarning` | The warnings putnami's workspace load for an interactive launch reported (empty for a planned job); pass them to `resultv2.EmitWithWarnings` |
 | `UserScope` | `*UserScope` | Set only when the job runs outside any workspace; `CallerDir` is where it was invoked |
 | `FilePatterns` | `[]string` | Optional file patterns for targeted operations |
 | `Version` | `*Version` | Git version info (nil if unavailable) |

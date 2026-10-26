@@ -866,44 +866,41 @@ func (s *Server) abortedRunError(a runJobsArgs, exitCode int) error {
 		strings.Join(a.Commands, ","), exitCode, strings.Join(strings.Fields(detail), " "))
 }
 
-// longLivedCommands names the commands routing through the engine makes
-// UNTERMINATABLE over MCP, so the refusal is scoped to the hazard A4 actually
-// introduces rather than to blocking calls in general. A command whose
-// resolved traits declare the serve workload qualifies too (serveWorkloadHazard).
-//
-// A command of the once workload deliberately does NOT qualify. It is not
-// promoted to watch, so it terminates, and forwarding a workload's exit code (a
-// migration returning 3) is a legitimate agent use.
-var longLivedCommands = map[string]string{
-	// `compose` is a structured command rather than a job verb, so run_jobs
-	// cannot reach it today. It is named here anyway: it supervises serve
-	// processes until a signal, and a future surface that forwards command
-	// names must inherit the refusal instead of rediscovering the hazard.
-	"compose": "supervises its workloads until it receives a signal, so it never returns on its own",
-	// `qualify` waits on a live workload for up to its readiness deadline and
-	// every request deadline, and with a local target it also composes and
-	// supervises that workload; one MCP tool call would block the session for
-	// that whole time.
-	"qualify": "waits on a live workload (and composes one for a local target) for as long as its readiness and request deadlines allow",
-}
-
 // serveWorkloadHazard is why a serve-workload command is refused: the engine
 // promotes it to watch mode, so it no longer ends even when its child exits.
 // The MCP transport is synchronous — one tool call at a time on a single stdio
 // loop — so that wedges the WHOLE session with no way out.
 const serveWorkloadHazard = "is promoted to watch mode by the engine, so it never returns — not even when its child exits"
 
-// rejectLongLivedCommands refuses the longLivedCommands and every command whose
-// resolved traits in extensions declare the serve workload.
+// rejectLongLivedCommands refuses every command whose resolved traits in
+// extensions declare the serve workload, and every command whose traits
+// declare a workload and that extensions carry only under interactive
+// subcommands (extension.InteractiveOnlyCarrier): such a subcommand runs its
+// workload in the terminal it shares with the user, and a run_jobs call has
+// none, so the refusal names the subcommand to type in a terminal. It refuses
+// no command by its name.
+//
+// A command of the once workload is not refused for its workload alone: it is
+// not promoted to watch, so it terminates, and forwarding a workload's exit
+// code (a migration returning 3) is a legitimate agent use. qualify-run
+// declares the once workload and is refused because only an interactive
+// subcommand carries it. A command without a workload that only interactive
+// subcommands carry is finite work that runs as a planned job, as any job
+// does, so it is not refused: sdd-contracts-generate is one.
 func rejectLongLivedCommands(extensions []*extension.ExtensionDescription, commands []string) error {
 	for _, command := range commands {
-		why, blocked := longLivedCommands[command]
-		if !blocked && jobs.CommandWorkload(extensions, command) == extension.WorkloadServe {
-			why, blocked = serveWorkloadHazard, true
-		}
-		if blocked {
+		workload := jobs.CommandWorkload(extensions, command)
+		if workload == extension.WorkloadServe {
 			return fmt.Errorf("run_jobs cannot run %q: it %s, and one MCP tool call blocks the whole session. "+
-				"Run it in a terminal instead", command, why)
+				"Run it in a terminal instead", command, serveWorkloadHazard)
+		}
+		if workload == "" {
+			continue
+		}
+		if path, interactive := extension.InteractiveOnlyCarrier(extensions, command); interactive {
+			return fmt.Errorf("run_jobs cannot run %q: an extension runs its %s workload only as the interactive "+
+				"subcommand `putnami %s`, which runs it in the terminal, and an MCP tool call has none. "+
+				"Run `putnami %s` in a terminal instead", command, workload, path, path)
 		}
 	}
 	return nil

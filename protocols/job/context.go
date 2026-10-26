@@ -10,6 +10,8 @@ package job
 import (
 	"encoding/json"
 	"strconv"
+
+	cliproto "go.putnami.dev/protocol/cli"
 )
 
 // ProtocolVersion is the current job context protocol version.
@@ -115,6 +117,15 @@ type Context struct {
 	// it, not against the directory the task runs in. Unlike UserScope it does
 	// not say whether a workspace exists.
 	InvocationDir string `json:"invocationDir,omitempty"`
+	// WorkspaceWarnings are the warnings the orchestrator's workspace load for
+	// an interactive extension command recorded, in order, each once, with the
+	// code and message of the result envelope's workspaceWarnings. v2 only and
+	// optional: the orchestrator sets it on an interactive launch whose load
+	// warned, and never on a planned job. It has already written each warning
+	// on stderr unless --quiet, so a command writes none of them again, and a
+	// command that writes a result envelope carries them in its
+	// workspaceWarnings. Absent means the load warned of nothing.
+	WorkspaceWarnings []cliproto.WorkspaceWarning `json:"workspaceWarnings,omitempty"`
 	// Params are the merged, coerced job parameters (CLI flags over config
 	// defaults); accessors define the shared coercion contract.
 	Params Params `json:"params"`
@@ -370,6 +381,22 @@ type ProjectRef struct {
 	// workloads declines rather than reading it as "application". v2 only, for
 	// the reason Config is.
 	Type string `json:"type,omitempty"`
+	// RunsWith are the projects this one runs with, as the orchestrator
+	// resolved them: the authored putnami.json list, else the one the owning
+	// provider's workspace probe reported. Each entry names a project by name
+	// or by id, as its source wrote it; a consumer resolves it by name first,
+	// then by id.
+	//
+	// The orchestrator populates it on WorkspaceProjects, where a task that
+	// composes a workload with the workloads it runs with reads the closure.
+	// Config carries only the authored list, and a provider reads the list from
+	// a native manifest (the TypeScript extension reads package.json's
+	// `putnami.runsWith`), so a consumer reads RunsWith, not Config.
+	//
+	// Absence is read from the containing member. Inside WorkspaceProjects,
+	// whose producer resolves every project's list, an entry without RunsWith
+	// runs with nothing. v2 only, for the reason Config is.
+	RunsWith []string `json:"runsWith,omitempty"`
 }
 
 // GetBinString returns the bin field as a string if it's a simple string value.

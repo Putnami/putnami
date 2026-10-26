@@ -139,11 +139,15 @@
     },
     {
       "id": "concurrent-session-output-exclusion",
-      "text": "Sessions of one workspace never write one task output at once. A task locks, in one global order, its command-output directory plus the project or workspace with a durable output, across a cache restore and an execution through capture; a preparation writing the project tree locks the project until the subprocess starts. A contended task prints one line naming the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
+      "text": "No two sessions of a workspace write one task output at once. In one global order, a task locks its command-output directory, unless its serve step released it, and any project or workspace with a durable output, from a cache restore or execution through capture; a preparation writing the project tree locks it until its subprocess starts. A contended task names the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
     },
     {
       "id": "concurrent-session-read-exclusion",
       "text": "An executing task that reads a resource it does not write shares the lock its writers hold: its project's, or the workspace's for a workspace-scoped resource, from its preparation through its capture. The sources resource takes none, and a restore reads nothing. Readers in several sessions hold the lock together, a writer in another session waits for all of them, and a reader waits for that writer. A wait behind readers prints one line saying another putnami process is reading, naming no holder."
+    },
+    {
+      "id": "a-serve-step-releases-its-command-output-once-it-started",
+      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline, whose task declares no command-output output releases its command-output lock once its process started, through its retries and capture, and keeps every other lock until capture. Another session, such as a dependent's serve run, then runs that project's finite serve steps beside it. A finite step, and a serve step whose task declares a command-output output, keep the lock until capture. The process never sees the released lock held."
     },
     {
       "id": "scratch-generation-retention",
@@ -195,7 +199,7 @@
     },
     {
       "id": "job-context-names-member-types",
-      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects, and each entry names the project's resolved type: the type its putnami.json authors, else the type its provider reported, else application. An entry without a type comes from a CLI that predates the member. selectedProjects and dependencyClosure carry no type."
+      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects. Each entry names the project's resolved type: the one its putnami.json authors, else its provider's, else application; an entry without a type comes from a CLI that predates the member. Each entry names its resolved runsWith: the list its putnami.json authors, else its provider's; an entry without runsWith runs with nothing. selectedProjects and dependencyClosure carry neither."
     },
     {
       "id": "extension-command-host-rpc",
@@ -239,11 +243,19 @@
     },
     {
       "id": "workload-lifecycle",
-      "text": "A command whose traits declare the serve workload streams it until interrupted: the run is promoted to watch unless its own --no-watch is set, a hosted run and MCP run_jobs refuse it, a composition starts only its terminal uncacheable step, and no portable run carries it. The once workload streams once and forwards the workload's exit code. A command that declares rewritesSources is never portable. Neither behavior follows a command's name."
+      "text": "A command whose traits declare the serve workload streams until interrupted: it, or a group invocation running it, is promoted to watch unless its own --no-watch is set; a hosted run and MCP run_jobs refuse it; a serve run, as a composition member's, streams only each selected project's terminal uncacheable step; no portable run carries it. The once workload streams once and forwards its exit code. A command declaring rewritesSources is never portable. Neither behavior follows a command's name."
     },
     {
       "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
-      "text": "An interactive extension subcommand launch, in a workspace or outside one, carries the absolute directory the user typed the command in, as the job context's invocationDir and PUTNAMI_INVOCATION_DIR. The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace and, outside one, the value equals the caller directory. A planned job carries neither, so no cache key depends on it, and an inherited value is dropped."
+      "text": "An interactive extension subcommand launch carries the absolute directory it was typed in as the job context's invocationDir and PUTNAMI_INVOCATION_DIR, and the typed output globals as params: verbose (--verbose, --debug), quiet, and color (false for --no-color, true for --color). The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace; outside one, the directory is the caller's. A planned job carries none, so no cache key reads them; an inherited value is dropped."
+    },
+    {
+      "id": "a-group-default-takes-positionals",
+      "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Such a manifest declares CLI contract 15; older readers refuse it."
+    },
+    {
+      "id": "an-interactive-command-stops-on-its-own-terms",
+      "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit, then kills it; the CLI's shutdown bound covers that budget from before the child starts. A second signal kills the child at once, or as soon as it started. A child that exits by itself after the signal keeps its exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
     },
     {
       "id": "project-setup-runs-in-the-project-extension",

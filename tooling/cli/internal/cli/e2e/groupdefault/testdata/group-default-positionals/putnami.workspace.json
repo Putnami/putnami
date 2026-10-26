@@ -1,0 +1,4 @@
+{
+  "name": "positional-ws",
+  "includes": ["stage-extension", "apps/web", "apps/list"]
+}

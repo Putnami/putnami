@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -135,6 +136,23 @@ func readyStreamFixture(t *testing.T) string {
 		t.Fatal("ready-server fixture carries no ready event; this proof would assert nothing")
 	}
 	return strings.Join(kept, "\n") + "\n"
+}
+
+// announcedPort is the port the stream's ready claim announces, read the way
+// the CLI's reader reads the line.
+func announcedPort(t *testing.T, stream string) int {
+	t.Helper()
+	for _, line := range strings.Split(stream, "\n") {
+		event, ok := jobs.ParseRawEvent(line)
+		if !ok || event.Type != jobs.EventTypeReady {
+			continue
+		}
+		if _, port := ReadyClaim(event); port > 0 {
+			return port
+		}
+	}
+	t.Fatal("the ready stream announces no port; the tracked-port assertion would assert nothing")
+	return 0
 }
 
 // writeServeFixtureExtension stages a contract-3 extension whose serve command
@@ -372,6 +390,16 @@ func TestServeLoop_TypedReadinessFromARealJobArmsAndReArms(t *testing.T) {
 			iterations, ready, _ := recorder.snapshot()
 			t.Fatalf("typed v2 ready events parsed = %d over %d iterations, want one per iteration (>= 3)",
 				ready, iterations)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// The renderer keeps the port the stream's ready claim announced: the
+	// listener a `--port 0` serve waits on between restarts.
+	announced := announcedPort(t, stream)
+	for deadline := time.Now().Add(10 * time.Second); session.watchRend.BoundPort() != announced; {
+		if time.Now().After(deadline) {
+			t.Fatalf("tracked port = %d, want the port %d the stream's ready claim announced", session.watchRend.BoundPort(), announced)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

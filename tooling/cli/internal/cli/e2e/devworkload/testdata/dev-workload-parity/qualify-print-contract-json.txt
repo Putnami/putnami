@@ -1,0 +1,30 @@
+exit 0
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "qualify",
+  "status": "success",
+  "exitCode": 0,
+  "data": {
+    "derivedFrom": [
+      {
+        "digest": "sha256:8d957da3be380f191d6329b5aca64ec414b207933dd26b5d978d84760a4b7a17",
+        "kind": "http-routes",
+        "path": "app/schema/http-routes.json"
+      }
+    ],
+    "digest": "sha256:a6f777e23ee9a3ab2cdf5f9276a80f91e06493c4b78cdf9d8c150f62ccfa3336",
+    "project": "/app",
+    "protocolVersion": 1,
+    "requests": [
+      {
+        "id": "GET /items",
+        "maxStatus": 499,
+        "method": "GET",
+        "path": "/items",
+        "provenance": "manual"
+      }
+    ]
+  }
+}
+--- stderr ---

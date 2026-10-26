@@ -7,11 +7,74 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
+
+// interactiveStopBudget is how long a canceled interactive job has to exit on
+// its own before the runner kills it (abort.InteractiveStopBudget). The exec
+// WaitDelay that enforces it also bounds the wait for the I/O pipes of a stream
+// that is no file once the child exited; the terminal streams of a dispatch are
+// files and need none.
+var interactiveStopBudget = abort.InteractiveStopBudget
+
+// interactiveHold is the abort.HoldInteractive record of one interactive
+// child. It holds the child from before its start, so a first signal that
+// lands while the child starts gets the interactive shutdown bound, and a
+// second one that lands then ends the child as soon as it started.
+type interactiveHold struct {
+	mu      sync.Mutex
+	kill    func()
+	started bool
+	killed  bool
+	release func()
+}
+
+// holdInteractive records an interactive child that kill ends at once. The
+// caller starts the child through start and calls release once the child is
+// gone or failed to start; release is harmless to call more than once.
+func holdInteractive(kill func()) *interactiveHold {
+	h := &interactiveHold{kill: kill}
+	h.release = abort.HoldInteractive(h.killNow)
+	return h
+}
+
+// killNow ends the child at once when it started, and otherwise marks it for
+// start to end.
+func (h *interactiveHold) killNow() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.killed = true
+	if h.started {
+		h.kill()
+	}
+}
+
+// start calls start, which starts the child, and ends the child at once when
+// a kill landed before it started. A kill waits for the start to return.
+func (h *interactiveHold) start(start func() error) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err := start(); err != nil {
+		return err
+	}
+	h.started = true
+	if h.killed {
+		h.kill()
+	}
+	return nil
+}
+
+// forced reports that a kill reached the hold.
+func (h *interactiveHold) forced() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.killed
+}
 
 // RunJobInteractive runs a job as an interactive subprocess, inheriting the
 // parent's stdin/stdout/stderr. Unlike RunJob, no JSONL parsing happens — the
@@ -77,31 +140,38 @@ func RunJobInteractiveWithStreams(
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
-	runErr := runInteractive(cmd, func(start func() error) error { return inv.startJob(job, start) })
+	forced, runErr := runInteractive(cmd, func(start func() error) error { return inv.startJob(job, start) })
 	duration := time.Since(start)
 
 	result := &JobResult{Status: "success", Duration: duration}
-	if runErr != nil {
+	if runErr == nil {
+		return result, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		result.ExitCode = exitErr.ExitCode()
+	}
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		// Same structural deadline marker the streaming runner sets.
 		result.Status = "failed"
-		var exitErr *exec.ExitError
-		if errors.As(runErr, &exitErr) {
-			result.ExitCode = exitErr.ExitCode()
-		}
-		if ctx.Err() != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				// Same structural deadline marker the streaming runner sets.
-				result.TimedOut = true
-				result.Error = &JobError{Message: "job timed out"}
-			} else {
-				result.Status = "canceled"
-			}
-		} else if endedByInterrupt(runErr) {
-			// A terminal Ctrl+C reached the child before this process's own
-			// cancel did. It is the same interrupted run.
+		result.TimedOut = true
+		result.Error = &JobError{Message: "job timed out"}
+	case ctx.Err() != nil || endedByInterrupt(runErr):
+		// A terminal signal stopped the run: this process's cancel, or a
+		// terminal Ctrl+C that reached the child first. The child owns its stop,
+		// so a child that exited by itself keeps its own exit code, 0 included.
+		// The run is canceled only when the child died by the signal or this
+		// process killed it.
+		switch {
+		case !exitedOnItsOwn(cmd.ProcessState, forced):
 			result.Status = "canceled"
-		} else {
-			result.Error = &JobError{Message: runErr.Error()}
+		case result.ExitCode != 0:
+			result.Status = "failed"
 		}
+	default:
+		result.Status = "failed"
+		result.Error = &JobError{Message: runErr.Error()}
 	}
 	return result, nil
 }

@@ -14,19 +14,15 @@ require (
 	go.putnami.dev/protocol/collaboration v0.0.0
 	go.putnami.dev/protocol/config v0.0.0
 	go.putnami.dev/protocol/contracts v0.0.0
-	go.putnami.dev/protocol/database v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/distribution v0.0.0
 	go.putnami.dev/protocol/doctor v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
-	go.putnami.dev/protocol/http-routes v0.0.0-00010101000000-000000000000
 	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/oci v0.0.0
-	go.putnami.dev/protocol/platform v0.0.0-00010101000000-000000000000
 	go.putnami.dev/protocol/put v0.0.0
-	go.putnami.dev/protocol/qualify v0.0.0-00010101000000-000000000000
 	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/runner v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
@@ -39,6 +35,7 @@ require (
 )
 
 require (
+	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/gomod v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
@@ -63,12 +60,9 @@ replace (
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
 	go.putnami.dev/protocol/gomod => ../../protocols/gomod
-	go.putnami.dev/protocol/http-routes => ../../protocols/http-routes
 	go.putnami.dev/protocol/infra => ../../protocols/infra
 	go.putnami.dev/protocol/job => ../../protocols/job
-	go.putnami.dev/protocol/platform => ../../protocols/platform
 	go.putnami.dev/protocol/put => ../../protocols/put
-	go.putnami.dev/protocol/qualify => ../../protocols/qualify
 	go.putnami.dev/protocol/runner => ../../protocols/runner
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
 	go.putnami.dev/protocol/support => ../../protocols/support

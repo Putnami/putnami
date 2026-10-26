@@ -1,0 +1,7 @@
+exit 0
+--- stdout ---
+contract: /app (sha256:a6f777e23ee9a3ab2cdf5f9276a80f91e06493c4b78cdf9d8c150f62ccfa3336)
+derived from: app/schema/http-routes.json (sha256:8d957da3be380f191d6329b5aca64ec414b207933dd26b5d978d84760a4b7a17)
+  GET /items  maxStatus 499  provenance manual
+requests: 1
+--- stderr ---

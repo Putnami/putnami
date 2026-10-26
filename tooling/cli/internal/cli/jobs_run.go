@@ -9,9 +9,11 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/telemetry"
 )
 
@@ -35,6 +37,22 @@ var drainTelemetry = telemetry.DrainContext
 // first repository code. extensions are the dispatch extensions.
 func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters, extensions ...*extension.ExtensionDescription) int {
 	req := terminalRequest(parsed, cfg, wsRoot, tc, interactive, extensions...)
+	// --serve-env - reads the serve steps' environment from the process's
+	// stdin, here and not in terminalRequest, which stays a pure mapping of the
+	// command line. The document reaches Request.ServeProcessEnv only.
+	if parsed.Global.ServeEnv != "" {
+		env, err := readServeEnvStdin(os.Stdin)
+		if err != nil {
+			iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+			return engine.ExitUsage
+		}
+		req.ServeProcessEnv = env
+	}
+	// A supervised serve run's supervisor stops it and reports the stop, so the
+	// first signal prints no interrupt notice on its serve log.
+	if engine.SupervisedServe(&parsed.Global) {
+		abort.Supervise()
+	}
 	req.HostedRemoteCache = hostedCache
 	req.HostedReporters = hostedReporters
 	result, _ := engine.New().Run(ctx, req, nil)

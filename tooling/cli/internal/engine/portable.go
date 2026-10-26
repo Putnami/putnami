@@ -166,8 +166,8 @@ const remoteDeadline = 4 * time.Hour
 // publication and admission checks read the whole graph.
 // A version 2 request carries no expected plan and captured no input, and no
 // CLI submitter ran rejectUnsupportedRemoteShape on it: the protocol refuses
-// the commands it names as unportable, the executing engine refuses a
-// workload or source-rewriting command after discovery
+// no command by name, the executing engine refuses a workload or
+// source-rewriting command after discovery, from its declared traits
 // (refuseUnportableCommands), and this seam refuses a task outside the
 // checkout, then checks publication (validateCommitPublication). Its
 // publication rides invocation.publication, as on the version 1 executing
@@ -276,25 +276,17 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 }
 
 // rejectUnsupportedRemoteShape refuses, before any transfer, the invocations
-// this release does not carry: long-running or interactive modes, compose and
-// qualify, a command whose resolved traits in extensions declare a workload or
-// source rewriting (refuseUnportableCommands), and jobs with side effects
-// outside the workspace. Rejection is a precise diagnostic, never a silent
-// modification of the request.
+// this release does not carry: long-running or interactive modes, a command
+// whose resolved traits in extensions declare a workload or source rewriting
+// (refuseUnportableCommands), and jobs with side effects outside the
+// workspace. Rejection is a precise diagnostic, never a silent modification of
+// the request.
 func rejectUnsupportedRemoteShape(req *Request, extensions []*internalextension.ExtensionDescription, planned []*scheduler.ScheduledJob) error {
 	if req.Global.Watch {
 		return fmt.Errorf("--watch is not portable; remote execution covers finite commands only")
 	}
 	if req.ExecutesUnderDryRun {
 		return fmt.Errorf("an executing dry-run is not portable")
-	}
-	for _, command := range req.Commands {
-		switch command {
-		case "compose":
-			return fmt.Errorf("%q streams a live workload and is not portable", command)
-		case "qualify":
-			return fmt.Errorf("%q reaches a live workload from this machine and is not portable", command)
-		}
 	}
 	if err := refuseUnportableCommands(extensions, req.Commands); err != nil {
 		return err

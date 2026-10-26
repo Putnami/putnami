@@ -103,6 +103,17 @@ The port manager detects conflicts and suggests alternatives:
 port 3000 is in use, try port 3001
 ```
 
+Between restarts, the serve loop waits up to 2 seconds for the stopped
+server's port to free up before it starts the next one. The port it waits on
+is:
+
+- the `--port` value, when it names a port;
+- the default port, 3000, when the run sets no `--port`;
+- with `--port 0`, the port of the last `ready` claim that announced one in
+  the stopped iteration: the first `http` or `https` endpoint, else the first
+  endpoint. A claim without an endpoint leaves it. When no claim announced a
+  port, the loop waits on nothing.
+
 ## Output
 
 Watch mode renders status information around the base renderer's job output:

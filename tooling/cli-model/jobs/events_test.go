@@ -323,3 +323,20 @@ func TestExtractResultReadsTheExtensionsTimeoutMark(t *testing.T) {
 		})
 	}
 }
+
+// TestParseRawEventRefusesTheRunnersProcessType pins that only the job runner
+// names a step's process group: a producer line of the CLI-built process type
+// is refused like a malformed one, whatever it claims.
+func TestParseRawEventRefusesTheRunnersProcessType(t *testing.T) {
+	if _, ok := ParseRawEvent(`{"v":2,"type":"process","group":1,"leaderStart":"1"}`); ok {
+		t.Fatal("ParseRawEvent accepted a producer line of the process type")
+	}
+	stream := "{\"v\":2,\"type\":\"process\",\"data\":{\"group\":1}}\n{\"v\":2,\"type\":\"log\",\"message\":\"kept\"}\n"
+	var seen []string
+	events, _ := ReadJSONLEventsObserved(strings.NewReader(stream), func(event RawJobEvent) {
+		seen = append(seen, event.Type)
+	}, nil, nil)
+	if !reflect.DeepEqual(seen, []string{EventTypeLog}) || len(events) != 1 {
+		t.Fatalf("observed %v and retained %d events, want only the log line", seen, len(events))
+	}
+}

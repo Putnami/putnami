@@ -1,0 +1,10 @@
+exit 0
+--- stdout ---
+✓ resolve-target <ms>
+✓ readiness <ms>
+✓ version-binding <ms>
+✓ smoke <ms>
+✓ teardown <ms>
+  ✓ GET /items 200 <ms>
+verdict: passed (/app, url, artifact expected 0123456789abcdef0123456789abcdef01234567 observed 0123456789abcdef0123456789abcdef01234567)
+--- stderr ---

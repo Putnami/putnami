@@ -9,7 +9,7 @@ Command Flags:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --serve-env, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 

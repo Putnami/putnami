@@ -1,0 +1,86 @@
+exit 1
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "qualify",
+  "status": "failure",
+  "exitCode": 1,
+  "data": {
+    "protocolVersion": 1,
+    "project": "/app",
+    "target": {
+      "kind": "local",
+      "compositionId": "<composition>"
+    },
+    "binding": {
+      "kind": "tree",
+      "fingerprint": "<fingerprint>",
+      "headSHA": "<sha>"
+    },
+    "contract": {
+      "digest": "sha256:a6f777e23ee9a3ab2cdf5f9276a80f91e06493c4b78cdf9d8c150f62ccfa3336",
+      "requests": 1,
+      "derivedFrom": [
+        {
+          "kind": "http-routes",
+          "path": "app/schema/http-routes.json",
+          "digest": "sha256:8d957da3be380f191d6329b5aca64ec414b207933dd26b5d978d84760a4b7a17"
+        }
+      ]
+    },
+    "phases": [
+      {
+        "name": "resolve-target",
+        "state": "composition_failed",
+        "durationMs": "<ms>",
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "qualify.composition_failed",
+            "message": "compose.member_exited: /provider: the serve step exited before its ready event (failed, exit code 3) (phase readiness)"
+          }
+        ]
+      },
+      {
+        "name": "readiness",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      },
+      {
+        "name": "version-binding",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      },
+      {
+        "name": "smoke",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      },
+      {
+        "name": "teardown",
+        "state": "passed",
+        "durationMs": "<ms>"
+      }
+    ],
+    "requests": [
+      {
+        "id": "GET /items",
+        "durationMs": "<ms>",
+        "state": "not_run"
+      }
+    ],
+    "state": "composition_failed",
+    "startedAt": "<time>",
+    "finishedAt": "<time>",
+    "cleanup": {
+      "state": "clean",
+      "leftovers": []
+    }
+  },
+  "error": {
+    "code": "failure",
+    "message": "qualify /app: verdict composition_failed"
+  }
+}
+--- stderr ---
+putnami: qualify /app: verdict composition_failed

@@ -12,6 +12,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -25,6 +26,33 @@ func runImpactPlan(t *testing.T, env *CommandEnv) error {
 		t.Fatal("impact-plan command is not registered")
 	}
 	return command.run(env)
+}
+
+// TestParseArgs_PositionalLeafKeepsItsArgument pins the parser rule
+// impact-plan depends on: its command list stays among its own arguments, so
+// the invocation path is impact-plan and --output=json is accepted. The
+// commands whose handlers read the first bare argument as their subcommand
+// keep it there.
+func TestParseArgs_PositionalLeafKeepsItsArgument(t *testing.T) {
+	t.Parallel()
+	parsed := ParseArgs([]string{"impact-plan", "test,build", "--output=json"}, nil, nil)
+	if parsed.Err != nil || parsed.Subcommand != "" || len(parsed.RawJobArgs) == 0 || parsed.RawJobArgs[0] != "test,build" {
+		t.Fatalf("impact-plan parsed as sub %q args %v err %v", parsed.Subcommand, parsed.RawJobArgs, parsed.Err)
+	}
+	if code, rejected := rejectStructuredIfUnsupported("json", "impact-plan", parsed.Subcommand); rejected {
+		t.Errorf("--output=json refused for impact-plan (exit %d)", code)
+	}
+	if pin := ParseArgs([]string{"pin", "1.2.3"}, nil, nil); pin.Subcommand != "1.2.3" {
+		t.Errorf("pin sub = %q, want the version (its handler reads it there)", pin.Subcommand)
+	}
+	if help := ParseArgs([]string{"help", "build"}, nil, nil); help.Subcommand != "build" {
+		t.Errorf("help sub = %q, want build", help.Subcommand)
+	}
+	for root, want := range map[string]bool{"impact-plan": true, "pin": false, "help": false, "sessions": false, "missing": false} {
+		if got := commandmeta.PositionalLeaf(root); got != want {
+			t.Errorf("PositionalLeaf(%q) = %v, want %v", root, got, want)
+		}
+	}
 }
 
 // TestCmdImpactPlanUsageErrors holds the command line to one command list and

@@ -213,7 +213,9 @@ shell completion:
 
 This lets completions offer `putnami cloud config list` and nested flags such
 as `putnami cloud config show --with-secrets` without running the extension
-binary during completion.
+binary during completion. `putnami <group> <subcommand> --help` prints the
+positionals a top-level subcommand declares in its usage line: `<name>` when
+it is required, `[<name>]` otherwise.
 
 A group can name a `default` subcommand, and a subcommand can declare that it
 runs without a workspace:
@@ -243,15 +245,28 @@ runs without a workspace:
   prints the group help. The value must be one of the group's own
   subcommands; the strict parser rejects any other value
   (`unresolved-default-subcommand`).
+- A `default` that declares `positionals` also takes a word that names none
+  of the group's subcommands, as its first argument: with `"positionals":
+  [{"name": "project", "required": true}]` on `run`, `putnami audit /apps/web`
+  is `putnami audit run /apps/web`. A declared subcommand wins, so a project
+  named `report` is addressed by its id, `putnami audit /apps/report`. The
+  CLI passes the word through unparsed, and the default's process validates
+  it. Help prints `Usage: putnami audit [run] <project> [flags]` beside
+  `putnami audit <subcommand> [flags]`, and completion offers the project ids
+  after `putnami audit` when the first positional is named `project`. Without
+  positionals on the default, such a word stays an unknown subcommand.
 - `workspace` is `required`, the meaning of an absent value, or `optional`.
   An `optional` subcommand must also be `interactive: true`; the strict parser
   rejects it otherwise (`invalid-workspace-requirement`). It runs outside any
   workspace when its extension is pinned in the [user scope](#the-user-scope).
   Inside a workspace the member changes nothing.
 
-Neither member raises the manifest's `cliContract`: a CLI that predates them
-reads the group as it read it before, which is safe. See the extension
-protocol's [ADR 0008](../../../protocols/extension/doc/adr/0008-workspace-requirement-and-group-default-need-no-contract.md).
+Neither `default` nor `workspace` raises the manifest's `cliContract`: a CLI
+that predates them reads the group as it read it before, which is safe. See
+the extension protocol's [ADR 0008](../../../protocols/extension/doc/adr/0008-workspace-requirement-and-group-default-need-no-contract.md).
+A `default` that declares positionals requires contract 15, because an older
+CLI answers "unknown subcommand" for the word it takes; see
+[ADR 0013](../../../protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md).
 
 ## MCP Tools
 
@@ -1075,7 +1090,10 @@ context carries `userScope.callerDir`, and the environment carries
 Any interactive launch, in a workspace or not, also carries `invocationDir` and
 `PUTNAMI_INVOCATION_DIR`, the directory the command was typed in; an extension
 resolves a relative path argument against it with `context.ResolvePath` of the
-SDK.
+SDK. It also carries the output globals the user typed, which the CLI consumes
+before the extension is reached, as job context params: `verbose` for
+`--verbose` or `--debug`, `quiet` for `--quiet`, and `color`, `false` for
+`--no-color` and `true` for `--color`, each absent when not typed.
 
 Inside a workspace the workspace's own pins are the only ones, so a workspace
 that pins version A of an extension runs A even when the user scope pins B.

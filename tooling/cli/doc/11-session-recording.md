@@ -626,7 +626,7 @@ New `events.jsonl` files use the same version-2 variants as machine JSONL:
 | Record | When | Required payload |
 |--------|------|------------------|
 | `task:start` | Task starts | typed `identity` |
-| `task:event` | Runtime or session audit event is accepted | typed `identity`, normalized `event` |
+| `task:event` | Runtime or session audit event is accepted, or a serve-workload step starts (a CLI-built `process` event naming its process group) | typed `identity`, normalized `event` |
 | `test:case` | A test task reached its terminal result, once per kept case, immediately before its `task:end` | typed `identity`, `testCase` |
 | `task:end` | Task reaches any terminal result | typed `identity`, canonical `task` result |
 | `session:end` | Renderer closes the run | bounded `run`, `machineOutput` budget/elision/artifact summary |
@@ -635,7 +635,9 @@ The renderer and artifact share one canonical sanitizer and serializer. This
 makes the live stream a byte-for-byte deterministic subsequence of the artifact
 and keeps the final line identical in both. Failure-priority events and failed
 or canceled task ends consume a dedicated live reserve, so early success noise
-cannot crowd out later failure evidence.
+cannot crowd out later failure evidence. A `ready` claim uses the same reserve,
+so a serve workload's log lines cannot crowd out the claim a supervisor waits
+on.
 
 Session-wide `scheduler:parallel`, `selection:impacted`,
 `selection:change-shape` and `invocation:reaped` audit signals use a stable

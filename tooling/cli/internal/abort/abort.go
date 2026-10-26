@@ -1,5 +1,6 @@
 // Package abort records why the process was asked to stop, so end-of-run
-// reporting can name the cause instead of guessing at it.
+// reporting can name the cause instead of guessing at it, and which
+// interactive child the stop waits for or kills (HoldInteractive).
 //
 // Signal delivery is process-global and arrives on its own goroutine, long
 // after the run's contexts are built, so the source is recorded here rather
@@ -44,6 +45,9 @@ func Source() string {
 	return ""
 }
 
-// Reset clears the recorded source, so a test (or a watch-mode iteration that
-// survives its own cancellation) starts from a clean slate.
-func Reset() { source.Store(nil) }
+// Reset clears the recorded source and the supervision record (Supervise), so
+// a test starts from a clean slate.
+func Reset() {
+	source.Store(nil)
+	supervised.Store(false)
+}

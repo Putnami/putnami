@@ -126,6 +126,13 @@ func (r *WatchRenderer) ResetServeReadySignal() <-chan struct{} {
 	return r.ready.reset()
 }
 
+// BoundPort is the port the current serve iteration's last typed `ready`
+// claim announced (ReadyClaim), or 0 when none announced one. It is the
+// listener a `--port 0` serve waits on between restarts.
+func (r *WatchRenderer) BoundPort() int {
+	return r.ready.lastPort()
+}
+
 // --- Delegate to base renderer ---
 
 func (r *WatchRenderer) Start(planned []*jobs.ScheduledJob) {

@@ -187,6 +187,8 @@ func TestWatchIterationRequest_ForwardsTheRunsIdentity(t *testing.T) {
 	outer := outerWatchRequest()
 	outer.ExecutesUnderDryRun = true
 	outer.VersionSnapshot = &git.VersionInfo{Full: "1.2.3"}
+	outer.Global.ServeEnv = "-"
+	outer.ServeProcessEnv = []string{"PORT=0"}
 	outer.latestWarnings = &atomic.Pointer[workspace.WarningReport]{}
 	planExtensions := []*extension.ExtensionDescription{{Name: "@putnami/one"}}
 
@@ -216,6 +218,11 @@ func TestWatchIterationRequest_ForwardsTheRunsIdentity(t *testing.T) {
 	}
 	if !iteration.ExecutesUnderDryRun {
 		t.Error("iteration dropped ExecutesUnderDryRun; an alias's --dry-run iterations would preview forever")
+	}
+	// A restarted serve step is a new process: the supervisor's environment
+	// must reach it as it reached the first one.
+	if !reflect.DeepEqual(iteration.ServeProcessEnv, outer.ServeProcessEnv) || iteration.Global.ServeEnv != "-" {
+		t.Errorf("iteration serve env = %v (flag %q), want the outer run's %v", iteration.ServeProcessEnv, iteration.Global.ServeEnv, outer.ServeProcessEnv)
 	}
 	if iteration.Stdout != io.Discard {
 		t.Error("iteration engine notices are not discarded; 'No jobs matched' would print on every save")
@@ -338,5 +345,74 @@ func TestWorkspaceScopedInputPatterns_IncludesWorkspaceAdapterInputs(t *testing.
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("patterns = %v, want %v (root-shaped adapter inputs and markers unioned, "+
 			"candidate-relative **/*.go omitted)", got, want)
+	}
+}
+
+// A run streams its workload when one of its commands declares a workload in
+// the loaded extensions, whatever its name: the serve workload is promoted to
+// watch, the once workload streams once. A serve or run command that declares
+// none streams nothing and is not promoted.
+func TestWorkloadModes_FollowTheDeclaredWorkloadNotTheName(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-serve-workload-command-of-any-name-streams-until-interrupted")
+	command := func(name, workload string) *extension.JobDefinition {
+		return &extension.JobDefinition{Name: name, Kind: "command", Traits: extension.CommandTraits{Workload: workload}}
+	}
+	extensions := []*extension.ExtensionDescription{{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
+		"daemon":  command("daemon", extension.WorkloadServe),
+		"migrate": command("migrate", extension.WorkloadOnce),
+		"serve":   command("serve", ""),
+		"run":     command("run", ""),
+	}}}
+	for _, tc := range []struct {
+		commands    []string
+		serve, once bool
+	}{
+		{commands: []string{"daemon"}, serve: true},
+		{commands: []string{"build", "daemon"}, serve: true},
+		{commands: []string{"migrate"}, once: true},
+		{commands: []string{"serve"}},
+		{commands: []string{"run"}},
+	} {
+		serve, once := workloadModes(extensions, tc.commands)
+		if serve != tc.serve || once != tc.once {
+			t.Errorf("workloadModes(%v) = (%v, %v), want (%v, %v)", tc.commands, serve, once, tc.serve, tc.once)
+		}
+		if got := forcesServeWatch(&Request{Commands: tc.commands}, serve); got != tc.serve {
+			t.Errorf("%v promoted to watch: %v, want %v", tc.commands, got, tc.serve)
+		}
+	}
+	if serve, once := workloadModes(nil, []string{"serve", "run"}); serve || once {
+		t.Errorf("without a loaded extension, serve and run stream: (%v, %v)", serve, once)
+	}
+}
+
+// Serve watches by default, and --no-watch, which reaches the run as the serve
+// flag `watch: false`, keeps it out of the restart loop. An iteration of an
+// outer watch loop is never promoted again.
+func TestForcesServeWatch_NoWatchKeepsServeOutOfTheLoop(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		watch     any // the run's `watch` param; nil leaves it out
+		serve     bool
+		iteration bool
+		want      bool
+	}{
+		{name: "serve by default", serve: true, want: true},
+		{name: "serve --watch=true", watch: true, serve: true, want: true},
+		{name: "serve --no-watch", watch: false, serve: true, want: false},
+		{name: "a watch iteration", serve: true, iteration: true, want: false},
+		{name: "not serve", serve: false, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params := map[string]any{}
+			if tc.watch != nil {
+				params["watch"] = tc.watch
+			}
+			req := &Request{CommandParams: params, watchIteration: tc.iteration}
+			if got := forcesServeWatch(req, tc.serve); got != tc.want {
+				t.Errorf("forcesServeWatch = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

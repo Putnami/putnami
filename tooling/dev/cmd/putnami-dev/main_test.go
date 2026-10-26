@@ -51,8 +51,9 @@ func TestRunAnswersTheRuntimeHandshake(t *testing.T) {
 }
 
 // TestRunRefusesEveryOtherInvocation pins that the runtime does nothing
-// beyond the handshake and the version commands: any other argument list, a
-// verb of the vocabulary included, exits 2 and writes nothing to stdout.
+// beyond the handshake and the version, compose up and qualify run commands:
+// any other argument list, a verb of the vocabulary included, exits 2 and
+// writes nothing to stdout.
 func TestRunRefusesEveryOtherInvocation(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, feature, "handshake-only-runtime", "every-other-invocation-is-refused")
@@ -65,6 +66,12 @@ func TestRunRefusesEveryOtherInvocation(t *testing.T) {
 		{"version"},
 		{"version", "set"},
 		{"get", "version"},
+		{"compose"},
+		{"compose", "down"},
+		{"up", "compose"},
+		{"qualify"},
+		{"qualify", "verify"},
+		{"serve", "app"},
 	} {
 		t.Run(path.Join(append([]string{"args"}, args...)...), func(t *testing.T) {
 			t.Parallel()

@@ -229,6 +229,26 @@ The `event` payload of a `task:event` record stays owned by
 [`protocols/runtime`](../../runtime/README.md) and is versioned there; this
 contract treats it as an opaque object.
 
+One `event` type is the CLI's own and the runtime protocol does not list it:
+`process`, which the CLI builds for each serve-workload step it starts, before
+any event the step writes. Its `group` is the process group the step runs in
+(the root process id on Windows) and its `leaderStart` is the start time of
+that group's leader, an opaque string a reader compares and never parses,
+empty when the platform cannot read it. A producer cannot
+emit it: the CLI drops a producer line of type `process`. A finite step has
+none. The bounded live stream admits it from the failure reserve, which it
+shares with every other failure-priority record, a `ready` claim included:
+256 KiB / 256 records in `normal` mode and 2 MiB / 2048 records in `verbose`.
+Once those records spent the reserve, a later `process` event is elided and
+counted in `machineOutput.elided.failure`, and the session artifact retains it
+([04-machine-output.md](./04-machine-output.md)).
+
+```json
+{"protocolVersion":2,"record":"task:event","time":"2026-10-24T10:15:30Z",
+ "identity":{"key":"/apps/api:serve~serve","…":"…"},
+ "event":{"type":"process","group":48213,"leaderStart":"Sat Oct 24 10:15:30 2026","time":"2026-10-24T10:15:30Z"}}
+```
+
 ### Workspace load warnings
 
 `workspaceWarnings` is an additive optional member of the result envelope. It
@@ -266,12 +286,16 @@ their warnings stay on stderr. A command that runs jobs fills the member in
 its `--output=json` envelope, for the run's verdict and for a plan-only
 preview, and in the `doctor` envelope of a blocked production preflight in
 either structured mode. A command that runs jobs inside its own result, such as
-`compose`, `qualify --target local`, `cache verify` and `impact-plan`, fills the
-member with the warnings of its job run. `compose` and every `qualify` form,
-`--target <url>` and `--print-contract` included, also fill it with the
-warnings of the load they perform before any job runs. A warning that two loads
+`cache verify` and `impact-plan`, fills the member with the warnings of its job
+run. An interactive extension subcommand receives the warnings of the load that
+launched it in `workspaceWarnings` of its
+[job context](../../job/README.md), and the envelope it writes carries them:
+`compose` and every `qualify` form of `@putnami/dev`, `--target <url>` and
+`--print-contract` included, fill the member that way. A warning that two loads
 of one command report appears once. The `--output=jsonl` session stream of a
-run writes no result envelope, so there its load warnings are on stderr only.
+run writes no result envelope, so there its load warnings are on stderr only. A
+supervised serve run, one with `--output=jsonl` and `--serve-env -`, writes
+none on its serve log: its supervisor reports the warnings of its own load.
 
 ### Test case records
 

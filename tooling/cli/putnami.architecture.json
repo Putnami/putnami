@@ -69,7 +69,7 @@
           "producerProject": "/tooling/extension-sdk"
         }
       ],
-      "justification": "The CLI and the extensions share one implementation of every contract both sides read or write, so the orchestrator and the extension that produced a document never disagree on it: release sets and package metadata (releaseset, pkgmeta), channel credentials (registrycred, privatebroker), recorded results, agent artifacts, context, profiles, architecture declarations, JSONL events, OCI and Docker publication, the compose test database (dbtestenv), the source-v1 record of one worktree path (sourcebinding), and the fingerprint of a whole worktree (treefingerprint). A few packages are shared platform primitives instead: filelock, the one cross-process lock every Putnami process takes on the same files; scratch, the reclaimable scratch directory both sides create; proctree, which starts and stops a process tree the same way on every OS; dirlink, the directory link (a symbolic link on Unix, a junction on Windows); treearchive, which stages a tree and packs it into a reproducible .tar.gz without starting a process; envkeys, the environment-name rule (case-insensitive on Windows); and ownerperm, which restricts a private file to its owner (an access list on Windows). None of them carries an extension's behavior."
+      "justification": "The CLI and the extensions share one implementation of every contract both sides read or write, so the orchestrator and the extension that produced a document never disagree on it: release sets and package metadata (releaseset, pkgmeta), channel credentials (registrycred, privatebroker), recorded results, agent artifacts, context, profiles, architecture declarations, JSONL events, OCI and Docker publication, the source-v1 record of one worktree path (sourcebinding), and the fingerprint of a whole worktree (treefingerprint). A few packages are shared platform primitives instead: filelock, the one cross-process lock every Putnami process takes on the same files; scratch, the reclaimable scratch directory both sides create; proctree, which starts and stops a process tree the same way on every OS; dirlink, the directory link (a symbolic link on Unix, a junction on Windows); treearchive, which stages a tree and packs it into a reproducible .tar.gz without starting a process; envkeys, the environment-name rule (case-insensitive on Windows); and ownerperm, which restricts a private file to its owner (an access list on Windows). None of them carries an extension's behavior."
     },
     {
       "id": "cli.protocol-contracts.v1",
@@ -178,11 +178,6 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/cli",
           "producerProject": "/protocols/infra"
         },
         {
@@ -198,17 +193,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli",
-          "producerProject": "/protocols/platform"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/cli",
           "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/cli",
-          "producerProject": "/protocols/qualify"
         },
         {
           "kind": "project-dependency",
@@ -343,11 +328,6 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
-          "producerProject": "/protocols/http-routes"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/infra"
         },
         {
@@ -363,17 +343,7 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
-          "producerProject": "/protocols/platform"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/cli-documents",
           "producerProject": "/protocols/put"
-        },
-        {
-          "kind": "project-dependency",
-          "consumerProject": "/tooling/cli-documents",
-          "producerProject": "/protocols/qualify"
         },
         {
           "kind": "project-dependency",

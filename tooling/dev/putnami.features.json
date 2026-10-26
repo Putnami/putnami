@@ -21,7 +21,7 @@
             "kind": "acceptance",
             "checks": [
               "the-manifest-declares-the-eleven-verbs-in-order",
-              "the-manifest-passes-strict-validation-at-contract-11",
+              "the-manifest-passes-strict-validation-at-contract-15",
               "each-verb-declares-its-presentation"
             ]
           }
@@ -204,6 +204,333 @@
         "commands": [
           "version get",
           "version tag"
+        ]
+      }
+    },
+    {
+      "id": "tooling/workload-qualification",
+      "type": "feature",
+      "name": "Workload qualification",
+      "outcome": "A user or agent runs a changed workload the way it is shipped, with the workloads and databases it needs, from one command, and proves with one derived smoke contract and one fail-closed verdict that it boots and serves real requests on the tree or deployed build it names",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "runs-with-closure-served-behind-stable-proxies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-closure-is-transitive-runs-with-in-topological-order",
+              "a-provider-reported-runs-with-composes-its-provider",
+              "an-unserveable-member-is-refused-before-anything-starts"
+            ]
+          }
+        },
+        {
+          "id": "a-member-is-reached-through-its-stable-proxy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-proxy-answers-unavailable-until-the-backend-is-known",
+              "dependants-reach-a-provider-through-its-injected-proxy-url"
+            ]
+          }
+        },
+        {
+          "id": "ephemeral-databases-per-composition",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-datasource-gets-a-database-created-and-dropped-with-the-composition",
+              "a-provided-server-is-shared-and-reported-as-isolation-none"
+            ]
+          }
+        },
+        {
+          "id": "typed-readiness-bounds-every-member",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-member-starts-only-after-the-one-before-it-announced-readiness",
+              "a-member-that-never-announces-readiness-fails-naming-member-and-phase",
+              "a-claim-without-an-endpoint-keeps-the-backend"
+            ]
+          }
+        },
+        {
+          "id": "ungraceful-death-is-reaped-by-the-next-invocation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-orphan-is-reaped-only-when-its-lock-is-free-and-its-owner-dead",
+              "a-killed-composition-leaves-a-lease-the-next-invocation-reaps"
+            ]
+          }
+        },
+        {
+          "id": "injected-configuration-never-reaches-output",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-document-carries-urls-and-bindings-and-the-status-carries-section-names-only"
+            ]
+          }
+        },
+        {
+          "id": "smoke-is-derived-from-the-route-inventory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "exact-public-read-only-routes-sorted-and-capped",
+              "platform-and-reserved-paths-are-never-requested",
+              "the-platform-prefix-is-read-from-the-inventory"
+            ]
+          }
+        },
+        {
+          "id": "no-derivable-request-is-unsupported-not-success",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-inventory-is-unsupported-with-a-build-remedy",
+              "an-empty-contract-never-passes"
+            ]
+          }
+        },
+        {
+          "id": "remote-verdict-binds-to-the-deployed-sha",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-matching-sha-passes",
+              "a-wrong-or-missing-sha-is-digest-mismatch",
+              "a-url-target-without-expect-sha-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "local-verdict-binds-to-the-exact-worktree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-local-verdict-names-the-worktree-it-composed-and-a-clean-teardown",
+              "a-worktree-that-changes-before-the-workload-is-ready-is-digest-mismatch",
+              "a-composition-failure-names-the-member-and-still-tears-down",
+              "canceling-a-local-run-tears-the-composition-down",
+              "expect-sha-with-a-local-target-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "local-target-reads-the-local-config",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-local-target-reads-the-local-config-of-its-production-build"
+            ]
+          }
+        },
+        {
+          "id": "local-readiness-is-completed-startup",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-member-records-completed-startup-from-a-workload-claim-alone",
+              "a-member-that-exits-before-completed-startup-fails-the-wait",
+              "a-local-target-without-a-readiness-route-passes-on-completed-startup",
+              "completed-startup-that-never-arrives-times-out-without-smoke",
+              "a-declared-readiness-route-is-polled"
+            ]
+          }
+        },
+        {
+          "id": "every-non-pass-state-exits-non-zero",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "passed-exits-zero-and-every-other-state-exits-one",
+              "the-verdict-rides-the-failure-envelope",
+              "a-server-error-fails-the-smoke"
+            ]
+          }
+        },
+        {
+          "id": "each-member-is-an-ordinary-serve-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-member-starts-as-a-serve-run-of-the-cli-with-its-environment-on-stdin",
+              "the-environment-document-reaches-no-session-file",
+              "the-start-exit-and-verdict-documents-keep-their-bytes",
+              "each-serve-run-takes-the-invocations-output-flags",
+              "a-serve-run-does-not-inherit-the-interactive-marker"
+            ]
+          }
+        },
+        {
+          "id": "compose-follows-each-serve-step-through-the-session-stream",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-preparation-is-prepare-failed-with-the-output-tail",
+              "the-ready-timeout-counts-from-the-serve-step-start",
+              "a-watched-target-follows-its-serve-step-across-restarts",
+              "a-member-reports-how-its-serve-last-ended"
+            ]
+          }
+        },
+        {
+          "id": "serve-run-output-reaches-stderr-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-caller-without-serve-logs-sees-only-a-failed-preparation",
+              "qualify-shows-the-serve-logs-only-in-a-verbose-human-run",
+              "qualify-reports-a-failed-preparation-on-stderr"
+            ]
+          }
+        },
+        {
+          "id": "the-lease-and-the-teardown-cover-every-serve-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-lease-records-the-serve-run-and-each-serve-step-with-its-leader-start",
+              "members-stop-in-reverse-start-order",
+              "a-killed-composition-leaves-both-groups-of-each-member-to-the-reap",
+              "the-teardown-waits-no-longer-than-its-deadline",
+              "the-teardown-ends-before-putnami-kills-the-command"
+            ]
+          }
+        },
+        {
+          "id": "a-lost-putnami-tears-the-command-down",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-changed-parent-pid-cancels-the-command",
+              "a-killed-parent-cancels-a-real-command-that-outlives-a-closed-stdout"
+            ]
+          }
+        },
+        {
+          "id": "the-dev-extension-runs-compose-and-qualify",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-declares-the-compose-and-qualify-groups"
+            ]
+          }
+        },
+        {
+          "id": "the-dev-executable-reads-its-launch-from-the-job-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-executable-dispatches-the-compose-and-qualify-commands",
+              "the-executable-reads-the-output-flags-from-the-job-context"
+            ]
+          }
+        },
+        {
+          "id": "compose-and-qualify-carry-their-launch-warnings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-executable-reads-the-warnings-from-the-job-context",
+              "every-envelope-carries-the-launch-warnings"
+            ]
+          }
+        }
+      ],
+      "surface": {
+        "commands": [
+          "compose up",
+          "qualify run"
         ]
       }
     }

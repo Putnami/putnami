@@ -118,6 +118,7 @@ const (
 	EventTypeResult     = model.EventTypeResult
 	EventTypeMeta       = model.EventTypeMeta
 	EventTypeReady      = model.EventTypeReady
+	EventTypeProcess    = model.EventTypeProcess
 )
 
 // BatchResultsDataKey is the result-data key of a batch subprocess's

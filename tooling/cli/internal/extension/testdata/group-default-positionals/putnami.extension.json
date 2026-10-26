@@ -1,0 +1,48 @@
+{
+  "name": "@acme/stage",
+  "version": "1.0.0",
+  "cliContract": 15,
+  "commands": {
+    "stage-up": { "description": "Stage one project.", "traits": { "workload": "serve" }, "run": [{ "id": "up", "task": "t" }] },
+    "stage-list": { "description": "List the staged projects.", "run": [{ "id": "list", "task": "t" }] },
+    "stage-status": { "description": "Show the stage status.", "run": [{ "id": "status", "task": "t" }] },
+    "notes-show": { "description": "Show the notes.", "run": [{ "id": "show", "task": "t" }] },
+    "notes-add": { "description": "Add a note.", "run": [{ "id": "add", "task": "t" }] },
+    "notes-draft": { "description": "Draft a note.", "run": [{ "id": "draft", "task": "t" }] },
+    "deploy": { "description": "Deploy.", "run": [{ "id": "deploy", "task": "t" }] }
+  },
+  "commandGroups": {
+    "stage": {
+      "description": "Stage projects.",
+      "default": "up",
+      "subcommands": {
+        "up": {
+          "description": "Stage one project.",
+          "command": "stage-up",
+          "interactive": true,
+          "positionals": [{ "name": "project", "required": true }]
+        },
+        "list": { "description": "List the staged projects.", "command": "stage-list", "interactive": true },
+        "status": { "description": "Show the stage status.", "command": "stage-status" },
+        "peek": { "description": "Show the notes.", "command": "notes-show" }
+      }
+    },
+    "notes": {
+      "description": "Keep notes.",
+      "default": "show",
+      "subcommands": {
+        "show": { "description": "Show the notes.", "command": "notes-show", "interactive": true },
+        "add": {
+          "description": "Add a note.",
+          "command": "notes-add",
+          "interactive": true,
+          "positionals": [{ "name": "text", "required": true }],
+          "subcommands": { "draft": { "description": "Draft a note.", "command": "notes-draft" } }
+        }
+      }
+    }
+  },
+  "tasks": {
+    "t": { "kind": "command", "command": "echo", "cache": false }
+  }
+}

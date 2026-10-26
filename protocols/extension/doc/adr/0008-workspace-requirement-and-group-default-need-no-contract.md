@@ -1,6 +1,7 @@
 # ADR 0008 — A subcommand's workspace requirement and a group default need no contract increment
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0013](0013-a-default-that-takes-positionals-requires-contract-15.md)
 - **Scope**: `go.putnami.dev/protocol/extension` (`protocols/extension`), the
   `commandGroups` member of `putnami.extension.json`, and
   `go.putnami.dev/protocol/cli` (`protocols/cli/contract.go`)

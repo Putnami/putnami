@@ -40,6 +40,16 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_takes_project() {
+    case "$1" in
+`)
+	for _, group := range ctx.projectPositionalGroups() {
+		iox.Fprintf(w, "        %s) return 0 ;;\n", bashQuote(group))
+	}
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     reply=()
     case "$1" in
@@ -139,6 +149,9 @@ _putnami() {
             nested_subcmds=("${reply[@]}")
             if (( ${#nested_subcmds} > 0 )) && [[ "${cur}" != -* ]] && (( i == CURRENT )); then
                 _describe -t subcmds 'subcommand' nested_subcmds
+                if _putnami_takes_project "${path}"; then
+                    _describe -t project-ids 'project ID' project_ids
+                fi
             else
                 local -a cmd_values
                 case "${path} ${prev}" in

@@ -11,6 +11,9 @@ import (
 
 // Finish is called when all jobs are complete.
 func (r *TextRenderer) Finish(results map[string]*jobs.JobResult, outcome jobs.SessionOutcome) {
+	if r.cfg.TasksOnly {
+		return
+	}
 	if r.cfg.Lifecycle {
 		// A lifecycle job's dry-run plan, such as the edit of deps add
 		// --dry-run, is the one success output the user asked to see.

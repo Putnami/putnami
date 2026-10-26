@@ -88,6 +88,18 @@ func (e *Engine) runWatch(
 	return SessionResult{ExitCode: code}
 }
 
+// forcesServeWatch reports whether a run is promoted to watch mode.
+// Serve-workload commands watch by default, except an iteration of an outer
+// watch loop, which already owns the replan policy, and a run that turned the
+// command's own `watch` flag off with --no-watch: restarting it on changes
+// would overrule that flag.
+func forcesServeWatch(req *Request, isServeMode bool) bool {
+	if watch, set := req.CommandParams["watch"].(bool); set && !watch {
+		return false
+	}
+	return isServeMode && !req.Global.Watch && !req.watchIteration
+}
+
 // watchIterationRequest builds the Request for ONE replan iteration.
 //
 // It is the whole watch→engine mapping, in one place, so "what a watch iteration
@@ -119,6 +131,9 @@ func (e *Engine) runWatch(
 //     chrome); the engine's generic notices — "No jobs matched. Nothing to do."
 //     above all — would print on every save. Diagnostics stay on stderr, which is
 //     not routed here for any adapter.
+//   - ServeProcessEnv is FORWARDED, with Global.ServeEnv. A restarted serve
+//     step is a new process, and it needs the supervisor's environment as much
+//     as the first one did.
 //   - Preflight is FORWARDED. Every iteration executes jobs, so every iteration
 //     is gated exactly as the outer run is; withholding it would make an
 //     ungated iteration out of a gated session — and, because a nil gate fails
@@ -146,6 +161,7 @@ func watchIterationRequest(
 		// still executes; dropping this would silently turn every iteration of
 		// `putnami <group> serve --dry-run --watch` into a plan preview.
 		ExecutesUnderDryRun: req.ExecutesUnderDryRun,
+		ServeProcessEnv:     req.ServeProcessEnv,
 		watchIteration:      true,
 		latestWarnings:      req.latestWarnings,
 		VersionSnapshot:     req.VersionSnapshot,

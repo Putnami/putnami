@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --ready-timeout "-5s" is not a positive duration (for example 60s or 2m)

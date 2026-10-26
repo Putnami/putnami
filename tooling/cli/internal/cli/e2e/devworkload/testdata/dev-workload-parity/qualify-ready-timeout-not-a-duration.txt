@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --ready-timeout must be a positive Go duration such as 30s or 2m

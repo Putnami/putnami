@@ -46,6 +46,16 @@ type ScheduledJob struct {
 	// It is run state, not task identity: nothing derived from it may reach a
 	// cache key or a session record.
 	InvocationDir string
+	// WorkspaceWarnings are the warnings of the workspace load the interactive
+	// launch of an extension command performed, in order, each once. The
+	// launch already wrote them on stderr unless --quiet; the job's context
+	// reports them as workspaceWarnings, so a command that writes a result
+	// envelope carries them. Only the interactive launch sets it; a planned job
+	// never does.
+	//
+	// It is run state, not task identity: nothing derived from it may reach a
+	// cache key or a session record.
+	WorkspaceWarnings []protocolcli.WorkspaceWarning
 	// SessionPrerequisiteNoopGates records dependent-owned gate commands that
 	// the planner proved have zero contributors across this prerequisite's
 	// active selection. It is an execution-only authorization fact, stamped on

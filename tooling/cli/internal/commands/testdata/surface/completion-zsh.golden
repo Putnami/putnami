@@ -140,7 +140,6 @@ _putnami_path_known() {
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
         'completion zsh') return 0 ;;
-        'compose') return 0 ;;
         'config') return 0 ;;
         'config set') return 0 ;;
         'config show') return 0 ;;
@@ -175,7 +174,6 @@ _putnami_path_known() {
         'projects list') return 0 ;;
         'projects sync') return 0 ;;
         'projects tag') return 0 ;;
-        'qualify') return 0 ;;
         'report') return 0 ;;
         'scopes') return 0 ;;
         'scopes list') return 0 ;;
@@ -208,6 +206,12 @@ _putnami_path_known() {
     esac
 }
 
+_putnami_takes_project() {
+    case "$1" in
+        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     reply=()
     case "$1" in
@@ -219,13 +223,6 @@ _putnami_flags_for() {
         'cli use')
             reply=(
                 '--global[Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)]'
-            )
-            ;;
-        'compose')
-            reply=(
-                '--no-watch[Run the target production-mode without watch, like its dependencies]'
-                '--port[Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port]:n:'
-                '--ready-timeout[Deadline for each member'\''s typed ready event; default 60s]:duration:'
             )
             ;;
         'context generate')
@@ -321,16 +318,6 @@ _putnami_flags_for() {
                 '--set[Replace the project'\''s tags with the given list]'
             )
             ;;
-        'qualify')
-            reply=(
-                '--expect-sha[Required with a URL target: the git sha the deployment must report on /version]:sha:'
-                '--platform-prefix[Prefix under which /readyz and /version are mounted; setting it makes local readiness poll <path>/readyz instead of waiting for the startup claim; default: where the route inventory declares both, else the root]:path:'
-                '--print-contract[Print the derived contract and exit without a target]'
-                '--ready-timeout[Deadline for readiness; default 60s]:duration:'
-                '--request-timeout[Deadline per smoke request; default 5s]:duration:'
-                '--target[local composes the workload on this machine; an http(s) URL is a running deployment]:local|url:'
-            )
-            ;;
         'report')
             reply=(
                 '--session[Report to read, by session ID (default: the newest CLI-driven run'\''s)]:id:'
@@ -418,7 +405,6 @@ _putnami() {
         'cache:Manage cache'
         'cli:Installed CLI binaries'
         'completion:Generate shell completions (bash, zsh, fish)'
-        'compose:Serve a workload with the workloads it runs with'
         'config:Manage configuration'
         'context:Manage AI context'
         'deps:Manage dependencies'
@@ -432,7 +418,6 @@ _putnami() {
         'migrate:Migrate Putnami workspace files forward'
         'pin:Pin the CLI version this workspace uses'
         'projects:Manage projects'
-        'qualify:Run a workload'\''s derived smoke contract against a target and emit one verdict'
         'report:Read back a run'\''s report'
         'scopes:List workspace scopes'
         'sessions:Inspect execution sessions'
@@ -498,6 +483,9 @@ _putnami() {
             nested_subcmds=("${reply[@]}")
             if (( ${#nested_subcmds} > 0 )) && [[ "${cur}" != -* ]] && (( i == CURRENT )); then
                 _describe -t subcmds 'subcommand' nested_subcmds
+                if _putnami_takes_project "${path}"; then
+                    _describe -t project-ids 'project ID' project_ids
+                fi
             else
                 local -a cmd_values
                 case "${path} ${prev}" in

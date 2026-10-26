@@ -21,14 +21,16 @@ import (
 //
 // So this is the full cross product of {absent, one behind, current, latest,
 // one ahead of latest} × {commands, command groups, tools, agent content,
-// verbs, command kinds, publish channels, provisioned toolchain, none},
+// verbs, command kinds, publish channels, provisioned toolchain, default
+// positionals, none},
 // in one table, next to the doc it mirrors. Ratcheting a row means editing this
 // table and that table together.
 //
 // The additive contracts above the base are opted into: a manifest needs one
 // only when it declares agent content, a verb vocabulary, command kinds,
-// publish channels or a provisioned toolchain candidate, so the floor a stamp
-// must reach depends on the surface, while the ceiling does not.
+// publish channels, a provisioned toolchain candidate or a group default that
+// takes positionals, so the floor a stamp must reach depends on the surface,
+// while the ceiling does not.
 
 // matrixManifest renders a manifest carrying exactly one kind of contract
 // surface at a given declared contract. Contract 0 is written as an ABSENT
@@ -86,6 +88,12 @@ const (
     "resolves": ["compiler"],
     "toolchains": {"compiler": {"lock": "compiler", "candidates": [{"from": "provisioned"}], "probe": {"expect": "{version}"}}}
   }`
+
+	defaultPositionalsSurface = `"commandGroups": {"stage": {"default": "up", "subcommands": {
+    "up": {"command": "deploy", "positionals": [{"name": "project", "required": true}]}
+  }}},
+  "commands": {"deploy": {"run": [{"id": "d", "task": "t"}]}},
+  "tasks": {"t": {"kind": "command", "command": "echo"}}`
 )
 
 func writeMatrixManifest(t *testing.T, body string) string {
@@ -128,6 +136,7 @@ func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
 		{name: "command kinds", body: commandKindsSurface, governs: true, required: protocolcli.CommandKindContract},
 		{name: "publish channels", body: publishChannelsSurface, governs: true, required: protocolcli.PublishChannelsContract},
 		{name: "provisioned toolchain", body: provisionedToolchainSurface, governs: true, required: protocolcli.ProvisionedToolchainContract},
+		{name: "default positionals", body: defaultPositionalsSurface, governs: true, required: protocolcli.DefaultPositionalsContract},
 		{name: "hook-only", body: hookOnlySurface, governs: false, required: current},
 	}
 	contracts := []struct {
@@ -215,6 +224,7 @@ func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
 		commandKindsSurface:         true,
 		publishChannelsSurface:      true,
 		provisionedToolchainSurface: true,
+		defaultPositionalsSurface:   true,
 		hookOnlySurface:             false,
 	}
 	for surface, want := range cases {

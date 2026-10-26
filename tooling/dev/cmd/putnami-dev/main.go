@@ -2,31 +2,45 @@
 //
 // Usage:
 //
-//	putnami-dev __putnami runtime-info    (the runtime handshake)
-//	putnami-dev version get [flags]       (putnami version get)
-//	putnami-dev version tag [flags]       (putnami version tag)
+//	putnami-dev __putnami runtime-info          (the runtime handshake)
+//	putnami-dev version get [flags]             (putnami version get)
+//	putnami-dev version tag [flags]             (putnami version tag)
+//	putnami-dev compose up <project> [flags]    (putnami compose <project>)
+//	putnami-dev qualify run <project> [flags]   (putnami qualify <project>)
 //
-// It answers the runtime handshake, serves the version commands, and refuses
-// every other invocation. putnami launches a version command as an
-// interactive subcommand in the workspace root and appends
-// --putnamiContext <file>; the command reads the output mode and --dry-run
-// from that job context. The development verbs the manifest declares run in
-// the language extensions, never here.
+// It answers the runtime handshake, serves the version, compose and qualify
+// commands, and refuses every other invocation. putnami launches each command
+// as an interactive subcommand in the workspace root and appends
+// --putnamiContext <file>; the command reads the output mode, --dry-run, the
+// output flags (--verbose, --quiet, --no-color), the workspace membership and
+// the warnings of putnami's workspace load from that job context. compose and
+// qualify start
+// each member of a composition as a serve run of the putnami executable that
+// launched them, which putnami names in PUTNAMI_CLI_EXECUTABLE. The
+// development verbs the manifest declares run in the language extensions,
+// never here.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/job"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/resultv2"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 
+	"go.putnami.dev/tooling/dev/internal/compose"
 	"go.putnami.dev/tooling/dev/internal/host"
+	"go.putnami.dev/tooling/dev/internal/parent"
+	"go.putnami.dev/tooling/dev/internal/qualify"
 	"go.putnami.dev/tooling/dev/internal/version"
 )
 
@@ -59,11 +73,110 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	contextFile := contextPath(args)
 	args = withoutContext(args)
-	if len(args) >= 2 && args[0] == "version" && (args[1] == "get" || args[1] == "tag") {
+	switch {
+	case len(args) >= 2 && args[0] == "version" && (args[1] == "get" || args[1] == "tag"):
 		return runVersion(args[1], args[2:], contextFile, stdout, stderr)
+	case len(args) >= 2 && args[0] == "compose" && args[1] == "up":
+		return runWorkload(compose.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
+			return compose.Run(compose.Request{
+				Ctx: launch.ctx, Workspace: launch.workspace, Args: launch.args, Output: launch.output,
+				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
+				Warnings: launch.warnings, Stdout: stdout, Stderr: stderr,
+			})
+		})
+	case len(args) >= 2 && args[0] == "qualify" && args[1] == "run":
+		return runWorkload(qualify.CommandPath, args[2:], contextFile, stdout, stderr, func(launch workloadLaunch) int {
+			return qualify.Run(qualify.Request{
+				Ctx: launch.ctx, Workspace: launch.workspace, Args: launch.args, Output: launch.output,
+				Executable: launch.executable, Verbose: launch.verbose, Quiet: launch.quiet, NoColor: launch.noColor,
+				Warnings: launch.warnings, Stdout: stdout, Stderr: stderr,
+			})
+		})
 	}
-	fmt.Fprintln(stderr, "putnami-dev: unknown invocation; this runtime answers the Putnami runtime handshake and the version get and tag commands")
+	fmt.Fprintln(stderr, "putnami-dev: unknown invocation; this runtime answers the Putnami runtime handshake and the version get and tag, compose up and qualify run commands")
 	return 2
+}
+
+// cliExecutableEnv names the putnami executable that launched an interactive
+// command. A composition starts its members' serve runs with it.
+const cliExecutableEnv = "PUTNAMI_CLI_EXECUTABLE"
+
+// workloadLaunch is what an interactive compose or qualify launch reads from
+// putnami before the command runs.
+type workloadLaunch struct {
+	// ctx ends once the putnami process that launched the command is gone
+	// (parent.Watch), which cancels the command as a terminal signal does.
+	ctx context.Context
+	// args are the user's arguments after the subcommand.
+	args []string
+	// output is the output mode putnami resolved.
+	output protocolcli.OutputMode
+	// verbose, quiet and noColor are the --verbose (or --debug), --quiet and
+	// --no-color the user typed, which putnami consumed as its own flags.
+	verbose bool
+	quiet   bool
+	noColor bool
+	// warnings are the warnings of putnami's workspace load, which it already
+	// wrote on stderr unless --quiet; every result envelope the command writes
+	// carries them.
+	warnings []protocolcli.WorkspaceWarning
+	// workspace is the workspace membership the job context carries.
+	workspace *compose.Workspace
+	// executable is the absolute path of the putnami executable.
+	executable string
+}
+
+// runWorkload reads a compose or qualify launch, then runs the command. It
+// takes the host channel out of the environment first, so no serve run the
+// command starts inherits it. A launch that names no job context, no
+// workspace membership or no absolute putnami executable is refused before
+// anything starts. The command runs under a watch of its parent: a putnami
+// killed outright signals nothing, so its loss cancels the command, which then
+// tears its composition down as it does on a terminal signal.
+func runWorkload(command string, args []string, contextFile string, stdout, stderr io.Writer, run func(workloadLaunch) int) int {
+	_ = host.Take("").Close()
+	if contextFile == "" {
+		fmt.Fprintf(stderr, "putnami: %s needs the job context of an interactive launch by putnami; run `putnami %s <project>`\n", command, command)
+		return protocolcli.ExitFailure
+	}
+	launchContext, err := job.ParseFile(contextFile)
+	if err != nil {
+		fmt.Fprintf(stderr, "putnami: %s: %v\n", command, err) //nolint:gosec // G705: stderr is a terminal or a log, never an HTTP response
+		return protocolcli.ExitFailure
+	}
+	launch := workloadLaunch{
+		args:     args,
+		output:   protocolcli.OutputMode(launchContext.Params.String("output")),
+		verbose:  launchContext.Params.Bool("verbose", false),
+		quiet:    launchContext.Params.Bool("quiet", false),
+		noColor:  !launchContext.Params.Bool("color", true),
+		warnings: launchContext.WorkspaceWarnings,
+	}
+	launch.workspace, launch.executable, err = readWorkloadLaunch(command, launchContext)
+	if err != nil {
+		return resultv2.EmitWithWarnings(stdout, stderr, launch.output, command, "", nil, err, launch.warnings)
+	}
+	ctx, stop := parent.Watch(context.Background())
+	defer stop()
+	launch.ctx = ctx
+	return run(launch)
+}
+
+// readWorkloadLaunch returns the workspace membership and the putnami
+// executable of a launch.
+func readWorkloadLaunch(command string, launchContext *job.Context) (*compose.Workspace, string, error) {
+	if len(launchContext.WorkspaceProjects) == 0 {
+		return nil, "", fmt.Errorf("%s: the job context carries no workspace membership; run `putnami %s <project>` in a workspace", command, command)
+	}
+	ws, err := compose.NewWorkspace(launchContext.WorkspaceRoot, wsproto.Load(launchContext.WorkspaceRoot), launchContext.WorkspaceProjects)
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: %w", command, err)
+	}
+	executable := os.Getenv(cliExecutableEnv)
+	if executable == "" || !filepath.IsAbs(executable) {
+		return nil, "", errors.New(command + ": " + cliExecutableEnv + " names no absolute putnami executable to start the serve runs with; run `putnami " + command + " <project>`")
+	}
+	return ws, executable, nil
 }
 
 // contextIndex returns the index of the last --putnamiContext <file> pair,

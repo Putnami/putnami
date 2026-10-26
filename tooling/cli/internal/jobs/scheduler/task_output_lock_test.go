@@ -515,6 +515,129 @@ func TestTaskOutputLockPreparationKeys(t *testing.T) {
 	}
 }
 
+// TestTaskOutputLockServeKeys pins which key a serve-workload step releases
+// once its process started: its command-output key, and only when every task
+// of the acquisition that needs it is a serve-workload step. Its writer key of
+// a durable project-rooted output and its reader key stay held until the
+// capture, the subprocess never receives the released key's id, and another
+// session takes that key while the step still holds the others.
+func TestTaskOutputLockServeKeys(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
+		"a-serve-step-keeps-every-other-key-until-capture")
+	root := t.TempDir()
+	clients := extension.ResourceRef{ID: "workspace-clients", Scope: extension.ResourceScopeWorkspace}
+	serving := readerJob("proj", "serve~serve", map[string]extension.DeclaredOutput{
+		"state": dirDeclaration(extension.OutputRootProject, ".gen/serve", false),
+	}, clients)
+	finite := outputLockJob("proj", "serve~generate", nil)
+	always := func(*ScheduledJob) bool { return true }
+	session := newTestOutputLocks(t, root, "session", "", nil)
+	session.serveSteps = map[string]bool{serving.Key(): true}
+
+	keys := session.keysFor([]*ScheduledJob{serving}, always, true)
+	commandOutput := keyNamed(t, keys, "command-output:proj/serve")
+	project := keyNamed(t, keys, "project:proj")
+	workspace := keyNamed(t, keys, "workspace:")
+	if !commandOutput.serve || project.serve || workspace.serve {
+		t.Fatalf("keys = %+v, want only the command-output key released once the process started", keys)
+	}
+	for _, key := range session.keysFor([]*ScheduledJob{serving, finite}, always, true) {
+		if key.serve {
+			t.Fatalf("%s is a serve key although a finite step of the acquisition needs it until capture", key.name)
+		}
+	}
+	for _, key := range session.keysFor([]*ScheduledJob{finite}, always, true) {
+		if key.serve {
+			t.Fatalf("%s is a serve key of a step that is not a serve-workload step", key.name)
+		}
+	}
+
+	hold, err := session.acquire(t.Context(), []*ScheduledJob{serving}, always, true)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	if preparing := hold.value(); !strings.Contains(preparing, commandOutput.id) {
+		t.Fatalf("preparation value = %q, want the command-output key the preparation holds", preparing)
+	}
+	ctx := hold.endPreparation(t.Context())
+	if got, want := heldOutputLocksValue(ctx), strings.Join(slices.Sorted(slices.Values([]string{project.id, workspace.id})), ","); got != want {
+		t.Fatalf("subprocess value = %q, want %q: the subprocess never holds the command-output key", got, want)
+	}
+	releaseServeOutputLocks(ctx)
+	if probeFree(t, session, commandOutput) {
+		t.Fatal("the command-output key was released outside a serve-workload step's process start")
+	}
+
+	other := newTestOutputLocks(t, root, "other", "", noWaitLine(t))
+	started := withServeStep(ctx)
+	releaseServeOutputLocks(started)
+	if !probeFree(t, session, commandOutput) {
+		t.Fatal("the command-output key is still held after the serve-workload step's process started")
+	}
+	if probeFree(t, session, project) || probeShared(t, session, project) {
+		t.Fatal("the writer key of a durable project-rooted output was released before the capture")
+	}
+	if probeFree(t, session, workspace) || !probeShared(t, session, workspace) {
+		t.Fatal("the reader key is not held shared until the capture")
+	}
+	finiteHold := awaitAcquired(t, acquireAsync(t.Context(), other, finite), "another session's finite step")
+	finiteHold.release()
+
+	releaseServeOutputLocks(started)
+	hold.serveStarted()
+	if probeFree(t, session, project) {
+		t.Fatal("a second release dropped a key held until the capture")
+	}
+	hold.release()
+	for _, key := range keys {
+		if !probeFree(t, session, key) {
+			t.Fatalf("%s is still held after release", key.name)
+		}
+	}
+	(*outputLockHold)(nil).serveStarted()
+	releaseServeOutputLocks(withServeStep(t.Context()))
+}
+
+// TestTaskOutputLockServeKeysKeepADeclaredCommandOutput pins the serve key's
+// limit: a serve-workload step whose task declares a command-output output
+// keeps that key until its capture, since its retry empties that output and
+// its capture stores it. The key is no serve key, the subprocess receives it
+// as held, and the process start releases nothing.
+func TestTaskOutputLockServeKeysKeepADeclaredCommandOutput(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
+		"a-serve-step-that-declares-a-command-output-keeps-it-until-capture")
+	root := t.TempDir()
+	serving := outputLockJob("proj", "serve~serve", map[string]extension.DeclaredOutput{
+		"state": fileDeclaration(extension.OutputRootCommandOutput, "serve.txt", false),
+	})
+	session := newTestOutputLocks(t, root, "session", "", nil)
+	session.serveSteps = map[string]bool{serving.Key(): true}
+
+	keys := session.keysFor([]*ScheduledJob{serving}, nil, true)
+	commandOutput := keyNamed(t, keys, "command-output:proj/serve")
+	if commandOutput.serve {
+		t.Fatalf("keys = %+v, want the declared command-output key kept until the capture", keys)
+	}
+	hold, err := session.acquire(t.Context(), []*ScheduledJob{serving}, nil, true)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	ctx := hold.endPreparation(t.Context())
+	if got := heldOutputLocksValue(ctx); !strings.Contains(got, commandOutput.id) {
+		t.Fatalf("subprocess value = %q, want the command-output key the step holds until its capture", got)
+	}
+	releaseServeOutputLocks(withServeStep(ctx))
+	if probeFree(t, session, commandOutput) {
+		t.Fatal("the process start released a command-output key the step declares an output under")
+	}
+	hold.release()
+	if !probeFree(t, session, commandOutput) {
+		t.Fatal("the command-output key is still held after release")
+	}
+}
+
 // TestPreparationWritesProjectTree pins the two preparation writes that take
 // the project key: a preBuild hook until this session started it, whatever
 // this session already stamped, and the version stamp until this session

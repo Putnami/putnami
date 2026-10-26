@@ -64,11 +64,11 @@ func LoadManifest(path string) (*Manifest, error) {
 //     v3, job context v2, runtime event protocol v2, lock format v2), the
 //     session prerequisites of 4, and, for a manifest that declares agent
 //     content, a verb vocabulary, command kinds, publish channels, a
-//     provisioned toolchain candidate or input selectors, the additive
-//     contract 5, 9, 11, 12, 13 or 14. Loading a manifest stamped below that
-//     would run a task whose outputs the scheduler cannot capture from a
-//     declaration, or accept agent content a reader of its stamp never had
-//     to represent.
+//     provisioned toolchain candidate, input selectors or a group default that
+//     takes positionals, the additive contract 5, 9, 11, 12, 13, 14 or 15.
+//     Loading a manifest stamped below that would run a task whose outputs
+//     the scheduler cannot capture from a declaration, or accept agent
+//     content a reader of its stamp never had to represent.
 //
 // A manifest that declares no contract surface at all is outside the ladder
 // (DeclaresContractSurface): the packager never stamps one, so requiring a
@@ -112,6 +112,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.DefaultPositionalsContract:
+			reason = " for a default subcommand that takes positionals"
 		case required == protocolcli.InputSelectorsContract:
 			reason = " for its input selectors"
 		case required == protocolcli.ProvisionedToolchainContract:

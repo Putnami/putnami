@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	cliproto "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	ext "go.putnami.dev/protocol/extension"
 )
@@ -142,11 +144,14 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"selectedProjects[1].dependencies",
 		"selectedProjects[0].extensions",
 		"selectedProjects[0].type",
+		"selectedProjects[0].runsWith",
 		"workspaceProjects",
 		"workspaceProjects[1].path",
 		"userScope",
 		"userScope.callerDir",
 		"invocationDir",
+		"workspaceWarnings",
+		"workspaceWarnings[0].code",
 		"invocation",
 		"invocation.id",
 		"invocation.artifactRoot",
@@ -210,6 +215,9 @@ func TestV1FixturesStayV1(t *testing.T) {
 		}
 		if ctx.InvocationDir != "" {
 			t.Errorf("v1 fixture %s carries the v2 invocationDir member", path)
+		}
+		if ctx.WorkspaceWarnings != nil {
+			t.Errorf("v1 fixture %s carries the v2 workspaceWarnings member", path)
 		}
 		if ctx.Workspace.Options != nil {
 			t.Errorf("v1 fixture %s carries the v2 workspace.options member", path)
@@ -625,6 +633,33 @@ func TestV2WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), `"type"`) {
 		t.Errorf("encoded reference = %s, want type omitted when empty", encoded)
+	}
+}
+
+// TestV2WorkspaceProjectsCarryTheResolvedRunsWith asserts the member a task
+// that composes a workload reads for the projects it runs with, and that a
+// reference without it encodes as it did before the member. Inside
+// workspaceProjects an entry without the member runs with nothing.
+func TestV2WorkspaceProjectsCarryTheResolvedRunsWith(t *testing.T) {
+	t.Parallel()
+	ctx, diags := ParseAndValidate(readFixture(t, "fixtures", "v2", "valid", "project-references.json"))
+	if diag.HasErrors(diags) {
+		t.Fatalf("valid fixture rejected: %v", diags)
+	}
+	if len(ctx.WorkspaceProjects) != 3 {
+		t.Fatalf("workspaceProjects = %d, want the fixture's three", len(ctx.WorkspaceProjects))
+	}
+	for i, want := range [][]string{{"legacy"}, nil, nil} {
+		if got := ctx.WorkspaceProjects[i].RunsWith; !slices.Equal(got, want) {
+			t.Errorf("workspaceProjects[%d].runsWith = %q, want %q", i, got, want)
+		}
+	}
+	encoded, err := json.Marshal(ProjectRef{Name: "a", Path: "a", FullPath: "/ws/a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "runsWith") {
+		t.Errorf("encoded reference = %s, want runsWith omitted when empty", encoded)
 	}
 }
 
@@ -1715,6 +1750,78 @@ func TestValidate_V2InvocationDir(t *testing.T) {
 	v1.Identity = nil
 	v1.InvocationDir = "/ws/docs"
 	assertDiagnostic(t, Validate(v1), ErrorCodeUnexpectedField, "invocationDir")
+}
+
+// TestValidate_V2WorkspaceWarnings pins the member that hands an interactive
+// command the warnings of its launch's workspace load. A command copies it
+// into its envelope's workspaceWarnings, so a present member follows that
+// member's rules: a non-empty array of warnings that each carry a code and a
+// message. A v1 document cannot carry it.
+func TestValidate_V2WorkspaceWarnings(t *testing.T) {
+	warning := cliproto.WorkspaceWarning{Code: "workspace.jobs_ignored", Message: "project /a declares jobs"}
+	cases := []struct {
+		name      string
+		warnings  []cliproto.WorkspaceWarning
+		present   bool
+		wantCode  string
+		wantField string
+	}{
+		{name: "absent is accepted"},
+		{name: "a warning with its code and message is accepted", warnings: []cliproto.WorkspaceWarning{warning}, present: true},
+		{name: "a present empty array is rejected", warnings: []cliproto.WorkspaceWarning{}, present: true,
+			wantCode: ErrorCodeInvalidValue, wantField: "workspaceWarnings"},
+		{name: "a present null is rejected", present: true,
+			wantCode: ErrorCodeInvalidValue, wantField: "workspaceWarnings"},
+		{name: "a warning without a code is rejected", warnings: []cliproto.WorkspaceWarning{warning, {Message: "m"}}, present: true,
+			wantCode: ErrorCodeMissingField, wantField: "workspaceWarnings[1].code"},
+		{name: "a warning without a message is rejected", warnings: []cliproto.WorkspaceWarning{{Code: "c", Message: " "}}, present: true,
+			wantCode: ErrorCodeMissingField, wantField: "workspaceWarnings[0].message"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := validV2Context()
+			ctx.WorkspaceWarnings = tc.warnings
+			ctx.presence.workspaceWarnings = tc.present
+			diags := Validate(ctx)
+			if tc.wantCode == "" {
+				if diag.HasErrors(diags) {
+					t.Fatalf("expected acceptance, got %v", diags)
+				}
+				return
+			}
+			assertDiagnostic(t, diags, tc.wantCode, tc.wantField)
+		})
+	}
+
+	v1 := validV2Context()
+	v1.ProtocolVersion = 0
+	v1.Identity = nil
+	v1.WorkspaceWarnings = []cliproto.WorkspaceWarning{warning}
+	assertDiagnostic(t, Validate(v1), ErrorCodeUnexpectedField, "workspaceWarnings")
+}
+
+// TestParse_WorkspaceWarningsFixture pins that the valid fixture parses and
+// validates strictly, keeps the warnings in order, and that a context whose
+// load warned of nothing encodes without the member.
+func TestParse_WorkspaceWarningsFixture(t *testing.T) {
+	ctx, diags := ParseAndValidate(readFixture(t, "fixtures/v2/valid/workspace-warnings.json"))
+	if diag.HasErrors(diags) {
+		t.Fatalf("valid fixture rejected: %v", diags)
+	}
+	codes := make([]string, 0, len(ctx.WorkspaceWarnings))
+	for _, warning := range ctx.WorkspaceWarnings {
+		codes = append(codes, warning.Code)
+	}
+	if want := []string{"workspace.jobs_ignored", "workspace.name_divergence"}; !slices.Equal(codes, want) {
+		t.Fatalf("workspaceWarnings codes = %q, want %q in order", codes, want)
+	}
+	encoded, err := json.Marshal(validV2Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "workspaceWarnings") {
+		t.Errorf("a context without warnings encodes the member: %s", encoded)
+	}
 }
 
 // TestParse_InvocationDirFixture pins that the valid fixture parses, validates

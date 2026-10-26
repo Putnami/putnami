@@ -245,6 +245,14 @@ binds a manifest wherever it loads from. Only a manifest that lists or names a
 selector is stamped 14. The rung retires rung 6: a manifest stamped below 14
 that names a selector is refused, and its remedy is a build stamped 14
 (`putnami extensions update`).
+Contract `15` (`DefaultPositionalsContract`) is additive for a command
+group's default subcommand that declares positionals. From 15 on, a word after
+the group that names none of its subcommands runs the default, with the word as
+the default's first argument; a declared subcommand wins over a word of the
+same name. A reader below 15 answers "unknown subcommand" for that word, so it
+refuses the stamp. The floor binds a manifest wherever it loads from. Only a
+manifest whose group default declares positionals is stamped 15; positionals
+on another subcommand keep the base stamp.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

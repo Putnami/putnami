@@ -1,0 +1,19 @@
+exit 1
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "compose",
+  "status": "failure",
+  "exitCode": 1,
+  "data": {
+    "code": "compose.not_serveable",
+    "member": "/lib",
+    "phase": "plan"
+  },
+  "error": {
+    "code": "failure",
+    "message": "compose.not_serveable: /lib: a library project has no workload to serve (phase plan)"
+  }
+}
+--- stderr ---
+putnami: compose.not_serveable: /lib: a library project has no workload to serve (phase plan)

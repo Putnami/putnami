@@ -64,10 +64,6 @@ Diagnostics:
   sessions summary             Summarize recorded sessions, one row per run
   report                       Read back a run's report
 
-Execution:
-  compose                      Serve a workload with the workloads it runs with
-  qualify                      Run a workload's derived smoke contract against a target and emit one verdict
-
 Migration:
   migrate vnext                Migrate putnami.lock.json to the current format
 

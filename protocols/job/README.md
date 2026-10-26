@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config`, `ProjectRef.extensions` and `ProjectRef.type` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -268,13 +268,25 @@ defaults are) is the language extension's, the graph is core's.
   absolute path (`job.invalid_value`); an empty or null one is rejected, not
   read as absent.
 
+- **`workspaceWarnings`** (v2 only) — the warnings the orchestrator's
+  workspace load for an interactive extension command recorded, in order, each
+  once. Each entry is the `{code, message}` pair of the result envelope's
+  `workspaceWarnings`. The orchestrator sets it on an interactive launch whose
+  load warned, and never on a planned job, so it cannot reach a cache key. It
+  has already written each warning on stderr as `putnami: warning: <message>`,
+  unless `--quiet`, so a command writes none of them again. A command that
+  writes a result envelope carries the member in its `workspaceWarnings`, under
+  `--quiet` too. Absence means the load warned of nothing. A present member is
+  a non-empty array (`job.invalid_value`) whose entries each carry a non-empty
+  `code` and `message` (`job.missing_field`).
+
 A v1 document may not carry v2 members (`job.unexpected_field`): a v1
 consumer would ignore exactly the members a v2 consumer would trust.
 
 ## Project references
 
 `selectedProjects[]`, `project.dependencyClosure[]` and `workspaceProjects[]`
-share one shape. Beyond `id`, `name`, `path` and `fullPath`, seven optional
+share one shape. Beyond `id`, `name`, `path` and `fullPath`, eight optional
 members carry facts the orchestrator already owns, so a task never re-derives
 them:
 
@@ -363,7 +375,29 @@ them:
   `project.type` keeps `""` for an unclassified project; the two agree once
   the default is applied.
 
-All seven are omitempty, so a producer that has nothing to say emits none,
+- **`runsWith`** (v2 only) — the projects this one runs with, as the
+  orchestrator **resolved** them: the authored `putnami.json` list, else the
+  one the owning provider's workspace probe reported. Each entry names a
+  project by name or by id, as its source wrote it, and a consumer resolves it
+  by name first, then by id. It is populated inside `workspaceProjects`, where
+  a task that composes a workload with the workloads it runs with reads the
+  closure. `config` holds only the authored list, and a provider reads the list
+  from a native manifest (the TypeScript extension reads `package.json`'s
+  `putnami.runsWith`), so a task reads `runsWith`, not `config`. A v1 document
+  carrying it is rejected (`job.unexpected_field`).
+
+  Absence is read from the **containing** member. Inside `workspaceProjects`,
+  whose producer resolves every project's list, an entry without `runsWith`
+  runs with nothing.
+
+  The orchestrator keys a task that reads the Git candidate cut (a `git:`
+  pattern among its key inputs) on the whole membership `workspaceProjects`
+  carries, without `version` and `fullPath`, so `runsWith` enters that key as
+  `type` does. An edit to a project's resolved `runsWith` invalidates such a
+  task's cached results, and the release that added the member invalidated
+  each of them once, in a workspace where a project runs with another.
+
+All eight are omitempty, so a producer that has nothing to say emits none,
 except that a `workspaceProjects` entry always carries `type`.
 
 ## Environment variable mirror

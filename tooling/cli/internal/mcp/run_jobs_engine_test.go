@@ -671,17 +671,39 @@ func TestRejectLongLivedCommands_ScopedToTheWatchPromotion(t *testing.T) {
 	renamed := []*extension.ExtensionDescription{{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
 		"daemon": command("daemon", extension.WorkloadServe), "serve": command("serve", ""),
 	}}}
+	// @putnami/dev declares compose-up with the serve workload and qualify-run
+	// with the once workload, each carried only by the interactive default of
+	// its group. The serve trait refuses compose-up and the once workload under
+	// an interactive-only carrier refuses qualify-run; neither name is refused
+	// on its own. version-get declares no workload, so its interactive carrier
+	// refuses nothing.
+	dev := []*extension.ExtensionDescription{{
+		Name: "@putnami/dev",
+		Jobs: map[string]*extension.JobDefinition{
+			"compose-up": command("compose-up", extension.WorkloadServe), "qualify-run": command("qualify-run", extension.WorkloadOnce),
+			"version-get": command("version-get", ""),
+		},
+		CommandGroups: map[string]extension.CommandGroupDefinition{
+			"compose": {Default: "up", Subcommands: map[string]extension.SubcommandDefinition{"up": {Command: "compose-up", Interactive: true}}},
+			"qualify": {Default: "run", Subcommands: map[string]extension.SubcommandDefinition{"run": {Command: "qualify-run", Interactive: true}}},
+			"version": {Default: "get", Subcommands: map[string]extension.SubcommandDefinition{"get": {Command: "version-get", Interactive: true}}},
+		},
+	}}
 	for _, tc := range []struct {
 		name       string
 		extensions []*extension.ExtensionDescription
 		commands   []string
 		refused    bool
+		why        string
 	}{
 		{name: "serve is refused", extensions: firstParty, commands: []string{"serve"}, refused: true},
 		{name: "serve refused among others", extensions: firstParty, commands: []string{"build", "serve"}, refused: true},
 		{name: "a serve-workload daemon is refused", extensions: renamed, commands: []string{"daemon"}, refused: true},
 		{name: "a serve without the workload is accepted", extensions: renamed, commands: []string{"serve"}, refused: false},
-		{name: "qualify is refused", commands: []string{"build", "qualify"}, refused: true},
+		{name: "compose-up is refused by its serve workload", extensions: dev, commands: []string{"build", "compose-up"}, refused: true, why: serveWorkloadHazard},
+		{name: "qualify-run is refused by its interactive carrier", extensions: dev, commands: []string{"build", "qualify-run"}, refused: true, why: "`putnami qualify run`"},
+		{name: "version-get without a workload is accepted under its interactive carrier", extensions: dev, commands: []string{"version-get"}, refused: false},
+		{name: "compose and qualify are not refused by name", commands: []string{"compose", "qualify"}, refused: false},
 		{name: "run is accepted", extensions: firstParty, commands: []string{"run"}, refused: false},
 		{name: "ordinary commands accepted", extensions: firstParty, commands: []string{"lint", "test", "build"}, refused: false},
 	} {
@@ -693,7 +715,106 @@ func TestRejectLongLivedCommands_ScopedToTheWatchPromotion(t *testing.T) {
 			if !tc.refused && err != nil {
 				t.Fatalf("rejectLongLivedCommands(%v) = %v, want it accepted", tc.commands, err)
 			}
+			if err != nil && !strings.Contains(err.Error(), tc.why) {
+				t.Errorf("rejectLongLivedCommands(%v) = %v, want it to name %q", tc.commands, err, tc.why)
+			}
 		})
+	}
+}
+
+// shippedManifestsWorkspace copies the shipped manifests and project files of
+// rels, repository-relative extension projects, into a fresh workspace that
+// declares each by path, and returns the extensions discovery loads from it.
+func shippedManifestsWorkspace(t *testing.T, rels ...string) []*extension.ExtensionDescription {
+	t.Helper()
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for start := repoRoot; ; repoRoot = filepath.Dir(repoRoot) {
+		if _, err := os.Stat(filepath.Join(repoRoot, wsproto.WorkspaceConfigFilename)); err == nil {
+			break
+		}
+		if filepath.Dir(repoRoot) == repoRoot {
+			t.Skipf("no repository root above %s", start)
+		}
+	}
+	ws := t.TempDir()
+	list := make(map[string]string, len(rels))
+	for _, rel := range rels {
+		for _, name := range []string{extension.ManifestFilename, "putnami.json"} {
+			data, err := os.ReadFile(filepath.Join(repoRoot, rel, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(ws, rel), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(ws, rel, name), data, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		list["/"+filepath.ToSlash(rel)] = ""
+	}
+	config, err := json.Marshal(struct {
+		Name       string            `json:"name"`
+		Extensions map[string]string `json:"extensions"`
+	}{Name: "shipped-manifests", Extensions: list})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, wsproto.WorkspaceConfigFilename), config, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	discovered, err := extension.DiscoverExtensionsDetailed(ws, &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: list}}, nil)
+	if err != nil {
+		t.Fatalf("discover the shipped manifests: %v", err)
+	}
+	if len(discovered.Skipped) != 0 || len(discovered.Extensions) != len(rels) {
+		t.Fatalf("discovery loaded %d of %d shipped extensions, skipped %+v", len(discovered.Extensions), len(rels), discovered.Skipped)
+	}
+	return discovered.Extensions
+}
+
+// The shipped manifests decide the interactive-only refusal by their traits.
+// Of every command their interactive subcommands alone carry, run_jobs refuses
+// compose-up, whose serve workload never returns, and qualify-run, whose once
+// workload only `putnami qualify run` runs in the terminal. It accepts every
+// command without a workload, the sdd, change, cloud and version commands,
+// which run as planned jobs.
+func TestRejectLongLivedCommands_TheShippedManifests(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary", "long-lived-and-externally-mutating-jobs-are-refused")
+	extensions := shippedManifestsWorkspace(t, filepath.Join("cloud", "extension"), filepath.Join("tooling", "contributor"),
+		filepath.Join("tooling", "dev"), filepath.Join("tooling", "sdd-extension"))
+	refused := map[string]string{"compose-up": serveWorkloadHazard, "qualify-run": "`putnami qualify run`"}
+	accepted := map[string]int{}
+	for _, ext := range extensions {
+		for command := range ext.Jobs {
+			if _, interactive := extension.InteractiveOnlyCarrier(extensions, command); !interactive {
+				continue
+			}
+			err := rejectLongLivedCommands(extensions, []string{command})
+			why, refuse := refused[command]
+			switch {
+			case refuse && (err == nil || !strings.Contains(err.Error(), why)):
+				t.Errorf("rejectLongLivedCommands(%s) = %v, want a refusal that names %q", command, err, why)
+			case !refuse && err != nil:
+				t.Errorf("rejectLongLivedCommands(%s) = %v, want it accepted: it declares no workload", command, err)
+			case !refuse:
+				prefix, _, _ := strings.Cut(command, "-")
+				accepted[prefix]++
+			}
+			delete(refused, command)
+		}
+	}
+	if len(refused) != 0 {
+		t.Errorf("the shipped manifests carry no interactive-only %v", refused)
+	}
+	for _, prefix := range []string{"change", "cloud", "sdd", "version"} {
+		if accepted[prefix] == 0 {
+			t.Errorf("no interactive-only %s-* command was accepted: %v", prefix, accepted)
+		}
 	}
 }
 

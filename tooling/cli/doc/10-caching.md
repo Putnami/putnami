@@ -942,8 +942,9 @@ that writes there waits until all of them finished.
 A task holds these locks across a cache restore into its outputs, and for an
 execution from the output preparation through the capture into the cache:
 the version-stamp refresh, the preBuild hook, the subprocess with its
-retries, and the capture. A cache restore takes no shared lock: it writes
-the task's own outputs and reads nothing another task writes.
+retries, and the capture. A serve-workload step is the one exception, below.
+A cache restore takes no shared lock: it writes the task's own outputs and
+reads nothing another task writes.
 
 An executing task also locks its project for its preparation alone when the
 preparation writes the project tree: the session has not yet started its
@@ -952,6 +953,20 @@ project's `.gen/version.json`. The task releases that lock before its
 subprocess starts, unless its declared outputs or its reads need it, so a
 long-running task such as `serve` that reads nothing another task writes
 does not keep another session's preparation out of its project.
+
+A serve-workload step, the long-running last step of a serve pipeline that
+`putnami serve` starts, releases its command-output lock once its process
+started. Another session can then run the finite steps of that project's
+serve pipeline, such as config merge and generate, while it serves:
+`putnami serve <consumer>` in a second terminal beside
+`putnami serve <provider>`, when the consumer depends on the provider, or a
+composition that starts the consumer after the provider. Those steps can rewrite
+`.putnami/out/<project>/serve` while the server runs; a cache hit restores
+the bytes the directory already holds. A finite step of the pipeline keeps
+its lock until its capture, although its command declares the serve
+workload, and the serve-workload step keeps its other locks until its
+capture: its project or the workspace when it declares a durable output
+there, and every lock it reads under.
 
 A task that needs one lock both to write and to read, or whose preparation
 writes the project tree, holds that lock exclusively until its capture.

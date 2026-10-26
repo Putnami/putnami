@@ -42,12 +42,14 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 
 	// Workspace warnings (e.g., name divergence, malformed package.json/go.mod)
 	// go to the caller's report when it passes one. Otherwise they go to
-	// stderr unless the run is quiet. Every result envelope the run writes
-	// carries them, quiet or not.
+	// stderr unless the run is quiet or supervised: a supervised serve run's
+	// stderr is its serve log, and its supervisor reports the warnings of its
+	// own load of the workspace. Every result envelope the run writes carries
+	// them, quiet or not.
 	req.workspaceWarnings = req.WarningReport
 	if req.workspaceWarnings == nil {
 		var warningOut io.Writer = os.Stderr
-		if req.Global.Quiet {
+		if req.Global.Quiet || SupervisedServe(&req.Global) {
 			warningOut = nil
 		}
 		req.workspaceWarnings = workspace.NewWarningReport(warningOut)

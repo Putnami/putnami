@@ -1,0 +1,5 @@
+exit 1
+--- stdout ---
+{"protocolVersion":2,"command":"compose","status":"failure","exitCode":1,"data":{"code":"compose.unknown_member","member":"/app","phase":"plan"},"error":{"code":"failure","message":"compose.unknown_member: /app: runsWith \"ghost\" names no project of this workspace (looked up by name, then by id) (phase plan)"}}
+--- stderr ---
+putnami: compose.unknown_member: /app: runsWith "ghost" names no project of this workspace (looked up by name, then by id) (phase plan)

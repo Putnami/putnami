@@ -1,0 +1,41 @@
+{
+  "name": "@acme/stage",
+  "version": "0.1.0",
+  "cliContract": 15,
+  "commandGroups": {
+    "stage": {
+      "description": "Stage projects.",
+      "default": "up",
+      "subcommands": {
+        "up": {
+          "description": "Stage one project.",
+          "command": "stage-up",
+          "interactive": true,
+          "positionals": [{ "name": "project", "required": true }],
+          "flags": { "keep": { "type": "boolean", "description": "Keep the stage after exit." } }
+        },
+        "list": { "description": "List the staged projects.", "command": "stage-list", "interactive": true }
+      }
+    },
+    "notes": {
+      "description": "Keep notes.",
+      "default": "add",
+      "subcommands": {
+        "add": {
+          "description": "Add a note.",
+          "command": "notes-add",
+          "interactive": true,
+          "positionals": [{ "name": "text", "required": true }]
+        }
+      }
+    }
+  },
+  "commands": {
+    "stage-up": { "description": "Stage one project.", "run": [{ "id": "up", "task": "t" }] },
+    "stage-list": { "description": "List the staged projects.", "run": [{ "id": "list", "task": "t" }] },
+    "notes-add": { "description": "Add a note.", "run": [{ "id": "add", "task": "t" }] }
+  },
+  "tasks": {
+    "t": { "kind": "command", "command": "echo", "cache": false }
+  }
+}

@@ -1,0 +1,4 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --print-contract derives and prints the contract without a target; drop --target and --expect-sha

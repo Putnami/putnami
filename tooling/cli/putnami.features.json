@@ -161,7 +161,8 @@
               "identities-and-dependencies-come-from-discovery",
               "load-warnings-reach-stderr-and-the-result-envelope",
               "a-job-run-envelope-carries-the-load-warnings",
-              "a-command-reports-the-warnings-of-its-own-load-once"
+              "a-command-reports-the-warnings-of-its-own-load-once",
+              "an-interactive-launch-hands-its-load-warnings-to-the-subcommand"
             ]
           }
         },
@@ -469,7 +470,8 @@
             "kind": "acceptance",
             "checks": [
               "dry-run-executes-nothing",
-              "long-lived-and-externally-mutating-jobs-are-refused"
+              "long-lived-and-externally-mutating-jobs-are-refused",
+              "a-workload-carried-only-by-an-interactive-subcommand-is-refused"
             ]
           }
         },
@@ -1178,6 +1180,23 @@
           }
         },
         {
+          "id": "a-serve-step-releases-its-command-output-once-it-started",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-finite-step-runs-beside-another-sessions-serve-step",
+              "a-finite-step-still-waits-for-another-sessions-finite-step",
+              "a-serve-step-keeps-every-other-key-until-capture",
+              "a-serve-step-that-declares-a-command-output-keeps-it-until-capture",
+              "a-dependents-serve-run-comes-up-beside-its-dependencys-serve-run"
+            ]
+          }
+        },
+        {
           "id": "scratch-generation-retention",
           "stage": "coded",
           "evidenceKinds": [
@@ -1393,7 +1412,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "each-workspace-member-names-its-resolved-type"
+              "each-workspace-member-names-its-resolved-type",
+              "each-workspace-member-names-its-resolved-runs-with"
             ]
           }
         },
@@ -1580,6 +1600,7 @@
               "a-once-workload-command-forwards-its-exit-code",
               "a-hosted-run-refuses-a-serve-workload-command",
               "a-serve-workload-command-owns-no-watch",
+              "a-group-invocation-that-serves-owns-no-watch",
               "a-composition-member-is-a-serve-workload-step"
             ]
           }
@@ -1597,7 +1618,43 @@
               "the-context-conforms-to-the-job-protocol",
               "a-planned-job-carries-none",
               "an-inherited-value-is-stripped",
-              "outside-a-workspace-it-equals-the-caller-directory"
+              "outside-a-workspace-it-equals-the-caller-directory",
+              "the-context-carries-the-typed-output-globals"
+            ]
+          }
+        },
+        {
+          "id": "a-group-default-takes-positionals",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-word-that-names-no-subcommand-runs-the-positional-default",
+              "a-declared-subcommand-wins-over-a-positional-word",
+              "a-word-without-a-positional-default-stays-an-unknown-subcommand",
+              "the-group-help-prints-the-positional-in-its-usage-line",
+              "completion-offers-project-ids-after-the-group-word",
+              "a-manifest-with-a-positional-default-requires-contract-15"
+            ]
+          }
+        },
+        {
+          "id": "an-interactive-command-stops-on-its-own-terms",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-waits-for-an-interactive-child-after-a-terminal-signal",
+              "a-second-signal-kills-the-interactive-child-at-once",
+              "the-cli-holds-the-interactive-child-from-before-its-start",
+              "a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code",
+              "a-child-that-dies-by-the-signal-or-is-killed-is-interrupted"
             ]
           }
         },
@@ -2944,161 +3001,6 @@
       ]
     },
     {
-      "id": "cli/workload-qualification",
-      "type": "feature",
-      "name": "Workload qualification",
-      "outcome": "A user or agent runs a changed workload the way it is shipped, with the workloads and databases it needs, from one command, and proves with one derived smoke contract and one fail-closed verdict that it boots and serves real requests on the tree or deployed build it names",
-      "owner": "tooling",
-      "target": "modeled",
-      "requirements": [
-        {
-          "id": "runs-with-closure-served-behind-stable-proxies",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-closure-is-transitive-runs-with-in-topological-order",
-              "an-unserveable-member-is-refused-before-anything-starts",
-              "the-proxy-answers-unavailable-until-the-backend-is-known",
-              "dependants-reach-a-provider-through-its-injected-proxy-url"
-            ]
-          }
-        },
-        {
-          "id": "ephemeral-databases-per-composition",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "each-datasource-gets-a-database-created-and-dropped-with-the-composition",
-              "a-provided-server-is-shared-and-reported-as-isolation-none"
-            ]
-          }
-        },
-        {
-          "id": "typed-readiness-bounds-every-member",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-member-starts-only-after-the-one-before-it-announced-readiness",
-              "a-member-that-never-announces-readiness-fails-naming-member-and-phase",
-              "a-claim-without-an-endpoint-keeps-the-backend"
-            ]
-          }
-        },
-        {
-          "id": "ungraceful-death-is-reaped-by-the-next-invocation",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "an-orphan-is-reaped-only-when-its-lock-is-free-and-its-owner-dead",
-              "a-killed-composition-leaves-a-lease-the-next-invocation-reaps"
-            ]
-          }
-        },
-        {
-          "id": "injected-configuration-never-reaches-output",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-document-carries-urls-and-bindings-and-the-status-carries-section-names-only"
-            ]
-          }
-        },
-        {
-          "id": "smoke-is-derived-from-the-route-inventory",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["exact-public-read-only-routes-sorted-and-capped", "platform-and-reserved-paths-are-never-requested", "the-platform-prefix-is-read-from-the-inventory"]
-          }
-        },
-        {
-          "id": "no-derivable-request-is-unsupported-not-success",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["a-missing-inventory-is-unsupported-with-a-build-remedy", "an-empty-contract-never-passes"]
-          }
-        },
-        {
-          "id": "remote-verdict-binds-to-the-deployed-sha",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-matching-sha-passes",
-              "a-wrong-or-missing-sha-is-digest-mismatch",
-              "a-url-target-without-expect-sha-is-a-usage-error"
-            ]
-          }
-        },
-        {
-          "id": "local-verdict-binds-to-the-exact-worktree",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-local-verdict-names-the-worktree-it-composed-and-a-clean-teardown",
-              "a-worktree-that-changes-before-the-workload-is-ready-is-digest-mismatch",
-              "a-composition-failure-names-the-member-and-still-tears-down",
-              "canceling-a-local-run-tears-the-composition-down",
-              "expect-sha-with-a-local-target-is-a-usage-error"
-            ]
-          }
-        },
-        {
-          "id": "local-target-reads-the-local-config",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["a-local-target-reads-the-local-config-of-its-production-build"]
-          }
-        },
-        {
-          "id": "local-readiness-is-completed-startup",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-member-records-completed-startup-from-a-workload-claim-alone",
-              "a-member-that-exits-before-completed-startup-fails-the-wait",
-              "a-local-target-without-a-readiness-route-passes-on-completed-startup",
-              "completed-startup-that-never-arrives-times-out-without-smoke",
-              "a-declared-readiness-route-is-polled"
-            ]
-          }
-        },
-        {
-          "id": "every-non-pass-state-exits-non-zero",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "passed-exits-zero-and-every-other-state-exits-one",
-              "the-verdict-rides-the-failure-envelope",
-              "a-server-error-fails-the-smoke"
-            ]
-          }
-        }
-      ]
-    },
-    {
       "id": "cli/collaboration-providers",
       "type": "feature",
       "name": "Collaboration provider contracts",
@@ -4295,6 +4197,90 @@
             "kind": "acceptance",
             "checks": [
               "a-dependent-manifest-requires-contract-8"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cli/supervised-serve-run",
+      "type": "feature",
+      "name": "Supervised serve run",
+      "outcome": "A supervisor starts a workload with one putnami serve run, hands its serve step the process environment the workload needs on stdin, and reads from the session stream which process group the workload runs in and when it is ready, however many ordinary log lines the workload writes",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "serve-env-reaches-only-serve-steps",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-flag-is-execution-only",
+              "the-engine-names-only-the-terminal-serve-step",
+              "only-the-serve-step-process-receives-the-env",
+              "a-supervised-serve-run-hands-the-env-to-the-serve-step-alone"
+            ]
+          }
+        },
+        {
+          "id": "a-manifest-env-conflict-is-refused",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-refusal-names-the-variable-and-the-task",
+              "the-cli-refuses-the-run-before-any-step-starts",
+              "a-terminal-stdin-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "ready-claims-are-never-elided",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-ready-claim-uses-the-failure-reserve",
+              "a-ready-claim-shares-the-bounded-failure-reserve"
+            ]
+          }
+        },
+        {
+          "id": "a-supervised-serve-run-splits-its-output",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "stdout-keeps-the-stream-and-stderr-renders-the-serve-steps",
+              "the-serve-log-carries-no-session-summary",
+              "the-serve-log-carries-no-load-warning"
+            ]
+          }
+        },
+        {
+          "id": "a-serve-step-names-its-process-group",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-process-event-precedes-every-producer-event"
+            ]
+          }
+        },
+        {
+          "id": "an-ephemeral-port-waits-on-the-announced-port",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-release-wait-reads-the-announced-port"
             ]
           }
         }

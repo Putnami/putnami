@@ -81,7 +81,9 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: ProvisionedToolchainContract for a runtime toolchain that
+// the manifest: DefaultPositionalsContract for a command group whose default
+// subcommand declares positionals, ProvisionedToolchainContract for a runtime
+// toolchain that
 // declares a provisioned candidate, PublishChannelsContract for a task that
 // declares the publish channels it serves, CommandKindContract for command or
 // verb traits that declare a kind, a workload, rewritesSources or
@@ -152,6 +154,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// whatever origin the manifest loads from.
 	if declaresInputSelectors(m) {
 		required = max(required, protocolcli.InputSelectorsContract)
+	}
+	// A word reaches a positional default only in a reader that routes it
+	// there, whatever origin the manifest loads from.
+	if DeclaresDefaultPositionals(m) {
+		required = max(required, protocolcli.DefaultPositionalsContract)
 	}
 	return required
 }

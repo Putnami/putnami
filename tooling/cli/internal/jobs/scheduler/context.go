@@ -83,8 +83,13 @@ type JobCommandContext struct {
 	// launch: the directory the user typed the command in, inside a workspace or
 	// outside one. A planned job omits it.
 	InvocationDir string `json:"invocationDir,omitempty"`
-	OutputPath    string `json:"outputPath"`
-	CacheRoot     string `json:"cacheRoot"`
+	// WorkspaceWarnings is present exactly when the job is an interactive
+	// command launch whose workspace load warned: the warnings, in order, each
+	// once, which the launch already wrote on stderr unless --quiet. A planned
+	// job omits it.
+	WorkspaceWarnings []protocolcli.WorkspaceWarning `json:"workspaceWarnings,omitempty"`
+	OutputPath        string                         `json:"outputPath"`
+	CacheRoot         string                         `json:"cacheRoot"`
 }
 
 // JobContextWorkspace describes the workspace in the context file. Options
@@ -273,6 +278,8 @@ func BuildJobContext(
 		// Run state of an interactive launch; a planned job has none, so the
 		// member never reaches a context a cache key could cover.
 		InvocationDir: job.InvocationDir,
+		// Run state of an interactive launch, as InvocationDir is.
+		WorkspaceWarnings: job.WorkspaceWarnings,
 	}
 	if ws.Config != nil {
 		ctx.Workspace.Options = ws.Config.Options

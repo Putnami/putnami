@@ -45,6 +45,16 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	15: ADDITIVE — a command group's default subcommand that declares
+//	   positionals. From 15 on, `putnami <group> <word>` runs the group's
+//	   default when the word names no subcommand of the group and the default
+//	   declares positionals, and the word reaches the default as its first
+//	   argument; a declared subcommand still wins. A manifest whose group
+//	   default declares positionals is stamped 15, and the floor binds it from
+//	   every origin: an older reader refuses the word as an unknown subcommand,
+//	   so it must refuse the stamp instead of refusing the spelling the
+//	   extension documents. A manifest whose defaults declare none keeps its
+//	   stamp.
 //	14: the input selectors an extension expands (`runtime.inputSelectors`,
 //	   and a task file pattern that names one). From 14 on, the CLI asks the
 //	   extension that declares a task for the files each selector reads, through
@@ -224,7 +234,15 @@ const ProvisionedToolchainContract = 13
 // task on files it lists by another rule.
 const InputSelectorsContract = 14
 
+// DefaultPositionalsContract is required by a manifest whose command group
+// names a default subcommand that declares positionals. A reader at this
+// contract runs that default for `putnami <group> <word>` when the word names
+// no subcommand of the group, with the word as the default's first argument,
+// so an older reader, which refuses the word as an unknown subcommand, refuses
+// the stamp instead.
+const DefaultPositionalsContract = 15
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = InputSelectorsContract
+const LatestContract = DefaultPositionalsContract

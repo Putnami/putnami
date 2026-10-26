@@ -156,13 +156,11 @@ func TestPortableExecutingEngineRefusesACommitRequestOnAnotherCheckout(t *testin
 	if code != cli.ExitUsage || !strings.Contains(output, "carries no plan") {
 		t.Fatalf("a version 2 request with a plan: exit %d: %s", code, output)
 	}
-	// So is one that names a core command no portable run carries: no CLI
-	// submitter refused it, so the protocol does. An extension command is
-	// refused by its declared traits, not its name: the fixture's format
-	// rewrites sources, and the engine refuses it from the manifest it loads.
+	// A command no portable run carries is refused by its declared traits,
+	// never its name: no CLI submitter refused it, so the executing engine
+	// does, from the manifest it loads. The fixture's format rewrites sources.
 	for command, want := range map[string]string{
-		"compose": `invocation.commands names "compose", which no portable run carries`,
-		"format":  `portable execution refused: "format" rewrites source and is not portable`,
+		"format": `portable execution refused: "format" rewrites source and is not portable`,
 	} {
 		request := strings.Replace(string(clitest.CommitFixtureRequest(t, second, "", all)), `"commands":["build"]`, `"commands":["`+command+`"]`, 1)
 		code, output = runBoundRequest(t, root, []byte(request))
@@ -171,6 +169,75 @@ func TestPortableExecutingEngineRefusesACommitRequestOnAnotherCheckout(t *testin
 		}
 		if _, err := os.Stat(filepath.Join(root, ".putnami", "sessions")); !os.IsNotExist(err) {
 			t.Fatalf("a refused %s request recorded a session: %v", command, err)
+		}
+	}
+}
+
+// shippedDevManifest reads the @putnami/dev manifest this repository ships.
+func shippedDevManifest(t *testing.T) []byte {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for start := dir; ; dir = filepath.Dir(dir) {
+		if _, err := os.Stat(filepath.Join(dir, "putnami.workspace.json")); err == nil {
+			break
+		}
+		if filepath.Dir(dir) == dir {
+			t.Skipf("no repository root above %s", start)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "tooling", "dev", "putnami.extension.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// The shipped @putnami/dev manifest, installed by the checkout a version 2
+// request names: the executing engine refuses its compose-up by the workload
+// its traits declare. The group word compose names no command of any
+// manifest, so it is refused as undeclared under an impacted selection, with
+// or without a change, as under all, before any selection is measured. No
+// refused request runs a task or records a session.
+func TestPortableExecutingEngineRefusesTheShippedDevWorkloads(t *testing.T) {
+	spectest.Proves(t, "cli/portable-runner", "commit-request", "the-executing-engine-refuses-a-workload-or-rewriting-command")
+	root, _ := clitest.PortableFixture(t, false, false)
+	clitest.WriteFile(t, filepath.Join(root, "dev", "putnami.json"), `{"name":"@putnami/dev"}`)
+	clitest.WriteFile(t, filepath.Join(root, "dev", "putnami.extension.json"), string(shippedDevManifest(t)))
+	clitest.WriteFile(t, filepath.Join(root, "app", "putnami.json"), `{"name":"app","extensions":["@fixture/gate","@putnami/dev"]}`)
+	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"placement-fixture","includes":["extension","dev","app"]}`)
+	clitest.RunGit(t, root, "add", "-A")
+	clitest.RunGit(t, root, "commit", "-m", "install the dev extension")
+	first := headCommit(t, root)
+	clitest.WriteFile(t, filepath.Join(root, "app", "marker"), "second\n")
+	clitest.RunGit(t, root, "commit", "-am", "change the app")
+	second := headCommit(t, root)
+
+	all := runner.RequestedSelection{Mode: runner.SelectionModeAll}
+	impacted := runner.RequestedSelection{Mode: runner.SelectionModeImpacted}
+	undeclared := "no extension of this workspace declares compose"
+	for _, tc := range []struct {
+		name, command, base string
+		selection           runner.RequestedSelection
+		want                string
+	}{
+		{"compose-up", "compose-up", "", all, `portable execution refused: "compose-up" streams a live workload and is not portable`},
+		{"compose under all", "compose", "", all, undeclared},
+		{"compose under impacted with a change", "compose", first, impacted, undeclared},
+		{"compose under impacted without a change", "compose", second, impacted, undeclared},
+	} {
+		request := strings.Replace(string(clitest.CommitFixtureRequest(t, second, tc.base, tc.selection)), `"commands":["build"]`, `"commands":["`+tc.command+`"]`, 1)
+		code, output := runBoundRequest(t, root, []byte(request))
+		if code != cli.ExitUsage || !strings.Contains(output, tc.want) {
+			t.Fatalf("%s: exit %d, want %d and %q: %s", tc.name, code, cli.ExitUsage, tc.want, output)
+		}
+		if _, err := os.Stat(filepath.Join(root, "app", "calls")); !os.IsNotExist(err) {
+			t.Fatalf("%s: a task ran: %v", tc.name, err)
+		}
+		if _, err := os.Stat(filepath.Join(root, ".putnami", "sessions")); !os.IsNotExist(err) {
+			t.Fatalf("%s: a refused request recorded a session: %v", tc.name, err)
 		}
 	}
 }

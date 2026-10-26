@@ -1,0 +1,34 @@
+{
+  "name": "@acme/stage",
+  "version": "1.0.0",
+  "cliContract": 15,
+  "commands": {
+    "stage-up": {
+      "description": "Stage one project.",
+      "run": [{ "id": "up", "task": "stage-up" }]
+    },
+    "stage-list": {
+      "description": "List the staged projects.",
+      "run": [{ "id": "list", "task": "stage-list" }]
+    }
+  },
+  "commandGroups": {
+    "stage": {
+      "description": "Stage projects.",
+      "default": "up",
+      "subcommands": {
+        "up": {
+          "description": "Stage one project.",
+          "command": "stage-up",
+          "interactive": true,
+          "positionals": [{ "name": "project", "required": true }]
+        },
+        "list": { "description": "List the staged projects.", "command": "stage-list", "interactive": true }
+      }
+    }
+  },
+  "tasks": {
+    "stage-up": { "kind": "command", "command": "echo", "cache": false },
+    "stage-list": { "kind": "command", "command": "echo", "cache": false }
+  }
+}

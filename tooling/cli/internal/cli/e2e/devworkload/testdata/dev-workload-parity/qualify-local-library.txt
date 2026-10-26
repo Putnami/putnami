@@ -1,0 +1,69 @@
+exit 1
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "qualify",
+  "status": "failure",
+  "exitCode": 1,
+  "data": {
+    "protocolVersion": 1,
+    "project": "/lib",
+    "target": {
+      "kind": "local"
+    },
+    "binding": {
+      "kind": "tree",
+      "fingerprint": "<fingerprint>",
+      "headSHA": "<sha>"
+    },
+    "contract": {
+      "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "requests": 0,
+      "derivedFrom": []
+    },
+    "phases": [
+      {
+        "name": "resolve-target",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      },
+      {
+        "name": "readiness",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      },
+      {
+        "name": "version-binding",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      },
+      {
+        "name": "smoke",
+        "state": "unsupported",
+        "durationMs": "<ms>",
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "qualify.no_route_inventory",
+            "message": "/lib has no route inventory at schema/http-routes.json or .gen/schema/http-routes.json; run `putnami build --projects /lib` to produce it"
+          }
+        ]
+      },
+      {
+        "name": "teardown",
+        "state": "not_run",
+        "durationMs": "<ms>"
+      }
+    ],
+    "requests": [],
+    "state": "unsupported",
+    "startedAt": "<time>",
+    "finishedAt": "<time>"
+  },
+  "error": {
+    "code": "failure",
+    "message": "qualify /lib: verdict unsupported"
+  }
+}
+--- stderr ---
+putnami: qualify /lib: verdict unsupported

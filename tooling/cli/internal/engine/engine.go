@@ -250,27 +250,17 @@ type Request struct {
 	// turn `putnami cloud deploy --dry-run` into a no-op. --plan stays the
 	// plan-only preview on both paths.
 	ExecutesUnderDryRun bool
-	// WithholdServeSteps runs a request for serve-workload commands as the
-	// PREPARATION of a supervisor that starts the workloads itself: `putnami
-	// compose`, which must hand each workload its own process environment (an
-	// ephemeral port, the URLs of the workloads it runs with, its database
-	// binding) and learn the port it bound, one member at a time.
-	//
-	// Everything up to the serve step stays the engine's: resolution, runtime
-	// synchronization, selection, planning with its guards, and the scheduled
-	// execution — cache, session file and all — of every finite step the serve
-	// pipelines declare (config merge, generate, describe, and their dependency
-	// steps). What changes is the one step no other job depends on: each
-	// selected project's uncacheable serve-workload step is not started. It is
-	// returned on SessionResult.Withheld together with the workspace it was
-	// planned against, and the serve force-watch rule does not apply, because
-	// nothing long-running is left in the run.
-	//
-	// The composition adapter (internal/compose) is the only caller. It executes
-	// the withheld steps with scheduler.RunJobWithProcessEnv, which keeps the
-	// injected environment out of every cache key: the steps that DO run here
-	// never see it.
-	WithholdServeSteps bool
+	// ServeProcessEnv is the process environment of the run's serve-workload
+	// steps, as `--serve-env -` read it from stdin: KEY=value entries a
+	// supervisor owns (the port, the URLs of the workloads it runs with, a
+	// CONFIG_DATA document), which may hold secrets. It is EXECUTION-ONLY: it
+	// reaches the processes of the serve-workload steps (serveWorkloadSteps)
+	// and nothing else, never a finite step, the job context, a param, a cache
+	// key, a run marker, a session record or an output. The engine refuses a
+	// run that sets Global.ServeEnv without a serve-workload step, hosted or
+	// portable, or whose serve task declares one of the variables itself
+	// (refuseInvalidServeEnv).
+	ServeProcessEnv []string
 	// WarningReport is the report the run's workspace load reports its
 	// warnings into: a caller that reported a load of its own passes its
 	// report, which writes and keeps each warning once, on the caller's writer.
@@ -570,12 +560,6 @@ type SessionResult struct {
 	Plan []*scheduler.ScheduledJob
 	// Projects are the selected projects, or nil when selection did not complete.
 	Projects []*workspace.Project
-	// Workspace is the workspace the run planned against. Set only by a
-	// Request.WithholdServeSteps run, whose withheld steps execute against it.
-	Workspace *workspace.Workspace
-	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
-	// did not start, one per selected project that has one, in plan order.
-	Withheld []*scheduler.ScheduledJob
 	// WorkspaceWarnings are every warning the run's report holds, in order:
 	// those the caller's Request.WarningReport already held, then the new ones
 	// of the run's workspace load. Nil when there are none, or when the run
@@ -916,11 +900,13 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// declared the dry-run flag they would have to interpret — BEFORE
 	// the publication guard below, so a dropped publish step surfaces as the
 	// existing actionable unpublished-channels failure instead of publishing.
-	//
-	// A supervisor that starts the serve steps itself then takes them out of the
-	// run, once the plan is final and before anything reads it for
-	// authorization, preview or execution (Request.WithholdServeSteps).
-	planned, withheld := withholdRequestedServeSteps(req, dropUndryableSideEffectJobs(req, planned), selectedProjects)
+	planned = dropUndryableSideEffectJobs(req, planned)
+
+	// A supervisor's environment must reach a serve-workload step of this plan,
+	// and nothing it declares may silently replace it (refuseInvalidServeEnv).
+	if refuseInvalidServeEnv(req, planned, serveWorkloadSteps(planned, selectedProjects), os.Stderr) {
+		return SessionResult{ExitCode: ExitUsage, Plan: planned, Projects: selectedProjects}, nil
+	}
 
 	// A repository can declare side-effect traits and dependency edges, so the
 	// trait alone never carries authority. Build an opaque proof from the exact
@@ -988,10 +974,6 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		}
 	})
 
-	if result, nothingToRun := servePreparationWithoutFiniteSteps(req, planned, selectedProjects, ws, withheld); nothingToRun {
-		return result, nil
-	}
-
 	// Phase 4: execute.
 	fatalUnpublished := len(unpublished) > 0 && !req.previewsOnly()
 	var finalizers []func(map[string]*scheduler.JobResult)
@@ -1020,7 +1002,6 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	defer closeOutboxes()
 	result := e.execute(ctx, req, ws, selectedProjects, discovered, planned, cacheManager, sink, finalizers...)
 	result.Plan, result.Projects = planned, selectedProjects
-	result = attachWithheldServeSteps(result, req, ws, withheld)
 	if len(unpublished) > 0 {
 		reportUnpublishedProjects(unpublished, unannounced, discovered.Skipped, req.Global, fatalUnpublished)
 		result.ExitCode = publicationGuardExitCode(result.ExitCode, unpublished, fatalUnpublished)

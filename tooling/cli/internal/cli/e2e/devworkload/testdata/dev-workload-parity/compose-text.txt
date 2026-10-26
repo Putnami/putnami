@@ -1,0 +1,11 @@
+exit 0
+--- stdout ---
+  composition <composition>: /app (isolation none)
+    /provider  http://127.0.0.1:<port>  ready in <ms>  (no injected configuration)
+    /app  http://127.0.0.1:<port>  ready in <ms>  (clients)
+  composition <composition> stopped: cleanup clean
+--- stderr ---
+  [1mserve[0m([2mprovider[0m) [32m●[0m fixture /provider starting in serve
+  [1mserve[0m([2mapp[0m) [32m●[0m fixture /app starting in started
+
+putnami: interrupting... press Ctrl-C again to force quit
