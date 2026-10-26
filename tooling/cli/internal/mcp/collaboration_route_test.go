@@ -482,9 +482,9 @@ func TestInterpret_MissionsIdentity(t *testing.T) {
 		}
 		return result
 	}
-	sync := collabBoundCall(t, "missions", "sync", `{"session":{"engine":"host-b","id":"s-1"},"mission":{"key":"issue-596"},`+
+	sync := collabBoundCall(t, "missions", "sync", `{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"putnami/putnami","key":"issue-596"},`+
 		`"event":"stop","state":"working","observedAt":"2026-10-26T09:00:00Z","decisions":["D-1"],"replies":[{"message":"M-1","reply":"yes"}]}`)
-	ask := collabBoundCall(t, "missions", "ask", `{"mission":{"key":"issue-596"},"question":"Ship?",`+
+	ask := collabBoundCall(t, "missions", "ask", `{"mission":{"repository":"putnami/putnami","key":"issue-596"},"question":"Ship?",`+
 		`"options":[{"id":"yes","label":"Ship"},{"id":"no","label":"Wait"}],"idempotencyKey":"k"}`)
 	reply := collabBoundCall(t, "missions", "reply", `{"message":"M-1","reply":"yes"}`)
 	cases := []struct {
@@ -494,6 +494,10 @@ func TestInterpret_MissionsIdentity(t *testing.T) {
 		outcome collab.Outcome
 	}{
 		{"a sync answered as asked", sync, syncResult(nil), collab.OutcomeOK},
+		{"a sync answered with the empty view of the mission it named", sync, syncResult(func(r *collab.MissionsSyncResult) {
+			r.Session.State = collab.SessionStateHandedBack
+			r.Mission = collab.MissionView{Key: "issue-596", Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}}
+		}), collab.OutcomeOK},
 		{"a sync answered for another mission", sync, syncResult(func(r *collab.MissionsSyncResult) { r.Mission.Key = "issue-1" }), collab.OutcomeUnresolved},
 		{"a sync reporting a decision it did not name", sync, syncResult(func(r *collab.MissionsSyncResult) {
 			r.Decisions = append(r.Decisions, collab.DecisionStatus{ID: "D-2", State: collab.DecisionStateOpen})
@@ -509,7 +513,7 @@ func TestInterpret_MissionsIdentity(t *testing.T) {
 		{"a new decision already answered", ask, &collab.MissionsAskResult{Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateAnswered, Answer: "yes"}},
 			collab.OutcomeUnresolved},
 		{"a replayed decision answered since", ask, &collab.MissionsAskResult{
-			Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateAnswered, Answer: "yes"}, Replayed: true}, collab.OutcomeOK},
+			Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateAnswered, Answer: "yes", Option: "yes"}, Replayed: true}, collab.OutcomeOK},
 		{"a reply to the message", reply, &collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: "M-1", State: collab.ReplyStateReplied}}, collab.OutcomeOK},
 		{"a reply to another message", reply, &collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: "M-2", State: collab.ReplyStateReplied}},
 			collab.OutcomeUnresolved},

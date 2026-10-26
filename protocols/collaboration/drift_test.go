@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -20,6 +21,7 @@ type schemaNode struct {
 	Minimum    *int                   `json:"minimum"`
 	Maximum    *int                   `json:"maximum"`
 	MaxLength  *int                   `json:"maxLength"`
+	Pattern    string                 `json:"pattern"`
 }
 
 func readSchemaNode(t *testing.T, name string) *schemaNode {
@@ -206,6 +208,7 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 		{"decisionState", missions.Defs["decisionState"].Enum, stringsOf(ValidDecisionStates)},
 		{"replyState", missions.Defs["replyState"].Enum, stringsOf(ValidReplyStates)},
 		{"replyResult message state", missions.Defs["replyResult"].Properties["message"].Properties["state"].Enum, []string{string(ReplyStateReplied)}},
+		{"replyStatus reason", missions.Defs["replyStatus"].Properties["reason"].Enum, ValidReplyRefusals},
 	}
 	for _, tc := range cases {
 		if !slices.Equal(tc.enum, tc.want) {
@@ -213,6 +216,57 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 		}
 		if !slices.IsSorted(tc.want) {
 			t.Errorf("%s vocabulary %v is not in canonical order", tc.name, tc.want)
+		}
+	}
+}
+
+// TestDrift_MissionsPatternsMatchTheValidator holds every pattern the missions
+// schema publishes on the rule the Go validator enforces, and every member
+// that names an option or a plan step on the shared definition, so a client
+// that validates against the schema accepts exactly what the orchestrator
+// accepts.
+func TestDrift_MissionsPatternsMatchTheValidator(t *testing.T) {
+	missions := readSchemaNode(t, ContractSchemaFile(ContractMissions, 1))
+	defs := missions.Defs
+	for _, tc := range []struct {
+		name      string
+		schema    string
+		validator *regexp.Regexp
+	}{
+		{"id", defs["id"].Pattern, missionIDPattern},
+		{"optionId", defs["optionId"].Pattern, optionIDPattern},
+		{"session.engine", defs["session"].Properties["engine"].Pattern, enginePattern},
+		{"session.id", defs["session"].Properties["id"].Pattern, sessionIDPattern},
+		{"syncInput.event", defs["syncInput"].Properties["event"].Pattern, eventPattern},
+	} {
+		if tc.schema != tc.validator.String() {
+			t.Errorf("%s pattern is %q in the schema, %q in Go", tc.name, tc.schema, tc.validator)
+		}
+	}
+	for _, tc := range []struct {
+		name string
+		node *schemaNode
+		ref  string
+	}{
+		{"decisionOption.id", defs["decisionOption"].Properties["id"], "#/$defs/optionId"},
+		{"recommendation.option", defs["askInput"].Properties["recommendation"].Properties["option"], "#/$defs/optionId"},
+		{"inboxDecision.option", defs["inboxDecision"].Properties["option"], "#/$defs/optionId"},
+		{"askResult decision.option", defs["askResult"].Properties["decision"].Properties["option"], "#/$defs/optionId"},
+		{"planStep.key", defs["planStep"].Properties["key"], CommonSchemaFile + "#/$defs/token"},
+		{"missionName.repository", defs["missionName"].Properties["repository"], CommonSchemaFile + "#/$defs/token"},
+	} {
+		if tc.node == nil || tc.node.Ref != tc.ref {
+			t.Errorf("%s does not reference %s", tc.name, tc.ref)
+		}
+	}
+	repository := regexp.MustCompile(defs["missionName"].Properties["repository"].Pattern)
+	for _, value := range []string{"putnami/putnami", "acme/app-2", "Putnami/putnami", "acme/App", "a b", "é/ü"} {
+		input := &MissionsSyncInput{
+			Session: SessionRef{Engine: "host-a", ID: "s-1"}, Mission: MissionName{Repository: value, Key: "k"},
+			Event: "stop", State: SessionStateWorking, ObservedAt: "2026-10-26T09:00:00Z",
+		}
+		if schema, validator := repository.MatchString(value), ValidateInput(input) == nil; schema != validator {
+			t.Errorf("repository %q: the schema accepts it %v, the validator %v", value, schema, validator)
 		}
 	}
 }

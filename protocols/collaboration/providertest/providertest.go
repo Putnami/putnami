@@ -5,8 +5,8 @@
 // A provider's test builds a Target — its handlers, the settings a binding
 // passes, the workspace root and name, the branches proposal scenarios may
 // use, for memory a second instance on the same store, and for missions a way
-// to post an inbox message — and calls RunTasks, RunProposals, RunMemory or
-// RunMissions. Every call goes through
+// to post an inbox message and to answer a decision — and calls RunTasks,
+// RunProposals, RunMemory or RunMissions. Every call goes through
 // collaboration.Serve with the request a routed call carries, so every answer
 // has passed the request and result validation a real call passes; the
 // scenarios then check what validation cannot: that an answer is about the
@@ -19,10 +19,12 @@
 // another provider instance resumes from the store alone, that a record
 // stays within its workspace, and that the largest checkpoint the contract
 // accepts (MaximalCheckpoint) is read back unchanged. The missions scenarios
-// check that a repeated ask replays and a changed one is a conflict, that a
-// message takes one reply, that a sync ignores ids it does not know and
-// answers each reply it carries, and that an older sync never overwrites a
-// newer one.
+// check that a repeated ask replays in any state and a changed one is a
+// conflict, that a message takes one reply, that an answer reaches the inbox
+// and its delivery acknowledges the decision, that a sync ignores ids it does
+// not know and answers each reply it carries, that a session acknowledges a
+// message of the mission it left, and that an older sync never overwrites a
+// newer one and still describes the mission it names.
 //
 // The scenarios name nothing a particular backend defines: they scope what
 // they create with labels, titles and mission names unique to the run, so
@@ -77,6 +79,11 @@ type Target struct {
 	// the mission's owner does outside the contract, and returns the
 	// message's id. RunMissions requires it.
 	Post func(t *testing.T, mission collab.MissionName, kind collab.InboxKind, text string) string
+	// Answer answers one open decision, as the mission's owner does outside
+	// the contract: option is the id of the option chosen, and text is the
+	// answer. The answer then reaches the decision's mission as an inbox
+	// message of kind answer. RunMissions requires it.
+	Answer func(t *testing.T, decision, option, text string)
 }
 
 // Session drives one Target from one test.

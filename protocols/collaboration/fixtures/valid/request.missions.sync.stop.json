@@ -1,6 +1,6 @@
 {
   "session": { "engine": "host-a", "id": "5b1f0c2e-8d7a-4f61-9a43-1c2d3e4f5a6b" },
-  "mission": { "repository": "Putnami/putnami", "key": "issue-596", "title": "Agent sessions report to their mission" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-596", "title": "Agent sessions report to their mission" },
   "event": "stop",
   "state": "handed_back",
   "observedAt": "2026-10-26T09:30:00Z",

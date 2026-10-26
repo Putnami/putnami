@@ -41,7 +41,7 @@
         {
           "event": "PostToolUse",
           "tools": ["TodoWrite", "TaskCreate"],
-          "mcpTools": ["missions.ask"],
+          "mcpTools": ["missions.ask", "missions.reply"],
           "args": ["--engine", "claude-code"],
           "timeoutSeconds": 30
         },
@@ -54,7 +54,7 @@
         {
           "event": "PostToolUse",
           "tools": ["update_plan"],
-          "mcpTools": ["missions.ask"],
+          "mcpTools": ["missions.ask", "missions.reply"],
           "args": ["--engine", "codex"],
           "timeoutSeconds": 30
         },

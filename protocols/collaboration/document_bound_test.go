@@ -92,7 +92,8 @@ func maximalStatus() ProposalStatusResult {
 	return status
 }
 
-// maximalID is the longest bare missions id, ending in i.
+// maximalID is the longest bare missions id, ending in i. It is also the
+// longest option id.
 func maximalID(i int) string {
 	suffix := strconv.Itoa(i)
 	return strings.Repeat("a", 64-len(suffix)) + suffix
@@ -101,7 +102,7 @@ func maximalID(i int) string {
 const maximalUTC = "2026-09-24T08:00:00.123456789Z"
 
 func maximalSession() SessionRef {
-	return SessionRef{Engine: strings.Repeat("e", 32), ID: fill(MaxSessionIDLength)}
+	return SessionRef{Engine: strings.Repeat("e", 32), ID: strings.Repeat("s", 128)}
 }
 
 func maximalMissionName() MissionName {
@@ -111,7 +112,7 @@ func maximalMissionName() MissionName {
 func maximalPlan() MissionPlan {
 	plan := MissionPlan{Steps: []PlanStep{}}
 	for i := range MaxListMembers {
-		plan.Steps = append(plan.Steps, PlanStep{Key: numbered(i, MaxPlanStepKeyLength), Status: PlanStepDoing, Text: fill(MaxPlanStepTextLength)})
+		plan.Steps = append(plan.Steps, PlanStep{Key: numbered(i, MaxTokenLength), Status: PlanStepDoing, Text: fill(MaxPlanStepTextLength)})
 	}
 	return plan
 }
@@ -133,14 +134,14 @@ func maximalSyncResult() *MissionsSyncResult {
 	for i := range MaxInboxMessages {
 		result.Inbox = append(result.Inbox, InboxMessage{
 			ID: maximalID(i), Kind: InboxKindAnswer, Text: fill(text), CreatedAt: maximalTimestamp,
-			Decision: &InboxDecision{ID: maximalID(i), Question: fill(MaxQuestionLength), Answer: fill(share - MaxQuestionLength - text)},
+			Decision: &InboxDecision{ID: maximalID(i), Question: fill(MaxQuestionLength), Answer: fill(share - MaxQuestionLength - text), Option: maximalID(i)},
 		})
 	}
 	for i := range MaxListMembers {
 		result.Decisions = append(result.Decisions, DecisionStatus{ID: maximalID(i), State: DecisionStateAcknowledged})
 	}
 	for i := range MaxSyncReplies {
-		result.Replies = append(result.Replies, ReplyStatus{Message: maximalID(i), State: ReplyStateRefused, Reason: fill(MaxTokenLength)})
+		result.Replies = append(result.Replies, ReplyStatus{Message: maximalID(i), State: ReplyStateRefused, Reason: ReasonMessageNotFound})
 	}
 	return result
 }
@@ -165,14 +166,13 @@ func maximalSyncInput() *MissionsSyncInput {
 }
 
 func maximalAskInput() *MissionsAskInput {
-	session := maximalSession()
 	input := &MissionsAskInput{
-		Mission: maximalMissionName(), Session: &session, Question: fill(MaxQuestionLength), Context: fill(MaxContextLength),
-		Recommendation: &DecisionRecommendation{Option: numbered(0, MaxOptionIDLength), Reason: fill(MaxExplanationLength)},
+		Mission: maximalMissionName(), Question: fill(MaxQuestionLength), Context: fill(MaxContextLength),
+		Recommendation: &DecisionRecommendation{Option: maximalID(0), Reason: fill(MaxExplanationLength)},
 		Blocks:         fill(MaxExplanationLength), IdempotencyKey: strings.Repeat("a", 128),
 	}
 	for i := range MaxDecisionOptions {
-		input.Options = append(input.Options, DecisionOption{ID: numbered(i, MaxOptionIDLength), Label: fill(MaxOptionLabelLength), Consequences: fill(MaxExplanationLength)})
+		input.Options = append(input.Options, DecisionOption{ID: maximalID(i), Label: fill(MaxOptionLabelLength), Consequences: fill(MaxExplanationLength)})
 	}
 	return input
 }
@@ -199,7 +199,7 @@ func TestMaxDocumentBytesHoldsEveryMaximalDocument(t *testing.T) {
 		"memory.context":    &MemoryListResult{Items: []MemoryRecord{record}, Page: Page{Next: cursor}},
 		"missions.sync":     maximalSyncResult(),
 		"missions.ask": &MissionsAskResult{Decision: MissionDecision{
-			ID: maximalID(0), State: DecisionStateAnswered, URL: maximalURL(0), Answer: fill(MaxInboxTextLength),
+			ID: maximalID(0), State: DecisionStateAnswered, URL: maximalURL(0), Answer: fill(MaxInboxTextLength), Option: maximalID(0),
 		}, Replayed: true},
 	}
 	for name, result := range results {

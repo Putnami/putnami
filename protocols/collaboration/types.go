@@ -693,15 +693,17 @@ type MemoryCheckpointResult struct {
 }
 
 // MissionName names a mission. Repository and Key are MemoryIdentity's
-// Repository and Mission, with the same rules, so a mission's sessions and its
-// memory records name it alike.
+// Repository and Mission, so a mission's sessions and its memory records name
+// it alike. Together they are the mission's identity, compared exactly.
 type MissionName struct {
-	// Repository is the repository the mission belongs to, when relevant.
-	Repository string `json:"repository,omitempty"`
+	// Repository is the repository the mission belongs to, in lowercase,
+	// such as "owner/name". It is required.
+	Repository string `json:"repository"`
 	// Key names the mission inside its repository, such as "issue-596". The
 	// contract treats it as opaque.
 	Key string `json:"key"`
-	// Title is the mission's title, for display.
+	// Title is the mission's title, for display. It is not part of the
+	// mission's identity.
 	Title string `json:"title,omitempty"`
 }
 
@@ -710,7 +712,8 @@ type SessionRef struct {
 	// Engine names the host that runs the agent, in lowercase letters,
 	// digits and hyphens.
 	Engine string `json:"engine"`
-	// ID is the host's identifier of the session.
+	// ID is the host's identifier of the session: 1 to 128 letters, digits,
+	// dots, colons, underscores or hyphens.
 	ID string `json:"id"`
 }
 
@@ -723,7 +726,8 @@ const (
 	SessionStateWorking SessionState = "working"
 	// SessionStateHandedBack: the agent stopped and waits for a person.
 	SessionStateHandedBack SessionState = "handed_back"
-	// SessionStateWaiting: the agent waits for an answer until WaitUntil.
+	// SessionStateWaiting: the agent waits for an answer until WaitUntil,
+	// which a waiting session always reports.
 	SessionStateWaiting SessionState = "waiting"
 	// SessionStateFailed: the session stopped on an error.
 	SessionStateFailed SessionState = "failed"
@@ -747,7 +751,7 @@ var ValidPlanStepStatuses = []PlanStepStatus{PlanStepDoing, PlanStepDone, PlanSt
 
 // PlanStep is one step of an agent's plan.
 type PlanStep struct {
-	// Key identifies the step inside its plan.
+	// Key identifies the step inside its plan. It is a token.
 	Key string `json:"key"`
 	// Status is where the step stands; see the PlanStep* constants.
 	Status PlanStepStatus `json:"status"`
@@ -770,8 +774,9 @@ type MessageReply struct {
 }
 
 // MissionsSyncInput is the missions.sync request. Its natural key is the
-// session and ObservedAt: a provider ignores a sync older than the last one
-// it applied for the session, so a repeat changes nothing.
+// session and ObservedAt: a provider applies State and Plan only from a sync
+// observed later than the last one it applied for the session, so a repeat
+// changes nothing.
 type MissionsSyncInput struct {
 	// Session is the session that publishes.
 	Session SessionRef `json:"session"`
@@ -792,15 +797,19 @@ type MissionsSyncInput struct {
 	LastMessage string `json:"lastMessage,omitempty"`
 	// Error is the error that stopped a failed session.
 	Error string `json:"error,omitempty"`
-	// WaitUntil is when a waiting session stops waiting, in RFC 3339.
+	// WaitUntil is when a waiting session stops waiting, in RFC 3339. A
+	// waiting session always reports it, and no other session does.
 	WaitUntil string `json:"waitUntil,omitempty"`
-	// Plan replaces the session's plan. Absent keeps the plan; an empty list
+	// Plan replaces the mission's plan. Absent keeps the plan; an empty list
 	// of steps clears it.
 	Plan *MissionPlan `json:"plan,omitempty"`
 	// Delivered are the ids of the inbox messages the host gave the agent.
+	// A repeated id counts once. A provider ignores an id it does not know
+	// or that is not the caller's.
 	Delivered []string `json:"delivered,omitempty"`
 	// Decisions are the ids of the decisions this session asked; sending
-	// them binds them to the session.
+	// them binds them to the session. A repeated id counts once. A provider
+	// ignores an id it does not know or that is not the caller's.
 	Decisions []string `json:"decisions,omitempty"`
 	// Replies are the agent's replies to inbox messages, one per message.
 	Replies []MessageReply `json:"replies,omitempty"`
@@ -820,7 +829,10 @@ type OpenDecision struct {
 	Question string `json:"question"`
 }
 
-// MissionView is what a session reads about its mission.
+// MissionView is what a session reads about its mission. It always describes
+// the mission the sync named, whatever the sync's age. A provider that does
+// not hold that mission answers its key, an empty title, an empty plan and no
+// open decision.
 type MissionView struct {
 	// Key is the mission's key: the one the sync named.
 	Key string `json:"key"`
@@ -828,7 +840,8 @@ type MissionView struct {
 	Title string `json:"title"`
 	// URL is a display link to the mission. It is never an identity.
 	URL string `json:"url,omitempty"`
-	// Plan is the session's current plan.
+	// Plan is the mission's current plan: the plan that the session that
+	// published last sent. It is empty when none did.
 	Plan MissionPlan `json:"plan"`
 	// OpenDecisions are the mission's decisions that no one answered yet.
 	OpenDecisions []OpenDecision `json:"openDecisions"`
@@ -858,6 +871,9 @@ type InboxDecision struct {
 	Question string `json:"question"`
 	// Answer is the owner's answer.
 	Answer string `json:"answer"`
+	// Option is the id of the option the owner chose, when the answer chose
+	// one.
+	Option string `json:"option,omitempty"`
 }
 
 // InboxMessage is one message that no session received yet.
@@ -866,7 +882,8 @@ type InboxMessage struct {
 	ID string `json:"id"`
 	// Kind classifies the message; see the InboxKind* constants.
 	Kind InboxKind `json:"kind"`
-	// Text is the message's text.
+	// Text is the message's text. On an answer, Decision.Answer is the
+	// answer, and Text is the provider's display of it.
 	Text string `json:"text"`
 	// CreatedAt is when the message was written, in RFC 3339.
 	CreatedAt string `json:"createdAt"`
@@ -885,7 +902,8 @@ const (
 	// DecisionStateAnswered: the owner answered, and no session received the
 	// answer yet.
 	DecisionStateAnswered DecisionState = "answered"
-	// DecisionStateAcknowledged: a session received the answer.
+	// DecisionStateAcknowledged: a session received the answer: a sync
+	// delivered the message that carries it.
 	DecisionStateAcknowledged DecisionState = "acknowledged"
 )
 
@@ -914,14 +932,19 @@ const (
 // ValidReplyStates is the closed reply-state vocabulary in canonical order.
 var ValidReplyStates = []ReplyState{ReplyStateRefused, ReplyStateReplied}
 
-// ReplyStatus is what became of one reply a sync carried.
+// ValidReplyRefusals is the closed vocabulary of a refused reply's reason, in
+// canonical order.
+var ValidReplyRefusals = []string{ReasonMessageClosed, ReasonMessageDenied, ReasonMessageNotFound}
+
+// ReplyStatus is what became of one reply a sync carried. A refused reply is
+// final: the host drops it.
 type ReplyStatus struct {
 	// Message is the id of the message the reply answers.
 	Message string `json:"message"`
 	// State is what became of the reply; see the ReplyState* constants.
 	State ReplyState `json:"state"`
-	// Reason is the stable code of a refusal, such as "message.closed".
-	// Only a refused reply carries one.
+	// Reason is why a reply was refused: one of ValidReplyRefusals. Only a
+	// refused reply carries one.
 	Reason string `json:"reason,omitempty"`
 }
 
@@ -938,8 +961,9 @@ type MissionsSyncResult struct {
 	Decisions []DecisionStatus `json:"decisions"`
 	// Replies hold one entry for each reply the sync carried.
 	Replies []ReplyStatus `json:"replies"`
-	// MinIntervalMs is the least time, in milliseconds, the provider wants
-	// between two syncs of one session.
+	// MinIntervalMs is the pace of routine syncs, in milliseconds. A host
+	// may sync sooner at session start, at stop and during a wait, and a
+	// provider does not refuse those syncs.
 	MinIntervalMs int `json:"minIntervalMs"`
 	// Now is the provider's clock, in RFC 3339.
 	Now string `json:"now"`
@@ -947,7 +971,8 @@ type MissionsSyncResult struct {
 
 // DecisionOption is one answer the owner can choose.
 type DecisionOption struct {
-	// ID identifies the option inside its decision.
+	// ID identifies the option inside its decision: 1 to 64 letters, digits,
+	// dots, underscores or hyphens.
 	ID string `json:"id"`
 	// Label names the option on one line.
 	Label string `json:"label"`
@@ -963,12 +988,14 @@ type DecisionRecommendation struct {
 	Reason string `json:"reason,omitempty"`
 }
 
-// MissionsAskInput is the missions.ask request.
+// MissionsAskInput is the missions.ask request. Its content is
+// Mission.Repository, Mission.Key, Question, Context, Options,
+// Recommendation and Blocks: the same IdempotencyKey with the same content
+// replays, and with other content is a conflict. Mission.Title is not
+// content. A session binds the decision through MissionsSyncInput.Decisions.
 type MissionsAskInput struct {
 	// Mission is the mission whose owner decides.
 	Mission MissionName `json:"mission"`
-	// Session is the session that asks, when the caller knows it.
-	Session *SessionRef `json:"session,omitempty"`
 	// Question is what the owner decides.
 	Question string `json:"question"`
 	// Context is what the owner needs to know to decide.
@@ -993,6 +1020,9 @@ type MissionDecision struct {
 	URL string `json:"url,omitempty"`
 	// Answer is the owner's answer, once there is one.
 	Answer string `json:"answer,omitempty"`
+	// Option is the id of the option the owner chose, when the answer chose
+	// one.
+	Option string `json:"option,omitempty"`
 }
 
 // MissionsAskResult is the missions.ask result. Replayed is true when the
@@ -1007,14 +1037,13 @@ type MissionsAskResult struct {
 }
 
 // MissionsReplyInput is the missions.reply request. Its natural key is the
-// message: a message takes one reply.
+// message: a message takes one reply. A session claims a message through
+// MissionsSyncInput.Delivered and Replies.
 type MissionsReplyInput struct {
 	// Message is the id of the message replied to.
 	Message string `json:"message"`
 	// Reply is the reply's text.
 	Reply string `json:"reply"`
-	// Session is the session that replies, when the caller knows it.
-	Session *SessionRef `json:"session,omitempty"`
 }
 
 // RepliedMessage is a message once a reply is recorded.

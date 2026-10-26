@@ -131,6 +131,12 @@ const (
 	// ReasonMessageClosed is the conflict of a reply to a message that
 	// already holds another reply.
 	ReasonMessageClosed = "message.closed"
+	// ReasonMessageNotFound is the refusal of a reply to a message the
+	// provider does not know.
+	ReasonMessageNotFound = "message.not_found"
+	// ReasonMessageDenied is the refusal of a reply to a message the caller
+	// may not answer, such as another person's.
+	ReasonMessageDenied = "message.denied"
 )
 
 // BindingStatus is the state of one contract's binding in a workspace.
@@ -196,6 +202,9 @@ type OperationCapability struct {
 	// Description is the provider tool's own description, which states
 	// provider-specific behavior and limits.
 	Description string `json:"description,omitempty"`
+	// HostOnly is true when only the host that runs an agent calls the
+	// operation: the agent has no tool for it.
+	HostOnly bool `json:"hostOnly,omitempty"`
 }
 
 // CapabilityIssue is one reason a binding cannot be honored.

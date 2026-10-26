@@ -373,9 +373,11 @@ func missionsMismatch(input, result any) (string, bool) {
 	return "", false
 }
 
-// syncMismatch checks a sync answer: it is about the mission the sync named,
-// it reports only decisions the sync named, and it answers each reply the
-// sync carried exactly once.
+// syncMismatch checks a sync answer: it describes the mission the sync named,
+// whatever the sync's age, it reports only decisions the sync named, and it
+// answers each reply the sync carried exactly once. A provider that does not
+// hold the named mission answers its empty view, never the session's current
+// mission.
 func syncMismatch(in *collab.MissionsSyncInput, result any) string {
 	sync, wrong := resultAs[*collab.MissionsSyncResult](result)
 	if wrong != "" {

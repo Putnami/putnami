@@ -83,7 +83,8 @@ does not offer has no MCP tool; on the command line it answers
 A host-only operation, such as `missions.sync`, has no MCP tool either. The
 host that runs an agent calls it with `putnami missions sync` or through the
 host channel's `collaboration.call`, and gets the same envelope; the agent
-never sees it as a tool. `putnami missions` marks it `host-only`.
+never sees it as a tool. `putnami missions` marks it `host-only`, and the
+capabilities document marks it `hostOnly: true`.
 
 ## Outcomes
 

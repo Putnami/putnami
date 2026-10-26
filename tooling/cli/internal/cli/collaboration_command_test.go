@@ -93,7 +93,7 @@ func TestCollaborationCommandProviderHelperProcess(t *testing.T) {
 			return &collab.MissionsAskResult{Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateOpen}}, nil
 		},
 		key("missions", "reply"): func(_ context.Context, call collab.Call) (any, *collab.Failure) {
-			return nil, collab.Fail(collab.OutcomeNotFound, "message.unknown", "no message %s", call.Input.(*collab.MissionsReplyInput).Message)
+			return nil, collab.Fail(collab.OutcomeNotFound, collab.ReasonMessageNotFound, "no message %s", call.Input.(*collab.MissionsReplyInput).Message)
 		},
 	}
 	if err := collab.Serve(context.Background(), os.Stdin, os.Stdout, handlers); err != nil {

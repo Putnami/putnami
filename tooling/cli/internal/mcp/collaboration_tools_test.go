@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -444,8 +445,33 @@ func TestCollaboration_AHostOnlyOperationHasNoTool(t *testing.T) {
 	}
 	envelope := CallProviderOperation(context.Background(), ProviderEnvironment{WorkspaceRoot: fixture.root, Extensions: discovered(t, fixture.root)},
 		collab.ContractMissions, collab.OperationSync,
-		json.RawMessage(`{"session":{"engine":"host-b","id":"s-1"},"mission":{"key":"issue-596"},"event":"stop","state":"handed_back","observedAt":"2026-10-26T09:00:00Z"}`))
+		json.RawMessage(`{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"putnami/putnami","key":"issue-596"},"event":"stop","state":"handed_back","observedAt":"2026-10-26T09:00:00Z"}`))
 	expectOutcome(t, envelope, collab.OutcomeOK, "")
+}
+
+// TestCollaboration_CapabilitiesMarkAHostOnlyOperation: missions.capabilities
+// lists sync, as it lists every operation, and says that only the host calls
+// it, so an agent that reads it does not look for a tool.
+func TestCollaboration_CapabilitiesMarkAHostOnlyOperation(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "capabilities-mark-a-host-only-operation")
+	fixture := newCollabFixture(t, "ok", bindAll, nil)
+	envelope := callCollab(t, fixture.server(t), "missions.capabilities", "")
+	var capabilities collab.Capabilities
+	if err := json.Unmarshal(envelope.Result, &capabilities); err != nil {
+		t.Fatal(err)
+	}
+	hostOnly := map[string]bool{}
+	for _, op := range capabilities.Operations {
+		hostOnly[op.Name] = op.HostOnly
+	}
+	if want := map[string]bool{collab.OperationAsk: false, collab.OperationReply: false, collab.OperationSync: true}; !maps.Equal(hostOnly, want) {
+		t.Errorf("missions.capabilities marks host-only %v, want %v", hostOnly, want)
+	}
+	envelope = callCollab(t, fixture.server(t), "tasks.capabilities", "")
+	if strings.Contains(string(envelope.Result), "hostOnly") {
+		t.Errorf("tasks.capabilities names hostOnly: %s", envelope.Result)
+	}
 }
 
 func TestCollaboration_AReservedNamespaceToolIsRefusedWhenContractsAreBound(t *testing.T) {

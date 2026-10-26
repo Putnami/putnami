@@ -203,12 +203,19 @@ write.
   size bound can never be below the contract's. [`@putnami/memory-store`](../../../tooling/memory-store/README.md)
   runs it against each of its backends.
 - A missions target also names `Post`, which writes one inbox message to a
-  mission as its owner does outside the contract. `RunMissions` checks that a
-  repeated `ask` replays and a changed one is `idempotency.mismatch`, that a
-  repeated `reply` replays, that another reply is `message.closed` and a reply
-  to an unknown message is `not_found`, that a delivered message leaves the
-  inbox, that a sync ignores ids it does not know, that each refused reply
-  has its own entry, and that an older sync never overwrites a newer one.
+  mission as its owner does outside the contract, and `Answer`, which answers
+  a decision as its owner does and writes the answer message. `RunMissions`
+  checks that a repeated `ask` replays and a changed one is
+  `idempotency.mismatch`, that the mission title is not part of an ask's
+  content, that an answered ask replays with its answer, that a delivered
+  answer moves its decision to `acknowledged`, that an answered decision
+  leaves the open decisions, that a repeated `reply` replays, that another
+  reply is `message.closed` and a reply to an unknown message is `not_found`
+  with `message.not_found`, that a delivered message leaves the inbox, that a
+  sync ignores ids it does not know and counts a repeated id once, that a
+  session acknowledges a message of the mission it left, that each refused
+  reply has its own entry, that an older sync never overwrites a newer one,
+  and that an older sync still describes the mission it names.
 - Drive your handlers through `collab.Serve` with the request a routed call
   carries (`tooling/local-collaboration/internal/provider/provider_test.go`),
   so every answer passes the same validation a real call does.

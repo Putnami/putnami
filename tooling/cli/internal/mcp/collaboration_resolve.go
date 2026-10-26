@@ -174,7 +174,7 @@ func capabilitiesOf(resolution collabResolution) collab.Capabilities {
 		return capabilities
 	}
 	for _, op := range resolution.Spec.Operations {
-		entry := collab.OperationCapability{Name: op.Name, Access: op.Access, Required: op.Required}
+		entry := collab.OperationCapability{Name: op.Name, Access: op.Access, Required: op.Required, HostOnly: op.HostOnly}
 		if provided, ok := resolution.Operations[op.Name]; ok {
 			entry.Supported = true
 			entry.Preconditions = provided.Declaration.Preconditions

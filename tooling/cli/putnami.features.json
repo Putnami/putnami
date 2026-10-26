@@ -3198,7 +3198,8 @@
             "kind": "acceptance",
             "checks": [
               "a-host-only-operation-has-no-mcp-tool",
-              "the-cli-and-the-host-channel-route-a-host-only-operation"
+              "the-cli-and-the-host-channel-route-a-host-only-operation",
+              "capabilities-mark-a-host-only-operation"
             ]
           }
         },

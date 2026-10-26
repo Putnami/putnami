@@ -35,7 +35,8 @@ describes every operation.
 `capabilities` is reserved in every contract: the orchestrator answers it from
 the binding and the provider's manifest, without running the provider.
 `missions.sync` is host-only: the host that runs an agent calls it through the
-CLI or the host channel, and the MCP server lists no tool for it.
+CLI or the host channel, the MCP server lists no tool for it, and
+`missions.capabilities` marks it `hostOnly`.
 
 Every result carries source-qualified opaque references (`{"source":
 "<kind>:<locator>", "id": "…"}`), optional display URLs, revision tokens,

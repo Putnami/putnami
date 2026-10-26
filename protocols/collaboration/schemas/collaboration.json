@@ -198,7 +198,8 @@
         "supported": { "type": "boolean", "description": "Whether the bound provider offers this operation." },
         "preconditions": { "$ref": "#/$defs/preconditions" },
         "openWorld": { "type": "boolean", "description": "Whether the operation reaches a system outside this machine." },
-        "description": { "type": "string", "description": "The provider tool's own description of provider-specific behavior and limits." }
+        "description": { "type": "string", "description": "The provider tool's own description of provider-specific behavior and limits." },
+        "hostOnly": { "type": "boolean", "description": "True when only the host that runs an agent calls the operation: the agent has no tool for it. Absent otherwise." }
       }
     },
     "capabilityIssue": {

@@ -17,15 +17,16 @@
     {
       "id": "msg_05",
       "kind": "answer",
-      "text": "Use bytes.",
+      "text": "Answer: 64 KiB of text in total",
       "createdAt": "2026-10-26T09:12:00Z",
-      "decision": { "id": "dec_01", "question": "Which bound does the inbox use?", "answer": "bytes" }
+      "decision": { "id": "dec_01", "question": "Which bound does the inbox use?", "answer": "64 KiB of text in total", "option": "bytes" }
     }
   ],
-  "decisions": [{ "id": "dec_01", "state": "acknowledged" }],
+  "decisions": [{ "id": "dec_01", "state": "answered" }],
   "replies": [
     { "message": "msg_02", "state": "replied" },
-    { "message": "msg_09", "state": "refused", "reason": "message.closed" }
+    { "message": "msg_09", "state": "refused", "reason": "message.closed" },
+    { "message": "msg_10", "state": "refused", "reason": "message.not_found" }
   ],
   "minIntervalMs": 15000,
   "now": "2026-10-26T09:30:01Z"

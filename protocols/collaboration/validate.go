@@ -30,16 +30,15 @@ const (
 
 // Bounds on the members of the missions contract. A member that means what
 // a member of another contract means uses that member's bound: the mission
-// key and repository are tokens, the title is a title, a list without its own
-// bound holds at most MaxListMembers, and the inbox texts total at most
-// MaxContentBytes. Lengths count characters.
+// key and repository and a plan step key are tokens, the title is a title, a
+// list without its own bound holds at most MaxListMembers, and the inbox
+// texts total at most MaxContentBytes. An id's pattern carries its own
+// length. Lengths count characters.
 const (
-	MaxSessionIDLength    = 128
 	MaxModelLength        = 128
 	MaxBranchLength       = 256
 	MaxLastMessageLength  = 4096
 	MaxErrorLength        = 1024
-	MaxPlanStepKeyLength  = 32
 	MaxPlanStepTextLength = 300
 	MaxSyncDecisions      = 20
 	MaxSyncReplies        = 20
@@ -48,7 +47,6 @@ const (
 	MaxContextLength      = 4000
 	MinDecisionOptions    = 2
 	MaxDecisionOptions    = 5
-	MaxOptionIDLength     = 32
 	MaxOptionLabelLength  = 200
 	MaxExplanationLength  = 1000
 	MaxOpenDecisions      = 50
@@ -72,6 +70,11 @@ var (
 	// missionIDPattern is a bare message or decision id of the missions
 	// contract. An agent types it, so it is short and needs no source.
 	missionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+	// sessionIDPattern is a host's session id. A provider can key a session
+	// on its engine and this id.
+	sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
+	// optionIDPattern names one option of a decision.
+	optionIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 )
 
 // ParseRequest strictly decodes and validates the request document of one
@@ -322,9 +325,6 @@ func ValidateInput(input any) []diag.Diagnostic {
 	case *MissionsReplyInput:
 		c.missionID("message", in.Message)
 		c.text("reply", in.Reply, MaxReplyLength, true)
-		if in.Session != nil {
-			c.session("session", *in.Session)
-		}
 	case *CapabilitiesInput:
 	default:
 		c.errorf(ErrorCodeUnknownOperation, "", "no request validator for %T", input)
@@ -422,6 +422,9 @@ func validateCapabilities(capabilities *Capabilities) []diag.Diagnostic {
 		}
 		if op.Preconditions != "" && !slices.Contains(ValidPreconditions, op.Preconditions) {
 			c.errorf(ErrorCodeInvalidValue, field+".preconditions", "unknown preconditions %q", op.Preconditions)
+		}
+		if op.HostOnly && op.Access != AccessMutating {
+			c.errorf(ErrorCodeInvalidValue, field+".hostOnly", "only a mutation is host-only")
 		}
 	}
 	return c.diags
@@ -904,17 +907,6 @@ func (c *checker) text(field, value string, limit int, required bool) {
 	}
 }
 
-// shortToken checks a required token of at most limit characters.
-func (c *checker) shortToken(field, value string, limit int) {
-	if value == "" {
-		c.errorf(ErrorCodeRequired, field, "%s is required", field)
-		return
-	}
-	if !isToken(value) || utf8.RuneCountInString(value) > limit {
-		c.errorf(ErrorCodeInvalidValue, field, "%s must be at most %d printable characters without whitespace", field, limit)
-	}
-}
-
 // missionID checks a bare message or decision id.
 func (c *checker) missionID(field, value string) {
 	if value == "" {
@@ -926,26 +918,37 @@ func (c *checker) missionID(field, value string) {
 	}
 }
 
-// missionIDs checks a list of distinct bare ids of at most limit members.
+// missionIDs checks a set of bare ids of at most limit members. A repeated
+// id counts once, so a repeat is not an error.
 func (c *checker) missionIDs(field string, ids []string, limit int) {
 	if len(ids) > limit {
 		c.errorf(ErrorCodeTooLarge, field, "at most %d members", limit)
 	}
-	seen := map[string]bool{}
 	for i, id := range ids {
-		item := fmt.Sprintf("%s[%d]", field, i)
-		c.missionID(item, id)
-		if seen[id] {
-			c.errorf(ErrorCodeInvalidValue, item, "%q is repeated", id)
-		}
-		seen[id] = true
+		c.missionID(fmt.Sprintf("%s[%d]", field, i), id)
 	}
 }
 
-// missionName checks a mission name: the repository and key follow the
-// memory identity's rules.
+// optionID checks the id of a decision option.
+func (c *checker) optionID(field, value string) {
+	if value == "" {
+		c.errorf(ErrorCodeRequired, field, "%s is required", field)
+		return
+	}
+	if !optionIDPattern.MatchString(value) {
+		c.errorf(ErrorCodeInvalidValue, field, "%s must be 1 to 64 letters, digits, dots, underscores or hyphens", field)
+	}
+}
+
+// missionName checks a mission name. The repository and the key together
+// are the mission's identity, compared exactly: both are required tokens, and
+// the repository holds no uppercase letter, so one repository has one
+// spelling.
 func (c *checker) missionName(field string, name MissionName) {
-	c.optionalToken(field+".repository", name.Repository)
+	c.token(field+".repository", name.Repository)
+	if strings.ContainsFunc(name.Repository, func(r rune) bool { return r >= 'A' && r <= 'Z' }) {
+		c.errorf(ErrorCodeInvalidValue, field+".repository", "%s.repository is lowercase, such as owner/name", field)
+	}
 	c.token(field+".key", name.Key)
 	c.bounded(field+".title", name.Title, MaxTitleLength, false)
 }
@@ -957,7 +960,12 @@ func (c *checker) session(field string, session SessionRef) {
 	case !enginePattern.MatchString(session.Engine):
 		c.errorf(ErrorCodeInvalidValue, field+".engine", "%s.engine must be 1 to 32 lowercase letters, digits or hyphens", field)
 	}
-	c.shortToken(field+".id", session.ID, MaxSessionIDLength)
+	switch {
+	case session.ID == "":
+		c.errorf(ErrorCodeRequired, field+".id", "%s.id is required", field)
+	case !sessionIDPattern.MatchString(session.ID):
+		c.errorf(ErrorCodeInvalidValue, field+".id", "%s.id must be 1 to 128 letters, digits, dots, colons, underscores or hyphens", field)
+	}
 }
 
 func (c *checker) sessionState(field string, state SessionState) {
@@ -975,7 +983,7 @@ func (c *checker) plan(field string, plan MissionPlan) {
 	seen := map[string]bool{}
 	for i, step := range plan.Steps {
 		entry := fmt.Sprintf("%s.steps[%d]", field, i)
-		c.shortToken(entry+".key", step.Key, MaxPlanStepKeyLength)
+		c.token(entry+".key", step.Key)
 		if seen[step.Key] {
 			c.errorf(ErrorCodeInvalidValue, entry+".key", "step key %q is repeated", step.Key)
 		}
@@ -1013,8 +1021,10 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 	if in.Error != "" && in.State != SessionStateFailed {
 		c.errorf(ErrorCodeInvalidValue, "error", "only a failed session reports an error")
 	}
-	c.timestamp("waitUntil", in.WaitUntil, false)
-	if in.WaitUntil != "" && in.State != SessionStateWaiting {
+	switch {
+	case in.State == SessionStateWaiting:
+		c.timestamp("waitUntil", in.WaitUntil, true)
+	case in.WaitUntil != "":
 		c.errorf(ErrorCodeInvalidValue, "waitUntil", "only a waiting session reports waitUntil")
 	}
 	if in.Plan != nil {
@@ -1039,9 +1049,6 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 
 func (c *checker) askInput(in *MissionsAskInput) {
 	c.missionName("mission", in.Mission)
-	if in.Session != nil {
-		c.session("session", *in.Session)
-	}
 	c.text("question", in.Question, MaxQuestionLength, true)
 	c.text("context", in.Context, MaxContextLength, false)
 	if len(in.Options) < MinDecisionOptions || len(in.Options) > MaxDecisionOptions {
@@ -1050,7 +1057,7 @@ func (c *checker) askInput(in *MissionsAskInput) {
 	ids := map[string]bool{}
 	for i, option := range in.Options {
 		entry := fmt.Sprintf("options[%d]", i)
-		c.shortToken(entry+".id", option.ID, MaxOptionIDLength)
+		c.optionID(entry+".id", option.ID)
 		if ids[option.ID] {
 			c.errorf(ErrorCodeInvalidValue, entry+".id", "option %q is repeated", option.ID)
 		}
@@ -1081,6 +1088,19 @@ func (c *checker) missionDecision(field string, decision MissionDecision) {
 	c.text(field+".answer", decision.Answer, MaxInboxTextLength, false)
 	if decision.Answer != "" && decision.State == DecisionStateOpen {
 		c.errorf(ErrorCodeInvalidState, field+".answer", "an open decision has no answer")
+	}
+	c.answerOption(field, decision.Option, decision.Answer)
+}
+
+// answerOption checks the option an answer chose: an option id, and only
+// beside the answer it chose.
+func (c *checker) answerOption(field, option, answer string) {
+	if option == "" {
+		return
+	}
+	c.optionID(field+".option", option)
+	if answer == "" {
+		c.errorf(ErrorCodeInvalidValue, field+".option", "an option goes with the answer that chose it")
 	}
 }
 
@@ -1156,6 +1176,7 @@ func (c *checker) inbox(messages []InboxMessage) {
 			c.missionID(entry+".decision.id", decision.ID)
 			c.text(entry+".decision.question", decision.Question, MaxQuestionLength, true)
 			c.text(entry+".decision.answer", decision.Answer, MaxInboxTextLength, true)
+			c.answerOption(entry+".decision", decision.Option, decision.Answer)
 			total += len(decision.Question) + len(decision.Answer)
 		}
 	}
@@ -1185,7 +1206,13 @@ func (c *checker) replyStatuses(replies []ReplyStatus) {
 				c.errorf(ErrorCodeInvalidValue, entry+".reason", "only a refused reply carries a reason")
 			}
 		case ReplyStateRefused:
-			c.token(entry+".reason", reply.Reason)
+			switch {
+			case reply.Reason == "":
+				c.errorf(ErrorCodeRequired, entry+".reason", "a refused reply says why")
+			case !slices.Contains(ValidReplyRefusals, reply.Reason):
+				c.errorf(ErrorCodeInvalidValue, entry+".reason", "unknown refusal %q; a refused reply is %s", reply.Reason,
+					strings.Join(ValidReplyRefusals, ", "))
+			}
 		default:
 			c.errorf(ErrorCodeInvalidState, entry+".state", "unknown reply state %q", reply.State)
 		}

@@ -10,7 +10,7 @@ import (
 
 func syncInput() *MissionsSyncInput {
 	return &MissionsSyncInput{
-		Session: SessionRef{Engine: "host-a", ID: "s-1"}, Mission: MissionName{Key: "issue-596"},
+		Session: SessionRef{Engine: "host-a", ID: "s-1"}, Mission: MissionName{Repository: "putnami/putnami", Key: "issue-596"},
 		Event: "stop", State: SessionStateWorking, ObservedAt: "2026-10-26T09:00:00Z",
 	}
 }
@@ -26,7 +26,7 @@ func syncResult() *MissionsSyncResult {
 
 func askInput() *MissionsAskInput {
 	return &MissionsAskInput{
-		Mission: MissionName{Key: "issue-596"}, Question: "Ship now?",
+		Mission: MissionName{Repository: "putnami/putnami", Key: "issue-596"}, Question: "Ship now?",
 		Options:        []DecisionOption{{ID: "yes", Label: "Ship"}, {ID: "no", Label: "Wait"}},
 		IdempotencyKey: "issue-596/ask/ship",
 	}
@@ -46,6 +46,7 @@ func TestMissions_InputRules(t *testing.T) {
 			in.State, in.WaitUntil = SessionStateWaiting, "2026-10-26T10:00:00+02:00"
 			return in
 		}, nil},
+		{"waiting without waitUntil", func() any { in := syncInput(); in.State = SessionStateWaiting; return in }, []string{ErrorCodeRequired}},
 		{"error outside failed", func() any { in := syncInput(); in.Error = "boom"; return in }, []string{ErrorCodeInvalidValue}},
 		{"an empty plan clears it", func() any { in := syncInput(); in.Plan = &MissionPlan{Steps: []PlanStep{}}; return in }, nil},
 		{"a plan without steps", func() any { in := syncInput(); in.Plan = &MissionPlan{}; return in }, []string{ErrorCodeRequired}},
@@ -64,7 +65,18 @@ func TestMissions_InputRules(t *testing.T) {
 			in.Plan = &MissionPlan{Steps: []PlanStep{{Key: "a", Status: PlanStepTodo, Text: "x\ny"}}}
 			return in
 		}, []string{ErrorCodeInvalidValue}},
-		{"a repeated delivered id", func() any { in := syncInput(); in.Delivered = []string{"m1", "m1"}; return in }, []string{ErrorCodeInvalidValue}},
+		{"a step key as long as a token", func() any {
+			in := syncInput()
+			in.Plan = &MissionPlan{Steps: []PlanStep{{Key: "task-" + strings.Repeat("a", MaxTokenLength-len("task-")), Status: PlanStepTodo, Text: "x"}}}
+			return in
+		}, nil},
+		{"a step key longer than a token", func() any {
+			in := syncInput()
+			in.Plan = &MissionPlan{Steps: []PlanStep{{Key: strings.Repeat("a", MaxTokenLength+1), Status: PlanStepTodo, Text: "x"}}}
+			return in
+		}, []string{ErrorCodeInvalidValue}},
+		{"a repeated delivered id counts once", func() any { in := syncInput(); in.Delivered = []string{"m1", "m1"}; return in }, nil},
+		{"a repeated decision id counts once", func() any { in := syncInput(); in.Decisions = []string{"d1", "d1"}; return in }, nil},
 		{"too many decisions", func() any {
 			in := syncInput()
 			for i := range MaxSyncDecisions + 1 {
@@ -80,19 +92,35 @@ func TestMissions_InputRules(t *testing.T) {
 		{"an empty reply", func() any { in := syncInput(); in.Replies = []MessageReply{{Message: "m1"}}; return in }, []string{ErrorCodeRequired}},
 		{"an uppercase event", func() any { in := syncInput(); in.Event = "Stop"; return in }, []string{ErrorCodeInvalidValue}},
 		{"an uppercase engine", func() any { in := syncInput(); in.Session.Engine = "Host"; return in }, []string{ErrorCodeInvalidValue}},
-		{"a long session id", func() any { in := syncInput(); in.Session.ID = fill(MaxSessionIDLength + 1); return in }, []string{ErrorCodeInvalidValue}},
+		{"a session id of 128 characters", func() any { in := syncInput(); in.Session.ID = strings.Repeat("a", 128); return in }, nil},
+		{"a long session id", func() any { in := syncInput(); in.Session.ID = strings.Repeat("a", 129); return in }, []string{ErrorCodeInvalidValue}},
+		{"a session id with a slash", func() any { in := syncInput(); in.Session.ID = "a/b"; return in }, []string{ErrorCodeInvalidValue}},
+		{"a session id outside ASCII", func() any { in := syncInput(); in.Session.ID = "sessión"; return in }, []string{ErrorCodeInvalidValue}},
+		{"a UUID session id", func() any { in := syncInput(); in.Session.ID = "5b1f0c2e-8d7a-4f61-9a43-1c2d3e4f5a6b"; return in }, nil},
 		{"an unknown session state", func() any { in := syncInput(); in.State = "sleeping"; return in }, []string{ErrorCodeInvalidState}},
 		{"a model on two lines", func() any { in := syncInput(); in.Model = "a\nb"; return in }, []string{ErrorCodeInvalidValue}},
 		{"a last message on two lines", func() any { in := syncInput(); in.LastMessage = "a\nb"; return in }, nil},
 		{"a last message with NUL", func() any { in := syncInput(); in.LastMessage = "a\x00b"; return in }, []string{ErrorCodeInvalidValue}},
 		{"a long last message", func() any { in := syncInput(); in.LastMessage = fill(MaxLastMessageLength + 1); return in }, []string{ErrorCodeTooLarge}},
 		{"a mission key with a space", func() any { in := syncInput(); in.Mission.Key = "issue 596"; return in }, []string{ErrorCodeInvalidValue}},
+		{"a mission without a repository", func() any { in := syncInput(); in.Mission.Repository = ""; return in }, []string{ErrorCodeRequired}},
+		{"a repository with an uppercase letter", func() any { in := syncInput(); in.Mission.Repository = "Putnami/putnami"; return in }, []string{ErrorCodeInvalidValue}},
+		{"an ask without a repository", func() any { in := askInput(); in.Mission.Repository = ""; return in }, []string{ErrorCodeRequired}},
 		{"a recommendation naming no option", func() any {
 			in := askInput()
 			in.Recommendation = &DecisionRecommendation{Option: "maybe"}
 			return in
 		}, []string{ErrorCodeInvalidValue}},
 		{"a repeated option", func() any { in := askInput(); in.Options[1].ID = "yes"; return in }, []string{ErrorCodeInvalidValue}},
+		{"an option id of 64 characters", func() any {
+			in := askInput()
+			in.Options[0].ID = strings.Repeat("a", 64)
+			in.Recommendation = &DecisionRecommendation{Option: in.Options[0].ID}
+			return in
+		}, nil},
+		{"a long option id", func() any { in := askInput(); in.Options[0].ID = strings.Repeat("a", 65); return in }, []string{ErrorCodeInvalidValue}},
+		{"an option id with a slash", func() any { in := askInput(); in.Options[0].ID = "ship/now"; return in }, []string{ErrorCodeInvalidValue}},
+		{"an option id with dots", func() any { in := askInput(); in.Options[0].ID = "v1.2_x-y"; return in }, nil},
 		{"six options", func() any {
 			in := askInput()
 			in.Options = nil
@@ -161,6 +189,32 @@ func TestMissions_ResultRules(t *testing.T) {
 			}
 			return r
 		}, []string{ErrorCodeTooLarge}},
+		{"an answer with the option it chose", func() any {
+			r := syncResult()
+			message := answer("Answer: ship")
+			message.Decision.Option = "ship.now"
+			r.Inbox = []InboxMessage{message}
+			return r
+		}, nil},
+		{"an answer whose option is not an option id", func() any {
+			r := syncResult()
+			message := answer("Answer: ship")
+			message.Decision.Option = "ship now"
+			r.Inbox = []InboxMessage{message}
+			return r
+		}, []string{ErrorCodeInvalidValue}},
+		{"every refusal reason", func() any {
+			r := syncResult()
+			for i, reason := range ValidReplyRefusals {
+				r.Replies = append(r.Replies, ReplyStatus{Message: maximalID(i), State: ReplyStateRefused, Reason: reason})
+			}
+			return r
+		}, nil},
+		{"a refusal reason outside the vocabulary", func() any {
+			r := syncResult()
+			r.Replies = []ReplyStatus{{Message: "m1", State: ReplyStateRefused, Reason: "message.unknown"}}
+			return r
+		}, []string{ErrorCodeInvalidValue}},
 		{"a replied entry with a reason", func() any {
 			r := syncResult()
 			r.Replies = []ReplyStatus{{Message: "m1", State: ReplyStateReplied, Reason: "x"}}
@@ -189,6 +243,20 @@ func TestMissions_ResultRules(t *testing.T) {
 		{"an answered decision", func() any {
 			return &MissionsAskResult{Decision: MissionDecision{ID: "d1", State: DecisionStateAnswered, Answer: "yes"}, Replayed: true}
 		}, nil},
+		{"an answered decision with its option", func() any {
+			return &MissionsAskResult{Decision: MissionDecision{ID: "d1", State: DecisionStateAcknowledged, Answer: "Ship it.", Option: "yes"}, Replayed: true}
+		}, nil},
+		{"an option without an answer", func() any {
+			return &MissionsAskResult{Decision: MissionDecision{ID: "d1", State: DecisionStateAnswered, Option: "yes"}, Replayed: true}
+		}, []string{ErrorCodeInvalidValue}},
+		{"a host-only mutation in capabilities", func() any {
+			return &Capabilities{Contract: ContractMissions, SupportedVersions: []int{1}, Status: BindingStatusUnbound,
+				Operations: []OperationCapability{{Name: OperationSync, Access: AccessMutating, Required: true, HostOnly: true}}}
+		}, nil},
+		{"a host-only read in capabilities", func() any {
+			return &Capabilities{Contract: ContractMissions, SupportedVersions: []int{1}, Status: BindingStatusUnbound,
+				Operations: []OperationCapability{{Name: OperationSync, Access: AccessRead, HostOnly: true}}}
+		}, []string{ErrorCodeInvalidValue}},
 		{"a refused reply result", func() any {
 			return &MissionsReplyResult{Message: RepliedMessage{ID: "m1", State: ReplyStateRefused}}
 		}, []string{ErrorCodeInvalidState}},

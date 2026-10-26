@@ -129,7 +129,7 @@ the command's exit code reaches the host unchanged.
     "hosts": {
       "claude-code": [
         { "event": "SessionStart", "args": ["--engine", "claude-code"], "timeoutSeconds": 30 },
-        { "event": "PostToolUse", "tools": ["TodoWrite"], "mcpTools": ["missions.ask"],
+        { "event": "PostToolUse", "tools": ["TodoWrite"], "mcpTools": ["missions.ask", "missions.reply"],
           "args": ["--engine", "claude-code"], "timeoutSeconds": 30 },
         { "event": "Stop", "args": ["--engine", "claude-code", "--idle-wake"], "wake": true, "timeoutSeconds": 660 }
       ],

@@ -279,14 +279,16 @@ var catalog = []ContractSpec{
 		Operations: []OperationSpec{
 			{
 				Name: OperationAsk, Access: AccessMutating, Required: true,
-				Summary: "Ask the mission's owner one decision, with 2 to 5 options. A retry with the same idempotencyKey " +
-					"returns the decision already recorded instead of asking twice; the same key with other content is a " +
-					"conflict. The answer arrives in the inbox of a later missions.sync.",
+				Summary: "Ask the mission's owner one decision, with 2 to 5 options. Take the mission's repository and key " +
+					"from the session sheet that the session hook prints. A retry with the same idempotencyKey returns the " +
+					"decision already recorded instead of asking twice; the same key with other content is a conflict. The " +
+					"answer reaches you at the end of a turn or while the session waits. Do not poll for it.",
 				newInput: alloc[MissionsAskInput](), newResult: alloc[MissionsAskResult](),
 			},
 			{
 				Name: OperationReply, Access: AccessMutating, Required: true,
-				Summary: "Reply to one message of the mission's inbox. A message takes one reply: the same reply again " +
+				Summary: "Reply to one message of the mission's inbox. message is the id shown with the owner's message " +
+					"in the session sheet that the session hook prints. A message takes one reply: the same reply again " +
 					"changes nothing, and another reply is a conflict.",
 				newInput: alloc[MissionsReplyInput](), newResult: alloc[MissionsReplyResult](),
 			},

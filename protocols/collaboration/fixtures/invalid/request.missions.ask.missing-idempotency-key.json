@@ -1,5 +1,5 @@
 {
-  "mission": { "key": "issue-596" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-596" },
   "question": "Ship now?",
   "options": [{ "id": "yes", "label": "Ship" }, { "id": "no", "label": "Wait" }]
 }

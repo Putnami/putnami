@@ -112,9 +112,10 @@ func capabilitiesTool(contract string) Tool {
 	tool := readOnlyTool(Tool{
 		Name: contract + "." + collab.OperationCapabilities,
 		Description: fmt.Sprintf("Report the %s binding of this workspace: the provider and contract version options.collaboration.%s names, "+
-			"every operation of the contract with whether that provider offers it and how it enforces preconditions, the installed "+
-			"providers that are not bound, and why a binding cannot be honored. Answered by Putnami from the manifests without running "+
-			"the provider. Call it before relying on an optional operation.", contract, contract),
+			"every operation of the contract with whether that provider offers it, how it enforces preconditions and whether only the "+
+			"host that runs the agent calls it, the installed providers that are not bound, and why a binding cannot be honored. "+
+			"Answered by Putnami from the manifests without running the provider. Call it before relying on an optional operation.",
+			contract, contract),
 		InputSchema: schema,
 	})
 	tool.Meta[collaborationMetaKey] = collaborationToolMeta{Contract: contract, Operation: collab.OperationCapabilities}

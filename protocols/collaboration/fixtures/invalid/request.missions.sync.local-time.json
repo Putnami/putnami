@@ -1,6 +1,6 @@
 {
   "session": { "engine": "host-b", "id": "s-1" },
-  "mission": { "key": "issue-596" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-596" },
   "event": "stop",
   "state": "working",
   "observedAt": "2026-10-26T11:00:00+02:00"

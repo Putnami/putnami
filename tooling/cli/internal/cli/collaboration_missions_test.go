@@ -32,7 +32,7 @@ func TestCollaborationCommand_AHostOnlyOperationIsRoutedByTheCLIAndTheHostChanne
 	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "a-host-only-operation-has-no-mcp-tool")
 	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "the-cli-and-the-host-channel-route-a-host-only-operation")
 	root := collabMissionsWorkspace(t)
-	input := `{"session":{"engine":"host-b","id":"s-1"},"mission":{"key":"issue-596"},"event":"stop","state":"handed_back","observedAt":"2026-10-26T09:00:00Z"}`
+	input := `{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"putnami/putnami","key":"issue-596"},"event":"stop","state":"handed_back","observedAt":"2026-10-26T09:00:00Z"}`
 
 	stdout, stderr, code := runCollabCommand(t, root, "", "missions", "sync", "--output=json", "--input", input)
 	if code != ExitSuccess {
