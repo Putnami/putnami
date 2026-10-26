@@ -70,7 +70,7 @@
     },
     {
       "id": "the-typescript-runtime-emits-and-validates-a-conforming-stream",
-      "text": "@putnami/runtime implements this wire in TypeScript. It gives every fixture of both versions the Go verdict, and refuses a ready event at version 1 and a stream that mixes versions. Its emitter writes the Go SDK's line shapes, a timed-out result and a ready event included, drops a non-finite metric, stamps one version on every line and writes no ready event at version 1. It resolves PUTNAMI_RUNTIME_EVENTS as the Go helper does, sorts endpoints by byte order, and a malformed readiness marker yields none."
+      "text": "In TypeScript, @putnami/runtime gives every fixture of both versions the Go verdict and refuses a version 1 ready event and a mixed-version stream. Its emitter writes a valid line of every event type, in the Go SDK's shape for meta, result, summary, ready and timed-out result lines, drops a non-finite metric, stamps one version per line and writes no version 1 ready event. It resolves PUTNAMI_RUNTIME_EVENTS as the Go helper does, sorts endpoints by byte order, and a malformed readiness marker yields none."
     },
     {
       "id": "the-cli-arms-on-typed-readiness",
