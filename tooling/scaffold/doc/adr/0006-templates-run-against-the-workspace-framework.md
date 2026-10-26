@@ -64,9 +64,10 @@ running the proof reads them from the proof's cached test result.
 
 - **Discovery is by manifest.** A template added beside the TypeScript proof
   is proven with no edit to the proof. A template added beside the Go proof
-  fails `TestEveryGoTemplateDeclaresTheChecksThisProofObserves` until the proof
-  binds its checks: a Go binding names its check literally, in a top-level
-  test.
+  fails `TestEveryGoTemplateDeclaresTheChecksThisProofObserves` until it is
+  listed in `provenTemplates` and declares the three checks; a check no test
+  observes then fails the template's spec gate as check-not-observed. A Go
+  binding names its check literally, in a top-level test.
 - **A test holds the key complete.** The TypeScript proof fails when a template
   declares a dependency the proof does not declare with the same specifier, or
   when a framework package's `src/**`, `package.json`, `bin/**` or
