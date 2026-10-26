@@ -240,8 +240,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "nearest-ancestor-line-wins",
-              "nested-line-is-refused"
+              "the-loader-maps-each-line-to-its-tag-pattern"
             ]
           }
         },
@@ -254,7 +253,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "project-override-replaces-the-entry"
+              "each-project-reads-the-entry-of-its-ecosystem"
             ]
           }
         },

@@ -85,7 +85,9 @@
             "kind": "acceptance",
             "checks": [
               "a-tag-pattern-defaults-renders-and-validates",
-              "a-project-belongs-to-one-line"
+              "a-project-belongs-to-one-line",
+              "the-cli-loader-puts-each-project-on-its-nearest-ancestor-line",
+              "the-cli-loader-refuses-a-nested-line"
             ]
           }
         },
@@ -98,7 +100,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-outer-map-is-validated-and-entries-stay-raw"
+              "the-outer-map-is-validated-and-entries-stay-raw",
+              "the-cli-loader-replaces-an-overridden-registry-entry-whole"
             ]
           }
         },

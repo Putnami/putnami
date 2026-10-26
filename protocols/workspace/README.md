@@ -616,8 +616,9 @@ The module owns the feature of its contract, `workspace/workspace-contract`,
 specified in [`specs/workspace-contract.json`](specs/workspace-contract.json).
 The tests here prove its requirements, and so do the implementations: the Go,
 TypeScript, Python and Cloud extensions prove that they answer the reserved
-calls, and `@putnami/cli` proves that it reads each answer through this module.
-The CLI commands and the language extensions keep the features of what they
+calls and leave every other call to its owner, and `@putnami/cli` proves that
+it reads each answer through this module and that its loader applies the line
+and registry rules. The CLI commands and the language extensions keep the features of what they
 deliver.
 
 Durable decisions:
