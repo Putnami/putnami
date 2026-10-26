@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -68,6 +69,11 @@ const (
 	hostHookGuard     = " || true"
 	hostHookWakeGuard = `; s=$?; [ "$s" -eq 75 ] && exit 2; exit 0`
 )
+
+// hostHookEnvironment starts every hook command: a hook never runs the
+// first-use install. That install can outlast the host's timeout, and it
+// prints on standard output, which the host reads as the hook's answer.
+const hostHookEnvironment = shared.NoAutoInstallEnv + "=1"
 
 // hostHookLaunchers are the launchers a hook command may start with. Each one
 // is recognized whatever the workspace uses now, so a hook written with an
@@ -320,9 +326,10 @@ type hostHookHandlerJSON struct {
 }
 
 // renderHostHookGroup renders one declared hook for host, started with the
-// launcher the workspace's MCP server uses (base, from mcpServerCommand).
+// launcher the workspace's MCP server uses (base, from mcpServerCommand), with
+// the first-use install turned off.
 func renderHostHookGroup(host, base string, path []string, entry extproto.HostHookEntry) hostHookGroupJSON {
-	words := append([]string{hostHookLauncher(host, base)}, path...)
+	words := append([]string{hostHookEnvironment, hostHookLauncher(host, base)}, path...)
 	words = append(words, entry.Args...)
 	command := strings.Join(words, " ")
 	if entry.Wake {
@@ -371,13 +378,13 @@ func hostHookMatcher(host string, entry extproto.HostHookEntry) string {
 }
 
 // ownsHostHookCommand reports whether a handler command runs one of paths
-// through a known launcher: the launcher and the path, word for word, between
-// shell word boundaries.
+// through a known launcher: the launcher and the path, word for word, as a
+// command the shell runs (see runsShellCommand).
 func ownsHostHookCommand(command string, paths [][]string) bool {
 	for _, path := range paths {
 		tail := " " + strings.Join(path, " ")
 		for _, launcher := range hostHookLaunchers {
-			if containsShellWords(command, launcher+tail) {
+			if runsShellCommand(command, launcher+tail) {
 				return true
 			}
 		}
@@ -385,10 +392,20 @@ func ownsHostHookCommand(command string, paths [][]string) bool {
 	return false
 }
 
-// containsShellWords reports whether needle occurs in command with a word
-// boundary on each side: the start or end of the command, a blank, or a shell
-// operator.
-func containsShellWords(command, needle string) bool {
+// shellAssignment is one NAME=value word before a command, with a value
+// without quotes, blanks or shell operators.
+var shellAssignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=[^\s"'$;&|()<>]*$`)
+
+// shellCommandStarts are the reserved words a command may follow.
+var shellCommandStarts = []string{"!", "{", "do", "elif", "else", "if", "then", "until", "while"}
+
+// runsShellCommand reports whether needle occurs in command as the words a
+// command starts with. The text after needle ends a word: the end of the
+// command, a blank or a shell operator. The text before it, without the
+// NAME=value assignments that lead the command, is empty or ends with a shell
+// operator or a reserved word, so needle is the command, never an argument
+// such as the text an echo prints.
+func runsShellCommand(command, needle string) bool {
 	for offset := 0; offset <= len(command)-len(needle); {
 		index := strings.Index(command[offset:], needle)
 		if index < 0 {
@@ -396,14 +413,40 @@ func containsShellWords(command, needle string) bool {
 		}
 		start := offset + index
 		end := start + len(needle)
-		before := start == 0 || strings.ContainsRune(" \t\n;&|(", rune(command[start-1]))
 		after := end == len(command) || strings.ContainsRune(" \t\n;&|)", rune(command[end]))
-		if before && after {
+		if after && startsShellCommand(command[:start]) {
 			return true
 		}
 		offset = start + 1
 	}
 	return false
+}
+
+// startsShellCommand reports whether a command may start right after prefix:
+// prefix, without its trailing NAME=value words, is blank or ends with a shell
+// operator or a reserved word.
+func startsShellCommand(prefix string) bool {
+	for {
+		trimmed := strings.TrimRight(prefix, " \t")
+		if trimmed == "" {
+			return true
+		}
+		if strings.ContainsRune("\n;&|(", rune(trimmed[len(trimmed)-1])) {
+			return true
+		}
+		if trimmed == prefix {
+			return false
+		}
+		cut := strings.LastIndexAny(trimmed, " \t\n;&|(")
+		word := trimmed[cut+1:]
+		if slices.Contains(shellCommandStarts, word) {
+			return true
+		}
+		if !shellAssignment.MatchString(word) {
+			return false
+		}
+		prefix = trimmed[:cut+1]
+	}
 }
 
 // hostHookFilePlan is the change a run makes to one hook file.

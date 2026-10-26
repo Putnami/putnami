@@ -78,11 +78,11 @@ func TestInstall_WritesHostHooksOnlyWhenExplicit(t *testing.T) {
 		root := hostHooksWorkspace(t)
 		out := install(context.Background(), root)
 		claude := readWorkspaceFile(t, root, ".claude/settings.json")
-		if !strings.Contains(claude, `"command": "putnami agent hook --engine claude-code || true"`) {
+		if !strings.Contains(claude, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true"`) {
 			t.Fatalf("Claude Code hooks:\n%s", claude)
 		}
 		codex := readWorkspaceFile(t, root, ".codex/hooks.json")
-		if !strings.Contains(codex, `"command": "putnami agent hook --engine codex || true"`) {
+		if !strings.Contains(codex, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine codex || true"`) {
 			t.Fatalf("Codex hooks:\n%s", codex)
 		}
 		if !strings.Contains(out, "run /hooks") {

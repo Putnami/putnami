@@ -16,6 +16,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
@@ -114,6 +115,9 @@ func (ws *hostHooksWorkspace) exists(rel string) bool {
 	return err == nil
 }
 
+// hookEnv starts every hook command: a hook never runs the first-use install.
+const hookEnv = "PUTNAMI_NO_AUTO_INSTALL=1 "
+
 // wantClaudeHooks is the Claude Code file the test extension's hooks produce
 // in a workspace that has none, started with launcher.
 func wantClaudeHooks(launcher string) string {
@@ -124,7 +128,7 @@ func wantClaudeHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + jsonEscape(launcher) + ` agent hook --engine claude-code || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -136,7 +140,7 @@ func wantClaudeHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + jsonEscape(launcher) + ` agent hook --engine claude-code || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -147,7 +151,7 @@ func wantClaudeHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + jsonEscape(launcher) + ` agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
             "timeout": 660,
             "asyncRewake": true
           }
@@ -170,7 +174,7 @@ func wantCodexHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + jsonEscape(launcher) + ` agent hook --engine codex || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine codex || true",
             "timeout": 30
           }
         ]
@@ -181,7 +185,7 @@ func wantCodexHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + jsonEscape(launcher) + ` agent hook --engine codex || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine codex || true",
             "timeout": 240
           }
         ]
@@ -239,11 +243,11 @@ func TestHostHooksMergeTable(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "%s agent hook %s || true",
+            "command": "%s%s agent hook %s || true",
             "timeout": %d
           }
         ]
-      }`, jsonEscape(launcher), args, timeout)
+      }`, hookEnv, jsonEscape(launcher), args, timeout)
 	}
 	personStop := `{
         "matcher": "",
@@ -259,7 +263,7 @@ func TestHostHooksMergeTable(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "putnami agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
             "timeout": 660,
             "asyncRewake": true
           }
@@ -270,7 +274,7 @@ func TestHostHooksMergeTable(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "putnami agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -325,6 +329,11 @@ func TestHostHooksMergeTable(t *testing.T) {
 			want: current,
 		},
 		{
+			name:   "ours from a CLI that let a hook install",
+			before: strings.ReplaceAll(current, hookEnv, ""),
+			want:   current,
+		},
+		{
 			name: "ours written twice",
 			before: settings(ours("putnami", "--engine claude-code", 30)+",\n      "+ours("putnami", "--engine claude-code", 30),
 				personStop+",\n      "+wake),
@@ -357,11 +366,11 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "host-hooks-ownership-by-command", "the-person-s-entries-keep-their-bytes")
 	ws := newHostHooksWorkspace(t, true, true)
 	person := `{
-    "model": "opus",
+    "theme": "dark",
     "hooks": {
         "Stop": [
             {
-                "hooks": [{"type": "command", "command": "putnami intelligence session hook || true", "timeout": 30}]
+                "hooks": [{"type": "command", "command": "other-tool session hook || true", "timeout": 30}]
             }
         ],
         "Notification": [{"hooks": [{"type": "command", "command": "notify"}]}]
@@ -373,17 +382,17 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
 		t.Fatalf("warnings = %q", warn)
 	}
 	want := `{
-    "model": "opus",
+    "theme": "dark",
     "hooks": {
         "Stop": [
             {
-                "hooks": [{"type": "command", "command": "putnami intelligence session hook || true", "timeout": 30}]
+                "hooks": [{"type": "command", "command": "other-tool session hook || true", "timeout": 30}]
             },
             {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "putnami agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
                         "timeout": 660,
                         "asyncRewake": true
                     }
@@ -396,7 +405,7 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "putnami agent hook --engine claude-code || true",
+                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
                         "timeout": 30
                     }
                 ]
@@ -408,7 +417,7 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "putnami agent hook --engine claude-code || true",
+                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
                         "timeout": 30
                     }
                 ]
@@ -455,7 +464,7 @@ func TestHostHooksSplitAMixedGroup(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "putnami agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -685,8 +694,9 @@ func TestHostHookMatcherRendering(t *testing.T) {
 	}
 }
 
-// A handler is Putnami's when its command runs a known launcher and a declared
-// path, word for word.
+// A handler is Putnami's when it runs a known launcher and a declared path,
+// word for word, as a command: after NAME=value words, a shell operator or a
+// reserved word, never as the argument of another command.
 func TestHostHookOwnershipByCommand(t *testing.T) {
 	paths := [][]string{{"agent", "hook"}}
 	for command, want := range map[string]bool{
@@ -696,12 +706,23 @@ func TestHostHookOwnershipByCommand(t *testing.T) {
 		`"$CLAUDE_PROJECT_DIR"/putnamiw agent hook; s=$?; exit 0`: true,
 		`"$(git rev-parse --show-toplevel)"/putnamiw agent hook`:  true,
 		"cd x && putnami agent hook":                              true,
+		"PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook || true":    true,
+		"A=1  B= ./putnamiw agent hook":                           true,
+		"if true; then putnami agent hook; fi":                    true,
+		"(putnami agent hook)":                                    true,
+		"echo putnami agent hook":                                 false,
+		"echo 'putnami agent hook'":                               false,
+		"say done; echo run putnami agent hook":                   false,
+		"A=1 echo putnami agent hook":                             false,
+		"A=$(x) putnami agent hook":                               false,
+		"xputnami agent hook":                                     false,
+		"ifputnami agent hook":                                    false,
 		"putnami agent hooks":                                     false,
 		"putnami agent hook-x":                                    false,
 		"putnami agents hook":                                     false,
 		"/usr/local/bin/putnami agent hook":                       false,
 		"putnamiw agent hook":                                     false,
-		"putnami intelligence session hook || true":               false,
+		"other-tool session hook || true":                         false,
 		"": false,
 	} {
 		if got := ownsHostHookCommand(command, paths); got != want {
@@ -722,19 +743,21 @@ func TestHostHookGuardsMapExitCodes(t *testing.T) {
 		t.Skip("no POSIX shell")
 	}
 	stubDir := t.TempDir()
-	stub := "#!/bin/sh\nexit \"$STUB_EXIT\"\n"
+	// The stub records whether the command turned the first-use install off.
+	stub := "#!/bin/sh\nprintf '%s' \"${PUTNAMI_NO_AUTO_INSTALL-unset}\" > \"$STUB_SEEN\"\nexit \"$STUB_EXIT\"\n"
+	seen := filepath.Join(t.TempDir(), "seen")
 	if err := os.WriteFile(filepath.Join(stubDir, "putnami"), []byte(stub), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	path := []string{"agent", "hook"}
 	wake := renderHostHookGroup(extproto.HostClaudeCode, "putnami", path,
 		extproto.HostHookEntry{Event: "Stop", Args: []string{"--idle-wake"}, Wake: true, TimeoutSeconds: 660}).Hooks[0]
-	if want := `putnami agent hook --idle-wake; s=$?; [ "$s" -eq 75 ] && exit 2; exit 0`; wake.Command != want || !wake.AsyncRewake {
+	if want := `PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --idle-wake; s=$?; [ "$s" -eq 75 ] && exit 2; exit 0`; wake.Command != want || !wake.AsyncRewake {
 		t.Fatalf("wake handler = %+v, want command %q with asyncRewake", wake, want)
 	}
 	ordinary := renderHostHookGroup(extproto.HostCodex, "putnami", path,
 		extproto.HostHookEntry{Event: "Stop", TimeoutSeconds: 240}).Hooks[0]
-	if want := "putnami agent hook || true"; ordinary.Command != want || ordinary.AsyncRewake {
+	if want := "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook || true"; ordinary.Command != want || ordinary.AsyncRewake {
 		t.Fatalf("ordinary handler = %+v, want command %q", ordinary, want)
 	}
 	for _, tc := range []struct {
@@ -752,8 +775,16 @@ func TestHostHookGuardsMapExitCodes(t *testing.T) {
 		{ordinary.Command, 1, 0, "ordinary"},
 		{ordinary.Command, 0, 0, "ordinary"},
 	} {
+		_ = os.Remove(seen)
 		cmd := exec.Command(shell, "-c", tc.command)
-		cmd.Env = append(os.Environ(), "PATH="+stubDir+string(os.PathListSeparator)+os.Getenv("PATH"), fmt.Sprintf("STUB_EXIT=%d", tc.exit))
+		var env []string
+		for _, kv := range os.Environ() {
+			if !strings.HasPrefix(kv, shared.NoAutoInstallEnv+"=") {
+				env = append(env, kv)
+			}
+		}
+		cmd.Env = append(env, "PATH="+stubDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+			fmt.Sprintf("STUB_EXIT=%d", tc.exit), "STUB_SEEN="+seen)
 		err := cmd.Run()
 		code := 0
 		var exitErr *exec.ExitError
@@ -764,6 +795,9 @@ func TestHostHookGuardsMapExitCodes(t *testing.T) {
 		}
 		if code != tc.wantCode {
 			t.Errorf("%s hook, command exits %d: hook exits %d, want %d", tc.guardName, tc.exit, code, tc.wantCode)
+		}
+		if got, err := os.ReadFile(seen); err != nil || string(got) != "1" {
+			t.Errorf("%s hook: the launcher saw %s %q (%v), want 1", tc.guardName, shared.NoAutoInstallEnv, got, err)
 		}
 	}
 }

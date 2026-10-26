@@ -56,7 +56,10 @@ Two facts make the hooks risky to write:
 4. **A handler is Putnami's by its command, and no record says so.** A
    handler is Putnami's when its command runs a known launcher followed by the
    command path an installed extension declares, as whole shell words. The
-   known launchers are `putnami`, `./putnamiw`,
+   launcher is a command word: it starts the command, or follows a shell
+   operator (`;`, `&`, `|`, `(` or a new line), a reserved word such as `then`,
+   or `NAME=value` words. `echo putnami agent hook` prints the text and is the
+   person's. The known launchers are `putnami`, `./putnamiw`,
    `"$CLAUDE_PROJECT_DIR"/putnamiw` and
    `"$(git rev-parse --show-toplevel)"/putnamiw`. A hook that a person wrote
    for the same command is therefore Putnami's, and the next run replaces it.
@@ -93,11 +96,16 @@ Two facts make the hooks risky to write:
    (`interactiveExitCode` in `internal/cli/extension_command.go`); a
    non-interactive one maps every failure to 1. This is why the command path
    must start with an interactive subcommand.
-10. **A hook starts with the workspace's launcher.** It uses the launcher the
-    MCP server registration chooses. In a source workspace, which runs
-    `./putnamiw`, a hook names the wrapper from the root the host provides:
-    `"$CLAUDE_PROJECT_DIR"/putnamiw` in Claude Code and
-    `"$(git rev-parse --show-toplevel)"/putnamiw` in Codex.
+10. **A hook starts with the workspace's launcher, and never installs.** It
+    uses the launcher the MCP server registration chooses. In a source
+    workspace, which runs `./putnamiw`, a hook names the wrapper from the root
+    the host provides: `"$CLAUDE_PROJECT_DIR"/putnamiw` in Claude Code and
+    `"$(git rev-parse --show-toplevel)"/putnamiw` in Codex. Every hook command
+    starts with `PUTNAMI_NO_AUTO_INSTALL=1`, the switch that turns the
+    first-use install off. That install can outlast the host's timeout, and it
+    prints on standard output, which the host reads as the hook's answer. A
+    workspace that is not installed yet gets no hook output until a person
+    runs a command.
 11. **Matchers follow each host.** Claude Code reads `A|B`. Codex reads a
     regular expression that matches a substring, so its matcher is `^(A|B)$`.
     A Putnami MCP tool is named `mcp__putnami__<tool>`, with each dot of the

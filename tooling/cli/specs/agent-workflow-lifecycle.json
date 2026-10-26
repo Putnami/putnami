@@ -89,11 +89,11 @@
     },
     {
       "id": "host-hooks-ownership-by-command",
-      "text": "A handler is Putnami's when its command runs a known launcher and a command path an installed extension declares. A run replaces it in place and never adds a second one; every other entry keeps its bytes and place. When the opt-in or binding is gone, the run removes Putnami's handlers and anything only they filled. A file that cannot be read, parsed or safely edited, or is a link, stays untouched with a warning."
+      "text": "A handler is Putnami's when its command runs a known launcher and a command path an installed extension declares, with the launcher as a command word: at the start, after a shell operator, a reserved word or NAME=value words, never as the argument of another command. A run replaces it in place and never adds a second one; every other entry keeps its bytes and place. When the opt-in or binding is gone, the run removes Putnami's handlers and anything only they filled. A file that cannot be read, parsed or safely edited, or is a link, stays untouched with a warning."
     },
     {
       "id": "host-hooks-exit-guard",
-      "text": "No exit code of the CLI reaches the host as is. An ordinary hook ends with || true. A wake hook, which only Claude Code runs, exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are alternations (A|B) and Codex matchers are anchored regular expressions (^(A|B)$); a Putnami MCP tool is named mcp__putnami__<tool> with its dots as underscores. A source workspace runs the hooks through \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
+      "text": "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never runs the first-use install. No exit code of the CLI reaches the host as is. An ordinary hook ends with || true. A wake hook, which only Claude Code runs, exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are alternations (A|B) and Codex matchers are anchored regular expressions (^(A|B)$); a Putnami MCP tool is named mcp__putnami__<tool> with its dots as underscores. A source workspace runs the hooks through \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
     }
   ],
   "decisions": [
