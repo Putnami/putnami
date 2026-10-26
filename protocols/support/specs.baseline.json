@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "support/support-catalog#closed-vocabularies-and-exact-version",
+    "support/support-catalog#documentation-repeats-the-reviewed-status",
+    "support/support-catalog#promotion-ladder-is-documented",
+    "support/support-catalog#stable-only-consumers",
+    "support/support-catalog#strict-canonical-catalog",
+    "support/support-catalog#validation-reports-independent-findings"
+  ]
+}

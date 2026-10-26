@@ -395,6 +395,7 @@ func TestAnUncommittedRemovalIsChecked(t *testing.T) {
 }
 
 func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "typescript-extension-skips-a-preview-or-experimental-project")
 	spectest.Proves(t, feature, requirement, "a-preview-or-experimental-project-is-not-checked")
 	f := newFixture(t, catalog("package", "experimental"))
 	f.write("ts/lib/src/index.ts", waveOnlySource)
@@ -414,6 +415,7 @@ func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
 }
 
 func TestAProjectTheCatalogDoesNotListIsSkipped(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "typescript-extension-skips-a-project-the-catalog-does-not-list")
 	spectest.Proves(t, feature, requirement, "an-unlisted-project-is-not-checked-when-a-catalog-exists")
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"@example/other","kind":"package","status":"stable"}]}`)
 	f.write("ts/lib/src/index.ts", waveOnlySource)
@@ -433,6 +435,7 @@ func TestAProjectTheCatalogDoesNotListIsSkipped(t *testing.T) {
 }
 
 func TestAWorkspaceWithoutACatalogChecksEveryProject(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "typescript-extension-checks-every-project-without-a-catalog")
 	spectest.Proves(t, feature, requirement, "a-workspace-without-a-catalog-checks-every-project")
 	f := newFixture(t, "")
 	f.write("ts/lib/src/index.ts", waveOnlySource)
@@ -444,6 +447,7 @@ func TestAWorkspaceWithoutACatalogChecksEveryProject(t *testing.T) {
 }
 
 func TestAnInvalidCatalogFailsTheCheck(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "typescript-extension-fails-on-an-invalid-catalog")
 	t.Parallel()
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"x"}]}`)
 	if _, err := Check(f.root, f.project, projectName, f.tags); err == nil || !strings.Contains(err.Error(), "putnami.support.json is invalid") {

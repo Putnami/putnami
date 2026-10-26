@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "agent-context/aggregated-agent-context#a-producer-emits-a-valid-document-and-writes-nothing",
+    "agent-context/aggregated-agent-context#canonical-deterministic-bytes",
+    "agent-context/aggregated-agent-context#conformance-corpus",
+    "agent-context/aggregated-agent-context#exact-version-tokens",
+    "agent-context/aggregated-agent-context#paths-are-workspace-relative-and-canonical",
+    "agent-context/aggregated-agent-context#publish-safety-fails-closed",
+    "agent-context/aggregated-agent-context#tests-section-and-diagnostic-taxonomy"
+  ]
+}

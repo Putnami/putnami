@@ -5,6 +5,8 @@ import (
 	"os"
 	"sort"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // agentContextSchemaPath is the JSON schema editors validate authored documents
@@ -18,6 +20,7 @@ const agentContextSchemaPath = "schemas/agent-context.json"
 // rejects a document the parser reads, and a schema that accepts more blesses
 // one the parser drops. Either gap is drift.
 func TestProtocolVersion_SchemaMatches(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "exact-version-tokens", "the-schema-accepts-exactly-the-current-document-and-overrides-versions")
 	for def, version := range map[string]int{"document": ProtocolVersion, "overridesFile": OverridesProtocolVersion} {
 		want := []int{version}
 		t.Run(def, func(t *testing.T) {
@@ -33,6 +36,7 @@ func TestProtocolVersion_SchemaMatches(t *testing.T) {
 // TestProtocolVersion_Pinned pins the constant so a bump is a deliberate,
 // reviewed change rather than an accident.
 func TestProtocolVersion_Pinned(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "exact-version-tokens", "the-document-version-is-2-and-the-overrides-version-is-1")
 	if ProtocolVersion != 2 {
 		t.Fatalf("ProtocolVersion = %d, want 2 (a bump must be deliberate and update the schema + fixtures)", ProtocolVersion)
 	}

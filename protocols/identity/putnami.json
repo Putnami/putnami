@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/identity",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -14,9 +14,11 @@
     },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "A consumer-side vocabulary compiled from one manifest; the outcomes belong to the surfaces that consume it."
   }
 }

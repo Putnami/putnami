@@ -203,10 +203,12 @@ takes exactly the evidence the table above requires of anything else.
   the only implementation, so no cross-implementation parity is promised. The
   v1 vocabulary is still evolving and has no consumer outside this repository,
   so `stable` would over-promise.
-- **User-facing feature**: none, deliberately. A support status is product
-  policy about other subjects, not a feature a user enables. The durable
+- **Feature**: `support/support-catalog`, specified in
+  [`specs/support-catalog.json`](specs/support-catalog.json). The module owns the
+  feature of its contract; the extensions that gate a project on its status
+  prove the `stable-only-consumers` requirement in their own tests. The durable
   decisions behind this module live in [`doc/adr/`](doc/adr/) and are linked
-  from specs the way
+  from the spec the way
   [`protocols/features`](../features/README.md#specs-and-durable-decisions)
   defines.
 

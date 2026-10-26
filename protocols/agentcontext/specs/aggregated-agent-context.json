@@ -1,0 +1,52 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "agent-context/aggregated-agent-context",
+  "outcomes": [
+    "An agent answers what a project is from one structured document instead of enumerating files",
+    "Every fact in the document is a reference, so the document carries no file content",
+    "The document is identical for identical inputs and is never written, so no stored copy goes stale",
+    "A document that references a sensitive path without marking it, embeds content, or carries an unsafe path never leaves the workspace",
+    "Each wire shape has one exact version token, so a reader never guesses a shape"
+  ],
+  "nonGoals": [
+    "Embedding source content in the document",
+    "Writing or committing the document",
+    "Deriving the sensitive path set inside the protocol",
+    "Letting authors override identity, capabilities, contracts or provenance",
+    "Promising byte parity across languages while one implementation exists"
+  ],
+  "requirements": [
+    {
+      "id": "exact-version-tokens",
+      "text": "The document protocol version is the exact integer 2 and the overrides file version is the exact integer 1. The JSON schema accepts exactly those two versions. A document with any other version fails validation with agentcontext.invalid_protocol_version."
+    },
+    {
+      "id": "conformance-corpus",
+      "text": "The fixture corpus is the conformance contract for both shapes. Every valid document and overrides fixture parses and validates without error. Every invalid fixture yields at least one error, and every error code belongs to the closed agent-context taxonomy."
+    },
+    {
+      "id": "canonical-deterministic-bytes",
+      "text": "The canonical form is JSON indented by two spaces with a trailing newline. A document and an overrides file serialize to identical bytes on every marshal, and the committed full fixtures equal that form. A parsed valid fixture re-serializes to a fixed point. A producer builds byte-identical documents from identical inputs."
+    },
+    {
+      "id": "publish-safety-fails-closed",
+      "text": "ValidatePublishSafety fails closed before a document leaves the workspace. It reports an error for a nil document, a reference to a caller-flagged sensitive path not marked sensitive, a string over the size threshold, a path that is not workspace-relative, and a duplicate reference. A producer whose document fails the gate emits no bytes and exits with a usage error."
+    },
+    {
+      "id": "paths-are-workspace-relative-and-canonical",
+      "text": "A path in a document is workspace-relative and canonical. Empty, absolute, parent-escaping and backslash paths are rejected, as are the spellings ./x, a//b, a/./b and a/b/. The identity path follows the same rule in validation and in the gate. The gate rejects a non-canonical spelling of a sensitive path, so it cannot bypass the exact-match lookup."
+    },
+    {
+      "id": "tests-section-and-diagnostic-taxonomy",
+      "text": "A tests section that lists no packs carries an absenceReason from the closed set, and one that lists packs carries none. Every pack has an id. The tests section has no policy member: a document that carries one fails strict parsing, and the schema omits it. Diagnostic codes form a closed taxonomy. Trailing data after the document is a parse error."
+    },
+    {
+      "id": "a-producer-emits-a-valid-document-and-writes-nothing",
+      "text": "A producer builds the document in memory from committed facts and writes no file. The context pack output and the MCP agent_context result carry the same document at the same revision and version. A producer reads author overrides from schema/agent-context.overrides.json, and the result still passes the gate. A malformed overrides file fails the build with a usage error."
+    }
+  ],
+  "decisions": [
+    "protocols/agentcontext/doc/adr/0001-aggregate-by-reference-fail-closed.md"
+  ]
+}

@@ -11,6 +11,7 @@ import (
 	agentcontext "go.putnami.dev/protocol/agentcontext"
 	protocolcli "go.putnami.dev/protocol/cli"
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -68,6 +69,7 @@ func packLoadedApp(t *testing.T, root, revision, cliVersion string) *agentcontex
 // revision and CLI version, that the provenance stamps both, that the payload
 // carries no disk-artifact status, and that neither path writes a file.
 func TestBuildAgentContextResult_IsThePackedDocumentAndWritesNothing(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "a-producer-emits-a-valid-document-and-writes-nothing", "go-cli-agent-context-tool-serves-the-packed-document-and-writes-nothing")
 	root := makeLoadableFixture(t)
 	before := treeOutsideState(t, root)
 

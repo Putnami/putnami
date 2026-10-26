@@ -1,0 +1,113 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "support",
+  "features": [
+    {
+      "id": "support/support-catalog",
+      "type": "feature",
+      "name": "Public support catalog",
+      "outcome": "A reviewer, a gate and a consumer read one strict, canonical statement of which subjects Putnami supports at which status, and the documents that state a status cannot drift from it unnoticed",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "closed-vocabularies-and-exact-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-status-and-kind-vocabularies-are-closed",
+              "only-the-exact-integer-1-is-accepted-as-the-protocol-version",
+              "a-rejected-version-names-the-accepted-token-and-field"
+            ]
+          }
+        },
+        {
+          "id": "strict-canonical-catalog",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-strict-reader-rejects-non-canonical-json",
+              "canonical-writing-sorts-a-copy-and-round-trips",
+              "valid-fixtures-are-canonical-and-invalid-fixtures-are-rejected"
+            ]
+          }
+        },
+        {
+          "id": "validation-reports-independent-findings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "independent-findings-are-all-reported",
+              "a-nil-or-empty-catalog-is-an-error",
+              "a-non-canonical-subject-id-is-invalid",
+              "an-experimental-entry-cannot-be-the-default"
+            ]
+          }
+        },
+        {
+          "id": "documentation-repeats-the-reviewed-status",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-support-section-is-found-outside-fenced-examples",
+              "every-disagreement-with-the-reviewed-status-is-explained",
+              "a-matching-documented-status-reports-no-reason"
+            ]
+          }
+        },
+        {
+          "id": "stable-only-consumers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-extension-skips-a-preview-or-experimental-project",
+              "go-extension-skips-a-project-the-catalog-does-not-list",
+              "go-extension-checks-every-project-without-a-catalog",
+              "go-extension-fails-on-an-invalid-catalog",
+              "typescript-extension-skips-a-preview-or-experimental-project",
+              "typescript-extension-skips-a-project-the-catalog-does-not-list",
+              "typescript-extension-checks-every-project-without-a-catalog",
+              "typescript-extension-fails-on-an-invalid-catalog"
+            ]
+          }
+        },
+        {
+          "id": "promotion-ladder-is-documented",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-promotion-table-has-one-row-per-status",
+              "the-promotion-section-states-the-ladder-and-its-record",
+              "the-status-table-reader-reads-only-the-status-table"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // findCode returns true if diags contains a diagnostic with the given code.
@@ -74,6 +75,7 @@ func TestValidateDocument_NilIsParseError(t *testing.T) {
 }
 
 func TestValidateDocument_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "exact-version-tokens", "a-document-with-another-version-fails-validation")
 	d := validDocument()
 	d.ProtocolVersion = 99
 	if !findCode(ValidateDocument(d), ErrorCodeInvalidProtocolVersion) {
@@ -167,6 +169,7 @@ func TestValidateDocument_SectionFields(t *testing.T) {
 const goodDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 
 func TestValidateDocument_TestsSection(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "tests-section-and-diagnostic-taxonomy", "the-absence-reason-rules-of-the-tests-section-are-enforced")
 	cases := []struct {
 		name  string
 		tests *TestsSection
@@ -253,6 +256,7 @@ func TestValidateOverrides_SampleIsClean(t *testing.T) {
 // --- Publish-safety gate ---
 
 func TestPublishSafety_NilIsError(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "a-nil-document-fails-the-gate")
 	if !findCode(ValidatePublishSafety(nil, PublishSafetyOptions{}), ErrorCodeParseError) {
 		t.Error("nil document must fail the publish-safety gate, never pass vacuously")
 	}
@@ -270,6 +274,7 @@ func TestPublishSafety_SampleWithFlaggedSensitivePasses(t *testing.T) {
 }
 
 func TestPublishSafety_UnflaggedSensitiveFailsClosed(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "a-flagged-sensitive-path-without-the-flag-fails-the-gate")
 	d := validDocument()
 	d.Capabilities = []ArtifactRef{{Path: "secret/keyring.json", Digest: goodDigest}} // not flagged
 	opts := PublishSafetyOptions{SensitivePaths: map[string]bool{"secret/keyring.json": true}}
@@ -302,6 +307,7 @@ func TestPublishSafety_SensitiveDocAndSourceEnforced(t *testing.T) {
 }
 
 func TestPublishSafety_EmbeddedContentRejected(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "an-oversized-string-fails-the-gate-as-embedded-content")
 	d := validDocument()
 	// Smuggle a large blob into a free-form provenance string.
 	d.CompositionRoots = []CompositionRoot{{Kind: RootKindApplicationMain, Path: "main.go", Provenance: strings.Repeat("x", defaultMaxStringBytes+1)}}
@@ -319,6 +325,7 @@ func TestPublishSafety_CustomThreshold(t *testing.T) {
 }
 
 func TestPublishSafety_PathHygieneDefenseInDepth(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "a-non-relative-path-fails-the-gate")
 	d := validDocument()
 	d.Contracts = []ArtifactRef{{Path: "../escape.json", Digest: goodDigest}}
 	if !findCode(ValidatePublishSafety(d, PublishSafetyOptions{}), ErrorCodeInvalidPath) {
@@ -327,6 +334,7 @@ func TestPublishSafety_PathHygieneDefenseInDepth(t *testing.T) {
 }
 
 func TestPublishSafety_DuplicateRefDefenseInDepth(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "a-duplicate-reference-fails-the-gate")
 	d := validDocument()
 	d.Contracts = []ArtifactRef{
 		{Path: "schema/contracts.json", Digest: goodDigest},
@@ -347,6 +355,7 @@ func TestPublishSafety_CleanDocumentPasses(t *testing.T) {
 // --- Path hygiene ---
 
 func TestIsWorkspaceRelative(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "paths-are-workspace-relative-and-canonical", "unsafe-path-shapes-are-not-workspace-relative")
 	ok := []string{"a.go", "go/samples/x/main.go", "schema/config.json", "a/b..c/d.go"}
 	for _, p := range ok {
 		if !isWorkspaceRelative(p) {
@@ -367,6 +376,7 @@ func TestIsWorkspaceRelative(t *testing.T) {
 // full path hygiene: consumers use it as the project directory, so an escaping
 // value must fail both the normal validation and the publish-safety gate.
 func TestValidateDocument_IdentityPathEscapeRejected(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "paths-are-workspace-relative-and-canonical", "an-escaping-identity-path-fails-validation-and-the-gate")
 	d := validDocument()
 	d.Identity.Path = "../outside"
 	if !findCode(ValidateDocument(d), ErrorCodeInvalidPath) {
@@ -382,6 +392,7 @@ func TestValidateDocument_IdentityPathEscapeRejected(t *testing.T) {
 // sensitive-path lookup in the publish-safety gate sound: "./secret/x" cannot
 // slip past a sensitive set keyed "secret/x" because it never validates.
 func TestValidatePath_NonCanonicalSpellingRejected(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "paths-are-workspace-relative-and-canonical", "a-non-canonical-spelling-of-a-sensitive-path-fails-the-gate")
 	d := validDocument()
 	d.Capabilities = []ArtifactRef{{Path: "./secret/keyring.json", Digest: goodDigest}} // not flagged
 	opts := PublishSafetyOptions{SensitivePaths: map[string]bool{"secret/keyring.json": true}}
@@ -408,6 +419,7 @@ func TestPublishSafety_KindEmbeddedContentRejected(t *testing.T) {
 // TestParseDocument_TrailingDataRejected pins that the strict decoder requires
 // exactly one JSON value: a valid document followed by trailing JSON fails.
 func TestParseDocument_TrailingDataRejected(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "tests-section-and-diagnostic-taxonomy", "trailing-data-after-the-document-is-a-parse-error")
 	data, err := json.Marshal(validDocument())
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -423,6 +435,7 @@ func TestParseDocument_TrailingDataRejected(t *testing.T) {
 // TestValidateTests_PackMissingIDRejected pins that pack entries are validated:
 // "packs":[{}] must not validate despite the section being non-empty.
 func TestValidateTests_PackMissingIDRejected(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "tests-section-and-diagnostic-taxonomy", "a-pack-without-an-id-is-rejected")
 	d := validDocument()
 	d.Tests = &TestsSection{Packs: []PackRef{{}}}
 	if !findCode(ValidateDocument(d), ErrorCodeInvalidPack) {
@@ -434,6 +447,7 @@ func TestValidateTests_PackMissingIDRejected(t *testing.T) {
 // the strict parser rejects the member as an unknown field, and the schema
 // closes the tests section without declaring it.
 func TestTestsSection_PolicyIsUnknown(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "tests-section-and-diagnostic-taxonomy", "tests-policy-is-an-unknown-field-and-absent-from-the-schema")
 	data := []byte(`{"protocolVersion":2,"identity":{"id":"/a","name":"a","path":"a"},` +
 		`"tests":{"policy":"auto","absenceReason":"no-packs"},` +
 		`"provenance":{"workspaceRevision":"deadbeef","generator":{"name":"putnami","version":"0.1.0"},"aggregationMethod":"by-reference"}}`)
@@ -474,6 +488,7 @@ func TestTestsSection_PolicyIsUnknown(t *testing.T) {
 // TestDiagnosticTaxonomy_Membership asserts every constant is registered in
 // ValidDiagnosticCodes so tooling can trust the map is exhaustive.
 func TestDiagnosticTaxonomy_Membership(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "tests-section-and-diagnostic-taxonomy", "every-diagnostic-code-is-in-the-closed-taxonomy")
 	required := []string{
 		ErrorCodeParseError,
 		ErrorCodeUnknownField,
@@ -509,6 +524,7 @@ func TestDiagnosticTaxonomy_Membership(t *testing.T) {
 
 // TestConstants pins the canonical path tooling depends on.
 func TestConstants(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "a-producer-emits-a-valid-document-and-writes-nothing", "the-overrides-file-path-is-schema-agent-context-overrides-json")
 	if OverridesPath != "schema/agent-context.overrides.json" {
 		t.Errorf("OverridesPath = %q", OverridesPath)
 	}

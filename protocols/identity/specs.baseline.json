@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "identity/consumer-side-vocabulary#adopted-constants-mirror-the-enums",
+    "identity/consumer-side-vocabulary#committed-twins-are-fresh",
+    "identity/consumer-side-vocabulary#one-manifest-identity-and-version",
+    "identity/consumer-side-vocabulary#reviewed-claim-and-principal-vocabulary"
+  ]
+}

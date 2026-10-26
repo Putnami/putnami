@@ -191,10 +191,12 @@ rewrite or to go stale.
   exists and there is no second-language twin, so no cross-implementation parity
   is promised. It is not `stable`: the consumers are all in-repo, and an
   agent-facing surface this young should be able to change.
-- **User-facing feature**: none of its own. The user-visible behavior is the
-  CLI command and the MCP tool that produce and serve the document; a wire
-  contract is not a product feature, and minting one per protocol would scatter
-  product intent across artifacts nobody operates directly. The durable
-  decisions for this module live in [`doc/adr/`](doc/adr/), the form
+- **Feature and spec**: `agent-context/aggregated-agent-context`, specified in
+  [`specs/aggregated-agent-context.json`](specs/aggregated-agent-context.json).
+  The protocol owns the feature of its contract. The Go tests here and the
+  CLI producer tests under `tooling/cli/internal/commands/agentctx` prove its
+  requirements. The CLI command and the MCP tool keep their own feature,
+  `cli/context-mcp-discovery`. The durable decisions for this module live in
+  [`doc/adr/`](doc/adr/), the form
   [`protocols/features`](../features/README.md#specs-and-durable-decisions)
   expects a spec to link to.
