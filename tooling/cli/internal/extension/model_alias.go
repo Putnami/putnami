@@ -286,6 +286,10 @@ var ExpandPipeline = model.ExpandPipeline
 // options, such as internal namespacing for composable commands.
 var ExpandPipelineWithOptions = model.ExpandPipelineWithOptions
 
+// SelectsChangedFile reports whether a changed file matches a changedFiles
+// activation gate.
+var SelectsChangedFile = model.SelectsChangedFile
+
 // --- Contract validation ---
 
 // ContractError describes a single contract validation failure.

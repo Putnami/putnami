@@ -366,9 +366,9 @@ Each step in the `run` array references a task and declares dependencies:
 | `with` | `map[string]Binding` | Input bindings (values passed to the task) |
 
 For an invocation-resource relation, producer start arms the finalizer exactly
-once and cleanup waits until every listed consumer is terminal. The producer
-task must declare an invocation-scoped output. Only those related tasks receive
-job-context `invocation.artifactRoot` and the matching
+once and cleanup waits until every listed consumer the plan holds is terminal.
+The producer task must declare an invocation-scoped output. Only those related
+tasks receive job-context `invocation.artifactRoot` and the matching
 `{invocationArtifactRoot}` task-argument token; unrelated steps receive neither.
 
 ### External Dependency References
@@ -854,7 +854,9 @@ Rules worth internalizing before writing one:
   would report success without ever creating the artifact.
 - `finalizes.consumers` must be the **complete** downstream frontier, and a
   finalizer has no ordinary `dependsOn`. Trigger and frontier come only from
-  `finalizes`, so they cannot disagree.
+  `finalizes`, so they cannot disagree. Cleanup waits for each consumer the
+  plan holds; a consumer an `if` or an activation gate removed never runs.
+  A plan that holds no consumer leaves the finalizer inert.
 - Nothing may bind an input from a finalizer, and neither a finalizer task nor
   its command may export a result: cleanup reports lifecycle status, not data.
 - Cache negotiation happens **before** materialization. An all-hit frontier
@@ -917,9 +919,19 @@ explicit camelCase binding.
 ### Context Binding
 
 ```json
-{ "from": "command", "path": "params.target" }
-{ "from": "context", "path": "workspace.name" }
+{ "from": "context", "path": "selection.changedFiles" }
 ```
+
+The value is a planner fact, bound for that pipeline step only, like a value
+binding: it overrides every other layer of the same name and keys the step's
+cache entry. The planner resolves one path, `selection.changedFiles`: the
+run's changed files that the target project holds in its own directory, as
+sorted, unique, project-relative slash paths. A project that holds none, and
+any project on a run that measured no diff (`--all`, `--projects`), binds no
+value, and the task receives no parameter. Pair it with the step gate
+`activation.changedFiles` to plan the step only where a matching file changed.
+Strict validation refuses any other `from` or `path`, and either form requires
+`cliContract` 16.
 
 ### Step Binding
 

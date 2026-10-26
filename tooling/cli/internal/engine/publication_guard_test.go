@@ -192,7 +192,7 @@ func cloudPublishPlan(t *testing.T, withCloud bool, channels ...string) (*worksp
 	if withCloud {
 		exts = append(exts, extension.LoadExtensionFromDir(filepath.Join(root, "cloud", "extension"), "@putnami/cloud"))
 	}
-	planned, err := planner.Plan(ws, []string{"publish"}, ws.Projects, exts, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"publish"}, ws.Projects, exts, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan publish: %v", err)
 	}

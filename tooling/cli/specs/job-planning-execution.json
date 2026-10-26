@@ -258,6 +258,10 @@
       "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Such a manifest declares CLI contract 15; older readers refuse it."
     },
     {
+      "id": "a-step-reads-the-changed-files",
+      "text": "A step can gate on the run's changed files (activation.changedFiles) and bind them (from: context, path selection.changedFiles). It is planned only for a project whose own directory holds a matching changed file, and binds those files, project-relative and sorted, into its parameters and cache key; plain steps key alike whatever the change. A run without a diff plans it nowhere; a portable request plans from the submitter's paths. A finalizer waits for the planned consumers. It needs CLI contract 16."
+    },
+    {
       "id": "an-interactive-command-stops-on-its-own-terms",
       "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit, then kills it; the CLI's shutdown bound covers that budget from before the child starts. A second signal kills the child at once, or as soon as it started. A child that exits by itself after the signal keeps its exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
     },

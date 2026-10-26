@@ -68,7 +68,7 @@ func TestPlan_BasicPipeline(t *testing.T) {
 	ws := makeTestWorkspace()
 	ext := makeTestExtension()
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestPlan_CrossProjectDeps(t *testing.T) {
 	ws := makeTestWorkspace()
 	ext := makeTestExtension()
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestPlan_IntraPipelineDeps(t *testing.T) {
 	ws := makeTestWorkspace()
 	ext := makeTestExtension()
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestPlan_DisabledJobs(t *testing.T) {
 	ws := makeTestWorkspace()
 	ext := makeTestExtension()
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, []string{"build"}, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, []string{"build"}, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestPlan_DisabledExtension(t *testing.T) {
 	ws := makeTestWorkspace()
 	ext := makeTestExtension()
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, []string{"@test/ts"})
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, []string{"@test/ts"}, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestPlan_MultiCommand(t *testing.T) {
 	ext := makeTestExtension()
 
 	// Only utils has test activation files (we don't check files in test, so both will match)
-	planned, err := Plan(ws, []string{"build", "test"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build", "test"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestPlan_AlsoRunsPlansTheCompanionCommand(t *testing.T) {
 		proj.Extensions = append(proj.Extensions, "@test/sdd")
 	}
 
-	planned, err := Plan(ws, []string{"validate"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"validate"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestPlan_AlsoRunsPlansTheCompanionCommand(t *testing.T) {
 
 	// Requesting both explicitly stays a single plan of each: expansion
 	// dedupes against the visited set instead of double-planning.
-	both, err := Plan(ws, []string{"validate", "validate-workspace"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	both, err := Plan(ws, []string{"validate", "validate-workspace"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan(both): %v", err)
 	}
@@ -459,7 +459,7 @@ func TestPlan_SingleProjectEmitsUpstreamDeps(t *testing.T) {
 	// Plan only "app" (which depends on "utils").
 	// The planner should emit utils:build~generate as an upstream dep.
 	appOnly := []*workspace.Project{ws.Projects[1]} // app
-	planned, err := Plan(ws, []string{"build"}, appOnly, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, appOnly, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -514,7 +514,7 @@ func TestPlan_TransitiveUpstreamDeps(t *testing.T) {
 	ext := makeTestExtension()
 
 	// Plan only "A" — should emit B:build~generate and C:build~generate
-	planned, err := Plan(ws, []string{"build"}, []*workspace.Project{projects[2]}, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, []*workspace.Project{projects[2]}, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -777,7 +777,7 @@ func TestEmitCommandDeps_AutoPlansPrerequisites(t *testing.T) {
 	}
 
 	// Plan only "publish" — emitCommandDeps should auto-plan "package" for B
-	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -830,7 +830,7 @@ func TestPlan_SessionCommandDepAutoPlansAndGatesSelectedScope(t *testing.T) {
 
 	ciExt := releaseGateExtension(false)
 
-	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -881,7 +881,7 @@ func TestPlan_SessionCommandDepChainsThroughAutoPlannedCommands(t *testing.T) {
 
 	ciExt := releaseGateExtension(true)
 
-	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -977,7 +977,7 @@ func TestPlan_PublishSerializesPackageGenerationAfterBuild(t *testing.T) {
 		"docker":   true,
 		"config":   true,
 		"no-cache": true,
-	}, nil, nil)
+	}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1027,7 +1027,7 @@ func TestPlan_GoPublishSerializesPackageGenerationAfterBuild(t *testing.T) {
 	ciExt := publishGraphCIExtension()
 	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{goExt, ciExt}, map[string]any{
 		"docker": true,
-	}, nil, nil)
+	}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1077,7 +1077,7 @@ func TestPlan_ConfigExtractActivatesForGoProjectWithoutExplicitExtension(t *test
 		},
 	}
 
-	planned, err := Plan(ws, []string{"config-extract"}, ws.Projects, []*extension.ExtensionDescription{goExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"config-extract"}, ws.Projects, []*extension.ExtensionDescription{goExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1115,7 +1115,7 @@ func TestPlan_ConfigExtractRecursiveActivationStaysInOwningProject(t *testing.T)
 			ws := testWorkspace(root, parent, child)
 			goExt := configExtractTestExtension("@putnami/go", tt.pattern)
 
-			planned, err := Plan(ws, []string{"config-extract"}, []*workspace.Project{parent}, []*extension.ExtensionDescription{goExt}, nil, nil, nil)
+			planned, err := Plan(ws, []string{"config-extract"}, []*workspace.Project{parent}, []*extension.ExtensionDescription{goExt}, nil, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("Plan: %v", err)
 			}
@@ -1150,7 +1150,7 @@ func TestPlan_ConfigExtractKeepsChildAndMixedLanguageActivation(t *testing.T) {
 		{"parent and child", ws.Projects, []string{"/app @putnami/typescript", "/app/clients/go @putnami/go"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			planned, err := Plan(ws, []string{"config-extract"}, tt.selected, exts, nil, nil, nil)
+			planned, err := Plan(ws, []string{"config-extract"}, tt.selected, exts, nil, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("Plan: %v", err)
 			}
@@ -1166,7 +1166,7 @@ func TestPlan_ConfigExtractKeepsChildAndMixedLanguageActivation(t *testing.T) {
 	}
 
 	writeTestFile(t, filepath.Join(root, "app", "src", "main.go"), "package app\n")
-	planned, err := Plan(ws, []string{"config-extract"}, []*workspace.Project{parent}, exts, nil, nil, nil)
+	planned, err := Plan(ws, []string{"config-extract"}, []*workspace.Project{parent}, exts, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan for mixed-language parent: %v", err)
 	}
@@ -1229,7 +1229,7 @@ func TestPlan_CloudPublishConfigActivatesFromGeneratedSchema(t *testing.T) {
 		},
 	}
 
-	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{cloud}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{cloud}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1266,7 +1266,7 @@ func TestPlanWorkspaceOnceCommandRunsOnce(t *testing.T) {
 		},
 	}
 
-	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1305,7 +1305,7 @@ func TestPlanWorkspaceOnceCommandCarriesSelectedProjects(t *testing.T) {
 		},
 	}
 
-	planned, err := Plan(ws, []string{"deploy"}, projects[:1], []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"deploy"}, projects[:1], []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1355,7 +1355,7 @@ func TestPlanWorkspaceOnceCommandCanDependOnAllPublishJobs(t *testing.T) {
 		},
 	}
 
-	planned, err := Plan(ws, []string{"publish", "deploy"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"publish", "deploy"}, ws.Projects, []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1410,7 +1410,7 @@ func TestPlanSessionDependencyWorkspaceOnceCarriesSelectedProjects(t *testing.T)
 		},
 	}
 
-	planned, err := Plan(ws, []string{"release"}, projects[:1], []*extension.ExtensionDescription{ciExt}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"release"}, projects[:1], []*extension.ExtensionDescription{ciExt}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1456,7 +1456,7 @@ func TestPlan_ComposesRootCommandContributions(t *testing.T) {
 	cloud := deployExtension("@putnami/cloud", "cloud.deploy.json")
 	pulumi := deployExtension("@putnami/pulumi", "Pulumi.yaml")
 
-	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{cloud, pulumi}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{cloud, pulumi}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1498,7 +1498,7 @@ func TestPlan_DeployActivatesFromCommittedInfraMarkersWithoutGen(t *testing.T) {
 	cloud := deployExtension("@putnami/cloud", "")
 	cloud.Jobs["deploy"].ActivationFiles = []string{"infra/runtime.json", "infra/requirements.json"}
 
-	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{cloud}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{cloud}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1535,7 +1535,7 @@ func TestPlan_ComposedRootCommandResolvesUpstreamStepRefs(t *testing.T) {
 	cloud := deployExtension("@putnami/cloud", "cloud.deploy.json")
 	pulumi := deployExtension("@putnami/pulumi", "Pulumi.yaml")
 
-	planned, err := Plan(ws, []string{"deploy"}, []*workspace.Project{app}, []*extension.ExtensionDescription{cloud, pulumi}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"deploy"}, []*workspace.Project{app}, []*extension.ExtensionDescription{cloud, pulumi}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -1584,7 +1584,7 @@ func TestPlan_ConflictingCommandFlagsFailValidation(t *testing.T) {
 		"target": {Type: "boolean", Description: "Target all stacks"},
 	}
 
-	_, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{cloud, pulumi}, nil, nil, nil)
+	_, err := Plan(ws, []string{"deploy"}, ws.Projects, []*extension.ExtensionDescription{cloud, pulumi}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected flag conflict")
 	}
@@ -1603,7 +1603,7 @@ func TestPlan_PipelineExpansionErrorWrapsProjectAndCommand(t *testing.T) {
 	// `expand pipeline for %s/%s` wrap in Plan that no other test reaches.
 	ext.Jobs["build"].PipelineSteps[0].Task = "build-missing"
 
-	_, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	_, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected pipeline expansion error")
 	}
@@ -1645,7 +1645,7 @@ func TestPlan_UpstreamPipelineExpansionErrorWrapsStepAndProject(t *testing.T) {
 	brokenExt.Jobs["build"].PipelineSteps[0].Task = "build-missing"
 
 	appOnly := []*workspace.Project{appProj}
-	_, err := Plan(ws, []string{"build"}, appOnly, []*extension.ExtensionDescription{goodExt, brokenExt}, nil, nil, nil)
+	_, err := Plan(ws, []string{"build"}, appOnly, []*extension.ExtensionDescription{goodExt, brokenExt}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected upstream pipeline expansion error")
 	}

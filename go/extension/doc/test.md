@@ -12,6 +12,7 @@ Runs Go tests with `go test -json`, parses results into structured metrics, and 
 - Parses `coverage.out` for per-file statement coverage
 - Emits metrics for test counts and coverage percentage
 - Warns on files with zero coverage
+- Runs the race detector on the packages a change touched, beside the test run (see [Race detector on changed packages](#race-detector-on-changed-packages))
 
 **Activation:** Any project containing `go.mod` or `*_test.go` files.
 
@@ -141,6 +142,39 @@ putnami test .
 
 ```bash
 putnami test . --race
+```
+
+`--race` runs every package under the race detector, in the test run itself.
+
+### Race detector on changed packages
+
+When the run measured a diff, as `putnami test --impacted` does, `test` also
+runs a `test-race` step in each project that owns a changed Go or testdata
+file. The step runs `go test -race` on the packages the change touched:
+
+- the directory of each changed `.go` file the project owns;
+- for a changed file under a `testdata` directory, the package that holds that
+  directory.
+
+The step runs beside `test`, not after it. It measures no coverage, writes no
+file and runs no benchmark. A project the change reaches only through a
+dependency runs no race step, and a run without a diff (`--all`, `--projects`)
+runs none. No package list is maintained: the change decides the packages.
+
+The CLI binds the changed files to the step, so they key its cache entry: the
+same change answers from the cache, and another change runs again.
+
+`--race` replaces the step, because it already runs every package under the
+detector. `--no-race-changed` turns the step off.
+
+The race detector needs a supported platform and, everywhere except macOS, cgo
+and a C compiler. The step sets `CGO_ENABLED=1`. When the platform has no race
+detector, or `go env CC` names a compiler that is not on `PATH`, the step fails
+with a diagnostic that names `--no-race-changed`.
+
+```bash
+# Skip the race step on a host without a C compiler
+putnami test --impacted --no-race-changed
 ```
 
 ### Filter tests
@@ -409,6 +443,7 @@ from config.
 | `--enforce-coverage` | `true` | Enforce each project's `coverage-threshold`. On by default so a drop fails the run that caused it. `--no-enforce-coverage` keeps measuring and reporting but never fails. Distinct from `--coverage`, so it never overrides a project's `coverage: false` opt-out |
 | `--coverage` | `true` | Per-project coverage policy, and the sole authority on whether a run instruments. Set `false` (typically in project config) to opt a project out of coverage entirely and skip the instrumentation cost |
 | `--race` | `false` | Enable race detector |
+| `--race-changed` | `true` | Run the race detector on the packages a change touched, in a step beside the test run. Planned only when the run measured a diff and the project owns a changed Go or testdata file; `--race` replaces it. `--no-race-changed` turns it off. See [Race detector on changed packages](#race-detector-on-changed-packages) |
 | `--timeout <duration>` | — | Test timeout (e.g. `30s`, `5m`) |
 | `--short` | `false` | Run only tests that check `testing.Short()` |
 | `--run <pattern>` | — | Run only tests matching this regex pattern |

@@ -64,7 +64,7 @@ func contractPlan(t *testing.T, providerDependsOnClient bool) []*jobmodel.Schedu
 	ws.Name = "ws"
 
 	planned, err := Plan(ws, []string{"build"}, projects,
-		[]*extension.ExtensionDescription{contractBuildExtension()}, nil, nil, nil)
+		[]*extension.ExtensionDescription{contractBuildExtension()}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -233,7 +233,7 @@ func clientTreePlan(t *testing.T, fixture clientTreeFixture) []*jobmodel.Schedul
 		selected = []*workspace.Project{client}
 	}
 	planned, err := Plan(ws, []string{"build", "lint", "test", "clientgen"}, selected,
-		clientTreeExtensions(fixture.writerRoot), nil, nil, nil)
+		clientTreeExtensions(fixture.writerRoot), nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

@@ -30,6 +30,7 @@ var moduleFetchingJobs = map[string]bool{
 	"build-generate": true,
 	"build-describe": true,
 	"test":           true,
+	"test-race":      true,
 	"lint":           true,
 	"serve":          true,
 	"run":            true,

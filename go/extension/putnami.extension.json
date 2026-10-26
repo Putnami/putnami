@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/go",
-  "cliContract": 14,
+  "cliContract": 16,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -134,6 +134,7 @@
         "coverage": { "type": "boolean", "default": true, "description": "Per-project coverage policy. Set false to opt a project out of coverage entirely (authoritative — the validation cadence never overrides it)." },
         "enforce-coverage": { "type": "boolean", "default": true, "description": "Enforce each project's coverage-threshold. On by default so a coverage drop fails the run that caused it. Pass --no-enforce-coverage to keep measuring and reporting coverage without failing on the threshold; to skip instrumentation entirely use --coverage=false, which this never overrides." },
         "race": { "type": "boolean", "default": false, "description": "Enable race detector" },
+        "race-changed": { "type": "boolean", "default": true, "description": "Run the race detector on the packages this change touches: the directories of the changed Go and testdata files the project owns. The step runs beside the test step, only when the run measured a diff and the project owns a changed Go or testdata file, and --race replaces it by running every package under the detector. Off skips it, for a host without race detector support or a C compiler." },
         "timeout": { "type": "string", "description": "Test timeout (e.g., 30s, 5m)" },
         "short": { "type": "boolean", "default": false, "description": "Run only short tests" },
         "run": { "type": "string", "description": "Run only tests matching the pattern" },
@@ -193,12 +194,21 @@
         },
         { "id": "test", "heavy": true, "task": "test-exec", "dependsOn": ["describe", "test-env"] },
         {
+          "id": "test-race",
+          "heavy": true,
+          "task": "test-race-exec",
+          "dependsOn": ["describe", "test-env"],
+          "if": "params.race-changed && !params.race",
+          "activation": { "changedFiles": ["**/*.go", "**/testdata/**"] },
+          "with": { "changed-files": { "from": "context", "path": "selection.changedFiles" } }
+        },
+        {
           "id": "test-env-teardown",
           "task": "test-env-down",
           "runOn": "finally",
           "finalizes": {
             "producer": "test-env",
-            "consumers": ["test"],
+            "consumers": ["test", "test-race"],
             "pruneIf": "!params.infra-down"
           },
           "activation": { "closureFiles": ["infra/requirements.json"] }
@@ -663,6 +673,54 @@
             "description": "The reserved run-scoped feature verification report: the merged observations of every test bound to a declared check through protocol/features/spectest. Absent when no test in the project bound one. Written per member under batching, so per-project attribution and cache restore hold for both the singleton and the batched run — a cache hit that lost this report would silently disarm the spec gate."
           }
         },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-race-exec": {
+      "description": "Run `go test -race` on the packages the change touched: the directory of each changed Go file the project owns, and the package that holds a changed testdata directory. The CLI binds those files, project-relative, as the changed-files input, so the files key the task and a stored verdict answers the same change only. It sets CGO_ENABLED=1 and fails, naming --no-race-changed, on a platform the race detector does not support or, off darwin, when the C compiler go env CC names is not on PATH. It measures no coverage and writes no file: coverage and the feature verification report belong to test-exec.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["test-race"],
+      "cwd": "{projectRoot}",
+      "env": {
+        "APP_ENV": "test"
+      },
+      "timeoutMs": 600000,
+      "inputs": {
+        "tests": { "from": "project", "files": ["**/*_test.go", "**/testdata/**"] },
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
+        "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "config": {
+          "from": "project",
+          "files": ["putnami.json", ".putnamirc.json", "conf/.env.yaml", "conf/.env.*.yaml", ".gen/conf/.env.*.yaml"]
+        },
+        "DATABASE_TEST_BINDINGS": { "from": "env" },
+        "changed-files": { "from": "params" },
+        "timeout": { "from": "params" },
+        "short": { "from": "params" },
+        "run": { "from": "params" },
+        "count": { "from": "params" },
+        "shuffle": { "from": "params" },
+        "test-verbose": { "from": "params" },
+        "test-json": { "from": "params" },
+        "package-parallel": { "from": "params" },
+        "parallel": { "from": "params" },
+        "failfast": { "from": "params" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Race run result with pass/fail counts" }
+      },
+      "reads": ["gen", "sources", { "id": "workspace-clients", "scope": "workspace" }],
+      "cache": {
+        "enabled": true,
+        "noOutput": true
+      },
+      "declares": {
         "effects": [
           "network",
           "toolchain-cache"

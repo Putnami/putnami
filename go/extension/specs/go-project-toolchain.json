@@ -60,6 +60,10 @@
       "text": "Every file under a testdata directory of a Go project, at any depth, is a test-exec input, so a fixture edit re-runs the tests instead of replaying an old verdict. The Go tool reserves testdata for test inputs, so a project declares no pattern of its own for them. The cache walker's directory skips still apply: a file below a node_modules, .git, .putnami, out, dist or vendor directory is not an input."
     },
     {
+      "id": "race-on-touched-packages",
+      "text": "When a run measured a diff, test also runs go test -race on the packages the change touched: the directory of each changed Go file and the package holding a changed testdata directory, in the project that owns them. A dependent reached only through an edge runs no race step, and no package list is maintained. The changed files key the step, which measures no coverage; --race replaces it. A host that cannot run the race detector fails the step naming --no-race-changed, which turns it off."
+    },
+    {
       "id": "modfile-restoration",
       "text": "A build that mutates go.mod or go.sum restores the tracked content it found, including deleting a file the run created and recreating one the run removed."
     },

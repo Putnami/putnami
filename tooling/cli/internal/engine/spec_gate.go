@@ -221,7 +221,7 @@ func (plan *projectionProducerPlan) ApplicableProjects() (map[string]bool, error
 		selected[project.ID] = true
 	}
 	planned, err := planner.Plan(plan.ws, commands, plan.projects, plan.extensions,
-		plan.req.CommandParams, nil, nil)
+		plan.req.CommandParams, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}

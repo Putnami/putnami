@@ -67,7 +67,7 @@ Steps can pass data to tasks via `with`:
   "task": "build-transpile",
   "with": {
     "target": { "value": "production" },
-    "config": { "from": "command", "path": "flags.target" },
+    "changed-files": { "from": "context", "path": "selection.changedFiles" },
     "schemas": { "fromStep": "generate", "output": "schemas" }
   }
 }
@@ -78,8 +78,18 @@ Three binding types:
 | Type | Fields | Description |
 |------|--------|-------------|
 | Value | `value` | Literal value |
-| Context | `from`, `path` | Value from command params or context |
+| Context | `from`, `path` | A planner fact; `from` is `context` |
 | Step result | `fromStep`, `output` | Named output port from a previous step |
+
+A literal and a context binding become the step's own parameters: the task
+receives them after every command, option and CLI layer, and they key the
+step's cache entry. The planner resolves one context path,
+`selection.changedFiles`: the run's changed files that the target project owns,
+as sorted, unique, project-relative slash paths. A run that measured no diff
+(`--all`, `--projects`) binds no value, and the task receives no parameter.
+Strict validation refuses any other `from` or `path`
+(`unresolvable-binding`), and a manifest with a context binding requires
+`cliContract` 16.
 
 ## Conditional Execution
 
@@ -134,8 +144,10 @@ selects its lifecycle condition:
 [invocation-scoped resource](07-lifecycles.md) must run exactly once whenever
 its producer started, or the resource outlives the invocation that created it.
 `finalizes.producer` must use a task that declares an invocation-scoped output;
-`finalizes.consumers` is the complete downstream terminal frontier cleanup
-waits for. A finalizer has no ordinary `dependsOn`, accepts no step-result input,
+`finalizes.consumers` is the complete downstream terminal frontier. Cleanup
+waits for each consumer the plan holds: one that an `if` or an activation gate
+removed never runs, and a plan that holds none leaves the finalizer inert. A
+finalizer has no ordinary `dependsOn`, accepts no step-result input,
 and exports no task or command result. It locates cleanup state through the
 explicit `{invocationArtifactRoot}` argument described in the lifecycle
 contract.
@@ -165,10 +177,19 @@ of projects:
 |-------|---------|
 | `files` | Active only if at least one project file matches one of these globs |
 | `contains` | Map of project-relative file path → required substring; active only if every file exists and contains its substring |
+| `changedFiles` | Active only if at least one of the run's changed files that the project owns, project-relative, matches one of these globs |
 
 A step is active only when **every** declared condition holds, and conditions fail closed — a missing or unreadable file makes the step inactive, mirroring the runtime skip checks so pruning never removes a step that would have done real work.
 
-Unlike `if` (which drops an excluded step's edges), an inactive `activation` step is **spliced out**: its dependents inherit its dependencies, so ordering and data-flow through the remaining steps are preserved. This removes a no-op node — and its process spawn and cache lookup — from the DAG instead of scheduling it just to skip. Older toolchains that predate `activation` ignore the field and fall back to scheduling-and-skipping, so adding a gate is backward compatible.
+`changedFiles` reads the change, not the tree. A project owns a changed file
+when it is the nearest project whose directory holds the file; a project that
+is impacted only through a dependency owns none, so the step is not planned
+for it. A run that
+measured no diff (`--all`, `--projects`, a specification gate) has no changed
+file, so the step is never planned there. A manifest with the gate requires
+`cliContract` 16.
+
+Unlike `if` (which drops an excluded step's edges), an inactive `activation` step is **spliced out**: its dependents inherit its dependencies, so ordering and data-flow through the remaining steps are preserved. This removes a no-op node — and its process spawn and cache lookup — from the DAG instead of scheduling it just to skip. Older toolchains that predate `activation` ignore the field and fall back to scheduling-and-skipping, so adding a `files`, `closureFiles` or `contains` gate is backward compatible. A `changedFiles` gate is not: the step does work only for a change, so its rung refuses an older reader.
 
 ## Output Bindings
 

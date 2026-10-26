@@ -447,7 +447,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       testFiles,
 		ceilingOnly: true,
-		want:        660,
+		want:        661,
 		why: "test fixtures built from untyped maps; they shrink as the canonical model lands. " +
 			"A0 pinned 516; A2b's scheduler and profiler tests now assert against typed records. " +
 			"An earlier change took it from 513 to 515: the two auto-selection tests that used to call " +
@@ -613,14 +613,18 @@ var structuralPins = []structuralPin{
 			"commands/composecmd/compose_test.go, and the e2e/devworkload parity package adds SIX. Three are the " +
 			"fixture workload's ready events, whose data is the untyped object protocols/runtime types, and three " +
 			"read the shipped @putnami/dev manifest's tasks as a generic document to point the runtime at the " +
-			"test's build of tooling/dev",
+			"test's build of tooling/dev. " +
+			"A later change raises 660→661 for ONE line: the planner test that plans the shipped Go manifest's " +
+			"race step states the --race and --no-race-changed command params literally in one table, because " +
+			"Plan takes the command params as the untyped map this pin already names. Production adds none: the " +
+			"model types the changed files the step binds",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        916,
+		want:        917,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -689,7 +693,9 @@ var structuralPins = []structuralPin{
 			"six test lines that leave with compose, and the six parity test lines that arrive, itemized on the " +
 			"two scoped pins above. " +
 			"A later change raises 915→916 = 256 production + 660 test for cli.addOutputGlobalParams, itemized on " +
-			"the production pin above; tests add none",
+			"the production pin above; tests add none. " +
+			"A later change raises 916→917 = 256 production + 661 test for the race step's planner test line " +
+			"itemized on the test pin above; production adds none",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

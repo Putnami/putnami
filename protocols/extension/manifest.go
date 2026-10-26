@@ -112,6 +112,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.ChangedFilesContract:
+			reason = " for a step that reads the run's changed files"
 		case required == protocolcli.DefaultPositionalsContract:
 			reason = " for a default subcommand that takes positionals"
 		case required == protocolcli.InputSelectorsContract:

@@ -3,6 +3,8 @@ package extension
 import (
 	"reflect"
 	"testing"
+
+	proto "go.putnami.dev/protocol/extension"
 )
 
 func TestStepJobName(t *testing.T) {
@@ -217,6 +219,72 @@ func TestExpandPipeline_MaterializesLiteralBindingsPerStep(t *testing.T) {
 	}
 	if expanded[1].JobDef.BoundParams != nil {
 		t.Errorf("plain sibling inherited bound params: %#v", expanded[1].JobDef.BoundParams)
+	}
+}
+
+// A context binding of the changed files takes the files the planner hands
+// the expansion, beside the step's literals, and binds nothing without them:
+// a run that measured no diff hands its task no changed files.
+func TestExpandPipeline_ResolvesContextBindings(t *testing.T) {
+	ext := &ExtensionDescription{
+		Name:  "@test/context",
+		Tasks: map[string]TaskDefinition{"run": {Kind: "command", Command: "runtime"}},
+	}
+	steps := []PipelineStep{{
+		ID:   "race",
+		Task: "run",
+		With: map[string]InputBinding{
+			"changed-files": {From: proto.InputBindingFromContext, Path: proto.ContextPathChangedFiles},
+			"mode":          {Value: "race", HasValue: true},
+		},
+	}}
+	changed := []string{"a/x.go", "b/y_test.go"}
+
+	expanded, err := ExpandPipelineWithOptions("test", &JobDefinition{Name: "test"}, steps, ext, nil,
+		PipelineExpansionOptions{ChangedFiles: changed})
+	if err != nil {
+		t.Fatalf("ExpandPipelineWithOptions: %v", err)
+	}
+	params := expanded[0].JobDef.BoundParams
+	if got, ok := params["changed-files"].([]string); !ok || !reflect.DeepEqual(got, changed) {
+		t.Errorf("bound changed-files = %#v, want %v", params["changed-files"], changed)
+	}
+	if params["mode"] != "race" {
+		t.Errorf("bound mode = %#v, want race beside the context binding", params["mode"])
+	}
+
+	expanded, err = ExpandPipelineWithOptions("test", &JobDefinition{Name: "test"}, steps, ext, nil, PipelineExpansionOptions{})
+	if err != nil {
+		t.Fatalf("ExpandPipelineWithOptions without changed files: %v", err)
+	}
+	params = expanded[0].JobDef.BoundParams
+	if _, present := params["changed-files"]; present {
+		t.Errorf("an expansion without changed files bound %#v", params["changed-files"])
+	}
+	if params["mode"] != "race" {
+		t.Errorf("bound mode = %#v, want race without changed files", params["mode"])
+	}
+}
+
+// A change gate reads the changed files with the workspace file-pattern
+// grammar: a recursive glob reaches a nested file, an exclusion removes one,
+// and a run without changed files matches nothing.
+func TestSelectsChangedFile(t *testing.T) {
+	globs := []string{"**/*.go", "**/testdata/**", "!**/.gen/**"}
+	for _, tc := range []struct {
+		files []string
+		want  bool
+	}{
+		{files: []string{"a.go"}, want: true},
+		{files: []string{"README.md", "sub/pkg/b_test.go"}, want: true},
+		{files: []string{"sub/testdata/case.json"}, want: true},
+		{files: []string{".gen/client/x.go"}, want: false},
+		{files: []string{"README.md", "go.mod"}, want: false},
+		{files: nil, want: false},
+	} {
+		if got := SelectsChangedFile(tc.files, globs); got != tc.want {
+			t.Errorf("SelectsChangedFile(%v) = %v, want %v", tc.files, got, tc.want)
+		}
 	}
 }
 
