@@ -1,0 +1,64 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "telemetry/otlp-push-contract",
+  "outcomes": [
+    "A workload that spans the Go and TypeScript runtimes points both at one OTLP/HTTP collector",
+    "Telemetry never fails or stalls the workload that produces it",
+    "The CLI and the usage receiver enforce one closed vocabulary, so a usage record carries no free text"
+  ],
+  "nonGoals": [
+    "A /metrics scrape endpoint, gRPC OTLP, statsd or a Prometheus push gateway: OTLP/JSON over HTTP is the one transport, as ADR 0001 records",
+    "An OpenTelemetry exporter SDK dependency: the envelope is written against the wire format",
+    "Whether the CLI sends usage telemetry, and its notice and opt-out, which the CLI owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-is-pinned",
+      "text": "ProtocolVersion is 1, and a test pins it, so a changed field name or encoding, a new required field or a changed canonical serialization is a reviewed version bump."
+    },
+    {
+      "id": "three-signals-on-fixed-paths",
+      "text": "The signals are metrics, traces and logs, posted as application/json to /v1/metrics, /v1/traces and /v1/logs on the collector base URL. An unknown signal has no path. The Go log sink posts its records to /v1/logs as a logs request that validates."
+    },
+    {
+      "id": "the-resource-names-the-service",
+      "text": "The canonical resource attribute keys are service.name, service.version and putnami.framework, in that order."
+    },
+    {
+      "id": "the-exporter-never-hurts-the-workload",
+      "text": "The contract pins an exporter's defaults: a flush every 10 seconds with a 5-second timeout, one more flush on shutdown, a batch dropped when the collector fails, and an in-memory queue capped at 10000 records. The Go metric reader flushes once more on shutdown, and the Go exporter swallows a collector error rather than return it."
+    },
+    {
+      "id": "the-parser-is-strict",
+      "text": "Each signal request parses strictly, and an unknown member is refused. Every valid fixture of the three signals parses clean and every invalid one is refused, and every reject branch of a metrics data point has an invalid fixture of its own."
+    },
+    {
+      "id": "the-error-codes-are-a-closed-set",
+      "text": "The protocol registers exactly 13 telemetry.* codes: an invalid metrics, traces or logs request, and an invalid metric, data point, attribute, resource, span, trace ID, span ID, temporality, log record or severity."
+    },
+    {
+      "id": "equivalent-input-serializes-to-the-same-bytes",
+      "text": "MarshalCanonical turns the fixed input of each signal into exactly the bytes of its committed golden, and those bytes hash to a pinned SHA-256 digest. The TypeScript renderer of @putnami/application builds the same input and reproduces the three digests."
+    },
+    {
+      "id": "values-map-to-otlp-numbers",
+      "text": "A log level maps to its OTLP severity number: trace, debug, info, warn or warning, error and fatal. An unknown or uppercase level maps to 0, unspecified. BoolVal and DoubleVal set exactly one value kind. The Go runtime maps its metric temporality, span status and log levels to the OTLP numbers."
+    },
+    {
+      "id": "cli-usage-vocabulary-is-closed",
+      "text": "cliusage pins the closed vocabulary of CLI usage records: the event names, the attributes each event allows and requires with their value kinds, the error categories and the command names. A conforming record validates, a record outside the vocabulary is refused, a request from another service is refused, and every required attribute is also allowed."
+    },
+    {
+      "id": "released-command-names-stay",
+      "text": "A command name that a released CLI sends never leaves the vocabulary, and every name is a unique lowercase token of at most 64 characters that starts with a letter, so the receiver keeps the records of every released CLI and its aggregate keys stay bounded."
+    },
+    {
+      "id": "the-cli-and-the-receiver-share-one-record-shape",
+      "text": "cliusage/otlp-logs.golden.json is a valid logs request that conforms to the vocabulary. The CLI encodes a session into exactly those bytes and refuses to record an event outside the vocabulary. The receiver keeps a conforming record and rewrites its integers in canonical decimal form."
+    }
+  ],
+  "decisions": [
+    "protocols/telemetry/doc/adr/0001-otlp-json-is-the-only-transport.md"
+  ]
+}

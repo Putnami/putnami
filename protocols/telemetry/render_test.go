@@ -1,8 +1,13 @@
 package telemetry
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestSeverityNumberFor(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "values-map-to-otlp-numbers", "a-level-maps-to-its-severity-number")
 	cases := []struct {
 		level string
 		want  SeverityNumber
@@ -26,6 +31,7 @@ func TestSeverityNumberFor(t *testing.T) {
 }
 
 func TestBoolVal(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "values-map-to-otlp-numbers", "a-value-sets-one-kind")
 	for _, b := range []bool{true, false} {
 		v := BoolVal(b)
 		if v.BoolValue == nil {
@@ -41,6 +47,7 @@ func TestBoolVal(t *testing.T) {
 }
 
 func TestDoubleVal(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "values-map-to-otlp-numbers", "a-value-sets-one-kind")
 	for _, f := range []float64{0, -1.5, 3.14159} {
 		v := DoubleVal(f)
 		if v.DoubleValue == nil {

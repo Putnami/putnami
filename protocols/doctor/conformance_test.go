@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ValidReports parses + validates every JSON file under
 // fixtures/valid. Each must strict-parse and validate clean.
 func TestConformance_ValidReports(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-corpus-is-the-contract", "every-valid-fixture-validates")
 	forEachFixture(t, "fixtures/valid/*.json", func(t *testing.T, path string, data []byte) {
 		r, diags := ParseAndValidateReport(data)
 		if diag.HasErrors(diags) {
@@ -25,6 +27,7 @@ func TestConformance_ValidReports(t *testing.T) {
 // TestConformance_ValidWaiverFiles parses + validates every JSON file under
 // fixtures/waivers/valid. Each must strict-parse and validate clean.
 func TestConformance_ValidWaiverFiles(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-corpus-is-the-contract", "every-valid-fixture-validates")
 	forEachFixture(t, "fixtures/waivers/valid/*.json", func(t *testing.T, path string, data []byte) {
 		w, diags := ParseAndValidateWaiverFile(data)
 		if diag.HasErrors(diags) {
@@ -39,6 +42,7 @@ func TestConformance_ValidWaiverFiles(t *testing.T) {
 // TestConformance_InvalidReports asserts every JSON file under fixtures/invalid
 // produces at least one error diagnostic drawn from the doctor taxonomy.
 func TestConformance_InvalidReports(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-corpus-is-the-contract", "every-invalid-fixture-fails-with-a-known-code")
 	forEachFixture(t, "fixtures/invalid/*.json", func(t *testing.T, path string, data []byte) {
 		_, diags := ParseAndValidateReport(data)
 		assertCodedError(t, path, diags)
@@ -48,6 +52,7 @@ func TestConformance_InvalidReports(t *testing.T) {
 // TestConformance_InvalidWaiverFiles asserts every JSON file under
 // fixtures/waivers/invalid produces at least one coded error diagnostic.
 func TestConformance_InvalidWaiverFiles(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-corpus-is-the-contract", "every-invalid-fixture-fails-with-a-known-code")
 	forEachFixture(t, "fixtures/waivers/invalid/*.json", func(t *testing.T, path string, data []byte) {
 		_, diags := ParseAndValidateWaiverFile(data)
 		assertCodedError(t, path, diags)
