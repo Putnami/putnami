@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { specTest } from '@putnami/spectest';
@@ -27,10 +27,47 @@ import {
 
 const PROTOCOL_DIR = join(__dirname, '../../../../protocols/qualify');
 const FIXTURES = join(PROTOCOL_DIR, 'fixtures');
-const BINDING = {
-  feature: 'typescript/cli-machine-output',
-  requirement: 'qualify-verdict-wire',
-  check: 'shared-qualify-corpus-and-digest',
+// Each test proves a requirement of the qualify protocol's feature under a
+// check of this package's own.
+const SHAPES = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'one-member-set',
+  check: 'the-typescript-shapes-and-vocabulary-match-the-schemas',
+};
+const CORPUS_LIST = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'one-fixture-corpus',
+  check: 'the-typescript-corpus-is-what-expectations-lists',
+};
+const FIXTURE_CODES = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'one-fixture-corpus',
+  check: 'the-typescript-reader-gives-every-fixture-its-listed-codes',
+};
+const DIGEST = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'the-contract-digest-is-canonical',
+  check: 'the-typescript-digest-matches-the-pins',
+};
+const NON_DOCUMENTS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'parsing-is-strict',
+  check: 'the-typescript-reader-refuses-non-documents',
+};
+const CONTRACT_DEFECTS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'contract-defects-get-their-codes',
+  check: 'the-typescript-reader-refuses-malformed-contracts',
+};
+const VERDICT_DEFECTS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'verdict-defects-get-their-codes',
+  check: 'the-typescript-reader-gives-each-verdict-defect-its-code',
+};
+const UNPROVEN_PASS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'a-pass-carries-its-proof',
+  check: 'the-typescript-reader-refuses-an-unproven-pass',
 };
 
 interface Expectations {
@@ -59,7 +96,7 @@ function fixtureVerdict(name: string): QualifyVerdict {
 }
 
 describe('qualify conformance corpus', () => {
-  test('expectations list every fixture on disk and nothing else', () => {
+  specTest('expectations list every fixture on disk and nothing else', CORPUS_LIST, () => {
     expect(readdirSync(join(FIXTURES, 'valid')).sort()).toEqual([...expectations.valid].sort());
     expect(readdirSync(join(FIXTURES, 'invalid')).sort()).toEqual(Object.keys(expectations.invalid).sort());
     expect(expectations.valid.length).toBeGreaterThan(0);
@@ -67,13 +104,13 @@ describe('qualify conformance corpus', () => {
   });
 
   for (const name of expectations.valid) {
-    specTest(`valid/${name} validates cleanly`, BINDING, async () => {
+    specTest(`valid/${name} validates cleanly`, FIXTURE_CODES, async () => {
       expect(await validateFixture(name, readJSON(join(FIXTURES, 'valid', name)))).toEqual([]);
     });
   }
 
   for (const [name, codes] of Object.entries(expectations.invalid)) {
-    specTest(`invalid/${name} produces ${codes.join(', ')}`, BINDING, async () => {
+    specTest(`invalid/${name} produces ${codes.join(', ')}`, FIXTURE_CODES, async () => {
       const violations = await validateFixture(name, readJSON(join(FIXTURES, 'invalid', name)));
       expect(distinctCodes(violations)).toEqual(codes);
       for (const code of distinctCodes(violations)) {
@@ -82,7 +119,7 @@ describe('qualify conformance corpus', () => {
     });
   }
 
-  specTest('the contract digest bytes match the Go pin', BINDING, async () => {
+  specTest('the contract digest bytes match the Go pin', DIGEST, async () => {
     expect(await qualifyContractDigest([])).toBe(
       'sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
     );
@@ -150,7 +187,7 @@ describe('qualify vocabulary and schema drift', () => {
     }
   }
 
-  specTest('the twin vocabulary and shapes match the published schemas', BINDING, () => {
+  specTest('the twin vocabulary and shapes match the published schemas', SHAPES, () => {
     expect(QUALIFY_PROTOCOL_VERSION).toBe(1);
     expect(verdictSchema.$id).toBe(QUALIFY_VERDICT_SCHEMA_ID);
     expect(contractSchema.$id).toBe(QUALIFY_CONTRACT_SCHEMA_ID);
@@ -169,7 +206,7 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     return JSON.parse(JSON.stringify(value)) as T;
   }
 
-  test('a passed verdict refuses every non-pass phase and request state', () => {
+  specTest('a passed verdict refuses every non-pass phase and request state', UNPROVEN_PASS, () => {
     const base = fixtureVerdict('passed-url.json');
     expect(validateQualifyVerdict(base)).toEqual([]);
     for (const [index] of base.phases.entries()) {
@@ -191,7 +228,7 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     expect(distinctCodes(validateQualifyVerdict(partial))).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
   });
 
-  test('non-documents are parse errors', async () => {
+  specTest('non-documents are parse errors', NON_DOCUMENTS, async () => {
     for (const input of [[], null, 'text', { protocolVersion: '1' }]) {
       expect(distinctCodes(validateQualifyVerdict(input))).toEqual([QUALIFY_VIOLATION_CODE.parseError]);
       expect(distinctCodes(await validateQualifyContract(input))).toEqual([QUALIFY_VIOLATION_CODE.parseError]);
@@ -200,7 +237,7 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     expect(nested).toEqual([{ code: QUALIFY_VIOLATION_CODE.unknownField, path: 'requests[0].extra' }]);
   });
 
-  test('malformed contract requests', async () => {
+  specTest('malformed contract requests', CONTRACT_DEFECTS, async () => {
     const violations = await validateQualifyContract({
       protocolVersion: 2,
       derivedFrom: [{ kind: 'openapi' }],
@@ -267,7 +304,7 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     ],
   };
   for (const [name, [mutate, code]] of Object.entries(shapeRules)) {
-    test(`shape rule: ${name}`, () => {
+    specTest(`shape rule: ${name}`, VERDICT_DEFECTS, () => {
       const verdict = clone(fixtureVerdict('digest-mismatch.json'));
       mutate(verdict);
       expect(distinctCodes(validateQualifyVerdict(verdict))).toEqual([code]);

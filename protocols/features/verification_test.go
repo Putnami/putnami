@@ -220,6 +220,11 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("cloud", "runtime", "go", ManifestFilename):         true,
 		filepath.Join("cloud", "runtime", "typescript", ManifestFilename): true,
 		filepath.Join("intelligence", "areas", ManifestFilename):          true,
+
+		// The qualify protocol names the acceptance checks of its contract,
+		// which its own tests and its implementers observe, in the
+		// verification block.
+		filepath.Join("protocols", "qualify", ManifestFilename): true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized

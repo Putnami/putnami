@@ -21,12 +21,6 @@
           }
         },
         {
-          "id": "qualify-verdict-wire",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": { "kind": "acceptance", "checks": ["shared-qualify-corpus-and-digest"] }
-        },
-        {
           "id": "session-reporter-wire",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

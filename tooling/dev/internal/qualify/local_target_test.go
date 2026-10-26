@@ -524,8 +524,6 @@ func TestLocalTarget_ReadsTheLocalConfigOfAProductionBuild(t *testing.T) {
 }
 
 func TestLocalTarget_TreeThatChangesBeforeReadinessIsDigestMismatch(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "local-verdict-binds-to-the-exact-worktree",
-		"a-worktree-that-changes-before-the-workload-is-ready-is-digest-mismatch")
 	fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureWriteTree})
 
 	verdict := execute(t, context.Background(), contractFor(t, "GET /items"), fixture.target(t, hangDetector), fastOptions())

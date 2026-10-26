@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // expectations is fixtures/expectations.json: the corpus index both runtimes
@@ -59,6 +60,7 @@ func distinctCodes(diags []diag.Diagnostic) []string {
 }
 
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "version-1-and-closed-vocabularies", "the-protocol-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -68,6 +70,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // protocol change: every consumer that branches on State must learn it, and the
 // TypeScript twin must list it too.
 func TestConformance_StateVocabularyIsClosed(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "version-1-and-closed-vocabularies", "states-and-phases-are-closed")
 	want := []State{"passed", "failed", "unsupported", "not_run", "timed_out", "canceled",
 		"target_unreachable", "digest_mismatch", "composition_failed"}
 	if !slices.Equal(ValidStates, want) {
@@ -88,6 +91,7 @@ func TestConformance_StateVocabularyIsClosed(t *testing.T) {
 }
 
 func TestConformance_ErrorCodesArePrefixed(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "version-1-and-closed-vocabularies", "every-code-starts-with-qualify")
 	for code := range ValidErrorCodes {
 		if !strings.HasPrefix(code, "qualify.") {
 			t.Errorf("error code %q must use the qualify.* prefix", code)
@@ -103,6 +107,8 @@ func TestConformance_ErrorCodesArePrefixed(t *testing.T) {
 }
 
 func TestConformance_Corpus(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "one-fixture-corpus", "every-fixture-gets-its-listed-codes")
+	spectest.Proves(t, "qualify/workload-qualification-contract", "one-fixture-corpus", "the-corpus-is-what-expectations-lists")
 	index := readExpectations(t)
 	for _, kind := range []string{"valid", "invalid"} {
 		entries, err := os.ReadDir(filepath.Join("fixtures", kind))
@@ -164,6 +170,7 @@ func TestConformance_Corpus(t *testing.T) {
 // corpus digests were computed by an independent serializer, and the
 // TypeScript twin recomputes the same values.
 func TestConformance_ContractDigestIsPinned(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "the-contract-digest-is-canonical", "the-digest-bytes-are-pinned")
 	if got, want := ContractDigest(nil), "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"; got != want {
 		t.Errorf("ContractDigest(nil) = %s, want %s (the digest of [])", got, want)
 	}
@@ -189,6 +196,7 @@ func TestConformance_ContractDigestIsPinned(t *testing.T) {
 // non-pass phase or request state, and no missing phase, can hide under a
 // passed verdict.
 func TestPassedRequiresEveryPhaseAndRequestPassed(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-pass-carries-its-proof", "an-unproven-pass-is-refused")
 	base := readVerdictFixture(t, "passed-url.json")
 	for index := range base.Phases {
 		for _, state := range ValidStates {
@@ -225,6 +233,7 @@ func TestPassedRequiresEveryPhaseAndRequestPassed(t *testing.T) {
 }
 
 func TestStrictDecode_RejectsNonDocuments(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "parsing-is-strict", "non-documents-are-parse-errors")
 	cases := map[string]string{
 		"invalid JSON":      `{"protocolVersion":`,
 		"trailing document": `{} {}`,
@@ -250,6 +259,7 @@ func TestStrictDecode_RejectsNonDocuments(t *testing.T) {
 }
 
 func TestValidateContract_RefusesMalformedRequests(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "contract-defects-get-their-codes", "each-contract-defect-class-gets-its-code")
 	requests := []Request{
 		{ID: "GET /a", Method: "GET", Path: "/a", MaxStatus: 499, Provenance: "typed-api"},
 		{ID: "GET /a", Method: "GET", Path: "/a", MaxStatus: 499, Provenance: "typed-api"},
@@ -269,6 +279,7 @@ func TestValidateContract_RefusesMalformedRequests(t *testing.T) {
 }
 
 func TestValidateVerdict_ShapeRules(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "verdict-defects-get-their-codes", "each-verdict-defect-gets-its-code")
 	base := readVerdictFixture(t, "digest-mismatch.json")
 	cases := map[string]struct {
 		mutate func(*Verdict)

@@ -309,8 +309,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "exact-public-read-only-routes-sorted-and-capped",
-              "platform-and-reserved-paths-are-never-requested",
+              "the-generated-inventory-is-read-when-no-committed-one-exists",
               "the-platform-prefix-is-read-from-the-inventory"
             ]
           }
@@ -338,8 +337,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-matching-sha-passes",
-              "a-wrong-or-missing-sha-is-digest-mismatch",
               "a-url-target-without-expect-sha-is-a-usage-error"
             ]
           }
@@ -354,7 +351,6 @@
             "kind": "acceptance",
             "checks": [
               "a-local-verdict-names-the-worktree-it-composed-and-a-clean-teardown",
-              "a-worktree-that-changes-before-the-workload-is-ready-is-digest-mismatch",
               "a-composition-failure-names-the-member-and-still-tears-down",
               "canceling-a-local-run-tears-the-composition-down",
               "expect-sha-with-a-local-target-is-a-usage-error"

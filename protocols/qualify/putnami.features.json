@@ -1,0 +1,176 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "qualify",
+  "features": [
+    {
+      "id": "qualify/workload-qualification-contract",
+      "type": "feature",
+      "name": "Workload qualification contract",
+      "outcome": "A producer and every reader of workload qualification share one versioned smoke contract and one fail-closed verdict, with one schema, one canonical digest and one fixture corpus, so a reader trusts a pass only when the verdict carries its proof.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "version-1-and-closed-vocabularies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-1",
+              "states-and-phases-are-closed",
+              "every-code-starts-with-qualify"
+            ]
+          }
+        },
+        {
+          "id": "one-member-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schemas-declare-the-go-members",
+              "the-strict-walk-declares-the-go-members",
+              "the-typescript-shapes-and-vocabulary-match-the-schemas"
+            ]
+          }
+        },
+        {
+          "id": "one-fixture-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-corpus-is-what-expectations-lists",
+              "every-fixture-gets-its-listed-codes",
+              "the-typescript-corpus-is-what-expectations-lists",
+              "the-typescript-reader-gives-every-fixture-its-listed-codes"
+            ]
+          }
+        },
+        {
+          "id": "the-contract-digest-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-digest-bytes-are-pinned",
+              "the-typescript-digest-matches-the-pins"
+            ]
+          }
+        },
+        {
+          "id": "parsing-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "non-documents-are-parse-errors",
+              "the-typescript-reader-refuses-non-documents"
+            ]
+          }
+        },
+        {
+          "id": "contract-defects-get-their-codes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-contract-defect-class-gets-its-code",
+              "the-typescript-reader-refuses-malformed-contracts"
+            ]
+          }
+        },
+        {
+          "id": "verdict-defects-get-their-codes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-verdict-defect-gets-its-code",
+              "the-typescript-reader-gives-each-verdict-defect-its-code"
+            ]
+          }
+        },
+        {
+          "id": "a-pass-carries-its-proof",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unproven-pass-is-refused",
+              "the-typescript-reader-refuses-an-unproven-pass"
+            ]
+          }
+        },
+        {
+          "id": "version-1-derives-safe-read-only-requests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dev-derives-exact-public-read-only-routes-sorted-and-capped",
+              "the-dev-never-requests-platform-or-reserved-paths"
+            ]
+          }
+        },
+        {
+          "id": "a-verdict-records-every-phase-in-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dev-records-every-phase-and-request-in-order",
+              "the-dev-folds-the-phases-into-the-verdict-state"
+            ]
+          }
+        },
+        {
+          "id": "a-verdict-binds-to-the-build-it-proves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-dev-passes-a-sha-that-starts-with-the-expected-one",
+              "the-dev-refuses-a-different-or-absent-sha",
+              "the-dev-proves-the-tree-again-once-the-target-is-ready"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

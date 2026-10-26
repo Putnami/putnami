@@ -101,6 +101,25 @@ a non-pass phase.
 
 Run `./putnamiw test --projects go.putnami.dev/protocol/qualify,@putnami/cli-protocol --enforce-coverage`.
 
+## Feature and spec
+
+The module owns the feature of its contract,
+`qualify/workload-qualification-contract`, specified in
+[`specs/workload-qualification-contract.json`](specs/workload-qualification-contract.json).
+The tests here prove the version and the closed vocabularies, the one member
+set of the schemas, the strict member walk and the Go types, the fixture
+corpus, the canonical digest, strict parsing, the code of each contract and
+verdict defect, and the refusal of an unproven pass. `@putnami/cli-protocol`,
+the TypeScript reader, proves the same member set, corpus, digest, parsing,
+defect codes and refusal under its own `the-typescript-…` checks.
+`@putnami/dev` (`tooling/dev`), the producer behind `putnami qualify`, proves
+under its own `the-dev-…` checks that it derives safe read-only requests,
+records every phase in order, folds the phases into the verdict state and binds
+the verdict to the build it proves. Its `tooling/workload-qualification`
+feature keeps what the tool adds: composing a local target, the command line,
+its exit codes and its output. The design intent is
+[ADR 0039](../../tooling/cli/doc/adr/0039-derived-smoke-contracts-and-fail-closed-verdicts.md).
+
 ## Support
 
 `preview`, as recorded in the [reviewed support catalog](../../putnami.support.json).

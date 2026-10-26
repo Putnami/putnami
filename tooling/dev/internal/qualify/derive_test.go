@@ -79,8 +79,9 @@ func validContract(t *testing.T, contract *qualifyproto.Contract) {
 }
 
 func TestDerive_SelectsExactPublicGetRoutesSortedAndCapped(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "version-1-derives-safe-read-only-requests", "the-dev-derives-exact-public-read-only-routes-sorted-and-capped")
 	spectest.Proves(t, "tooling/workload-qualification", "smoke-is-derived-from-the-route-inventory",
-		"exact-public-read-only-routes-sorted-and-capped")
+		"the-generated-inventory-is-read-when-no-committed-one-exists")
 	routes := []httproutes.Route{
 		route(httproutes.MatchExact, "/zeta", true, "GET", "POST"),
 		route(httproutes.MatchExact, "/alpha", true, "HEAD"),
@@ -146,8 +147,8 @@ func TestDerive_SelectsExactPublicGetRoutesSortedAndCapped(t *testing.T) {
 }
 
 func TestDerive_ExcludesPlatformAndPprofPaths(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "smoke-is-derived-from-the-route-inventory",
-		"platform-and-reserved-paths-are-never-requested")
+	spectest.Proves(t, "qualify/workload-qualification-contract", "version-1-derives-safe-read-only-requests",
+		"the-dev-never-requests-platform-or-reserved-paths")
 	routes := []httproutes.Route{
 		route(httproutes.MatchExact, "/healthz", true, "GET"),
 		route(httproutes.MatchExact, "/livez", true, "GET"),

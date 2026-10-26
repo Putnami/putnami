@@ -168,7 +168,8 @@ func phaseCode(verdict *qualifyproto.Verdict, name string) string {
 }
 
 func TestExecute_PassedAgainstHttptestServer(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "remote-verdict-binds-to-the-deployed-sha", "a-matching-sha-passes")
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-binds-to-the-build-it-proves",
+		"the-dev-passes-a-sha-that-starts-with-the-expected-one")
 	d := &deployment{sha: deployedSHA, notReadyFor: 2}
 	server := newDeployment(t, d)
 	contract := contractFor(t, "GET /items", "HEAD /whoami", "GET /private", "GET /redirect")
@@ -210,7 +211,8 @@ func TestExecute_PassedAgainstHttptestServer(t *testing.T) {
 }
 
 func TestExecute_DigestMismatchOnWrongSha(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "remote-verdict-binds-to-the-deployed-sha", "a-wrong-or-missing-sha-is-digest-mismatch")
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-binds-to-the-build-it-proves",
+		"the-dev-refuses-a-different-or-absent-sha")
 	cases := map[string]struct {
 		deployment *deployment
 		expect     string
@@ -243,6 +245,7 @@ func TestExecute_DigestMismatchOnWrongSha(t *testing.T) {
 }
 
 func TestExecute_TargetUnreachableOnClosedPort(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-records-every-phase-in-order", "the-dev-records-every-phase-and-request-in-order")
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -265,6 +268,7 @@ func TestExecute_TargetUnreachableOnClosedPort(t *testing.T) {
 }
 
 func TestExecute_ReadinessDeadlineIsTimedOut(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-records-every-phase-in-order", "the-dev-records-every-phase-and-request-in-order")
 	server := newDeployment(t, &deployment{sha: deployedSHA, notReadyFor: 1 << 30})
 	opts := fastOptions()
 	opts.ReadyTimeout = 100 * time.Millisecond
@@ -282,6 +286,7 @@ func TestExecute_ReadinessDeadlineIsTimedOut(t *testing.T) {
 }
 
 func TestExecute_CanceledMidSmoke(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-records-every-phase-in-order", "the-dev-records-every-phase-and-request-in-order")
 	d := &deployment{sha: deployedSHA, slowEntered: make(chan struct{})}
 	server := newDeployment(t, d)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -394,6 +399,7 @@ func (f *fakeTarget) Close(context.Context) *qualifyproto.Cleanup {
 }
 
 func TestVerdict_NeverPassedWithAnyNonPassPhase(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-records-every-phase-in-order", "the-dev-folds-the-phases-into-the-verdict-state")
 	spectest.Proves(t, "tooling/workload-qualification", "no-derivable-request-is-unsupported-not-success", "an-empty-contract-never-passes")
 	passed := func() []qualifyproto.Phase {
 		phases := make([]qualifyproto.Phase, 0, len(qualifyproto.PhaseNames))
@@ -444,6 +450,7 @@ func TestVerdict_NeverPassedWithAnyNonPassPhase(t *testing.T) {
 }
 
 func TestExecute_TargetFailuresAndTeardown(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-records-every-phase-in-order", "the-dev-records-every-phase-and-request-in-order")
 	server := newDeployment(t, &deployment{sha: deployedSHA})
 	tree := qualifyproto.Binding{Kind: qualifyproto.BindingTree, Fingerprint: strings.Repeat("a", 64), HeadSHA: deployedSHA}
 
@@ -479,8 +486,8 @@ func TestExecute_TargetFailuresAndTeardown(t *testing.T) {
 }
 
 func TestExecute_TreeBindingIsProvenAgainOnceTheTargetIsReady(t *testing.T) {
-	spectest.Proves(t, "tooling/workload-qualification", "local-verdict-binds-to-the-exact-worktree",
-		"a-worktree-that-changes-before-the-workload-is-ready-is-digest-mismatch")
+	spectest.Proves(t, "qualify/workload-qualification-contract", "a-verdict-binds-to-the-build-it-proves",
+		"the-dev-proves-the-tree-again-once-the-target-is-ready")
 	server := newDeployment(t, &deployment{sha: deployedSHA})
 	tree := qualifyproto.Binding{Kind: qualifyproto.BindingTree, Fingerprint: strings.Repeat("a", 64), HeadSHA: deployedSHA}
 	moved := tree

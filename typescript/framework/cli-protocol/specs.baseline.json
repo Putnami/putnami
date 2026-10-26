@@ -5,7 +5,6 @@
     "typescript/cli-machine-output#bounded-stream-policy",
     "typescript/cli-machine-output#deterministic-violations",
     "typescript/cli-machine-output#execution-placement",
-    "typescript/cli-machine-output#qualify-verdict-wire",
     "typescript/cli-machine-output#sanitization",
     "typescript/cli-machine-output#schema-pinned-bounds",
     "typescript/cli-machine-output#schema-pinned-members",

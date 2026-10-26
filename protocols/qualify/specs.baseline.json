@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "qualify/workload-qualification-contract#a-pass-carries-its-proof",
+    "qualify/workload-qualification-contract#a-verdict-binds-to-the-build-it-proves",
+    "qualify/workload-qualification-contract#a-verdict-records-every-phase-in-order",
+    "qualify/workload-qualification-contract#contract-defects-get-their-codes",
+    "qualify/workload-qualification-contract#one-fixture-corpus",
+    "qualify/workload-qualification-contract#one-member-set",
+    "qualify/workload-qualification-contract#parsing-is-strict",
+    "qualify/workload-qualification-contract#the-contract-digest-is-canonical",
+    "qualify/workload-qualification-contract#verdict-defects-get-their-codes",
+    "qualify/workload-qualification-contract#version-1-and-closed-vocabularies",
+    "qualify/workload-qualification-contract#version-1-derives-safe-read-only-requests"
+  ]
+}
