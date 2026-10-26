@@ -588,8 +588,10 @@ func TestScheduler_AServeStepThatDeclaresACommandOutputKeepsIt(t *testing.T) {
 	serving := f.serveJob("serve~serve", f.blockingWriter(t, "blocking-serve.sh", served), map[string]extension.DeclaredOutput{
 		"state": fileDeclaration(extension.OutputRootCommandOutput, "serve.txt", false),
 	})
-	first := runAsync(ctx, f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, serving))
+	firstScheduler := f.servePlan(outputRaceSessionA, nil, []*ScheduledJob{serving}, serving)
+	first := runAsync(ctx, firstScheduler)
 	f.awaitFirstStarted(t, first)
+	awaitServeKeysReleased(t, firstScheduler, serving)
 
 	waits := make(chan string, 1)
 	generate := f.serveJob("serve~generate", f.serveGenerateScript(t, "b"), serveGenerateOutputs())
