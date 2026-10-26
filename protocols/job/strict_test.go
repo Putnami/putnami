@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseFile(t *testing.T) {
@@ -159,6 +160,7 @@ func TestValidate_Nil(t *testing.T) {
 }
 
 func TestParams_BoolSynonyms(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "parameters-resolve-alike", "a-boolean-accepts-its-synonyms-and-defaults-otherwise")
 	p := Params{
 		"on":      []byte(`"on"`),
 		"off":     []byte(`"off"`),
@@ -188,6 +190,7 @@ func TestParams_BoolSynonyms(t *testing.T) {
 }
 
 func TestParams_IntAndString(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "parameters-resolve-alike", "a-number-or-a-string-resolves-or-defaults")
 	p := Params{
 		"n":       []byte(`42`),
 		"ns":      []byte(`"42"`),

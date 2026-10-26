@@ -1,0 +1,44 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "job/execution-context",
+  "outcomes": [
+    "An extension in any language reads the job it runs, its project, its selection and its parameters from one documented context",
+    "An orchestrator that adds a member never breaks an older extension, and a version 1 producer keeps emitting the same bytes",
+    "Each rule of the contract is held by a fixture that another implementation can run, not only by this package's code"
+  ],
+  "nonGoals": [
+    "Defining what a job does or which jobs run: the extension manifest and the planner own those",
+    "Publishing a JSON Schema: the Go types, the strict parser and the fixture corpus are the contract",
+    "Claiming parity with an SDK in another language: today this Go package is the only parser"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-is-read-from-the-document",
+      "text": "A document without protocolVersion, or with 1, is version 1, and protocolVersion 2 is version 2. The two constants stay 1 and 2, so a bump is a reviewed change. Validation refuses any other version, a negative one included, while the lenient parser still reads the members it knows from a future version."
+    },
+    {
+      "id": "version-1-stays-frozen",
+      "text": "A version 1 document refuses the version 2 members identity, staging, the extension runtime path and cache root, the project metadata, type, dependency closure and tags, the invocation, the selection and the workspace options. Every version 1 fixture still validates, reads as version 1 and carries no version 2 member. A parsed version 1 document serializes without protocolVersion, identity or staging, so a producer that has not migrated emits the same bytes."
+    },
+    {
+      "id": "strict-producers-lenient-consumers",
+      "text": "ParseAndValidate accepts every valid fixture of both versions and refuses every invalid one. Parse accepts everything ParseAndValidate accepts and ignores an unknown field, so an older extension keeps reading a newer orchestrator's document. Every valid version 2 fixture reads as version 2 and carries an identity whose key equals its derived key."
+    },
+    {
+      "id": "every-reject-branch-has-a-fixture",
+      "text": "Each required-field reject branch of version 1, and each reject code and field path of version 2, is triggered by an invalid fixture, so relaxing one rule turns a red fixture green and fails the suite."
+    },
+    {
+      "id": "parameters-resolve-alike",
+      "text": "A parameter lookup falls back to the alternative names the caller lists. 1 and on read as true, 0 and off as false, and a JSON true as true. A numeric string reads as its number. An unrecognized or missing value returns the caller's default, and a string lookup returns the raw value."
+    },
+    {
+      "id": "the-cli-produces-a-conforming-context",
+      "text": "The context the CLI builds for a job passes the strict reader as version 2. It carries the plan node's typed identity and key, the run's resolved selection byte for byte and no staging tree, and a numeric string parameter still reads as its number on the consumer side."
+    }
+  ],
+  "decisions": [
+    "protocols/job/doc/adr/0001-v2-optional-members.md"
+  ]
+}

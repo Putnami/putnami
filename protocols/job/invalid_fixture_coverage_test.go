@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestInvalidFixtureCoverage holds the "corpus is the spec" contract for the job
@@ -17,6 +18,7 @@ import (
 // a rule that only this implementation enforces. Relaxing one of those
 // required(...) checks turns a red fixture green and fails this test.
 func TestInvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "every-reject-branch-has-a-fixture", "every-version-1-reject-branch-has-a-fixture")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)

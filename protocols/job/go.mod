@@ -9,13 +9,20 @@ require (
 	// extension is TEST-ONLY: it pins the staging-root names against the task
 	// contract's declared-output roots (context_v2_test.go).
 	go.putnami.dev/protocol/extension v0.0.0
+	// features is TEST-ONLY: spectest binds the conformance tests to the
+	// requirements of job/execution-context.
+	go.putnami.dev/protocol/features v0.0.0
 )
+
+replace go.putnami.dev/protocol/capabilities => ../capabilities
 
 replace go.putnami.dev/protocol/cli => ../cli
 
 replace go.putnami.dev/protocol/diagnostic => ../diagnostic
 
 replace go.putnami.dev/protocol/extension => ../extension
+
+replace go.putnami.dev/protocol/features => ../features
 
 // The v0.1 series predates the open-source cut: its sources will not exist in
 // the public repository, whose history starts at the v0.2.0 initial commit.

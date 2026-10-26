@@ -6,17 +6,20 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-version-is-read-from-the-document", "the-version-constants-stay-1-and-2")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
 }
 
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "strict-producers-lenient-consumers", "every-valid-fixture-passes-both-parsers")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -42,6 +45,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "strict-producers-lenient-consumers", "every-invalid-fixture-fails-the-strict-parser")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -65,6 +69,7 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 // TestForwardCompatibility pins the lenient consumer path: an older
 // extension must keep working when a newer orchestrator adds fields.
 func TestForwardCompatibility(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "strict-producers-lenient-consumers", "the-lenient-parser-ignores-an-unknown-field")
 	data, err := os.ReadFile("fixtures/invalid/unknown-field.json")
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +84,7 @@ func TestForwardCompatibility(t *testing.T) {
 }
 
 func TestParamCoercion(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "parameters-resolve-alike", "a-lookup-falls-back-and-reads-a-numeric-string-as-a-number")
 	data, err := os.ReadFile("fixtures/valid/full.json")
 	if err != nil {
 		t.Fatal(err)

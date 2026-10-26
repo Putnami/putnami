@@ -477,16 +477,13 @@ honest.
 
 ## Specs and durable decisions
 
-There is deliberately **no user-facing feature or spec for this module**. Its
-whole content is the handshake between the orchestrator and a job subprocess: a
-user never authors it, reads it, or asks for it, and a product feature per
-technical wire contract would be a promise with no user on the other end.
-
-The user-facing surface that owns the outcome is **every task-running CLI
-command** — `putnami build`, `putnami test`, `putnami lint` and the rest — and
-the extension-authoring experience documented by
-[`tooling/extension-sdk`](../../tooling/extension-sdk). A spec belongs with the
-change one of those is made for.
+The module owns the feature of its contract, `job/execution-context`, specified
+in [`specs/execution-context.json`](specs/execution-context.json). The
+conformance tests here and the CLI producer test
+(`tooling/cli/internal/jobs/scheduler/context_protocol_test.go`) prove its
+requirements. The task-running CLI commands and the extension-authoring
+experience of [`tooling/extension-sdk`](../../tooling/extension-sdk) keep their
+own features.
 
 Durable decisions recorded here:
 

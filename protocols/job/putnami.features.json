@@ -1,0 +1,104 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "job",
+  "features": [
+    {
+      "id": "job/execution-context",
+      "type": "feature",
+      "name": "Job execution context",
+      "outcome": "Every job subprocess, whatever its language, reads one execution context document from the orchestrator, so the workspace, the project, the task identity, the selection and the parameters mean the same thing to every extension",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-is-read-from-the-document",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-constants-stay-1-and-2",
+              "an-absent-version-reads-as-version-1",
+              "validation-refuses-an-unknown-or-negative-version"
+            ]
+          }
+        },
+        {
+          "id": "version-1-stays-frozen",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-1-document-refuses-the-version-2-members",
+              "every-version-1-fixture-stays-version-1",
+              "a-version-1-document-serializes-without-version-2-members"
+            ]
+          }
+        },
+        {
+          "id": "strict-producers-lenient-consumers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-passes-both-parsers",
+              "every-invalid-fixture-fails-the-strict-parser",
+              "the-lenient-parser-ignores-an-unknown-field"
+            ]
+          }
+        },
+        {
+          "id": "every-reject-branch-has-a-fixture",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-version-1-reject-branch-has-a-fixture",
+              "every-version-2-reject-branch-has-a-fixture"
+            ]
+          }
+        },
+        {
+          "id": "parameters-resolve-alike",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lookup-falls-back-and-reads-a-numeric-string-as-a-number",
+              "a-boolean-accepts-its-synonyms-and-defaults-otherwise",
+              "a-number-or-a-string-resolves-or-defaults"
+            ]
+          }
+        },
+        {
+          "id": "the-cli-produces-a-conforming-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-context-passes-the-strict-reader-as-version-2"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
