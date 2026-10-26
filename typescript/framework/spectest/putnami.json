@@ -6,6 +6,9 @@
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "dependencies": ["/protocols/features"],
   "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/features/schemas/**"]
+    },
     "package": {
       "npm": true
     },

@@ -1,5 +1,14 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -99,10 +108,45 @@ afterAll(() => {
   }
 });
 
+type CaseOutcome = 'passed' | 'failed' | 'skipped';
+
 interface ChildRun {
   exitCode: number;
   fragments: Record<string, unknown>[];
   suitePath: string;
+  /** The scratch directory holding everything the child could reach: suite, home, temporary directory. */
+  root: string;
+  /** The outcome bun reported for each case, by test name, read from its JUnit report. */
+  outcomes: Record<string, CaseOutcome>;
+}
+
+/** Reads each case's outcome from the JUnit report bun wrote: a failure, a skip, or neither. */
+function caseOutcomes(junit: string): Record<string, CaseOutcome> {
+  const outcomes: Record<string, CaseOutcome> = {};
+  for (const [, name, body] of junit.matchAll(/<testcase name="([^"]*)"[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+    outcomes[name ?? ''] = body?.includes('<failure') ? 'failed' : body?.includes('<skipped') ? 'skipped' : 'passed';
+  }
+  return outcomes;
+}
+
+/**
+ * Lists every file under `root` that holds a JSON object with a `check`
+ * member, the mark of a fragment, whatever its name or depth. A staging file
+ * counts, because it holds the same bytes.
+ */
+function fragmentsUnder(root: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(root, { recursive: true, encoding: 'utf8' })) {
+    const path = join(root, entry);
+    try {
+      if (!statSync(path).isFile()) continue;
+      const value: unknown = JSON.parse(readFileSync(path, 'utf8'));
+      if (typeof value === 'object' && value !== null && 'check' in value) found.push(entry);
+    } catch {
+      // Not a readable JSON file: the suite, the JUnit report, a bun cache entry.
+    }
+  }
+  return found.sort();
 }
 
 function runChildSuite(options: { fragmentsDir: boolean }): ChildRun {
@@ -110,8 +154,12 @@ function runChildSuite(options: { fragmentsDir: boolean }): ChildRun {
   scratchRoots.push(root);
   const suiteDir = join(root, 'suite');
   const fragmentsDir = join(root, 'fragments');
-  mkdirSync(suiteDir);
-  mkdirSync(fragmentsDir);
+  const homeDir = join(root, 'home');
+  const tempDir = join(root, 'tmp');
+  const junitPath = join(root, 'junit.xml');
+  for (const directory of [suiteDir, fragmentsDir, homeDir, tempDir]) {
+    mkdirSync(directory);
+  }
 
   const suitePath = join(suiteDir, 'generated.test.ts');
   writeFileSync(
@@ -140,19 +188,38 @@ observeMeasurement.skip('skipped measuring case', binding('skipped-measured-chec
 `,
   );
 
-  const env: Record<string, string | undefined> = { ...process.env };
+  // The working directory, the home directory and every temporary directory
+  // the child can name sit inside `root`, so a fragment written anywhere the
+  // binding might default to lands where the parent can find it.
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    HOME: homeDir,
+    USERPROFILE: homeDir,
+    TMPDIR: tempDir,
+    TEMP: tempDir,
+    TMP: tempDir,
+  };
   if (options.fragmentsDir) {
     env[FRAGMENT_DIR_ENV] = fragmentsDir;
   } else {
     env[FRAGMENT_DIR_ENV] = undefined;
   }
-  const result = Bun.spawnSync([process.execPath, 'test'], { cwd: suiteDir, env });
+  const result = Bun.spawnSync([process.execPath, 'test', '--reporter=junit', `--reporter-outfile=${junitPath}`], {
+    cwd: suiteDir,
+    env,
+  });
 
   const fragments = readdirSync(fragmentsDir)
     .filter((name) => name.endsWith('.json'))
     .sort()
     .map((name) => JSON.parse(readFileSync(join(fragmentsDir, name), 'utf8')) as Record<string, unknown>);
-  return { exitCode: result.exitCode, fragments, suitePath: realpathSync(suitePath) };
+  return {
+    exitCode: result.exitCode,
+    fragments,
+    suitePath: realpathSync(suitePath),
+    root,
+    outcomes: caseOutcomes(readFileSync(junitPath, 'utf8')),
+  };
 }
 
 // One child run serves every assertion about a recorded run: spawning bun is
@@ -169,6 +236,66 @@ const bare = (): ChildRun => {
   bareRun ??= runChildSuite({ fragmentsDir: false });
   return bareRun;
 };
+
+// The verification wire's schema, read from the features protocol: a fragment
+// is an observation without its provenance, so the schema decides which members
+// a fragment may carry and what each may hold.
+interface SchemaDefinition {
+  pattern?: string;
+  enum?: string[];
+  required?: string[];
+  properties?: Record<string, SchemaDefinition>;
+  $ref?: string;
+}
+const wire = JSON.parse(
+  readFileSync(
+    resolve(import.meta.dir, '../../../../protocols/features/schemas/putnami-feature-verification.json'),
+    'utf8',
+  ),
+) as { $defs: Record<string, SchemaDefinition> };
+
+/** Resolves a `$ref` into the schema's `$defs`, then returns the definition. */
+function definition(node: SchemaDefinition | undefined): SchemaDefinition {
+  const name = node?.$ref?.replace('#/$defs/', '');
+  return name ? (wire.$defs[name] ?? {}) : (node ?? {});
+}
+
+function expectMatches(value: unknown, node: SchemaDefinition | undefined): void {
+  const { pattern } = definition(node);
+  expect(typeof value).toBe('string');
+  expect(value as string).toMatch(new RegExp(pattern ?? '', 'u'));
+}
+
+/** Asserts that a fragment fits the wire's observation, apart from its declaration site. */
+function expectOnTheWire(fragment: Record<string, unknown>): void {
+  const observation = wire.$defs['observation'] ?? {};
+  const members = observation.properties ?? {};
+  const rest = Object.fromEntries(
+    Object.entries(fragment).filter(([member]) => member !== 'file' && member !== 'symbol'),
+  );
+  for (const member of Object.keys(rest)) {
+    expect(Object.keys(members), `${member} is not an observation member`).toContain(member);
+  }
+  for (const member of (observation.required ?? []).filter((name) => name !== 'provenance')) {
+    expect(rest, `${member} is required`).toHaveProperty(member);
+  }
+  expectMatches(rest['feature'], members['feature']);
+  expectMatches(rest['requirement'], members['requirement']);
+  expectMatches(rest['check'], members['check']);
+  if (rest['status'] !== undefined) {
+    expect(definition(members['status']).enum).toContain(rest['status'] as string);
+  }
+  if (rest['measurement'] !== undefined) {
+    const measurement = definition(members['measurement']);
+    const fields = measurement.properties ?? {};
+    const given = rest['measurement'] as Record<string, unknown>;
+    expect(Object.keys(given).sort()).toEqual([...(measurement.required ?? [])].sort());
+    expectMatches(given['name'], fields['name']);
+    expectMatches(given['unit'], fields['unit']);
+    expect(definition(fields['aggregation']).enum).toContain(given['aggregation'] as string);
+    expect(typeof given['value']).toBe('number');
+  }
+}
 
 // This project's own spec bindings. They are registered AFTER the synthetic
 // bindings above restored the inherited fragment directory, so these four —
@@ -203,6 +330,7 @@ describe('specTest', () => {
       expect(byCheck.get('done-check')?.status).toBe('passed');
 
       for (const fragment of run.fragments) {
+        expectOnTheWire(fragment);
         expect(fragment.feature).toBe('ts/spectest-demo');
         expect(fragment.requirement).toBe('lifecycle');
         // The declaration site is the absolute path of the registering file,
@@ -237,6 +365,7 @@ describe('specTest', () => {
 
       for (const check of ['measured-check', 'async-measured-check']) {
         const fragment = byCheck.get(check);
+        expectOnTheWire(fragment as Record<string, unknown>);
         // The wire refuses an observation carrying both, so the measured
         // producer must state no verdict of its own.
         expect(fragment?.status).toBeUndefined();
@@ -260,7 +389,13 @@ describe('specTest', () => {
     'writes nothing without the fragment directory',
     fragmentContract('a-typescript-binding-writes-nothing-without-the-adapter-directory'),
     () => {
-      expect(bare().fragments).toEqual([]);
+      // The bare run keeps its working directory, home directory and temporary
+      // directories inside its scratch root, so a fragment written to any
+      // default location is found there. The recorded run is the control: the
+      // same scan finds its fragments, so an empty result is not blindness.
+      expect(fragmentsUnder(recorded().root).length).toBe(recorded().fragments.length);
+      expect(recorded().fragments.length).toBeGreaterThan(0);
+      expect(fragmentsUnder(bare().root)).toEqual([]);
     },
   );
 
@@ -272,9 +407,23 @@ describe('specTest', () => {
       check: 'the-runner-verdict-is-unchanged',
     },
     () => {
-      // The deliberately failing case fails the child suite either way: the
-      // binding reports an observation and never alters the standard verdict.
-      expect(recorded().exitCode).not.toBe(0);
+      // Bare bun runs `test(name, fn)` unwrapped, so its outcomes are what the
+      // runner gives: a body that returns passes, a body that throws fails, a
+      // skipped case is skipped. The recorded run must give the same outcome
+      // for every case, and so the same exit code.
+      const expected: Record<string, CaseOutcome> = {
+        'passing case': 'passed',
+        'failing case': 'failed',
+        'skipped case': 'skipped',
+        'done style case': 'passed',
+        'measuring case': 'passed',
+        'async measuring case': 'passed',
+        'failing measuring case': 'failed',
+        'skipped measuring case': 'skipped',
+      };
+      expect(bare().outcomes).toEqual(expected);
+      expect(recorded().outcomes).toEqual(expected);
+      expect(recorded().exitCode).toBe(bare().exitCode);
       expect(bare().exitCode).not.toBe(0);
     },
   );
