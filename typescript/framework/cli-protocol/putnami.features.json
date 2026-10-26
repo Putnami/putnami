@@ -29,7 +29,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["paths-compare-by-code-unit", "array-indices-order-numerically"]
+            "checks": ["paths-compare-by-code-unit", "array-indices-order-by-code-unit"]
           }
         }
       ]

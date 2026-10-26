@@ -934,17 +934,18 @@ describe('validateDocument determinism', () => {
   );
 
   specTest(
-    'indexes array elements above nine',
+    'orders array indices above nine by code unit',
     {
       feature: 'typescript/cli-machine-output',
       requirement: 'violations-order-by-code-unit',
-      check: 'array-indices-order-numerically',
+      check: 'array-indices-order-by-code-unit',
     },
     () => {
-      const commands = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', ''];
+      const commands = ['a', 'b', '', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', ''];
       const document = JSON.stringify({ protocolVersion: 2, sessionId: 's', commands, tasks: [] });
       expect(validateDocument(DOCUMENT_KIND.sessionPlanFile, document)).toEqual([
         { code: VIOLATION_CODE.invalidValue, path: 'commands[11]' },
+        { code: VIOLATION_CODE.invalidValue, path: 'commands[2]' },
       ]);
     },
   );
