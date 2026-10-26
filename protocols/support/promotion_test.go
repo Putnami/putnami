@@ -62,7 +62,6 @@ func TestPromotionDocumentationStatesTheLadderAndItsRecord(t *testing.T) {
 }
 
 func TestStatusTableRowParserDiscriminates(t *testing.T) {
-	spectest.Proves(t, "support/support-catalog", "promotion-ladder-is-documented", "the-status-table-reader-reads-only-the-status-table")
 	if rows := statusTableRows("prose with no table at all\n"); len(rows) != 0 {
 		t.Fatalf("parser invented %d rows from prose", len(rows))
 	}

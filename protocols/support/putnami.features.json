@@ -22,7 +22,7 @@
             "checks": [
               "the-status-and-kind-vocabularies-are-closed",
               "only-the-exact-integer-1-is-accepted-as-the-protocol-version",
-              "a-rejected-version-names-the-accepted-token-and-field"
+              "a-newer-version-is-rejected-with-the-accepted-token-and-field"
             ]
           }
         },
@@ -35,7 +35,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-strict-reader-rejects-non-canonical-json",
+              "the-strict-reader-rejects-a-catalog-that-is-not-strict-json",
               "canonical-writing-sorts-a-copy-and-round-trips",
               "valid-fixtures-are-canonical-and-invalid-fixtures-are-rejected"
             ]
@@ -58,7 +58,7 @@
           }
         },
         {
-          "id": "documentation-repeats-the-reviewed-status",
+          "id": "a-documented-status-is-read-from-the-support-section",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -102,8 +102,7 @@
             "kind": "acceptance",
             "checks": [
               "the-promotion-table-has-one-row-per-status",
-              "the-promotion-section-states-the-ladder-and-its-record",
-              "the-status-table-reader-reads-only-the-status-table"
+              "the-promotion-section-states-the-ladder-and-its-record"
             ]
           }
         }

@@ -27,7 +27,7 @@
     },
     {
       "id": "adopted-constants-mirror-the-enums",
-      "text": "Each framework adopts the manifest vocabulary. The Go security decision labels equal the generated AuthDecision constants. The TypeScript ClaimName, PrincipalKind and AuthDecision constants equal the manifest enum names and wire values."
+      "text": "The Go security decision labels equal the generated AuthDecision constants. The TypeScript ClaimName, PrincipalKind and AuthDecision constants equal the manifest enum names and wire values."
     }
   ],
   "decisions": [

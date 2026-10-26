@@ -12,7 +12,7 @@
       "target": "coded",
       "requirements": [
         {
-          "id": "exact-version-tokens",
+          "id": "pinned-versions",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -20,7 +20,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-schema-accepts-exactly-the-current-document-and-overrides-versions",
+              "the-schema-accepts-only-the-current-version-of-each-shape",
               "the-document-version-is-2-and-the-overrides-version-is-1",
               "a-document-with-another-version-fails-validation"
             ]
@@ -59,6 +59,22 @@
           }
         },
         {
+          "id": "strict-parse",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-document-field-fails-parsing-and-returns-no-document",
+              "an-unknown-overrides-field-fails-parsing-and-returns-no-overrides",
+              "malformed-json-is-a-parse-error",
+              "trailing-data-after-the-document-is-a-parse-error"
+            ]
+          }
+        },
+        {
           "id": "publish-safety-fails-closed",
           "stage": "coded",
           "evidenceKinds": [
@@ -72,7 +88,7 @@
               "an-oversized-string-fails-the-gate-as-embedded-content",
               "a-non-relative-path-fails-the-gate",
               "a-duplicate-reference-fails-the-gate",
-              "go-cli-producer-emits-no-bytes-and-exits-usage-when-the-gate-fails"
+              "go-cli-producer-emits-no-bytes-when-the-gate-fails"
             ]
           }
         },
@@ -103,8 +119,7 @@
               "the-absence-reason-rules-of-the-tests-section-are-enforced",
               "a-pack-without-an-id-is-rejected",
               "tests-policy-is-an-unknown-field-and-absent-from-the-schema",
-              "every-diagnostic-code-is-in-the-closed-taxonomy",
-              "trailing-data-after-the-document-is-a-parse-error"
+              "every-diagnostic-code-is-in-the-closed-taxonomy"
             ]
           }
         },
@@ -118,7 +133,6 @@
             "kind": "acceptance",
             "checks": [
               "go-cli-context-pack-prints-the-documents-and-writes-nothing",
-              "go-cli-agent-context-tool-serves-the-packed-document-and-writes-nothing",
               "go-cli-producer-applies-author-overrides-and-the-document-passes-the-gate",
               "go-cli-producer-refuses-a-malformed-overrides-file",
               "the-overrides-file-path-is-schema-agent-context-overrides-json"

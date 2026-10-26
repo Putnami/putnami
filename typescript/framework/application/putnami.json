@@ -12,6 +12,8 @@
         "../../../protocols/clientcontract/fixtures/**",
         "../../../protocols/clientcontract/schemas/**",
         "../../../protocols/http-routes/fixtures/**",
+        "../../../protocols/identity/schema/contracts.gen.ts",
+        "../../../protocols/identity/schema/contracts.json",
         "../../../protocols/platform/fixtures/envelope/**"
       ]
     },

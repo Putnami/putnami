@@ -75,7 +75,7 @@ func TestProtocolVersionIsAnExactIntegerToken(t *testing.T) {
 // The catalog is hand-authored, so the only fix is to edit the file — which the
 // message has to say, because there is no command that does it.
 func TestProtocolVersionRejectionNamesTheAcceptedToken(t *testing.T) {
-	spectest.Proves(t, "support/support-catalog", "closed-vocabularies-and-exact-version", "a-rejected-version-names-the-accepted-token-and-field")
+	spectest.Proves(t, "support/support-catalog", "closed-vocabularies-and-exact-version", "a-newer-version-is-rejected-with-the-accepted-token-and-field")
 	_, diagnostics := ParseCatalog([]byte(`{"protocolVersion":2,"entries":[]}`))
 	if len(diagnostics) != 1 {
 		t.Fatalf("diagnostics = %#v, want exactly one", diagnostics)

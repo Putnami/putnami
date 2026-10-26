@@ -30,7 +30,7 @@ func TestStatusAndKindVocabulariesAreClosed(t *testing.T) {
 }
 
 func TestStrictParserRejectsNonCanonicalJSON(t *testing.T) {
-	spectest.Proves(t, "support/support-catalog", "strict-canonical-catalog", "the-strict-reader-rejects-non-canonical-json")
+	spectest.Proves(t, "support/support-catalog", "strict-canonical-catalog", "the-strict-reader-rejects-a-catalog-that-is-not-strict-json")
 	tests := []struct {
 		name string
 		data string
@@ -147,6 +147,13 @@ func TestCanonicalCatalogSortsACopyAndRoundTrips(t *testing.T) {
 	}
 	if !reflect.DeepEqual(input.Entries, original) {
 		t.Fatal("MarshalCatalog mutated caller entry order")
+	}
+	var order []string
+	for _, entry := range CanonicalCatalog(input).Entries {
+		order = append(order, entry.ID)
+	}
+	if want := []string{"alpha", "@putnami/python", "zeta"}; !reflect.DeepEqual(order, want) {
+		t.Fatalf("canonical entry order = %v, want %v: by kind, then by ID", order, want)
 	}
 	parsed, diagnostics := ParseAndValidateCatalog(first)
 	if parsed == nil || diag.HasErrors(diagnostics) {

@@ -39,6 +39,7 @@ func validDocument() *Document {
 }
 
 func TestParseDocument_UnknownField(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "strict-parse", "an-unknown-document-field-fails-parsing-and-returns-no-document")
 	d, diags := ParseDocument([]byte(`{"protocolVersion":2,"bogus":true}`))
 	if d != nil {
 		t.Error("document should be nil on parse error")
@@ -49,6 +50,7 @@ func TestParseDocument_UnknownField(t *testing.T) {
 }
 
 func TestParseDocument_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "strict-parse", "malformed-json-is-a-parse-error")
 	_, diags := ParseDocument([]byte("{not json"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected parse error")
@@ -59,6 +61,7 @@ func TestParseDocument_InvalidJSON(t *testing.T) {
 }
 
 func TestParseOverrides_UnknownField(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "strict-parse", "an-unknown-overrides-field-fails-parsing-and-returns-no-overrides")
 	o, diags := ParseOverrides([]byte(`{"protocolVersion":1,"bogus":true}`))
 	if o != nil {
 		t.Error("overrides file should be nil on parse error")
@@ -75,7 +78,7 @@ func TestValidateDocument_NilIsParseError(t *testing.T) {
 }
 
 func TestValidateDocument_ProtocolVersion(t *testing.T) {
-	spectest.Proves(t, "agent-context/aggregated-agent-context", "exact-version-tokens", "a-document-with-another-version-fails-validation")
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "pinned-versions", "a-document-with-another-version-fails-validation")
 	d := validDocument()
 	d.ProtocolVersion = 99
 	if !findCode(ValidateDocument(d), ErrorCodeInvalidProtocolVersion) {
@@ -419,7 +422,7 @@ func TestPublishSafety_KindEmbeddedContentRejected(t *testing.T) {
 // TestParseDocument_TrailingDataRejected pins that the strict decoder requires
 // exactly one JSON value: a valid document followed by trailing JSON fails.
 func TestParseDocument_TrailingDataRejected(t *testing.T) {
-	spectest.Proves(t, "agent-context/aggregated-agent-context", "tests-section-and-diagnostic-taxonomy", "trailing-data-after-the-document-is-a-parse-error")
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "strict-parse", "trailing-data-after-the-document-is-a-parse-error")
 	data, err := json.Marshal(validDocument())
 	if err != nil {
 		t.Fatalf("marshal: %v", err)

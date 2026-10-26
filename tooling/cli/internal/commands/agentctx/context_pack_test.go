@@ -446,7 +446,7 @@ func TestContextPackCommand_PrintsTheDocumentsAndWritesNothing(t *testing.T) {
 // bytes are produced (the document is never written), and the machine-readable
 // violation travels on the error.
 func TestCanonicalDocumentBytes_FailsClosedOnUnflaggedSensitive(t *testing.T) {
-	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "go-cli-producer-emits-no-bytes-and-exits-usage-when-the-gate-fails")
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "go-cli-producer-emits-no-bytes-when-the-gate-fails")
 	sensitivePath := "svc/app/infra/requirements.json"
 	doc := &agentcontext.Document{
 		Schema:          agentContextSchemaURI,
