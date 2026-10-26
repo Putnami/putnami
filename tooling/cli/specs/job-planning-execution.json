@@ -63,7 +63,7 @@
     },
     {
       "id": "dependents-wait-for-an-output-they-read",
-      "text": "A declared output may state readByDependents: the projects that depend on its project read it as part of that project, such as a generated client they compile. Only a durable output under the project root may state it, strict validation refuses any other with invalid-output-read-by-dependents, and stating it requires no CLI contract above 4. Every planned job of a project that depends on the writer's project, directly or through declared dependency edges, runs after the writer over an ordering edge that never reaches a cache key. Finalizers take no edge, nor does a job that already runs before the writer, so the plan stays a DAG."
+      "text": "A declared output may state readByDependents: the projects that depend on its project read it, such as a generated client they compile. Only a durable output under the project root may state it, else validation reports invalid-output-read-by-dependents; it needs no CLI contract above 4. Every planned job of a direct or transitive dependent runs after the writer over an ordering edge that never reaches a cache key. Finalizers and jobs already running before the writer take no edge, so the plan stays a DAG."
     },
     {
       "id": "preview-no-effects",
