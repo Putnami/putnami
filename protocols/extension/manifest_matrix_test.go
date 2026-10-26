@@ -95,6 +95,13 @@ const (
   "commands": {"deploy": {"run": [{"id": "d", "task": "t"}]}},
   "tasks": {"t": {"kind": "command", "command": "echo"}}`
 
+	changedFilesGateSurface = `"commands": {"test": {"run": [{"id": "r", "task": "t", "activation": {"changedFiles": ["**/*.go"]}}]}},
+  "tasks": {"t": {"kind": "command", "command": "echo"}}`
+
+	changedFilesBindingSurface = `"commands": {"test": {"run": [{"id": "r", "task": "t",
+    "with": {"changed-files": {"from": "context", "path": "selection.changedFiles"}}}]}},
+  "tasks": {"t": {"kind": "command", "command": "echo"}}`
+
 	hostHooksSurface = `"commandGroups": {"agent": {"subcommands": {"hook": {"command": "hook", "interactive": true}}}},
   "commands": {"hook": {"run": [{"id": "h", "task": "t"}]}},
   "tasks": {"t": {"kind": "command", "command": "echo"}},
@@ -143,6 +150,8 @@ func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
 		{name: "publish channels", body: publishChannelsSurface, governs: true, required: protocolcli.PublishChannelsContract},
 		{name: "provisioned toolchain", body: provisionedToolchainSurface, governs: true, required: protocolcli.ProvisionedToolchainContract},
 		{name: "default positionals", body: defaultPositionalsSurface, governs: true, required: protocolcli.DefaultPositionalsContract},
+		{name: "changed-files gate", body: changedFilesGateSurface, governs: true, required: protocolcli.ChangedFilesContract},
+		{name: "changed-files binding", body: changedFilesBindingSurface, governs: true, required: protocolcli.ChangedFilesContract},
 		{name: "host hooks", body: hostHooksSurface, governs: true, required: protocolcli.HostHooksContract},
 		{name: "hook-only", body: hookOnlySurface, governs: false, required: current},
 	}
@@ -232,6 +241,8 @@ func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
 		publishChannelsSurface:      true,
 		provisionedToolchainSurface: true,
 		defaultPositionalsSurface:   true,
+		changedFilesGateSurface:     true,
+		changedFilesBindingSurface:  true,
 		hostHooksSurface:            true,
 		hookOnlySurface:             false,
 	}

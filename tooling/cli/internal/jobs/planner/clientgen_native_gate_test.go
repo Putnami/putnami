@@ -86,7 +86,7 @@ func planValidate(t *testing.T, projects int) []*jobmodel.ScheduledJob {
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, projects)
 	planned, err := Plan(ws, []string{"validate"}, selected,
-		[]*extension.ExtensionDescription{description}, nil, nil, nil)
+		[]*extension.ExtensionDescription{description}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan validate: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestNativeValidateGuardWaitsForTheSelectedProvidersGeneration(t *testing.T)
 	}
 	ws := &workspace.Workspace{Root: root, Name: "mixed", Projects: []*workspace.Project{provider, consumer}}
 	planned, err := Plan(ws, []string{"validate"}, []*workspace.Project{provider, consumer},
-		[]*extension.ExtensionDescription{description}, nil, nil, nil)
+		[]*extension.ExtensionDescription{description}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan validate with a provider: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
 	ws, selected := clientgenConsumerWorkspace(t, 3)
 	for _, command := range []string{"build", "lint", "test"} {
 		planned, err := Plan(ws, []string{command}, selected,
-			[]*extension.ExtensionDescription{description}, nil, nil, nil)
+			[]*extension.ExtensionDescription{description}, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("plan %s: %v", command, err)
 		}
@@ -233,7 +233,7 @@ func TestNativeValidateGuardIsDisableable(t *testing.T) {
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
 	planned, err := Plan(ws, []string{"validate"}, selected,
-		[]*extension.ExtensionDescription{description}, nil, nil, []string{clientgenExtensionName})
+		[]*extension.ExtensionDescription{description}, nil, nil, []string{clientgenExtensionName}, nil)
 	if err != nil {
 		t.Fatalf("plan validate with the extension disabled: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite(t *testing.T) {
 	}
 	planned, err := Plan(testWorkspace(root, provider), []string{"package", "clientgen", "validate"},
 		[]*workspace.Project{provider},
-		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil)
+		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan package,clientgen,validate: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 	}
 	planned, err := Plan(testWorkspace(root, provider, consumer), []string{"lint", "test", "build", "clientgen"},
 		[]*workspace.Project{provider, consumer},
-		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil)
+		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan lint,test,build,clientgen: %v", err)
 	}

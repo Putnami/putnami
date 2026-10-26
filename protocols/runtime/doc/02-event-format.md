@@ -172,6 +172,17 @@ Set `error.timedOut` to `true` when the failure is a deadline the producer's own
 }
 ```
 
+Set `error.code` to `"host-unsupported"` when this host cannot run the job at all, such as a race detector run on a host without the C compiler it needs. The failure describes the host, not the job's inputs, so the Putnami CLI never records it in its failure-replay cache, and the next run executes the job again. Every other code is the producer's own. A result can carry both `code` and `timedOut`.
+
+```json
+{
+  "data": {
+    "status": "FAILED",
+    "error": { "message": "no C compiler on PATH", "code": "host-unsupported" }
+  }
+}
+```
+
 ## Flat vs. Nested Fields
 
 Job subprocesses may use flat top-level fields (e.g., `"severity"`, `"location"`, `"current"`) rather than nesting under `"data"`. The orchestrator normalizes both forms — all non-envelope fields are accessible via `event.Data[key]`.

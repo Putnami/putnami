@@ -1,0 +1,31 @@
+{
+  "name": "@acme/race",
+  "version": "1.0.0",
+  "cliContract": 16,
+  "commands": {
+    "test": {
+      "description": "Test the project, and race the packages a change touches.",
+      "run": [
+        { "id": "test", "task": "test-exec" },
+        {
+          "id": "test-race",
+          "task": "test-race-exec",
+          "activation": { "changedFiles": ["**/*.go", "**/testdata/**"] },
+          "with": {
+            "changed-files": { "from": "context", "path": "selection.changedFiles" }
+          }
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "test-exec": { "kind": "command", "command": "echo" },
+    "test-race-exec": {
+      "kind": "command",
+      "command": "echo",
+      "inputs": {
+        "changed-files": { "from": "params" }
+      }
+    }
+  }
+}

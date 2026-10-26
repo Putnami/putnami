@@ -23,6 +23,9 @@ type activationScope struct {
 	projRoot     string
 	closureRoots func() []string
 	cache        *planCache
+	// changedFiles are the run's changed files the project owns,
+	// project-relative; nil when it owns none or the run measured no diff.
+	changedFiles []string
 }
 
 // pipelineExpansionOptions returns every project/invocation fact the pipeline
@@ -60,10 +63,16 @@ func pipelineExpansionOptions(
 		cache.closureRoots[proj.ID] = roots
 		return roots
 	}
+	if cache != nil && proj != nil {
+		scope.changedFiles = cache.ownedChangedFiles[proj.ID]
+	}
 	opts := extension.PipelineExpansionOptions{
 		StepActive: func(step extension.PipelineStep) bool {
 			return stepIsActive(step.Activation, scope)
 		},
+		// A project that owns no changed file binds none: the task receives
+		// no parameter rather than an empty list.
+		ChangedFiles: scope.changedFiles,
 	}
 	if cache != nil && proj != nil {
 		projectType := proj.Type
@@ -90,6 +99,13 @@ func pipelineExpansionOptions(
 func stepIsActive(act *extension.StepActivation, scope activationScope) bool {
 	if act == nil {
 		return true
+	}
+	// A change gate reads the diff, not the tree, so it needs no project root
+	// and holds before the fallback below: a step that does work only for a
+	// change is planned only where the project owns a matching changed file,
+	// and never on a run that measured no diff.
+	if len(act.ChangedFiles) > 0 && !extension.SelectsChangedFile(scope.changedFiles, act.ChangedFiles) {
+		return false
 	}
 	// Without a resolvable project root we cannot probe files; keep the step so
 	// it skips at runtime exactly as before rather than risk over-pruning.

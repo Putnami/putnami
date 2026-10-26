@@ -299,7 +299,7 @@ func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
 		loadShippedExtension(t, "go/extension", "@putnami/go"),
 		loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen"),
 	}
-	planned, err := Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil)
+	planned, err := Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan clientgen: %v", err)
 	}

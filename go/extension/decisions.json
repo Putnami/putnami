@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decisions.json",
+  "protocolVersion": 1,
+  "decisions": [
+    {
+      "id": "D-G1",
+      "statement": "the Go test runs the race detector on the packages a change touches, not on a maintained package list",
+      "settled": "2026-10-25",
+      "settledBy": "fdumay",
+      "adr": "doc/adr/0013-the-race-detector-runs-on-the-packages-a-change-touches.md",
+      "reviewOnly": true
+    }
+  ]
+}

@@ -1658,6 +1658,25 @@
           }
         },
         {
+          "id": "a-step-reads-the-changed-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-gated-step-is-planned-only-for-a-project-that-owns-a-matching-changed-file",
+              "a-run-that-measured-no-diff-plans-no-change-gated-step",
+              "the-owned-changed-files-are-bound-into-the-step",
+              "the-owned-changed-files-key-the-step",
+              "a-frozen-request-plans-the-submitters-changed-files",
+              "cleanup-waits-for-the-consumers-the-plan-holds",
+              "a-manifest-with-a-change-gate-requires-contract-16"
+            ]
+          }
+        },
+        {
           "id": "an-interactive-command-stops-on-its-own-terms",
           "stage": "coded",
           "evidenceKinds": [

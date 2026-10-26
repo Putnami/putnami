@@ -60,6 +60,10 @@
       "text": "Every file under a testdata directory of a Go project, at any depth, is a test-exec input, so a fixture edit re-runs the tests instead of replaying an old verdict. The Go tool reserves testdata for test inputs, so a project declares no pattern of its own for them. The cache walker's directory skips still apply: a file below a node_modules, .git, .putnami, out, dist or vendor directory is not an input."
     },
     {
+      "id": "race-on-touched-packages",
+      "text": "When a run measured a diff, test runs go test -race after the test step passes, on the packages the change touched outside .gen: each changed Go file's directory and the package holding a changed testdata directory, in the project owning them. A dependent reached through an edge runs none, and no package list is kept. The files key the step, which reports no test counts; --race replaces it and --no-race-changed turns it off. A host that cannot run the detector fails it, and that failure is never replayed."
+    },
+    {
       "id": "modfile-restoration",
       "text": "A build that mutates go.mod or go.sum restores the tracked content it found, including deleting a file the run created and recreating one the run removed."
     },
@@ -272,6 +276,8 @@
     "go/extension/doc/adr/0005-describe-owns-the-migration-bundle-inside-gen.md",
     "go/extension/doc/adr/0008-coverage-scope-decides-whose-tests-count.md",
     "go/extension/doc/adr/0009-coverage-names-the-packages-a-module-owns.md",
+    "go/extension/doc/adr/0013-the-race-detector-runs-on-the-packages-a-change-touches.md",
+    "protocols/extension/doc/adr/0015-a-step-reads-the-changed-files-from-contract-16.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",

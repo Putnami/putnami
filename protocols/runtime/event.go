@@ -187,7 +187,10 @@ type JobError struct {
 	// Message is the human-readable failure text.
 	Message string `json:"message,omitempty"`
 	// Code is the producer's machine-readable failure identifier, when it has
-	// one. This protocol does not define a code vocabulary.
+	// one. The code host-unsupported reports that this host cannot run the job
+	// at all: the failure describes the host, not the job's inputs, and a
+	// consumer that caches failures by input never records one. This protocol
+	// defines no other code.
 	Code string `json:"code,omitempty"`
 	// TimedOut reports that the failure is a deadline the producer's own tool
 	// enforced, such as a test binary's timeout, and not a verdict its inputs
