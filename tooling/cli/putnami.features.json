@@ -2936,6 +2936,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "pin-shows-a-lock-with-the-reserved-literal-as-built-from-this-workspace",
               "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it",
               "pin-remove-clears-the-source-sentinel",
               "pin-replaces-the-source-sentinel"

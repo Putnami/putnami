@@ -372,6 +372,7 @@ func writeSourceWorkspaceLock(t *testing.T, ws string) {
 // "pinned to " with an empty version would read as a corrupt lock; this
 // workspace is not unpinned, it is self-hosted.
 func TestCLIPinShowsTheSourceWorkspaceSentinel(t *testing.T) {
+	spectest.Proves(t, "cli/engine-provenance", "source-workspace-declaration", "pin-shows-a-lock-with-the-reserved-literal-as-built-from-this-workspace")
 	ws := t.TempDir()
 	writeSourceWorkspaceLock(t, ws)
 	out := captureCLIPinStdout(t, func() error {
