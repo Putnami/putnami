@@ -151,21 +151,15 @@ func uploadTestEvents() []cache.ActionEvent {
 	}
 }
 
-// The prepared input keeps the cached events whatever the provider answered,
-// and the upload drops them unless the provider advertised action-events.
+// The prepared task upload keeps the cached events whatever the provider
+// answered, and the upload drops them unless the provider advertised
+// action-events.
 func TestProviderResult_CarriesEventsOnlyWhenAdvertised(t *testing.T) {
 	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-cli-uploads-cached-events-only-when-advertised")
 	t.Parallel()
-	ws := makeExecutorTestWorkspace(t)
-	cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
-	job := cacheableJob("lint", "/proj", "proj", "proj")
-	hash := "ce" + strings.Repeat("1", cache.KeyLength-2)
 	events := uploadTestEvents()
-	meta := &store.EntryMetadata{Extension: "@test/ext", Task: "lint", Project: "proj", DurationMs: 1500}
-	if err := cm.Save(hash, &store.EntryResult{Status: "success", Events: events}, meta, ""); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-	in, ok := newUploadTestCache().prepareUpload(hash, job, cm)
+	producer := publishFetchTestEntry(t, &store.EntryResult{Status: "success", Events: events})
+	in, ok := newUploadTestCache().PrepareTaskUpload(fetchTestKey, fetchTestJob(), producer)
 	if !ok {
 		t.Fatalf("expected an eligible upload")
 	}
@@ -176,7 +170,7 @@ func TestProviderResult_CarriesEventsOnlyWhenAdvertised(t *testing.T) {
 	// The provider has not advertised event support: events are dropped, and
 	// the prepared input keeps them.
 	withoutEvents := newUploadTestCache()
-	if got := withoutEvents.providerResult(in.Result); len(got.Events) != 0 || got.Status != "success" || got.DurationMs != 1500 {
+	if got := withoutEvents.providerResult(in.Result); len(got.Events) != 0 || got.Status != "success" || got.DurationMs != 4000 {
 		t.Fatalf("without action-events the upload must carry the result without its events, got %+v", got)
 	}
 	if len(in.Result.Events) != len(events) {

@@ -814,13 +814,10 @@ func TestLoadRemoteCacheProvider_UploadCarriesEventsOnlyWhenTheProviderAdvertise
 		if remote == nil || !remote.IsProviderBacked() || notice != "" {
 			t.Fatalf("expected a provider-backed remote cache, got %+v, notice %q", remote, notice)
 		}
-		cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(wsRoot, ".putnami", "store")))
-		hash := "ce" + strings.Repeat("2", cache.KeyLength-2)
-		meta := &store.EntryMetadata{Extension: "@test/ext", Task: "lint", Project: "proj", DurationMs: 1500}
-		if err := cm.Save(hash, &store.EntryResult{Status: "success", Events: events}, meta, ""); err != nil {
-			t.Fatalf("Save: %v", err)
-		}
-		remote.Upload(context.Background(), hash, cacheableJob("lint", "/proj", "proj", "proj"), cm)
+		// The first remote operation of the run is the upload of a published
+		// task entry, which starts the provider, as the scheduler does.
+		producer := publishFetchTestEntry(t, &store.EntryResult{Status: "success", Events: events})
+		remote.UploadTaskEntry(context.Background(), fetchTestKey, fetchTestJob(), producer)
 		remote.DrainUploads()
 		remote.Close()
 		got, err := os.ReadFile(eventsOut)
