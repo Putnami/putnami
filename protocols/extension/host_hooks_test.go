@@ -13,7 +13,7 @@ import (
 // hostHooksFixture is a manifest stamped 16 that declares host hooks for both
 // hosts. It lives outside fixtures/valid, whose tests hold every valid
 // fixture to the base contract and no agent content.
-var hostHooksFixture = filepath.Join("testdata", "host-hooks", ManifestFilename)
+var hostHooksFixture = filepath.Join("testdata", "host-hooks.extension.json")
 
 // hostHooksInvalidFixtureCodes maps each host-hooks counter-example to the
 // exact diagnostic codes FullValidateManifest reports, in order.
