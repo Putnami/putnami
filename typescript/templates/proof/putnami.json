@@ -3,6 +3,7 @@
   "name": "@putnami/typescript-templates-proof",
   "tags": ["ts"],
   "extensions": ["/typescript/extension"],
+  "featureAuthority": { "owner": "tooling/project-scaffolding" },
   "options": {
     "test": {
       "coverage": false,
@@ -26,6 +27,7 @@
         "../../framework/web/package.json",
         "../../framework/web/putnami.extension.json",
         "../../framework/web/src/**",
+        "../../../protocols/template/template.go",
         "../../../tooling/cli/internal/commands/lifecycle/workspace_init.go"
       ]
     }

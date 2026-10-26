@@ -110,6 +110,17 @@ my-app/
 
 **Use case:** Full-stack web applications with React SSR, file-based routing, loaders, and actions.
 
+## What each template promises
+
+Each template declares its own feature in its `putnami.features.json`:
+`typescript/library-template`, `typescript/server-template` and
+`typescript/web-template`, each with `tooling/project-scaffolding` as parent.
+Its spec states the promise: a project created from it passes the Biome check of
+`putnami lint`, the type-check and its own tests, before you edit a line. The
+`typescript/templates/proof` project renders each template against this
+repository's framework and observes those checks whenever a template or the
+framework changes.
+
 ## Boundaries
 
 - **Scope**: Scaffolding new project directories with starter files and configuration

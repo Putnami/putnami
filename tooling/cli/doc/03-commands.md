@@ -807,10 +807,12 @@ creates the project on that release channel, as `putnami init` does.
 
 Template archives contain `putnami.template.json` plus the renderable/static
 template content. Source-workspace declarations at the template root
-(`putnami.json`, `putnami.features.json`, and `specs/`) and root-local state such
-as `node_modules/` are excluded so a generated project does not inherit the
-template project's root SDD identity. Nested directories are ordinary template
-content and are copied as authored. `README.md` and `LICENSE.md` are ordinary
+(`putnami.json`, `putnami.features.json`, `specs/`, and `specs.baseline.json`),
+root-local state such as `node_modules/`, and root entries whose name starts
+with a dot are excluded so a generated project does not inherit the template
+project's root SDD identity. `projects create` skips the same entries when it
+renders a template from the workspace, so both paths create the same project.
+Nested directories are ordinary template content and are copied as authored. `README.md` and `LICENSE.md` are ordinary
 optional template content:
 they are included when present and are not required to package a template.
 
