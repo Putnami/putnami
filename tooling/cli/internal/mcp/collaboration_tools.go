@@ -18,7 +18,9 @@ import (
 // A workspace that binds contracts in options.collaboration gets, for every
 // contract, a read-only `<contract>.capabilities` tool answered by the
 // orchestrator, and one `<contract>.<operation>` tool per operation the
-// binding serves. Every routed tool resolves the binding again when it is
+// binding serves, except a host-only operation: the host that runs the agent
+// calls it through the command line or the host channel, and the agent never
+// sees it as a tool. Every routed tool resolves the binding again when it is
 // called, so a call always reaches the provider the workspace document names
 // at that moment and never another one. A workspace without the block gets
 // none of this and reserves no name.
@@ -52,7 +54,7 @@ func inContractNamespace(name string) bool {
 }
 
 // registerCollaborationTools registers the routed tools of every contract the
-// workspace document declares.
+// workspace document declares. A host-only operation gets no tool.
 func (s *Server) registerCollaborationTools(exts []*extension.ExtensionDescription) {
 	document, err := readCollabDocument(s.opts.WorkspaceRoot)
 	if err != nil || !document.Present {
@@ -63,6 +65,9 @@ func (s *Server) registerCollaborationTools(exts []*extension.ExtensionDescripti
 		resolution := resolveCollab(document, contract, exts, unavailable)
 		s.registerCollaborationTool(capabilitiesTool(contract), contract, collab.OperationCapabilities)
 		for _, op := range routedOperations(resolution) {
+			if op.HostOnly {
+				continue
+			}
 			s.registerCollaborationTool(routedTool(resolution, op), contract, op.Name)
 		}
 	}
@@ -107,9 +112,10 @@ func capabilitiesTool(contract string) Tool {
 	tool := readOnlyTool(Tool{
 		Name: contract + "." + collab.OperationCapabilities,
 		Description: fmt.Sprintf("Report the %s binding of this workspace: the provider and contract version options.collaboration.%s names, "+
-			"every operation of the contract with whether that provider offers it and how it enforces preconditions, the installed "+
-			"providers that are not bound, and why a binding cannot be honored. Answered by Putnami from the manifests without running "+
-			"the provider. Call it before relying on an optional operation.", contract, contract),
+			"every operation of the contract with whether that provider offers it, how it enforces preconditions and whether only the "+
+			"host that runs the agent calls it, the installed providers that are not bound, and why a binding cannot be honored. "+
+			"Answered by Putnami from the manifests without running the provider. Call it before relying on an optional operation.",
+			contract, contract),
 		InputSchema: schema,
 	})
 	tool.Meta[collaborationMetaKey] = collaborationToolMeta{Contract: contract, Operation: collab.OperationCapabilities}

@@ -45,6 +45,14 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	17: ADDITIVE — the host hooks an extension declares (`hostHooks`). From
+//	   17 on, an explicit `putnami install`, `init` or `upgrade` writes the
+//	   declared hooks into the agent hosts' own hook files, for a workspace
+//	   that opts into the extension's agent content and binds the
+//	   collaboration contract the hooks require. An older reader would
+//	   install the extension without its hooks, so it must refuse the stamp.
+//	   A manifest that declares the member is stamped 17, and the floor binds
+//	   it from every origin. A manifest without it keeps its stamp.
 //	16: ADDITIVE — the run's changed files as a step fact. A pipeline step
 //	   may gate on them (`activation.changedFiles`: active only when a file
 //	   the change touches in the target project matches one of the globs)
@@ -262,7 +270,13 @@ const DefaultPositionalsContract = 15
 // key it without them, refuses the stamp instead.
 const ChangedFilesContract = 16
 
+// HostHooksContract is required by a manifest that declares host hooks. A
+// reader at this contract writes the declared hooks into the agent hosts'
+// hook files on an explicit install, init or upgrade, so an older reader,
+// which would install the extension without them, refuses the stamp instead.
+const HostHooksContract = 17
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ChangedFilesContract
+const LatestContract = HostHooksContract

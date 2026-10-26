@@ -1,0 +1,28 @@
+{
+  "session_id": "ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8",
+  "transcript_path": "/home/agent/.claude/projects/-work-repo/ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8.jsonl",
+  "cwd": "/work/repo",
+  "prompt_id": "50054e58-1cf4-49cf-a268-3df3069ab5e6",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "mcp__putnami__missions_reply",
+  "tool_input": {
+    "message": "msg-prompt",
+    "reply": "Done: b.txt now holds the letter b."
+  },
+  "tool_response": [
+    {
+      "type": "text",
+      "text": "{\n  \"contract\": \"missions\",\n  \"version\": 1,\n  \"operation\": \"reply\",\n  \"provider\": {\n    \"name\": \"@acme/missions\",\n    \"version\": \"1.0.0\"\n  },\n  \"outcome\": \"ok\",\n  \"result\": {\n    \"message\": {\n      \"id\": \"msg-prompt\",\n      \"state\": \"replied\"\n    },\n    \"replayed\": false\n  }\n}"
+    }
+  ],
+  "tool_use_id": "toolu_01GinHxVZ6FcTrXcffY4FVSU",
+  "duration_ms": 174,
+  "mcp_server": {
+    "name": "putnami",
+    "source": "dynamic"
+  }
+}

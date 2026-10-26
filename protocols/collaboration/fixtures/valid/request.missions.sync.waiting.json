@@ -1,0 +1,15 @@
+{
+  "session": { "engine": "host-a", "id": "5b1f0c2e-8d7a-4f61-9a43-1c2d3e4f5a6b" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-596" },
+  "event": "wait",
+  "state": "waiting",
+  "observedAt": "2026-10-26T09:40:00Z",
+  "waitUntil": "2026-10-26T09:50:00Z",
+  "plan": {
+    "steps": [
+      { "key": "task-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "status": "doing", "text": "Wait for the owner's answer" }
+    ]
+  },
+  "delivered": ["msg_05", "msg_05"],
+  "decisions": ["dec_01", "dec_01"]
+}

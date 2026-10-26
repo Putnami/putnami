@@ -81,15 +81,15 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: ChangedFilesContract for a step that gates on or binds the
-// run's changed files, DefaultPositionalsContract for a command group whose
-// default subcommand declares positionals, ProvisionedToolchainContract for a
-// runtime toolchain that declares a provisioned candidate,
-// PublishChannelsContract for a task that declares the publish channels it
-// serves, CommandKindContract for command or verb traits that declare a kind,
-// a workload, rewritesSources or consumesReleaseSet, or a task's batchable
-// policy that declares a kind or a phase, SourceBoundCacheContract for a task
-// that declares cache.sourceBound,
+// the manifest: HostHooksContract for a hostHooks member, ChangedFilesContract
+// for a step that gates on or binds the run's changed files,
+// DefaultPositionalsContract for a command group whose default subcommand
+// declares positionals, ProvisionedToolchainContract for a runtime toolchain
+// that declares a provisioned candidate, PublishChannelsContract for a task
+// that declares the publish channels it serves, CommandKindContract for
+// command or verb traits that declare a kind, a workload, rewritesSources or
+// consumesReleaseSet, or a task's batchable policy that declares a kind or a
+// phase, SourceBoundCacheContract for a task that declares cache.sourceBound,
 // VerbVocabularyContract for a verb vocabulary, ExtensionDependenciesContract
 // for extensionDependencies that name a registry extension,
 // ReleaseBaselineInputContract for a task that declares the releaseBaseline
@@ -166,6 +166,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// manifest loads from.
 	if DeclaresChangedFiles(m) {
 		required = max(required, protocolcli.ChangedFilesContract)
+	}
+	// A host hook reaches the agent host only through a reader that writes
+	// it, whatever origin the manifest loads from.
+	if DeclaresHostHooks(m) {
+		required = max(required, protocolcli.HostHooksContract)
 	}
 	return required
 }

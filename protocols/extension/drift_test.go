@@ -2,8 +2,10 @@ package extension
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -377,6 +379,51 @@ func TestDrift_AgentContentContribution(t *testing.T) {
 	schemaFields := schemaDefProperties(t, "agentContentContribution")
 	goFields := goTypeJSONFields(t, AgentContentContribution{})
 	assertFieldParity(t, "AgentContentContribution", schemaFields, goFields)
+}
+
+func TestDrift_HostHooks(t *testing.T) {
+	assertFieldParity(t, "HostHooksDeclaration", schemaDefProperties(t, "hostHooksDeclaration"), goTypeJSONFields(t, HostHooksDeclaration{}))
+	assertFieldParity(t, "HostHooksRequirement", schemaDefProperties(t, "hostHooksRequirement"), goTypeJSONFields(t, HostHooksRequirement{}))
+	assertFieldParity(t, "HostHookEntry", schemaDefProperties(t, "hostHookEntry"), goTypeJSONFields(t, HostHookEntry{}))
+
+	// The schema's host and event lists are the closed lists the validator
+	// enforces.
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Defs struct {
+			Declaration struct {
+				Properties struct {
+					Hosts struct {
+						Properties map[string]any `json:"properties"`
+					} `json:"hosts"`
+				} `json:"properties"`
+			} `json:"hostHooksDeclaration"`
+			Entry struct {
+				Properties struct {
+					Event struct {
+						Enum []string `json:"enum"`
+					} `json:"event"`
+				} `json:"properties"`
+			} `json:"hostHookEntry"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	schemaHosts := slices.Sorted(maps.Keys(schema.Defs.Declaration.Properties.Hosts.Properties))
+	assertFieldParity(t, "hostHooks.hosts", schemaHosts, HostHookHosts())
+	var events []string
+	for _, host := range HostHookHosts() {
+		for _, event := range HostHookEvents(host) {
+			if !slices.Contains(events, event) {
+				events = append(events, event)
+			}
+		}
+	}
+	assertFieldParity(t, "hostHookEntry.event", schema.Defs.Entry.Properties.Event.Enum, events)
 }
 
 func TestDrift_VerbDefinition(t *testing.T) {

@@ -1,0 +1,20 @@
+{
+  "session": { "engine": "host-a", "id": "5b1f0c2e-8d7a-4f61-9a43-1c2d3e4f5a6b" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-596", "title": "Agent sessions report to their mission" },
+  "event": "stop",
+  "state": "handed_back",
+  "observedAt": "2026-10-26T09:30:00Z",
+  "model": "example-model",
+  "branch": "feat/agent-sessions-contract",
+  "lastMessage": "The contract is in place.\nThe gate passes.",
+  "plan": {
+    "steps": [
+      { "key": "contract", "status": "done", "text": "Add the missions contract" },
+      { "key": "hooks", "status": "doing", "text": "Wire the host hooks" },
+      { "key": "docs", "status": "todo", "text": "Document the session flow" }
+    ]
+  },
+  "delivered": ["msg_01", "msg_02"],
+  "decisions": ["dec_01"],
+  "replies": [{ "message": "msg_02", "reply": "Yes: the gate runs on the changed projects." }]
+}
