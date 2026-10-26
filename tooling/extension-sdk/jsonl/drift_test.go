@@ -18,7 +18,7 @@ import (
 // If the emitter and the protocol ever disagree on the wire format,
 // this test fails — the protocol package is the source of truth.
 func TestDrift_EmitterConformsToRuntimeProtocol(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "the-emitter-conforms-to-the-runtime-protocol-wire-shape")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-emitter-conforms-to-the-runtime-protocol-wire-shape")
 	out := captureStdout(t, func() {
 		e := New()
 		e.Meta("@putnami/test", "build")
@@ -75,7 +75,7 @@ func TestDrift_EmitterConformsToRuntimeProtocol(t *testing.T) {
 // from its members and must never travel, or an endpoint could ship a url that
 // disagrees with its own scheme/host/port.
 func TestDrift_ReadyWireShape(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "the-readiness-marker-has-the-protocol-wire-shape")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-readiness-marker-has-the-protocol-wire-shape")
 	out := captureStdout(t, func() {
 		NewForVersion(runtime.ProtocolVersion2).Ready(runtime.ReadyData{
 			Target: runtime.ReadyTargetServer,
@@ -159,7 +159,7 @@ func assertKeys(t *testing.T, what string, obj map[string]any, want []string) {
 // the protocol forbids: the metric is replaced by a debug log rather
 // than emitting a schema-violating event.
 func TestDrift_NonNumericMetricDropped(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "an-unrepresentable-value-is-dropped-rather-than-emitted-malformed")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "an-unrepresentable-value-is-dropped-rather-than-emitted-malformed")
 	out := captureStdout(t, func() {
 		New().Metric("bad", struct{}{}, "count")
 	})

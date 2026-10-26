@@ -191,8 +191,11 @@ the other.
 The module owns the feature of its contract, `runtime/event-stream`, specified
 in [`specs/event-stream.json`](specs/event-stream.json). The tests here prove
 its requirements, and so do two implementations: the extension SDK's emitter
-(`tooling/extension-sdk/jsonl`) and the CLI's serve watcher. The CLI commands
-whose output these events become keep the features of what they deliver.
+(`tooling/extension-sdk/jsonl`) and the CLI's serve watcher. The emitter's wire
+conformance moved here from the SDK's own feature, `tooling/extension-authoring`,
+which keeps log forwarding and the rest of the authoring library. The CLI
+commands whose output these events become keep the features of what they
+deliver.
 
 Durable decisions recorded here:
 

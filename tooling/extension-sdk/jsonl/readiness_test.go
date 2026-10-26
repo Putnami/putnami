@@ -74,7 +74,7 @@ func decodeLines(t *testing.T, output string) []*runtime.Event {
 // workload's listening log becomes BOTH the log line the console shows and a
 // typed readiness event, in that order.
 func TestForwardLine_EmitsTypedReadinessAtV2(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "a-typed-readiness-marker-is-emitted-at-the-negotiated-version")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "a-typed-readiness-marker-is-emitted-at-the-negotiated-version")
 	e := NewForVersion(runtime.ProtocolVersion2)
 	line := listeningLine(t, 3000)
 	output := captureStdout(t, func() { ForwardLine(e, line, "info") })
@@ -144,7 +144,7 @@ func TestForwardLine_ReadinessMarkerStrippedFromContext(t *testing.T) {
 // advertised v2 acceptance receives the byte-identical v1 stream it always did,
 // with no `ready` line it would reject the whole stream for.
 func TestForwardLine_NoReadinessLeakAtV1(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "no-readiness-marker-leaks-at-a-version-that-lacks-it")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "no-readiness-marker-leaks-at-a-version-that-lacks-it")
 	e := New() // no advertisement in the test environment ⇒ v1
 	if e.SupportsReady() {
 		t.Fatal("an un-negotiated emitter must not claim readiness support")

@@ -67,7 +67,7 @@
     },
     {
       "id": "the-extension-sdk-emits-a-conforming-stream",
-      "text": "The extension SDK's emitter speaks the version the CLI advertises, resolved through this module, and falls back to version 1 for an unknown one. It never writes an invalid line: it reports a ready event it cannot write at version 1, a malformed marker loses its readiness but keeps its log line, and a timed-out result parses. It announces readiness again on every restart."
+      "text": "The extension SDK's emitter writes this wire shape at the version the CLI advertises, resolved through this module, and falls back to version 1 for an unknown one. A typed ready marker appears only from version 2. It never writes an invalid line: it drops a value the protocol cannot represent, reports a ready event it cannot write at version 1, keeps the log line of a malformed marker, and writes a timed-out result that parses. It announces readiness again on every restart."
     },
     {
       "id": "the-cli-arms-on-typed-readiness",
