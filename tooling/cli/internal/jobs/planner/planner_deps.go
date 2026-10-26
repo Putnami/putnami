@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -1240,7 +1241,7 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 // is committed whether or not the provider's job succeeds, and it must not
 // read it while the provider's generator is rewriting it.
 //
-// Two rules name the provider jobs, and both decide from the plan alone.
+// Three rules name the jobs to wait for, and each decides from the plan alone.
 //
 // The step rule is the `^` rule applied to the contract provider instead of
 // the declared dependencies: a step orders after the provider's step of the
@@ -1261,13 +1262,21 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 // directory therefore waits for no project-rooted writer. A file output never
 // qualifies: a generated client is a directory.
 //
-// An unplanned provider contributes no edge — there is nothing to wait for —
+// The dependents rule orders every job of every project that depends on a
+// writer's project, directly or transitively, after that writer. Such a writer's
+// task declares a project-rooted output with readByDependents: a generated
+// client its project commits and its dependents compile. A resource cannot
+// state this, because a resource conflicts only within one project. The rule
+// follows declared dependency edges; the implicit edge from a scope include to
+// its scope reads nothing, so it does not count.
+//
+// An unplanned writer contributes no edge — there is nothing to wait for —
 // and nothing is emitted into the plan for it, so an ordering relation never
 // widens a selection. A finalizer is on neither end of an edge: the invocation
 // runtime dispatches it, not the DAG.
 //
-// An edge is added only when the provider's job does not already run after the
-// client's, so a provider that imports its own generated client keeps a plan
+// An edge is added only when the writer's job does not already run after the
+// waiting job, so a provider that imports its own generated client keeps a plan
 // that is a DAG: the client jobs its writer depends on already run before it,
 // through the writer's dependencies, and the others wait. The check is over every edge the plan holds —
 // functional, write-serialization, and the contract edges already added — so
@@ -1376,6 +1385,112 @@ func orderContractClients(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace
 			continue
 		}
 		job.SerializeAfter = jobmodel.DedupeSorted(append(job.SerializeAfter, extra...))
+	}
+
+	orderDependentReaders(jobs, ws.Graph, idx, predecessors)
+}
+
+// orderDependentReaders applies the dependents rule of orderContractClients.
+// predecessors holds every edge the plan has, keyed by the waiting job, and
+// takes each edge this pass adds.
+//
+// The writer's ancestors, the jobs that already run before it, are read once
+// per writer. An edge that makes a job outside them wait for the writer leaves
+// them unchanged, so one read decides every edge to that writer.
+func orderDependentReaders(
+	jobs []*jobmodel.ScheduledJob,
+	graph *workspace.DependencyGraph,
+	idx *plannedIndex,
+	predecessors map[string][]string,
+) {
+	if graph == nil {
+		return
+	}
+	// declaresReadByDependents reports whether a planned job's task declares a
+	// project-rooted output that the projects depending on its project read.
+	declaresReadByDependents := func(job *jobmodel.ScheduledJob) bool {
+		if job.JobDef == nil || job.Project == nil || jobmodel.IsFinalizerJob(job) {
+			return false
+		}
+		declaration := jobmodel.TaskDeclarationOf(job)
+		if declaration == nil {
+			return false
+		}
+		for _, output := range declaration.Outputs {
+			if output.ReadByDependents && output.EffectiveRoot() == extension.OutputRootProject {
+				return true
+			}
+		}
+		return false
+	}
+	// dependentsOf returns, sorted, every project that depends on projectID
+	// through declared dependency edges, directly or transitively, without
+	// projectID itself.
+	dependentsOf := func(projectID string) []string {
+		seen := map[string]bool{projectID: true}
+		queue := append([]string(nil), graph.ImpactDependentsOf(projectID)...)
+		var dependents []string
+		for len(queue) > 0 {
+			current := queue[0]
+			queue = queue[1:]
+			if seen[current] {
+				continue
+			}
+			seen[current] = true
+			dependents = append(dependents, current)
+			queue = append(queue, graph.ImpactDependentsOf(current)...)
+		}
+		sort.Strings(dependents)
+		return dependents
+	}
+	// ancestorsOf returns the plan keys that run before key over the edges in
+	// predecessors.
+	ancestorsOf := func(key string) map[string]bool {
+		ancestors := make(map[string]bool)
+		stack := append([]string(nil), predecessors[key]...)
+		for len(stack) > 0 {
+			current := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if ancestors[current] {
+				continue
+			}
+			ancestors[current] = true
+			stack = append(stack, predecessors[current]...)
+		}
+		return ancestors
+	}
+
+	readersOf := make(map[string][]string)
+	added := make(map[*jobmodel.ScheduledJob][]string)
+	for _, writer := range jobs {
+		if !declaresReadByDependents(writer) {
+			continue
+		}
+		projectID := writer.Project.ID
+		readers, ok := readersOf[projectID]
+		if !ok {
+			readers = dependentsOf(projectID)
+			readersOf[projectID] = readers
+		}
+		if len(readers) == 0 {
+			continue
+		}
+		key := writer.Key()
+		ancestors := ancestorsOf(key)
+		for _, readerProject := range readers {
+			for _, reader := range idx.byProject[readerProject] {
+				readerKey := reader.Key()
+				if reader.JobDef == nil || jobmodel.IsFinalizerJob(reader) || readerKey == key || ancestors[readerKey] ||
+					slices.Contains(reader.DependsOn, key) || slices.Contains(reader.SerializeAfter, key) {
+					continue
+				}
+				added[reader] = append(added[reader], key)
+				predecessors[readerKey] = append(predecessors[readerKey], key)
+			}
+		}
+	}
+	for reader, keys := range added {
+		reader.SerializeAfter = jobmodel.DedupeSorted(append(append([]string(nil), reader.SerializeAfter...), keys...))
 	}
 }
 

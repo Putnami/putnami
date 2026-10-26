@@ -278,6 +278,58 @@ func TestExtensionsValidate_AnInvalidPublishChannelDeclarationIsRefused(t *testi
 	}
 }
 
+// `putnami extensions validate` refuses readByDependents on an output outside
+// the project tree: under the workspace root, under the command-output root, or
+// in the invocation scratch. It names each offending output, and the same
+// outputs under the project root validate.
+func TestExtensionsValidate_AReadByDependentsOutputOutsideTheProjectIsRefused(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "dependents-wait-for-an-output-they-read",
+		"a-read-by-dependents-output-outside-the-project-is-refused")
+	manifest := `{
+  "name": "@putnami/test-ext",
+  "cliContract": 4,
+  "commands": {
+    "build": {"run": [{"id": "generate", "task": "generate"}, {"id": "scratch", "task": "scratch"}]}
+  },
+  "tasks": {
+    "generate": {"kind": "command", "command": "echo", "timeoutMs": -1, "cache": false, "declares": {"outputs": {
+      "shared": {"kind": "directory", "root": "workspace", "path": "dist/clients", "readByDependents": true},
+      "bin": {"kind": "directory", "root": "command-output", "path": "bin", "readByDependents": true}
+    }}},
+    "scratch": {"kind": "command", "command": "echo", "timeoutMs": -1, "cache": false, "declares": {"outputs": {
+      "scratch": {"kind": "directory", "scope": "invocation", "path": "scratch", "readByDependents": true}
+    }}}
+  }
+}`
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("readByDependents outside the project tree validated:\n%s", out)
+	}
+	for _, want := range []string{
+		"invalid-output-read-by-dependents",
+		"tasks.generate.declares.outputs.shared.readByDependents",
+		"tasks.generate.declares.outputs.bin.readByDependents",
+		"tasks.scratch.declares.outputs.scratch.readByDependents",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	valid := strings.NewReplacer(`"root": "workspace"`, `"root": "project"`, `"root": "command-output"`, `"root": "project"`,
+		`"scope": "invocation", `, ``).Replace(manifest)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(valid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) }); err != nil {
+		t.Fatalf("the same outputs under the project root must validate: %v\n%s", err, out)
+	}
+}
+
 // `putnami extensions validate` refuses a provisioned candidate that names a
 // path, a toolchain that lists two, and one whose lock identity the manifest
 // does not answer for, and names each offending candidate.

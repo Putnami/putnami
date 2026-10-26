@@ -224,6 +224,21 @@ func TestTaskContractDigest_EmptiedMoves(t *testing.T) {
 	}
 }
 
+// The planner orders a dependent project's jobs after a task whose output they
+// read, so the flag is task contract and moves the digest on its own.
+func TestTaskContractDigest_ReadByDependentsMoves(t *testing.T) {
+	read := func(readByDependents bool) TaskDefinition {
+		task := digestTask()
+		task.Declares.Outputs["report"] = DeclaredOutput{
+			Kind: OutputKindDirectory, Path: "out", ReadByDependents: readByDependents,
+		}
+		return task
+	}
+	if TaskContractDigest(read(true)) == TaskContractDigest(read(false)) {
+		t.Fatal("readByDependents did not move the digest")
+	}
+}
+
 func TestTaskContractDigest_DoesNotMutateItsArgument(t *testing.T) {
 	task := digestTask()
 	task.Declares.Effects = []string{"network", "locks"} // deliberately unsorted

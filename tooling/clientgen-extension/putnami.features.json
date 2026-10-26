@@ -51,7 +51,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "both-language-targets-report-and-own-their-configured-output-directory"
+              "both-language-targets-report-and-own-their-configured-output-directory",
+              "both-language-targets-are-read-by-the-client-projects-dependents"
             ]
           }
         },

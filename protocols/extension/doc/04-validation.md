@@ -127,6 +127,7 @@ manifest that predates the task contract keeps its exact verdict.
 | `path` is relative, cleaned, concrete (no glob, no template variable), and never the root itself | `invalid-output-path` |
 | `pathFrom` names a port the task declares in its `outputs` map | `unresolved-output-port` |
 | `within` is set only with `pathFrom`, and is relative, cleaned, concrete, and never the root itself | `invalid-output-within`, `invalid-output-path` |
+| `readByDependents` is set only on a durable output under the `project` root | `invalid-output-read-by-dependents` |
 | `effects` come from the closed vocabulary, without duplicates | `invalid-enum`, `duplicate-effect` |
 | `publishChannels`, when present, names at least one channel and each channel once | `invalid-value`, `duplicate-publish-channel` |
 | A task that declares `publishChannels` also declares the `registry` effect | `effect-conflict` |

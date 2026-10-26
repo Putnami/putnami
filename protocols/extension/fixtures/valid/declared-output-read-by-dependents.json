@@ -1,0 +1,71 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/declared-output-read-by-dependents",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {
+    "clientgen": {
+      "description": "Generate the clients that the projects depending on this one compile",
+      "run": [
+        { "id": "generate-go", "task": "clientgen-go" },
+        { "id": "generate-stub", "task": "clientgen-stub" }
+      ]
+    }
+  },
+  "tasks": {
+    "clientgen-go": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["generate-go"],
+      "cwd": "{projectRoot}",
+      "cache": { "enabled": true, "deterministic": true },
+      "outputs": {
+        "goClientOutput": { "description": "Project-relative directory of the generated Go client." },
+        "goClientIndex": { "description": "Project-relative path of the generated client index." }
+      },
+      "declares": {
+        "outputs": {
+          "client": {
+            "kind": "directory",
+            "pathFrom": "goClientOutput",
+            "optionalEmpty": true,
+            "readByDependents": true,
+            "description": "The generated client at the path the port reports. The projects that depend on this one compile it (protocol ADR 0014)."
+          },
+          "index": {
+            "kind": "file",
+            "root": "project",
+            "pathFrom": "goClientIndex",
+            "optionalEmpty": true,
+            "readByDependents": true,
+            "description": "The client index at the path the port reports, read by the same dependents."
+          }
+        }
+      }
+    },
+    "clientgen-stub": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["generate-stub"],
+      "cwd": "{projectRoot}",
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "stub": {
+            "kind": "directory",
+            "root": "project",
+            "path": "stub",
+            "readByDependents": true,
+            "description": "A generated directory at a literal path that the dependents compile."
+          },
+          "stubIndex": {
+            "kind": "file",
+            "path": "stub.go",
+            "readByDependents": true,
+            "description": "A generated file at a literal path that the dependents compile."
+          }
+        }
+      }
+    }
+  }
+}

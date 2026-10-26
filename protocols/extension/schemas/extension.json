@@ -1311,6 +1311,20 @@
         },
         {
           "if": {
+            "required": ["readByDependents"],
+            "properties": {
+              "readByDependents": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "scope": { "const": "durable" },
+              "root": { "const": "project" }
+            }
+          }
+        },
+        {
+          "if": {
             "required": ["drift"]
           },
           "then": {
@@ -1384,6 +1398,10 @@
         "emptied": {
           "type": "boolean",
           "description": "The engine empties this optionalEmpty directory output before its task executes, and on a restore of an entry that records it empty, keeping the ceded and preserved subpaths. Set it when only this task writes the path: no committed file and no other task's bytes live there. The engine already does this for a required directory output and for an optional one under the command-output root, so the flag requires kind directory, a durable scope, a literal path, the project or workspace root, and optionalEmpty true."
+        },
+        "readByDependents": {
+          "type": "boolean",
+          "description": "The projects that depend on the owning project read this output as part of that project, such as a generated client they compile. The planner orders every job of those projects, direct and transitive, after this task, as an ordering edge that never enters a cache key. Requires a durable scope and the project root: the workspace and command-output roots and the invocation scratch lie outside the project."
         },
         "excludes": {
           "type": "array",

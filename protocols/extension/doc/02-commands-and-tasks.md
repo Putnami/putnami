@@ -437,6 +437,7 @@ wiring — though a declared output may take its path from such a port (see
 | `within` | no | Root-relative subtree a `pathFrom` output's reported path must equal or lie under. A path outside it leaves the run uncached, and the planner takes the output's write to be this subtree instead of the whole root. Requires `pathFrom` |
 | `optionalEmpty` | no | The output may legitimately be absent, or empty, after a successful run |
 | `emptied` | no | The engine empties this `optionalEmpty` **directory** output before the task executes and on a restore of an entry that records it empty. Requires a durable scope, a literal `path`, and the `project` or `workspace` root |
+| `readByDependents` | no | The projects that depend on the owning project read this output as part of that project, such as a generated client they compile. The planner orders their jobs after the task. Requires a durable scope and the `project` root |
 | `excludes` | no | Root-relative subpaths this **directory** output cedes: neither captured nor restored with it, and ownable by another task |
 | `preserves` | no | Output-relative subpaths of this **directory** output the workspace owns (a `putnami.json`, a `go.mod`): never captured, never replaced or deleted by a restore, never judged for drift. Allowed on a `pathFrom` output |
 | `drift` | no | `warn` or `fail`: the engine compares the bytes the task produces (or a cache hit restores) with the bytes present at the path immediately before, and reports a difference as `generated-output-drift` |
@@ -453,6 +454,16 @@ to that subtree. The planner then moves only the keys that read a file under
 it, and the engine caches no entry for a run whose port reports a path
 outside it
 ([ADR 0010](adr/0010-a-path-from-output-may-bound-its-path.md)).
+
+A generated client is often a project of its own, and the projects that depend
+on it compile it. A resource conflicts only within one project, so no resource
+orders the generator against their jobs. Set `readByDependents` on the output
+those projects read. The planner then runs every job of every project that
+depends on the owning project, directly or transitively, after the task. The
+edge orders execution only: it never enters a cache key. The output must be
+durable and lie under the `project` root, because the `workspace` and
+`command-output` roots and the invocation scratch lie outside the project
+([ADR 0014](adr/0014-a-declared-output-may-be-read-by-dependents.md)).
 
 A `path` is canonical and concrete: slash-separated, cleaned, relative to its
 root, never the root itself, and never a glob or a template variable. The root

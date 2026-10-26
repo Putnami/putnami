@@ -29,6 +29,7 @@ func TestConformance_SchemaConditionalsValidateFixtures(t *testing.T) {
 		"declared-output-preserve-invalid.json",
 		"declared-output-emptied-invalid.json",
 		"declared-output-within-invalid.json",
+		"declared-output-read-by-dependents-invalid.json",
 	} {
 		t.Run("reject "+fixture, func(t *testing.T) {
 			outputs := fixtureDeclaredOutputs(t, filepath.Join("fixtures/invalid", fixture))
@@ -45,6 +46,7 @@ func TestConformance_SchemaConditionalsValidateFixtures(t *testing.T) {
 	for _, fixture := range []string{
 		lifecycleFixturePath, "fixtures/valid/declared-output-drift.json", "fixtures/valid/declared-output-preserves.json",
 		"fixtures/valid/declared-output-emptied.json", "fixtures/valid/declared-output-within.json",
+		"fixtures/valid/declared-output-read-by-dependents.json",
 	} {
 		for _, output := range fixtureDeclaredOutputs(t, fixture) {
 			if violations := conditionalSchemaViolations(declaredOutput, output); violations != 0 {
@@ -318,6 +320,10 @@ var v3ValidFixtures = map[string]bool{
 	// A file whose name the environment chooses, reported through a port and
 	// bounded to the subtree it lands in (protocol ADR 0010).
 	"declared-output-within.json": true,
+	// A generated client that the projects depending on its project compile,
+	// as a file and a directory, at a literal and a reported path, under the
+	// project root (protocol ADR 0014).
+	"declared-output-read-by-dependents.json": true,
 }
 
 // v3InvalidFixtureCodes maps each v3 conformance counter-example to the exact
@@ -387,6 +393,12 @@ var v3InvalidFixtureCodes = map[string][]string{
 	// WITHIN — only a pathFrom output is bounded, and the bound is a subtree of
 	// the root.
 	"declared-output-within-invalid.json": {"invalid-output-path", "invalid-output-within"},
+	// READ BY DEPENDENTS — the dependents of a project read only what lies in
+	// it: not the command-output root, not the workspace root, and not the
+	// invocation scratch.
+	"declared-output-read-by-dependents-invalid.json": {
+		"invalid-output-read-by-dependents", "invalid-output-read-by-dependents", "invalid-output-read-by-dependents",
+	},
 	// PUBLISH CHANNELS — each channel once, at least one, and only on a task
 	// that publishes to a registry.
 	"publish-channels-invalid.json": {"duplicate-publish-channel", "invalid-value", "effect-conflict"},
@@ -525,6 +537,9 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 				if output.Within != "" {
 					covered["within"] = true
 				}
+				if output.ReadByDependents {
+					covered["readByDependents"] = true
+				}
 				if len(output.Excludes) != 0 {
 					covered["excludes"] = true
 				}
@@ -536,7 +551,7 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 	}
 
 	features := []string{
-		"mutatesSources", "pathFrom", "path", "optionalEmpty", "emptied", "within", "sensitive", "excludes",
+		"mutatesSources", "pathFrom", "path", "optionalEmpty", "emptied", "within", "readByDependents", "sensitive", "excludes",
 		"kind:" + OutputKindFile, "kind:" + OutputKindDirectory, "kind:" + OutputKindRuntimeFile,
 		"root:" + OutputRootProject, "root:" + OutputRootWorkspace, "root:" + OutputRootCommandOutput,
 		"root:" + OutputRootInvocation,

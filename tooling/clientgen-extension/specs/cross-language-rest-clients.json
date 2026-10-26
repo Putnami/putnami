@@ -27,7 +27,7 @@
     },
     {
       "id": "dynamic-output-ownership",
-      "text": "Each language target reports its configured output directory through its own port and owns that exact dynamic directory, so a cache restore recreates a deleted generated client and the two targets never overlap."
+      "text": "Each language target reports its configured output directory through its own port and owns that exact dynamic directory, so a cache restore recreates a deleted generated client and the two targets never overlap. Each target declares that directory read by the projects that depend on the client project, so the planner runs none of their jobs while the generator rewrites it."
     },
     {
       "id": "unclaimed-outputs-are-declared-unclaimed",

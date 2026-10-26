@@ -526,7 +526,8 @@ func withServeStep(ctx context.Context) context.Context {
 // started: it releases the step's serve keys, its command-output lock when
 // its task declares no command-output output (releaseServeOutputLocks), and
 // announces the step's process group (announceProcessGroup). For a finite
-// step it does nothing.
+// step it does nothing. The release comes first: a process event therefore
+// tells an observer that the serve keys are already released.
 func serveStepStarted(ctx context.Context, group int, onEvent EventHandler) {
 	releaseServeOutputLocks(ctx)
 	announceProcessGroup(ctx, group, onEvent)

@@ -216,7 +216,8 @@ A generated client is a project of its own whose provider writes its directory.
 Resources cannot express that relation, because a resource conflicts only
 within one project. After write serialization, `orderContractClients`
 (`internal/jobs/planner/planner_deps.go`) adds serialize edges from each job of a
-contract client to its provider's jobs, under two rules:
+contract client to its provider's jobs, and from each job of a dependent to a
+writer of the output it reads, under three rules:
 
 - **Step rule.** A client step that references `^<step>` also waits for the
   provider's step of that name. A client's `build~generate` waits for the
@@ -229,14 +230,22 @@ contract client to its provider's jobs, under two rules:
   applies only when the client's directory and the provider's directory nest.
   A workspace-rooted output applies to every client. The command-output and
   invocation roots apply to none. A file output never applies.
+- **Dependents rule.** Every job of every project that depends on a writer's
+  project, directly or transitively, waits for the writer. A writer is a job
+  whose task declares a project-rooted output with `readByDependents`, such as
+  `clientgen~generate-go`: the client project commits the generated client,
+  and the projects that depend on it compile it. The rule follows declared
+  dependency edges. The implicit edge from a scope include to its scope reads
+  nothing, so it does not count. A job that already depends on the writer
+  takes no extra edge.
 
-Both rules add ordering only. They never add a job to the plan, so an
-unplanned provider adds no edge. They skip finalizers, which the invocation
-runtime dispatches. They also skip any edge that would close a cycle, for
-example when a provider imports its own client: the client jobs that the
-provider's writer depends on already run before it, through the writer's
-dependencies, and the other client jobs wait. The check covers functional, write-serialization, and contract edges, so
-the plan stays a DAG.
+The three rules add ordering only. They never add a job to the plan, so an
+unplanned provider or writer adds no edge. They skip finalizers, which the
+invocation runtime dispatches. They also skip any edge that would close a
+cycle, for example when a provider imports its own client: the client jobs that
+the provider's writer depends on already run before it, through the writer's
+dependencies, and the other client jobs wait. The check covers functional,
+write-serialization, and contract edges, so the plan stays a DAG.
 
 A skipped edge leaves the order to the path that already exists, and that path
 can pass through a job an `--impacted` task scope drops. A task scope keeps

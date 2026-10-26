@@ -818,6 +818,21 @@
           }
         },
         {
+          "id": "dependents-wait-for-an-output-they-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-read-by-dependents-output-outside-the-project-is-refused",
+              "every-dependent-job-waits-for-the-generated-client-writer",
+              "the-dependents-rule-orders-only-dependents-and-keeps-the-plan-a-dag"
+            ]
+          }
+        },
+        {
           "id": "preview-no-effects",
           "stage": "coded",
           "evidenceKinds": [
