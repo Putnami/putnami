@@ -81,7 +81,7 @@ func TestPlan_DescribePrunedForNonAppProject(t *testing.T) {
 	ws.Name = "ws"
 	ext := goBuildExtension()
 
-	planned, err := Plan(ws, []string{"build"}, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

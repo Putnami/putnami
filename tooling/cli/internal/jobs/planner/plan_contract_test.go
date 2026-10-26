@@ -54,7 +54,7 @@ func declaresOutput(kind, root, path string) *extension.TaskDeclaration {
 
 func planCommands(t *testing.T, ws *workspace.Workspace, ext *extension.ExtensionDescription, commands ...string) error {
 	t.Helper()
-	_, err := Plan(ws, commands, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	_, err := Plan(ws, commands, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	return err
 }
 

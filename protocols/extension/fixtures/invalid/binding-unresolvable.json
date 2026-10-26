@@ -1,0 +1,22 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/binding-unresolvable",
+  "commands": {
+    "test": {
+      "run": [
+        {
+          "id": "run",
+          "task": "test-exec",
+          "with": {
+            "changed-files": { "from": "context", "path": "selection.changedPackages" },
+            "target": { "from": "command", "path": "params.target" },
+            "workspace": { "path": "workspace.name" }
+          }
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "test-exec": { "kind": "command", "command": "echo" }
+  }
+}

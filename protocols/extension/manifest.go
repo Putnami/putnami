@@ -57,7 +57,8 @@ func LoadManifest(path string) (*Manifest, error) {
 //     never half-interpreted; the remedy is a newer putnami.
 //   - contract from RequiredLoadContract up to LatestContract → enforce
 //     strictly: the packager stamped compliance, so a reserved global-flag
-//     shadow is a hard error.
+//     shadow is a hard error, and so is, from ChangedFilesContract, an input
+//     binding source the planner does not resolve.
 //   - contract absent (0) or below RequiredLoadContract → hard error naming
 //     the fix. The stamp is what proves an extension speaks the contracts its
 //     manifest relies on — the four that move together at 3 (task contract
@@ -100,6 +101,13 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 		if diags := ValidateNoReservedFlagShadows(&m); diag.HasErrors(diags) {
 			return nil, fmt.Errorf("extension manifest %s has reserved global flag shadows: %s", path, formatDiagnostics(diags))
 		}
+		// From ChangedFilesContract, every input binding names a source the
+		// planner resolves.
+		if m.CLIContract >= protocolcli.ChangedFilesContract {
+			if diags := validateManifestBindingSources(&m); diag.HasErrors(diags) {
+				return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+			}
+		}
 		return &m, nil
 	case !DeclaresContractSurface(&m):
 		// Hook-only: nothing the contract governs, and nothing the packager
@@ -112,6 +120,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.ChangedFilesContract:
+			reason = " for a step that reads the run's changed files"
 		case required == protocolcli.DefaultPositionalsContract:
 			reason = " for a default subcommand that takes positionals"
 		case required == protocolcli.InputSelectorsContract:

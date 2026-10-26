@@ -176,6 +176,13 @@ var ValidOutputDriftPolicies = []string{
 // OutputDriftFail it is also the failed task's error code.
 const OutputDriftDiagnosticCode = "generated-output-drift"
 
+// HostUnsupportedFailureCode is the error code of a failed task result that
+// reports this host cannot run the task at all, such as a race detector run
+// without the C compiler it needs. The verdict describes the host, not the
+// task's inputs: the engine never records it for failure replay, and the next
+// run at the same key executes the task again.
+const HostUnsupportedFailureCode = "host-unsupported"
+
 // IsValidOutputDriftPolicy reports whether value is part of the closed drift
 // vocabulary.
 func IsValidOutputDriftPolicy(value string) bool {

@@ -293,10 +293,11 @@ type JobDefinition struct {
 	// TraitsDeclared is set when the manifest declared the command's traits.
 	// ApplyVocabularyTraits leaves such a job alone.
 	TraitsDeclared bool
-	// BoundParams are literal `with: {value: ...}` bindings materialized for
-	// this expanded pipeline step. They are task-local inputs, not command
-	// defaults: execution overlays them after every shared command/config layer
-	// so one step's binding cannot leak to, or be overridden by, a sibling.
+	// BoundParams are literal `with: {value: ...}` bindings and resolved
+	// `with: {from: context, ...}` bindings materialized for this expanded
+	// pipeline step. They are task-local inputs, not command defaults:
+	// execution overlays them after every shared command/config layer so one
+	// step's binding cannot leak to, or be overridden by, a sibling.
 	BoundParams map[string]any
 	// ContractDigest is the canonical task-contract digest
 	// (proto.TaskContractDigest) of the manifest task this job executes,

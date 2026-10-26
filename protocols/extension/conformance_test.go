@@ -438,6 +438,10 @@ var lifecycleInvalidFixtureCodes = map[string][]string{
 	"finalizer-producer-without-invocation-output.json": {"finalizer-producer-without-invocation-output"},
 	// Neither task ports nor command outputs may export a finalizer result.
 	"finalizer-result-exports.json": {"finalizer-export", "finalizer-export"},
+	// A binding reads only the one planner fact the CLI resolves: an unknown
+	// context path, the `command` source and a path without a source would
+	// each reach the task as no value.
+	"binding-unresolvable.json": {"unresolvable-binding", "unresolvable-binding", "unresolvable-binding"},
 }
 
 // TestConformance_FixtureProtocolVersions pins that adding the v3 vocabulary did

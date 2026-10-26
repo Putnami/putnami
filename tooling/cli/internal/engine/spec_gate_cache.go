@@ -191,7 +191,7 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 		disabledJobs, disabledExtensions = source.req.Config.Disable.Jobs, source.req.Config.Disable.Extensions
 	}
 	planned, err := planner.Plan(source.ws, commands, candidates, source.extensions,
-		source.req.CommandParams, disabledJobs, disabledExtensions)
+		source.req.CommandParams, disabledJobs, disabledExtensions, nil)
 	if err != nil {
 		return source.unconsultedAll(candidates, unconsultedCause{
 			fmt.Sprintf("their test plan could not be derived: %v", err), features.UnconsultedPlanFailed})

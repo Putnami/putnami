@@ -117,6 +117,7 @@ func planCLIValidationCadence(t *testing.T, commandParams extension.ParamMap) []
 		commandParams,
 		nil,
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("plan CLI validation cadence: %v", err)

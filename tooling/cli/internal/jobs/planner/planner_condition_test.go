@@ -161,7 +161,7 @@ func planGoProject(
 	}
 	ws := testWorkspace(root, project)
 	planned, err := Plan(ws, commands, []*workspace.Project{project},
-		[]*extension.ExtensionDescription{ext}, nil, nil, nil)
+		[]*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan(%v, type=%s, options=%s): %v", commands, projectType, options, err)
 	}
@@ -221,7 +221,7 @@ func planGoWorkload(
 	}
 	project.Publish = project.Config.Publish
 	ws := testWorkspace(root, project)
-	return Plan(ws, commands, []*workspace.Project{project}, extensions, nil, nil, nil)
+	return Plan(ws, commands, []*workspace.Project{project}, extensions, nil, nil, nil, nil)
 }
 
 // plannedSteps lists the step ids one extension planned for one command.
