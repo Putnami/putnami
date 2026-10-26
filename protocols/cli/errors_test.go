@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestExitCodeForError(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "errors-classify-to-exit-codes")
 	cases := []struct {
 		name string
 		err  error
@@ -35,6 +38,7 @@ func TestExitCodeForError(t *testing.T) {
 }
 
 func TestErrorCode(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "errors-classify-to-exit-codes")
 	cases := []struct {
 		err  error
 		want string
@@ -56,6 +60,7 @@ func TestErrorCode(t *testing.T) {
 // TestClassifyPreservesMessage checks that classification is invisible to the
 // message while still matching errors.Is against every class.
 func TestClassifyPreservesMessage(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "errors-classify-to-exit-codes")
 	err := Classify(errors.New("no template named quickstart"), ErrNotFound, ErrUsage)
 	if err.Error() != "no template named quickstart" {
 		t.Errorf("Error() = %q, want the original message", err.Error())
@@ -72,6 +77,7 @@ func TestClassifyPreservesMessage(t *testing.T) {
 }
 
 func TestClassifyNil(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "errors-classify-to-exit-codes")
 	if got := Classify(nil, ErrUsage); got != nil {
 		t.Errorf("Classify(nil) = %v, want nil", got)
 	}
@@ -80,6 +86,7 @@ func TestClassifyNil(t *testing.T) {
 // TestWithNextNilSafe verifies WithNext returns nil for a nil error and
 // SuggestedNext returns "" for a nil error.
 func TestWithNextNilSafe(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-innermost-suggested-next-wins")
 	if got := WithNext(nil, "putnami workspace init"); got != nil {
 		t.Errorf("WithNext(nil) = %v, want nil", got)
 	}
@@ -91,6 +98,7 @@ func TestWithNextNilSafe(t *testing.T) {
 // TestSuggestedNextNoneWhenAbsent verifies SuggestedNext returns "" for an
 // error that carries no suggestion, including a classified one.
 func TestSuggestedNextNoneWhenAbsent(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-innermost-suggested-next-wins")
 	if got := SuggestedNext(errors.New("boom")); got != "" {
 		t.Errorf("SuggestedNext(plain) = %q, want \"\"", got)
 	}
@@ -102,6 +110,7 @@ func TestSuggestedNextNoneWhenAbsent(t *testing.T) {
 // TestWithNextPreservesMessage verifies the suggestion is invisible to the
 // presented message.
 func TestWithNextPreservesMessage(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-innermost-suggested-next-wins")
 	err := WithNext(errors.New("no workspace found"), "putnami workspace init")
 	if err.Error() != "no workspace found" {
 		t.Errorf("Error() = %q, want the original message", err.Error())
@@ -115,6 +124,7 @@ func TestWithNextPreservesMessage(t *testing.T) {
 // either nesting order: the suggestion is readable and errors.Is against the
 // underlying class still matches (the carrier is transparent to Unwrap).
 func TestWithNextComposesWithClassify(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-innermost-suggested-next-wins")
 	// WithNext(Classify(...)) — suggestion outermost, class beneath.
 	outer := WithNext(Usagef("no workspace"), "putnami workspace init")
 	if !errors.Is(outer, ErrUsage) {
@@ -144,6 +154,7 @@ func TestWithNextComposesWithClassify(t *testing.T) {
 // TestWithNextInnermostWins verifies SuggestedNext returns the first suggestion
 // encountered when the chain carries more than one.
 func TestWithNextInnermostWins(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-innermost-suggested-next-wins")
 	err := WithNext(WithNext(errors.New("boom"), "putnami inner"), "putnami outer")
 	// errors.As finds the outermost matching value first.
 	if got := SuggestedNext(err); got != "putnami outer" {
@@ -155,6 +166,7 @@ func TestWithNextInnermostWins(t *testing.T) {
 // never wraps, so it neither shadows an inner suggestion nor registers a
 // carrier of its own.
 func TestWithNextEmptyDoesNotShadow(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-innermost-suggested-next-wins")
 	// An empty outer suggestion must not hide the inner one.
 	err := WithNext(WithNext(errors.New("boom"), "putnami login"), "")
 	if got := SuggestedNext(err); got != "putnami login" {
@@ -174,6 +186,7 @@ func TestWithNextEmptyDoesNotShadow(t *testing.T) {
 // A signal-classified error must carry 130, not the 1 of a genuine failure: an
 // interrupted run's envelope has to agree with the code the process returns.
 func TestExitCodeForError_Signal(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "errors-classify-to-exit-codes")
 	err := Classify(errors.New("session interrupted by user"), ErrSignal)
 	if got := ExitCodeForError(err); got != ExitSignal {
 		t.Errorf("ExitCodeForError = %d, want %d (ExitSignal)", got, ExitSignal)
@@ -192,6 +205,7 @@ func TestExitCodeForError_Signal(t *testing.T) {
 // decision 2) — while the exit code, the thing a consumer acts on, is the same
 // 130 in both.
 func TestNewResultV2_SignalCarriesExitCode130(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "errors-classify-to-exit-codes")
 	r := NewResultV2("build", nil, Classify(errors.New("session interrupted by user"), ErrSignal))
 	if r.ExitCode != ExitSignal {
 		t.Errorf("ResultV2.ExitCode = %d, want %d", r.ExitCode, ExitSignal)

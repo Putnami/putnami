@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The runner environment and the run's CPU balance.
@@ -85,6 +87,7 @@ func sessionFileWithEnvironment() SessionFile {
 // TestSessionEnvironmentRoundTrip pins the whole block through the wire: every
 // member survives marshal/unmarshal, and the document validates.
 func TestSessionEnvironmentRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	want := sessionFileWithEnvironment()
 	data, err := json.Marshal(want)
 	if err != nil {
@@ -107,6 +110,7 @@ func TestSessionEnvironmentRoundTrip(t *testing.T) {
 // producer wrote, and it
 // still validates.
 func TestSessionEnvironmentIsAdditive(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment = nil
 	file.Run.CPU = nil
@@ -130,6 +134,7 @@ func TestSessionEnvironmentIsAdditive(t *testing.T) {
 // read as "measured: never throttled" for a machine that cannot throttle at
 // all, which is a false measurement, not a conservative one.
 func TestSessionEnvironmentDegradesToAbsence(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment = &SessionEnvironment{
 		OS:          "darwin",
@@ -166,6 +171,7 @@ func TestSessionEnvironmentDegradesToAbsence(t *testing.T) {
 // memory measurement: a zero closing gauge, lifetime peak, composition, event
 // delta or PSI delta is evidence, not absence.
 func TestSessionMemoryMeasuredZeros(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.CgroupMemory.Closing = CgroupMemoryClosing{
 		CurrentBytes: 0,
@@ -196,6 +202,7 @@ func TestSessionMemoryMeasuredZeros(t *testing.T) {
 // peak, while rejecting v2 composition and events. In particular, v1 failcnt
 // is not an OOM/high event under a new spelling.
 func TestCgroupV1MemoryKeepsOnlyExactFacts(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.MemoryCapacity.CgroupLimit.Source = CgroupMemoryV1
 	file.Environment.CgroupMemory = &CgroupMemory{
@@ -234,6 +241,7 @@ func TestCgroupV1MemoryKeepsOnlyExactFacts(t *testing.T) {
 // TestMemoryCapacityPinsItsProvenance keeps effectiveBytes tied to the smaller
 // measured stable bound and to the source that supplied it.
 func TestMemoryCapacityPinsItsProvenance(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.MemoryCapacity.EffectiveBytes = file.Environment.MemoryCapacity.PhysicalBytes
 	file.Environment.MemoryCapacity.EffectiveSource = MemoryCapacityPhysical
@@ -248,6 +256,7 @@ func TestMemoryCapacityPinsItsProvenance(t *testing.T) {
 }
 
 func TestMemorySubsetsStayInternallyConsistent(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.CgroupMemory.Closing.Composition = &CgroupMemoryComposition{
 		AnonBytes: 1024, FileBytes: 128, ShmemBytes: 256,
@@ -273,6 +282,7 @@ func TestMemorySubsetsStayInternallyConsistent(t *testing.T) {
 // accepting it would let an unlimited cgroup masquerade as a fully-throttled
 // one in every allocation figure derived from it.
 func TestCgroupQuotaAbsenceMeansUnlimited(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.CgroupCPU.QuotaUs = 0
 	file.Run.CPU.AllocatedSource = CPUAllocationLogicalCPUs
@@ -311,6 +321,7 @@ func TestCgroupQuotaAbsenceMeansUnlimited(t *testing.T) {
 // from quota starvation — and an omitempty member could not state it. Presence
 // of the object carries "this was read"; the zeros inside carry the result.
 func TestThrottleZeroIsAMeasurement(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.CgroupCPU.Throttle = &CgroupThrottle{Periods: 35}
 	data, err := json.Marshal(file)
@@ -329,6 +340,7 @@ func TestThrottleZeroIsAMeasurement(t *testing.T) {
 // run's OWN durationMs. Two numbers stated against different walls make every
 // utilization ratio derived from them wrong, so the validator ties them.
 func TestRunCPUBudgetTiesToTheRunWall(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Run.CPU.AllocatedMs = 28001
 	data, err := json.Marshal(file)
@@ -346,6 +358,7 @@ func TestRunCPUBudgetTiesToTheRunWall(t *testing.T) {
 // allocated × wall over short bursts. Clamping actualMs to the budget would
 // hide exactly the oversubscription this block exists to expose.
 func TestRunCPUMayExceedItsAllocation(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Run.CPU.ActualMs = file.Run.CPU.AllocatedMs + 5000
 	data, err := json.Marshal(file)
@@ -362,6 +375,7 @@ func TestRunCPUMayExceedItsAllocation(t *testing.T) {
 // mismatched samples would publish a steal share above 100%, which is a
 // producer bug the contract catches rather than a runner fact.
 func TestHostCPUSharesStayWithinTheirWindow(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "environment-facts-are-exact-or-absent")
 	file := sessionFileWithEnvironment()
 	file.Environment.HostCPU = &HostCPUTime{StealTicks: 900, IOWaitTicks: 500, TotalTicks: 404}
 	data, err := json.Marshal(file)

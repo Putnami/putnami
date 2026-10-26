@@ -8,11 +8,15 @@ require (
 	go.putnami.dev/protocol/distribution v0.0.0
 )
 
+replace go.putnami.dev/protocol/capabilities => ../capabilities
+
 replace go.putnami.dev/protocol/cli => ../cli
 
 replace go.putnami.dev/protocol/diagnostic => ../diagnostic
 
 replace go.putnami.dev/protocol/distribution => ../distribution
+
+replace go.putnami.dev/protocol/features => ../features
 
 // The v0.1 series predates the open-source cut: its sources will not exist in
 // the public repository, whose history starts at the v0.2.0 initial commit.

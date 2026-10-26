@@ -6,6 +6,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The subscriber evidence document has three representations that must move
@@ -14,6 +16,7 @@ import (
 // both runtimes, and both check their member sets against the schema.
 
 func TestSessionSubscribersSharedCorpus(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "subscriber-evidence-passes-its-corpus")
 	data, err := os.ReadFile("conformance/session-subscribers.json")
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +49,7 @@ func TestSessionSubscribersSharedCorpus(t *testing.T) {
 }
 
 func TestSessionSubscribersSchemaDrift(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "subscriber-evidence-passes-its-corpus")
 	data, err := os.ReadFile("schemas/session-subscribers.json")
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +119,7 @@ func TestSessionSubscribersSchemaDrift(t *testing.T) {
 // TestNewSessionSubscriberEvidenceClassifiesAndValidates pins the one
 // classification every producer uses, and proves its output always validates.
 func TestNewSessionSubscriberEvidenceClassifiesAndValidates(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "subscriber-evidence-passes-its-corpus")
 	stream := SessionStreamPosition{Offset: 900, Records: 3}
 	for _, c := range []struct {
 		name  string

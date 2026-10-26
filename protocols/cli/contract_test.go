@@ -1,12 +1,17 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 // TestCurrentContract_Pinned keeps the contract version intentional: bumping it
 // requires updating this test, the changelog block on the constant, and — since
 // contract 3 replaced adaptation with rejection — shipping the migration that
 // moves an extension onto the new contract.
 func TestCurrentContract_Pinned(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "the-extension-contract-only-moves-forward")
 	if CurrentContract != 4 {
 		t.Fatalf("CurrentContract = %d, want 4 — a bump must ship the migration for contract N-1 and update the changelog on the constant", CurrentContract)
 	}
@@ -16,6 +21,7 @@ func TestCurrentContract_Pinned(t *testing.T) {
 // for manifests without a cliContract field (the pre-registry world), so the
 // constant can never regress to it.
 func TestCurrentContract_OnlyMovesForward(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "the-extension-contract-only-moves-forward")
 	if CurrentContract < 1 {
 		t.Fatalf("CurrentContract = %d; the contract version only moves forward (>= 1)", CurrentContract)
 	}
@@ -24,6 +30,7 @@ func TestCurrentContract_OnlyMovesForward(t *testing.T) {
 // The additive rungs leave the base stamp unchanged; a reader before each
 // rung rejects only manifests that declare that rung's vocabulary.
 func TestAdditiveContractsAreOrdered(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "the-extension-contract-only-moves-forward")
 	if AgentContentContract != 5 {
 		t.Fatalf("AgentContentContract = %d, want 5", AgentContentContract)
 	}

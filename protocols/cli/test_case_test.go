@@ -7,9 +7,12 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestBoundTestCasesDropsCasesItCannotDescribe(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
 	cases := []TestCase{
 		{Name: "TestA", Suite: "example.com/a", Status: TestCaseStatusPassed},
 		{Name: "", Suite: "example.com/a", Status: TestCaseStatusPassed},
@@ -29,6 +32,7 @@ func TestBoundTestCasesDropsCasesItCannotDescribe(t *testing.T) {
 }
 
 func TestBoundTestCasesKeepsEveryCaseWithinTheCap(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
 	cases := make([]TestCase, TestCaseMaxPerTask)
 	for i := range cases {
 		cases[i] = TestCase{Name: fmt.Sprintf("Test%04d", i), Suite: "example.com/a", Status: TestCaseStatusPassed}
@@ -48,6 +52,7 @@ func TestBoundTestCasesKeepsEveryCaseWithinTheCap(t *testing.T) {
 }
 
 func TestBoundTestCasesKeepsFailedThenSkippedThenPassedInRunnerOrder(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
 	cases := make([]TestCase, 0, 1207)
 	failedAt := map[int]bool{3: true, 250: true, 700: true, 1100: true, 1204: true}
 	skippedAt := map[int]bool{10: true, 1150: true}
@@ -87,6 +92,7 @@ func TestBoundTestCasesKeepsFailedThenSkippedThenPassedInRunnerOrder(t *testing.
 }
 
 func TestBoundTestCasesRemovesPassedOutputAndOrphanMembers(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
 	kept, dropped := BoundTestCases([]TestCase{
 		{Name: "TestPass", Suite: "example.com/a", Status: TestCaseStatusPassed, DurationMs: -5, Output: "ok", OutputTruncated: true, File: "a_test.go", Line: 3},
 		{Name: "TestFail", Suite: "example.com/a", Status: TestCaseStatusFailed, OutputTruncated: true, Line: 9},
@@ -106,6 +112,7 @@ func TestBoundTestCasesRemovesPassedOutputAndOrphanMembers(t *testing.T) {
 }
 
 func TestBoundTestCasesCutsTextOnCodePoints(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "text-is-cut-on-code-points")
 	long := strings.Repeat("é", TestCaseMaxTextBytes) // two bytes each
 	kept, _ := BoundTestCases([]TestCase{{Name: "x" + long, Suite: long, File: long, Status: TestCaseStatusPassed}})
 	if len(kept) != 1 {
@@ -122,6 +129,7 @@ func TestBoundTestCasesCutsTextOnCodePoints(t *testing.T) {
 }
 
 func TestBoundTestCasesRepairsInvalidUTF8(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "text-is-cut-on-code-points")
 	kept, dropped := BoundTestCases([]TestCase{{
 		Name:   "Test\xffBad",
 		Suite:  "example.com/\xfe",
@@ -140,6 +148,7 @@ func TestBoundTestCasesRepairsInvalidUTF8(t *testing.T) {
 }
 
 func TestTruncateTestCaseOutputKeepsHeadAndTailOnCodePoints(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "text-is-cut-on-code-points")
 	if got, truncated := TruncateTestCaseOutput("short"); got != "short" || truncated {
 		t.Errorf("short output = %q, %v; want unchanged", got, truncated)
 	}
@@ -176,6 +185,7 @@ func TestTruncateTestCaseOutputKeepsHeadAndTailOnCodePoints(t *testing.T) {
 // Every cut lands on a code point boundary and keeps the longest prefix or
 // suffix within the limit, whatever the limit.
 func TestUTF8CutsKeepTheLongestWholeCodePoints(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "text-is-cut-on-code-points")
 	s := "a€😀é"
 	for limit := 0; limit <= len(s)+1; limit++ {
 		prefix, suffix := truncateUTF8(s, limit), lastUTF8(s, limit)
@@ -200,6 +210,7 @@ func TestUTF8CutsKeepTheLongestWholeCodePoints(t *testing.T) {
 }
 
 func TestTruncateTestCaseOutputStaysBoundedThroughSanitization(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "truncation-stays-bounded-and-redacts")
 	// Sanitization turns each one-byte control into a three-byte U+FFFD, so an
 	// output bounded before sanitization would outgrow the bound after it.
 	output := strings.Repeat("\x00", TestCaseMaxOutputBytes)
@@ -213,6 +224,7 @@ func TestTruncateTestCaseOutputStaysBoundedThroughSanitization(t *testing.T) {
 }
 
 func TestTruncateTestCaseOutputRedactsASecretTheCutWouldSplit(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "truncation-stays-bounded-and-redacts")
 	secret := "gh" + "p_" + strings.Repeat("a", 40)
 	// The head keeps the first 1024 bytes, so the cut falls inside the token.
 	output := strings.Repeat("x", testCaseOutputHeadBytes-10) + secret + strings.Repeat("y", TestCaseMaxOutputBytes)
@@ -226,6 +238,7 @@ func TestTruncateTestCaseOutputRedactsASecretTheCutWouldSplit(t *testing.T) {
 // validators: every case BoundTestCases keeps, once the CLI sanitizes its
 // record, is a valid test:case record.
 func TestBoundTestCasesOutputValidatesAsRecords(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "bounded-cases-validate-as-records")
 	long := strings.Repeat("\x01é€", TestCaseMaxOutputBytes)
 	kept, _ := BoundTestCases([]TestCase{
 		{Name: "TestPass", Suite: "example.com/a", Status: TestCaseStatusPassed, Output: "ok", OutputTruncated: true, Line: 4},
@@ -273,6 +286,7 @@ func TestBoundTestCasesOutputValidatesAsRecords(t *testing.T) {
 // maxLength: a two-byte character at the bound is accepted and one more byte is
 // rejected, on each bounded member.
 func TestValidateDocumentEnforcesTestCaseByteBounds(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "bounded-cases-validate-as-records")
 	bounds := map[string]int{
 		"name":   TestCaseMaxTextBytes,
 		"suite":  TestCaseMaxTextBytes,
@@ -334,6 +348,7 @@ func testCaseNames(cases []TestCase) []string {
 }
 
 func TestBoundTestCasesWithinKeepsFailedCasesInsideTheByteBudget(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "byte-budgets-hold-per-task-and-batch")
 	failed := func(name string) TestCase {
 		return TestCase{Name: name, Suite: "example.com/a", Status: TestCaseStatusFailed, Output: strings.Repeat("x", 3000)}
 	}
@@ -360,6 +375,7 @@ func TestBoundTestCasesWithinKeepsFailedCasesInsideTheByteBudget(t *testing.T) {
 }
 
 func TestBoundTestCasesWithinNeverExceedsTheTaskBudget(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "byte-budgets-hold-per-task-and-batch")
 	cases := make([]TestCase, 0, 400)
 	for i := range 400 {
 		cases = append(cases, TestCase{
@@ -379,6 +395,7 @@ func TestBoundTestCasesWithinNeverExceedsTheTaskBudget(t *testing.T) {
 }
 
 func TestTestCaseBatchMemberBytesSharesTheBatchBudget(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "byte-budgets-hold-per-task-and-batch")
 	for _, tc := range []struct {
 		members int
 		want    int

@@ -1,6 +1,10 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 // conventionalCase is one message and what ParseConventionalCommit reads in
 // it. A case with ok false expects the zero commit.
@@ -26,6 +30,7 @@ func runConventionalCases(t *testing.T, cases []conventionalCase) {
 
 // The subject gives the type, the scope and the "!" marker.
 func TestParseConventionalCommitReadsTheSubject(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "a-commit-is-read-one-way", "subjects-and-footers-are-read")
 	t.Parallel()
 	runConventionalCases(t, []conventionalCase{
 		{name: "plain type", subject: "feat: add", want: ConventionalCommit{Type: "feat"}, ok: true},
@@ -44,6 +49,7 @@ func TestParseConventionalCommitReadsTheSubject(t *testing.T) {
 // The body declares a breaking change with a footer line. The token is
 // uppercase, and the hyphenated form is its synonym.
 func TestParseConventionalCommitReadsTheBreakingFooter(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "a-commit-is-read-one-way", "subjects-and-footers-are-read")
 	t.Parallel()
 	runConventionalCases(t, []conventionalCase{
 		{name: "breaking footer", subject: "refactor: move", body: "why\n\nBREAKING CHANGE: the flag is gone",
@@ -74,6 +80,7 @@ func TestParseConventionalCommitReadsTheBreakingFooter(t *testing.T) {
 // A subject without the conventional shape is no conventional commit, and its
 // body declares nothing.
 func TestParseConventionalCommitRejectsOtherSubjects(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "a-commit-is-read-one-way", "subjects-and-footers-are-read")
 	t.Parallel()
 	runConventionalCases(t, []conventionalCase{
 		{name: "no colon", subject: "just a message"},
@@ -98,6 +105,7 @@ func TestParseConventionalCommitRejectsOtherSubjects(t *testing.T) {
 // footer only in the last paragraph. They are held because the version bump
 // and the API checks read them this way.
 func TestParseConventionalCommitHoldsItsReadingsOutsideTheSpecification(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "a-commit-is-read-one-way", "the-departures-from-the-specification-are-pinned")
 	t.Parallel()
 	runConventionalCases(t, []conventionalCase{
 		{name: "capitalized type", subject: "Feat: add"},

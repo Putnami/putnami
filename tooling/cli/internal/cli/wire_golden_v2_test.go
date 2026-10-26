@@ -14,6 +14,7 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -89,6 +90,7 @@ var (
 // quietly came back — or a residual branch that fired on one spelling — would
 // produce a versionless document for exactly these inputs and nothing else.
 func TestWireGoldenV2_IsTheOnlyContract(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "version-2-is-the-only-contract-the-cli-writes")
 	for _, format := range []string{"json", "jsonl"} {
 		for _, value := range []string{"", "v1", "V1 ", "v2", "latest"} {
 			t.Run(format+"/"+machine.RetiredSelectionEnv+"="+value, func(t *testing.T) {
@@ -122,6 +124,7 @@ func TestWireGoldenV2_IsTheOnlyContract(t *testing.T) {
 // deliberately inverted (the aborted fixture reported "failure" with exitCode
 // 130 in v1, and reports "aborted" with exitCode 130 here).
 func TestWireGoldenV2_OutputJSON(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-cli-machine-surfaces-validate-and-match-their-goldens")
 	t.Parallel()
 	for _, name := range []string{"mixed", "aborted"} {
 		t.Run(name, func(t *testing.T) {
@@ -138,6 +141,7 @@ func TestWireGoldenV2_OutputJSON(t *testing.T) {
 // task:event / task:end / session:end, each carrying the typed identity, with
 // the fixed budget, sanitization and artifact contract closing the stream.
 func TestWireGoldenV2_OutputJSONL(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-cli-machine-surfaces-validate-and-match-their-goldens")
 	t.Parallel()
 	for _, name := range []string{"mixed", "aborted"} {
 		t.Run(name, func(t *testing.T) {
@@ -157,6 +161,7 @@ func TestWireGoldenV2_OutputJSONL(t *testing.T) {
 // real artifact. Historical v1 session-event goldens remain reader compatibility
 // fixtures.
 func TestWireGoldenV2_SessionFiles(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-cli-machine-surfaces-validate-and-match-their-goldens")
 	t.Parallel()
 	run := loadWireRun(t, "mixed")
 
@@ -199,6 +204,7 @@ func TestWireGoldenV2_SessionFiles(t *testing.T) {
 // its first pin and the proof that the run summary is ONE type across all four
 // surfaces: these counts are byte-identical to the envelope's.
 func TestWireGoldenV2_MCPResult(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-cli-machine-surfaces-validate-and-match-their-goldens")
 	t.Parallel()
 	run := loadWireRun(t, "mixed")
 	view := machine.RunFrom(
@@ -220,6 +226,7 @@ func TestWireGoldenV2_MCPResult(t *testing.T) {
 // the v1 verdict onto the v2 shape would still produce a schema-valid document
 // and would still pass every structural check.
 func TestWireGoldenV2_EncodesTheSettledSemantics(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "version-2-is-the-only-contract-the-cli-writes")
 	t.Parallel()
 	t.Run("abort wins over failure", func(t *testing.T) {
 		run := loadWireRun(t, "aborted")

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/machine-contract",
+  "outcomes": [
+    "A script or an agent branches on one exit-code taxonomy and one versioned machine document, whatever binary it ran",
+    "A document a CLI wrote stays readable by the next one, and a document that breaks the contract fails a test instead of a consumer",
+    "Every bounded surface keeps the failures first and counts what it drops"
+  ],
+  "nonGoals": [
+    "The CLI's commands and behavior: the features of @putnami/cli own them",
+    "The TypeScript twin of the validators: @putnami/cli-protocol proves it under typescript/cli-machine-output",
+    "Producing the bounded JSONL stream by default: this module defines the wire, and the CLI producer adopts it separately"
+  ],
+  "requirements": [
+    {
+      "id": "exit-codes-and-error-classification",
+      "text": "The exit codes are 0 success, 1 failure, 2 usage, 3 auth, 4 API and 130 signal. ExitCodeForError and ErrorCode read the class of a wrapped or classified error, an unclassified error is a failure, and a signal exits 130, the code a version 2 envelope carries too. Classify keeps the message. The suggested next action of the innermost WithNext wins, and an empty one shadows nothing."
+    },
+    {
+      "id": "output-modes-and-the-result-envelope",
+      "text": "ResolveOutputMode reads text, json, jsonl and cloud-logging, reads --json as --output=json, and refuses an unknown mode and a --json that conflicts with another mode. Only json and jsonl are structured. NewResultV2 carries no error on success, maps each failure class to the contract's code and carries the suggested next action, and WriteResultV2 writes the envelope in every mode."
+    },
+    {
+      "id": "version-2-is-the-only-machine-contract",
+      "text": "Every emitted document carries protocolVersion 2, the pinned ResultProtocolVersion. The version 1 envelope is read-only: recorded success and failure documents still decode, carry no protocolVersion, and validate against the released version 1 schema. That schema has not drifted since its last release, and the recorded release artifacts stay byte for byte."
+    },
+    {
+      "id": "the-schemas-and-the-go-types-agree",
+      "text": "The version 2 schema and its Go structs declare the same members and enums, its $id equals its constant, and the validator checks every schema definition. The report, test case and machine output bounds the Go code enforces are the schema's. The retained version 1 schema matches its Go type, and the version 2 error object matches the version 1 one."
+    },
+    {
+      "id": "one-validator-and-a-shared-corpus",
+      "text": "ValidateDocument refuses an unknown kind, malformed JSON, a wrong container type, a non-integer where the contract wants an integer, and an inconsistent local cache attribution, and reports violations sorted, with index paths. Every case of the shared conformance corpus and pack, which the TypeScript twin runs too, meets its accept or reject expectation; every document kind and violation code has a case, and case ids are unique."
+    },
+    {
+      "id": "one-run-verdict-on-every-surface",
+      "text": "A task identity derives its key from its parts. RunSummary derives one verdict: a reused failure fails the run and an aborted run never succeeds, whatever its counts. The JSON envelope, the session end record, the MCP result and the session file report that same run summary type."
+    },
+    {
+      "id": "session-members-are-additive",
+      "text": "The session file's executions, environment, placement, preparation and tree members are optional: a document without them still parses, and each round-trips. An execution id resolves, a superseded execution is allowed and counts once. Placement provenance is complete or absent. Preparation phases form a closed histogram that overlaps only under parallelism. An environment fact the run could not measure is absent, and a measured zero stays zero."
+    },
+    {
+      "id": "the-report-is-a-bounded-projection",
+      "text": "report.json round-trips, and a fact the run could not measure is omitted rather than reported as zero. It keeps at most 64 jobs, 16 diagnostics per job and 1024 UTF-8 bytes per message, and the jobs it elides are counted so the totals still account for the whole run."
+    },
+    {
+      "id": "the-bounded-stream-keeps-its-promises",
+      "text": "The bounded JSONL profile has a fixed budget per mode and keeps its hard partitions in arrival order. Normal mode suppresses debug detail, every test case among it, and verbose mode admits it. Failure priority and debug detail are closed vocabularies whose classifiers agree on decoded records. Values are sanitized, and stream validation refuses raw invalid UTF-8 and an unpaired surrogate."
+    },
+    {
+      "id": "test-cases-are-bounded",
+      "text": "BoundTestCases keeps failed, then skipped, then passed cases in runner order within the cap, drops a case it cannot describe and the output of a passed one, cuts text on code points and repairs invalid UTF-8. Truncation keeps head and tail, stays bounded through sanitization and redacts a secret the cut would split. Failed cases fit the task's byte budget, a batch member shares the batch budget, and the result validates as records."
+    },
+    {
+      "id": "reserved-flags-and-the-extension-contract",
+      "text": "The reserved global-flag registry has no duplicate long or short name and hands out an independent copy. IsReservedGlobalFlag, LookupReservedGlobalFlag and ValidateNoReservedShadow agree on it, so no extension flag redefines a reserved one. CurrentContract is pinned and only moves forward, and the additive contracts above it are ordered."
+    },
+    {
+      "id": "the-command-surface-names-breaking-changes",
+      "text": "NewCommandSurface writes a sorted document and refuses a duplicate. ParseCommandSurface reads every version up to its own, reports a later one as ErrUnknownCommandSurfaceVersion, refuses an oversized document and names the same null member every time. IncompatibleCommandChanges names each change that can break an invocation, sorted and once. The corpus passes, and the schema matches the Go types."
+    },
+    {
+      "id": "a-commit-is-read-one-way",
+      "text": "ParseConventionalCommit reads a subject's type, scope and ! marker and a BREAKING CHANGE footer, and refuses any other subject. Where its reading departs from Conventional Commits 1.0.0, the departure is pinned, so the version bump, the changelog and the API checks agree on which commit is breaking."
+    },
+    {
+      "id": "the-reporting-wire",
+      "text": "The session and log reporter capabilities keep their names. Their chunk, ACK and handshake documents pass the shared corpus, the schema and its bounds; an ACK binds every identity field, and the handshake hands the run credential only in its authenticate step. The subscribers file passes its shared corpus and schema, and new subscriber evidence is classified and validated."
+    },
+    {
+      "id": "the-cli-emits-conforming-documents",
+      "text": "The CLI's --output=json envelope, its bounded JSONL stream, its two recorded session files and its MCP result each pass ValidateDocument as version 2 and match a committed golden. No value of the retired selection variable makes the CLI write another contract, and the goldens encode the strict verdict and abort precedence."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0002-cli-vnext-contracts.md"
+  ]
+}

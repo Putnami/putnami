@@ -3,6 +3,8 @@ package cli
 import (
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The cross-language corpus (conformance/manifest.json) owns the contract's
@@ -11,6 +13,7 @@ import (
 // producers use.
 
 func TestValidateDocument_UnknownKind(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-validator-refuses-malformed-documents")
 	got := ValidateDocument(DocumentKind("planFile"), []byte(`{}`))
 	want := []Violation{{Code: ViolationInvalidJSON, Path: ""}}
 	if !reflect.DeepEqual(got, want) {
@@ -19,6 +22,7 @@ func TestValidateDocument_UnknownKind(t *testing.T) {
 }
 
 func TestValidateDocument_Malformed(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-validator-refuses-malformed-documents")
 	for name, data := range map[string]string{
 		"truncated":  `{"protocolVersion":2`,
 		"bare-value": `2`,
@@ -38,6 +42,7 @@ func TestValidateDocument_Malformed(t *testing.T) {
 // every container check: an object, an array, and the open payload another
 // protocol owns.
 func TestValidateDocument_WrongContainerTypes(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-validator-refuses-malformed-documents")
 	cases := map[string]struct {
 		kind     DocumentKind
 		document string
@@ -97,6 +102,7 @@ func TestValidateDocument_WrongContainerTypes(t *testing.T) {
 // and anything fractional or beyond the safe range does not — identically in
 // both runtimes, whatever the wire encoding.
 func TestValidateDocument_IntegerRule(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-validator-refuses-malformed-documents")
 	document := func(duration string) string {
 		return `{"protocolVersion":2,"record":"session:end","time":"t","run":{"outcome":"success","exitCode":0,` +
 			`"counts":{"total":0,"succeeded":0,"failed":0,"canceled":0,"skipped":0},` +
@@ -125,6 +131,7 @@ func TestValidateDocument_IntegerRule(t *testing.T) {
 }
 
 func TestValidateDocument_LocalCacheAttribution(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-validator-refuses-malformed-documents")
 	document := func(local string) string {
 		return `{"protocolVersion":2,"record":"session:end","time":"t","run":{"outcome":"success","exitCode":0,` +
 			`"counts":{"total":1,"succeeded":1,"failed":0,"canceled":0,"skipped":0},` +
@@ -157,6 +164,7 @@ func TestValidateDocument_LocalCacheAttribution(t *testing.T) {
 // runtimes emit: by path, then by code. Without it the two could report the
 // same violations and still disagree.
 func TestValidateDocument_ViolationsAreSorted(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "violations-are-sorted-with-index-paths")
 	got := ValidateDocument(DocumentSessionPlanFile, []byte(`{"zzz":1,"protocolVersion":1,"aaa":2}`))
 	want := []Violation{
 		{Code: ViolationUnknownField, Path: "aaa"},
@@ -174,6 +182,7 @@ func TestValidateDocument_ViolationsAreSorted(t *testing.T) {
 // TestValidateDocument_IndexPaths covers the array index formatting used in
 // every nested path, including indexes above nine.
 func TestValidateDocument_IndexPaths(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "violations-are-sorted-with-index-paths")
 	commands := `["a","b","c","d","e","f","g","h","i","j","k",""]`
 	document := `{"protocolVersion":2,"sessionId":"s","commands":` + commands + `,"tasks":[]}`
 	got := ValidateDocument(DocumentSessionPlanFile, []byte(document))
@@ -184,6 +193,7 @@ func TestValidateDocument_IndexPaths(t *testing.T) {
 }
 
 func TestTaskIdentityDerivedKey(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "the-verdict-is-strict-and-abort-wins")
 	identity := TaskIdentity{
 		Key:     "/tooling/cli:build~compile",
 		Scope:   TaskScopeProject,
@@ -196,6 +206,7 @@ func TestTaskIdentityDerivedKey(t *testing.T) {
 }
 
 func TestRunSummaryDerivations(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "the-verdict-is-strict-and-abort-wins")
 	summary := RunSummary{
 		Outcome: RunOutcomeSuccess,
 		Counts:  RunCounts{Total: 4, Succeeded: 3, Canceled: 1},
@@ -230,6 +241,7 @@ func TestRunSummaryDerivations(t *testing.T) {
 // record, an MCP run_jobs result and a session file report is the same type, so
 // the four cannot drift into four vocabularies again.
 func TestResultV2SurfacesShareOneRunSummary(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "every-surface-shares-one-run-summary")
 	want := reflect.TypeOf(RunSummary{})
 	surfaces := map[string]reflect.Type{
 		"resultEnvelope.run":      reflect.TypeOf(ResultV2{}.Run).Elem(),

@@ -5,9 +5,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSessionFilePlacementRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "placement-is-complete-or-absent")
 	for _, placement := range []SessionPlacement{
 		{Requested: "local", Actual: "local"},
 		{Requested: "remote", Actual: "remote"},
@@ -38,6 +41,7 @@ func TestSessionFilePlacementRoundTrip(t *testing.T) {
 // every member present when the block is, absent as a whole otherwise, and
 // spelled exactly the way the runner contract spells its digests.
 func TestSessionPlacementProvenanceIsCompleteOrAbsent(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "placement-is-complete-or-absent")
 	digest := "sha256:" + strings.Repeat("ab", 32)
 	provenance := SessionProvenance{SourceDigest: digest, InputDigest: "sha256:" + strings.Repeat("cd", 32), Submission: strings.Repeat("ef", 16)}
 	want := sessionFileWithTree()
@@ -81,6 +85,7 @@ func TestSessionPlacementProvenanceIsCompleteOrAbsent(t *testing.T) {
 }
 
 func TestSessionFilePlacementIsOptional(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "placement-is-complete-or-absent")
 	data, err := json.Marshal(sessionFileWithTree())
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +103,7 @@ func TestSessionFilePlacementIsOptional(t *testing.T) {
 }
 
 func TestSessionPlacementEnumsMatchSchema(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-go-types-agree", "the-version-2-schema-matches-the-go-types")
 	definition := loadResultV2Schema(t).Defs["sessionPlacement"]
 	for _, member := range []string{"requested", "actual"} {
 		var property struct {
