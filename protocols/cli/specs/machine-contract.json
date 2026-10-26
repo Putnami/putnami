@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "exit-codes-and-error-classification",
-      "text": "The exit codes are 0 success, 1 failure, 2 usage, 3 auth, 4 API and 130 signal. ExitCodeForError and ErrorCode read the class of a wrapped or classified error, an unclassified error is a failure, and a signal exits 130, the code a version 2 envelope carries too. Classify keeps the message. The suggested next action of the innermost WithNext wins, and an empty one shadows nothing."
+      "text": "The exit codes are 0 success, 1 failure, 2 usage, 3 auth, 4 API and 130 signal. ExitCodeForError and ErrorCode read the class of a wrapped or classified error, an unclassified error is a failure. A signal exits 130, and a version 2 envelope carries that code with status aborted. Classify keeps the message. The suggested next action of the innermost WithNext wins, and an empty one shadows nothing."
     },
     {
       "id": "output-modes-and-the-result-envelope",
@@ -26,7 +26,7 @@
     },
     {
       "id": "the-schemas-and-the-types-agree",
-      "text": "The version 2 schema, the Go structs and the TypeScript member lists declare the same members and enums, and the schema's $id equals its constant. The validators check every schema definition. The report, test case and machine output bounds the code enforces are the schema's. The retained version 1 schema matches its Go type, and the version 2 error object matches the version 1 one."
+      "text": "The version 2 schema and the Go structs declare the same members and enums. The TypeScript member lists declare the same members, and the TypeScript test case statuses match the schema's. The schema's $id equals its constant. The validators check every schema definition. The report, test case and machine output bounds the code enforces are the schema's. The retained version 1 schema matches its Go type, and the version 2 error object matches the version 1 one."
     },
     {
       "id": "one-validator-and-a-shared-corpus",
@@ -38,7 +38,7 @@
     },
     {
       "id": "session-members-are-additive",
-      "text": "The session file's executions, environment, placement, preparation and tree members are optional: a document without them still parses, and each round-trips. An execution id resolves, a superseded execution is allowed and counts once. Placement provenance is complete or absent and leaves the tree member unchanged. Preparation phases form a closed histogram that overlaps only under parallelism. An environment fact the run could not measure is absent, and a measured zero stays zero."
+      "text": "The session file's executions, environment, placement, preparation and tree members are optional: a document without them parses, and each round-trips. An execution id resolves, a superseded execution is allowed and counts once. Placement, a remote request run locally included, leaves the tree member unchanged, and its provenance is complete or absent. Preparation phases form a closed histogram that overlaps only under parallelism. An unmeasured environment fact is absent, and a measured zero stays zero."
     },
     {
       "id": "the-report-is-a-bounded-projection",
