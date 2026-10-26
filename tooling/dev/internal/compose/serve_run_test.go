@@ -114,7 +114,8 @@ func TestClose_StopsMembersInReverseStartOrder(t *testing.T) {
 // A serve run that fails before its serve step starts — a usage error, or a
 // finite step of the serve pipeline — fails the composition as
 // compose.prepare_failed for that member, at once, with the last lines of the
-// run's output as detail and never in the message.
+// failed step's output, else of the run's output, as detail and never in the
+// message.
 func TestUp_AServeRunThatFailsBeforeItsServeStepIsPrepareFailed(t *testing.T) {
 	spectest.Proves(t, "tooling/workload-qualification", serveStreamRequirement,
 		"a-failed-preparation-is-prepare-failed-with-the-output-tail")

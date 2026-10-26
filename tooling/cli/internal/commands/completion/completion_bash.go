@@ -48,6 +48,16 @@ _putnami_takes_project() {
     esac
 }
 
+_putnami_core_root() {
+    case "$1" in
+`)
+	for _, root := range ctx.coreRoots() {
+		iox.Fprintf(w, "        %s) return 0 ;;\n", bashQuote(root))
+	}
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     case "$1" in
 `)
@@ -62,6 +72,7 @@ _putnami_completions() {
     local commands="%s"
     local structured="%s"
     local global_flags="%s"
+    local job_global_flags="%s"
     local projects="%s"
     local project_ids="%s"
     local project_basenames="%s"
@@ -76,6 +87,10 @@ _putnami_completions() {
     fi
 
     local cmd="${words[1]}"
+    # A core command takes a job-only flag only as one of its own flags.
+    if ! _putnami_core_root "${cmd}"; then
+        global_flags="${global_flags} ${job_global_flags}"
+    fi
 
     local path="${cmd}"
     local i=2
@@ -103,7 +118,8 @@ _putnami_completions() {
     fi
 `, strings.Join(allCommands, " "),
 		strings.Join(ctx.structured, " "),
-		strings.Join(ctx.globalFlagNames(), " "),
+		strings.Join(ctx.sharedGlobalFlagNames(), " "),
+		strings.Join(ctx.jobGlobalFlagNames(), " "),
 		strings.Join(ctx.projects, " "),
 		strings.Join(ctx.projectIDs, " "),
 		strings.Join(ctx.projectBasenames, " "),

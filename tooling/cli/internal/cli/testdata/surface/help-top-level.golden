@@ -91,8 +91,6 @@ Project Selection:
 Execution:
   --credential-fd <n>          Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2
   --no-cache                   Force re-execution (skip cache)
-  --continue-on-error          Don't abort on first failure
-  --dry-run                    Show changes without applying
 
 Output:
   --output <format>            Output format: text | json | jsonl | cloud-logging

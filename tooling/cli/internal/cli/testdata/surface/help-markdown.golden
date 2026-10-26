@@ -39,8 +39,6 @@ Multi-command: `putnami <command>,<command> --impacted`
 |------|-------------|
 | `--credential-fd` <n> | Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2 |
 | `--no-cache` | Force re-execution (skip cache) |
-| `--continue-on-error` | Don't abort on first failure |
-| `--dry-run` | Show changes without applying |
 
 ## Output Options
 
@@ -255,6 +253,7 @@ putnami projects sync [--prune] [--skip-install] [--dry-run]
 |------|-------------|
 | `--prune` | Drop config entries whose project directory no longer exists |
 | `--skip-install` | Do not run dependency installation after syncing |
+| `--dry-run` | Show the changes without applying them |
 
 **Examples**
 
@@ -324,7 +323,7 @@ Upgrade the CLI, extensions, templates, and framework dependencies in one comman
 **Usage**
 
 ```
-putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]
+putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run] [--continue-on-error]
 ```
 
 **Flags**
@@ -341,6 +340,7 @@ putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|ca
 | `--version` <version> | Use an exact Putnami release version |
 | `--from-source` | Build the CLI from this workspace's source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI) |
 | `--dry-run` | Resolve and print the upgrade plan without modifying files |
+| `--continue-on-error` | Run the remaining upgrade phases after one fails |
 
 **Examples**
 
@@ -728,6 +728,69 @@ putnami deps install [--tag <tags>] [--exclude-tag <tags>]
 - `putnami deps install`
 - `putnami deps install --tag go`
 
+### `putnami deps add`
+
+Add a dependency to one project's language manifest through the deps-edit job of the project's extension
+
+**Usage**
+
+```
+putnami deps add <module>[@version] [--projects <name>] [--dry-run]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Print the planned edit and change nothing |
+
+**Examples**
+
+- `putnami deps add golang.org/x/text@latest`
+- `putnami deps add golang.org/x/text@latest --projects api --dry-run`
+
+### `putnami deps remove`
+
+Remove a dependency from one project's language manifest through the deps-edit job of the project's extension
+
+**Usage**
+
+```
+putnami deps remove <module> [--projects <name>] [--dry-run]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Print the planned edit and change nothing |
+
+**Examples**
+
+- `putnami deps remove golang.org/x/text`
+- `putnami deps remove golang.org/x/text --projects api --dry-run`
+
+### `putnami deps prune`
+
+Remove the dependency edges a project declares and none of its imports uses, from the provider view the last install or build recorded
+
+**Usage**
+
+```
+putnami deps prune [--projects <name>] [--dry-run]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | List the edges to remove and change nothing |
+
+**Examples**
+
+- `putnami deps prune`
+- `putnami deps prune --projects api --dry-run`
+
 ### `putnami cache clean`
 
 Delete cached build artifacts from this repo's shared store (affects all worktrees of the repo); --all clears every repo's store
@@ -764,8 +827,20 @@ Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, te
 **Usage**
 
 ```
-putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
+putnami cache verify [--projects <selector> | --impacted | --all] [--exclude <names>] [--impacted-strict] [--profile <profile>] [--retry <n>] [--cpu-policy <policy>] [--trace-profile <path>] [--continue-on-error] [--output <format>]
 ```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--exclude` <names> | Leave these projects out of the verified runs |
+| `--impacted-strict` | Fail when the --impacted baseline can't be resolved |
+| `--profile` <profile> | Deployment profile the verified runs use: dev | test | production |
+| `--retry` <n> | Retry transient failures in the verified runs |
+| `--cpu-policy` <policy> | CPU ceiling policy: critical-path | measured |
+| `--trace-profile` <path> | Write the trace events of the last verified run (Chrome trace format) |
+| `--continue-on-error` | Don't abort a verified run on the first failure |
 
 **Examples**
 

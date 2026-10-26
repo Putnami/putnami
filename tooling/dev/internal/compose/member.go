@@ -167,9 +167,9 @@ type memberRuntime struct {
 	stepVerdict bool
 	prepareErr  string
 	// stepOutput is the log of each step that ran before the serve step
-	// started, kept only for a failures writer and dropped once the serve step
-	// started. failedOutput is the output of the step that failed the
-	// preparation: its log, diagnostics and error.
+	// started, dropped once the serve step started. failedOutput is the
+	// output of the step that failed the preparation: its log, diagnostics
+	// and error.
 	stepOutput   map[string][]string
 	failedOutput []string
 	failedStep   bool
@@ -204,9 +204,7 @@ func (rt *memberRuntime) start() error {
 	cmd.Dir = rt.root
 	cmd.Env = serveRunEnviron(os.Environ())
 	cmd.Stdin = bytes.NewReader(document)
-	if rt.failures != nil {
-		rt.stepOutput = make(map[string][]string)
-	}
+	rt.stepOutput = make(map[string][]string)
 	output := newOutputSink(rt.logs, rt.addOutput)
 	stream := &lineWriter{line: func(line []byte) { rt.observeLine(line, output) }}
 	cmd.Stdout = stream
@@ -461,10 +459,7 @@ const stepOutputLines = 50
 func (rt *memberRuntime) failureReport() string {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	lines := rt.failedOutput
-	if !rt.failedStep {
-		lines = rt.tail.snapshot()
-	}
+	lines := rt.preparationOutput()
 	var report strings.Builder
 	report.WriteString(rt.member.Project.ID + ": " + rt.prepareErr)
 	if len(lines) == 0 {
@@ -476,6 +471,17 @@ func (rt *memberRuntime) failureReport() string {
 		report.WriteString("  | " + line + "\n")
 	}
 	return report.String()
+}
+
+// preparationOutput is the output of a failed preparation: the failed step's
+// own, read from the session stream, else the tail of the run's output. The
+// step's own output is complete once its end arrived, while its stderr may
+// still be in flight. The caller holds rt.mu.
+func (rt *memberRuntime) preparationOutput() []string {
+	if rt.failedStep {
+		return append([]string(nil), rt.failedOutput...)
+	}
+	return rt.tail.snapshot()
 }
 
 // logLine is a log event as one line of output, "<level>: <message>", or ""
@@ -627,10 +633,10 @@ func (rt *memberRuntime) notReady(id string) error {
 	case <-rt.prepareFailed:
 		rt.mu.Lock()
 		message := rt.prepareErr
-		tail := rt.tail.snapshot()
+		output := lastLines(rt.preparationOutput(), maxDetailLines)
 		rt.mu.Unlock()
 		err := newError(CodePrepareFailed, id, PhasePrepare, message)
-		err.Detail = tail
+		err.Detail = output
 		return err
 	default:
 	}

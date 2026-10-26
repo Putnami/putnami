@@ -494,9 +494,6 @@ func cmdCache(env *CommandEnv) error {
 	if env.Sub == "" {
 		return missingSubcommandError("cache")
 	}
-	if env.Global.DryRun && (env.Sub == "clean" || env.Sub == "gc" || env.Sub == "verify") {
-		return usageErrorf("cache %s does not support --dry-run; remove --dry-run to run it", env.Sub)
-	}
 	switch env.Sub {
 	case "clean":
 		// `clean --all` and `gc` act on the machine-global store and need no

@@ -286,6 +286,23 @@ func (s *helpScope) flagCategories() []FlagCategory {
 	return out
 }
 
+// flagCategoriesFor is flagCategories for the help of the core command at path:
+// it also drops each global flag that command refuses
+// (commandmeta.RefusesGlobalFlag), and each job-only one it declares, which its
+// Command Flags list.
+func (s *helpScope) flagCategoriesFor(path string) []FlagCategory {
+	out := make([]FlagCategory, 0, len(allFlagCategories))
+	for _, category := range s.flagCategories() {
+		flags := slices.DeleteFunc(slices.Clone(category.Flags), func(flag FlagInfo) bool {
+			return commandmeta.RefusesGlobalFlag(path, flag.Long) || (flag.JobOnly && declaresFlag(path, flag.Long))
+		})
+		if len(flags) > 0 {
+			out = append(out, FlagCategory{Name: category.Name, Flags: flags})
+		}
+	}
+	return out
+}
+
 // aliases returns the aliases help lists: the vocabulary's whose verb a
 // loaded extension declares. The core declares no alias.
 func (s *helpScope) aliases() []commandmeta.Alias {
@@ -299,4 +316,11 @@ func (s *helpScope) aliases() []commandmeta.Alias {
 		}
 	}
 	return out
+}
+
+// declaresFlag reports whether the cataloged command at path declares the flag
+// long as its own.
+func declaresFlag(path, long string) bool {
+	declared, _ := commandmeta.ResolveFlags(path)
+	return slices.ContainsFunc(declared, func(flag commandmeta.Flag) bool { return flag.Long == long })
 }

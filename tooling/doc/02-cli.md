@@ -282,6 +282,12 @@ Use `.` when you want current-directory scope instead of the smart default.
 | `--max-parallel <mode\|n>` | Parallelism policy (`auto`, `eco`, `max`) or explicit worker count |
 | `--retry <n>` | Retry transient failures |
 
+Job commands and extension command groups read `--watch`, `--plan`,
+`--dry-run`, `--continue-on-error`, `--max-parallel` and `--retry`, among other
+job-only flags. A core command that does not declare one refuses it with a
+usage error that names the flag: `putnami projects list --dry-run` fails, while
+`putnami projects sync --dry-run` runs.
+
 ## Output modes
 
 | Flag | Format | Use case |

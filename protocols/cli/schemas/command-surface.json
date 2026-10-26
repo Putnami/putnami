@@ -23,7 +23,7 @@
           "items": {
             "$ref": "#/$defs/flag"
           },
-          "description": "The flags the CLI accepts with any command, sorted by long, longs unique."
+          "description": "The flags the CLI accepts with every job command and command group, sorted by long, longs unique. A core command accepts a global flag that only job commands and command groups read only when its own entry declares it. The document does not mark those flags."
         },
         "commands": {
           "type": "array",

@@ -1,6 +1,7 @@
 package commandmeta
 
 import (
+	"slices"
 	"sort"
 	"strings"
 )
@@ -128,8 +129,10 @@ type GlobalFlag struct {
 	// and the subcommands of command groups: no core command gives it an
 	// effect. Help and shell completion list it only where a loaded extension
 	// declares a job command or a command group, so a workspace with none, and
-	// the space outside a workspace, show no such flag. The parser still
-	// accepts it everywhere, and the full Markdown reference lists it always.
+	// the space outside a workspace, show no such flag. A core command with a
+	// known catalog path refuses it as a usage error unless the command's own
+	// entry declares the flag in Flags; an uncataloged path and the commands of
+	// extensions accept it. The full Markdown reference lists it always.
 	// False means a core command reads the flag, or help must always list it.
 	JobOnly bool
 }
@@ -540,6 +543,27 @@ func ResolveFlags(path string) ([]Flag, bool) {
 		return command.Flags, true
 	}
 	return source.Flags, true
+}
+
+// RefusesGlobalFlag reports whether the core command at path refuses the global
+// flag long: path is cataloged, the flag is JobOnly, and the command's own entry
+// does not declare it. An uncataloged path refuses nothing.
+func RefusesGlobalFlag(path, long string) bool {
+	declared, known := ResolveFlags(path)
+	if !known {
+		return false
+	}
+	var spec GlobalFlag
+	for _, flag := range globalFlags {
+		if flag.Long == long {
+			spec = flag
+			break
+		}
+	}
+	if !spec.JobOnly {
+		return false
+	}
+	return !slices.ContainsFunc(declared, func(flag Flag) bool { return flag.Long == long })
 }
 
 // Lookup returns the catalog entry for an exact invocation path.

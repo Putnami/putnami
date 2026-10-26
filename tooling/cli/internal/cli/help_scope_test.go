@@ -370,12 +370,12 @@ func TestHelpListsTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "help-and-completion-hide-the-job-flags-where-no-job-command-is-loaded")
 	jobFlags := jobOnlyFlags()
-	for _, flag := range []string{"--retry", "--max-parallel", "--impacted-strict", "--plan"} {
+	for _, flag := range []string{"--retry", "--max-parallel", "--impacted-strict", "--plan", "--dry-run", "--continue-on-error"} {
 		if !slices.Contains(jobFlags, flag) {
 			t.Errorf("the catalog does not mark %s as read by job commands only", flag)
 		}
 	}
-	for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--dry-run", "--providers", "--verbose", "--output", "--help"} {
+	for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--providers", "--verbose", "--output", "--help"} {
 		if slices.Contains(jobFlags, flag) {
 			t.Errorf("the catalog marks %s as read by job commands only, but a core command or help reads it", flag)
 		}
@@ -412,13 +412,44 @@ func TestHelpListsTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 			if got := strings.Contains(help, "--max-parallel"); got != c.listsIt {
 				t.Errorf("help text lists --max-parallel = %v, want %v", got, c.listsIt)
 			}
-			for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--dry-run", "--output", "--help"} {
+			for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--output", "--help"} {
 				if !slices.Contains(flags, flag) {
 					t.Errorf("help must always list %s", flag)
 				}
 			}
 		})
 	}
+
+	t.Run("a core command's help omits the job flags it refuses", func(t *testing.T) {
+		t.Parallel()
+		scope := declaredScope("build")
+		listed := func(path string) []string {
+			var names []string
+			for _, category := range scope.flagCategoriesFor(path) {
+				for _, flag := range category.Flags {
+					names = append(names, flag.Long)
+				}
+			}
+			return names
+		}
+		list := listed("projects list")
+		for _, flag := range []string{"--dry-run", "--continue-on-error", "--serve-env", "--max-parallel", "--watch"} {
+			if slices.Contains(list, flag) {
+				t.Errorf("help projects list lists %s, which the command refuses", flag)
+			}
+		}
+		for _, flag := range []string{"--no-cache", "--projects", "--output"} {
+			if !slices.Contains(list, flag) {
+				t.Errorf("help projects list omits %s, which the command accepts", flag)
+			}
+		}
+		if sync := listed("projects sync"); slices.Contains(sync, "--dry-run") {
+			t.Errorf("help projects sync lists --dry-run among the global options; its own Command Flags declare it")
+		}
+		if uncataloged := listed("build"); !slices.Contains(uncataloged, "--dry-run") {
+			t.Errorf("help of an uncataloged path omits --dry-run")
+		}
+	})
 
 	t.Run("the parser keeps every flag", func(t *testing.T) {
 		t.Parallel()

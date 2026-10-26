@@ -135,7 +135,8 @@ func runFakeCLI(args []string) int {
 		run.out.taskEnd(describe, protocolcli.TaskStatusSuccess, 0)
 		run.out.event(generate, map[string]any{"type": "log", "level": "debug", "message": "fixture generate debug"})
 		run.out.event(generate, map[string]any{"type": "log", "level": "error", "message": fakeCLIGenerateLog})
-		fmt.Fprintln(os.Stderr, "["+generate+"] "+fakeCLIGenerateLog)
+		// No rendered copy on stderr: stderr and stdout carry no order between
+		// them, so the failure's output must come from the session stream.
 		run.out.write(protocolcli.SessionStreamRecord{
 			Record:   protocolcli.RecordTaskEnd,
 			Identity: &protocolcli.TaskIdentity{Key: generate},

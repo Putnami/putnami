@@ -41,8 +41,10 @@ const (
 type CommandSurface struct {
 	// ProtocolVersion identifies the command-surface contract; currently 1.
 	ProtocolVersion int `json:"protocolVersion"`
-	// GlobalFlags are the flags the CLI accepts with any command, sorted by
-	// long name.
+	// GlobalFlags are the flags the CLI accepts with every job command and
+	// command group, sorted by long name. A core command accepts a global flag
+	// that only job commands and command groups read only when its own entry
+	// declares it. The document does not mark those flags.
 	GlobalFlags []CommandSurfaceFlag `json:"globalFlags"`
 	// Commands are the commands users type, sorted by path.
 	Commands []CommandSurfaceCommand `json:"commands"`

@@ -165,7 +165,45 @@
     },
     {
       "path": "cache verify",
-      "flags": [],
+      "flags": [
+        {
+          "long": "--continue-on-error",
+          "type": "bool"
+        },
+        {
+          "long": "--cpu-policy",
+          "type": "value",
+          "values": [
+            "critical-path",
+            "measured"
+          ]
+        },
+        {
+          "long": "--exclude",
+          "type": "value"
+        },
+        {
+          "long": "--impacted-strict",
+          "type": "bool"
+        },
+        {
+          "long": "--profile",
+          "type": "value",
+          "values": [
+            "dev",
+            "production",
+            "test"
+          ]
+        },
+        {
+          "long": "--retry",
+          "type": "value"
+        },
+        {
+          "long": "--trace-profile",
+          "type": "value"
+        }
+      ],
       "positionals": []
     },
     {
@@ -291,7 +329,12 @@
     },
     {
       "path": "deps add",
-      "flags": [],
+      "flags": [
+        {
+          "long": "--dry-run",
+          "type": "bool"
+        }
+      ],
       "positionals": []
     },
     {
@@ -300,8 +343,33 @@
       "positionals": []
     },
     {
+      "path": "deps prune",
+      "flags": [
+        {
+          "long": "--dry-run",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
       "path": "deps remove",
-      "flags": [],
+      "flags": [
+        {
+          "long": "--dry-run",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "deps rm",
+      "flags": [
+        {
+          "long": "--dry-run",
+          "type": "bool"
+        }
+      ],
       "positionals": []
     },
     {
@@ -576,6 +644,10 @@
       "path": "projects sync",
       "flags": [
         {
+          "long": "--dry-run",
+          "type": "bool"
+        },
+        {
           "long": "--prune",
           "type": "bool"
         },
@@ -837,6 +909,10 @@
         },
         {
           "long": "--cli",
+          "type": "bool"
+        },
+        {
+          "long": "--continue-on-error",
           "type": "bool"
         },
         {

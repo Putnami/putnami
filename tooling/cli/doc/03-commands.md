@@ -878,13 +878,16 @@ Build-cache data lives in the machine-global per-repo store at `~/.putnami/store
 of `putnami.ci.json` in its order, or those of the CI protocol's default
 document (`lint`, `test` and `build`) without one, in
 detached temporary worktrees and isolated stores. It requires a clean worktree
-and supports the ordinary project-selection flags plus structured output. See
+and supports the ordinary project-selection flags plus structured output. It
+also takes the flags that still shape its runs: `--exclude`,
+`--impacted-strict`, `--profile`, `--retry`, `--cpu-policy`,
+`--trace-profile` (the trace of the last verified run) and
+`--continue-on-error`. See
 [Cache Determinism Verification](10-caching.md#cache-determinism-verification)
 for its checks and `.gen` classification rules.
 
 Cache subcommands do not support `--dry-run`. Passing it returns a usage error
-before any store is mutated, extension cache hook is invoked, or verification
-worktree is created.
+at parse time.
 
 To share the cache across machines and CI, see the [Remote Build Cache](10-caching.md#remote-build-cache). The cache provider extension owns its configuration.
 
@@ -1305,9 +1308,20 @@ gives meaning: `--where` without a runner provider, `--providers` without a
 credential provider, and `--cache-trust` without a cache provider. Outside a
 workspace no extension is loaded, so it lists none of them. It hides no
 provider flag when an extension of the workspace does not load. The man page,
-the Markdown reference and shell completion list the same flags, and the
-parser accepts every flag. `--credential-fd` is always listed, because a
-hosted launcher reads it from the help of the pinned CLI.
+the Markdown reference and shell completion list the same flags.
+`--credential-fd` is always listed, because a hosted launcher reads it from the
+help of the pinned CLI.
+
+A core command refuses a flag that only extension commands read, unless its own
+entry declares the flag. `putnami projects list --dry-run` and
+`putnami projects list --serve-env -` fail with a usage error that names the
+flag and the command, because `projects list` reads neither, and
+`putnami help projects list` does not list them. The commands that read
+`--dry-run` or `--continue-on-error` declare them: `projects sync`,
+`deps add`, `deps remove`, `deps prune` and `upgrade` take `--dry-run`,
+`upgrade` and `cache verify` take `--continue-on-error`, and `doctor` takes
+`--profile`. Job commands and extension command groups accept every flag.
+With `--help`, the command prints its help instead of refusing the flag.
 
 `putnami help` also documents the smart default selection: with no target, a
 feature branch runs `--impacted` against the trunk, while `main`/`master` uses a

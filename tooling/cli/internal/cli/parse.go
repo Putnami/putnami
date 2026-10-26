@@ -262,11 +262,14 @@ func firstPositionalArg(args []string) string {
 
 // validateStructuredFlags is the hard-rejection half of the strictness policy:
 // a built-in structured command whose exact catalog path is known accepts only
-// its declared flags plus the CLI-wide globals. An unknown path stays lenient —
-// see commandmeta.ResolveFlags for why. Any built-in path, known or not, rejects
-// a bare "--": a payload it does not read must not reach a handler that would
-// take a token for its own flag.
-func validateStructuredFlags(root, sub string, rawArgs []string) error {
+// its declared flags plus the CLI-wide globals, and refuses a job-only global
+// (commandmeta.GlobalFlag.JobOnly) that its own entry does not declare: no core
+// command reads it, so accepting it would do nothing. supplied holds the long
+// spelling of each global flag the global pass bound, which rawArgs no longer
+// carries. An unknown path stays lenient — see commandmeta.ResolveFlags for
+// why. Any built-in path, known or not, rejects a bare "--": a payload it does
+// not read must not reach a handler that would take a token for its own flag.
+func validateStructuredFlags(root, sub string, rawArgs, supplied []string) error {
 	path := commandmeta.CanonicalPath(root, sub)
 	if passthroughCut(rawArgs) < len(rawArgs) {
 		return usageErrorf("`putnami %s` takes no arguments after --", strings.TrimSpace(root+" "+sub))
@@ -294,6 +297,14 @@ func validateStructuredFlags(root, sub string, rawArgs []string) error {
 		}
 		return usageErrorf("unknown flag %s for `putnami %s`%s\n  Run `putnami help %s` for the accepted flags.",
 			spelling, path, acceptedFlagHint(declared), path)
+	}
+
+	for _, long := range supplied {
+		if !commandmeta.RefusesGlobalFlag(path, long) {
+			continue
+		}
+		return usageErrorf("`putnami %s` does not take %s: job commands, and the core commands whose help lists it, read it%s\n  Run `putnami help %s` for the accepted flags.",
+			path, long, acceptedFlagHint(declared), path)
 	}
 	return nil
 }

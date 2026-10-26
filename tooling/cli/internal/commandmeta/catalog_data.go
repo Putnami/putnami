@@ -119,6 +119,7 @@ var catalog = []Command{
 		Flags: []Flag{
 			{Long: "--prune", Description: "Drop config entries whose project directory no longer exists"},
 			{Long: "--skip-install", Description: "Do not run dependency installation after syncing"},
+			{Long: "--dry-run", Description: "Show the changes without applying them"},
 		},
 		Examples: []string{
 			"putnami projects sync",
@@ -208,7 +209,7 @@ var catalog = []Command{
 		Category:    "Workspace",
 		Summary:     "Upgrade CLI, extensions, and dependencies",
 		Description: "Upgrade the CLI, extensions, templates, and framework dependencies in one command; a channel resolves on each ecosystem's own registry",
-		Usage:       "putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]",
+		Usage:       "putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run] [--continue-on-error]",
 		Flags: []Flag{
 			{Long: "--global", Short: "-g", Description: "Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g)"},
 			{Long: "--cli", Description: "Only upgrade the CLI binary"},
@@ -220,6 +221,7 @@ var catalog = []Command{
 			{Long: "--version", Type: FlagValue, ValueName: "<version>", Description: "Use an exact Putnami release version"},
 			{Long: "--from-source", Description: "Build the CLI from this workspace's source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI)"},
 			{Long: "--dry-run", Description: "Resolve and print the upgrade plan without modifying files"},
+			{Long: "--continue-on-error", Description: "Run the remaining upgrade phases after one fails"},
 		},
 		Examples: []string{
 			"putnami upgrade",
@@ -639,23 +641,60 @@ var catalog = []Command{
 		Related:   []string{"extensions install", "upgrade"},
 		Workspace: requiredWorkspace(),
 	},
-	// `deps add` and `deps remove` are dispatcher paths (cmdDeps) that carry no
-	// help of their own. They are cataloged without a Description so shell
-	// completion keeps offering them — before A1b they lived only in
-	// completion's hand-maintained subcommand map — while the man/Markdown
-	// reference, which renders documented paths, stays unchanged. Writing their
-	// help is a documentation change, not a completion change, so it is not this
-	// slice's; internal/commands' completionSubcommandsWithoutHelp records the
-	// gap until then.
 	{
-		Path:      "deps add",
-		Kind:      KindStructured,
+		Path:        "deps add",
+		Kind:        KindStructured,
+		Summary:     "Add a dependency to a project",
+		Description: "Add a dependency to one project's language manifest through the deps-edit job of the project's extension",
+		Usage:       "putnami deps add <module>[@version] [--projects <name>] [--dry-run]",
+		Flags: []Flag{
+			{Long: "--dry-run", Description: "Print the planned edit and change nothing"},
+		},
+		Examples: []string{
+			"putnami deps add golang.org/x/text@latest",
+			"putnami deps add golang.org/x/text@latest --projects api --dry-run",
+		},
+		Related:   []string{"deps install"},
 		Workspace: requiredWorkspace(),
 	},
 	{
-		Path:      "deps remove",
-		Kind:      KindStructured,
+		Path:        "deps remove",
+		Kind:        KindStructured,
+		Summary:     "Remove a dependency from a project",
+		Description: "Remove a dependency from one project's language manifest through the deps-edit job of the project's extension",
+		Usage:       "putnami deps remove <module> [--projects <name>] [--dry-run]",
+		Flags: []Flag{
+			{Long: "--dry-run", Description: "Print the planned edit and change nothing"},
+		},
+		Examples: []string{
+			"putnami deps remove golang.org/x/text",
+			"putnami deps remove golang.org/x/text --projects api --dry-run",
+		},
+		Related:   []string{"deps install"},
 		Workspace: requiredWorkspace(),
+	},
+	{
+		Path:        "deps prune",
+		Kind:        KindStructured,
+		Summary:     "Remove declared dependency edges no import backs",
+		Description: "Remove the dependency edges a project declares and none of its imports uses, from the provider view the last install or build recorded",
+		Usage:       "putnami deps prune [--projects <name>] [--dry-run]",
+		Flags: []Flag{
+			{Long: "--dry-run", Description: "List the edges to remove and change nothing"},
+		},
+		Examples: []string{
+			"putnami deps prune",
+			"putnami deps prune --projects api --dry-run",
+		},
+		Related:   []string{"deps install"},
+		Workspace: requiredWorkspace(),
+	},
+	{
+		Path:       "deps rm",
+		Kind:       KindStructured,
+		Summary:    "Same as deps remove",
+		DetailFrom: "deps remove",
+		Workspace:  requiredWorkspace(),
 	},
 	{
 		Path:    "cache",
@@ -702,7 +741,16 @@ var catalog = []Command{
 		Category:    "Dependencies",
 		Summary:     "Verify cache determinism and restore equivalence",
 		Description: "Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing",
-		Usage:       "putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]",
+		Usage:       "putnami cache verify [--projects <selector> | --impacted | --all] [--exclude <names>] [--impacted-strict] [--profile <profile>] [--retry <n>] [--cpu-policy <policy>] [--trace-profile <path>] [--continue-on-error] [--output <format>]",
+		Flags: []Flag{
+			{Long: "--exclude", Type: FlagValue, ValueName: "<names>", Description: "Leave these projects out of the verified runs"},
+			{Long: "--impacted-strict", Description: "Fail when the --impacted baseline can't be resolved"},
+			{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile the verified runs use: dev | test | production", Values: []string{"dev", "test", "production"}},
+			{Long: "--retry", Type: FlagValue, ValueName: "<n>", Description: "Retry transient failures in the verified runs"},
+			{Long: "--cpu-policy", Type: FlagValue, ValueName: "<policy>", Description: "CPU ceiling policy: critical-path | measured", Values: []string{"critical-path", "measured"}},
+			{Long: "--trace-profile", Type: FlagValue, ValueName: "<path>", Description: "Write the trace events of the last verified run (Chrome trace format)"},
+			{Long: "--continue-on-error", Description: "Don't abort a verified run on the first failure"},
+		},
 		Examples: []string{
 			"putnami cache verify --projects /my/project",
 			"putnami cache verify --all --output=jsonl",
@@ -1203,10 +1251,12 @@ func userScopeFlag(description string) Flag {
 //     a hosted launcher reads it from the pinned CLI's --help wherever that
 //     runs (launch.credentialProbe), so help must always list it.
 //   - JobOnly marks a flag that only extension commands read (job commands and
-//     the subcommands of command groups). A flag is not JobOnly
-//     when a core command reads it, directly or through the lifecycle jobs it
-//     runs (install, upgrade, deps, projects). A command that declares the flag
-//     in its own catalog entry (doctor --profile) does not make it shared.
+//     the subcommands of command groups). A core command with a known catalog
+//     path refuses a JobOnly flag unless its own entry declares it (doctor
+//     --profile, projects sync --dry-run, cache verify --exclude); a command
+//     that declares the flag does not make it shared. A flag is not JobOnly
+//     when most core commands read it, directly or through the lifecycle jobs
+//     they run.
 //   - Values enumerate what completion offers for a FlagValue flag. Leave it nil
 //     when the value is unbounded (a path, a project selector, a count): an
 //     incomplete candidate list reads as "these are the only values".
@@ -1238,7 +1288,7 @@ var globalFlags = []GlobalFlag{
 	{Long: "--no-cache", Description: "Force re-execution (skip cache)", Category: "Execution"},
 	{Long: "--no-cache-projects", Type: FlagValue, ValueName: "<list>", Description: "Force re-execution of these projects only", Category: "Execution", JobOnly: true},
 	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}, Providers: []string{cache.ProviderCommandName}, JobOnly: true},
-	{Long: "--continue-on-error", Description: "Don't abort on first failure", Category: "Execution"},
+	{Long: "--continue-on-error", Description: "Don't abort on first failure", Category: "Execution", JobOnly: true},
 	{Long: "--max-parallel", Type: FlagValue, ValueName: "<mode|n>", Description: "Parallelism: auto | eco | max | number", Category: "Execution", Values: []string{"auto", "eco", "max"}, JobOnly: true},
 	{Long: "--resource", Type: FlagValue, ValueName: "<name=units>", Description: "Budget for a named shared resource (repeatable)", Category: "Execution", JobOnly: true},
 	{Long: "--cpu-policy", Type: FlagValue, ValueName: "<policy>", Description: "CPU ceiling policy: critical-path | measured", Category: "Execution", Values: []string{"critical-path", "measured"}, JobOnly: true},
@@ -1246,7 +1296,7 @@ var globalFlags = []GlobalFlag{
 	{Long: "--retry-failed", Description: "Re-run tasks whose identical failure is cached", Category: "Execution", JobOnly: true},
 	{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile: dev | test | production", Category: "Execution", Values: []string{"dev", "test", "production"}, JobOnly: true},
 	{Long: "--serve-env", Type: FlagValue, ValueName: "<->", Description: "Read the serve steps' process environment from stdin: one JSON object of string variables", Category: "Execution", Values: []string{"-"}, JobOnly: true},
-	{Long: "--dry-run", Description: "Show changes without applying", Category: "Execution"},
+	{Long: "--dry-run", Description: "Show changes without applying", Category: "Execution", JobOnly: true},
 
 	{Long: "--output", Type: FlagValue, ValueName: "<format>", Description: "Output format: text | json | jsonl | cloud-logging", Category: "Output", Values: []string{"text", "json", "jsonl", "cloud-logging"}},
 	{Long: "--json", Description: "Shorthand for --output=json", Category: "Output"},

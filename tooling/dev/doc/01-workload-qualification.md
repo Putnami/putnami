@@ -93,8 +93,9 @@ fails the composition at once (`compose.prepare_failed`). A member whose serve
 step exits before its ready event fails it at once (`compose.member_exited`);
 one that stays silent fails after `--ready-timeout`, default `60s`, counted
 from the start of its serve step (`compose.ready_timeout`). Either way the
-error names the member and the phase, text output prints the last lines of the
-member's serve run output on stderr, and everything already started is torn
+error names the member and the phase, text output prints on stderr the last
+lines of the step that failed the preparation, else of the member's serve run
+output, and everything already started is torn
 down before `compose` exits.
 
 Dependencies run production-mode (`NODE_ENV=production`) without watch

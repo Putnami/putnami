@@ -41,7 +41,7 @@ and examples are not part of it: rewording help never changes the document.
 | Member | Meaning |
 | --- | --- |
 | `protocolVersion` | The contract version: `1`. See [Versions](#versions). |
-| `globalFlags` | The flags the CLI accepts with any command, sorted by `long`. |
+| `globalFlags` | The flags the CLI accepts with every job command and command group, sorted by `long`. A job-only flag is a global flag that only job commands and command groups read. A core command accepts a job-only flag only when its own entry declares it in `flags`. This document does not mark which global flags are job-only. |
 | `commands` | The commands users type, sorted by `path`. An alternate spelling of another command is a command of its own. |
 | `path` | The space-separated invocation path after the program name, such as `projects list`. |
 | `flags` | A command's own flags, sorted by `long`. |

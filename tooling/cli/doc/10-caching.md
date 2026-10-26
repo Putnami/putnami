@@ -1488,8 +1488,7 @@ Because the store is shared across all worktrees of a repo, `cache clean` clears
 and exits with a usage error, so typing it to discover them deletes nothing.
 
 Cache subcommands do not support `--dry-run`. Passing it returns a usage error
-before any store is mutated, extension cache hook is invoked, or verification
-worktree is created.
+at parse time.
 
 ### Cache Determinism Verification
 

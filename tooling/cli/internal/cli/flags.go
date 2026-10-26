@@ -28,13 +28,15 @@ import (
 // parseFlags extracts known global flags and returns remaining args, consuming
 // --version as a request to print the CLI version.
 func parseFlags(args []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: true})
+	g, remaining, _, err := parseGlobalFlags(args, flagParseOptions{consumeVersion: true})
+	return g, remaining, err
 }
 
 // parseCommandFlags is parseFlags after a command has been selected, where
 // --version belongs to the command (`putnami upgrade --version 1.2.3`) rather
-// than to the CLI.
-func parseCommandFlags(args, commands, serveWorkloads []string) (GlobalFlags, []string, error) {
+// than to the CLI. It also returns the long spelling of every global flag it
+// bound, which validateStructuredFlags checks against the command's own flags.
+func parseCommandFlags(args, commands, serveWorkloads []string) (GlobalFlags, []string, []string, error) {
 	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, ownWatch: ownsWatchFlag(commands, serveWorkloads)})
 }
 
@@ -52,7 +54,8 @@ func ownsWatchFlag(commands, serveWorkloads []string) bool {
 // become job params (buildCommandParams) and nothing else; see
 // splitInlineValues for what that changes.
 func parseJobFlags(args, commands, serveWorkloads []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true, ownWatch: ownsWatchFlag(commands, serveWorkloads)})
+	g, remaining, _, err := parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true, ownWatch: ownsWatchFlag(commands, serveWorkloads)})
+	return g, remaining, err
 }
 
 type flagParseOptions struct {
@@ -198,7 +201,9 @@ func switchOpposite(long string, opts flagParseOptions) (string, bool) {
 }
 
 // parseGlobalFlags is phase 2 of the parse: syntax-normalized tokens in, bound
-// GlobalFlags plus the untouched remainder out. A value-taking flag with no
+// GlobalFlags, the untouched remainder and the long spelling of every global
+// flag it bound out (a switch spelled `--x=false` binds nothing and is not
+// listed). A value-taking flag with no
 // value, an unparseable --retry and an unrecognized --max-parallel mode are
 // hard usage errors here; before this change all three were silently dropped.
 // So is a switch with an inline value other than true or false
@@ -211,13 +216,14 @@ func switchOpposite(long string, opts flagParseOptions) (string, bool) {
 // one exception, removed wherever it appears, because the CLI that re-executes
 // itself appends it to its own argv, past a separator too
 // (runcredential.withDescriptor), and runcredential.Capture has read it.
-func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, error) {
+func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, []string, error) {
 	g := GlobalFlags{}
+	var bound []string
 	cut := passthroughCut(args)
 	payload := runcredential.WithoutFlag(args[cut:])
 	flags, err := resolveSwitchValues(args[:cut], opts)
 	if err != nil {
-		return g, nil, err
+		return g, nil, nil, err
 	}
 	normalized := splitInlineValues(flags, opts.jobArgs)
 	remaining := make([]string, 0, len(normalized)+len(payload))
@@ -238,17 +244,18 @@ func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []stri
 		value := ""
 		if spec.Type == commandmeta.FlagValue {
 			if i+1 >= len(normalized) {
-				return g, nil, usageErrorf("flag %s requires a value: %s %s", arg, spec.Long, spec.ValueName)
+				return g, nil, nil, usageErrorf("flag %s requires a value: %s %s", arg, spec.Long, spec.ValueName)
 			}
 			i++
 			value = normalized[i]
 		}
 		if err := applyGlobalFlag(&g, arg, value); err != nil {
-			return g, nil, err
+			return g, nil, nil, err
 		}
+		bound = append(bound, spec.Long)
 	}
 
-	return g, append(remaining, payload...), nil
+	return g, append(remaining, payload...), bound, nil
 }
 
 // applyGlobalFlag binds one recognized global flag onto g. It is a cohesive
