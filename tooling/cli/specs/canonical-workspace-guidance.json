@@ -18,6 +18,10 @@
       "text": "Top-level, command, Markdown, man-page, completion, and structured help are derived from the command catalog and cover every public command."
     },
     {
+      "id": "a-bare-root-without-a-default-runs-nothing",
+      "text": "A built-in command root that declares no default subcommand runs nothing when typed bare: it exits with a usage error that lists its subcommands with their summaries, and its help lists them too. A reader who types putnami cache to discover its subcommands cannot wipe the shared cache store."
+    },
+    {
       "id": "onboarding-path",
       "text": "Public guidance presents workspace and project discovery, feature and specification discovery, project selection, plan preview, the validation gate, and diagnostic recall as one usable path."
     },
