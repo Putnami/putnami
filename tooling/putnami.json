@@ -12,7 +12,8 @@
     "local-collaboration",
     "memory-store",
     "scaffold",
-    "sdd-extension"
+    "sdd-extension",
+    "windows-vet"
   ],
   "line": {}
 }
