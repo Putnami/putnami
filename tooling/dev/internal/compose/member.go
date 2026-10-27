@@ -157,7 +157,17 @@ type memberRuntime struct {
 	// event; serveGroups are the groups of its current process.
 	serveKey    string
 	serveGroups []int
-	tail        tailLines
+	// tail is the last lines of the run's text output: its stderr and the
+	// lines of its stdout that are no record. streamTail is the last lines of
+	// the member's output as the session stream carries it, in order: the
+	// lines of stdout that are no record, the serve step's log events, and
+	// the diagnostics and error of the serve step's end. stdout and stderr are
+	// two pipes with no order between them, so when the serve step's end
+	// arrives, its stderr may still be in flight; streamTail is then complete.
+	// serveEnded reports that the current serve step's end arrived.
+	tail       tailLines
+	streamTail tailLines
+	serveEnded bool
 	// lastStatus is how the member's serve last ended: the status of the
 	// serve step's end, empty while a serve step runs, and the serve run's
 	// exit once the run ended after anything but a serve step's own verdict.
@@ -238,6 +248,9 @@ func (rt *memberRuntime) start() error {
 func (rt *memberRuntime) observeLine(line []byte, output *outputSink) {
 	var record protocolcli.SessionStreamRecord
 	if json.Unmarshal(line, &record) != nil || record.Record == "" {
+		rt.mu.Lock()
+		rt.streamTail.add(stripANSI(string(line)))
+		rt.mu.Unlock()
 		_, _ = output.Write(append(append([]byte(nil), line...), '\n'))
 		return
 	}
@@ -273,6 +286,7 @@ func (rt *memberRuntime) observeEvent(key string, event map[string]any) {
 		// A serve step runs: no end describes the member's serve yet. The
 		// preparation succeeded, so no step's output reports a failure.
 		rt.lastStatus, rt.stepVerdict = "", false
+		rt.serveEnded = false
 		rt.stepOutput = nil
 		rt.mu.Unlock()
 		rt.observeProcess(int(group), leaderStart)
@@ -283,7 +297,12 @@ func (rt *memberRuntime) observeEvent(key string, event map[string]any) {
 	case eventTypeLog:
 		rt.mu.Lock()
 		defer rt.mu.Unlock()
-		if line := logLine(event); rt.stepOutput != nil && key != "" && line != "" {
+		line := logLine(event)
+		switch {
+		case key == "" || line == "":
+		case key == rt.serveKey:
+			rt.streamTail.add(line)
+		case rt.stepOutput != nil:
 			rt.stepOutput[key] = lastLines(append(rt.stepOutput[key], line), stepOutputLines)
 		}
 	case string(runtimeproto.EventReady):
@@ -351,6 +370,10 @@ func (rt *memberRuntime) observeTaskEnd(key string, task *protocolcli.TaskRecord
 	if serve {
 		groups, rt.serveGroups = rt.serveGroups, nil
 		rt.lastStatus, rt.stepVerdict = status, task.Status != protocolcli.TaskStatusCanceled
+		for _, line := range taskOutput(task) {
+			rt.streamTail.add(line)
+		}
+		rt.serveEnded = true
 	}
 	failed := task.Status == protocolcli.TaskStatusFailed && !spawned && !rt.isReady()
 	if failed && rt.stepOutput != nil && !rt.failedStep {
@@ -539,9 +562,17 @@ func (rt *memberRuntime) addOutput(line []byte) {
 	rt.tail.add(stripANSI(string(line)))
 }
 
+// exitDetail is how the member's serve last ended, and the last lines of its
+// output. Once the serve step's end arrived, the output is the session
+// stream's, which holds all of the step's output by then; the run's text
+// output may still miss lines the step wrote before its end. Before that end,
+// or when the stream carried no output, it is the run's text output.
 func (rt *memberRuntime) exitDetail() (string, []string) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
+	if lines := rt.streamTail.snapshot(); rt.serveEnded && len(lines) > 0 {
+		return rt.lastStatus, lines
+	}
 	return rt.lastStatus, rt.tail.snapshot()
 }
 
