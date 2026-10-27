@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 )
 
 func TestCanonicalJSON_MatchesGolden(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-serialization-is-canonical", "the-golden-pins-the-bytes-and-the-digest")
 	data, err := os.ReadFile("fixtures/valid/full.json")
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +46,7 @@ func TestCanonicalJSON_MatchesGolden(t *testing.T) {
 }
 
 func TestCanonicalize_EmptyInventory(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-serialization-is-canonical", "an-empty-inventory-is-the-minimal-fixture")
 	for _, services := range [][]Service{nil, {}} {
 		canonical, diags := Canonicalize(services)
 		if diag.HasErrors(diags) {
@@ -67,6 +70,7 @@ func TestCanonicalize_EmptyInventory(t *testing.T) {
 }
 
 func TestCanonicalize_OrderIndependentAndPure(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-serialization-is-canonical", "input-order-does-not-matter-and-the-input-is-kept")
 	data, err := os.ReadFile("fixtures/equivalence/grpc-services.golden.json")
 	if err != nil {
 		t.Fatal(err)
@@ -119,6 +123,7 @@ func TestCanonicalize_OrderIndependentAndPure(t *testing.T) {
 }
 
 func TestCanonicalize_MethodListAlwaysSerialized(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-serialization-is-canonical", "a-methods-list-is-always-written")
 	canonical, diags := Canonicalize([]Service{{
 		Name: "pkg.v1.Echo", Transport: TransportConnect, BasePath: "/pkg.v1.Echo/",
 		Provenance: Provenance{Project: "p", Package: "go.putnami.dev/grpc", SourceKind: SourceConnectGateway},
@@ -139,6 +144,7 @@ func TestCanonicalize_MethodListAlwaysSerialized(t *testing.T) {
 }
 
 func TestCanonicalizeManifest_RejectsForeignProtocol(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-serialization-is-canonical", "another-protocol-is-not-canonicalized")
 	if _, diags := CanonicalizeManifest(nil); !hasCode(diags, ErrorCodeParseError) {
 		t.Fatalf("nil manifest: %v", diags)
 	}
@@ -149,6 +155,7 @@ func TestCanonicalizeManifest_RejectsForeignProtocol(t *testing.T) {
 }
 
 func TestValidateServices_Rules(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "a-service-is-identified-by-name-transport-and-base-path", "the-service-rules-hold")
 	grpcService := func(name string) Service {
 		return Service{
 			Name: name, Transport: TransportGRPC, MethodsKnown: true,

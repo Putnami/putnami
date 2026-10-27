@@ -190,7 +190,20 @@ user change.
   [compatibility budget](../../tooling/cli/doc/21-compatibility-and-migration.md)
   and a stated N-1 read window.
 
-**Owning user feature** — none. The inventory is a build output about a
-workload's surface. The outcome it reports belongs to the producer's
+## Feature and spec
+
+The module owns the feature of its contract,
+`grpc-services/service-inventory-contract`, specified in
+[`specs/service-inventory-contract.json`](specs/service-inventory-contract.json).
+The tests here prove the identifiers, the fixture corpus, the identity rules
+and the canonical bytes. `go.putnami.dev/grpc` (`go/framework/grpc`) proves
+under its own `the-go-grpc-…` checks that its server, gateway and API bridge
+describe each source kind and its route join as the contract states, and that
+its plugins collapse an identical registration and fail on a conflict.
+`@putnami/go` (`go/extension`) proves under its own `the-go-extension-…` check
+that describe refuses an inventory the parser refuses. Which surfaces the
+framework composes, and when it describes them, stays in the producer's
 `service-inventory` requirement in
 [`go/framework/grpc/specs/grpc-services.json`](../../go/framework/grpc/specs/grpc-services.json).
+The design intent is
+[ADR 0001](doc/adr/0001-grpc-services-is-its-own-protocol.md).

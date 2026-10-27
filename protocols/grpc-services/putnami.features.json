@@ -1,0 +1,93 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "grpc-services",
+  "features": [
+    {
+      "id": "grpc-services/service-inventory-contract",
+      "type": "feature",
+      "name": "gRPC service inventory contract",
+      "outcome": "A framework describes the gRPC and Connect services an application registered as one canonical, digest-pinned inventory, so a consumer knows which services a committed tree serves without running the workload or parsing its source",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-identifiers-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-identifiers-are-pinned",
+              "the-schema-members-and-enums-match-the-go-types"
+            ]
+          }
+        },
+        {
+          "id": "an-inventory-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates",
+              "every-invalid-fixture-fails-with-its-code",
+              "every-expected-code-is-registered",
+              "the-go-extension-refuses-an-inventory-the-parser-refuses"
+            ]
+          }
+        },
+        {
+          "id": "a-service-is-identified-by-name-transport-and-base-path",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-service-rules-hold",
+              "the-go-grpc-plugins-collapse-identical-services-and-fail-on-a-conflict"
+            ]
+          }
+        },
+        {
+          "id": "the-serialization-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-golden-pins-the-bytes-and-the-digest",
+              "input-order-does-not-matter-and-the-input-is-kept",
+              "an-empty-inventory-is-the-minimal-fixture",
+              "a-methods-list-is-always-written",
+              "another-protocol-is-not-canonicalized"
+            ]
+          }
+        },
+        {
+          "id": "each-source-kind-joins-the-route-inventory-its-own-way",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-grpc-server-lists-every-registered-method",
+              "the-go-grpc-gateway-joins-one-prefix-post-route-per-service",
+              "the-go-grpc-bridge-joins-one-exact-post-route-per-method"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

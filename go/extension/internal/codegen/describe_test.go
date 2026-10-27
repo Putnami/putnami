@@ -2455,6 +2455,7 @@ func TestRunDescribeChecksTheGRPCInventoryWhenSchemasAreNotCommitted(t *testing.
 // leaves service facts unavailable, and an untouched, unstaged leftover is
 // neither promoted nor checked.
 func TestPreflightGRPCInventoryChecksOnlyTheCurrentInventory(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "an-inventory-fails-closed", "the-go-extension-refuses-an-inventory-the-parser-refuses")
 	spectest.Proves(t, "go/go-project-toolchain", "grpc-inventory-checked-before-promotion", "only-the-current-grpc-inventory-is-checked")
 	canonical := grpcInventory(t, "items.v1.Items")
 	malformed := []byte(`{"protocol":`)
