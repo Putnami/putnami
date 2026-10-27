@@ -787,6 +787,40 @@ func TestCapabilityPackageStamps_ABindingFailureInsideARepositoryIsNotMarkedUnav
 	}
 }
 
+// A binding that fails inside a repository names its cause in the run log, once
+// per project however many stamps read it, because an emitter refuses the empty
+// binding without one. A root Git does not manage logs nothing: its stamps say
+// why they carry no binding.
+func TestCapabilitySourceBindingMemo_LogsAFailureOncePerProject(t *testing.T) {
+	ws, projects := sourceClaimWorkspace(t)
+	runVersionsGit(t, ws.Root, "init")
+	logs := captureInvocationWarnings(t)
+
+	memo := newCapabilitySourceBindingMemo()
+	memo.resolve = func(_, projectRoot string) (string, int, error) {
+		return "", 0, fmt.Errorf("read source path %q: no such file", filepath.Base(projectRoot))
+	}
+	memo.isUnmanaged = func(string) bool { return false }
+	capabilityPackageStamps(ws, projects[0], memo, nil)
+	capabilityPackageStamps(ws, projects[1], memo, nil)
+
+	for _, project := range projects {
+		line := fmt.Sprintf("project=%s error=%q", project.Path, fmt.Sprintf("read source path %q: no such file", filepath.Base(project.Path)))
+		if got := strings.Count(logs(), line); got != 1 {
+			t.Errorf("log lines naming %s = %d, want 1; log:\n%s", project.Path, got, logs())
+		}
+	}
+
+	unmanaged := newCapabilitySourceBindingMemo()
+	unmanaged.resolve = func(string, string) (string, int, error) { return "", 0, fmt.Errorf("not a git repository") }
+	unmanaged.isUnmanaged = func(string) bool { return true }
+	before := logs()
+	capabilityPackageStamps(ws, projects[0], unmanaged, nil)
+	if after := logs(); after != before {
+		t.Errorf("an unmanaged root logged %q", strings.TrimPrefix(after, before))
+	}
+}
+
 // Inside a repository the stamp carries exactly the binding Git's enumeration
 // yields for the project root, the marker stays unset, and Git is never asked
 // whether it manages the root.
