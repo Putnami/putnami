@@ -183,8 +183,14 @@ type objectCache struct {
 	// LISTENER only stops new dials: a job process that left a connection open
 	// leaves its serving goroutine parked in a blocking read, and close() would
 	// then wait for a client that is never going to speak again.
-	connMu sync.Mutex
-	conns  map[net.Conn]struct{}
+	//
+	// connsClosed is set, under connMu, by the shutdown sweep. A connection the
+	// accept loop took before the listener closed but had not tracked yet is
+	// refused by track instead of being served: the sweep never saw it, so
+	// nothing else would close it.
+	connMu      sync.Mutex
+	conns       map[net.Conn]struct{}
+	connsClosed bool
 
 	// queue carries put batches to the upload workers. It is closed exactly once,
 	// by drain, and queueClosed guards the send: a put racing the end-of-run
@@ -435,7 +441,10 @@ func (oc *objectCache) acceptLoop() {
 			_ = conn.Close()
 			return
 		}
-		oc.track(conn)
+		if !oc.track(conn) {
+			<-oc.connSem
+			return // the shutdown sweep already ran: track closed the connection
+		}
 		oc.serveWG.Add(1)
 		go func() {
 			defer oc.serveWG.Done()
@@ -446,12 +455,20 @@ func (oc *objectCache) acceptLoop() {
 	}
 }
 
-// track registers a live connection. untrack closes it and forgets it, so the
-// two are idempotent with the shutdown sweep in close.
-func (oc *objectCache) track(conn net.Conn) {
+// track registers a live connection and reports whether it may be served.
+// After the shutdown sweep it closes the connection and returns false. untrack
+// closes it and forgets it, so the two are idempotent with the sweep in close.
+func (oc *objectCache) track(conn net.Conn) bool {
 	oc.connMu.Lock()
-	oc.conns[conn] = struct{}{}
+	closed := oc.connsClosed
+	if !closed {
+		oc.conns[conn] = struct{}{}
+	}
 	oc.connMu.Unlock()
+	if closed {
+		_ = conn.Close()
+	}
+	return !closed
 }
 
 func (oc *objectCache) untrack(conn net.Conn) {
@@ -462,9 +479,12 @@ func (oc *objectCache) untrack(conn net.Conn) {
 }
 
 // closeConns closes every live connection, which is what unblocks the parked
-// reads in serveConn so close can wait on a bounded amount of work.
+// reads in serveConn so close can wait on a bounded amount of work. It also
+// makes track refuse every later connection, so a connection accepted before
+// the listener closed cannot slip past the sweep.
 func (oc *objectCache) closeConns() {
 	oc.connMu.Lock()
+	oc.connsClosed = true
 	live := make([]net.Conn, 0, len(oc.conns))
 	for conn := range oc.conns {
 		live = append(live, conn)

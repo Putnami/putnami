@@ -1254,6 +1254,34 @@ func TestProviderObjectCache_ShutdownDoesNotWaitOnAnIdleClient(t *testing.T) {
 	}
 }
 
+// TestProviderObjectCache_ShutdownRefusesAConnectionAcceptedBeforeTheSweep pins
+// the window between Accept and track. The accept loop can take a connection
+// before the listener closes and track it after the shutdown sweep ran; served,
+// that connection would park its reader until the first-request deadline and
+// hold close for as long. After the sweep, track closes it and refuses it.
+func TestProviderObjectCache_ShutdownRefusesAConnectionAcceptedBeforeTheSweep(t *testing.T) {
+	f := newFakeObjectServer(t)
+	exchangeDir := shortExchangeDir(t)
+	s, _ := startObjectSession(t, f, exchangeDir, coreCapabilities()...)
+	oc := s.objects
+	s.close()
+
+	late, peer := net.Pipe()
+	t.Cleanup(func() { _ = peer.Close() })
+	if oc.track(late) {
+		t.Fatal("track accepted a connection after the shutdown sweep")
+	}
+	oc.connMu.Lock()
+	live := len(oc.conns)
+	oc.connMu.Unlock()
+	if live != 0 {
+		t.Errorf("live connections=%d after shutdown, want 0", live)
+	}
+	if _, err := late.Write([]byte("x")); err == nil {
+		t.Error("track left the refused connection open")
+	}
+}
+
 // TestProviderObjectCache_GetBatchIsOneRoundTrip proves the batching promise:
 // a whole wave of ids costs ONE index round trip, which is the point of the
 // contract's batched get.
