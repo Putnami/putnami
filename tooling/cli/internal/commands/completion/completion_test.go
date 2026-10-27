@@ -961,7 +961,7 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 	var bash bytes.Buffer
 	CompletionBash(&bash, dir, cfg, nil)
 	bashOut := bash.String()
-	if !strings.Contains(bashOut, `local project_basenames="`) {
+	if !strings.Contains(bashOut, `local project_basenames='`) {
 		t.Error("bash: missing project_basenames variable")
 	}
 	for _, want := range []string{"web-app", "api", "acme-api"} {
@@ -970,10 +970,10 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 		}
 	}
 	// The positional branch must complete the full target set, not just IDs.
-	if !strings.Contains(bashOut, `compgen -W "${project_targets} ${global_flags}"`) {
+	if !strings.Contains(bashOut, `_putnami_reply "${project_targets} ${global_flags}"`) {
 		t.Error("bash: positional target should use project_targets (ids+names+basenames+aliases)")
 	}
-	if strings.Contains(bashOut, `compgen -W "${projects} ${project_ids}"`) {
+	if strings.Contains(bashOut, `_putnami_reply "${projects} ${project_ids}"`) {
 		t.Error("bash: --exclude should not suggest project IDs")
 	}
 

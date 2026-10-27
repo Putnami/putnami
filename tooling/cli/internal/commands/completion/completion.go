@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
@@ -605,6 +606,21 @@ func (c completionContext) globalFlagValues(long string) []string {
 		}
 	}
 	return nil
+}
+
+// plainWord reports whether bash, zsh and fish all read value as itself and as
+// one word without quotes. A script writes such a value bare and quotes any
+// other: a workspace name can hold a space, a "$", a "(" or an apostrophe.
+func plainWord(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, c := range value {
+		if !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./@:,+-", c) {
+			return false
+		}
+	}
+	return true
 }
 
 func aliasNames(aliases []completionValue) []string {

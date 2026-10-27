@@ -65,24 +65,37 @@ _putnami_flags_for() {
 	iox.Fprintf(w, `    esac
 }
 
+# _putnami_reply offers the words of the compgen word list $1 that start with
+# the current word. compgen expands each word of the list once, so the list
+# holds quoted words; each reply is quoted again, so the command line reads it
+# back as the same word.
+_putnami_reply() {
+    COMPREPLY=()
+    local match quoted
+    while IFS= read -r match; do
+        printf -v quoted '%%q' "${match}"
+        COMPREPLY+=("${quoted}")
+    done < <(compgen -W "$1" -- "${cur}")
+}
+
 _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="%s"
-    local structured="%s"
-    local global_flags="%s"
-    local job_global_flags="%s"
-    local projects="%s"
-    local project_ids="%s"
-    local project_basenames="%s"
-    local project_aliases="%s"
+    local commands=%s
+    local structured=%s
+    local global_flags=%s
+    local job_global_flags=%s
+    local projects=%s
+    local project_ids=%s
+    local project_basenames=%s
+    local project_aliases=%s
     # Every form ResolveTarget accepts for a positional/--projects target.
     local project_targets="${project_ids} ${projects} ${project_basenames} ${project_aliases}"
 
     # First argument: command name
     if [[ ${cword} -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "${commands}" -- "${cur}") )
+        _putnami_reply "${commands}"
         return
     fi
 
@@ -113,17 +126,17 @@ _putnami_completions() {
         if _putnami_takes_project "${path}"; then
             nested_subcommands="${nested_subcommands} ${project_ids}"
         fi
-        COMPREPLY=( $(compgen -W "${nested_subcommands}" -- "${cur}") )
+        _putnami_reply "${nested_subcommands}"
         return
     fi
-`, strings.Join(allCommands, " "),
-		strings.Join(ctx.structured, " "),
-		strings.Join(ctx.sharedGlobalFlagNames(), " "),
-		strings.Join(ctx.jobGlobalFlagNames(), " "),
-		strings.Join(ctx.projects, " "),
-		strings.Join(ctx.projectIDs, " "),
-		strings.Join(ctx.projectBasenames, " "),
-		strings.Join(aliasNames(ctx.aliases), " "))
+`, bashWordList(allCommands),
+		bashWordList(ctx.structured),
+		bashWordList(ctx.sharedGlobalFlagNames()),
+		bashWordList(ctx.jobGlobalFlagNames()),
+		bashWordList(ctx.projects),
+		bashWordList(ctx.projectIDs),
+		bashWordList(ctx.projectBasenames),
+		bashWordList(aliasNames(ctx.aliases)))
 
 	iox.Fprintf(w, `
     # Flags and project names
@@ -143,40 +156,40 @@ _putnami_completions() {
 		for _, value := range values {
 			names = append(names, value.Value)
 		}
-		iox.Fprintf(w, "        '%s')\n", key)
-		iox.Fprintf(w, "            structured_values='%s'\n", strings.Join(names, " "))
+		iox.Fprintf(w, "        %s)\n", bashQuote(key))
+		iox.Fprintf(w, "            structured_values=%s\n", bashWordList(names))
 		iox.Fprintf(w, "            ;;\n")
 	}
 
 	iox.Fprintf(w, `    esac
 
     if [[ -n "${structured_values}" ]]; then
-        COMPREPLY=( $(compgen -W "${structured_values}" -- "${cur}") )
+        _putnami_reply "${structured_values}"
     elif [[ "${cur}" == -* ]]; then
         local structured_flags="$(_putnami_flags_for "${path}")"
-        COMPREPLY=( $(compgen -W "${structured_flags} ${global_flags}" -- "${cur}") )
+        _putnami_reply "${structured_flags} ${global_flags}"
     elif [[ "${prev}" == "--projects" ]]; then
-        COMPREPLY=( $(compgen -W "${project_targets}" -- "${cur}") )
+        _putnami_reply "${project_targets}"
 `)
 	if ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, `    elif [[ "${prev}" == "--exclude" ]]; then
         # --exclude matches project names.
-        COMPREPLY=( $(compgen -W "${projects}" -- "${cur}") )
+        _putnami_reply "${projects}"
 `)
 	}
 	iox.Fprintf(w, `    elif [[ "${prev}" == "--output" ]]; then
-        COMPREPLY=( $(compgen -W "%s" -- "${cur}") )
+        _putnami_reply %s
     elif [[ "${prev}" == "--tag" || "${prev}" == "--exclude-tag" ]]; then
         # Tags are dynamic — no static completion
         :
     else
         # Positional project target: IDs, names, basenames, and aliases
-        COMPREPLY=( $(compgen -W "${project_targets} ${global_flags}" -- "${cur}") )
+        _putnami_reply "${project_targets} ${global_flags}"
     fi
 }
 
 complete -F _putnami_completions putnami
-`, strings.Join(ctx.globalFlagValues("--output"), " "))
+`, bashWordList(ctx.globalFlagValues("--output")))
 }
 
 func writeBashSubcommandCases(w io.Writer, ctx completionContext) {
@@ -190,7 +203,7 @@ func writeBashSubcommandCases(w io.Writer, ctx completionContext) {
 		if len(subs) == 0 {
 			continue
 		}
-		iox.Fprintf(w, "        %s) printf '%%s\\n' %s ;;\n", bashQuote(key), bashQuote(strings.Join(subs, " ")))
+		iox.Fprintf(w, "        %s) printf '%%s\\n' %s ;;\n", bashQuote(key), bashWordList(subs))
 	}
 }
 
@@ -220,10 +233,39 @@ func writeBashFlagCases(w io.Writer, ctx completionContext) {
 		if len(names) == 0 {
 			continue
 		}
-		iox.Fprintf(w, "        %s) printf '%%s\\n' %s ;;\n", bashQuote(key), bashQuote(strings.Join(names, " ")))
+		iox.Fprintf(w, "        %s) printf '%%s\\n' %s ;;\n", bashQuote(key), bashWordList(names))
 	}
 }
 
+// bashQuote single-quotes a value as one bash or zsh word, read once.
 func bashQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+// bashWord quotes a value as one bash or zsh word, unless the shell reads it as
+// itself.
+func bashWord(value string) string {
+	if plainWord(value) {
+		return value
+	}
+	return bashQuote(value)
+}
+
+// bashWordList renders values as a compgen word list, quoted as one word of
+// the script. Bash reads the list twice: once with the script, and again when
+// compgen -W expands each of its words. Each value is quoted for the second
+// read and the whole list for the first, so a name such as "p $l" or
+// "x$(cmd)" is one literal candidate.
+func bashWordList(values []string) string {
+	return bashQuote(bashWords(values))
+}
+
+// bashWords renders values as bash or zsh words separated by spaces
+// (bashWord).
+func bashWords(values []string) string {
+	words := make([]string, len(values))
+	for i, value := range values {
+		words[i] = bashWord(value)
+	}
+	return strings.Join(words, " ")
 }
