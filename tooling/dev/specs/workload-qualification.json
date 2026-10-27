@@ -55,7 +55,7 @@
     },
     {
       "id": "local-verdict-binds-to-the-exact-worktree",
-      "text": "--target local composes the workload with the workloads it runs with, production-mode without watch, and binds the verdict to the worktree fingerprint read before anything is prepared. --expect-sha with local exits 2. A composition failure is composition_failed naming the member and phase; teardown always runs and cleanup.state is recorded."
+      "text": "--target local composes the workload with the workloads it runs with, production-mode without watch, and reads the worktree fingerprint before anything is prepared. --expect-sha with local exits 2. A composition failure is composition_failed naming the member and phase; teardown always runs and cleanup.state is recorded."
     },
     {
       "id": "local-target-reads-the-local-config",

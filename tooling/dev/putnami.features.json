@@ -310,6 +310,8 @@
             "kind": "acceptance",
             "checks": [
               "the-generated-inventory-is-read-when-no-committed-one-exists",
+              "the-dev-reads-the-committed-inventory-before-the-generated-one",
+              "the-dev-refuses-an-invalid-or-unreadable-inventory",
               "the-platform-prefix-is-read-from-the-inventory"
             ]
           }

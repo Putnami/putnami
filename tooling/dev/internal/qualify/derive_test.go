@@ -157,8 +157,12 @@ func TestDerive_ExcludesPlatformAndPprofPaths(t *testing.T) {
 		route(httproutes.MatchExact, "/debug/pprof", true, "GET"),
 		route(httproutes.MatchExact, "/debug/pprof/heap", true, "GET"),
 		route(httproutes.MatchExact, "/_putnami/state", true, "GET"),
+		route(httproutes.MatchExact, "/ops/livez", true, "GET"),
+		route(httproutes.MatchExact, "/ops/healthz", true, "GET"),
 		route(httproutes.MatchExact, "/ops/readyz", true, "GET"),
+		route(httproutes.MatchExact, "/ops/version", true, "GET"),
 		route(httproutes.MatchExact, "/ops/debug/pprof/goroutine", true, "GET"),
+		route(httproutes.MatchExact, "/ops/_putnami/state", true, "GET"),
 		route(httproutes.MatchExact, "/debugger", true, "GET"),
 		route(httproutes.MatchExact, "/items", true, "GET"),
 	}
@@ -170,13 +174,16 @@ func TestDerive_ExcludesPlatformAndPprofPaths(t *testing.T) {
 	if got := strings.Join(requestIDs(contract), ","); got != "GET /debugger,GET /items" {
 		t.Fatalf("requests = %s, want only /debugger and /items", got)
 	}
-	// Without the prefix, a route at /ops/readyz is an ordinary business route.
+	// Without the prefix, the routes under /ops are ordinary business routes.
 	unprefixed, _, err := Derive(ws, project, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(requestIDs(unprefixed), ","); !strings.Contains(got, "GET /ops/readyz") {
-		t.Errorf("without a prefix, /ops/readyz must be derivable: %s", got)
+	got := strings.Join(requestIDs(unprefixed), ",")
+	for _, id := range []string{"GET /ops/livez", "GET /ops/healthz", "GET /ops/readyz", "GET /ops/version"} {
+		if !strings.Contains(got, id) {
+			t.Errorf("without a prefix, %s must be derivable: %s", id, got)
+		}
 	}
 }
 
@@ -217,7 +224,39 @@ func TestDerive_NoInventoryIsUnsupportedWithRemedy(t *testing.T) {
 	validContract(t, contract)
 }
 
+// TestDerive_ReadsTheCommittedInventoryFirst writes both inventories with
+// different routes: the contract comes from schema/, never .gen/schema/.
+func TestDerive_ReadsTheCommittedInventoryFirst(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", "smoke-is-derived-from-the-route-inventory",
+		"the-dev-reads-the-committed-inventory-before-the-generated-one")
+	ws, project := fixtureProject(t, ".gen/schema", []httproutes.Route{route(httproutes.MatchExact, "/generated", true, "GET")})
+	committed, _ := fixtureProject(t, "schema", []httproutes.Route{route(httproutes.MatchExact, "/committed", true, "GET")})
+	data, err := os.ReadFile(filepath.Join(committed.Root, "app", "schema", "http-routes.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(ws.Root, "app", "schema")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "http-routes.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	contract, unsupported, err := Derive(ws, project, "")
+	if err != nil || unsupported != nil {
+		t.Fatalf("Derive: %v, unsupported %+v", err, unsupported)
+	}
+	if got := strings.Join(requestIDs(contract), ","); got != "GET /committed" {
+		t.Errorf("requests = %s, want only GET /committed", got)
+	}
+	if len(contract.DerivedFrom) != 1 || contract.DerivedFrom[0].Path != "app/schema/http-routes.json" {
+		t.Errorf("derivedFrom = %+v, want app/schema/http-routes.json", contract.DerivedFrom)
+	}
+}
+
 func TestDerive_RefusesAnInvalidInventory(t *testing.T) {
+	spectest.Proves(t, "tooling/workload-qualification", "smoke-is-derived-from-the-route-inventory",
+		"the-dev-refuses-an-invalid-or-unreadable-inventory")
 	ws, project := fixtureProject(t, "schema", nil)
 	dir := filepath.Join(ws.Root, "app", "schema")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
