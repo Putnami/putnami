@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestValidateName(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-name-grammar-is-enforced")
 	tests := []struct {
 		name    string
 		value   string
@@ -36,6 +38,7 @@ func TestValidateName(t *testing.T) {
 }
 
 func TestValidateAppName(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-name-grammar-is-enforced")
 	tests := []struct {
 		name    string
 		value   string
@@ -75,6 +78,7 @@ func TestValidateAppName(t *testing.T) {
 }
 
 func TestValidateOptionalName(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-name-grammar-is-enforced")
 	// Empty is valid for optional fields.
 	diags := ValidateOptionalName("", "version")
 	if diag.HasErrors(diags) {
@@ -89,6 +93,7 @@ func TestValidateOptionalName(t *testing.T) {
 }
 
 func TestValidateConfigEntry(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	tests := []struct {
 		name    string
 		entry   *ConfigEntry
@@ -115,6 +120,7 @@ func TestValidateConfigEntry(t *testing.T) {
 }
 
 func TestValidateConfigEntry_MaxKeys(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	values := make(map[string]any, MaxValuesKeys+1)
 	for i := range MaxValuesKeys + 1 {
 		values[strings.Repeat("k", 5)+string(rune('a'+i%26))+strings.Repeat("0", 5)] = i
@@ -139,6 +145,7 @@ func TestValidateConfigEntry_MaxKeys(t *testing.T) {
 }
 
 func TestValidateSecretEntry(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	validEnvelope := SealedEnvelope{
 		KeyURI:     "gcp-kms://projects/p/locations/l/keyRings/r/cryptoKeys/k",
 		WrappedDEK: "dGVzdA==",
@@ -172,6 +179,7 @@ func TestValidateSecretEntry(t *testing.T) {
 }
 
 func TestValidateSealedEnvelope(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	tests := []struct {
 		name    string
 		env     *SealedEnvelope
@@ -197,6 +205,7 @@ func TestValidateSealedEnvelope(t *testing.T) {
 }
 
 func TestValidateSealedEnvelope_InvalidBase64Diagnostic(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	diags := ValidateSealedEnvelope(&SealedEnvelope{
 		KeyURI:     "kms://key",
 		WrappedDEK: "%%%bad%%%",
@@ -216,6 +225,7 @@ func TestValidateSealedEnvelope_InvalidBase64Diagnostic(t *testing.T) {
 }
 
 func TestValidateDeleteRequest(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	tests := []struct {
 		name    string
 		req     *DeleteRequest
@@ -237,6 +247,7 @@ func TestValidateDeleteRequest(t *testing.T) {
 }
 
 func TestValidateResolveSecretsRequest(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "input-names", "each-write-shape-is-validated")
 	tests := []struct {
 		name    string
 		req     *ResolveSecretsRequest

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ConformanceManifestFixtures holds the "corpus is the spec"
@@ -15,6 +16,7 @@ import (
 // not exercise. ValidateConformanceManifest's duplicate-id and
 // unknown-transport branches are therefore each pinned by an invalid fixture.
 func TestConformance_ConformanceManifestFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "conformance-manifest", "each-manifest-fixture-gets-its-verdict")
 	runManifestDir(t, "valid", false)
 	runManifestDir(t, "invalid", true)
 }
@@ -50,6 +52,7 @@ func runManifestDir(t *testing.T, kind string, wantErrors bool) {
 // TestConformance_ConformanceManifestRejectCodes pins that the acute reject
 // branches are each exercised: a duplicate case id and an unknown transport.
 func TestConformance_ConformanceManifestRejectCodes(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "conformance-manifest", "each-manifest-defect-gets-its-code")
 	cases := map[string]string{
 		"duplicate-case-id.json": "duplicate-case",
 		"bad-transport.json":     "invalid-enum",
@@ -70,6 +73,7 @@ func TestConformance_ConformanceManifestRejectCodes(t *testing.T) {
 // into the fixture corpus. ValidateHandlerOptions' 3 enum and 5 negative-number
 // reject branches (validate.go:284) each get a representative invalid fixture.
 func TestConformance_HandlerOptionsFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "handler-options", "each-handler-options-fixture-gets-its-verdict")
 	runHandlerOptionsDir(t, "valid", false)
 	runHandlerOptionsDir(t, "invalid", true)
 }
@@ -106,6 +110,7 @@ func runHandlerOptionsDir(t *testing.T, kind string, wantErrors bool) {
 // reject branch to a specific fixture field, so relaxing any single check turns
 // a red fixture green and fails here.
 func TestConformance_HandlerOptionsRejectBranches(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "handler-options", "each-refusal-names-the-member-it-breaks")
 	want := map[string]string{
 		"bad-distribution.json":     "distribution",
 		"bad-overflow.json":         "overflow",

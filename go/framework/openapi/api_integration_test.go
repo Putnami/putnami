@@ -673,6 +673,7 @@ type ProjectionRequest struct {
 }
 
 func TestContractProjection_RoundTripsThroughClientGeneration(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "contract-types-become-components", "the-go-openapi-generator-projects-contract-types")
 	manifest := &contracts.Manifest{
 		ProtocolVersion: contracts.ProtocolVersion,
 		Name:            "example/projection",

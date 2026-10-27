@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "envelope-and-gateway-corpus", "every-envelope-and-gateway-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -45,6 +47,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "envelope-and-gateway-corpus", "every-envelope-and-gateway-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -80,6 +83,7 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 }
 
 func TestConformance_HandlerOptionDefaults(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "handler-options", "the-defaults-are-competing-with-retries-and-a-dlq")
 	opts := NormalizedHandlerOptions(HandlerOptions{})
 	if opts.Distribution != DistributionCompeting {
 		t.Fatalf("default distribution = %q, want %q", opts.Distribution, DistributionCompeting)
@@ -96,6 +100,7 @@ func TestConformance_HandlerOptionDefaults(t *testing.T) {
 }
 
 func TestConformance_GRPCProtoIsNonNormativeReference(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "the-proto-is-non-normative", "the-proto-carries-the-banner-and-the-four-rpcs")
 	data, err := os.ReadFile("proto/putnami/events/v1/event_server.proto")
 	if err != nil {
 		t.Fatal(err)
@@ -133,6 +138,7 @@ func TestConformance_GRPCProtoIsNonNormativeReference(t *testing.T) {
 }
 
 func TestConformance_Manifest(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "conformance-manifest", "the-manifest-lists-every-required-case")
 	data, err := os.ReadFile("conformance/manifest.json")
 	if err != nil {
 		t.Fatal(err)

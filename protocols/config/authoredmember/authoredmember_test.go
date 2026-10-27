@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func request() BuildAuthoredMemberRequest {
@@ -13,6 +15,7 @@ func request() BuildAuthoredMemberRequest {
 }
 
 func TestBuildCanonicalSecretFreeBytesAndDescriptor(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-member-is-canonical-and-secret-free")
 	p := Publisher{}
 	r := request()
 	first, err := p.Build(context.Background(), r)
@@ -36,6 +39,7 @@ func TestBuildCanonicalSecretFreeBytesAndDescriptor(t *testing.T) {
 }
 
 func TestValidateDetectsNoncanonicalBytesAndDescriptorMismatch(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "each-member-defect-is-refused")
 	p := Publisher{}
 	member, err := p.Build(context.Background(), request())
 	if err != nil {
@@ -56,6 +60,7 @@ func TestValidateDetectsNoncanonicalBytesAndDescriptorMismatch(t *testing.T) {
 }
 
 func TestRejectsSchemaAuthoredAndReferenceViolations(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "each-member-defect-is-refused")
 	p := Publisher{}
 	cases := []struct {
 		name   string
@@ -81,6 +86,7 @@ func TestRejectsSchemaAuthoredAndReferenceViolations(t *testing.T) {
 }
 
 func TestRejectsSensitiveDescendantsAndOverlappingAuthoredPaths(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "each-member-defect-is-refused")
 	p := Publisher{}
 	cases := []struct {
 		name   string
@@ -141,6 +147,7 @@ func TestRejectsSensitiveDescendantsAndOverlappingAuthoredPaths(t *testing.T) {
 }
 
 func TestValidateRejectsSensitiveDescendantInReceivedMemberBytes(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "each-member-defect-is-refused")
 	wire := memberWire{
 		FormatVersion: FormatVersion, MediaType: MediaType,
 		WorkspaceID: "workspace-1", Project: "storefront", Environment: "production",
@@ -164,6 +171,7 @@ func TestValidateRejectsSensitiveDescendantInReceivedMemberBytes(t *testing.T) {
 }
 
 func TestAcceptsSchemaBoundedNonSensitiveObjectDescendants(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-member-is-canonical-and-secret-free")
 	p := Publisher{}
 	request := BuildAuthoredMemberRequest{
 		WorkspaceID: "workspace-1", Project: "storefront", Environment: "production",
@@ -188,6 +196,7 @@ func TestAcceptsSchemaBoundedNonSensitiveObjectDescendants(t *testing.T) {
 }
 
 func TestSecretReferencePathRequiresCanonicalExactURI(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "each-member-defect-is-refused")
 	path, err := SecretReferencePath("config-secret://database/other")
 	if err != nil || path != "database.other" {
 		t.Fatalf("path=%q err=%v", path, err)
@@ -206,6 +215,7 @@ func TestSecretReferencePathRequiresCanonicalExactURI(t *testing.T) {
 }
 
 func TestIdentityChangesWithAuthoredSelection(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-member-is-canonical-and-secret-free")
 	p := Publisher{}
 	base, _ := p.Build(context.Background(), request())
 	for _, mutate := range []func(*BuildAuthoredMemberRequest){func(r *BuildAuthoredMemberRequest) { r.AuthoredLayers[0].Values["server.port"] = 9090 }, func(r *BuildAuthoredMemberRequest) { r.AuthoredLayers[0].Pin = "other-pin" }, func(r *BuildAuthoredMemberRequest) {
@@ -224,6 +234,7 @@ func TestIdentityChangesWithAuthoredSelection(t *testing.T) {
 }
 
 func TestNoSecretObservability(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-member-is-canonical-and-secret-free")
 	p := Publisher{}
 	member, err := p.Build(context.Background(), request())
 	if err != nil {
@@ -244,6 +255,7 @@ func TestNoSecretObservability(t *testing.T) {
 }
 
 func TestEmptySchemaMemberRemainsCanonicalAndRejectsUndeclaredContent(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "each-member-defect-is-refused")
 	r := request()
 	r.Schema.Fields = nil
 	r.AuthoredLayers[0].Values = map[string]any{}
@@ -278,6 +290,7 @@ func TestEmptySchemaMemberRemainsCanonicalAndRejectsUndeclaredContent(t *testing
 // predates it refuse the member. A member with only required references keeps
 // the same bytes.
 func TestOptionalSecretReferenceKeepsTheReferenceShape(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-member-is-canonical-and-secret-free")
 	p := Publisher{}
 	required, err := p.Build(t.Context(), request())
 	if err != nil {
@@ -310,6 +323,7 @@ func TestOptionalSecretReferenceKeepsTheReferenceShape(t *testing.T) {
 // The v1 encoding is fixed: the same request yields these exact bytes and
 // this content digest. A change to either is a new FormatVersion.
 func TestCanonicalBytesArePinned(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-v1-bytes-are-pinned")
 	const want = `{"formatVersion":"config.authored-member.v1","mediaType":"application/vnd.putnami.config.authored-member+json","workspaceID":"workspace-1","project":"storefront","environment":"production","schema":{"fields":[{"path":"database.url","type":"string","required":true,"sensitive":true},{"path":"server.port","type":"integer","required":true}]},"authoredLayers":[{"name":"application","pin":"a1b2c3","values":{"server.port":8080}}],"secretReferences":[{"path":"database.url","reference":"config-secret://database/url"}],"sourceProvenance":{"repository":"github.com/acme/storefront","revision":"a1b2c3"}}`
 	const wantDigest = "sha256:cd168b0c5485b0d618332071bfb89f46dea86779694c70f040d6cd4090bf7f7f"
 	member, err := (Publisher{}).Build(t.Context(), request())

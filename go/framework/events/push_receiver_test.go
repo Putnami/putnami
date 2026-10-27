@@ -60,6 +60,7 @@ func recordingHandler(topic string, gotTopic *string, ret error) *HandlerDefinit
 // --- allowlist guard ---
 
 func TestAllowPusher(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-admission", "the-go-receiver-admits-only-an-allowlisted-pusher")
 	p := Events(PluginConfig{Push: PushConfig{AllowedServiceAccounts: []string{"pusher@sa.example"}}})
 
 	cases := []struct {
@@ -83,7 +84,7 @@ func TestAllowPusher(t *testing.T) {
 }
 
 func TestAllowPusherEmptyAllowlistRejects(t *testing.T) {
-	spectest.Proves(t, "go/event-delivery", "ingress-authority", "empty-allowlist-rejects-every-pusher")
+	spectest.Proves(t, "events/event-server-contract", "push-admission", "the-go-receiver-admits-only-an-allowlisted-pusher")
 	p := Events(PluginConfig{})
 	if p.allowPusher(&phttp.Claims{Extra: map[string]any{"email": "anyone@sa.example"}}, nil) {
 		t.Error("empty allowlist must reject (fail-closed)")
@@ -93,7 +94,7 @@ func TestAllowPusherEmptyAllowlistRejects(t *testing.T) {
 // --- envelope decode ---
 
 func TestDecodePushEnvelopeDefaultsAndStrip(t *testing.T) {
-	spectest.Proves(t, "go/event-delivery", "ingress-authority", "push-ingress-strips-auth-attributes")
+	spectest.Proves(t, "events/event-server-contract", "push-admission", "the-go-receiver-drops-auth-attributes")
 	env := Envelope{Topic: "order.created", Payload: map[string]any{"id": "o-1"}}
 	raw, _ := json.Marshal(env)
 	wrapper := protoevents.PushEnvelope{
@@ -126,6 +127,7 @@ func TestDecodePushEnvelopeDefaultsAndStrip(t *testing.T) {
 }
 
 func TestDecodePushEnvelopeErrors(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "the-go-receiver-refuses-an-undecodable-wrapper")
 	validData := base64.StdEncoding.EncodeToString([]byte(`{"id":"x","topic":"t","payload":{"a":1},"timestamp":"2026-05-01T12:00:00Z","attempt":1}`))
 
 	// Missing subscription is a wrapper-contract violation, even with a valid
@@ -143,6 +145,7 @@ func TestDecodePushEnvelopeErrors(t *testing.T) {
 }
 
 func TestHandlePushMissingSubscriptionDLQs(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "the-go-receiver-refuses-an-undecodable-wrapper")
 	spectest.Proves(t, "go/event-delivery", "push-refusal-envelope", "an-undecodable-push-answers-400-bad-request")
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	// A valid encoded envelope but no subscription on the wrapper must be
@@ -201,6 +204,7 @@ func TestPushBroadcastDistributionFansOut(t *testing.T) {
 // --- handlePush status mapping ---
 
 func TestHandlePushAcks(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "the-receiver-status-is-the-outcome", "the-go-receiver-answers-by-outcome")
 	var got string
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	p.Register(recordingHandler("order.created", &got, nil))
@@ -215,6 +219,7 @@ func TestHandlePushAcks(t *testing.T) {
 }
 
 func TestHandlePushHandlerErrorRetries(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "the-receiver-status-is-the-outcome", "the-go-receiver-answers-by-outcome")
 	var got string
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	p.Register(recordingHandler("order.created", &got, context.DeadlineExceeded))
@@ -226,6 +231,7 @@ func TestHandlePushHandlerErrorRetries(t *testing.T) {
 }
 
 func TestHandlePushBadBodyDLQs(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "the-go-receiver-refuses-an-undecodable-wrapper")
 	spectest.Proves(t, "go/event-delivery", "push-refusal-envelope", "an-undecodable-push-answers-400-bad-request")
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	resp := p.handlePush(pushContext([]byte("not json")))
@@ -254,6 +260,7 @@ func assertBadRequestEnvelope(t *testing.T, resp *phttp.Response, message string
 }
 
 func TestHandlePushNoMatchingHandlerAcks(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "the-receiver-status-is-the-outcome", "the-go-receiver-answers-by-outcome")
 	var got string
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	// A handler registered for a different topic must not run for this delivery.
@@ -292,6 +299,7 @@ func errorRecords(sink *logger.MemorySink) []logger.LogEntry {
 }
 
 func TestHandlePushRedeliverAnswers429AndLogsNoError(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "the-receiver-status-is-the-outcome", "the-go-receiver-answers-by-outcome")
 	spectest.Proves(t, "go/event-delivery", "redelivery-request", "push-redelivery-answers-429-without-an-error-record")
 	var got string
 	p := Events(PluginConfig{Delivery: DeliveryPush})
@@ -397,7 +405,7 @@ func TestHandlePushFailureWithoutRequestLoggingKeepsTheDeliveryRecord(t *testing
 // --- secured chain (OIDC + allowlist), exercised without minting JWTs ---
 
 func TestSecuredPushHandlerRejectsMissingToken(t *testing.T) {
-	spectest.Proves(t, "go/event-delivery", "ingress-authority", "push-rejects-a-missing-token")
+	spectest.Proves(t, "events/event-server-contract", "push-admission", "the-go-receiver-admits-only-an-allowlisted-pusher")
 	p := Events(PluginConfig{
 		Delivery: DeliveryPush,
 		Push:     PushConfig{Issuer: "https://accounts.google.com", AllowedServiceAccounts: []string{"pusher@sa.example"}},
@@ -410,7 +418,7 @@ func TestSecuredPushHandlerRejectsMissingToken(t *testing.T) {
 }
 
 func TestSecuredPushHandlerRejectsNonAllowlisted(t *testing.T) {
-	spectest.Proves(t, "go/event-delivery", "ingress-authority", "push-rejects-a-non-allowlisted-pusher")
+	spectest.Proves(t, "events/event-server-contract", "push-admission", "the-go-receiver-admits-only-an-allowlisted-pusher")
 	var got string
 	p := Events(PluginConfig{
 		Delivery: DeliveryPush,
@@ -432,7 +440,7 @@ func TestSecuredPushHandlerRejectsNonAllowlisted(t *testing.T) {
 }
 
 func TestSecuredPushHandlerAllowsAllowlisted(t *testing.T) {
-	spectest.Proves(t, "go/event-delivery", "ingress-authority", "push-allows-an-allowlisted-pusher")
+	spectest.Proves(t, "events/event-server-contract", "push-admission", "the-go-receiver-admits-only-an-allowlisted-pusher")
 	var got string
 	p := Events(PluginConfig{
 		Delivery: DeliveryPush,

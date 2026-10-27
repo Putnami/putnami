@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "contracts/contract-ir#canonical-bytes",
+    "contracts/contract-ir#committed-lowerings",
+    "contracts/contract-ir#contract-types-become-components",
+    "contracts/contract-ir#fixture-corpus",
+    "contracts/contract-ir#markdown-reference",
+    "contracts/contract-ir#one-ir-many-lowerings",
+    "contracts/contract-ir#strict-manifest",
+    "contracts/contract-ir#versioned-paths"
+  ]
+}
