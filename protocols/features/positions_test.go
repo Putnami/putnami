@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // findingsByField indexes findings by field and fails when two findings share
@@ -36,6 +37,7 @@ func assertFields(t *testing.T, byField map[string]diag.Diagnostic, want ...stri
 }
 
 func TestManifestDiagnosticsNameFilePositions(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "manifest-findings-name-their-position-and-bound")
 	zeta := Feature{
 		ID: "billing/zeta", Type: FeatureTypeFeature, Name: strings.Repeat("x", 513),
 		Outcome: "A bounded outcome", Owner: "billing", Target: MaturityCoded,
@@ -86,6 +88,7 @@ func TestManifestDiagnosticsNameFilePositions(t *testing.T) {
 }
 
 func TestEvidenceAndReportDiagnosticsNameFilePositions(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "evidence-and-report-findings-name-their-position")
 	late := basicEvidence()
 	late.ID, late.Feature, late.Stage = "zeta/evidence", "zeta/feature", "unknown-stage"
 	early := basicEvidence()
@@ -108,6 +111,7 @@ func TestEvidenceAndReportDiagnosticsNameFilePositions(t *testing.T) {
 }
 
 func TestRepositoryDiagnosticsNameFilePositions(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "repository-findings-name-the-file-and-the-position")
 	zeta := basicManifest("billing", "billing/zeta").Features[0]
 	zeta.Relations = []Relation{
 		{Kind: RelationKindParent, Target: "billing/alpha"},
