@@ -223,14 +223,10 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("cloud", "runtime", "typescript", ManifestFilename): true,
 		filepath.Join("intelligence", "areas", ManifestFilename):          true,
 
-		// The cache, doctor, http-routes, platform and telemetry protocols name
-		// the acceptance checks of their contracts, which their own tests and
-		// their implementers observe, in the verification block.
+		// The cache, doctor, features, http-routes, platform and telemetry
+		// protocols name the acceptance checks of their contracts, which their own
+		// tests and their implementers observe, in the verification block.
 		filepath.Join("protocols", "cache", ManifestFilename):       true,
-
-		// The doctor, features, http-routes, platform and telemetry protocols
-		// name the acceptance checks of their contracts, which their own tests
-		// and their implementers observe, in the verification block.
 		filepath.Join("protocols", "doctor", ManifestFilename):      true,
 		filepath.Join("protocols", "features", ManifestFilename):    true,
 		filepath.Join("protocols", "http-routes", ManifestFilename): true,
