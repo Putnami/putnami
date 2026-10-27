@@ -17,7 +17,7 @@ The normative artifacts are the JSON Schema [`schemas/site-content-bundle.json`]
 
 | Role | Implementation |
 | --- | --- |
-| Producer (out of repo) | Putnami Cloud's docs pipeline builds a bundle with `BuildArchive` and publishes it to the put registry. No producer lives in this repository. |
+| Producer (in repo) | `cloud/extension` (`internal/distributioncli`) builds a bundle from a site-content section with `BuildArchive` and publishes it to the put registry. |
 | Consumer (in repo) | `sites/putnami.dev` pins a digest in `content.lock.json`, fetches by digest, verifies, and overlays into `.gen/public/docs` (`src/lib/content/`). The user-facing behaviour is documented in [`sites/putnami.dev/doc/02-concepts/site-content-bundles.md`](../../sites/putnami.dev/doc/02-concepts/site-content-bundles.md). |
 | Reference implementation | This package: `BuildArchive`, `VerifyArchive`, `VerifyPayload`, `ValidateMergePlan`, and `ValidatePrefixOwners` are the semantics both sides must reproduce. |
 
@@ -101,19 +101,30 @@ yet carrying a stable cross-implementation commitment.
   (`sites/putnami.dev/src/lib/content/sitecontent.ts`) is a hand-written
   TypeScript port that reproduces this package's rules and error codes but is
   tested against fixtures **ported** from this corpus rather than the corpus
-  itself, so the two can drift without a test failing. The producer lives in
-  another repository and runs no conformance suite here. Promotion needs the
+  itself, so the two can drift without a test failing. Promotion needs the
   TypeScript port to consume `protocols/sitecontent/fixtures` directly, the way
   the platform and http-routes ports already do.
 - Nothing silently regresses meanwhile: a bundle that fails verification fails
   the site build in CI, and a newer format major is skipped in favour of baked
   content.
 
-**Owning user feature** — none in this repository. The user-visible outcome —
-documentation produced elsewhere appears in the site's navigation and search —
-is owned by `sites/putnami.dev`, which documents it in
-[`doc/02-concepts/site-content-bundles.md`](../../sites/putnami.dev/doc/02-concepts/site-content-bundles.md);
-this package owns only the wire that outcome travels on. Declaring a separate
-product feature for the wire would split one user outcome across two owners. The
-durable decisions live in [`doc/adr/`](doc/adr/) rather than in a spec, which by
-contract details exactly one authored feature.
+## Feature and spec
+
+The module owns the feature of its contract,
+`sitecontent/content-bundle-contract`, specified in
+[`specs/content-bundle-contract.json`](specs/content-bundle-contract.json).
+The tests here prove the pinned versions, the strict manifest, the path, mount
+and digest grammar, the payload and archive rules, the newer-major fallback and
+the merge rules. The implementers prove the same contract under their own
+checks:
+
+- `cloud/extension` (`the-cloud-extension-…`) builds byte-identical,
+  conformant bundles and refuses a nonconformant source.
+- `sites/putnami.dev` (`the-site-…`) hashes, parses, verifies, falls back and
+  refuses colliding mounts the way this package does.
+
+The user-visible outcome, documentation produced elsewhere appearing in the
+site's navigation and search, stays with `sites/putnami.dev`, which documents
+it in
+[`doc/02-concepts/site-content-bundles.md`](../../sites/putnami.dev/doc/02-concepts/site-content-bundles.md).
+The durable decisions live in [`doc/adr/`](doc/adr/).
