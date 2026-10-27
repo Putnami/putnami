@@ -424,3 +424,48 @@ func copyTree(t *testing.T, src, dst string, names ...string) {
 		}
 	}
 }
+
+// TestContributorBuildLoopPushesDeclarationsBeforeCode pins the intent-first
+// order of build: the declarations go first and alone, the code goes on
+// without waiting, and the comments are read and answered at each checkpoint.
+func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "intent-first-publication", "the-build-loop-pushes-declarations-before-code")
+	build := filepath.Join(contributorRoot(t), "src", "skills", "build")
+	read := func(rel string) string {
+		t.Helper()
+		content, err := os.ReadFile(filepath.Join(build, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(content)
+	}
+	loop := read("references/loop.md")
+	start := strings.Index(loop, "\n## Intent first\n")
+	end := strings.Index(loop, "\n## One intent, gated phases\n")
+	if start < 0 || end < start {
+		t.Fatalf("loop.md has no Intent first section before the phases section")
+	}
+	section := strings.Join(strings.Fields(loop[start:end]), " ")
+	for _, want := range []string{
+		"`putnami.features.json`", "`specs/*.json`", "`specs.baseline.json`",
+		"`putnami.architecture.json`", "`decisions.json`", "decision record (ADR)",
+		"commit them alone", "before any implementation commit",
+		"without waiting for an approval",
+		"`proposals status`", "`proposals comments`", "`proposals review`",
+		"before the next code checkpoint",
+		"goes in its own commit, which touches declarations only",
+		"before the ready finalization",
+		"changes no declaration keeps the order",
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("the Intent first section of loop.md lacks %q", want)
+		}
+	}
+	skill := strings.Join(strings.Fields(read("SKILL.md")), " ")
+	for _, want := range []string{"the declarations as its first checkpoint", `"Intent first"`} {
+		if !strings.Contains(skill, want) {
+			t.Errorf("build SKILL.md lacks %q", want)
+		}
+	}
+}

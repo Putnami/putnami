@@ -155,7 +155,7 @@ func TestCommentsListReviewBodiesLineCommentsAndConversationOnce(t *testing.T) {
 		seen[id] = true
 	}
 
-	for _, cursor := range []string{"p1.n1", "x.p1.n1", "r.", "c.forged"} {
+	for _, cursor := range []string{"p1.n1", "x.p1.n1", "r.", "r.p1.n1", "r.n99999999999999999999", "c.forged"} {
 		failure := h.fails("proposals", "comments", `{"ref":`+refJSON(proposal.Ref)+`,"page":{"cursor":"`+cursor+`"}}`, collab.OutcomeInvalid)
 		if failure.Reason != collab.ReasonRequestInvalid {
 			t.Fatalf("cursor %q: %+v", cursor, failure)
@@ -163,6 +163,36 @@ func TestCommentsListReviewBodiesLineCommentsAndConversationOnce(t *testing.T) {
 	}
 	h.fails("proposals", "comments", `{"ref":{"source":"github:acme/other","id":"`+strconv.Itoa(n)+`"}}`, collab.OutcomeNotFound)
 	h.fails("proposals", "comments", `{"ref":{"source":"github:acme/app","id":"999"}}`, collab.OutcomeNotFound)
+}
+
+// TestAReviewSubmittedAfterANewerOneIsListedOnce: GitHub lists reviews in
+// submission order, and a review started as a pending draft keeps the lower
+// identifier it got then. Submitted after a newer review, its body is still
+// listed once, in identifier order, whatever the page size.
+func TestAReviewSubmittedAfterANewerOneIsListedOnce(t *testing.T) {
+	spectest.Proves(t, feature, "proposal-comments", "comments-list-review-bodies-line-comments-and-conversation-once")
+	h := newHarness(t)
+	proposal := h.openProposal("Drafted review")
+	n := number(t, proposal.Ref)
+	drafted := h.review(n, "octocat", "PENDING", "Started first, submitted last.")
+	newer := h.review(n, "hubot", "COMMENTED", "Started last, submitted first.")
+	thanks := h.conversationComment(n, fakeComment{user: "octocat", body: "Thanks."})
+	h.fake.mu.Lock()
+	drafted.state, drafted.submitted = "COMMENTED", h.fake.tick()
+	h.fake.reviews[n] = []*fakeReview{newer, drafted}
+	h.fake.mu.Unlock()
+
+	want := []string{"review-" + strconv.FormatInt(drafted.id, 10), "review-" + strconv.FormatInt(newer.id, 10),
+		"comment-" + strconv.FormatInt(thanks.id, 10)}
+	for _, size := range []int{1, 2, 20} {
+		listed := h.comments(proposal.Ref, size, nil)
+		if got := refIDs(listed); !slices.Equal(got, want) {
+			t.Fatalf("pages of %d list %v, want %v", size, got, want)
+		}
+		if listed[0].Body != "Started first, submitted last." || listed[1].Body != "Started last, submitted first." {
+			t.Fatalf("pages of %d list the bodies %q and %q", size, listed[0].Body, listed[1].Body)
+		}
+	}
 }
 
 // TestAReviewBodyIsListedWithoutItsIdempotencyMarker: GitHub keeps the

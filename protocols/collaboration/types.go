@@ -463,8 +463,10 @@ type ProposalCommentsInput struct {
 }
 
 // ProposalComment is one text someone wrote on a change proposal: the body of
-// a review, a comment on one line of a file, or a comment on the proposal as a
-// whole. A comment on no file line has no Path.
+// a review, a comment on a file or on one line of it, or a comment on the
+// proposal as a whole. A comment on no file has no Path. A comment on a whole
+// file has a Path and no Line, and so does a comment whose line was deleted or
+// is no longer in the change.
 type ProposalComment struct {
 	// Ref is the comment's source-qualified opaque reference.
 	Ref Ref `json:"ref"`
@@ -480,10 +482,13 @@ type ProposalComment struct {
 	// anchored to, absent for a comment on no file.
 	Path string `json:"path,omitempty"`
 	// Line is the line of Path, in the file at Commit, the comment is
-	// anchored to, when the line still exists. It is never set without Path,
-	// and the first line is 1.
+	// anchored to. It is absent for a comment on the whole file, and for one
+	// whose line was deleted or is no longer in the change. It is never set
+	// without Path, and the first line is 1.
 	Line *int `json:"line,omitempty"`
-	// Commit is the commit the comment was written on, when known.
+	// Commit is the commit whose file Line refers to, when known. It is not
+	// necessarily the commit the comment was written on: a provider may report
+	// where the comment stands now.
 	Commit string `json:"commit,omitempty"`
 	// Body is the comment's text.
 	Body string `json:"body"`

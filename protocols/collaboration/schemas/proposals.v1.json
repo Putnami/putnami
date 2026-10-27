@@ -91,7 +91,7 @@
     },
     "comment": {
       "type": "object",
-      "description": "One text someone wrote on a proposal: a review's body, a comment on one line of a file, or a comment on the proposal as a whole. A comment on no file line has no path.",
+      "description": "One text someone wrote on a proposal: a review's body, a comment on a file or on one line of it, or a comment on the proposal as a whole. A comment on no file has no path.",
       "additionalProperties": false,
       "required": ["ref", "body"],
       "properties": {
@@ -101,8 +101,8 @@
         "submittedAt": { "$ref": "collaboration.json#/$defs/timestamp" },
         "review": { "$ref": "collaboration.json#/$defs/ref", "description": "The review the comment belongs to." },
         "path": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "The repository-relative path of the file the comment is anchored to." },
-        "line": { "type": "integer", "minimum": 1, "description": "The line of path, in the file at commit, the comment is anchored to; absent when that line no longer exists. Never present without path." },
-        "commit": { "$ref": "collaboration.json#/$defs/commit" },
+        "line": { "type": "integer", "minimum": 1, "description": "The line of path, in the file at commit, the comment is anchored to; absent for a comment on the whole file, and when that line was deleted or is no longer in the change. Never present without path." },
+        "commit": { "$ref": "collaboration.json#/$defs/commit", "description": "The commit whose file line refers to; not necessarily the commit the comment was written on." },
         "body": { "type": "string", "minLength": 1 }
       }
     },

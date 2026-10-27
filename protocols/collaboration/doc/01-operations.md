@@ -104,8 +104,10 @@ nobody to merge.
 `comments` lists what people wrote on one proposal. A comment is `ref` and
 `body`, plus, when known, `url`, `author`, `submittedAt`, `review` (the ref of
 the review it belongs to) and the file line it is anchored to: `path`, `line`
-(the first line is 1) and `commit`. A comment on no file line has no `path`. A
-comment whose line is gone keeps its `path` without a `line`, and a `line`
+(the first line is 1) and `commit`, the commit whose file `line` refers to,
+which is not necessarily the commit the comment was written on. A comment on
+no file has no `path`. A comment on a whole file, and one whose line was
+deleted or is no longer in the change, has a `path` and no `line`. A `line`
 never comes without its `path`. The comment and its review are in the source
 of the proposal. A provider that offers `comments` lists the body of a
 published review once across pages, naming that review.

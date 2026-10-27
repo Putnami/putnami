@@ -128,14 +128,18 @@ GitHub token, from everything it writes.
   not reported. GitHub refuses an approval or a change request by the pull
   request's author: that is `invalid`.
 - **Comments.** `comments` lists the body of each submitted review, then each
-  comment on a file line, then each conversation comment, each list oldest
-  first. A review body is listed without the hidden comment that records an
+  comment on a file line, then each conversation comment, each list by
+  ascending identifier. A review body is listed without the hidden comment that records an
   idempotency key, and a review whose body is empty, or still pending, is no
   comment; a dismissed review's body is listed. A review body names its own
   review, and a line comment names the review it was written in, with its
-  `path`, `line` and `commit`. A line comment whose line left the diff keeps
-  its `path` without a `line`. A conversation comment names no review and no
-  file.
+  `path`, `line` and `commit`: the commit GitHub positions the comment on now,
+  whose file `line` refers to. A line comment whose line left the diff, and a
+  comment on a whole file, have a `path` and no `line`. A conversation comment
+  names no review and no file. Review bodies are read whole, at most 1,000
+  reviews as for `status`, and listed by review identifier: GitHub lists
+  reviews in submission order, and a review started as a draft keeps the
+  older identifier it got then.
 - **Merge** needs `allowMerge` and an `expectedHeadCommit` that is still the
   head. Binding the provider authorizes nobody to merge.
 

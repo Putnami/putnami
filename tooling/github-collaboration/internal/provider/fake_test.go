@@ -933,8 +933,10 @@ func (f *fakeGitHub) listLineComments(w http.ResponseWriter, r *http.Request, ma
 		writeJSON(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
 		return
 	}
-	if query := r.URL.Query(); query.Get("sort") != "created" || query.Get("direction") != "asc" {
-		f.t.Errorf("line comments listed without sort=created&direction=asc: %s", r.URL.RawQuery)
+	// Without a sort, GitHub lists line comments by ascending identifier,
+	// which is the order the fake answers.
+	if query := r.URL.Query(); query.Has("sort") || query.Has("direction") {
+		f.t.Errorf("line comments listed with a sort, which GitHub then follows instead of the identifier order: %s", r.URL.RawQuery)
 	}
 	comments := make([]map[string]any, 0, len(f.lineComments[number]))
 	for _, comment := range f.lineComments[number] {

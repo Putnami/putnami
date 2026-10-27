@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"net/url"
@@ -811,8 +812,8 @@ func (s *proposalSession) reviewWithKey(number int, marker idempotency) (*ghRevi
 	return nil, nil
 }
 
-// A comments answer walks three GitHub lists of a pull request in a fixed
-// order, each oldest first: its reviews, for their bodies, its line comments
+// A comments answer walks three lists of a pull request in a fixed order, each
+// by ascending identifier: its reviews, for their bodies, its line comments
 // and its conversation comments. Its cursor is the list it resumes, "r", "l"
 // or "c", a dot, and that list's own cursor, so each comment present
 // throughout a traversal is listed once.
@@ -845,12 +846,10 @@ func (s *proposalSession) comments(input any) (any, *collab.Failure) {
 	number := strconv.Itoa(pull.Number)
 	sources := []commentSource{
 		{"r", func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
-			return commentsOf(listed[ghReview](s, s.repo.path("pulls", number, "reviews"), nil, "the reviews of pull request #"+number),
-				func(review *ghReview) int64 { return review.ID }, s.reviewComment, size, from)
+			return s.reviewBodies(pull.Number, size, from)
 		}},
 		{"l", func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
-			oldestFirst := url.Values{"sort": {"created"}, "direction": {"asc"}}
-			return commentsOf(listed[ghReviewComment](s, s.repo.path("pulls", number, "comments"), oldestFirst, "the line comments of pull request #"+number),
+			return commentsOf(listed[ghReviewComment](s, s.repo.path("pulls", number, "comments"), nil, "the line comments of pull request #"+number),
 				func(comment *ghReviewComment) int64 { return comment.ID }, s.lineComment, size, from)
 		}},
 		{"c", func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
@@ -903,7 +902,8 @@ func listed[T any](s *proposalSession, path string, query url.Values, what strin
 }
 
 // commentsOf fills a page of the comments one GitHub list renders. GitHub
-// lists each of them by ascending identifier, the order collect resumes in.
+// lists line comments and conversation comments by ascending identifier when
+// no sort is asked for, the order collect resumes in.
 func commentsOf[T any](fetch fetchPage[T], id func(*T) int64, render func(*T) (collab.ProposalComment, bool), size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
 	kept := func(item T) bool {
 		_, comment := render(&item)
@@ -919,6 +919,50 @@ func commentsOf[T any](fetch fetchPage[T], id func(*T) int64, render func(*T) (c
 		comments = append(comments, comment)
 	}
 	return comments, next, nil
+}
+
+var reviewCursorPattern = regexp.MustCompile(`^n([0-9]{1,19})$`)
+
+// reviewBodies fills a page of review bodies. GitHub lists the reviews of a
+// pull request in submission order, and a review started as a pending draft
+// keeps the lower identifier it got then, so it is listed after newer reviews
+// once submitted. Every review is therefore read, as status reads them, and
+// paged by ascending identifier: the cursor "n<id>" is the last identifier a
+// page listed. A review submitted during a traversal below that identifier is
+// not listed by it; every review submitted throughout is listed once.
+func (s *proposalSession) reviewBodies(number, size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
+	var after int64
+	if from != "" {
+		match := reviewCursorPattern.FindStringSubmatch(from)
+		var err error
+		if match != nil {
+			after, err = strconv.ParseInt(match[1], 10, 64)
+		}
+		if match == nil || err != nil {
+			return nil, "", collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "cursor %q was not issued by this provider", from)
+		}
+	}
+	reviews, failure := s.reviews(number)
+	if failure != nil {
+		return nil, "", failure
+	}
+	slices.SortFunc(reviews, func(a, b ghReview) int { return cmp.Compare(a.ID, b.ID) })
+	comments := make([]collab.ProposalComment, 0, size)
+	for i := range reviews {
+		if reviews[i].ID <= after {
+			continue
+		}
+		comment, kept := s.reviewComment(&reviews[i])
+		if !kept {
+			continue
+		}
+		if len(comments) == size {
+			return comments, "n" + strconv.FormatInt(after, 10), nil
+		}
+		comments = append(comments, comment)
+		after = reviews[i].ID
+	}
+	return comments, "", nil
 }
 
 // reviewComment renders the body of a submitted review, without the
