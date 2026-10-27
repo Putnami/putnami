@@ -436,6 +436,10 @@ func (u *upgrade) pinGoWork() bool {
 
 	// Stage the rewrite in a sibling file so a failure cannot corrupt go.work.
 	staged := u.goWork + ".putnami-upgrade." + strconv.Itoa(os.Getpid())
+	// A signal ends the job as soon as the go command in flight returns, so
+	// this function never removes the copy then. The rollback restores only
+	// the surfaces the transaction snapshotted, so the trap removes the copy.
+	defer u.Trap().OnSignal(func() { _ = os.Remove(staged) })()
 	if err := copyFile(u.goWork, staged); err != nil {
 		_ = os.Remove(staged)
 		u.Emit.Log("error", "Cannot stage "+u.goWork+" for editing")

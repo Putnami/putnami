@@ -92,6 +92,9 @@ type Provider struct {
 	sets        map[string]distribution.ReleaseSet
 	heads       map[string]distribution.ReleaseSetRef
 	generations map[string]uint64
+
+	// recorded is closed, and replaced, each time a call is recorded.
+	recorded chan struct{}
 }
 
 // releaseRecord is the first answer to one plan digest's release.
@@ -113,6 +116,7 @@ func New(config Config) *Provider {
 	}
 	return &Provider{
 		config:      config,
+		recorded:    make(chan struct{}),
 		unanswered:  maps.Clone(config.Unanswered),
 		released:    make(map[string]releaseRecord),
 		sets:        make(map[string]distribution.ReleaseSet),
@@ -253,6 +257,8 @@ func (s *Session) handle(request *registry.CredentialRequest) (any, *registry.Cr
 		call.Answered = false
 	}
 	p.calls = append(p.calls, call)
+	close(p.recorded)
+	p.recorded = make(chan struct{})
 	p.mu.Unlock()
 	return payload, refusal, call.Answered
 }
@@ -513,8 +519,32 @@ func (p *Provider) Calls() []Call {
 
 // CallsOf returns the requests of op read so far, in order.
 func (p *Provider) CallsOf(op registry.CredentialOp) []Call {
+	return callsOf(p.Calls(), op)
+}
+
+// AwaitCalls returns the requests of op, in order, once the provider has
+// recorded n of them, or the ones recorded so far when ctx ends first. The
+// provider records a request once it has applied it, which can come after
+// the engine stopped waiting for its answer.
+func (p *Provider) AwaitCalls(ctx context.Context, op registry.CredentialOp, n int) []Call {
+	for {
+		p.mu.Lock()
+		calls, recorded := callsOf(p.calls, op), p.recorded
+		p.mu.Unlock()
+		if len(calls) >= n {
+			return calls
+		}
+		select {
+		case <-recorded:
+		case <-ctx.Done():
+			return calls
+		}
+	}
+}
+
+func callsOf(all []Call, op registry.CredentialOp) []Call {
 	var calls []Call
-	for _, call := range p.Calls() {
+	for _, call := range all {
 		if call.Op == op {
 			calls = append(calls, call)
 		}

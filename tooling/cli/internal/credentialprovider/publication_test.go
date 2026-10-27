@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -324,9 +325,21 @@ func TestAnUnansweredUploadEndsTheSession(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "an-unanswered-upload-ends-the-session")
 	ctx := context.Background()
-	reg, provider := npmRegistry(t, providertest.Config{Unanswered: map[registry.CredentialOp]int{registry.CredentialOpUpload: 1}})
+	// The provider finishes applying the upload only once the engine gave up
+	// on it, as a loaded machine can order them: the engine's bound fires
+	// before the provider records the request.
+	gaveUp := make(chan struct{})
+	reg, provider := npmRegistry(t, providertest.Config{
+		Unanswered: map[registry.CredentialOp]int{registry.CredentialOpUpload: 1},
+		UploadAnswer: func(_ registry.UploadParams, answer registry.UploadResult) registry.UploadResult {
+			<-gaveUp
+			return answer
+		},
+	})
 	const timeout = 300 * time.Millisecond
 	_, publication := publicationBroker(t, provider, WithUploadTimeout(timeout))
+	release := sync.OnceFunc(func() { close(gaveUp) })
+	t.Cleanup(release)
 	open := testOpenParams(t, "0.3.0", []string{"canary"}, nil)
 	if err := publication.Open(ctx, open); err != nil {
 		t.Fatal(err)
@@ -335,14 +348,18 @@ func TestAnUnansweredUploadEndsTheSession(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "did not answer upload within "+timeout.String()) {
 		t.Fatalf("unanswered upload: %v, want an error naming the bound", err)
 	}
-	if calls := provider.CallsOf(registry.CredentialOpUpload); len(calls) != 1 || calls[0].Answered {
-		t.Fatalf("upload requests %+v, want one unanswered request and no retry", calls)
-	}
 	if _, err := publication.Upload(ctx, testUpload(t, open, reg.Server.URL)); err == nil {
 		t.Fatal("a session that left an upload unanswered serves another upload")
 	}
 	if _, err := publication.Release(ctx, testReleaseParams(open)); err == nil {
 		t.Fatal("a session that left an upload unanswered serves a release")
+	}
+
+	release()
+	recorded, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if calls := provider.AwaitCalls(recorded, registry.CredentialOpUpload, 1); len(calls) != 1 || calls[0].Answered {
+		t.Fatalf("upload requests %+v, want one unanswered request and no retry", calls)
 	}
 	if got := len(provider.CallsOf(registry.CredentialOpUpload)) + len(provider.CallsOf(registry.CredentialOpRelease)); got != 1 {
 		t.Fatalf("the provider read %d upload and release requests, want only the first upload", got)
