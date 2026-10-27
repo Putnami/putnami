@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -110,18 +112,21 @@ func assertFieldParity(t *testing.T, typeName string, schemaFields, goFields []s
 }
 
 func TestDrift_UnitOfWork(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "UnitOfWork",
 		schemaRootProperties(t, unitOfWorkSchemaPath),
 		goTypeJSONFields(t, UnitOfWork{}))
 }
 
 func TestDrift_Result(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Result",
 		schemaRootProperties(t, resultSchemaPath),
 		goTypeJSONFields(t, Result{}))
 }
 
 func TestDrift_SchemaRequiredFields(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-schemas-and-the-go-types-agree", "the-schemas-require-and-pin-what-go-requires")
 	assertRequiredFields(t, "UnitOfWork",
 		schemaRootRequired(t, unitOfWorkSchemaPath),
 		[]string{"propagation", "protocolVersion"})
@@ -134,6 +139,7 @@ func TestDrift_SchemaRequiredFields(t *testing.T) {
 // to the current ProtocolVersion, so an editor validating an authored document
 // agrees with the Go parser.
 func TestDrift_SchemaProtocolVersionPinned(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-schemas-and-the-go-types-agree", "the-schemas-require-and-pin-what-go-requires")
 	for _, path := range []string{unitOfWorkSchemaPath, resultSchemaPath} {
 		t.Run(path, func(t *testing.T) {
 			var schema struct {
@@ -160,6 +166,7 @@ func TestDrift_SchemaProtocolVersionPinned(t *testing.T) {
 // TestDrift_SchemaEnumParity asserts the closed enums in the schemas match the
 // Go enum values, so a schema edit that drops or adds a value fails the guard.
 func TestDrift_SchemaEnumParity(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-schemas-and-the-go-types-agree", "the-schema-enums-match-the-go-enums")
 	t.Run("propagation", func(t *testing.T) {
 		assertEnumParity(t, unitOfWorkSchemaPath, "propagation",
 			[]string{string(PropagationRequired), string(PropagationRequiresNew), string(PropagationNested)})

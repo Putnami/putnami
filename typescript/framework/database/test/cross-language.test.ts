@@ -23,7 +23,7 @@ describe('cross-language equivalence', () => {
     'database producer matches the shared golden fixture',
     {
       feature: 'typescript/relational-persistence',
-      requirement: 'cross-language-conformance',
+      requirement: 'declared-infrastructure',
       check: 'the-producer-matches-the-shared-golden-fixture',
     },
     async () => {

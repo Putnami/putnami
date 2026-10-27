@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/transaction"
 )
 
@@ -32,6 +33,7 @@ func execTag(tag string) func(context.Context, string, ...any) (pgconn.CommandTa
 // --- Classifier ---
 
 func TestClassifyOutcome(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-classifier-maps-postgres-errors-to-outcomes")
 	tests := []struct {
 		name    string
 		err     error
@@ -62,6 +64,7 @@ func TestClassifyOutcome(t *testing.T) {
 // TestClassifyOutcome_WrappedError proves the classifier walks the error chain,
 // so a pg error wrapped by errors.Wrapf is still recognized.
 func TestClassifyOutcome_WrappedError(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-classifier-maps-postgres-errors-to-outcomes")
 	wrapped := wrapQueryError(context.Background(), &pgconn.PgError{Code: "40001"}, "update")
 	got, ok := ClassifyOutcome(wrapped)
 	if !ok || got != transaction.OutcomeRetryableSerializationFailure {
@@ -70,6 +73,7 @@ func TestClassifyOutcome_WrappedError(t *testing.T) {
 }
 
 func TestIsSerializationFailureAndDeadlock(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-classifier-maps-postgres-errors-to-outcomes")
 	if !IsSerializationFailure(&pgconn.PgError{Code: "40001"}) {
 		t.Error("40001 should be a serialization failure")
 	}
@@ -90,6 +94,7 @@ func TestIsSerializationFailureAndDeadlock(t *testing.T) {
 // --- CompareAndSet ---
 
 func TestCompareAndSet(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-helpers-return-an-outcome")
 	tests := []struct {
 		name     string
 		affected string // command tag the UPDATE returns
@@ -131,6 +136,7 @@ func TestCompareAndSet_InvalidColumnPanics(t *testing.T) {
 // --- ConsumeOnce ---
 
 func TestConsumeOnce(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-helpers-return-an-outcome")
 	tests := []struct {
 		name     string
 		affected string
@@ -198,6 +204,7 @@ func TestConsumeOnce_ParamNumbering(t *testing.T) {
 // --- Serialization failure surfaced from a helper ---
 
 func TestCompareAndSet_SerializationFailure(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-helpers-return-an-outcome")
 	q := &mockQuerier{
 		execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 			return pgconn.CommandTag{}, &pgconn.PgError{Code: "40001"}
@@ -216,6 +223,7 @@ func TestCompareAndSet_SerializationFailure(t *testing.T) {
 // TestCompareAndSet_GenuineErrorPassthrough proves a genuine I/O error is returned
 // raw (not masked as a business outcome).
 func TestCompareAndSet_GenuineErrorPassthrough(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "the-helpers-return-an-outcome")
 	q := &mockQuerier{
 		execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 			return pgconn.CommandTag{}, errors.New("connection refused")
@@ -263,6 +271,7 @@ func TestUpdateWhere_Error(t *testing.T) {
 // the successor insert are BOTH issued on the one transaction begun by WithTx
 // (atomic predecessor→successor), and that the successful path commits once.
 func TestRotate_AppliedInsideTx(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "a-rotation-is-one-outcome-for-two-writes")
 	var stmts []string
 	commits := 0
 	mq := &mockQuerier{
@@ -321,6 +330,7 @@ func TestRotate_AppliedInsideTx(t *testing.T) {
 // rotated (conflict), so rotation never installs a successor for a stale
 // predecessor.
 func TestRotate_PredecessorConflictSkipsInsert(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "a-rotation-is-one-outcome-for-two-writes")
 	var inserts int
 	q := &mockQuerier{
 		execFn: func(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
@@ -356,6 +366,7 @@ func TestRotate_PredecessorConflictSkipsInsert(t *testing.T) {
 // TestRotate_SuccessorUniqueViolation maps a unique_violation on the successor
 // insert to a conflict outcome rather than a raw error.
 func TestRotate_SuccessorUniqueViolation(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-go-adapter-answers-with-an-outcome", "a-rotation-is-one-outcome-for-two-writes")
 	q := &mockQuerier{
 		execFn: func(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
 			if strings.HasPrefix(strings.TrimSpace(sql), "INSERT") {

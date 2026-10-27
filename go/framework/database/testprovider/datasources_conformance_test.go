@@ -12,6 +12,7 @@ import (
 
 	pdb "go.putnami.dev/protocol/database"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // datasourcesCorpus is the datasource-selection corpus both test providers run.
@@ -31,6 +32,7 @@ type datasourcesCase struct {
 }
 
 func TestDatasourceSelectionCorpus(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-passes-the-selection-corpus")
 	raw, err := os.ReadFile(datasourcesCorpus)
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +103,7 @@ func TestDatasourceSelectionCorpus(t *testing.T) {
 }
 
 func TestSelectDatasources_LeavesTheCallersBindingIntact(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-passes-the-selection-corpus")
 	tb := &pdb.TestBinding{
 		Mode: pdb.TestModeRequire,
 		Databases: map[string]pdb.Database{
@@ -128,6 +131,7 @@ func TestSelectDatasources_LeavesTheCallersBindingIntact(t *testing.T) {
 // planning it fails before any connection opens. The selected entry points at a
 // closed local port, so a narrowed run fails later, while connecting to it.
 func TestProvision_PlansOnlyTheSelectedDatasources(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-test-provider-reads-the-test-binding", "the-provider-passes-the-selection-corpus")
 	tb := &pdb.TestBinding{
 		KeepDatabases: true,
 		Databases: map[string]pdb.Database{

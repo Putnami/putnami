@@ -55,7 +55,7 @@ describe('cross-language equivalence', () => {
     'migration producer matches the shared golden fixture',
     {
       feature: 'typescript/migration-orchestration',
-      requirement: 'cross-language-bundle',
+      requirement: 'infra-aggregation',
       check: 'the-producer-output-matches-the-shared-golden-fixture',
     },
     async () => {
@@ -83,9 +83,9 @@ describe('cross-language equivalence', () => {
   specTest(
     'bundle digest matches the shared golden fixture',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'cross-language-bundle',
-      check: 'the-bundle-digest-matches-the-shared-golden-fixture',
+      feature: 'migration/migration-contract',
+      requirement: 'the-digest-is-identical-across-languages',
+      check: 'the-typescript-runner-reproduces-the-golden-digests',
     },
     async () => {
       const bundle = JSON.parse(await readFile(BUNDLE_FIXTURE_PATH, 'utf8')) as Bundle;
@@ -105,9 +105,9 @@ describe('cross-language equivalence', () => {
   specTest(
     'bundle digest matches Go for a bundle that sets compatible',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'compatible-marker-parity',
-      check: 'compatible-bundle-digest-matches-go',
+      feature: 'migration/migration-contract',
+      requirement: 'the-digest-is-identical-across-languages',
+      check: 'the-typescript-runner-reproduces-the-golden-digests',
     },
     async () => {
       const bundle = JSON.parse(await readFile(COMPATIBLE_BUNDLE_FIXTURE_PATH, 'utf8')) as Bundle;

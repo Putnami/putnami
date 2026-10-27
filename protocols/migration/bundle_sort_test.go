@@ -3,12 +3,15 @@ package migration
 import (
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestSortOperations pins the canonical operation ordering exported for
 // external emitters: kind, then target, then namespace, then orderKey, then
 // name, with the up-payload hash breaking any remaining tie.
 func TestSortOperations(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-digest-addresses-the-migration-content", "provenance-and-order-leave-the-digest-unchanged")
 	op := func(kind OperationKind, target, ns, orderKey, name, hash string) BundleOperation {
 		return BundleOperation{
 			Kind:      kind,

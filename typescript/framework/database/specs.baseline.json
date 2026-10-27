@@ -3,7 +3,6 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "typescript/relational-persistence#cancellation",
-    "typescript/relational-persistence#cross-language-conformance",
     "typescript/relational-persistence#declared-infrastructure",
     "typescript/relational-persistence#lazy-transaction",
     "typescript/relational-persistence#partial-commit-is-an-error",

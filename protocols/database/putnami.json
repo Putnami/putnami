@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/database",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -11,9 +11,11 @@
   "options": {
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "The declaration contract sits between a project and a deployer; what a developer uses is the database packages."
   }
 }

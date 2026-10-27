@@ -41,12 +41,8 @@
       "text": "The transaction boundary record and the `sql.tx.rollback.<cause>` counter carry a classified cause code only. No error message, bound parameter value, or row datum is read or emitted, and a rollback record never carries an error object."
     },
     {
-      "id": "cross-language-conformance",
-      "text": "The transaction and concurrency behaviour is asserted against the shared cross-language corpus, so the TypeScript and Go adapters cannot drift on outcomes, causes, or metric names."
-    },
-    {
       "id": "declared-infrastructure",
-      "text": "A project that declares tables emits the database and schemas it needs into its own infra requirements sidecar, including tables that live only in a dependency package, so deployment requirements are derived from code rather than restated by hand."
+      "text": "A project that declares tables emits the database and schemas it needs into its own infra requirements sidecar, including tables that live only in a dependency package, so deployment requirements are derived from code rather than restated by hand. For the shared equivalence tables, its output equals protocols/infra/fixtures/equivalence/database.golden.json byte for byte."
     }
   ],
   "decisions": ["typescript/framework/database/doc/adr/0001-the-request-is-the-transaction-boundary.md"]

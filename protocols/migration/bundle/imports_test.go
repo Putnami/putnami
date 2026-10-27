@@ -8,12 +8,15 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestPackageImportsOnlyTheStandardLibrary holds the package to the standard
 // library, so a dependency-light publisher imports it without the parent
 // protocol's dependencies.
 func TestPackageImportsOnlyTheStandardLibrary(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-bundle-packs-to-one-tar", "the-transport-imports-only-the-standard-library")
 	names, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)

@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -126,54 +128,63 @@ func assertFieldParity(t *testing.T, typeName string, schemaFields, goFields []s
 }
 
 func TestDrift_RequirementManifest(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "RequirementManifest",
 		schemaRootProperties(t, requirementSchemaPath),
 		goTypeJSONFields(t, RequirementManifest{}))
 }
 
 func TestDrift_Requirement(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Requirement",
 		schemaDefProperties(t, requirementSchemaPath, "requirement"),
 		goTypeJSONFields(t, Requirement{}))
 }
 
 func TestDrift_Binding(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Binding",
 		schemaRootProperties(t, bindingSchemaPath),
 		goTypeJSONFields(t, Binding{}))
 }
 
 func TestDrift_BindingDatabase(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Database",
 		schemaDefProperties(t, bindingSchemaPath, "database"),
 		goTypeJSONFields(t, Database{}))
 }
 
 func TestDrift_BindingConnection(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Connection",
 		schemaDefProperties(t, bindingSchemaPath, "connection"),
 		goTypeJSONFields(t, Connection{}))
 }
 
 func TestDrift_TestBinding(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "TestBinding",
 		schemaRootProperties(t, testBindingSchemaPath),
 		goTypeJSONFields(t, TestBinding{}))
 }
 
 func TestDrift_TestBindingDatabase(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Database",
 		schemaDefProperties(t, testBindingSchemaPath, "database"),
 		goTypeJSONFields(t, Database{}))
 }
 
 func TestDrift_TestBindingConnection(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schema-members-match-the-go-types")
 	assertFieldParity(t, "Connection",
 		schemaDefProperties(t, testBindingSchemaPath, "connection"),
 		goTypeJSONFields(t, Connection{}))
 }
 
 func TestDrift_SchemaRequiredFields(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schemas-require-and-pin-what-go-requires")
 	assertRequiredFields(t, "Requirement",
 		schemaDefRequired(t, requirementSchemaPath, "requirement"),
 		[]string{"engine", "schema"})
@@ -189,6 +200,7 @@ func TestDrift_SchemaRequiredFields(t *testing.T) {
 // to the current ProtocolVersion, so an editor validating an authored
 // manifest/binding agrees with the Go parser.
 func TestDrift_SchemaProtocolVersionPinned(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-schemas-and-the-go-types-agree", "the-schemas-require-and-pin-what-go-requires")
 	for _, path := range []string{requirementSchemaPath, bindingSchemaPath, testBindingSchemaPath} {
 		t.Run(path, func(t *testing.T) {
 			var schema struct {

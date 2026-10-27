@@ -72,21 +72,16 @@
           }
         },
         {
-          "id": "cross-language-conformance",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["the-producer-matches-the-shared-golden-fixture", "the-vendored-corpus-is-byte-identical"]
-          }
-        },
-        {
           "id": "declared-infrastructure",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["tables-derive-the-infra-requirements-sidecar", "pool-schemas-union-deduped-and-sorted"]
+            "checks": [
+              "tables-derive-the-infra-requirements-sidecar",
+              "pool-schemas-union-deduped-and-sorted",
+              "the-producer-matches-the-shared-golden-fixture"
+            ]
           }
         }
       ]

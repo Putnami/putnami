@@ -127,6 +127,21 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/database",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/database",
+          "producerProject": "/protocols/transaction"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/migration",
+          "producerProject": "/protocols/migration"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/typescript/framework/runtime",
           "producerProject": "/protocols/runtime"
         },

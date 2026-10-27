@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const conformanceSchemaPath = "schemas/conformance-manifest.json"
@@ -18,6 +19,7 @@ const conformanceSchemaPath = "schemas/conformance-manifest.json"
 // disappear. This is the non-gated guard: the manifest's own structure is
 // conformance-checked even without a Postgres, exactly like the events manifest.
 func TestConformanceManifest(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "one-behavioral-corpus-for-every-runner", "the-corpus-holds-the-required-scenarios")
 	m, diags := ParseAndValidateManifest(ConformanceManifestJSON())
 	if diag.HasErrors(diags) {
 		t.Fatalf("conformance manifest produced errors: %v", diags)
@@ -57,6 +59,7 @@ func TestConformanceManifest(t *testing.T) {
 // the on-disk conformance/manifest.json byte-for-byte, so the single source of
 // truth cannot silently drift from the accessor the exported runners consume.
 func TestConformanceManifestJSON_MatchesFile(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "one-behavioral-corpus-for-every-runner", "the-corpus-holds-the-required-scenarios")
 	onDisk, err := os.ReadFile(filepath.Join("conformance", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -71,6 +74,7 @@ func TestConformanceManifestJSON_MatchesFile(t *testing.T) {
 // every document under .../invalid must produce at least one diagnostic. This is
 // the guard-test pattern that keeps the corpus structure honest without Postgres.
 func TestConformanceManifest_Fixtures(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "one-behavioral-corpus-for-every-runner", "the-corpus-validator-refuses-each-broken-shape")
 	runManifestFixtureDir(t, "valid", false)
 	runManifestFixtureDir(t, "invalid", true)
 }
@@ -107,6 +111,7 @@ func runManifestFixtureDir(t *testing.T, kind string, wantErrors bool) {
 // fixture, so relaxing any single validation check turns a red fixture green and
 // fails here.
 func TestConformanceManifest_RejectCodes(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "one-behavioral-corpus-for-every-runner", "the-corpus-validator-refuses-each-broken-shape")
 	cases := map[string]string{
 		"duplicate-case-id.json":             ConformanceErrDuplicate,
 		"unknown-primitive.json":             ConformanceErrEnum,
@@ -141,6 +146,7 @@ func hasCode(diags []diag.Diagnostic, code string) bool {
 // schema match the Go enum values, so a schema edit that drops or adds a value —
 // silently letting a runner accept a document the other rejects — fails here.
 func TestConformanceManifest_SchemaEnumParity(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "one-behavioral-corpus-for-every-runner", "the-corpus-schema-matches-the-go-enums")
 	var root any
 	if err := json.Unmarshal(readSchemaBytes(t, conformanceSchemaPath), &root); err != nil {
 		t.Fatalf("parse schema: %v", err)

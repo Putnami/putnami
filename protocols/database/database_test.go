@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func firstErrorCode(diags []diag.Diagnostic) string {
@@ -22,6 +23,7 @@ func firstErrorCode(diags []diag.Diagnostic) string {
 func boolPtr(v bool) *bool { return &v }
 
 func TestEnumsValid(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "a-test-binding-adds-a-closed-policy", "the-enums-are-closed")
 	t.Run("engine", func(t *testing.T) {
 		if !EnginePostgres.Valid() {
 			t.Error("postgres should be valid")
@@ -71,6 +73,7 @@ func TestEnumsValid(t *testing.T) {
 }
 
 func TestValidErrorCodesPrefixed(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-shapes-parse-strictly", "each-refusal-has-its-code")
 	if len(ValidErrorCodes) == 0 {
 		t.Fatal("ValidErrorCodes is empty")
 	}
@@ -82,6 +85,7 @@ func TestValidErrorCodesPrefixed(t *testing.T) {
 }
 
 func TestParse_MalformedJSON(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-shapes-parse-strictly", "each-refusal-has-its-code")
 	bad := []byte("{")
 	if _, diags := ParseAndValidateRequirementManifest(bad); firstErrorCode(diags) != ErrorCodeParseError {
 		t.Errorf("requirement: want %s, got %v", ErrorCodeParseError, diags)
@@ -95,6 +99,7 @@ func TestParse_MalformedJSON(t *testing.T) {
 }
 
 func TestValidate_NilGuards(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-shapes-parse-strictly", "each-refusal-has-its-code")
 	if !diag.HasErrors(ValidateRequirementManifest(nil)) {
 		t.Error("nil requirement manifest should error")
 	}
@@ -107,6 +112,7 @@ func TestValidate_NilGuards(t *testing.T) {
 }
 
 func TestValidateConnection(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "a-connection-declares-exactly-one-transport", "the-transport-rule-holds-for-each-shape")
 	cases := []struct {
 		name string
 		conn *Connection
@@ -140,6 +146,7 @@ func TestValidateConnection(t *testing.T) {
 }
 
 func TestValidationErrorCodes(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-shapes-parse-strictly", "each-refusal-has-its-code")
 	cases := []struct {
 		name string
 		json string
@@ -177,6 +184,7 @@ func TestValidationErrorCodes(t *testing.T) {
 }
 
 func TestProject(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-projection-is-secret-free-and-sorted", "the-projection-is-sorted-and-adds-nothing")
 	if got := (*RequirementManifest)(nil).Project(); got != nil {
 		t.Errorf("nil manifest: want nil, got %v", got)
 	}
@@ -211,6 +219,7 @@ func TestProject(t *testing.T) {
 }
 
 func TestBindingRoundTrip(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "a-binding-resolves-each-datasource", "a-binding-round-trips")
 	data, err := os.ReadFile("fixtures/binding/valid/full.json")
 	if err != nil {
 		t.Fatal(err)

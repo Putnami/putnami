@@ -10,6 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"go.putnami.dev/protocol/features/spectest"
 	protocolmigration "go.putnami.dev/protocol/migration"
 	"go.putnami.dev/protocol/migration/bundle"
 	"go.putnami.dev/protocol/migration/bundle/publication"
@@ -56,6 +57,7 @@ func (m memFS) WriteFile(name string, data []byte) error {
 // on map order, the process, or the build. The blob digest is pinned: a change
 // to it would make every publication packed before the change unacceptable.
 func TestPackPinsTheStoredBytes(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-same-input-packs-the-same-bytes")
 	first, err := publication.Pack(sampleInput())
 	if err != nil {
 		t.Fatalf("pack: %v", err)
@@ -109,6 +111,7 @@ func TestPackPinsTheStoredBytes(t *testing.T) {
 // from the workspace path a nested project publishes under. The appName stays
 // a label covered by the bundle digest.
 func TestPackKeepsTheBundleAppNameAsALabel(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-same-input-packs-the-same-bytes")
 	in := sampleInput()
 	in.Application, in.Package, in.Files = "sites/putnami.dev", "sites-putnami.dev", sampleFiles("putnami.dev")
 	packed, err := publication.Pack(in)
@@ -128,6 +131,7 @@ func TestPackKeepsTheBundleAppNameAsALabel(t *testing.T) {
 }
 
 func TestPackRefusesAnInvalidPublication(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-publication-scope-is-enforced")
 	cases := map[string]func(*publication.Input){
 		"application pattern":    func(in *publication.Input) { in.Application = "Identity" },
 		"application traversal":  func(in *publication.Input) { in.Application = "billing/../auth" },
@@ -160,6 +164,7 @@ func TestPackRefusesAnInvalidPublication(t *testing.T) {
 // scope does not. Pack refuses them, so a publisher fails before it uploads a
 // bundle every receiver would refuse.
 func TestPackRefusesABundleOnlyThePublicationScopeRefuses(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-publication-scope-is-enforced")
 	qualified := strings.Replace(sampleOperation, `"namespace":"auth","name":"001_example"`, `"name":"auth/001_example"`, 1)
 	for name, tc := range map[string]struct {
 		files   map[string][]byte
@@ -189,6 +194,7 @@ func TestPackRefusesABundleOnlyThePublicationScopeRefuses(t *testing.T) {
 }
 
 func TestValidatorsMatchThePublisherRules(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-publication-scope-is-enforced")
 	for application, want := range map[string]bool{"sites/putnami.dev": true, "putnami.dev": true, "/sites": false, "a..b": false, "": false} {
 		if publication.ValidApplication(application) != want {
 			t.Fatalf("ValidApplication(%q) = %v", application, !want)
@@ -207,6 +213,7 @@ func TestValidatorsMatchThePublisherRules(t *testing.T) {
 // CheckScope refuses what the protocol already refuses too, so a bundle built
 // in memory, never loaded from files, gets the same answer.
 func TestCheckScopeRefusesABundleOutsideThePublicationScope(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-publication-scope-is-enforced")
 	valid := protocolmigration.BundleOperation{
 		Kind: protocolmigration.KindSQL, Target: "default", Namespace: "auth", Name: "001_example",
 		Up: protocolmigration.PayloadRef{Path: "payload/001.sql", Hash: samplePayloadHash}, Safety: protocolmigration.SafetySafeOnline,
@@ -236,6 +243,7 @@ func TestCheckScopeRefusesABundleOutsideThePublicationScope(t *testing.T) {
 }
 
 func TestFrameworkNameStampsOnlyABareName(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-publication-scope-is-enforced")
 	for _, tc := range []struct{ namespace, name, want string }{
 		{"auth", "001_example", "auth/001_example"},
 		{"", "001_example", protocolmigration.DefaultDatasource + "/001_example"},
@@ -253,6 +261,7 @@ func TestFrameworkNameStampsOnlyABareName(t *testing.T) {
 // packer change that moves any digest makes every publication packed before it
 // unacceptable. The bundle digest is the one testdata/README.md documents.
 func TestPackPinsTheFixtureCorpusDigests(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-publication-packs-exactly-the-stored-bytes", "the-same-input-packs-the-same-bytes")
 	root := filepath.Join("..", "testdata", "valid")
 	files := map[string][]byte{}
 	err := fs.WalkDir(os.DirFS(root), ".", func(name string, entry fs.DirEntry, walkErr error) error {

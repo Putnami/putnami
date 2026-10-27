@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // pack mirrors conformance/pack.json: the committed pack-manifest convention a
@@ -40,6 +42,7 @@ func loadPack(t *testing.T) pack {
 // the single source of truth. Downstream aggregation identifies a pack by id,
 // so these fields must stay stable.
 func TestConformancePack(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "a-pack-names-the-corpus", "the-pack-is-stable-and-resolves")
 	p := loadPack(t)
 
 	if p.ID != "putnami.transaction.conformance" {

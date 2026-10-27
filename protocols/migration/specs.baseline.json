@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "migration/migration-contract#a-bundle-manifest-is-strict",
+    "migration/migration-contract#a-bundle-packs-to-one-tar",
+    "migration/migration-contract#a-migration-is-identified-by-datasource-and-name",
+    "migration/migration-contract#a-publication-packs-exactly-the-stored-bytes",
+    "migration/migration-contract#a-rollback-needs-reversible-or-compatible",
+    "migration/migration-contract#definitions-are-validated",
+    "migration/migration-contract#startup-and-reliability-are-contract-defaults",
+    "migration/migration-contract#the-digest-addresses-the-migration-content",
+    "migration/migration-contract#the-digest-is-identical-across-languages",
+    "migration/migration-contract#the-error-codes-are-a-closed-set",
+    "migration/migration-contract#the-go-sql-runner-emits-and-loads-bundles",
+    "migration/migration-contract#the-state-store-is-canonical",
+    "migration/migration-contract#the-typescript-runner-builds-bundles-by-the-same-rules",
+    "migration/migration-contract#writing-and-loading-verify-every-payload"
+  ]
+}
