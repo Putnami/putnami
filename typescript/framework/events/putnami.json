@@ -7,10 +7,7 @@
   "dependencies": ["/protocols/events", "/protocols/infra"],
   "options": {
     "test": {
-      "filePatterns": [
-        "../../../protocols/events/fixtures/**",
-        "../../../protocols/infra/fixtures/equivalence/**"
-      ]
+      "filePatterns": ["../../../protocols/events/fixtures/**", "../../../protocols/infra/fixtures/equivalence/**"]
     },
     "package": {
       "npm": true
