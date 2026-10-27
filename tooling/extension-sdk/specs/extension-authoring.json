@@ -21,10 +21,6 @@
       "text": "The job-context release-set plan accepts additive unknown fields at the supported protocol version, rejects unsupported versions naming received and supported versions, and preserves single-document framing, size limits and validation of known fields. A reused member carries the reuse head's artifact record, built at the plan's reuse source revision, rebound to the plan's revision and the run's one source tree, and a plan that reuses nothing emits no reuse field."
     },
     {
-      "id": "event-stream-conformance",
-      "text": "The emitter's output conforms to the runtime protocol's wire shape, including the typed readiness marker at the negotiated version, and a value the protocol cannot represent is dropped rather than emitted malformed."
-    },
-    {
       "id": "log-forwarding-fidelity",
       "text": "A child process's structured log line is forwarded with its severity and fields preserved, a plain line is forwarded as text, an unparseable line is not dropped, and reserved protocol keys in child output cannot overwrite the envelope."
     },
