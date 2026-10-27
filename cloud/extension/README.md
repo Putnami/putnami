@@ -711,7 +711,22 @@ provenance, verified, idempotent, workspace_id, repo, sha, submission_id,
 reports}`, and `cloud token --output=jsonl` sets `data` to the scoped bearer
 envelope. `cloud ci report -- <cmd…>` consumes the wrapped command's
 `--output=jsonl` stream unchanged (its tee'd test, coverage and build report
-batch is independent of this flag on `report` itself).
+batch is independent of this flag on `report` itself). This wrapper is how CI
+that runs outside Putnami's hosted runners reports its tests, coverage and
+builds. After the command exits, it folds that batch from the complete session
+record the stream's final `session:end` names,
+`.putnami/sessions/<sessionId>/events.jsonl` under the workspace root, because
+a large run's stdout drops records once its output budget is spent. The record
+must hold that one `session:end` as its last line, byte for byte; a line in it
+that the fold cannot read is counted in `malformedLines` and skipped. When the
+stream names no session record, or the file is outside `.putnami/sessions/`,
+unreadable or from another session, the batch comes from stdout as before, and
+one stderr line starting `note: delivery reports come from the command's
+stdout` says why. That batch's `elidedLines` counts every record the stream's
+`session:end` reports as left out, including the per-test `test:case` and
+debug records that normal output always omits. Delivery marks a batch partial
+when that count is not zero, so a batch from the stdout of a normal-mode run
+that reported test cases is partial.
 
 **App resolution**:
 

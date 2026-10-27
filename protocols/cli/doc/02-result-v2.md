@@ -1029,9 +1029,18 @@ the inner version reads it from the CLI's contract, not from the event.
 
 An event the CLI builds itself has the same normalized shape, and names its
 `type`, `level` and `message` the same way: a cache hit's replayed or
-synthesized `result`, a batched task's projected events, an upload node's
-`published-member` artifact. A consumer can therefore switch on `event.type`
-for every `task:event` record, whether a subprocess or the CLI produced it.
+synthesized `result`, an upload node's `published-member` artifact. A consumer
+can therefore switch on `event.type` for every `task:event` record, whether a
+subprocess or the CLI produced it.
+
+A batched dispatch writes its shared subprocess's events once, under a
+workspace-scoped batch identity: project `/workspace`, and the members' task
+name and kind with `-batch` appended. The CLI writes no `task:event` for a
+batch member. A member's own result travels in the batch `result` event, as the
+`data.batchResults` entry whose `projectId` names the member, with its
+`testCases` removed. The member's `task:end` carries its status and
+diagnostics but no test or coverage summary, and its cases travel as
+`test:case` records under its own identity.
 
 The version-1 column is documentation, not code: `protocols/runtime/stream.go`
 and `schemas/stream.json` declared those envelopes until they were deleted. The

@@ -36,8 +36,8 @@ folded from the v2 capture must equal the batch folded from its v1 twin
   `protocols/cli` project is a small, fast, self-contained selection).
 - **Date**: 2026-07-28. **Exit code**: 0 for both. **91 lines each.**
 - **Commands** (`--no-cache` so both runs execute rather than replaying cache
-  hits, which do not carry structured `job:event` / `task:event` records, a
-  known upstream gap):
+  hits, which the capturing CLI did not replay as structured `job:event` /
+  `task:event` records):
 
   ```sh
   # v2 (the CLI default since 0.1.0-405dcd542)
@@ -56,6 +56,30 @@ test compares build tasks as a sorted, duration-free multiset and the golden tes
 
 Regenerating them means re-running both commands and re-deriving the counts the
 tests assert — do not patch a line by hand.
+
+## `verbose-session.jsonl` — one session's stdout and its session record
+
+A real capture of a small v2 run under the verbose budget, so the live copy
+elided nothing (`machineOutput.elided` is zero for both classes). 158 lines.
+
+- **CLI**: the framework checkout's `./putnamiw`, built from
+  `95ef1b42bccabc8bfe8ed4f937396c6225d0669f`, with uncommitted test and spec
+  changes only.
+- **Workspace**: the framework checkout itself.
+- **Date**: 2026-10-27. **Exit code**: 0. **Session**: `20261027-231809-0e209a`.
+- **Command**:
+
+  ```sh
+  GOFLAGS=-buildvcs=false ./putnamiw test \
+      --projects go.putnami.dev/protocol/gomod --output=jsonl --verbose --no-cache
+  ```
+
+The stdout and `.putnami/sessions/20261027-231809-0e209a/events.jsonl` were
+byte-identical (same SHA-1, `8af71f05…`), so the one file serves as both copies
+of the session: `FoldRun` reads it as stdout and as the session record
+(`artifact_test.go`). The elision tests drop its `task:event` and `test:case`
+records in memory to stand for a stdout that ran out of budget; the file
+itself is unedited.
 
 ## `twins/`
 

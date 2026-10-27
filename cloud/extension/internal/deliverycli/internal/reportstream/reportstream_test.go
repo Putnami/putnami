@@ -234,9 +234,10 @@ func TestUnknownOrMalformedRunnerMarkersAreCounted(t *testing.T) {
 }
 
 // The checked-in warm capture is healthy framing plus 14 real cache hits, so
-// it folds builds without marking the stream partial. The Putnami CLI does not
-// replay cached test/coverage events yet (a confirmed upstream gap);
-// keeping nil reports here pins the gap rather than inventing data.
+// it folds builds without marking the stream partial. The CLI that produced it
+// replayed no test or coverage event for a hit, so the fold must report none
+// rather than invent data. A current CLI replays a hit's stored result as a
+// task:event (TestCacheHitFoldsItsReplayedResult).
 func TestWarmFixturePinsCachedResultContractGap(t *testing.T) {
 	batch := parseWarmFixture(t)
 	if batch.Stats != (Stats{Lines: 31}) {
