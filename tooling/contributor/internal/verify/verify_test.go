@@ -114,6 +114,11 @@ func newVerifyFixture(t *testing.T) *verifyFixture {
 	f.git("config", "user.name", "Verification Fixture")
 	f.git("config", "user.email", "fixture@example.invalid")
 	f.git("config", "commit.gpgSign", "false")
+	// A commit starts `git maintenance run --auto` in the background, which
+	// takes a lock under .git after the commit returned: it can still write
+	// there when the test's TempDir cleanup removes the fixture.
+	f.git("config", "maintenance.auto", "false")
+	f.git("config", "gc.auto", "0")
 	// A global hooksPath must not run inside the fixture.
 	f.git("config", "core.hooksPath", filepath.Join(f.root, ".git", "no-hooks"))
 	f.write(".gitignore", ".context/\n")
