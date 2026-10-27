@@ -1107,20 +1107,26 @@ func TestDepsUpgrade_MalformedReleaseSetFailsBeforeGo(t *testing.T) {
 // A SIGTERM or a SIGINT during the upgrade rolls back every surface the
 // transaction snapshotted, then ends the job with the status a shell trap
 // gave: 143 and 130. The job runs in a child process whose go command blocks
-// in the checksum phase, after go.work was already rewritten.
+// at a request the case names: in the checksum phase, after go.work was
+// already rewritten, or in the `go work edit` that edits the staged copy of
+// go.work, which the rollback does not restore and the job removes itself.
 func TestDepsUpgrade_SignalRollsBackThenExitsWithTheShellStatus(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("a process cannot be sent SIGTERM or SIGINT on Windows")
 	}
 	t.Parallel()
+	const checksums = "mod download all"
 	for _, tc := range []struct {
+		name   string
 		signal syscall.Signal
 		code   int
+		block  string
 	}{
-		{syscall.SIGTERM, 143},
-		{syscall.SIGINT, 130},
+		{"terminated", syscall.SIGTERM, 143, checksums},
+		{"interrupt", syscall.SIGINT, 130, checksums},
+		{"terminated while go work edit runs", syscall.SIGTERM, 143, "work edit -dropreplace="},
 	} {
-		t.Run(tc.signal.String(), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ws := sandboxWorkspace(t)
 			before := fileStates(t,
@@ -1132,7 +1138,7 @@ func TestDepsUpgrade_SignalRollsBackThenExitsWithTheShellStatus(t *testing.T) {
 			realGo := jobtest.RequireGo(t)
 			fakes := jobtest.NewFakes(t)
 			ready := filepath.Join(t.TempDir(), "ready")
-			fakes.Go(t, realGo, "mod download all", ready)
+			fakes.Go(t, realGo, tc.block, ready)
 			self, err := os.Executable()
 			if err != nil {
 				t.Fatal(err)
@@ -1157,16 +1163,16 @@ func TestDepsUpgrade_SignalRollsBackThenExitsWithTheShellStatus(t *testing.T) {
 			for waiting := true; waiting; {
 				select {
 				case err := <-done:
-					t.Fatalf("the job ended before its checksum phase: %v\n%s", err, output.String())
+					t.Fatalf("the job ended before its go command blocked at %q: %v\n%s", tc.block, err, output.String())
 				case <-deadline:
 					_ = cmd.Process.Kill()
-					t.Fatalf("the job never reached its checksum phase:\n%s", output.String())
+					t.Fatalf("the job never ran a go command that blocks at %q:\n%s", tc.block, output.String())
 				case <-time.After(20 * time.Millisecond):
 					_, waiting = jobtest.ReadOptional(t, ready)
 					waiting = !waiting
 				}
 			}
-			if work := readGoWork(t, ws); !strings.Contains(work, "go.putnami.dev/api => go.putnami.dev/api v0.1.0-bbbb3333") {
+			if work := readGoWork(t, ws); tc.block == checksums && !strings.Contains(work, "go.putnami.dev/api => go.putnami.dev/api v0.1.0-bbbb3333") {
 				t.Fatalf("go.work was not rewritten before the checksum phase, so a rollback proves nothing:\n%s", work)
 			}
 
