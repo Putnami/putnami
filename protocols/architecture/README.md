@@ -197,7 +197,7 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **95 of its 151 projects to 10 domains** and
+The Putnami repository maps **96 of its 152 projects to 10 domains** and
 excludes the other 56 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
@@ -221,7 +221,7 @@ its declarations complete, so there has never been debt to record.
 | `go-framework` | framework | 24 | The Go application runtime API and its documentation |
 | `typescript-framework` | framework | 14 | The TypeScript application runtime API and its documentation |
 | `extension-providers` | extension-providers | 8 | Probe answers, verification observations, provider results, the Python surface |
-| `cli` | cli | 3 | The workspace engine and the tooling documentation |
+| `cli` | cli | 4 | The workspace engine and the tooling documentation |
 | `sdd` | sdd | 1 | The spec-driven method and its documentation |
 | `extension-sdk` | tooling | 1 | The extension runtime an extension binary is built on |
 | `agent-workflows` | tooling | 1 | The agent content of the `@putnami/contributor` extension |
