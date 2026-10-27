@@ -1206,7 +1206,7 @@ func TestResolveCompileOutputFile_NestedEntrypoint(t *testing.T) {
 // ---- buildCompileArgs ----
 
 func TestBuildCompileArgs(t *testing.T) {
-	args := buildCompileArgs("serve.ts", "/out/serve-linux-x64", "bun-linux-x64")
+	args := buildCompileArgs("", "serve.ts", "/out/serve-linux-x64", "bun-linux-x64")
 	if len(args) != 7 {
 		t.Fatalf("expected 7 args, got %d: %v", len(args), args)
 	}
@@ -1218,6 +1218,15 @@ func TestBuildCompileArgs(t *testing.T) {
 	}
 	if args[5] != "--target" || args[6] != "bun-linux-x64" {
 		t.Errorf("unexpected target args: %v", args[5:7])
+	}
+}
+
+func TestBuildCompileArgs_Config(t *testing.T) {
+	args := buildCompileArgs("/p/bunfig.toml", "/p/serve.ts", "/out/serve-linux-x64", "bun-linux-x64")
+	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "/p/serve.ts",
+		"--outfile", "/out/serve-linux-x64", "--target", "bun-linux-x64"}
+	if !slices.Equal(args, want) {
+		t.Errorf("buildCompileArgs() = %v, want %v", args, want)
 	}
 }
 
