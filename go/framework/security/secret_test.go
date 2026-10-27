@@ -54,6 +54,7 @@ func loadSecretVectors(t *testing.T) []secretVector {
 // keyring grammar, and re-hashing with the pinned salt reproduces the EXACT
 // digest string — the byte-for-byte contract the TypeScript twin must match.
 func TestSecretVectors_CrossLanguage(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "secret-vectors-reproduce-in-both-languages", "the-go-security-reproduces-the-secret-vectors")
 	vectors := loadSecretVectors(t)
 
 	// Require both algorithms to be represented so the corpus can't silently drop

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "gomod/module-write-contract#a-release-answers-the-requested-version",
+    "gomod/module-write-contract#publishing-releases-nothing",
+    "gomod/module-write-contract#the-error-codes-are-closed",
+    "gomod/module-write-contract#the-field-names-are-the-servers",
+    "gomod/module-write-contract#the-fixture-corpus-is-the-contract",
+    "gomod/module-write-contract#the-version-and-endpoints-are-pinned",
+    "gomod/module-write-contract#the-version-is-bound-to-the-stored-zip"
+  ]
+}

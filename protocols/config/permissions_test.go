@@ -1,8 +1,13 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestAllScopes(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "permission-scopes", "the-six-scopes-are-fixed")
 	scopes := AllScopes()
 	if len(scopes) != 6 {
 		t.Fatalf("expected 6 scopes, got %d", len(scopes))
@@ -25,6 +30,7 @@ func TestAllScopes(t *testing.T) {
 }
 
 func TestScopeConstants(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "permission-scopes", "the-six-scopes-are-fixed")
 	tests := []struct {
 		name  string
 		scope string

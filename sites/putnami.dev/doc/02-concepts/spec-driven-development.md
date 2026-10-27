@@ -79,9 +79,10 @@ every push, at zero findings and with no baseline. The other 34 projects are
 samples and templates, each excluded with a reason and an owner: a sample proves
 the public API and a template is a scaffold input, so neither owns a fact.
 
-Most of those 417 edges are ARC permissions and nothing more. Six imports go
+Most of those 417 edges are ARC permissions and nothing more. Seven imports go
 further and are enforced at run time: the documentation the site publishes for
-five other domains, plus the runtime API it is built on. The protocol is
+five other domains, the runtime API it is built on, and the content-bundle
+protocol it implements. The protocol is
 experimental: its wire format may still change without a migration path.
 
 ### Authored in code, enforced at run time
@@ -120,7 +121,7 @@ recorded what a component was configured with and nothing watched a request.
 That makes runtime adoption **atomic per domain**. The first row a domain emits
 opts it in, and from then on every one of its active imports is expected to be
 implemented too. In this workspace two domains have opted in — `observability`
-with two rows and `public-docs` with six — and the other eight emit nothing and
+with two rows and `public-docs` with seven — and the other eight emit nothing and
 pass. The silence is deliberate: a capability row is written by an application
 describing itself, and a CLI binary is not an application. Writing a row by hand
 to raise the number would make the join a tautology, which is the one thing the

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "storage/storage-declaration-contract#a-binding-is-strict",
+    "storage/storage-declaration-contract#a-manifest-is-strict-and-closed",
+    "storage/storage-declaration-contract#the-fixture-corpus-is-the-contract",
+    "storage/storage-declaration-contract#the-projection-drops-scope-and-signer",
+    "storage/storage-declaration-contract#the-schemas-match-the-go-types"
+  ]
+}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ValidFixtures parses + validates every JSON file under
@@ -13,6 +14,7 @@ import (
 // clean. This corpus is the cross-language contract: the Go and TypeScript
 // emitters (Slice 3) must both produce IR documents that pass here.
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +52,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 // fixtures/invalid produces at least one coded error diagnostic drawn from the
 // canonical taxonomy.
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)

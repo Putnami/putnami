@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { CAPABILITY_DIAGNOSTIC_CODES, CapabilityManifestValidationError } from '../../src/capabilities/manifest';
 import {
   availableProviderKindsV2,
@@ -145,79 +146,103 @@ function everyKind(): ManifestV2 {
 }
 
 describe('capability manifest v2', () => {
-  it('strictly dispatches v1/v2 and reproduces the shared Go v2 bytes', () => {
-    const bytes = readFileSync(FIXTURE, 'utf8');
-    const document = parseCapabilityManifestDocument(bytes);
-    expect(document.protocolVersion).toBe(2);
-    if (document.protocolVersion !== 2) throw new Error('expected v2');
-    expect(serializeCapabilityManifestV2(document.manifest)).toBe(bytes);
+  specTest(
+    'strictly dispatches v1/v2 and reproduces the shared Go v2 bytes',
+    {
+      feature: 'capabilities/manifest-contract',
+      requirement: 'the-typescript-application-reproduces-the-go-golden',
+      check: 'the-typescript-application-serializes-the-shared-v2-golden-to-its-bytes',
+    },
+    () => {
+      const bytes = readFileSync(FIXTURE, 'utf8');
+      const document = parseCapabilityManifestDocument(bytes);
+      expect(document.protocolVersion).toBe(2);
+      if (document.protocolVersion !== 2) throw new Error('expected v2');
+      expect(serializeCapabilityManifestV2(document.manifest)).toBe(bytes);
 
-    const v1 = readFileSync(
-      join(import.meta.dir, '../../../../../protocols/capabilities/fixtures/valid/minimal.json'),
-      'utf8',
-    );
-    expect(parseCapabilityManifestDocument(v1).protocolVersion).toBe(1);
-  });
+      const v1 = readFileSync(
+        join(import.meta.dir, '../../../../../protocols/capabilities/fixtures/valid/minimal.json'),
+        'utf8',
+      );
+      expect(parseCapabilityManifestDocument(v1).protocolVersion).toBe(1);
+    },
+  );
 
-  it('accepts historical volatile metadata but never emits it', () => {
-    const legacy = everyKind() as unknown as {
-      configDefinitions: Array<{ provenance: Record<string, unknown> }>;
-      packages?: Array<{ identity: unknown; package: string; provenance: Record<string, unknown> }>;
-      packageVersions?: Array<{
-        identity: unknown;
-        package: string;
-        version: string;
-        provenance: Record<string, unknown>;
-      }>;
-    };
-    legacy.configDefinitions[0].provenance['sourceBinding'] = LEGACY_BINDING;
-    const stablePackage = legacy.packages?.[0];
-    if (!stablePackage) throw new Error('missing stable package fixture');
-    legacy.packageVersions = [
-      {
-        ...stablePackage,
-        version: '1.4.0',
-        provenance: { ...stablePackage.provenance, version: '1.4.0' },
-      },
-    ];
-    legacy.packages = undefined;
-    const document = parseCapabilityManifestDocument(JSON.stringify(legacy));
-    if (document.protocolVersion !== 2) throw new Error('expected v2');
-    const serialized = serializeCapabilityManifestV2(document.manifest);
-    expect(serialized).not.toContain('sourceBinding');
-    expect(serialized).not.toContain('packageVersions');
-    expect(serialized).not.toContain('"version"');
-    expect(serialized).toContain('"packages"');
-  });
+  specTest(
+    'accepts historical volatile metadata but never emits it',
+    {
+      feature: 'capabilities/manifest-contract',
+      requirement: 'v2-emission-drops-volatile-state',
+      check: 'the-typescript-application-never-emits-volatile-metadata',
+    },
+    () => {
+      const legacy = everyKind() as unknown as {
+        configDefinitions: Array<{ provenance: Record<string, unknown> }>;
+        packages?: Array<{ identity: unknown; package: string; provenance: Record<string, unknown> }>;
+        packageVersions?: Array<{
+          identity: unknown;
+          package: string;
+          version: string;
+          provenance: Record<string, unknown>;
+        }>;
+      };
+      legacy.configDefinitions[0].provenance['sourceBinding'] = LEGACY_BINDING;
+      const stablePackage = legacy.packages?.[0];
+      if (!stablePackage) throw new Error('missing stable package fixture');
+      legacy.packageVersions = [
+        {
+          ...stablePackage,
+          version: '1.4.0',
+          provenance: { ...stablePackage.provenance, version: '1.4.0' },
+        },
+      ];
+      legacy.packages = undefined;
+      const document = parseCapabilityManifestDocument(JSON.stringify(legacy));
+      if (document.protocolVersion !== 2) throw new Error('expected v2');
+      const serialized = serializeCapabilityManifestV2(document.manifest);
+      expect(serialized).not.toContain('sourceBinding');
+      expect(serialized).not.toContain('packageVersions');
+      expect(serialized).not.toContain('"version"');
+      expect(serialized).toContain('"packages"');
+    },
+  );
 
-  it('requires exact top-level integer version tokens', () => {
-    for (const value of ['{"protocolVersion":1,"project":"p"}', '{"protocolVersion":2,"project":"p"}']) {
-      expect(parseCapabilityManifestDocument(value).protocolVersion).toBe(Number(JSON.parse(value).protocolVersion));
-    }
-    for (const value of [
-      '{"project":"p"}',
-      '{"protocolVersion":null,"project":"p"}',
-      '{"protocolVersion":"2","project":"p"}',
-      '{"protocolVersion":1.5,"project":"p"}',
-      '{"protocolVersion":1.0,"project":"p"}',
-      '{"protocolVersion":2.0,"project":"p"}',
-      '{"protocolVersion":1e0,"project":"p"}',
-      '{"protocolVersion":2e0,"project":"p"}',
-      '{"protocolVersion":3,"project":"p"}',
-      '{"nested":{"protocolVersion":2},"project":"p"}',
-      '{"protocolVersion":1,"protocolVersion":2,"project":"p"}',
-    ]) {
-      try {
-        parseCapabilityManifestDocument(value);
-        throw new Error(`${value} should fail`);
-      } catch (error) {
-        expect(error).toBeInstanceOf(CapabilityManifestValidationError);
-        expect((error as CapabilityManifestValidationError).diagnostics[0]?.code).toBe(
-          CAPABILITY_DIAGNOSTIC_CODES.invalidProtocolVersion,
-        );
+  specTest(
+    'requires exact top-level integer version tokens',
+    {
+      feature: 'capabilities/manifest-contract',
+      requirement: 'the-reader-is-strict-and-versioned',
+      check: 'the-typescript-application-reader-requires-the-exact-version-token',
+    },
+    () => {
+      for (const value of ['{"protocolVersion":1,"project":"p"}', '{"protocolVersion":2,"project":"p"}']) {
+        expect(parseCapabilityManifestDocument(value).protocolVersion).toBe(Number(JSON.parse(value).protocolVersion));
       }
-    }
-  });
+      for (const value of [
+        '{"project":"p"}',
+        '{"protocolVersion":null,"project":"p"}',
+        '{"protocolVersion":"2","project":"p"}',
+        '{"protocolVersion":1.5,"project":"p"}',
+        '{"protocolVersion":1.0,"project":"p"}',
+        '{"protocolVersion":2.0,"project":"p"}',
+        '{"protocolVersion":1e0,"project":"p"}',
+        '{"protocolVersion":2e0,"project":"p"}',
+        '{"protocolVersion":3,"project":"p"}',
+        '{"nested":{"protocolVersion":2},"project":"p"}',
+        '{"protocolVersion":1,"protocolVersion":2,"project":"p"}',
+      ]) {
+        try {
+          parseCapabilityManifestDocument(value);
+          throw new Error(`${value} should fail`);
+        } catch (error) {
+          expect(error).toBeInstanceOf(CapabilityManifestValidationError);
+          expect((error as CapabilityManifestValidationError).diagnostics[0]?.code).toBe(
+            CAPABILITY_DIAGNOSTIC_CODES.invalidProtocolVersion,
+          );
+        }
+      }
+    },
+  );
 
   it('covers every contribution kind and sorts by complete owner identity', () => {
     const manifest = everyKind();
@@ -233,83 +258,101 @@ describe('capability manifest v2', () => {
   // surface, so a committed manifest can never enumerate the reachable dependency
   // closure. The Go twin is TestCanonicalPackagesAreScopedToTheCapabilitySurface;
   // both emitters must agree on the canonical bytes.
-  it('scopes package contributions to the capability surface', () => {
-    const manifest = everyKind();
-    const closure = (name: string): PackageV2 => ({
-      identity: { ownerProject: name, kind: 'package', key: name },
-      package: name,
-      provenance: {
-        project: name,
+  specTest(
+    'scopes package contributions to the capability surface',
+    {
+      feature: 'capabilities/manifest-contract',
+      requirement: 'packages-stay-on-the-capability-surface',
+      check: 'the-typescript-application-scopes-packages-to-the-capability-surface',
+    },
+    () => {
+      const manifest = everyKind();
+      const closure = (name: string): PackageV2 => ({
+        identity: { ownerProject: name, kind: 'package', key: name },
         package: name,
-        sourceKind: 'framework',
-        declaration: { root: 'project', path: 'package.json' },
-      },
-    });
+        provenance: {
+          project: name,
+          package: name,
+          sourceKind: 'framework',
+          declaration: { root: 'project', path: 'package.json' },
+        },
+      });
 
-    const surface = capabilitySurfaceV2(manifest);
-    expect(surface.has('example')).toBe(true);
-    expect(surface.has('@putnami/unrelated')).toBe(false);
+      const surface = capabilitySurfaceV2(manifest);
+      expect(surface.has('example')).toBe(true);
+      expect(surface.has('@putnami/unrelated')).toBe(false);
 
-    const baseline = serializeCapabilityManifestV2(manifest);
-    manifest.packages = [...(manifest.packages ?? []), closure('@putnami/unrelated'), closure('@putnami/also-new')];
-    const widened = serializeCapabilityManifestV2(manifest);
+      const baseline = serializeCapabilityManifestV2(manifest);
+      manifest.packages = [...(manifest.packages ?? []), closure('@putnami/unrelated'), closure('@putnami/also-new')];
+      const widened = serializeCapabilityManifestV2(manifest);
 
-    expect(widened).toBe(baseline);
-    expect(widened).toContain('@putnami/database');
-    expect(widened).not.toContain('@putnami/unrelated');
-  });
+      expect(widened).toBe(baseline);
+      expect(widened).toContain('@putnami/database');
+      expect(widened).not.toContain('@putnami/unrelated');
+    },
+  );
 
-  it('checks every container-scoped required-provider mapping', () => {
-    const manifest = everyKind();
-    manifest.healthContributors?.push(
-      {
-        identity: identity('health', 'health', 'service'),
-        name: 'service',
-        probe: 'health',
-        provenance: provenance('health.ts'),
-      },
-      {
-        identity: identity('health', 'liveness', 'service'),
-        name: 'service',
-        probe: 'liveness',
-        provenance: provenance('liveness.ts'),
-      },
-    );
-    const allProviders = [
-      'config',
-      'schema',
-      'discoverer',
-      'migration',
-      'datasource',
-      'infra',
-      'health',
-      'liveness',
-      'readiness',
-      'lifecycle',
-      'package',
-    ] as const;
-    (manifest.requiredCapabilities as NonNullable<ManifestV2['requiredCapabilities']>)[0].requires = [...allProviders];
-    expect([...availableProviderKindsV2(manifest)].sort()).toEqual([...allProviders].sort());
-    expect(validateCapabilityManifestV2(manifest)).toEqual([]);
+  specTest(
+    'checks every container-scoped required-provider mapping',
+    {
+      feature: 'capabilities/manifest-contract',
+      requirement: 'a-required-capability-needs-a-provider-in-its-manifest',
+      check: 'the-typescript-application-scopes-completeness-to-the-manifest',
+    },
+    () => {
+      const manifest = everyKind();
+      manifest.healthContributors?.push(
+        {
+          identity: identity('health', 'health', 'service'),
+          name: 'service',
+          probe: 'health',
+          provenance: provenance('health.ts'),
+        },
+        {
+          identity: identity('health', 'liveness', 'service'),
+          name: 'service',
+          probe: 'liveness',
+          provenance: provenance('liveness.ts'),
+        },
+      );
+      const allProviders = [
+        'config',
+        'schema',
+        'discoverer',
+        'migration',
+        'datasource',
+        'infra',
+        'health',
+        'liveness',
+        'readiness',
+        'lifecycle',
+        'package',
+      ] as const;
+      (manifest.requiredCapabilities as NonNullable<ManifestV2['requiredCapabilities']>)[0].requires = [
+        ...allProviders,
+      ];
+      expect([...availableProviderKindsV2(manifest)].sort()).toEqual([...allProviders].sort());
+      expect(validateCapabilityManifestV2(manifest)).toEqual([]);
 
-    const copiedProvider = everyKind();
-    const config = (copiedProvider.configDefinitions as NonNullable<ManifestV2['configDefinitions']>)[0];
-    config.identity.ownerProject = 'dependency';
-    config.provenance.project = 'dependency';
-    (copiedProvider.requiredCapabilities as NonNullable<ManifestV2['requiredCapabilities']>)[0].requires = ['config'];
-    expect(
-      validateCapabilityManifestV2(copiedProvider).some(
-        ({ code }) => code === CAPABILITY_DIAGNOSTIC_CODES.missingRequiredProvider,
-      ),
-    ).toBe(false);
+      const copiedProvider = everyKind();
+      const config = (copiedProvider.configDefinitions as NonNullable<ManifestV2['configDefinitions']>)[0];
+      config.identity.ownerProject = 'dependency';
+      config.provenance.project = 'dependency';
+      (copiedProvider.requiredCapabilities as NonNullable<ManifestV2['requiredCapabilities']>)[0].requires = ['config'];
+      expect(
+        validateCapabilityManifestV2(copiedProvider).some(
+          ({ code }) => code === CAPABILITY_DIAGNOSTIC_CODES.missingRequiredProvider,
+        ),
+      ).toBe(false);
 
-    copiedProvider.configDefinitions = undefined;
-    const missing = validateCapabilityManifestV2(copiedProvider);
-    expect(missing.some(({ code }) => code === CAPABILITY_DIAGNOSTIC_CODES.missingRequiredProvider)).toBe(true);
-    expect(missing.find(({ code }) => code === CAPABILITY_DIAGNOSTIC_CODES.missingRequiredProvider)?.field).toBe(
-      'requiredCapabilities[0].requires[0]',
-    );
-  });
+      copiedProvider.configDefinitions = undefined;
+      const missing = validateCapabilityManifestV2(copiedProvider);
+      expect(missing.some(({ code }) => code === CAPABILITY_DIAGNOSTIC_CODES.missingRequiredProvider)).toBe(true);
+      expect(missing.find(({ code }) => code === CAPABILITY_DIAGNOSTIC_CODES.missingRequiredProvider)?.field).toBe(
+        'requiredCapabilities[0].requires[0]',
+      );
+    },
+  );
 
   it('pins strict and semantic diagnostics', () => {
     for (const [file, code] of [

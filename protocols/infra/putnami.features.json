@@ -1,0 +1,204 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "infra",
+  "features": [
+    {
+      "id": "infra/infrastructure-requirements-contract",
+      "type": "feature",
+      "name": "Infrastructure requirements contract",
+      "outcome": "A project declares the databases, topics, buckets, secrets, jobs and runtime it needs once, next to its code, and every producer, the build aggregator and every deployer read and write those needs in one versioned, strict and byte-deterministic form",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-and-the-schemas-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-2",
+              "the-schemas-match-the-go-types",
+              "no-cost-policy-field-is-exposed",
+              "every-typescript-producer-stamps-the-version"
+            ]
+          }
+        },
+        {
+          "id": "a-manifest-is-read-strictly",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates-and-every-invalid-one-is-refused",
+              "an-unknown-member-is-refused",
+              "a-runtime-block-is-workload-only",
+              "the-version-and-the-engine-are-closed",
+              "bytes-that-are-not-json-are-a-parse-error",
+              "the-cloud-plan-prints-the-codes-of-an-invalid-manifest"
+            ]
+          }
+        },
+        {
+          "id": "names-schedules-provenance-and-scaling-are-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "names-follow-their-patterns",
+              "a-schedule-is-a-5-field-cron",
+              "every-aggregated-entry-carries-its-provenance",
+              "a-negative-scaling-value-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "merging-follows-the-identity-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-merge-unions-each-kind-by-its-identity",
+              "a-conflicting-value-resolves-by-precedence",
+              "sources-are-sorted-and-deduped",
+              "the-merge-is-deterministic"
+            ]
+          }
+        },
+        {
+          "id": "a-subscription-carries-its-delivery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-subscribe-has-two-forms",
+              "a-merged-subscribe-takes-the-strongest-delivery"
+            ]
+          }
+        },
+        {
+          "id": "overrides-drop-entries-by-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-ignore-rule-drops-its-entry",
+              "an-unused-rule-warns",
+              "the-overrides-reader-is-strict",
+              "the-extension-sdk-applies-the-workload-overrides"
+            ]
+          }
+        },
+        {
+          "id": "a-workload-always-has-a-runtime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-default-runtime-is-pinned",
+              "the-extension-sdk-gives-a-workload-the-default-runtime",
+              "the-extension-sdk-lets-an-authored-runtime-win",
+              "the-extension-sdk-refuses-scaling-min",
+              "the-typescript-extension-turns-http2-off"
+            ]
+          }
+        },
+        {
+          "id": "committed-requirements-are-synced-from-the-fragments",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-writes-the-committed-requirements",
+              "a-v1-fragment-is-moved-to-v2-and-stays-strict",
+              "the-committed-form-is-the-formatter-fixed-point",
+              "each-producer-owns-one-fragment",
+              "the-typescript-extension-syncs-the-committed-requirements"
+            ]
+          }
+        },
+        {
+          "id": "producers-emit-the-shared-goldens",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-database-producer-emits-its-golden",
+              "the-go-events-producer-emits-its-golden",
+              "the-go-migration-producer-emits-its-golden",
+              "the-go-storage-producer-emits-its-golden",
+              "the-go-extension-secrets-producer-emits-its-golden",
+              "the-typescript-database-producer-emits-its-golden",
+              "the-typescript-events-producer-emits-its-golden",
+              "the-typescript-migration-producer-emits-its-golden",
+              "the-typescript-document-producer-emits-its-golden",
+              "the-typescript-storage-producer-emits-its-golden",
+              "the-typescript-runtime-secrets-producer-emits-its-golden"
+            ]
+          }
+        },
+        {
+          "id": "the-deployment-declaration-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-deployment-golden-is-pinned",
+              "an-invalid-manifest-encodes-to-nothing",
+              "the-reader-refuses-every-other-spelling",
+              "the-extension-sdk-declares-the-aggregate-in-canonical-bytes",
+              "the-typescript-extension-declares-the-aggregate-in-canonical-bytes",
+              "the-cloud-publish-stores-the-declaration-byte-for-byte",
+              "the-cloud-publish-refuses-a-non-canonical-declaration"
+            ]
+          }
+        },
+        {
+          "id": "projections-carry-no-secret",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-database-projection-follows-the-database-protocol",
+              "the-storage-projection-follows-the-storage-protocol",
+              "a-projection-carries-no-secret"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

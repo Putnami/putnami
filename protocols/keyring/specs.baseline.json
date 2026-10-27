@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "keyring/signing-keyring-contract#an-omitted-state-is-active",
+    "keyring/signing-keyring-contract#every-error-code-is-registered",
+    "keyring/signing-keyring-contract#jwt-vectors-verify-in-both-languages",
+    "keyring/signing-keyring-contract#secret-vectors-reproduce-in-both-languages",
+    "keyring/signing-keyring-contract#the-digest-grammar-is-strict",
+    "keyring/signing-keyring-contract#the-key-state-machine-is-closed",
+    "keyring/signing-keyring-contract#the-projection-has-one-byte-form",
+    "keyring/signing-keyring-contract#the-public-projection-fails-closed",
+    "keyring/signing-keyring-contract#the-schemas-match-the-go-types"
+  ]
+}

@@ -8,11 +8,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-version-and-endpoints-are-pinned", "the-protocol-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -21,6 +23,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // TestConformance_Paths pins the endpoint path templates the cloud gomod
 // registry serves. Changing any is a protocol change.
 func TestConformance_Paths(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-version-and-endpoints-are-pinned", "the-paths-and-content-types-are-pinned")
 	if got := BlobUploadPath("go.putnami.dev/http"); got != "/go.putnami.dev/http/-/blobs/upload" {
 		t.Errorf("BlobUploadPath = %q, want /go.putnami.dev/http/-/blobs/upload", got)
 	}
@@ -44,6 +47,7 @@ func TestConformance_Paths(t *testing.T) {
 // TestConformance_WireFieldNames pins the JSON field names the server owns.
 // Drifting them would silently break the cross-repo contract.
 func TestConformance_WireFieldNames(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-field-names-are-the-servers", "the-field-names-are-pinned-and-an-empty-dist-tag-is-omitted")
 	digest := "sha256:" + strings.Repeat("a", 64)
 	full, err := json.Marshal(PublishVersionRequest{GoMod: "module x\n", ZipDigest: digest, DistTag: "latest"})
 	if err != nil {
@@ -78,6 +82,7 @@ func TestConformance_WireFieldNames(t *testing.T) {
 // TestConformance_ErrorCodes validates that every protocol error code uses the
 // gomod.* prefix and that the canonical set is complete.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-error-codes-are-closed", "the-error-codes-are-the-five-canonical-ones")
 	canonical := []string{
 		"gomod.invalid_blob_upload",
 		"gomod.invalid_publish",
@@ -103,6 +108,7 @@ type parseFunc func([]byte) []diag.Diagnostic
 // TestConformance_Fixtures runs every fixture under fixtures/<message>: those in
 // valid/ must produce no errors, those in invalid/ must produce at least one.
 func TestConformance_Fixtures(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-fixture-corpus-is-the-contract", "every-fixture-gets-its-verdict")
 	messages := map[string]parseFunc{
 		"blob-upload-response":    func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateBlobUploadResponse(b); return d },
 		"publish-version-request": func(b []byte) []diag.Diagnostic { _, d := ParseAndValidatePublishVersionRequest(b); return d },
@@ -118,6 +124,7 @@ func TestConformance_Fixtures(t *testing.T) {
 }
 
 func TestConformance_ReleaseResponseRejectsTrailingJSON(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "a-release-answers-the-requested-version", "a-trailing-json-value-is-refused")
 	body := []byte(`{"module":"go.putnami.dev/http","version":"v1.2.3","visibility":"public"} null`)
 	if _, diagnostics := ParseAndValidateReleaseVersionResponse(body); !diag.HasErrors(diagnostics) {
 		t.Fatal("release response with a trailing JSON value must fail strict parsing")
@@ -125,6 +132,7 @@ func TestConformance_ReleaseResponseRejectsTrailingJSON(t *testing.T) {
 }
 
 func TestConformance_ReleaseResponseMustMatchRequestedCoordinate(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "a-release-answers-the-requested-version", "another-version-is-refused")
 	body := []byte(`{"module":"go.putnami.dev/http","version":"v1.2.4","visibility":"public"}`)
 	if _, diagnostics := ParseAndValidateReleaseVersionResponseFor(body, "go.putnami.dev/http", "v1.2.3"); !diag.HasErrors(diagnostics) {
 		t.Fatal("release response for another immutable version must fail validation")

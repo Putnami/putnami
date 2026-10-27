@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSchemasPinProtocolVersionAndVocabularies(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-protocol-identity-is-pinned", "the-schemas-pin-the-version-and-vocabularies")
 	schemas := map[string]string{
 		"schemas/release-set.json":     ReleaseSetSchemaURL,
 		"schemas/provider.json":        ProviderSchemaURL,

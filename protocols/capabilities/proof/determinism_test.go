@@ -1,4 +1,4 @@
-package capabilities
+package proof
 
 import (
 	"bytes"
@@ -6,78 +6,81 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // sampleManifest builds a representative manifest exercising every
 // contribution kind, telling the "sql capability" story: a project that
 // contributes a config block with a sensitive field, a route, a migration
 // bundle bound to a datasource, an infra database requirement, a readiness
-// contributor, a lifecycle hook, a package version, and a RequiredCapability
+// contributor, a lifecycle hook, a package version, and a capabilities.RequiredCapability
 // that ties them together. It is the shared input for the byte-stability and
 // canonical-form guards.
-func sampleManifest() *Manifest {
-	prov := Provenance{
+func sampleManifest() *capabilities.Manifest {
+	prov := capabilities.Provenance{
 		Project:      "go.putnami.dev/example/iam",
 		Package:      "go.putnami.dev/database",
 		Version:      "1.4.0",
-		SourceKind:   SourceKindFramework,
+		SourceKind:   capabilities.SourceKindFramework,
 		EvidencePath: "example/iam/db.go",
 	}
-	return &Manifest{
+	return &capabilities.Manifest{
 		Schema:          "https://putnami.dev/schemas/putnami-capabilities.json",
-		ProtocolVersion: ProtocolVersion,
+		ProtocolVersion: capabilities.ProtocolVersion,
 		Project:         "go.putnami.dev/example/iam",
-		ConfigDefinitions: []ConfigDefinition{{
+		ConfigDefinitions: []capabilities.ConfigDefinition{{
 			Path: "database.default",
-			Fields: []ConfigField{
+			Fields: []capabilities.ConfigField{
 				{Name: "url", Type: "string"},
 				{Name: "password", Type: "string", Sensitive: true},
 			},
 			Provenance: prov,
 		}},
-		Schemas: []SchemaContribution{{
+		Schemas: []capabilities.SchemaContribution{{
 			Name:       "listUsers",
-			Kind:       SchemaKindRoute,
+			Kind:       capabilities.SchemaKindRoute,
 			Path:       "/api/users",
 			Provenance: prov,
 		}},
-		Discoverers: []Discoverer{{
+		Discoverers: []capabilities.Discoverer{{
 			Name:       "sqlSources",
-			Kind:       DiscovererKindSource,
+			Kind:       capabilities.DiscovererKindSource,
 			Provenance: prov,
 		}},
-		Migrations: []MigrationBundle{{
+		Migrations: []capabilities.MigrationBundle{{
 			Name:       "iam",
 			Datasource: "default",
 			Digest:     "sha256:0000000000000000000000000000000000000000000000000000000000000000",
 			Provenance: prov,
 		}},
-		InfraRequirements: []InfraRequirement{{
+		InfraRequirements: []capabilities.InfraRequirement{{
 			Name:       "primary",
-			Kind:       InfraKindDatabase,
+			Kind:       capabilities.InfraKindDatabase,
 			Provenance: prov,
 		}},
-		HealthContributors: []HealthContributor{{
+		HealthContributors: []capabilities.HealthContributor{{
 			Name:       "primaryDatabase",
-			Probe:      ProbeKindReadiness,
+			Probe:      capabilities.ProbeKindReadiness,
 			Provenance: prov,
 		}},
-		LifecycleHooks: []LifecycleHook{{
+		LifecycleHooks: []capabilities.LifecycleHook{{
 			Name:       "connectionPool",
-			Phase:      LifecyclePhaseStarter,
+			Phase:      capabilities.LifecyclePhaseStarter,
 			Provenance: prov,
 		}},
-		PackageVersions: []PackageVersion{{
+		PackageVersions: []capabilities.PackageVersion{{
 			Package:    "go.putnami.dev/database",
 			Version:    "1.4.0",
 			Provenance: prov,
 		}},
-		RequiredCapabilities: []RequiredCapability{{
+		RequiredCapabilities: []capabilities.RequiredCapability{{
 			Name: "sql",
-			Requires: []CapabilityKind{
-				CapabilityKindDatasource,
-				CapabilityKindMigration,
-				CapabilityKindReadiness,
+			Requires: []capabilities.CapabilityKind{
+				capabilities.CapabilityKindDatasource,
+				capabilities.CapabilityKindMigration,
+				capabilities.CapabilityKindReadiness,
 			},
 			Provenance: prov,
 		}},
@@ -88,7 +91,7 @@ func sampleManifest() *Manifest {
 // two-space indentation and a trailing newline. This is the exact byte form
 // both the Go and the TypeScript emitters must reproduce (the TS equivalent is
 // TypeScript producer's Go-compatible canonical serializer).
-func canonical(t *testing.T, m *Manifest) []byte {
+func canonical(t *testing.T, m *capabilities.Manifest) []byte {
 	t.Helper()
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -101,6 +104,7 @@ func canonical(t *testing.T, m *Manifest) []byte {
 // manifest is byte-identical across 100 marshals — no map iteration or other
 // nondeterminism leaks into the wire form.
 func TestSerialization_Stable100(t *testing.T) {
+	spectest.Proves(t, feature, "v1-bytes-are-canonical", "serialization-is-stable-across-100-marshals")
 	m := sampleManifest()
 	first := canonical(t, m)
 	for i := range 100 {
@@ -115,7 +119,8 @@ func TestSerialization_Stable100(t *testing.T) {
 // of sampleManifest(). This is the cross-language contract — the TypeScript
 // emitter must produce this same file byte-for-byte.
 func TestSerialization_CanonicalByteForm(t *testing.T) {
-	want, err := os.ReadFile(filepath.Join("fixtures", "valid", "full.json"))
+	spectest.Proves(t, feature, "v1-bytes-are-canonical", "the-representative-manifest-serializes-to-the-full-fixture")
+	want, err := os.ReadFile(filepath.Join("..", "fixtures", "valid", "full.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +134,8 @@ func TestSerialization_CanonicalByteForm(t *testing.T) {
 // byte-stable for every valid fixture: re-serializing a parsed manifest yields
 // the same bytes the second time, so the wire form is a fixed point.
 func TestRoundTrip_Idempotent(t *testing.T) {
-	files, err := filepath.Glob("fixtures/valid/*.json")
+	spectest.Proves(t, feature, "v1-bytes-are-canonical", "a-round-trip-is-a-fixed-point")
+	files, err := filepath.Glob("../fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,12 +148,12 @@ func TestRoundTrip_Idempotent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			m1, diags := ParseManifest(data)
+			m1, diags := capabilities.ParseManifest(data)
 			if m1 == nil {
 				t.Fatalf("parse %s: %v", path, diags)
 			}
 			once := canonical(t, m1)
-			m2, _ := ParseManifest(once)
+			m2, _ := capabilities.ParseManifest(once)
 			if m2 == nil {
 				t.Fatalf("re-parse %s produced nil manifest", path)
 			}

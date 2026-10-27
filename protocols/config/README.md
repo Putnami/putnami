@@ -294,17 +294,30 @@ Evidence still missing for `stable`:
 - `constraints` is declared but never enforced, so a schema can carry a hint no
   reader honours.
 
-## Product feature and durable decisions
+## Feature, spec and durable decisions
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcomes it serves — typed configuration that fails fast when it drifts, and
-secrets that never land in plaintext — belong to the framework packages and the
-config server that implement them, not to a wire contract. Declaring a feature
-per protocol module would create one artificial product identity per technical
-boundary, which the [feature protocol's authoring
-boundary](../features/README.md) rules out. With no feature to detail there is
-no spec, since a spec details exactly one already-authored feature and never
-mints one.
+The module owns the feature of its contract, `config/configuration-contract`,
+specified in
+[`specs/configuration-contract.json`](specs/configuration-contract.json). The
+tests here prove the fixture corpus, the strict manifest, the closed field-type
+vocabulary, the canonical schema hash, the JSON Schema rendering, the
+resolution layers, the input names, the permission scopes, the sensitive-field
+policy and the authored member format.
+
+The implementations prove the same contract under checks of their own:
+
+- the Go extension (`go/extension`), under its `the-go-extension-…` check: its
+  extractor maps Go types onto the vocabulary;
+- the Go application framework (`go/framework/app`), under its
+  `the-go-framework-…` check: describe mode maps the same fields;
+- `@putnami/application` (`typescript/framework/application`), under its
+  `the-typescript-…` checks: its vocabulary, schema hash, JSON Schema renderer
+  and extractor match the Go side on the shared fixtures;
+- the cloud extension (`cloud/extension`), under its `the-cloud-…` check: the
+  member it publishes passes `Publisher.Validate`.
+
+Typed configuration loading, defaults and remote resolution at runtime stay with
+the framework packages.
 
 Durable decisions:
 

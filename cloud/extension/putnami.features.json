@@ -243,11 +243,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "uploader-v1-is-echoed-only-beside-publication-v1",
-              "each-ecosystem-uploads-and-answers-the-stored-digest",
-              "no-answer-carries-the-bearer",
-              "upload-refusals-come-before-any-registry-request",
-              "upload-failures-map-to-their-refusal-codes"
+              "each-ecosystem-uploads-and-answers-the-stored-digest"
             ]
           }
         }

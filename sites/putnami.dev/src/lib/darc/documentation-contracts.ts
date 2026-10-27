@@ -6,7 +6,8 @@
  * `generate asset source not found, skipping` for a source that disappeared, the
  * section vanishes, and the build stays green. The declarations below are the
  * same five copies stated as Domain Access & Replication Contracts, plus the
- * reference to the TypeScript framework runtime the site itself consumes.
+ * reference to the TypeScript framework runtime the site itself consumes and
+ * the reference to the content-bundle protocol the site implements.
  *
  * Every contract here must stay identical to the committed
  * `putnami.architecture.json`. It is not a copy that may drift: a row emitted
@@ -184,8 +185,30 @@ export const APPLICATION_RUNTIME_IMPORT: ArchitectureImport = {
 /** The fact the application-runtime reference names, and the only one it may resolve. */
 export const APPLICATION_RUNTIME_FACT = 'typescript_application_runtime_api';
 
+/**
+ * The wire contract this site implements: `site-content-bundle/v1`, owned by
+ * `/protocols/sitecontent`.
+ *
+ * `src/lib/content/` verifies and mounts content bundles by that contract's
+ * rules, and the site's tests prove the protocol's requirements. Like the
+ * runtime reference it copies nothing, so it declares no transport and names
+ * the one fact it consumes.
+ */
+export const PROTOCOL_CONTRACTS_IMPORT: ArchitectureImport = {
+  id: 'public-docs.protocol-contracts.v1',
+  version: 1,
+  from: { domain: 'protocols', export: 'protocols.wire-contracts.v1' },
+  as: 'public-docs.protocol-contracts',
+  mode: 'reference',
+  status: 'active',
+  facts: ['wire_contract_definitions'],
+  justification:
+    "putnami.dev implements the site-content-bundle/v1 contract that /protocols/sitecontent owns: it verifies and mounts content bundles by that contract's rules, and its tests prove the protocol's requirements. The protocols domain owns what the contract means; the site holds a reference to it and owns none of its meaning.",
+};
+
 /** Every contract this domain declares, snapshots first, in declaration order. */
 export const PUBLIC_DOCS_CONTRACTS: readonly ArchitectureImport[] = [
   ...DOCUMENTATION_SOURCES.map((source) => source.contract),
   APPLICATION_RUNTIME_IMPORT,
+  PROTOCOL_CONTRACTS_IMPORT,
 ];

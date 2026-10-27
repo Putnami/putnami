@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "sitecontent/content-bundle-contract",
+  "outcomes": [
+    "A bundle the cloud extension builds verifies in the site that serves it, because both follow one manifest, one grammar and one fixture corpus",
+    "A site serves only files a manifest lists, with their digests, under mounts that collide with nothing",
+    "A site that meets a bundle of a newer format major keeps its baked content instead of failing or serving a shape it cannot read"
+  ],
+  "nonGoals": [
+    "Where a bundle is published, how a site pins it and how it fetches it, which the producer and the site own",
+    "Which sections of a site a bundle may claim, which the site's own documentation feature owns",
+    "A second carrier format: the manifest travels inside the archive"
+  ],
+  "requirements": [
+    {
+      "id": "the-versions-are-pinned",
+      "text": "ProtocolVersion, the version of the Go parser surface, is 1, and a test pins it. A bundle carries its own formatVersion: a reader accepts 1.0 and 1.2 and refuses 2.0 and a malformed version."
+    },
+    {
+      "id": "the-manifest-is-closed-and-strict",
+      "text": "A parser accepts each manifest of fixtures/valid, whose $schema is SchemaID. It refuses each manifest of fixtures/invalid: a bad digest, a bad mount, a file outside its mounts, a newer format, a traversal and an unknown field, and the corpus reaches the digest and mount codes. A manifest that lists one path twice is refused, and so is a manifest whose own mounts overlap."
+    },
+    {
+      "id": "paths-mounts-and-digests-follow-one-grammar",
+      "text": "A payload path is relative, with no empty, . or .. segment and no backslash. A mount is absolute, lowercase and not the root, with no trailing slash and no empty, . or .. segment. A digest is the bare SHA-256 of a file: 64 lowercase hex characters with no prefix. The site applies the same grammar and hashes the shared fixture file to the digest the Go corpus pins."
+    },
+    {
+      "id": "the-payload-matches-the-manifest",
+      "text": "A payload is a gzip tar whose regular files are exactly the files the manifest lists, each with its digest. A verifier accepts fixtures/payload/valid-bundle and refuses a traversal, a file outside every mount, a symlink, an unlisted file, a digest mismatch and a newer format, each with the code fixtures/payload pins, and it refuses bytes that are not gzip. The site accepts the same valid bundle and refuses the first five defects with the same codes."
+    },
+    {
+      "id": "the-manifest-travels-inside-the-archive",
+      "text": "A bundle archive carries bundle.json at its root beside the payload. VerifyArchive refuses an archive without bundle.json, with bundle.json as a symlink or with an unlisted file, and returns the payload without bundle.json. BuildArchive builds the same bytes twice and verifies them, and refuses a file outside the mounts and a file named bundle.json. The cloud extension builds byte-identical conformant bundles and refuses a bad mount, a linked page or a bad path."
+    },
+    {
+      "id": "a-newer-major-falls-back-and-a-bad-envelope-fails-closed",
+      "text": "A reader reads formatVersion before it decodes the manifest strictly. A newer major, whatever its shape, sets NewerFormatMajor and yields no bundle, so a site keeps its baked content, in CI and locally. A formatVersion that is not a string fails closed and does not trigger the fallback. The site follows the same order."
+    },
+    {
+      "id": "mounts-partition-the-url-space",
+      "text": "Two prefixes conflict when they are equal or one holds the other at a segment boundary: /docs conflicts with /docs/cloud and with /, not with /docs-cloud. A merge plan refuses a bundle mount that conflicts with a site prefix or another bundle mount, even when a sibling sorts between them, and accepts disjoint mounts. MountForPath matches a path only under its mount. The site applies the same rules and refuses overlapping bundles."
+    }
+  ],
+  "decisions": [
+    "protocols/sitecontent/doc/adr/0001-manifest-travels-inside-the-bundle.md"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "infra/infrastructure-requirements-contract#a-manifest-is-read-strictly",
+    "infra/infrastructure-requirements-contract#a-subscription-carries-its-delivery",
+    "infra/infrastructure-requirements-contract#a-workload-always-has-a-runtime",
+    "infra/infrastructure-requirements-contract#committed-requirements-are-synced-from-the-fragments",
+    "infra/infrastructure-requirements-contract#merging-follows-the-identity-rules",
+    "infra/infrastructure-requirements-contract#names-schedules-provenance-and-scaling-are-validated",
+    "infra/infrastructure-requirements-contract#overrides-drop-entries-by-identity",
+    "infra/infrastructure-requirements-contract#producers-emit-the-shared-goldens",
+    "infra/infrastructure-requirements-contract#projections-carry-no-secret",
+    "infra/infrastructure-requirements-contract#the-deployment-declaration-is-canonical",
+    "infra/infrastructure-requirements-contract#the-version-and-the-schemas-are-pinned"
+  ]
+}

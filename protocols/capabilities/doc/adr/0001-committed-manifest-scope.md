@@ -67,7 +67,7 @@ by kind and `MigrationBundle` carries none.
 - "What modules does this workload link" is answered by the stamp or the index
   snapshot, not the committed manifest.
 - Two live versions mean two schemas, corpora, and validators.
-  `version_test.go` pins each schema to its constant and checks the TypeScript
+  `proof/version_test.go` pins each schema to its constant and checks the TypeScript
   producer stamps an accepted version.
 - v1 migrations stay unreferenceable; no shim invents the kind.
 - Diffing an old manifest against a regenerated one shows removals that are not

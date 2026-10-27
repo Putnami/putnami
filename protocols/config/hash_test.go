@@ -5,9 +5,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestComputeSchemaHash_Prefix(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	blocks := []Block{
 		{Path: "server", Fields: []FieldSchema{
 			{Name: "port", Type: "int"},
@@ -24,6 +27,7 @@ func TestComputeSchemaHash_Prefix(t *testing.T) {
 }
 
 func TestComputeSchemaHash_Deterministic(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	blocks := []Block{
 		{Path: "server", Fields: []FieldSchema{
 			{Name: "port", Type: "int"},
@@ -43,6 +47,7 @@ func TestComputeSchemaHash_Deterministic(t *testing.T) {
 }
 
 func TestComputeSchemaHash_OrderIndependent(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	// Blocks in different order should produce the same hash.
 	blocks1 := []Block{
 		{Path: "server", Fields: []FieldSchema{
@@ -75,6 +80,7 @@ func TestComputeSchemaHash_OrderIndependent(t *testing.T) {
 // recursively canonicalizing its blocks. The TS extractor's test must
 // produce the same hash for byte-identical input.
 func TestComputeSchemaHash_NestedFixture(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	data, err := os.ReadFile("fixtures/valid/nested-hash.json")
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +104,7 @@ func TestComputeSchemaHash_NestedFixture(t *testing.T) {
 // the value was computed by the recursive canonicalizer. The same
 // value is asserted independently by the TS extractor.
 func TestComputeSchemaHash_FlatAnchorStable(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	blocks := []Block{
 		{Path: "server", Fields: []FieldSchema{
 			{Name: "host", Type: "string"},
@@ -119,6 +126,7 @@ func TestComputeSchemaHash_FlatAnchorStable(t *testing.T) {
 // participate in the hash so a marked field is distinguishable from an unmarked
 // one across languages.
 func TestProductionUnsafeDefault_OmitemptyByteStable(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	base := FieldSchema{Name: "driver", Type: FieldTypeString, Default: "memory"}
 
 	baseBytes, err := json.Marshal(base)
@@ -170,6 +178,7 @@ func TestProductionUnsafeDefault_OmitemptyByteStable(t *testing.T) {
 // marker included. The TS extractor asserts the same fixture hash, proving the
 // marker hashes byte-identically in both languages.
 func TestComputeSchemaHash_ProductionUnsafeFixture(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	data, err := os.ReadFile("fixtures/valid/production-unsafe.json")
 	if err != nil {
 		t.Fatal(err)
@@ -188,6 +197,7 @@ func TestComputeSchemaHash_ProductionUnsafeFixture(t *testing.T) {
 }
 
 func TestCanonicalizeBlocks(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	blocks := []Block{
 		{Path: "z-last", Fields: []FieldSchema{
 			{Name: "b", Type: "string"},

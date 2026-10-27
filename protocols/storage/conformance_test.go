@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_Manifests parses + validates every fixture under
 // fixtures/manifest: those in valid/ must produce no errors, those in invalid/
 // must produce at least one.
 func TestConformance_Manifests(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-fixture-corpus-is-the-contract", "every-valid-fixture-validates-and-every-invalid-one-fails")
 	runConformance(t, "fixtures/manifest", func(data []byte) []diag.Diagnostic {
 		_, diags := ParseAndValidateManifest(data)
 		return diags
@@ -20,6 +22,7 @@ func TestConformance_Manifests(t *testing.T) {
 
 // TestConformance_Bindings does the same for fixtures/binding.
 func TestConformance_Bindings(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-fixture-corpus-is-the-contract", "every-valid-fixture-validates-and-every-invalid-one-fails")
 	runConformance(t, "fixtures/binding", func(data []byte) []diag.Diagnostic {
 		_, diags := ParseAndValidateBinding(data)
 		return diags

@@ -93,7 +93,6 @@
               "one-collection-emits-one-firestore-database",
               "one-database-per-named-store-sorted-by-name",
               "repeated-collection-names-are-de-duplicated",
-              "the-producer-output-matches-the-shared-golden-fixture",
               "zero-collections-emit-nothing"
             ]
           }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { decodeBase64Url, importPublicKey, verifyJwt, verifyJwtES256, verifyJwtRS256 } from '../../src/oauth/oauth-jwt';
 
 // The shared, language-neutral corpus the Go conformance suite
@@ -69,8 +70,13 @@ function structuralProblems(v: JwtVector): string[] {
 
 describe('oauth-jwt cross-language JWT vectors', () => {
   const corpus = loadCorpus();
+  const jwtVectors = {
+    feature: 'keyring/signing-keyring-contract',
+    requirement: 'jwt-vectors-verify-in-both-languages',
+    check: 'the-typescript-application-verifies-the-jwt-vectors',
+  };
 
-  it('the corpus covers both asymmetric families', () => {
+  specTest('the corpus covers both asymmetric families', jwtVectors, () => {
     const families = new Set(corpus.valid.map((v) => v.algorithm));
     expect(families.has('ES256')).toBe(true);
     expect(families.has('RS256')).toBe(true);
@@ -78,11 +84,11 @@ describe('oauth-jwt cross-language JWT vectors', () => {
 
   for (const v of corpus.valid) {
     describe(`valid/${v.id}`, () => {
-      it('passes the structural checks', () => {
+      specTest('passes the structural checks', jwtVectors, () => {
         expect(structuralProblems(v)).toEqual([]);
       });
 
-      it('cryptographically verifies the real Go-signed token', async () => {
+      specTest('cryptographically verifies the real Go-signed token', jwtVectors, async () => {
         const key = await importPublicKey({ kind: 'jwk', jwk: v.jwk as JsonWebKey & { kid?: string } });
         const payload = await verifyJwt<{ sub?: string; iss?: string }>(v.token, key, {});
         // The pinned payload is the same across every vector.
@@ -93,7 +99,7 @@ describe('oauth-jwt cross-language JWT vectors', () => {
   }
 
   for (const v of corpus.invalid) {
-    it(`invalid/${v.id} fails at least one structural check`, () => {
+    specTest(`invalid/${v.id} fails at least one structural check`, jwtVectors, () => {
       expect(structuralProblems(v).length).toBeGreaterThan(0);
     });
   }

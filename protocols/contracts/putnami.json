@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/contracts",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -11,9 +11,11 @@
   "options": {
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "The IR is an authoring input to generators; the outcomes belong to the surfaces those generators produce."
   }
 }

@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type MigrationContributor, type MigrationSource, KindSQL } from '@putnami/migration';
 import { Config, type ConfigContributor, Sensitive } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { application } from '../../src/application';
 import type { Plugin } from '../../src/application/module.types';
 import {
@@ -85,101 +86,109 @@ function provenance(): { package: string } {
 }
 
 describe('cross-language equivalence', () => {
-  it('actual v2 producer is canonical and the TypeScript serializer reproduces shared Go bytes', async () => {
-    const DatabaseConfig = Config('database.default', {
-      url: String,
-      password: Sensitive(String),
-    });
-    const configPlugin: Plugin & ConfigContributor & CapabilityProvenanceContributor = {
-      capabilityProvenance: provenance,
-      configDefinitions: () => [DatabaseConfig],
-    };
+  specTest(
+    'actual v2 producer is canonical and the TypeScript serializer reproduces shared Go bytes',
+    {
+      feature: 'capabilities/manifest-contract',
+      requirement: 'the-typescript-application-reproduces-the-go-golden',
+      check: 'the-typescript-application-producer-emits-the-same-canonical-bytes-every-run',
+    },
+    async () => {
+      const DatabaseConfig = Config('database.default', {
+        url: String,
+        password: Sensitive(String),
+      });
+      const configPlugin: Plugin & ConfigContributor & CapabilityProvenanceContributor = {
+        capabilityProvenance: provenance,
+        configDefinitions: () => [DatabaseConfig],
+      };
 
-    const iam: MigrationSource = {
-      kind: KindSQL,
-      namespace: 'iam',
-      infraDatabase: () => ({ name: 'default', engine: 'postgres' }),
-    };
-    const migrationPlugin: Plugin & MigrationContributor & CapabilityProvenanceContributor = {
-      capabilityProvenance: provenance,
-      migrationSources: () => [iam],
-    };
-    const readinessPlugin: Plugin & ReadinessChecker & CapabilityProvenanceContributor = {
-      name: 'primaryDatabase',
-      capabilityProvenance: provenance,
-      checkReadiness: async () => {},
-    };
-    const healthPlugin: Plugin & HealthChecker & CapabilityProvenanceContributor = {
-      name: 'diskSpace',
-      capabilityProvenance: provenance,
-      checkHealth: async () => {},
-    };
-    const lifecyclePlugin: Plugin & LifecycleContributor & CapabilityProvenanceContributor = {
-      capabilityProvenance: provenance,
-      // Deliberately unsorted: the producer must canonicalize stopper/starter.
-      lifecycleContributions: () => [
-        { name: 'connectionPool', phase: 'stopper' },
-        { name: 'connectionPool', phase: 'starter' },
-      ],
-    };
-    const requirementPlugin: Plugin & RequiredCapabilityContributor & CapabilityProvenanceContributor = {
-      capabilityProvenance: provenance,
-      // Deliberately unsorted: the producer canonicalizes the closed enum.
-      requiredCapabilities: () => [
-        {
-          name: 'sql',
-          requires: [
-            'readiness',
-            'package',
-            'lifecycle',
-            'infra',
-            'health',
-            'schema',
-            'migration',
-            'discoverer',
-            'datasource',
-            'config',
-          ],
-        },
-      ],
-    };
-    const inventoryPlugin: Plugin & CapabilityInventoryContributor & CapabilityProvenanceContributor = {
-      capabilityProvenance: provenance,
-      capabilityInventory: () => ({
-        schemas: [
-          { name: 'api-proto', kind: 'proto', path: 'schema/api.proto' },
-          { name: 'listUsers', kind: 'route', path: '/api/users' },
-          { name: 'openapi', kind: 'openapi', path: 'schema/openapi.json' },
+      const iam: MigrationSource = {
+        kind: KindSQL,
+        namespace: 'iam',
+        infraDatabase: () => ({ name: 'default', engine: 'postgres' }),
+      };
+      const migrationPlugin: Plugin & MigrationContributor & CapabilityProvenanceContributor = {
+        capabilityProvenance: provenance,
+        migrationSources: () => [iam],
+      };
+      const readinessPlugin: Plugin & ReadinessChecker & CapabilityProvenanceContributor = {
+        name: 'primaryDatabase',
+        capabilityProvenance: provenance,
+        checkReadiness: async () => {},
+      };
+      const healthPlugin: Plugin & HealthChecker & CapabilityProvenanceContributor = {
+        name: 'diskSpace',
+        capabilityProvenance: provenance,
+        checkHealth: async () => {},
+      };
+      const lifecyclePlugin: Plugin & LifecycleContributor & CapabilityProvenanceContributor = {
+        capabilityProvenance: provenance,
+        // Deliberately unsorted: the producer must canonicalize stopper/starter.
+        lifecycleContributions: () => [
+          { name: 'connectionPool', phase: 'stopper' },
+          { name: 'connectionPool', phase: 'starter' },
         ],
-      }),
-    };
+      };
+      const requirementPlugin: Plugin & RequiredCapabilityContributor & CapabilityProvenanceContributor = {
+        capabilityProvenance: provenance,
+        // Deliberately unsorted: the producer canonicalizes the closed enum.
+        requiredCapabilities: () => [
+          {
+            name: 'sql',
+            requires: [
+              'readiness',
+              'package',
+              'lifecycle',
+              'infra',
+              'health',
+              'schema',
+              'migration',
+              'discoverer',
+              'datasource',
+              'config',
+            ],
+          },
+        ],
+      };
+      const inventoryPlugin: Plugin & CapabilityInventoryContributor & CapabilityProvenanceContributor = {
+        capabilityProvenance: provenance,
+        capabilityInventory: () => ({
+          schemas: [
+            { name: 'api-proto', kind: 'proto', path: 'schema/api.proto' },
+            { name: 'listUsers', kind: 'route', path: '/api/users' },
+            { name: 'openapi', kind: 'openapi', path: 'schema/openapi.json' },
+          ],
+        }),
+      };
 
-    const app = application()
-      .use(configPlugin)
-      .use(migrationPlugin)
-      .use(readinessPlugin)
-      .use(healthPlugin)
-      .use(lifecyclePlugin)
-      .use(requirementPlugin)
-      .use(inventoryPlugin);
-    const options = producerOptions();
-    const producer = createCapabilitiesProducer(options);
-    const manifestPath = join(options.projectRoot as string, '.gen', 'schema', 'capabilities.json');
-    const shared = readFileSync(EQUIVALENCE_FIXTURE_PATH, 'utf8');
-    const sharedDocument = parseCapabilityManifestDocument(shared);
-    if (sharedDocument.protocolVersion !== 2) throw new Error('expected shared v2 fixture');
-    expect(serializeCapabilityManifestV2(sharedDocument.manifest)).toBe(shared);
+      const app = application()
+        .use(configPlugin)
+        .use(migrationPlugin)
+        .use(readinessPlugin)
+        .use(healthPlugin)
+        .use(lifecyclePlugin)
+        .use(requirementPlugin)
+        .use(inventoryPlugin);
+      const options = producerOptions();
+      const producer = createCapabilitiesProducer(options);
+      const manifestPath = join(options.projectRoot as string, '.gen', 'schema', 'capabilities.json');
+      const shared = readFileSync(EQUIVALENCE_FIXTURE_PATH, 'utf8');
+      const sharedDocument = parseCapabilityManifestDocument(shared);
+      if (sharedDocument.protocolVersion !== 2) throw new Error('expected shared v2 fixture');
+      expect(serializeCapabilityManifestV2(sharedDocument.manifest)).toBe(shared);
 
-    let first: string | undefined;
-    for (let iteration = 0; iteration < 5; iteration++) {
-      await producer.postGenerate?.(app, {});
-      const bytes = readFileSync(manifestPath, 'utf8');
-      const document = parseCapabilityManifestDocument(bytes);
-      expect(document.protocolVersion).toBe(2);
-      if (document.protocolVersion !== 2) throw new Error('expected producer v2 output');
-      expect(serializeCapabilityManifestV2(document.manifest)).toBe(bytes);
-      first ??= bytes;
-      expect(bytes).toBe(first);
-    }
-  });
+      let first: string | undefined;
+      for (let iteration = 0; iteration < 5; iteration++) {
+        await producer.postGenerate?.(app, {});
+        const bytes = readFileSync(manifestPath, 'utf8');
+        const document = parseCapabilityManifestDocument(bytes);
+        expect(document.protocolVersion).toBe(2);
+        if (document.protocolVersion !== 2) throw new Error('expected producer v2 output');
+        expect(serializeCapabilityManifestV2(document.manifest)).toBe(bytes);
+        first ??= bytes;
+        expect(bytes).toBe(first);
+      }
+    },
+  );
 });

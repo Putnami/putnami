@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/keyring"
 )
 
@@ -75,6 +76,7 @@ func parseFixtureRSAKey(t *testing.T) *rsa.PrivateKey {
 // from the shared corpus verify through the unchanged validateJWKS path, tying the
 // sign side's understanding of the wire format to the shared vectors.
 func TestJWTVectors_ValidTokensVerify(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "jwt-vectors-verify-in-both-languages", "the-go-security-verifies-the-valid-jwt-vectors")
 	data, err := os.ReadFile(jwtVectorsPath)
 	if err != nil {
 		t.Fatalf("read jwt-vectors fixture: %v", err)

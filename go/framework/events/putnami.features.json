@@ -33,12 +33,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "empty-allowlist-rejects-every-pusher",
-              "google-pubsub-ingress-strips-auth-attributes",
-              "push-allows-an-allowlisted-pusher",
-              "push-ingress-strips-auth-attributes",
-              "push-rejects-a-non-allowlisted-pusher",
-              "push-rejects-a-missing-token"
+              "google-pubsub-ingress-strips-auth-attributes"
             ]
           }
         },

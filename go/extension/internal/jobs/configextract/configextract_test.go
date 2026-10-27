@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocfg "go.putnami.dev/protocol/config"
+	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 )
 
@@ -59,6 +60,7 @@ func TestResolveOutputPath_DefaultWhenProjectOptionUnset(t *testing.T) {
 }
 
 func TestExtractFromProject_PicksUpSensitiveTag(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-extension-maps-go-types-onto-the-vocabulary")
 	dir := t.TempDir()
 	src := `package myapp
 
@@ -110,6 +112,7 @@ var DatabaseConfig = config.Config[DatabaseOptions]("database")
 }
 
 func TestExtractFromProject_PicksUpProductionUnsafeDefaultTag(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-extension-maps-go-types-onto-the-vocabulary")
 	dir := t.TempDir()
 	src := `package myapp
 
@@ -148,6 +151,7 @@ var DatabaseConfig = config.Config[DatabaseOptions]("database")
 }
 
 func TestExtractFromProject_ExpandsNestedStruct(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-extension-maps-go-types-onto-the-vocabulary")
 	dir := writeProject(t, map[string]string{
 		"go.mod": "module example.com/app\n\ngo 1.25\n",
 		"server/server.go": `package server
@@ -232,6 +236,7 @@ var Cfg = config.Config[App]("app")
 }
 
 func TestExtractFromProject_ArrayAndMap(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-extension-maps-go-types-onto-the-vocabulary")
 	dir := writeProject(t, map[string]string{
 		"go.mod": "module example.com/app\n\ngo 1.25\n",
 		"app/app.go": `package app
@@ -277,6 +282,7 @@ var Cfg = config.Config[App]("app")
 }
 
 func TestExtractFromProject_RejectsStructMapKey(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-extension-maps-go-types-onto-the-vocabulary")
 	dir := writeProject(t, map[string]string{
 		"go.mod": "module example.com/app\n\ngo 1.25\n",
 		"app/app.go": `package app

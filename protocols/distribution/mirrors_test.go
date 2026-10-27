@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func mirrorReleaseRequest() ReleaseRequest {
@@ -18,6 +19,7 @@ func mirrorReleaseRequest() ReleaseRequest {
 }
 
 func TestReleaseCarriesOptionalMirrorTargetsWithoutChangingTheSet(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "mirror-intent-never-changes-the-set", "mirror-intent-leaves-the-ref-unchanged")
 	request := mirrorReleaseRequest()
 	wireWithoutMirrors := string(strictJSON(t, request))
 	if strings.Contains(wireWithoutMirrors, `"mirrors"`) {
@@ -45,6 +47,7 @@ func TestReleaseCarriesOptionalMirrorTargetsWithoutChangingTheSet(t *testing.T) 
 }
 
 func TestMirrorTargetsRejectUnboundedOrCredentialBearingDestinations(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "mirror-intent-never-changes-the-set", "a-credential-bearing-mirror-is-refused")
 	for _, tc := range []struct {
 		name, ecosystem, target, code string
 	}{
@@ -95,6 +98,7 @@ func TestMirrorTargetsRejectUnboundedOrCredentialBearingDestinations(t *testing.
 }
 
 func TestMirrorIntentStrictShapeRejectsAmbiguousOrSecretFields(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "mirror-intent-never-changes-the-set", "an-ambiguous-mirror-intent-is-refused")
 	base := strings.TrimSuffix(string(strictJSON(t, mirrorReleaseRequest())), "}")
 	for _, mirrors := range []string{
 		`null`, `[]`, `{"npm":null}`, `{"npm":{}}`,

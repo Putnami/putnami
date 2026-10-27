@@ -42,7 +42,7 @@
     },
     {
       "id": "infra-aggregation",
-      "text": "The registry walks every contributed source's infrastructure contribution and merges them into databases keyed by name and engine, so one project emits one requirement per database with the union of its schemas. For the shared equivalence inputs, its output equals protocols/infra/fixtures/equivalence/migration.golden.json byte for byte."
+      "text": "The registry walks every contributed source's infrastructure contribution and merges them into databases keyed by name and engine, so one project emits one requirement per database with the union of its schemas."
     },
     {
       "id": "defensive-reads",

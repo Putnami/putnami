@@ -59,7 +59,6 @@
               "one-sql-source-emits-one-database-entry",
               "re-emitting-the-same-input-yields-identical-bytes",
               "schemas-are-de-duplicated-and-databases-sorted",
-              "the-producer-output-matches-the-shared-golden-fixture",
               "the-sidecar-is-written-atomically-and-parseably",
               "two-sources-for-one-database-union-and-sort-their-schemas",
               "zero-sources-contribute-nothing"

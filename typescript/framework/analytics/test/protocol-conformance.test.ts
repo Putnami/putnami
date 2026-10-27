@@ -1,8 +1,27 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { sanitizeBatch } from '../src/server/sanitize/sanitizer';
 import { DROP_REASONS } from '../src/server/sanitize/vocabulary';
+
+// Each binding proves a requirement of the analytics protocol's feature
+// under a check of this package's own.
+const VALID_CORPUS = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'the-fixture-corpus-is-the-contract',
+  check: 'the-typescript-sanitizer-accepts-every-valid-batch',
+};
+const INVALID_CORPUS = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'the-fixture-corpus-is-the-contract',
+  check: 'the-typescript-sanitizer-drops-each-invalid-batch-with-its-code',
+};
+const GOLDEN = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'the-fixture-corpus-is-the-contract',
+  check: 'the-typescript-sanitizer-accepts-the-golden-batch',
+};
 
 // The shared fixture corpus of protocols/analytics is the cross-language test
 // surface: the Go validator runs these same files in
@@ -35,7 +54,7 @@ const VALID = loadFixtures('valid');
 const INVALID = loadFixtures('invalid');
 
 describe('protocol conformance: valid corpus', () => {
-  it('reads the four valid batches', () => {
+  specTest('reads the four valid batches', VALID_CORPUS, () => {
     expect(VALID.map((fixture) => fixture.name)).toEqual([
       'action.json',
       'full-page-view.json',
@@ -45,7 +64,7 @@ describe('protocol conformance: valid corpus', () => {
   });
 
   for (const fixture of VALID) {
-    it(`accepts every event of ${fixture.name}`, () => {
+    specTest(`accepts every event of ${fixture.name}`, VALID_CORPUS, () => {
       const result = sanitizeBatch(fixture.data, DECLARED);
 
       expect(result.dropped).toEqual([]);
@@ -56,13 +75,13 @@ describe('protocol conformance: valid corpus', () => {
 });
 
 describe('protocol conformance: invalid corpus', () => {
-  it('reads one fixture per Go error code, minus parse_error', () => {
+  specTest('reads one fixture per Go error code, minus parse_error', INVALID_CORPUS, () => {
     expect(INVALID).toHaveLength(17);
   });
 
   for (const fixture of INVALID) {
     const stem = fixture.name.replace(/\.json$/, '');
-    it(`drops ${fixture.name} with reason ${stem}`, () => {
+    specTest(`drops ${fixture.name} with reason ${stem}`, INVALID_CORPUS, () => {
       const result = sanitizeBatch(fixture.data, DECLARED);
       const reasons = result.dropped.map((drop) => drop.reason);
 
@@ -74,7 +93,7 @@ describe('protocol conformance: invalid corpus', () => {
     });
   }
 
-  it('never invents a reason outside the closed vocabulary', () => {
+  specTest('never invents a reason outside the closed vocabulary', INVALID_CORPUS, () => {
     for (const fixture of INVALID) {
       for (const drop of sanitizeBatch(fixture.data, DECLARED).dropped) {
         expect(DROP_REASONS).toContain(drop.reason);
@@ -84,7 +103,7 @@ describe('protocol conformance: invalid corpus', () => {
 });
 
 describe('protocol conformance: the golden batch', () => {
-  it('round-trips the one importable reference payload', () => {
+  specTest('round-trips the one importable reference payload', GOLDEN, () => {
     const golden = JSON.parse(readFileSync(join(FIXTURES_DIR, 'equivalence', 'batch.golden.json'), 'utf8')) as {
       events: unknown[];
     };

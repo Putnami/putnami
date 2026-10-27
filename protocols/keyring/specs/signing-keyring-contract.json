@@ -1,0 +1,58 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "keyring/signing-keyring-contract",
+  "outcomes": [
+    "A verifier receives only active and retiring public keys, never a revoked, expired or symmetric key and never private material",
+    "A credential digest hashed in Go verifies in TypeScript and the reverse, because both reproduce the same vectors byte for byte",
+    "A key store, a signer and a verifier written against the contract and its fixtures agree on every key state and transition"
+  ],
+  "nonGoals": [
+    "Cryptography: this module signs, verifies, hashes and derives nothing, and the frameworks that do own those features",
+    "When to rotate, expire or revoke a key, which go/signing-key-rotation owns",
+    "Token signing, verification and secret hashing policy, which go/authentication-authorization owns",
+    "Where a keyring or a digest is stored"
+  ],
+  "requirements": [
+    {
+      "id": "the-key-state-machine-is-closed",
+      "text": "A key state is active, retiring, revoked or expired, and revoked is the only terminal state. A transition is legal exactly when fixtures/key-states.json marks it legal: active reaches retiring, expired and revoked, retiring reaches expired and revoked, and expired reaches revoked, while a move back, a same-state move and an unknown state are illegal. AllowedTransitions returns the legal targets sorted, the same on every call."
+    },
+    {
+      "id": "the-public-projection-fails-closed",
+      "text": "PublicJWKS publishes active and retiring keys and drops revoked, expired and symmetric oct keys: projecting each private keyring of fixtures/keyrings.json gives its public JWKS exactly. The projection carries no d, p, q, dp, dq, qi or k field and no state, and it strict-parses as a public JWKS."
+    },
+    {
+      "id": "an-omitted-state-is-active",
+      "text": "A private key that omits its state counts as active: PublicJWKS publishes it, and a key store that persists the key stores it as active."
+    },
+    {
+      "id": "the-projection-has-one-byte-form",
+      "text": "The canonical bytes of a public projection are its JSON indented by two spaces, with a final newline. The projection of the first case of fixtures/keyrings.json equals fixtures/equivalence/keyring.golden.json byte for byte, and 100 serializations of it are identical."
+    },
+    {
+      "id": "the-digest-grammar-is-strict",
+      "text": "A credential digest is $pbkdf2-sha256$v=1$i=<iterations>$<salt>$<hash> or $hmac-sha256$v=1$<salt>$<hash>. The parser accepts every valid digest of fixtures/digests.json with its algorithm, version and iterations, and String gives the same string back, twice. It refuses every invalid digest with the code the fixture pins. The pattern of schemas/digest.json accepts every valid digest and refuses the structurally malformed ones."
+    },
+    {
+      "id": "secret-vectors-reproduce-in-both-languages",
+      "text": "Each vector of fixtures/secret-vectors.json holds a secret, a salt, an iteration count and a digest, and the vectors cover pbkdf2-sha256 and hmac-sha256. In Go and in TypeScript, the digest parses through the grammar, hashing the secret with that salt gives the digest byte for byte, each valid secret verifies with the pinned rehash flag and each invalid secret does not verify."
+    },
+    {
+      "id": "jwt-vectors-verify-in-both-languages",
+      "text": "fixtures/jwt-vectors.json holds valid ES256 and RS256 tokens and broken ones. A valid token has three base64url segments, an asymmetric alg and a public JWK whose alg and kid match its header, and each broken token fails one of these checks. The Go and TypeScript verifiers verify each valid token with its JWK."
+    },
+    {
+      "id": "the-schemas-match-the-go-types",
+      "text": "schemas/keyring.json and schemas/jwks.json declare exactly the JSON fields of the Go types, and the public JWK schema declares no private field. A private keyring requires keys and protocolVersion, a JWKS requires keys, and the keyring schema pins protocolVersion to ProtocolVersion. The key-state, key-type and digest-algorithm enums of the schemas equal the Go enums."
+    },
+    {
+      "id": "every-error-code-is-registered",
+      "text": "ValidErrorCodes registers each of the 14 error codes the package declares, and no other."
+    }
+  ],
+  "decisions": [
+    "protocols/keyring/doc/adr/0001-closed-key-state-machine-and-fail-closed-publication.md",
+    "protocols/keyring/doc/adr/0002-phc-style-versioned-digest-grammar.md"
+  ]
+}

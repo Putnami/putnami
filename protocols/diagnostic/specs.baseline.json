@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "diagnostic/finding-record#only-an-error-blocks",
+    "diagnostic/finding-record#severities-rank-error-warning-info",
+    "diagnostic/finding-record#string-shows-the-field-only-when-set",
+    "diagnostic/finding-record#the-constructors-fill-the-record",
+    "diagnostic/finding-record#the-record-has-four-json-members"
+  ]
+}

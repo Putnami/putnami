@@ -1,0 +1,52 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "contracts/contract-ir",
+  "outcomes": [
+    "An IR that a reader cannot represent is refused with a coded diagnostic instead of being dropped downstream.",
+    "Go and TypeScript lower the same IR to the same JSON Schema bytes.",
+    "A committed lowering that no longer matches its IR, or an IR change that breaks a consumer, fails the contracts check."
+  ],
+  "nonGoals": [
+    "Comparing the generated Go and TypeScript type files across languages: each is pinned by its own golden.",
+    "A producer outside this workspace stamping the IR.",
+    "Serving routes or validating requests, which the API frameworks own."
+  ],
+  "requirements": [
+    {
+      "id": "fixture-corpus",
+      "text": "Each valid fixture and the equivalence golden parse and validate clean, and each invalid fixture yields at least one error whose code is in ValidErrorCodes: a duplicate field, node or variant, an enum without values or with a conflicting value, an invalid default, discriminator, field type, protocol version or variant, a missing name or variants, a non-integral default, an unknown field and an unknown reference."
+    },
+    {
+      "id": "strict-manifest",
+      "text": "The parser refuses an unknown field, also a nested one, and invalid JSON. Validation names each defect with its own code: a wrong protocol version, a missing name, an enum without values or with a repeated name or wire value, an empty discriminator, no variants, a repeated tag, a variant with both or neither of struct and fields, an unknown reference, a name used twice, a bad field type and a default of the wrong kind. A typed default of the right kind is accepted."
+    },
+    {
+      "id": "canonical-bytes",
+      "text": "The canonical serialization is indented JSON with two spaces and a trailing newline. fixtures/valid/full.json is those exact bytes for the sample manifest, 100 marshals give the same bytes, and parsing then marshalling each valid fixture is a fixed point."
+    },
+    {
+      "id": "versioned-paths",
+      "text": "schemas/contracts.json accepts exactly ProtocolVersion. The IR is named contracts.json, emitted under .gen/schema and committed at schema/contracts.json."
+    },
+    {
+      "id": "one-ir-many-lowerings",
+      "text": "From the equivalence golden, the JSON Schema emitter reproduces testdata/contracts.schema.json byte for byte, and the Go emitter reproduces testdata/contracts.golden.go, which parses as Go; both give the same bytes on every run. @putnami/application reproduces the same JSON Schema bytes, serializes them deterministically and emits the TypeScript types of testdata/contracts.golden.ts."
+    },
+    {
+      "id": "markdown-reference",
+      "text": "The Markdown reference gives the same bytes on every run, has a section for each enum, union and DTO and for configuration, scopes, capabilities, grants and claims, and changes when the contract changes."
+    },
+    {
+      "id": "committed-lowerings",
+      "text": "putnami contracts generate writes the canonical schema/contracts.json, its Go types, its JSON Schema and schema/contracts.md with the same bytes on every run, and fails with exit 2, leaving them untouched, when the manifest is invalid. putnami contracts check exits 0 when the committed files match, and 2 on drift or on a breaking change against the prior manifest, such as a renamed enum wire value. An addition is compatible."
+    },
+    {
+      "id": "contract-types-become-components",
+      "text": "A route type that names a contract node becomes a referenced OpenAPI component: an enum lists its values, a union is a oneOf with its discriminator and one tag per variant, and an unreferenced node is not projected. The Go generator does this through Options.Contract and its client reader keeps the enums and unions. @putnami/application does it through contractStruct, and its validation refuses a union value with a missing or unknown tag or a wrong variant field."
+    }
+  ],
+  "decisions": [
+    "protocols/contracts/doc/adr/0001-one-ir-many-lowerings.md"
+  ]
+}

@@ -10,6 +10,7 @@ import (
 
 	"go.putnami.dev/config"
 	protocfg "go.putnami.dev/protocol/config"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // configContribPlugin is a plugin that owns config blocks, used to exercise the
@@ -53,6 +54,7 @@ func findConfigField(fields []protocfg.FieldSchema, name string) (protocfg.Field
 }
 
 func TestDescribeConfig_AggregatesContributorBlocks(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-framework-describes-the-same-vocabulary")
 	type TLS struct {
 		CertFile string `json:"certFile"`
 		KeyFile  string `json:"keyFile" sensitive:"true"`
@@ -144,6 +146,7 @@ func TestDescribeConfig_DuplicatePathErrors(t *testing.T) {
 }
 
 func TestDescribeConfig_NonPrimitiveMapKeyErrors(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "extractors-map-onto-the-vocabulary", "the-go-framework-describes-the-same-vocabulary")
 	type Key struct {
 		A string `json:"a"`
 	}

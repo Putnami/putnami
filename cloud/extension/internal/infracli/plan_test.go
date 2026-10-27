@@ -260,6 +260,7 @@ func TestPlanOfAnEmptyWorkspacePlansNoWorkloads(t *testing.T) {
 }
 
 func TestPlanReportsAnInvalidManifestInThePlan(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "the-cloud-plan-prints-the-codes-of-an-invalid-manifest")
 	w := newWorkspace(t)
 	worker := w.project(workerName)
 	path := filepath.Join(worker.FullPath, infra.AggregatedManifestDir, infra.AggregatedManifestFilename)

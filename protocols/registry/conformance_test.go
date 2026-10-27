@@ -1,10 +1,15 @@
 package registry
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-seam-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -14,6 +19,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // exactly `putnami cloud registry-token --host <host>`; the cloud repo must
 // implement that subcommand. Changing any token here is a cross-repo break.
 func TestConformance_Seam(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-seam-invocation-is-pinned")
 	if CLIExecutableEnv != "PUTNAMI_CLI_EXECUTABLE" {
 		t.Errorf("CLIExecutableEnv = %q, want PUTNAMI_CLI_EXECUTABLE", CLIExecutableEnv)
 	}
@@ -34,6 +40,7 @@ func TestConformance_Seam(t *testing.T) {
 // TestConformance_PublishProviderMarker pins the feature-detection command name
 // shared with @putnami/cloud.
 func TestConformance_PublishProviderMarker(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-publish-provider-name-is-reserved")
 	if PublishProviderCommandName != "publish-provider" {
 		t.Errorf("PublishProviderCommandName = %q, want publish-provider", PublishProviderCommandName)
 	}
@@ -42,6 +49,7 @@ func TestConformance_PublishProviderMarker(t *testing.T) {
 // TestConformance_ValidBearer pins the bare-bearer-on-stdout contract: a token is
 // valid only when non-empty and free of internal whitespace.
 func TestConformance_ValidBearer(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "a-seam-token-is-a-bare-bearer", "a-bearer-is-non-empty-without-whitespace")
 	cases := []struct {
 		name string
 		in   string
@@ -68,6 +76,7 @@ func TestConformance_ValidBearer(t *testing.T) {
 // command, the RPC version, the capability, the purposes and the ops. Every
 // provider and engine depends on these tokens.
 func TestConformance_CredentialProvider(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-provider-tokens-are-pinned", "the-credential-provider-tokens-are-pinned")
 	if CredentialProviderCommand != "credential-provider" {
 		t.Errorf("CredentialProviderCommand = %q, want credential-provider", CredentialProviderCommand)
 	}
@@ -96,6 +105,7 @@ func TestConformance_CredentialProvider(t *testing.T) {
 // the line bounds. The engine and every provider that echoes publication-v1
 // depend on them.
 func TestConformance_PublicationProvider(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-publication-tokens-are-pinned", "the-publication-tokens-are-pinned")
 	if CapabilityPublicationV1 != "publication-v1" {
 		t.Errorf("CapabilityPublicationV1 = %q, want publication-v1", CapabilityPublicationV1)
 	}
@@ -140,6 +150,7 @@ func TestConformance_PublicationProvider(t *testing.T) {
 // its line bound. The engine and every provider that echoes uploader-v1
 // depend on them.
 func TestConformance_UploaderProvider(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-uploader-tokens-are-pinned", "the-uploader-tokens-are-pinned")
 	if CapabilityUploaderV1 != "uploader-v1" || CredentialOpUpload != "upload" {
 		t.Errorf("uploader-v1 tokens = %q, %q; want uploader-v1, upload", CapabilityUploaderV1, CredentialOpUpload)
 	}

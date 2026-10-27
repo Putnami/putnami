@@ -1,0 +1,232 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "distribution",
+  "features": [
+    {
+      "id": "distribution/release-set-contract",
+      "type": "feature",
+      "name": "Release-set contract",
+      "outcome": "A publisher, a provider and a consumer agree on one immutable release-set identity, one strict and bounded wire, and one four-operation provider seam, pinned by an embedded fixture corpus, so a channel never names a set its bytes do not derive and a conflict never half-advances a publication",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-protocol-identity-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-tokens-and-grammars-are-pinned",
+              "the-schemas-pin-the-version-and-vocabularies"
+            ]
+          }
+        },
+        {
+          "id": "a-release-set-is-closed-over-its-members",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-member-defect-gets-its-code"
+            ]
+          }
+        },
+        {
+          "id": "the-canonical-bytes-are-the-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-canonical-bytes-match-the-golden",
+              "the-id-and-the-digest-share-one-hash",
+              "non-canonical-bytes-are-refused",
+              "normalization-never-aliases-its-input",
+              "a-ref-whose-id-and-digest-differ-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "optional-provenance-is-part-of-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "attribution-is-optional-and-part-of-identity",
+              "attribution-round-trips-through-strict-decoding",
+              "the-source-tree-is-optional-and-part-of-identity",
+              "the-kind-vocabulary-is-closed",
+              "a-deployment-member-round-trips",
+              "a-member-project-drops-the-leading-slash"
+            ]
+          }
+        },
+        {
+          "id": "parsing-is-strict-and-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ambiguous-json-is-refused",
+              "an-input-above-4-mib-is-refused",
+              "diagnostics-are-capped-at-128",
+              "a-nil-provider-value-fails-closed"
+            ]
+          }
+        },
+        {
+          "id": "channels-are-portable-and-visibility-only-widens",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-git-tag-encodes-as-a-portable-channel",
+              "visibility-only-widens"
+            ]
+          }
+        },
+        {
+          "id": "a-resolve-answers-exactly-what-it-asked",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-resolve-answer-binds-to-its-request",
+              "a-resolve-names-channels-or-one-release",
+              "a-head-recomputes-from-its-snapshot",
+              "the-extension-sdk-resolves-an-immutable-release"
+            ]
+          }
+        },
+        {
+          "id": "a-release-is-one-compare-and-swap",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-release-answer-binds-to-its-request",
+              "the-cli-writes-nothing-when-one-channel-conflicts",
+              "the-cli-releases-an-empty-channel-with-a-null-expectation"
+            ]
+          }
+        },
+        {
+          "id": "a-channel-set-moves-one-channel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-channel-set-answer-binds-to-its-source",
+              "the-extension-sdk-refuses-an-answer-about-another-channel",
+              "the-extension-sdk-binds-a-move-to-its-source-release"
+            ]
+          }
+        },
+        {
+          "id": "a-channel-status-reports-desired-and-observed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-channel-status-answer-is-strict"
+            ]
+          }
+        },
+        {
+          "id": "the-publish-outcome-names-one-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-publish-outcome-is-strict"
+            ]
+          }
+        },
+        {
+          "id": "mirror-intent-never-changes-the-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "mirror-intent-leaves-the-ref-unchanged",
+              "a-credential-bearing-mirror-is-refused",
+              "an-ambiguous-mirror-intent-is-refused",
+              "the-extension-sdk-carries-mirror-intent-to-the-provider"
+            ]
+          }
+        },
+        {
+          "id": "the-embedded-corpus-is-the-conformance-suite",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-embedded-corpus-gets-its-verdict",
+              "the-embedded-fixtures-are-fresh-copies"
+            ]
+          }
+        },
+        {
+          "id": "the-provider-seam-is-one-request-file-and-one-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cloud-extension-accepts-only-the-four-operations",
+              "the-cloud-extension-refuses-a-bad-request-file-before-the-network",
+              "the-cloud-extension-prints-one-answer-line-per-outcome",
+              "the-cloud-extension-prints-nothing-when-the-provider-fails",
+              "the-cloud-extension-refuses-an-invalid-answer",
+              "the-cloud-extension-refuses-an-answer-that-does-not-bind",
+              "the-extension-sdk-passes-an-absolute-private-request-file",
+              "the-extension-sdk-refuses-a-malformed-answer",
+              "the-extension-sdk-invokes-the-exact-operations"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

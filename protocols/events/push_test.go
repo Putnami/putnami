@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestPushConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "each-push-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/push/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -32,6 +34,7 @@ func TestPushConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestPushConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "each-push-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/push/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -54,6 +57,7 @@ func TestPushConformance_InvalidFixtures(t *testing.T) {
 }
 
 func TestPushOutcomeForStatus(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "the-receiver-status-is-the-outcome", "the-status-decides-the-outcome")
 	cases := map[int]PushAckOutcome{
 		200: PushAck,
 		201: PushAck,
@@ -78,12 +82,14 @@ func TestPushOutcomeForStatus(t *testing.T) {
 }
 
 func TestDefaultDeliveryProfileIsPull(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "delivery-profiles", "pull-is-the-default-profile")
 	if DefaultDeliveryProfile != DeliveryProfilePull {
 		t.Fatalf("DefaultDeliveryProfile = %q, want %q", DefaultDeliveryProfile, DeliveryProfilePull)
 	}
 }
 
 func TestValidateDeliveryProfile(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "delivery-profiles", "the-profile-vocabulary-is-closed")
 	for _, p := range []DeliveryProfile{DeliveryProfilePull, DeliveryProfileStream, DeliveryProfilePush} {
 		if !ValidateDeliveryProfile(p) {
 			t.Errorf("ValidateDeliveryProfile(%q) = false, want true", p)
@@ -95,6 +101,7 @@ func TestValidateDeliveryProfile(t *testing.T) {
 }
 
 func TestDecodePushEnvelope(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "a-push-wrapper-decodes-to-one-envelope")
 	encode := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
 
 	valid := &PushEnvelope{
@@ -124,6 +131,7 @@ func TestDecodePushEnvelope(t *testing.T) {
 }
 
 func TestValidatePushEnvelopeInvariants(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "push-wrapper", "a-push-wrapper-decodes-to-one-envelope")
 	if diags := ValidatePushEnvelope(nil); !diag.HasErrors(diags) {
 		t.Error("expected error for nil push envelope")
 	}
@@ -145,6 +153,7 @@ func TestValidatePushEnvelopeInvariants(t *testing.T) {
 }
 
 func TestCapabilitiesDeliveryProfiles(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "delivery-profiles", "the-profile-vocabulary-is-closed")
 	base := func(profiles []DeliveryProfile) *EventServerCapabilities {
 		return &EventServerCapabilities{
 			Protocol:         Protocol,

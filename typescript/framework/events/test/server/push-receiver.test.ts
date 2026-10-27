@@ -1,9 +1,32 @@
 import { describe, expect, it } from 'bun:test';
 import type { HttpRequestContext } from '@putnami/application';
+import { specTest } from '@putnami/runtime/spectest';
 import type { HandlerDefinition } from '../../src/handler/handler';
 import { resolveHandlerOptions } from '../../src/handler/handler.type';
 import { type PushConfig, createPushReceiver, decodePushEnvelope } from '../../src/server/push-receiver';
 import type { Envelope } from '../../src/transport/transport';
+
+// Each test proves a requirement of the events protocol's feature under a check of this package's own.
+const ADMISSION = {
+  feature: 'events/event-server-contract',
+  requirement: 'push-admission',
+  check: 'the-typescript-receiver-admits-only-an-allowlisted-pusher',
+};
+const AUTH_ATTRIBUTES = {
+  feature: 'events/event-server-contract',
+  requirement: 'push-admission',
+  check: 'the-typescript-receiver-drops-auth-attributes',
+};
+const STATUS_OUTCOME = {
+  feature: 'events/event-server-contract',
+  requirement: 'the-receiver-status-is-the-outcome',
+  check: 'the-typescript-receiver-answers-by-outcome',
+};
+const UNDECODABLE_WRAPPER = {
+  feature: 'events/event-server-contract',
+  requirement: 'push-wrapper',
+  check: 'the-typescript-receiver-refuses-an-undecodable-wrapper',
+};
 
 const ALLOWED = 'pusher@sa.example';
 
@@ -82,19 +105,19 @@ describe('push receiver auth', () => {
     expect(called).toBe(false);
   });
 
-  it('rejects a request with no bearer token (401)', async () => {
+  specTest('rejects a request with no bearer token (401)', ADMISSION, async () => {
     const receiver = createPushReceiver(baseConfig(), []);
     const res = await receiver(ctx({ body: pushBody() }));
     expect(res.status).toBe(401);
   });
 
-  it('rejects an unverifiable token (401)', async () => {
+  specTest('rejects an unverifiable token (401)', ADMISSION, async () => {
     const receiver = createPushReceiver(baseConfig(), []);
     const res = await receiver(ctx({ token: 'bad', body: pushBody() }));
     expect(res.status).toBe(401);
   });
 
-  it('rejects a verified but non-allowlisted pusher (403)', async () => {
+  specTest('rejects a verified but non-allowlisted pusher (403)', ADMISSION, async () => {
     const config = baseConfig({
       verify: async () => ({ email: 'intruder@evil.example', email_verified: true }),
     });
@@ -105,7 +128,7 @@ describe('push receiver auth', () => {
     expect(called).toBe(false);
   });
 
-  it('rejects an unverified email (403)', async () => {
+  specTest('rejects an unverified email (403)', ADMISSION, async () => {
     const config = baseConfig({ verify: async () => ({ email: ALLOWED, email_verified: false }) });
     const receiver = createPushReceiver(config, []);
     const res = await receiver(ctx({ token: 'good', body: pushBody() }));
@@ -126,7 +149,7 @@ describe('push receiver dispatch + status mapping', () => {
     expect(called).toBe(true);
   });
 
-  it('acknowledges a valid push (204) and runs the matching handler', async () => {
+  specTest('acknowledges a valid push (204) and runs the matching handler', STATUS_OUTCOME, async () => {
     let receivedId: string | undefined;
     const receiver = createPushReceiver(baseConfig(), [
       makeHandler('order.created', (msg) => {
@@ -138,7 +161,7 @@ describe('push receiver dispatch + status mapping', () => {
     expect(receivedId).toBe('evt-9');
   });
 
-  it('returns 500 (retry) when a handler throws', async () => {
+  specTest('returns 500 (retry) when a handler throws', STATUS_OUTCOME, async () => {
     const receiver = createPushReceiver(baseConfig(), [
       makeHandler('order.created', () => {
         throw new Error('boom');
@@ -148,7 +171,7 @@ describe('push receiver dispatch + status mapping', () => {
     expect(res.status).toBe(500);
   });
 
-  it('acknowledges (204) a push with no matching handler', async () => {
+  specTest('acknowledges (204) a push with no matching handler', STATUS_OUTCOME, async () => {
     let called = false;
     const receiver = createPushReceiver(baseConfig(), [makeHandler('billing.charged', () => (called = true))]);
     const res = await receiver(ctx({ token: 'good', body: pushBody({ topic: 'unhandled.topic' }) }));
@@ -156,7 +179,7 @@ describe('push receiver dispatch + status mapping', () => {
     expect(called).toBe(false);
   });
 
-  it('dead-letters a malformed push body (400)', async () => {
+  specTest('dead-letters a malformed push body (400)', UNDECODABLE_WRAPPER, async () => {
     const receiver = createPushReceiver(baseConfig(), []);
     const res = await receiver(ctx({ token: 'good', body: { message: { data: 'not-valid-json' } } }));
     expect(res.status).toBe(400);
@@ -168,13 +191,13 @@ describe('push receiver dispatch + status mapping', () => {
     expect(res.status).toBe(413);
   });
 
-  it('dead-letters a body that fails to parse (400, not 5xx/retry)', async () => {
+  specTest('dead-letters a body that fails to parse (400, not 5xx/retry)', UNDECODABLE_WRAPPER, async () => {
     const receiver = createPushReceiver(baseConfig(), []);
     const res = await receiver(ctx({ token: 'good', bodyThrows: true }));
     expect(res.status).toBe(400);
   });
 
-  it('dead-letters a wrapper missing the subscription field (400)', async () => {
+  specTest('dead-letters a wrapper missing the subscription field (400)', UNDECODABLE_WRAPPER, async () => {
     const receiver = createPushReceiver(baseConfig(), []);
     const wrapper = pushBody() as { message: { data: string }; subscription?: string };
     wrapper.subscription = undefined;
@@ -227,7 +250,7 @@ describe('push receiver distribution semantics', () => {
 });
 
 describe('decodePushEnvelope', () => {
-  it('applies defaults and strips auth.* attributes', () => {
+  specTest('applies defaults and strips auth.* attributes', AUTH_ATTRIBUTES, () => {
     const wrapper = {
       message: {
         data: Buffer.from(
@@ -250,7 +273,7 @@ describe('decodePushEnvelope', () => {
     expect(env?.attributes['region']).toBe('eu');
   });
 
-  it('returns undefined for a missing subscription, missing data, or malformed data', () => {
+  specTest('returns undefined for a missing subscription, missing data, or malformed data', UNDECODABLE_WRAPPER, () => {
     expect(decodePushEnvelope(undefined)).toBeUndefined();
     // valid data but no subscription (wrapper-contract violation)
     expect(decodePushEnvelope({ message: { data: Buffer.from('{"topic":"t"}').toString('base64') } })).toBeUndefined();

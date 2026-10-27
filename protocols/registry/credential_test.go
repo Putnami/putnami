@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
@@ -40,6 +41,7 @@ var publicationSessionFixtures = map[string]bool{
 // answers: response-<op>-<case>.json.
 func TestCredentialFixtures(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-wire-is-strict", "every-fixture-line-gets-its-verdict")
 	for _, validity := range []string{"valid", "invalid"} {
 		paths, err := filepath.Glob(filepath.Join("fixtures", "credential-provider", validity, "*.json"))
 		if err != nil || len(paths) == 0 {
@@ -156,6 +158,7 @@ func parsePublicationPayload(op CredentialOp, answer bool, payload json.RawMessa
 // and grammars.
 func TestCredentialSchemaTracksWireShape(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-schema-tracks-the-go-contract", "the-schema-tracks-the-go-types")
 	data, err := os.ReadFile(filepath.Join("schemas", "credential-provider-v1.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -326,6 +329,7 @@ const noControlCharactersPattern = `^[^\x00-\x1f\x7f]*$`
 // Basic Multilingual Plane and samples above it cover the whole range.
 func TestRunCredentialPatternIsValidBearer(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-schema-tracks-the-go-contract", "the-run-credential-grammar-matches-the-go-rule")
 	pattern := regexp.MustCompile(RunCredentialPattern)
 	for r := rune(0); r <= 0xffff; r++ {
 		if r >= 0xd800 && r <= 0xdfff {
@@ -345,6 +349,7 @@ func TestRunCredentialPatternIsValidBearer(t *testing.T) {
 
 func TestValidRunCredential(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "a-run-credential-is-a-bounded-bearer", "a-run-credential-is-validated")
 	for value, want := range map[string]bool{
 		"prc_x": true,
 		"eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ4In0.sig": true,
@@ -370,6 +375,7 @@ func TestValidRunCredential(t *testing.T) {
 // of every formatted value an engine may log, while the wire still carries it.
 func TestInitializeParamsNeverFormatTheRunCredential(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "secrets-are-never-formatted", "a-run-credential-is-never-formatted")
 	const secret = "prc_secret_run_credential"
 	params := CredentialInitializeParams{ProtocolVersion: 1, Capabilities: []string{CapabilityCredentialV1}, RunCredential: secret}
 	payload, err := json.Marshal(params)
@@ -428,6 +434,7 @@ func sortStrings(values []string) []string {
 
 func TestCredentialServesOnlyItsHosts(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "a-credential-serves-only-its-hosts", "the-host-rule-is-exact")
 	credential := Credential{Bearer: "pat_x", ExpiresAt: "2026-09-28T12:00:00Z", Hosts: []string{"127.0.0.1:8080", "localhost", "put.putnami.dev", "registry.example.com:8443"}}
 	cases := map[string]bool{
 		"https://put.putnami.dev/npm/pkg.tgz":        true,
@@ -471,6 +478,7 @@ func TestCredentialServesOnlyItsHosts(t *testing.T) {
 
 func TestCredentialNeverFormatsItsBearer(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "secrets-are-never-formatted", "a-bearer-is-never-formatted")
 	credential := Credential{Bearer: "pat_secret_value", ExpiresAt: "2026-09-28T12:00:00Z", Hosts: []string{"put.putnami.dev"}}
 	for _, format := range []string{"%v", "%+v", "%s", "%#v"} {
 		if out := fmt.Sprintf(format, credential); strings.Contains(out, "pat_secret_value") {
@@ -484,6 +492,7 @@ func TestCredentialNeverFormatsItsBearer(t *testing.T) {
 
 func TestCredentialValidation(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "a-credential-serves-only-its-hosts", "a-credential-is-validated")
 	valid := Credential{Bearer: "pat_x", ExpiresAt: "2026-09-28T12:00:00Z", Hosts: []string{"put.putnami.dev"}}
 	if err := ValidateCredential(valid); err != nil {
 		t.Fatal(err)
@@ -520,6 +529,7 @@ func TestCredentialValidation(t *testing.T) {
 
 func TestCredentialPayloadParsersRefuseMalformedInput(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-wire-is-strict", "the-credential-parsers-refuse-malformed-input")
 	for name, parse := range map[string]func(json.RawMessage) error{
 		"initialize params": func(p json.RawMessage) error { _, err := ParseCredentialInitializeParams(p); return err },
 		"initialize result": func(p json.RawMessage) error { _, err := ParseCredentialInitializeResult(p); return err },
@@ -552,6 +562,7 @@ func TestCredentialPayloadParsersRefuseMalformedInput(t *testing.T) {
 
 func TestCredentialResponseNeverFormatsTheBearer(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "secrets-are-never-formatted", "a-bearer-is-never-formatted")
 	const secret = "pkt_secret_response_bearer"
 	payload, err := json.Marshal(CredentialResult{Credential: &Credential{Bearer: secret, ExpiresAt: "2099-01-01T00:00:00Z", Hosts: []string{"registry.example.test"}}})
 	if err != nil {

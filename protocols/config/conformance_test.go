@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // Schema manifest fixtures.
 
 func TestConformance_ValidSchemaFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +54,7 @@ func TestConformance_ValidSchemaFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidSchemaFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +97,7 @@ func TestConformance_InvalidSchemaFixtures(t *testing.T) {
 }
 
 func TestConformance_ValidRegisteredSchemaFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/schema-with-registered-at*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +130,7 @@ func TestConformance_ValidRegisteredSchemaFixtures(t *testing.T) {
 // ConfigEntry fixtures.
 
 func TestConformance_ValidConfigEntryFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/config-entry*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -153,6 +158,7 @@ func TestConformance_ValidConfigEntryFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidConfigEntryFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/config-entry*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -185,6 +191,7 @@ func TestConformance_InvalidConfigEntryFixtures(t *testing.T) {
 // SecretEntry fixtures.
 
 func TestConformance_ValidSecretEntryFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/secret-entry*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -212,6 +219,7 @@ func TestConformance_ValidSecretEntryFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidSecretEntryFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/secret-entry*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -244,6 +252,7 @@ func TestConformance_InvalidSecretEntryFixtures(t *testing.T) {
 // DeleteRequest fixtures.
 
 func TestConformance_ValidDeleteRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/delete-request*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -271,6 +280,7 @@ func TestConformance_ValidDeleteRequestFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidDeleteRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/delete-request*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -303,6 +313,7 @@ func TestConformance_InvalidDeleteRequestFixtures(t *testing.T) {
 // ResolveSecretsRequest fixtures.
 
 func TestConformance_ValidResolveSecretsRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/resolve-secrets*.json")
 	if err != nil {
 		t.Fatal(err)

@@ -269,7 +269,7 @@ func TestProviderAbsentIsNotAnError(t *testing.T) {
 // fail, so a command that needs no credential still runs.
 func TestTwoDeclaringExtensionsFailTheFirstCredential(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/credential-provider", "one-provider-or-none", "two-declarers-fail-the-first-download")
+	spectest.Proves(t, "registry/credential-seam-contract", "one-declaring-extension-is-the-provider", "the-cli-fails-the-first-request-when-two-extensions-declare")
 	first := providerExtension("@fixture/a", "/a", nil)
 	second := providerExtension("@fixture/b", "/b", nil)
 	broker := New(t.TempDir(), []*extension.ExtensionDescription{first, second}, []string{runner.InvocationProviderInstall}, "PUTNAMI_PROVIDERS", io.Discard)
@@ -292,7 +292,8 @@ func TestTwoDeclaringExtensionsFailTheFirstCredential(t *testing.T) {
 // purpose while the answer is valid, and the bearer reaches only its hosts.
 func TestOneCallPerPurposeAcrossHostsAndRequests(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/credential-provider", "bearer-only-for-its-hosts", "one-call-per-purpose")
+	spectest.Proves(t, "registry/credential-seam-contract", "one-call-per-purpose-while-valid", "the-cli-asks-once-per-purpose")
+	spectest.Proves(t, "registry/credential-seam-contract", "a-credential-serves-only-its-hosts", "the-cli-sends-the-bearer-only-to-a-matching-host")
 	var opens, calls atomic.Int32
 	broker := NewBroker([]string{registry.PurposeRead, registry.PurposePublish}, inProcess(t, fakeConfig{
 		bearer: "pat", hosts: []string{"put.putnami.dev", "registry.example.com:8443"}, lifetime: time.Hour, calls: &calls,
@@ -334,7 +335,7 @@ func TestOneCallPerPurposeAcrossHostsAndRequests(t *testing.T) {
 // and at most halfway through the lifetime it arrived with.
 func TestExpiringCredentialIsRefreshedBeforeUse(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/credential-provider", "bearer-only-for-its-hosts", "refresh-before-expiry")
+	spectest.Proves(t, "registry/credential-seam-contract", "one-call-per-purpose-while-valid", "the-cli-renews-before-expiry")
 	clock := &fakeClock{now: time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)}
 	var opens, calls atomic.Int32
 	config := fakeConfig{bearer: "pat", hosts: []string{"put.putnami.dev"}, lifetime: 10 * time.Minute, clock: clock.Now, calls: &calls}
@@ -386,7 +387,7 @@ func TestExpiringCredentialIsRefreshedBeforeUse(t *testing.T) {
 // that serves nothing.
 func TestRefusalSurfacesItsCodeAndAbsenceServesNothing(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/credential-provider", "refusal-never-falls-back", "refusal-fails-every-request-of-its-purpose")
+	spectest.Proves(t, "registry/credential-seam-contract", "refusal-and-absence-hold-for-the-process", "the-cli-holds-a-refusal-and-an-absence-for-the-process")
 	var opens, calls atomic.Int32
 	clock := &fakeClock{now: time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)}
 	refusing := NewBroker([]string{registry.PurposeRead}, inProcess(t, fakeConfig{refuse: "account_suspended", calls: &calls}, &opens), WithClock(clock.Now))
@@ -426,6 +427,7 @@ func TestRefusalSurfacesItsCodeAndAbsenceServesNothing(t *testing.T) {
 // it never degrades to another credential.
 func TestProviderFailureIsAnError(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "a-failure-answers-for-30-seconds", "the-cli-fails-the-request-on-a-provider-failure")
 	var opens atomic.Int32
 	target := mustURL(t, "https://put.putnami.dev/x")
 	malformed := NewBroker([]string{registry.PurposeRead}, inProcess(t, fakeConfig{malformed: true}, &opens))
@@ -704,7 +706,7 @@ func TestNewHandsTheRunCredentialOnlyThroughInitialize(t *testing.T) {
 // started again.
 func TestAProviderFailureIsRetriedAfterTheBackoff(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/credential-provider", "refusal-never-falls-back", "failure-retries-after-the-backoff")
+	spectest.Proves(t, "registry/credential-seam-contract", "a-failure-answers-for-30-seconds", "the-cli-starts-the-provider-again-after-the-backoff")
 	target := mustURL(t, "https://put.putnami.dev/x")
 	for name, failure := range map[string]fakeConfig{
 		"crash":        {crash: true},

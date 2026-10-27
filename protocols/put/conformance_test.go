@@ -12,11 +12,13 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-version-bounds-and-paths-are-pinned", "the-protocol-version-and-bounds-are-pinned")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1: bumping requires a migration story", ProtocolVersion)
 	}
@@ -28,6 +30,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // TestConformance_Paths pins the endpoint templates the Put registry serves,
 // relative to the registry base URL.
 func TestConformance_Paths(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-version-bounds-and-paths-are-pinned", "the-paths-are-pinned")
 	for got, want := range map[string]string{
 		BlobUploadPath("acme", "widget"):                   "/acme/widget/blobs",
 		PublishPath("acme", "widget"):                      "/acme/widget/publish",
@@ -48,6 +51,7 @@ func TestConformance_Paths(t *testing.T) {
 // TestConformance_Profiles pins the media types each member kind publishes. A
 // producer, the engine and the registry read one table.
 func TestConformance_Profiles(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "each-kind-has-one-profile", "every-kind-names-its-media-types")
 	want := map[distribution.MemberKind]Profile{
 		distribution.KindConfig:     {Kind: distribution.KindConfig, ManifestMediaType: "application/vnd.putnami.config.authored-member+json"},
 		distribution.KindMigration:  {Kind: distribution.KindMigration, ManifestMediaType: "application/vnd.putnami.data.migration.v2+json", BlobMediaTypes: []string{"application/vnd.putnami.migration-bundle.v1.tar"}},
@@ -85,6 +89,7 @@ func TestConformance_Profiles(t *testing.T) {
 
 // TestConformance_WireFieldNames pins the JSON field names the server owns.
 func TestConformance_WireFieldNames(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-wire-is-closed", "the-field-names-are-pinned")
 	for _, tc := range []struct {
 		value any
 		keys  []string
@@ -109,6 +114,7 @@ func TestConformance_WireFieldNames(t *testing.T) {
 // TestConformance_SchemaTracksTheGoTypes holds the schema and the Go types to
 // the same member set.
 func TestConformance_SchemaTracksTheGoTypes(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-wire-is-closed", "the-schema-tracks-the-go-types")
 	data, err := os.ReadFile(filepath.Join("schemas", "put-write-v1.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -146,6 +152,7 @@ func TestConformance_SchemaTracksTheGoTypes(t *testing.T) {
 // TestConformance_ErrorCodes validates that every protocol error code uses the
 // put.* prefix and that the canonical set is complete.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-error-codes-are-closed", "the-error-codes-are-the-ten-canonical-ones")
 	canonical := []string{
 		"put.invalid_coordinate",
 		"put.invalid_version",
@@ -173,6 +180,7 @@ type parseFunc func([]byte) []diag.Diagnostic
 // TestConformance_Fixtures runs every fixture under fixtures/<message>: those in
 // valid/ must produce no errors, those in invalid/ must produce at least one.
 func TestConformance_Fixtures(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-fixture-corpus-is-the-contract", "every-fixture-gets-its-verdict")
 	messages := map[string]parseFunc{
 		"blob-receipt":     func(b []byte) []diag.Diagnostic { _, d := ParseBlobReceipt(b); return d },
 		"publish-request":  func(b []byte) []diag.Diagnostic { _, d := ParsePublishRequest(b); return d },
@@ -198,6 +206,7 @@ func TestConformance_Fixtures(t *testing.T) {
 // TestConformance_CanonicalPayload pins the stored form: the digest a
 // publisher computes is the digest of the bytes the registry stores.
 func TestConformance_CanonicalPayload(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-payload-is-canonical", "the-canonical-form-is-pinned")
 	for _, payload := range []string{
 		`{}`,
 		`{"artifacts":{"linux-amd64":{"digest":"sha256:` + strings.Repeat("1", 64) + `","size":1}}}`,
@@ -243,6 +252,7 @@ func TestConformance_CanonicalPayload(t *testing.T) {
 // TestConformance_BlobReferences pins the members through which a manifest
 // references a blob: the registry links exactly these to the package.
 func TestConformance_BlobReferences(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "blob-references-are-three-members", "the-blob-references-are-pinned")
 	one, two, three := "sha256:"+strings.Repeat("1", 64), "sha256:"+strings.Repeat("2", 64), "sha256:"+strings.Repeat("3", 64)
 	for payload, want := range map[string][]string{
 		`{"values":{"region":"eu"}}`:                                                                        nil,
@@ -280,6 +290,7 @@ func TestConformance_BlobReferences(t *testing.T) {
 }
 
 func TestConformance_ArchivePlatforms(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "an-archive-lists-its-platforms", "an-archive-reads-one-digest-per-platform")
 	data, err := os.ReadFile(filepath.Join("fixtures", "archive-payload", "valid", "template-fan-out.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -295,6 +306,7 @@ func TestConformance_ArchivePlatforms(t *testing.T) {
 }
 
 func TestConformance_CoordinateAndVersion(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "coordinates-and-versions-are-validated", "coordinates-and-versions-are-checked")
 	for _, coordinate := range []string{"acme/widget", "cloud/doc-contents-platform", "putnami/cli", "a/b", "a.b_c-d/0"} {
 		if _, _, err := SplitCoordinate(coordinate); err != nil {
 			t.Errorf("SplitCoordinate(%q) = %v", coordinate, err)
@@ -321,6 +333,7 @@ func TestConformance_CoordinateAndVersion(t *testing.T) {
 // version, media type or payload is refused even when the answer is
 // well-formed.
 func TestConformance_AnswersMatchTheRequest(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "an-answer-matches-its-request", "an-answer-of-another-request-is-refused")
 	data, err := os.ReadFile(filepath.Join("fixtures", "publish-response", "valid", "published.json"))
 	if err != nil {
 		t.Fatal(err)

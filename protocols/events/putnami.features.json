@@ -1,0 +1,214 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "events",
+  "features": [
+    {
+      "id": "events/event-server-contract",
+      "type": "feature",
+      "name": "Event Server contract",
+      "outcome": "An application, a client library and any Event Server, managed or self-hosted, exchange one set of envelopes, frames, discovery documents, push deliveries and managed publish requests under the putnami.events.v1 token, held by one schema set and one fixture corpus that the Go and TypeScript implementations read, so neither side widens the wire on its own.",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "envelope-and-gateway-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-envelope-and-gateway-fixture-gets-its-verdict",
+              "the-typescript-guards-accept-every-valid-fixture",
+              "the-typescript-guards-refuse-a-missing-or-other-protocol"
+            ]
+          }
+        },
+        {
+          "id": "handler-options",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-defaults-are-competing-with-retries-and-a-dlq",
+              "each-handler-options-fixture-gets-its-verdict",
+              "each-refusal-names-the-member-it-breaks"
+            ]
+          }
+        },
+        {
+          "id": "delivery-profiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pull-is-the-default-profile",
+              "the-profile-vocabulary-is-closed"
+            ]
+          }
+        },
+        {
+          "id": "push-wrapper",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-push-fixture-gets-its-verdict",
+              "a-push-wrapper-decodes-to-one-envelope",
+              "the-go-receiver-refuses-an-undecodable-wrapper",
+              "the-typescript-receiver-refuses-an-undecodable-wrapper"
+            ]
+          }
+        },
+        {
+          "id": "push-admission",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-receiver-admits-only-an-allowlisted-pusher",
+              "the-go-receiver-drops-auth-attributes",
+              "the-typescript-receiver-admits-only-an-allowlisted-pusher",
+              "the-typescript-receiver-drops-auth-attributes"
+            ]
+          }
+        },
+        {
+          "id": "the-receiver-status-is-the-outcome",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-status-decides-the-outcome",
+              "the-go-receiver-answers-by-outcome",
+              "the-typescript-receiver-answers-by-outcome"
+            ]
+          }
+        },
+        {
+          "id": "conformance-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-lists-every-required-case",
+              "each-manifest-fixture-gets-its-verdict",
+              "each-manifest-defect-gets-its-code"
+            ]
+          }
+        },
+        {
+          "id": "the-proto-is-non-normative",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-proto-carries-the-banner-and-the-four-rpcs"
+            ]
+          }
+        },
+        {
+          "id": "managed-publish-requests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-managed-request-fixture-gets-its-verdict",
+              "the-corpus-holds-every-required-defect",
+              "the-managed-schemas-are-json",
+              "the-go-framework-gives-each-managed-request-its-verdict",
+              "the-typescript-guard-gives-each-managed-request-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "a-managed-publish-is-one-authenticated-post",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-transport-posts-the-canonical-request",
+              "the-go-transport-refuses-an-unadmissible-frame-before-sending",
+              "the-typescript-transport-posts-the-canonical-request",
+              "the-typescript-transport-refuses-an-unadmissible-frame-before-sending"
+            ]
+          }
+        },
+        {
+          "id": "a-retry-resends-the-same-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-mutated-retry-is-refused",
+              "the-go-transport-resends-the-same-bytes",
+              "the-typescript-transport-resends-the-same-bytes"
+            ]
+          }
+        },
+        {
+          "id": "publish-answers-have-four-classes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-transport-classifies-each-answer",
+              "the-typescript-transport-classifies-each-answer"
+            ]
+          }
+        },
+        {
+          "id": "one-outcome-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-outcome-vector-validates-and-every-class-is-present",
+              "a-known-answer-is-never-ambiguous",
+              "the-go-framework-finds-every-outcome-class",
+              "the-typescript-corpus-covers-every-class"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

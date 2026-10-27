@@ -912,8 +912,6 @@
             "kind": "acceptance",
             "checks": [
               "every-listed-head-is-resolved-once",
-              "an-empty-channel-releases-with-a-null-expectation",
-              "a-conflict-on-one-channel-writes-nothing",
               "selection-fingerprint-follows-the-package-key",
               "distinct-package-provider-fingerprint-follows-real-package-key",
               "an-empty-channel-measures-against-the-named-baseline",
@@ -3431,7 +3429,6 @@
             "kind": "acceptance",
             "checks": [
               "absent-provider-stays-native",
-              "two-declarers-fail-the-first-download",
               "errors-name-their-source"
             ]
           }
@@ -3443,9 +3440,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "bearer-reaches-only-its-hosts",
-              "one-call-per-purpose",
-              "refresh-before-expiry"
+              "bearer-reaches-only-its-hosts"
             ]
           }
         },
@@ -3456,8 +3451,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "refusal-fails-every-request-of-its-purpose",
-              "failure-retries-after-the-backoff",
               "late-answer-before-exit-is-heard",
               "exit-is-seen-while-a-child-holds-output"
             ]
@@ -3822,12 +3815,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-session-offers-publication-v1-and-the-echo-decides",
               "resolve-runs-through-the-session",
               "open-follows-every-barrier-leaf-once",
-              "a-second-plan-is-refused-in-one-session",
-              "a-head-that-is-not-forward-is-refused-at-open",
-              "an-uncertain-release-is-resolved-by-plan-digest",
               "a-refused-release-moves-no-channel",
               "without-the-echo-the-legacy-path-runs",
               "real-extensions-open-once-and-release-forward-only",

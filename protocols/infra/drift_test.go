@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // schemaDefProperties extracts property names from a schema $defs entry
@@ -171,84 +173,98 @@ const (
 )
 
 func TestDrift_Database(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Database",
 		schemaDefProperties(t, perProjectSchemaPath, "database"),
 		goTypeJSONFields(t, Database{}))
 }
 
 func TestDrift_Events(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Events",
 		schemaDefProperties(t, perProjectSchemaPath, "events"),
 		goTypeJSONFields(t, Events{}))
 }
 
 func TestDrift_Subscription(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Subscription",
 		schemaDefProperties(t, perProjectSchemaPath, "subscription"),
 		goTypeJSONFields(t, Subscription{}))
 }
 
 func TestDrift_StorageBucket(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "StorageBucket",
 		schemaDefProperties(t, perProjectSchemaPath, "storageBucket"),
 		goTypeJSONFields(t, StorageBucket{}))
 }
 
 func TestDrift_ScheduledJob(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "ScheduledJob",
 		schemaDefProperties(t, perProjectSchemaPath, "scheduledJob"),
 		goTypeJSONFields(t, ScheduledJob{}))
 }
 
 func TestDrift_AggregatedDatabase(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "AggregatedDatabase",
 		schemaDefProperties(t, aggregatedSchemaPath, "aggregatedDatabase"),
 		goTypeJSONFields(t, AggregatedDatabase{}))
 }
 
 func TestDrift_AggregatedTopic(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "AggregatedTopic",
 		schemaDefProperties(t, aggregatedSchemaPath, "aggregatedTopic"),
 		goTypeJSONFields(t, AggregatedTopic{}))
 }
 
 func TestDrift_AggregatedStorage(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "AggregatedStorage",
 		schemaDefProperties(t, aggregatedSchemaPath, "aggregatedStorage"),
 		goTypeJSONFields(t, AggregatedStorage{}))
 }
 
 func TestDrift_AggregatedSecret(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "AggregatedSecret",
 		schemaDefProperties(t, aggregatedSchemaPath, "aggregatedSecret"),
 		goTypeJSONFields(t, AggregatedSecret{}))
 }
 
 func TestDrift_AggregatedScheduledJob(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "AggregatedScheduledJob",
 		schemaDefProperties(t, aggregatedSchemaPath, "aggregatedScheduledJob"),
 		goTypeJSONFields(t, AggregatedScheduledJob{}))
 }
 
 func TestDrift_Source(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Source",
 		schemaDefProperties(t, aggregatedSchemaPath, "source"),
 		goTypeJSONFields(t, Source{}))
 }
 
 func TestDrift_Runtime(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Runtime",
 		schemaDefProperties(t, aggregatedSchemaPath, "runtime"),
 		goTypeJSONFields(t, Runtime{}))
 }
 
 func TestDrift_Ingress(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Ingress",
 		schemaDefProperties(t, aggregatedSchemaPath, "ingress"),
 		goTypeJSONFields(t, Ingress{}))
 }
 
 func TestDrift_Scaling(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Scaling",
 		schemaDefProperties(t, aggregatedSchemaPath, "scaling"),
 		goTypeJSONFields(t, Scaling{}))
@@ -263,6 +279,7 @@ func TestDrift_Scaling(t *testing.T) {
 // that is, under `resources`, not `scaling` — so a guard that only inspected
 // `runtime` and `scaling` would miss the reintroduction it exists to catch.
 func TestDrift_RuntimeCostPolicyIsDeployerOwned(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "no-cost-policy-field-is-exposed")
 	for _, field := range schemaSubtreeProperties(t, aggregatedSchemaPath, "runtime") {
 		if reason, forbidden := RemovedRuntimeFields[field]; forbidden {
 			t.Errorf("the runtime schema subtree exposes deployer-owned cost policy field %q (%s)", field, reason)
@@ -280,6 +297,7 @@ func TestDrift_RuntimeCostPolicyIsDeployerOwned(t *testing.T) {
 // diagnostics consult, so an entry silently dropped from it would disarm both
 // at once without failing anything.
 func TestDrift_RemovedRuntimeFieldsCoversTheRemovedField(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "no-cost-policy-field-is-exposed")
 	for _, name := range []string{"min", "billing", "requestBased", "cpuIdle", "cpuAlwaysAllocated"} {
 		if _, ok := RemovedRuntimeFields[name]; !ok {
 			t.Errorf("RemovedRuntimeFields is missing %q", name)
@@ -288,42 +306,49 @@ func TestDrift_RemovedRuntimeFieldsCoversTheRemovedField(t *testing.T) {
 }
 
 func TestDrift_Resources(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Resources",
 		schemaDefProperties(t, aggregatedSchemaPath, "resources"),
 		goTypeJSONFields(t, Resources{}))
 }
 
 func TestDrift_ResourceLimits(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "ResourceLimits",
 		schemaDefProperties(t, aggregatedSchemaPath, "resourceLimits"),
 		goTypeJSONFields(t, ResourceLimits{}))
 }
 
 func TestDrift_Security(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "Security",
 		schemaDefProperties(t, aggregatedSchemaPath, "security"),
 		goTypeJSONFields(t, Security{}))
 }
 
 func TestDrift_RuntimeProtocols(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "RuntimeProtocols",
 		schemaDefProperties(t, aggregatedSchemaPath, "runtimeProtocols"),
 		goTypeJSONFields(t, RuntimeProtocols{}))
 }
 
 func TestDrift_IgnoreRules(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "IgnoreRules",
 		schemaDefProperties(t, overridesSchemaPath, "ignoreRules"),
 		goTypeJSONFields(t, IgnoreRules{}))
 }
 
 func TestDrift_DatabaseRef(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "DatabaseRef",
 		schemaDefProperties(t, overridesSchemaPath, "databaseRef"),
 		goTypeJSONFields(t, DatabaseRef{}))
 }
 
 func TestDrift_EventsRef(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-schemas-match-the-go-types")
 	assertFieldParity(t, "EventsRef",
 		schemaDefProperties(t, overridesSchemaPath, "eventsRef"),
 		goTypeJSONFields(t, EventsRef{}))

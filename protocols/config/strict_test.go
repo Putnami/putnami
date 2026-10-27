@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseSchemaManifest_Valid(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "the-strict-parser-refuses-unknown-and-server-owned-members")
 	data := []byte(`{
 		"appName": "test",
 		"version": "1.0.0",
@@ -24,6 +26,7 @@ func TestParseSchemaManifest_Valid(t *testing.T) {
 }
 
 func TestParseSchemaManifest_UnknownField(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "the-strict-parser-refuses-unknown-and-server-owned-members")
 	data := []byte(`{"appName": "test", "unknown": true, "configs": []}`)
 	_, diags := ParseSchemaManifest(data)
 	if !diag.HasErrors(diags) {
@@ -32,6 +35,7 @@ func TestParseSchemaManifest_UnknownField(t *testing.T) {
 }
 
 func TestParseSchemaManifest_RejectsRegisteredAt(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "the-strict-parser-refuses-unknown-and-server-owned-members")
 	data := []byte(`{
 		"appName": "test",
 		"version": "1.0.0",
@@ -47,6 +51,7 @@ func TestParseSchemaManifest_RejectsRegisteredAt(t *testing.T) {
 }
 
 func TestValidateSchemaManifest_MissingAppName(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	m := &SchemaManifest{
 		Configs: []Block{{Path: "server", Fields: []FieldSchema{{Name: "port", Type: "int"}}}},
 	}
@@ -60,6 +65,7 @@ func TestValidateSchemaManifest_MissingAppName(t *testing.T) {
 // against regressing on real project names: appName is the project name, which
 // for scoped npm packages and Go modules contains '@' and '/'.
 func TestValidateSchemaManifest_ProjectNameAppName(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	for _, appName := range []string{"@putnami/application", "go.putnami.dev/examples/task-api"} {
 		m := &SchemaManifest{
 			AppName: appName,
@@ -72,6 +78,7 @@ func TestValidateSchemaManifest_ProjectNameAppName(t *testing.T) {
 }
 
 func TestValidateSchemaManifest_EmptyConfigs(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	m := &SchemaManifest{AppName: "test", Configs: []Block{}}
 	diags := ValidateSchemaManifest(m)
 	if !diag.HasErrors(diags) {
@@ -80,6 +87,7 @@ func TestValidateSchemaManifest_EmptyConfigs(t *testing.T) {
 }
 
 func TestValidateSchemaManifest_BadHashPrefix(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	m := &SchemaManifest{
 		AppName:    "test",
 		SchemaHash: "fnv:abc123",
@@ -92,6 +100,7 @@ func TestValidateSchemaManifest_BadHashPrefix(t *testing.T) {
 }
 
 func TestValidateSchemaManifest_InvalidFieldType(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	m := &SchemaManifest{
 		AppName: "test",
 		Configs: []Block{{Path: "s", Fields: []FieldSchema{{Name: "a", Type: "number"}}}},
@@ -103,6 +112,7 @@ func TestValidateSchemaManifest_InvalidFieldType(t *testing.T) {
 }
 
 func TestValidateSchemaManifest_DuplicatePath(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	m := &SchemaManifest{
 		AppName: "test",
 		Configs: []Block{
@@ -123,6 +133,7 @@ func TestValidateSchemaManifest_DuplicatePath(t *testing.T) {
 }
 
 func TestValidateSchemaManifest_InvalidPath(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	m := &SchemaManifest{
 		AppName: "test",
 		Configs: []Block{
@@ -144,6 +155,7 @@ func TestNormalizeSchemaManifest(t *testing.T) {
 }
 
 func TestParseAndValidateSchemaManifest(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "the-strict-parser-refuses-unknown-and-server-owned-members")
 	data := []byte(`{
 		"appName": "test",
 		"version": "1.0.0",
@@ -161,6 +173,7 @@ func TestParseAndValidateSchemaManifest(t *testing.T) {
 }
 
 func TestParseAndValidateRegisteredSchemaManifest(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "the-strict-parser-refuses-unknown-and-server-owned-members")
 	data := []byte(`{
 		"appName": "test",
 		"version": "1.0.0",
@@ -182,6 +195,7 @@ func TestParseAndValidateRegisteredSchemaManifest(t *testing.T) {
 }
 
 func TestValidateResolveRequest(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "strict-manifest", "validation-names-each-manifest-defect")
 	tests := []struct {
 		name    string
 		req     *ResolveRequest

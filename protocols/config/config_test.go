@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestResolutionLayers(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "resolution-layers", "the-layers-and-the-merge-are-fixed")
 	layers := ResolutionLayers("my-app", "production", "1.2.0")
 	if len(layers) != 5 {
 		t.Fatalf("expected 5 layers, got %d", len(layers))
@@ -31,6 +34,7 @@ func TestResolutionLayers(t *testing.T) {
 }
 
 func TestResolutionLayersNoVersion(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "resolution-layers", "the-layers-and-the-merge-are-fixed")
 	layers := ResolutionLayers("my-app", "staging", "")
 	if len(layers) != 4 {
 		t.Fatalf("expected 4 layers without version, got %d", len(layers))
@@ -38,6 +42,7 @@ func TestResolutionLayersNoVersion(t *testing.T) {
 }
 
 func TestDeepMerge(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "resolution-layers", "the-layers-and-the-merge-are-fixed")
 	dst := map[string]any{
 		"server": map[string]any{
 			"host": "localhost",
@@ -74,6 +79,7 @@ func TestDeepMerge(t *testing.T) {
 }
 
 func TestValidFieldTypes(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "closed-vocabulary", "the-schema-enums-are-the-vocabulary")
 	for _, ft := range []string{"string", "int", "float", "bool", "duration", "object", "array", "map"} {
 		if !ValidFieldTypes[ft] {
 			t.Errorf("%q should be a valid field type", ft)
@@ -87,6 +93,7 @@ func TestValidFieldTypes(t *testing.T) {
 }
 
 func TestSchemaManifestJSONSchemaVocabularyMatchesProtocol(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "closed-vocabulary", "the-schema-enums-are-the-vocabulary")
 	var doc map[string]any
 	if err := json.Unmarshal(SchemaManifestJSONSchema(), &doc); err != nil {
 		t.Fatalf("SchemaManifestJSONSchema invalid JSON: %v", err)
@@ -104,6 +111,7 @@ func TestSchemaManifestJSONSchemaVocabularyMatchesProtocol(t *testing.T) {
 }
 
 func TestSchemaManifestJSONSchemaCompositeSlotRules(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "closed-vocabulary", "the-schema-enums-are-the-vocabulary")
 	var doc map[string]any
 	if err := json.Unmarshal(SchemaManifestJSONSchema(), &doc); err != nil {
 		t.Fatalf("SchemaManifestJSONSchema invalid JSON: %v", err)

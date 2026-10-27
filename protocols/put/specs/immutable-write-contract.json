@@ -1,0 +1,69 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "put/immutable-write-contract",
+  "outcomes": [
+    "A publisher and the Put registry exchange the blobs and the manifest of a version through one strictly parsed, versioned write, pinned with its schema and fixtures",
+    "A version is immutable and bound to the canonical bytes the registry stores, and a publish moves no channel",
+    "A publisher refuses an answer that names another version, so a member is recorded only for what the registry stored"
+  ],
+  "nonGoals": [
+    "Channels and releases, which the distribution protocol owns",
+    "How a publication job packs a member into its outbox, which the extension protocol owns",
+    "How the registry stores blobs and manifests, which the server owns",
+    "Retries of a transient failure, which the extension SDK's publication outbox feature owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-bounds-and-paths-are-pinned",
+      "text": "The protocol version is 1. A manifest payload is at most 4 MiB, a version at most 256 bytes and an archive at most 32 platforms. The paths are /<namespace>/<name>/blobs, /<namespace>/<name>/publish and /<namespace>/<name>/versions/<version>/manifest, with the version path-escaped, and a publish is sent as application/json."
+    },
+    {
+      "id": "each-kind-has-one-profile",
+      "text": "Config, migration, doc, archive and deployment members each publish one manifest media type, listed in the order of the distribution member kinds, and migration, doc and archive members also name the media types of their blobs. Image and library members have no profile."
+    },
+    {
+      "id": "the-wire-is-closed",
+      "text": "The field names of the blob receipt, the publish request and response, the version, the manifest and the archive payload are pinned, and so are the published state and the private visibility. The JSON Schema schemas/put-write-v1.json lists the same members as the Go types and names the rules it cannot express: the canonical form, no duplicate member, the three bounds and no member in another case."
+    },
+    {
+      "id": "the-error-codes-are-closed",
+      "text": "The error codes are exactly put.invalid_coordinate, put.invalid_version, put.invalid_media_type, put.invalid_payload, put.invalid_digest, put.invalid_blob_receipt, put.invalid_publish_request, put.invalid_publish_response, put.invalid_manifest and put.invalid_archive_payload."
+    },
+    {
+      "id": "the-fixture-corpus-is-the-contract",
+      "text": "Every valid fixture of the blob receipt, the publish request and response, the manifest and the archive payload parses with no error, and every invalid fixture fails. Every fixture directory names a message the suite parses."
+    },
+    {
+      "id": "the-payload-is-canonical",
+      "text": "A manifest payload is a JSON object in canonical form: no spacing, escaped HTML characters and line separators, no duplicate member, valid UTF-8, no trailing data, no member named in another case, and no more than the bound. Its digest is the sha256 of those bytes, and the digest of {} is pinned."
+    },
+    {
+      "id": "blob-references-are-three-members",
+      "text": "A manifest references a blob only through blob_digest, artifact.blob and artifacts.<platform>.digest, and the references are listed sorted, each once. A malformed digest, a reference of the wrong type and a reference member named in another case, such as BLOB_DIGEST, are refused."
+    },
+    {
+      "id": "an-archive-lists-its-platforms",
+      "text": "An archive payload reads as one blob digest per platform, with the platform written with a slash, as windows/arm64."
+    },
+    {
+      "id": "coordinates-and-versions-are-validated",
+      "text": "A coordinate is a lowercase namespace and name, exactly two segments, neither starting with - or ., and a coordinate with a 256-byte name is refused. A version is 1 to 256 bytes of valid UTF-8, is neither . nor .., and holds no slash, no NUL, line feed or carriage return, and no leading or trailing space."
+    },
+    {
+      "id": "an-answer-matches-its-request",
+      "text": "A publish response that names another coordinate, version or media type is refused, and so are a manifest with another payload and a blob receipt with another digest or size. A receipt with another media type is accepted, because the registry keeps the media type of a blob's first upload. The SDK publisher (tooling/extension-sdk) accepts such a receipt, and refuses a receipt of other bytes, an unknown field, a moved channel and another stored payload."
+    },
+    {
+      "id": "a-publish-stores-the-payload-at-its-digest",
+      "text": "The SDK publisher sends each kind's payload byte for byte in a publish request the strict parser accepts, uploads each blob, and answers the payload's digest with no reuse; an archive also answers its platforms. A second publish of the same manifest reuses the version at that digest, and a version that holds another manifest or media type is refused. A member that breaks a profile, coordinate, version, canonical form or blob rule is refused before any request."
+    },
+    {
+      "id": "the-publisher-sends-its-bearer",
+      "text": "The SDK publisher sends its bearer on every request, so a bearer the registry refuses fails the publish with 401. It reads a version's manifest at /<namespace>/<name>/versions/<version>/manifest."
+    }
+  ],
+  "decisions": [
+    "protocols/put/doc/adr/0001-immutable-write-without-a-channel.md"
+  ]
+}

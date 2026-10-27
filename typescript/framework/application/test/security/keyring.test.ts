@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { decodeJwtHeader, importPublicKey, verifyJwt } from '../../src/oauth/oauth-jwt';
 import {
   allowedTransitions,
@@ -46,24 +47,29 @@ describe('keyring key-state machine (cross-language corpus)', () => {
     transitions: { id: string; from: string; to: string; legal: boolean }[];
   }
   const corpus = loadFixture<KeyStateCorpus>('key-states.json');
+  const stateCorpus = {
+    feature: 'keyring/signing-keyring-contract',
+    requirement: 'the-key-state-machine-is-closed',
+    check: 'the-typescript-application-follows-the-state-corpus',
+  };
 
-  it('exposes the closed enum in canonical order', () => {
+  specTest('exposes the closed enum in canonical order', stateCorpus, () => {
     expect(corpus.states).toEqual([...KEY_STATES]);
   });
 
-  it('marks exactly the terminal states terminal', () => {
+  specTest('marks exactly the terminal states terminal', stateCorpus, () => {
     for (const s of KEY_STATES) {
       expect(isTerminal(s)).toBe(corpus.terminal.includes(s));
     }
   });
 
   for (const t of corpus.transitions) {
-    it(`transition ${t.id} is ${t.legal ? 'legal' : 'illegal'}`, () => {
+    specTest(`transition ${t.id} is ${t.legal ? 'legal' : 'illegal'}`, stateCorpus, () => {
       expect(canTransition(t.from, t.to)).toBe(t.legal);
     });
   }
 
-  it('revoked is terminal with no allowed transitions', () => {
+  specTest('revoked is terminal with no allowed transitions', stateCorpus, () => {
     expect(allowedTransitions('revoked')).toEqual([]);
     expect(allowedTransitions('active')).toEqual(['expired', 'retiring', 'revoked']);
   });
@@ -76,21 +82,29 @@ describe('keyring public JWKS projection (cross-language corpus)', () => {
   const corpus = loadFixture<KeyringCorpus>('keyrings.json');
 
   for (const c of corpus.cases) {
-    it(`${c.id}: projects to the exact fixture public JWKS`, async () => {
-      const keys = await signingKeysFromKeyring(c.private);
-      // A fixed clock keeps the retiring key inside its overlap window at read time.
-      const provider = await createSigningKeyProvider({ keys, clock: () => 1_700_000_000_000 });
-      const jwks = provider.publicJwks();
-      expect(jwks).toEqual(c.public as typeof jwks);
+    specTest(
+      `${c.id}: projects to the exact fixture public JWKS`,
+      {
+        feature: 'keyring/signing-keyring-contract',
+        requirement: 'the-public-projection-fails-closed',
+        check: 'the-typescript-application-projects-the-corpus',
+      },
+      async () => {
+        const keys = await signingKeysFromKeyring(c.private);
+        // A fixed clock keeps the retiring key inside its overlap window at read time.
+        const provider = await createSigningKeyProvider({ keys, clock: () => 1_700_000_000_000 });
+        const jwks = provider.publicJwks();
+        expect(jwks).toEqual(c.public as typeof jwks);
 
-      // Belt-and-suspenders: the serialized projection leaks no private material or
-      // keyring lifecycle state (mirror of the Go projection-corpus assertion).
-      const raw = JSON.stringify(jwks);
-      for (const field of ['d', 'p', 'q', 'dp', 'dq', 'qi', 'k']) {
-        expect(raw).not.toContain(`"${field}":`);
-      }
-      expect(raw).not.toContain('"state":');
-    });
+        // Belt-and-suspenders: the serialized projection leaks no private material or
+        // keyring lifecycle state (mirror of the Go projection-corpus assertion).
+        const raw = JSON.stringify(jwks);
+        for (const field of ['d', 'p', 'q', 'dp', 'dq', 'qi', 'k']) {
+          expect(raw).not.toContain(`"${field}":`);
+        }
+        expect(raw).not.toContain('"state":');
+      },
+    );
   }
 });
 

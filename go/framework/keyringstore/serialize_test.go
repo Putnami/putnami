@@ -86,6 +86,7 @@ func TestRowStateColumnIsAuthoritative(t *testing.T) {
 // TestRowFromJWKDefaultsState confirms an owner document that omits state
 // persists as an active key, so a minimal keyring is usable after Save/Load.
 func TestRowFromJWKDefaultsState(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "an-omitted-state-is-active", "the-go-keyringstore-stores-a-key-without-a-state-as-active")
 	row, err := rowFromJWK("k", keyring.PrivateJWK{Kty: "EC", Kid: "x"})
 	if err != nil {
 		t.Fatalf("rowFromJWK: %v", err)

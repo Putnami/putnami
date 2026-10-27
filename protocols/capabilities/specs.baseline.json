@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "capabilities/manifest-contract#a-provider-identity-is-unique",
+    "capabilities/manifest-contract#a-required-capability-needs-a-provider-in-its-manifest",
+    "capabilities/manifest-contract#each-schema-accepts-exactly-its-version",
+    "capabilities/manifest-contract#every-fixture-gets-its-verdict",
+    "capabilities/manifest-contract#packages-stay-on-the-capability-surface",
+    "capabilities/manifest-contract#the-reader-is-strict-and-versioned",
+    "capabilities/manifest-contract#the-typescript-application-reproduces-the-go-golden",
+    "capabilities/manifest-contract#typescript-loaders-are-reconciled-into-the-manifest",
+    "capabilities/manifest-contract#v1-bytes-are-canonical",
+    "capabilities/manifest-contract#v2-emission-drops-volatile-state"
+  ]
+}

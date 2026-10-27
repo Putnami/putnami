@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "diagnostic/finding-record",
+  "outcomes": [
+    "A finding from any protocol package has the same four members on the wire and the same line in a terminal.",
+    "A caller decides whether to proceed from the severity alone: only an error blocks."
+  ],
+  "nonGoals": [
+    "A code vocabulary: each protocol package declares and freezes its own dotted codes.",
+    "The text of a message, which is written for a person and which automation does not match.",
+    "A protocol version, a schema or a fixture corpus: a finding travels inside a document whose contract specifies its bytes."
+  ],
+  "requirements": [
+    {
+      "id": "the-record-has-four-json-members",
+      "text": "A diagnostic marshals to the JSON members severity, code, message and field, in that order, and leaves field out when it is empty. The severities Error, Warning and Info are the strings error, warning and info."
+    },
+    {
+      "id": "the-constructors-fill-the-record",
+      "text": "Errorf builds a diagnostic of severity error with the given code and field and the message formatted from its arguments. Warningf builds a diagnostic of severity warning and keeps an empty field empty."
+    },
+    {
+      "id": "string-shows-the-field-only-when-set",
+      "text": "String renders [severity] field: message (code) when the field is set, and [severity] message (code) when it is empty."
+    },
+    {
+      "id": "only-an-error-blocks",
+      "text": "HasErrors is false for no diagnostic and for warnings alone, and true once one diagnostic is an error. Errors returns the error diagnostics in their order and drops warnings and infos. ErrorText renders each error as String after two spaces and a dash, one per line, and returns the empty string when no diagnostic is an error."
+    },
+    {
+      "id": "severities-rank-error-warning-info",
+      "text": "SeverityRank orders error before warning before info, and any other severity after info."
+    }
+  ]
+}

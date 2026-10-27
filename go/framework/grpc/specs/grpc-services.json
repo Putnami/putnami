@@ -51,7 +51,7 @@
     },
     {
       "id": "service-inventory",
-      "text": "Describe emits one canonical service inventory from all composed surfaces. Native registrations run without a listener and include enabled reflection; gateway methods stay unknown and use mounted prefixes; bridge methods join exact POST routes. One elected writer unions the facts, collapses identical entries and rejects conflicts. UseForDescribe is refused. A configured surface with no registrations emits an empty inventory."
+      "text": "Describe emits one canonical service inventory from all composed surfaces. Native registrations run without a listener and include enabled reflection. One elected writer unions the facts of every surface. UseForDescribe is refused. A configured surface with no registrations emits an empty inventory."
     }
   ],
   "decisions": [

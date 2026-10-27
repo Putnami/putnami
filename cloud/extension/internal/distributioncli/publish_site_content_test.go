@@ -16,6 +16,7 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/sitecontent"
 )
 
@@ -59,6 +60,7 @@ func assembleFixtureBundle(t *testing.T, dir string) (*sitecontent.Manifest, []b
 // and published versions). Any per-run tar/gzip nondeterminism (mtimes,
 // ownership, entry order) breaks content addressing and re-rolls the consumer.
 func TestSiteContentBundleDeterministic(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "the-cloud-extension-builds-the-same-bundle-twice")
 	dir := writeSiteContentFixture(t)
 
 	_, manifest1, payload1 := assembleFixtureBundle(t, dir)
@@ -80,6 +82,7 @@ func TestSiteContentBundleDeterministic(t *testing.T) {
 // contract with zero error diagnostics: strict manifest parse + validation,
 // payload verification, and every file served under the declared mount.
 func TestSiteContentBundleSatisfiesContract(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "the-cloud-extension-builds-a-conformant-bundle")
 	dir := writeSiteContentFixture(t)
 	manifest, manifestJSON, payload := assembleFixtureBundle(t, dir)
 

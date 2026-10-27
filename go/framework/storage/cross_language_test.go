@@ -26,7 +26,7 @@ const equivalenceFixturePath = "../../../protocols/infra/fixtures/equivalence/st
 // against the same golden file. A change to either implementation that
 // breaks byte-equivalence fails both tests.
 func TestCrossLanguageEquivalence_Storage(t *testing.T) {
-	spectest.Proves(t, "go/object-storage", "backend-contract", "cross-runtime-backend-conformance")
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "producers-emit-the-shared-goldens", "the-go-storage-producer-emits-its-golden")
 	buckets := []*BucketDefinition{
 		{Name: "uploads"},
 		{Name: "audit-logs", Options: BucketOptions{Retention: "30d"}},

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "sitecontent",
+  "features": [
+    {
+      "id": "sitecontent/content-bundle-contract",
+      "type": "feature",
+      "name": "Content bundle contract",
+      "outcome": "A producer builds a content bundle, a versioned archive that carries its own manifest, and a site verifies it against one strict contract and one fixture corpus, so a site mounts only the files a manifest lists, under mounts that collide with nothing, and keeps its baked content when a bundle is newer than it can read",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-versions-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-pinned",
+              "a-reader-accepts-only-its-format-major"
+            ]
+          }
+        },
+        {
+          "id": "the-manifest-is-closed-and-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-valid-manifests-parse",
+              "the-invalid-manifests-are-refused",
+              "a-duplicate-path-is-refused",
+              "the-site-refuses-an-unknown-field",
+              "the-site-refuses-a-duplicate-path-and-overlapping-mounts"
+            ]
+          }
+        },
+        {
+          "id": "paths-mounts-and-digests-follow-one-grammar",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-payload-path-is-relative-and-clean",
+              "a-mount-is-a-clean-absolute-prefix",
+              "a-digest-is-bare-lowercase-hex",
+              "the-site-hashes-the-fixture-like-go",
+              "the-site-applies-the-same-grammar"
+            ]
+          }
+        },
+        {
+          "id": "the-payload-matches-the-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-payload-corpus-gets-its-verdict",
+              "a-payload-that-is-not-gzip-is-refused",
+              "the-site-gives-the-payload-corpus-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "the-manifest-travels-inside-the-archive",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-archive-corpus-gets-its-verdict",
+              "a-built-archive-is-deterministic-and-verifies",
+              "a-nonconformant-archive-is-not-built",
+              "the-cloud-extension-builds-the-same-bundle-twice",
+              "the-cloud-extension-builds-a-conformant-bundle",
+              "the-cloud-extension-refuses-a-nonconformant-source"
+            ]
+          }
+        },
+        {
+          "id": "a-newer-major-falls-back-and-a-bad-envelope-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-newer-major-gates-before-strict-decoding",
+              "a-version-that-is-not-a-string-fails-closed",
+              "the-site-gates-a-newer-major",
+              "the-site-gates-a-newer-major-before-strict-decoding",
+              "the-site-fails-closed-on-a-version-that-is-not-a-string",
+              "the-site-falls-back-to-baked-content-on-a-newer-major"
+            ]
+          }
+        },
+        {
+          "id": "mounts-partition-the-url-space",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "prefixes-conflict-at-segment-boundaries",
+              "a-path-matches-only-its-mount",
+              "a-merge-plan-refuses-colliding-mounts",
+              "a-merge-plan-accepts-disjoint-mounts",
+              "the-site-matches-the-go-prefix-semantics",
+              "the-site-refuses-a-bundle-above-its-content",
+              "the-site-refuses-overlapping-bundles"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

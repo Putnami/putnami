@@ -3,9 +3,12 @@ package config
 import (
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestValidateSchemaManifest_Deterministic(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "fixture-corpus", "validation-is-deterministic")
 	m := &SchemaManifest{
 		AppName: "test",
 		Configs: []Block{
@@ -30,6 +33,7 @@ func TestValidateSchemaManifest_Deterministic(t *testing.T) {
 }
 
 func TestComputeSchemaHash_Deterministic100(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "canonical-schema-hash", "the-hash-is-canonical-and-pinned")
 	blocks := []Block{
 		{Path: "z", Fields: []FieldSchema{{Name: "b", Type: "int"}, {Name: "a", Type: "string"}}},
 		{Path: "a", Fields: []FieldSchema{{Name: "x", Type: "bool"}}},

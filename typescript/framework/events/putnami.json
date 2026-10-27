@@ -4,7 +4,11 @@
   "visibility": "public",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/events", "/protocols/infra"],
   "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/events/fixtures/**", "../../../protocols/infra/fixtures/equivalence/**"]
+    },
     "package": {
       "npm": true
     },

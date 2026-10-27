@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "registry/credential-seam-contract#a-credential-serves-only-its-hosts",
+    "registry/credential-seam-contract#a-failure-answers-for-30-seconds",
+    "registry/credential-seam-contract#a-run-credential-is-a-bounded-bearer",
+    "registry/credential-seam-contract#a-seam-token-is-a-bare-bearer",
+    "registry/credential-seam-contract#an-upload-carries-no-credential",
+    "registry/credential-seam-contract#an-upload-is-refused-before-any-registry-request",
+    "registry/credential-seam-contract#an-upload-is-validated",
+    "registry/credential-seam-contract#each-op-has-its-line-bound",
+    "registry/credential-seam-contract#nothing-moves-before-an-open",
+    "registry/credential-seam-contract#one-call-per-purpose-while-valid",
+    "registry/credential-seam-contract#one-declaring-extension-is-the-provider",
+    "registry/credential-seam-contract#open-is-idempotent-and-release-final",
+    "registry/credential-seam-contract#plans-ancestry-and-evidence-are-validated",
+    "registry/credential-seam-contract#publication-v1-is-negotiated",
+    "registry/credential-seam-contract#refusal-and-absence-hold-for-the-process",
+    "registry/credential-seam-contract#resolve-and-release-carry-distribution-documents",
+    "registry/credential-seam-contract#secrets-are-never-formatted",
+    "registry/credential-seam-contract#the-plan-digest-is-the-release-plan-contract",
+    "registry/credential-seam-contract#the-provider-tokens-are-pinned",
+    "registry/credential-seam-contract#the-publication-tokens-are-pinned",
+    "registry/credential-seam-contract#the-schema-tracks-the-go-contract",
+    "registry/credential-seam-contract#the-seam-is-pinned",
+    "registry/credential-seam-contract#the-session-ends-at-shutdown-or-eof",
+    "registry/credential-seam-contract#the-uploader-tokens-are-pinned",
+    "registry/credential-seam-contract#the-wire-is-strict",
+    "registry/credential-seam-contract#uploader-v1-needs-publication-v1"
+  ]
+}

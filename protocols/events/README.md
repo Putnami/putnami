@@ -182,19 +182,31 @@ through `conformance/manifest.json`.
 - **`default` and `parity`**: no claim is recorded on either axis. Omission is
   not a denial — see the support vocabulary.
 
-## Specs and durable decisions
+## Feature, spec and durable decisions
 
-There is deliberately **no user-facing feature or spec for this module**. A
-feature declares a product outcome a user obtains; this module declares the
-bytes several products exchange. Minting `events/protocol` as a feature would
-create a product promise with no user on the other end of it, and would put a
-second authority beside the schemas.
+The module owns the feature of its contract, `events/event-server-contract`,
+specified in
+[`specs/event-server-contract.json`](specs/event-server-contract.json). The
+tests here prove the envelope and gateway corpus, the handler options and their
+defaults, the closed delivery profiles, the push wrapper and the status that
+decides its outcome, the conformance manifest, the non-normative proto, and the
+managed publish corpus: its requests, the byte-stable retry and the outcome
+vectors.
 
-The user-facing surface that owns the outcome is the **events capability of a
-Putnami application** — `@putnami/events` and the Go events framework, the
-managed Event Plane offering, and the client libraries. A spec belongs with
-whichever of those a change is actually for; this module records only the wire
-decisions behind it.
+The implementations prove the same contract under checks of their own:
+
+- the Go events framework (`go/framework/events`), under its `the-go-…`
+  checks: its push receiver refuses an undecodable wrapper, admits only an
+  allowlisted pusher, drops `auth.*` attributes and answers by outcome, and its
+  managed transport posts the canonical request, resends the same bytes and
+  classifies each answer;
+- `@putnami/events` (`typescript/framework/events`), under its
+  `the-typescript-…` checks: its protocol guards read the corpus, and its push
+  receiver and managed transport prove what the Go ones prove.
+
+Their own features, `go/event-delivery` and `typescript/event-messaging`, keep
+what each framework adds: delivery, retry, dead-letter and shutdown semantics,
+and the logs each outcome writes.
 
 Durable decisions recorded here:
 

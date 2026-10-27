@@ -18,9 +18,9 @@ describe('cross-language equivalence', () => {
   specTest(
     'document producer matches the shared golden fixture',
     {
-      feature: 'typescript/document-repository',
-      requirement: 'infra-publication',
-      check: 'the-producer-output-matches-the-shared-golden-fixture',
+      feature: 'infra/infrastructure-requirements-contract',
+      requirement: 'producers-emit-the-shared-goldens',
+      check: 'the-typescript-document-producer-emits-its-golden',
     },
     async () => {
       const users = Collection('users', { id: DocumentId(String), name: Field(String) });

@@ -338,6 +338,7 @@ func TestBindingBackendCloseClosesAllBackends(t *testing.T) {
 }
 
 func TestParseBindings(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-binding-is-strict", "the-go-storage-framework-refuses-an-invalid-bindings-document")
 	tests := []struct {
 		name    string
 		json    string
@@ -426,6 +427,7 @@ func TestParseBindings(t *testing.T) {
 }
 
 func TestBackendFromBindingsValidatesDocument(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-binding-is-strict", "the-go-storage-framework-refuses-an-invalid-bindings-document")
 	t.Run("duplicate logical names rejected", func(t *testing.T) {
 		doc := &BindingsDocument{
 			ProtocolVersion: BindingsProtocolVersion,

@@ -213,16 +213,27 @@ diagnostic rather than a silently trusted value.
   — why stored credentials use a self-describing PHC-style string, and why two
   base64 alphabets coexist in one module.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is a security vocabulary consumed by framework code; what a developer
-experiences is token signing, verification, rotation, and credential hashing in
-`go.putnami.dev/security` and `@putnami/application`. Per the spec contract in
-[`protocols/features`](../features/README.md) a spec details an already-authored
-feature and never mints one, so the durable design intent lives in the ADRs
-above. A product feature that later owns authentication links to them rather
-than restating them.
+The module owns the feature of its contract, `keyring/signing-keyring-contract`,
+specified in
+[`specs/signing-keyring-contract.json`](specs/signing-keyring-contract.json).
+The tests here prove the closed key-state machine, the fail-closed public
+projection and its canonical bytes, the default state of a key that omits one,
+the strict digest grammar, the structure of the JWT vectors, the schemas and
+the error registry. The implementers prove the rest under their own checks:
+
+- `go.putnami.dev/security` (`the-go-security-…`) reproduces the secret vectors
+  and verifies the valid JWT vectors.
+- `go.putnami.dev/keyringstore` (`the-go-keyringstore-…`) stores a key without a
+  state as active.
+- `@putnami/application` (`the-typescript-application-…`) follows the state
+  corpus, projects the keyring corpus, reproduces the secret vectors and
+  verifies the JWT vectors.
+
+Token signing, verification and secret policy stay in
+`go/authentication-authorization`, and rotation stays in
+`go/signing-key-rotation`.
 
 ## Support
 

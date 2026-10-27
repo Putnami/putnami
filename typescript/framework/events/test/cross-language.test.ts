@@ -17,9 +17,9 @@ describe('cross-language equivalence', () => {
   specTest(
     'events producer matches the shared golden fixture',
     {
-      feature: 'typescript/event-messaging',
-      requirement: 'cross-language-records',
-      check: 'the-producer-output-matches-the-shared-golden-fixture',
+      feature: 'infra/infrastructure-requirements-contract',
+      requirement: 'producers-emit-the-shared-goldens',
+      check: 'the-typescript-events-producer-emits-its-golden',
     },
     async () => {
       // The publish list is unsorted with a duplicate so the dedupe-and-sort

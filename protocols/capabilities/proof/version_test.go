@@ -1,4 +1,4 @@
-package capabilities
+package proof
 
 import (
 	"encoding/json"
@@ -8,12 +8,16 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+
+	"go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // capabilitiesSchemaPath is the JSON schema editors validate authored
 // manifests against.
-const capabilitiesSchemaPath = "schemas/capabilities.json"
-const capabilitiesV2SchemaPath = "schemas/capabilities-v2.json"
+const capabilitiesSchemaPath = "../schemas/capabilities.json"
+
+const capabilitiesV2SchemaPath = "../schemas/capabilities-v2.json"
 
 // TestProtocolVersion_SchemasMatch asserts the JSON schema accepts exactly the
 // current protocol version — no more, no less. The schema and the parser must
@@ -21,12 +25,13 @@ const capabilitiesV2SchemaPath = "schemas/capabilities-v2.json"
 // manifest the parser intentionally reads, and a schema that accepts more
 // blesses a manifest the parser drops. Either gap is drift.
 func TestProtocolVersion_SchemasMatch(t *testing.T) {
+	spectest.Proves(t, feature, "each-schema-accepts-exactly-its-version", "each-schema-accepts-exactly-its-version")
 	for _, test := range []struct {
 		path string
 		want []int
 	}{
-		{capabilitiesSchemaPath, []int{ProtocolVersion}},
-		{capabilitiesV2SchemaPath, []int{ProtocolVersionV2}},
+		{capabilitiesSchemaPath, []int{capabilities.ProtocolVersion}},
+		{capabilitiesV2SchemaPath, []int{capabilities.ProtocolVersionV2}},
 	} {
 		t.Run(filepath.Base(test.path), func(t *testing.T) {
 			accepted := schemaProtocolVersions(t, test.path)
@@ -46,7 +51,7 @@ var tsProducers = []struct {
 	path    string
 	version int
 }{
-	{"typescript/framework/application/src/capabilities/capabilities.producer.ts", ProtocolVersionV2},
+	{"typescript/framework/application/src/capabilities/capabilities.producer.ts", capabilities.ProtocolVersionV2},
 }
 
 // tsProtocolVersionPattern captures the integer a TypeScript producer assigns
@@ -58,16 +63,17 @@ var tsProtocolVersionPattern = regexp.MustCompile(`(?m)\bconst\s+(?:CAPABILITIES
 // TestProtocolVersion_TSProducersSupported is the cross-language guard: it
 // scans every TypeScript producer and asserts the protocolVersion it stamps is
 // the version the parser accepts. It fails when a producer stamps a version the
-// parser would reject — the silent contribution-drop failure mode. The scan
-// skips itself if the producer list is ever emptied, so the guard survives a
-// producer being moved rather than turning into a false pass.
+// parser would reject — the silent contribution-drop failure mode. An empty
+// producer list or a missing workspace root fails the test, so the guard never
+// turns into a false pass.
 func TestProtocolVersion_TSProducersSupported(t *testing.T) {
+	spectest.Proves(t, feature, "each-schema-accepts-exactly-its-version", "the-typescript-producer-stamps-version-2")
 	if len(tsProducers) == 0 {
-		t.Skip("no TypeScript capabilities producers are listed; add one when an emitter stamps this wire")
+		t.Fatalf("no TypeScript capabilities producer is listed; list the emitter that stamps this wire")
 	}
 	root := repoRoot(t)
 	if root == "" {
-		t.Skip("workspace root (putnami.workspace.json) not found; skipping cross-language producer scan")
+		t.Fatal("no putnami.workspace.json above the working directory; the cross-language producer scan needs the repository checkout")
 	}
 	for _, producer := range tsProducers {
 		t.Run(producer.path, func(t *testing.T) {
@@ -124,8 +130,7 @@ func schemaProtocolVersions(t *testing.T, path string) []int {
 }
 
 // repoRoot walks up from the working directory to the workspace root,
-// identified by putnami.workspace.json. Returns "" when not found (e.g. when
-// the module is tested in isolation outside the monorepo).
+// identified by putnami.workspace.json. It returns "" when none is found.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

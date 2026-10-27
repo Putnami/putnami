@@ -13,6 +13,7 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	distributionproto "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/sitecontent"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
@@ -340,6 +341,7 @@ func TestSiteContentSectionsAndCoordinate(t *testing.T) {
 }
 
 func TestValidateSiteContentSourcesSharesPackageRejections(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "the-cloud-extension-refuses-a-nonconformant-source")
 	for _, test := range []struct {
 		name string
 		path string

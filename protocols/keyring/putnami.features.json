@@ -1,0 +1,147 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "keyring",
+  "features": [
+    {
+      "id": "keyring/signing-keyring-contract",
+      "type": "feature",
+      "name": "Signing keyring contract",
+      "outcome": "Go and TypeScript signers, verifiers and key stores share one closed key-state machine, one fail-closed public projection and one versioned credential-digest grammar, pinned by one fixture corpus, so a verifier never sees a distrusted key and a stored credential verifies the same way in either language",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-key-state-machine-is-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-state-corpus-gets-its-verdict",
+              "allowed-transitions-are-sorted-and-stable",
+              "the-typescript-application-follows-the-state-corpus"
+            ]
+          }
+        },
+        {
+          "id": "the-public-projection-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-projection-corpus-gets-its-verdict",
+              "the-typescript-application-projects-the-corpus"
+            ]
+          }
+        },
+        {
+          "id": "an-omitted-state-is-active",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-key-without-a-state-is-published",
+              "the-go-keyringstore-stores-a-key-without-a-state-as-active"
+            ]
+          }
+        },
+        {
+          "id": "the-projection-has-one-byte-form",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-projection-matches-the-golden-bytes",
+              "the-projection-serializes-the-same-way-every-time"
+            ]
+          }
+        },
+        {
+          "id": "the-digest-grammar-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-digest-corpus-gets-its-verdict",
+              "a-digest-round-trips-to-the-same-string",
+              "the-digest-schema-pattern-agrees-with-the-parser"
+            ]
+          }
+        },
+        {
+          "id": "secret-vectors-reproduce-in-both-languages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-security-reproduces-the-secret-vectors",
+              "the-typescript-application-reproduces-the-secret-vectors"
+            ]
+          }
+        },
+        {
+          "id": "jwt-vectors-verify-in-both-languages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-jwt-corpus-gets-its-structural-verdict",
+              "the-go-security-verifies-the-valid-jwt-vectors",
+              "the-typescript-application-verifies-the-jwt-vectors"
+            ]
+          }
+        },
+        {
+          "id": "the-schemas-match-the-go-types",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-fields-match-the-go-types",
+              "the-required-fields-are-pinned",
+              "the-schema-pins-the-protocol-version",
+              "the-schema-enums-match-the-go-enums"
+            ]
+          }
+        },
+        {
+          "id": "every-error-code-is-registered",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-error-registry-is-complete"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

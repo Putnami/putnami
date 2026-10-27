@@ -1,0 +1,112 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "gomod",
+  "features": [
+    {
+      "id": "gomod/module-write-contract",
+      "type": "feature",
+      "name": "Go module registry write contract",
+      "outcome": "A publisher and a Putnami Go module registry exchange a module version through one authenticated, content-addressed and strictly parsed write, pinned with its fixtures, while reads stay the standard Go module proxy protocol",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-and-endpoints-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-1",
+              "the-paths-and-content-types-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "the-field-names-are-the-servers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-field-names-are-pinned-and-an-empty-dist-tag-is-omitted"
+            ]
+          }
+        },
+        {
+          "id": "the-error-codes-are-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-error-codes-are-the-five-canonical-ones"
+            ]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "a-release-answers-the-requested-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-trailing-json-value-is-refused",
+              "another-version-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "the-version-is-bound-to-the-stored-zip",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-sdk-publishes-and-reuses-the-same-bytes",
+              "the-extension-sdk-refuses-another-upload-digest",
+              "the-extension-sdk-reuses-a-conflict-only-when-allowed"
+            ]
+          }
+        },
+        {
+          "id": "publishing-releases-nothing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-publishes-without-a-channel-or-a-release"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
