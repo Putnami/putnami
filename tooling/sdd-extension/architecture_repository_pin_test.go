@@ -422,6 +422,7 @@ func authoredTypeScriptFrameworkDomain() *arch.Builder {
 				arch.Status(archproto.StatusActive),
 				arch.Facts("wire_contract_definitions"),
 				arch.Justification("The TypeScript framework packages implement wire contracts the protocols domain owns: they write, read or replay a protocol's shapes and fixtures, and their tests prove the protocol's requirements. Each protocol owns its contract; a package holds a reference to it and owns none of its meaning."),
+				arch.Bind("/typescript/framework/application", "/protocols/capabilities"),
 				arch.Bind("/typescript/framework/application", "/protocols/features"),
 				arch.Bind("/typescript/framework/application", "/protocols/http-routes"),
 				arch.Bind("/typescript/framework/application", "/protocols/identity"),

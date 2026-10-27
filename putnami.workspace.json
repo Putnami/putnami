@@ -46,9 +46,7 @@
         "architecture": "enforce"
       },
       "featureCoverage": {
-        "debt": [
-          "/protocols/doccov"
-        ]
+        "debt": []
       }
     },
     "test": {

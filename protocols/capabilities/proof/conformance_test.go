@@ -1,4 +1,4 @@
-package capabilities
+package proof
 
 import (
 	"os"
@@ -6,22 +6,29 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/capabilities"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
+
+// feature is the feature go.putnami.dev/protocol/capabilities declares and
+// these tests prove.
+const feature = "capabilities/manifest-contract"
 
 // TestConformance_ValidFixtures parses + validates every JSON file under
 // fixtures/valid. Each must strict-parse and validate clean. This corpus is
 // the cross-language contract: the Go and TypeScript emitters must both
 // produce manifests that pass here.
 func TestConformance_ValidFixtures(t *testing.T) {
-	files, err := filepath.Glob("fixtures/valid/*.json")
+	spectest.Proves(t, feature, "every-fixture-gets-its-verdict", "every-valid-v1-fixture-validates")
+	files, err := filepath.Glob("../fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(files) == 0 {
 		t.Fatal("no valid fixtures found")
 	}
-	equivalence, err := filepath.Glob("fixtures/equivalence/*.golden.json")
+	equivalence, err := filepath.Glob("../fixtures/equivalence/*.golden.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +43,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			m, diags := ParseAndValidateManifest(data)
+			m, diags := capabilities.ParseAndValidateManifest(data)
 			if diag.HasErrors(diags) {
 				t.Errorf("valid fixture %s produced errors: %v", path, diags)
 			}
@@ -50,7 +57,8 @@ func TestConformance_ValidFixtures(t *testing.T) {
 // TestConformance_InvalidFixtures asserts every JSON file under
 // fixtures/invalid produces at least one error diagnostic.
 func TestConformance_InvalidFixtures(t *testing.T) {
-	files, err := filepath.Glob("fixtures/invalid/*.json")
+	spectest.Proves(t, feature, "every-fixture-gets-its-verdict", "every-invalid-v1-fixture-is-refused")
+	files, err := filepath.Glob("../fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +72,7 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, diags := ParseAndValidateManifest(data)
+			_, diags := capabilities.ParseAndValidateManifest(data)
 			if !diag.HasErrors(diags) {
 				t.Errorf("invalid fixture %s should produce errors but none found", path)
 			}
@@ -73,11 +81,12 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 }
 
 func TestConformance_V2Fixtures(t *testing.T) {
-	valid, err := filepath.Glob("fixtures/v2/valid/*.json")
+	spectest.Proves(t, feature, "every-fixture-gets-its-verdict", "every-v2-fixture-gets-its-verdict")
+	valid, err := filepath.Glob("../fixtures/v2/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	equivalence, err := filepath.Glob("fixtures/v2/equivalence/*.golden.json")
+	equivalence, err := filepath.Glob("../fixtures/v2/equivalence/*.golden.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,12 +100,12 @@ func TestConformance_V2Fixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			document, diagnostics := ParseAndValidateManifestDocument(data)
+			document, diagnostics := capabilities.ParseAndValidateManifestDocument(data)
 			if document == nil || document.V2 == nil || diag.HasErrors(diagnostics) {
 				t.Fatalf("valid v2 fixture produced errors: %v", diagnostics)
 			}
 			if strings.HasSuffix(fixture, ".golden.json") {
-				canonical, err := MarshalManifestV2(document.V2)
+				canonical, err := capabilities.MarshalManifestV2(document.V2)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -107,7 +116,7 @@ func TestConformance_V2Fixtures(t *testing.T) {
 		})
 	}
 
-	invalid, err := filepath.Glob("fixtures/v2/invalid/*.json")
+	invalid, err := filepath.Glob("../fixtures/v2/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +129,7 @@ func TestConformance_V2Fixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, diagnostics := ParseAndValidateManifestDocument(data); !diag.HasErrors(diagnostics) {
+			if _, diagnostics := capabilities.ParseAndValidateManifestDocument(data); !diag.HasErrors(diagnostics) {
 				t.Fatalf("invalid v2 fixture should fail")
 			}
 		})

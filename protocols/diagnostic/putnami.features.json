@@ -1,0 +1,87 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "diagnostic",
+  "features": [
+    {
+      "id": "diagnostic/finding-record",
+      "type": "feature",
+      "name": "Diagnostic finding record",
+      "outcome": "Every protocol package reports a parse or validation finding as one record with a severity, a stable code, a message and the path of the field at fault, so a tool decides whether to proceed from the severity alone and a person reads the same line everywhere.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-record-has-four-json-members",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-json-members-are-severity-code-message-and-field",
+              "an-empty-field-is-left-out",
+              "the-severities-are-error-warning-and-info"
+            ]
+          }
+        },
+        {
+          "id": "the-constructors-fill-the-record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "errorf-builds-an-error-with-its-code-field-and-message",
+              "warningf-builds-a-warning"
+            ]
+          }
+        },
+        {
+          "id": "string-shows-the-field-only-when-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "string-renders-with-and-without-a-field"
+            ]
+          }
+        },
+        {
+          "id": "only-an-error-blocks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "has-errors-is-true-only-with-an-error",
+              "errors-keeps-the-errors-in-order",
+              "error-text-lists-the-errors-one-per-line"
+            ]
+          }
+        },
+        {
+          "id": "severities-rank-error-warning-info",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "severity-rank-orders-the-vocabulary-then-the-rest"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

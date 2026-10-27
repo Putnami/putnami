@@ -242,7 +242,7 @@ Field order in every Go struct is deliberate. The canonical serialization is
 field order, two-space indentation, `omitempty` behavior, HTML and JavaScript
 separator escaping, and trailing newline.
 `fixtures/valid/full.json` is that exact canonical form for a representative
-manifest; `determinism_test.go` pins it and asserts serialization is stable
+manifest; [`proof/determinism_test.go`](proof/determinism_test.go) pins it and asserts serialization is stable
 across 100 marshals and idempotent under round-trip. The actual Go and
 TypeScript application emitters independently produce and byte-compare the
 shared `fixtures/equivalence/capabilities.golden.json`, which covers every v1
@@ -259,7 +259,7 @@ including the Go/TypeScript canonical golden at
 The `no-source-claim.*` files beside it are two scheduler stamps of one
 workload, one bound and one with an unavailable binding, and the one manifest
 both emitters produce from either.
-This corpus is the cross-language contract — `conformance_test.go` runs it
+This corpus is the cross-language contract — [`proof/conformance_test.go`](proof/conformance_test.go) runs it
 through the Go parser and validator, and the TypeScript emitter reads the same
 files by relative path. [`conformance/`](conformance/README.md) additionally
 publishes the manifest-determinism pack a downstream project runs against its
@@ -267,7 +267,7 @@ own committed manifest.
 
 ### Versioning
 
-`version_test.go` asserts [`schemas/capabilities.json`](schemas/capabilities.json)
+[`proof/version_test.go`](proof/version_test.go) asserts [`schemas/capabilities.json`](schemas/capabilities.json)
 accepts exactly `ProtocolVersion` and
 [`schemas/capabilities-v2.json`](schemas/capabilities-v2.json) exactly
 `ProtocolVersionV2`. It also scans the TypeScript producer and asserts the
@@ -325,12 +325,21 @@ the v1 compatibility path.
 - **Evidence**: producers in both languages, in-repo consumers listed above, two
   fixture corpora with Go/TypeScript byte-parity goldens, canonical-bytes
   determinism tests, and both schemas pinned to their constants by
-  `version_test.go`. It is not `stable` because two wire versions are live while
+  `proof/version_test.go`. It is not `stable` because two wire versions are live while
   v1 readers remain in service, so the surface can still move.
-- **User-facing feature**: none. A capability manifest is a build artifact that
-  other tools read; the user-visible behavior it enables belongs to the CLI and
-  framework features that produce and consume it, and inventing a product feature
-  per wire contract would put product intent in the wrong place. The durable
-  decisions for this module live in [`doc/adr/`](doc/adr/), which is the form
-  [`protocols/features`](../features/README.md#specs-and-durable-decisions)
-  expects a spec to link to.
+- **Feature**: `capabilities/manifest-contract`, declared in
+  [`putnami.features.json`](putnami.features.json) and specified in
+  [`specs/manifest-contract.json`](specs/manifest-contract.json). The spec
+  states what every producer and reader must do: strict versioned reading, the
+  fixture verdicts, canonical bytes in both versions, the capability-surface
+  rule for packages, and required-provider completeness. The durable decisions
+  it rests on live in [`doc/adr/`](doc/adr/).
+- **Proofs**: the protocol's own requirements are proven by the tests of
+  [`proof/`](proof), a Go module of its own that names the feature with
+  `featureAuthority.owner` and uses only the exported API. The protocol cannot
+  bind them itself: `go.putnami.dev/protocol/features`, which provides
+  `spectest`, requires this module, so a test here that imported `spectest`
+  would make the two projects depend on each other. The tests that stay here
+  are unbound unit tests. The implementations prove the spec under checks of
+  their own: `go/framework/app` (describe), `@putnami/application` (its reader,
+  serializer and producer) and `@putnami/typescript` (loader reconciliation).

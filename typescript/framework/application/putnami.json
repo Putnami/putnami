@@ -5,6 +5,7 @@
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "dependencies": [
+    "/protocols/capabilities",
     "/protocols/features",
     "/protocols/http-routes",
     "/protocols/identity",

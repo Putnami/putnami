@@ -89,26 +89,34 @@ keep the type small rather than a reason to freeze it prematurely.
   [`protocols/support/README.md`](../support/README.md)).
 - **Owner**: this project (`protocols/diagnostic`).
 - **Evidence for `preview` rather than `stable`**: the package is exercised by
-  `diagnostic_test.go` (constructors, `String()` rendering with and without a
-  field, `HasErrors`, `Errors`, `ErrorText`), and its four wire fields are documented on the
-  Go type, which `protocols/doccov` guards at or below the undocumented-field bar
-  and pins in `documentedPackages`. What is missing for `stable` is a frozen
-  vocabulary: **no test pins the three `Severity` values**, there is no
-  `ProtocolVersion` token, no schema and no fixture corpus, so nothing would fail
-  if a fourth severity were added or one renamed. A test that pins the severity
-  set — the same drift guard sibling modules apply to their enums — is the
-  concrete work that would earn `stable`.
+  the tests of [`proof/`](proof) (the JSON members, the three `Severity`
+  strings, the constructors, `String()` rendering with and without a field,
+  `HasErrors`, `Errors`, `ErrorText`, `SeverityRank`), and its four wire fields
+  are documented on the Go type, which `protocols/doccov` guards at or below the
+  undocumented-field bar and pins in `documentedPackages`. What is missing for
+  `stable` is a closed vocabulary: the proof pins the strings of `Error`,
+  `Warning` and `Info`, but there is no `ProtocolVersion` token, no schema and no
+  fixture corpus, so nothing would fail if a fourth severity were added.
 - **`default` and `parity`**: no claim is recorded on either axis. Omission is
   not a denial — see the support vocabulary.
 
 ## Specs and durable decisions
 
-There is deliberately **no user-facing feature or spec for this module**. It is
-a shared record type between protocol packages; a user never chooses it, and the
-outcome a user cares about — "the tool told me exactly which field is wrong and
-why" — is delivered by whichever command renders the findings
-(`putnami doctor`, `putnami contracts check`, …). A product feature per shared Go
-type would be a promise with no user behind it.
+This module declares the feature `diagnostic/finding-record` in
+[`putnami.features.json`](putnami.features.json), specified in
+[`specs/finding-record.json`](specs/finding-record.json): the record's four JSON
+members and severity strings, the constructors, the rendering, and the rule that
+only an error blocks. The outcome a user cares about — "the tool told me exactly
+which field is wrong and why" — is still delivered by whichever command renders
+the findings (`putnami doctor`, `putnami contracts check`, …); the feature is the
+contract every protocol package reports them in.
+
+The requirements are proven by the tests of [`proof/`](proof), a Go module of
+its own that names this feature with `featureAuthority.owner`. The protocol
+cannot bind them itself: `go.putnami.dev/protocol/features`, which provides
+`spectest`, requires this module, so a test here that imported `spectest` would
+make the two projects depend on each other. The proof uses only the exported
+API, so this module has no tests and measures no coverage of its own.
 
 This module records **no durable decisions of its own**. The one rule worth
 stating — codes belong to the emitting package, not to a central registry — is
