@@ -113,12 +113,13 @@ func (provider *foreignProvider) drain(t *testing.T) {
 }
 
 // startForeignProviderInstance runs one TypeScript provider process, owned by
-// the test, and returns it once it announced readiness.
+// the test, and returns it once it announced readiness. A missing bun fails the
+// test: a Go client that cannot start its TypeScript provider proves nothing.
 func startForeignProviderInstance(t *testing.T) *foreignProvider {
 	t.Helper()
 	bunBin, err := exec.LookPath("bun")
 	if err != nil {
-		t.Skipf("bun is not on PATH: %v", err)
+		t.Fatalf("bun is not on PATH, so the TypeScript provider cannot start: %v", err)
 	}
 	root := workspaceRoot(t)
 	entrypoint := filepath.Join(root, providerProject, "src", "serve.ts")

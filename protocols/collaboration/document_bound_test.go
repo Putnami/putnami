@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // Maximal documents: every member at its bound, filled with a character the
@@ -181,6 +182,7 @@ func maximalAskInput() *MissionsAskInput {
 // one item, whose members are all within their bounds always parse, so only a
 // list page can outgrow the bound, and a page of one item never does.
 func TestMaxDocumentBytesHoldsEveryMaximalDocument(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-documents", "every-maximal-document-fits-the-bound")
 	cursor := strings.Repeat("<", MaxCursorLength)
 	checkpoint := &MemoryCheckpointInput{
 		Mission: fill(MaxTokenLength), Identity: MemoryIdentity{Workspace: fill(MaxTokenLength), Repository: fill(MaxTokenLength), Scope: fill(MaxTokenLength)},
@@ -273,6 +275,7 @@ func pagedTasks(n, body int, calls *int) Handler {
 // answers the items that fit and the cursor after them, so the traversal
 // still covers every task exactly once.
 func TestServe_ShortensAPageThatWouldExceedTheDocumentBound(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-documents", "serve-shortens-a-page-above-the-bound")
 	calls := 0
 	handlers := map[OperationKey]Handler{{ContractTasks, 1, OperationFind}: pagedTasks(MaxPageSize, MaxBodyBytes, &calls)}
 	seen := map[string]int{}
@@ -318,6 +321,7 @@ func TestServe_ShortensAPageThatWouldExceedTheDocumentBound(t *testing.T) {
 // answering the page that does not fit is refused after one repeat, never
 // asked forever.
 func TestServe_AListHandlerThatIgnoresThePageSizeIsRefused(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-documents", "serve-refuses-a-handler-that-ignores-the-page-size")
 	calls := 0
 	whole := pagedTasks(MaxPageSize, MaxBodyBytes, new(int))
 	handlers := map[OperationKey]Handler{{ContractTasks, 1, OperationFind}: func(ctx context.Context, call Call) (any, *Failure) {

@@ -147,7 +147,7 @@ describe('a TypeScript consumer keeps the change feed across an instance change'
     {
       feature: FEATURE,
       requirement: REQUIREMENT,
-      check: 'a-cursor-stream-continues-on-another-instance-after-the-last-delivered-change',
+      check: 'the-typescript-consumer-continues-after-the-last-delivered-change-on-another-instance',
     },
     async () => {
       const client = consumer.context.get(ItemsClient);
@@ -210,7 +210,7 @@ describe('a TypeScript consumer keeps the change feed across an instance change'
     {
       feature: FEATURE,
       requirement: REQUIREMENT,
-      check: 'a-position-the-provider-never-issued-is-its-typed-refusal',
+      check: 'the-typescript-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal',
     },
     async () => {
       const before = router.openings.length;

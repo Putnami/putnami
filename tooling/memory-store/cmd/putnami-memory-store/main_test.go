@@ -50,6 +50,7 @@ func readManifest(t *testing.T) *extension.Manifest {
 // reads when it resolves a binding: the provider offers exactly the memory
 // operations this runtime answers, with truthful annotations.
 func TestTheManifestPassesBothGates(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-memory-store-manifest-draws-no-diagnostic")
 	spectest.Proves(t, feature, "truthful-manifest", "the-manifest-passes-both-gates")
 	manifest := readManifest(t)
 	if manifest.Name != extensionName {
