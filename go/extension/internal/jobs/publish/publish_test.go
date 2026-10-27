@@ -349,6 +349,7 @@ func TestManagedGoModuleDryRunUsesPlanWithoutPackageArtifacts(t *testing.T) {
 }
 
 func TestFullBootstrapGoModuleStaysPrivateWhenSparseIsOff(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "publishing-releases-nothing", "the-go-extension-publishes-without-a-channel-or-a-release")
 	ctx, zipBytes, goModBytes, digest := managedGoPublishTestContext(t)
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "")
 
@@ -605,6 +606,7 @@ func TestSparseGoModuleStaysPrivateAndIdempotent(t *testing.T) {
 // input — it no longer writes a registry dist-tag either. Advancing a channel
 // is the release set's one transaction, after every member has a digest.
 func TestLegacyGoModuleDoesNotCallManagedReleaseOrWriteADistTag(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "publishing-releases-nothing", "the-go-extension-publishes-without-a-channel-or-a-release")
 	var releaseCalls, anonymousReads int
 	ctx, zipBytes, goModBytes, digest := managedGoPublishTestContext(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

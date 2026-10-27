@@ -3,17 +3,22 @@
   "name": "go.putnami.dev/protocol/gomod",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
   },
   "options": {
+    "test": {
+      "filePatterns": ["fixtures/**"]
+    },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "A go.mod read/write contract is toolchain plumbing behind the Go extension's jobs."
   }
 }

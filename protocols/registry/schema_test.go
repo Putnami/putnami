@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // schemaOnlyInexpressible lists the invalid fixtures whose violation is a rule
@@ -54,6 +56,7 @@ var schemaOnlyInexpressible = map[string]string{
 // invalid line except those whose rule the schema names as inexpressible.
 func TestCredentialFixturesAgainstTheSchema(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-schema-tracks-the-go-contract", "every-fixture-is-judged-by-the-schema")
 	data, err := os.ReadFile(filepath.Join("schemas", "credential-provider-v1.json"))
 	if err != nil {
 		t.Fatal(err)

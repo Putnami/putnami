@@ -393,7 +393,7 @@ func answerText(t *testing.T, response *registry.CredentialResponse) string {
 // the engine offers it. An upload in a session that did not negotiate it is
 // refused, and reaches no registry and no Delivery route.
 func TestUploaderEchoNeedsTheOfferBesidePublication(t *testing.T) {
-	spectest.Proves(t, uploadFeature, uploadRequirement, "uploader-v1-is-echoed-only-beside-publication-v1")
+	spectest.Proves(t, "registry/credential-seam-contract", "uploader-v1-needs-publication-v1", "the-cloud-provider-echoes-uploader-v1-only-beside-publication-v1")
 	cases := []struct {
 		name          string
 		runCredential string
@@ -452,7 +452,7 @@ func TestUploaderEchoNeedsTheOfferBesidePublication(t *testing.T) {
 // registry stores. No answer and no diagnostic carries the bearer.
 func TestUploadAnswersTheStoredDigestOfEachEcosystem(t *testing.T) {
 	spectest.Proves(t, uploadFeature, uploadRequirement, "each-ecosystem-uploads-and-answers-the-stored-digest")
-	spectest.Proves(t, uploadFeature, uploadRequirement, "no-answer-carries-the-bearer")
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-carries-no-credential", "the-cloud-provider-answers-no-bearer")
 	u := newUploadRig(t, nil, nil).started().openedPlan()
 	uploads := u.everyEcosystem(t)
 	ids := map[int64]string{}
@@ -490,7 +490,8 @@ func TestUploadAnswersTheStoredDigestOfEachEcosystem(t *testing.T) {
 // the same host at another port (registry_not_served), and when Delivery
 // refuses to renew the plan's bearer.
 func TestUploadRefusesBeforeAnyRegistryRequest(t *testing.T) {
-	spectest.Proves(t, uploadFeature, uploadRequirement, "upload-refusals-come-before-any-registry-request")
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-refused-before-any-registry-request", "the-cloud-provider-refuses-an-upload-before-any-registry-request")
+	spectest.Proves(t, "oci/registry-fast-path-contract", "consumers-read-the-host-by-the-rules", "the-cloud-provider-sends-an-image-to-its-repository-host")
 	u := newUploadRig(t, nil, nil).started()
 	outside := newRecordingRegistry(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
 
@@ -563,7 +564,7 @@ func TestUploadRefusesBeforeAnyRegistryRequest(t *testing.T) {
 // artifact at the version is artifact_conflict, and any other failure is
 // upload_failed. No refusal carries the bearer.
 func TestUploadFailuresAnswerTheirRefusal(t *testing.T) {
-	spectest.Proves(t, uploadFeature, uploadRequirement, "upload-failures-map-to-their-refusal-codes")
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-refused-before-any-registry-request", "the-cloud-provider-maps-a-failed-upload-to-its-refusal")
 	forbidden := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) })
 	u := newUploadRig(t, forbidden, nil).started().openedPlan()
 	held := func(t *testing.T, upload packedUpload) {

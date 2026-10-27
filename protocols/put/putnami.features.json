@@ -1,0 +1,179 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "put",
+  "features": [
+    {
+      "id": "put/immutable-write-contract",
+      "type": "feature",
+      "name": "Put registry immutable write contract",
+      "outcome": "A publisher and the Put registry exchange the blobs and the canonical manifest of an immutable version through one strictly parsed, versioned write pinned with its schema and fixtures, and a publisher refuses an answer that names another version",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-bounds-and-paths-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-and-bounds-are-pinned",
+              "the-paths-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "each-kind-has-one-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-kind-names-its-media-types"
+            ]
+          }
+        },
+        {
+          "id": "the-wire-is-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-field-names-are-pinned",
+              "the-schema-tracks-the-go-types"
+            ]
+          }
+        },
+        {
+          "id": "the-error-codes-are-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-error-codes-are-the-ten-canonical-ones"
+            ]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "the-payload-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-canonical-form-is-pinned"
+            ]
+          }
+        },
+        {
+          "id": "blob-references-are-three-members",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-blob-references-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "an-archive-lists-its-platforms",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-archive-reads-one-digest-per-platform"
+            ]
+          }
+        },
+        {
+          "id": "coordinates-and-versions-are-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "coordinates-and-versions-are-checked"
+            ]
+          }
+        },
+        {
+          "id": "an-answer-matches-its-request",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-answer-of-another-request-is-refused",
+              "the-extension-sdk-accepts-a-blob-stored-with-another-media-type",
+              "the-extension-sdk-refuses-an-answer-of-another-version"
+            ]
+          }
+        },
+        {
+          "id": "a-publish-stores-the-payload-at-its-digest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-sdk-stores-every-kind-at-its-payload-digest",
+              "the-extension-sdk-reuses-only-the-same-manifest",
+              "the-extension-sdk-refuses-a-member-before-any-request"
+            ]
+          }
+        },
+        {
+          "id": "the-publisher-sends-its-bearer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-sdk-sends-the-bearer-and-reads-the-manifest"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

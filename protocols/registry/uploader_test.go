@@ -12,6 +12,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	extension "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // uploadFixtures maps each valid upload request fixture to the response
@@ -30,6 +31,7 @@ var uploadFixtures = map[string][]string{
 // publication-v1, for a request and for its answer.
 func TestUploadNeedsUploaderAndPublication(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "uploader-v1-needs-publication-v1", "upload-needs-both-capabilities")
 	refused := [][]string{
 		nil,
 		{CapabilityCredentialV1},
@@ -88,6 +90,7 @@ func TestUploadNeedsUploaderAndPublication(t *testing.T) {
 // publication-v1, in any order.
 func TestUploaderCapabilityNeedsPublication(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "uploader-v1-needs-publication-v1", "uploader-v1-names-publication-v1")
 	for _, test := range []struct {
 		capabilities []string
 		valid        bool
@@ -120,6 +123,7 @@ func TestUploaderCapabilityNeedsPublication(t *testing.T) {
 // no project beside the member's own; the answer reports no reuse.
 func TestUploadWireCarriesNoCredentialAndNoReuse(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-carries-no-credential", "the-upload-wire-holds-no-credential")
 	if got := jsonMembers(UploadParams{}); got != "kind,member,outbox,planDigest,registry" {
 		t.Errorf("upload params members = %s", got)
 	}
@@ -144,6 +148,7 @@ func fixtureUpload(t *testing.T, name string) UploadParams {
 // registry.
 func TestUploadParamsRules(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-validated", "upload-params-are-validated")
 	put := fixtureUpload(t, "request-upload-put.json")
 	archive := fixtureUpload(t, "request-upload-archive.json")
 	for _, kind := range distribution.MemberKinds {
@@ -244,6 +249,7 @@ func TestUploadParamsRules(t *testing.T) {
 // os/arch pairs mapped to sha256 digests.
 func TestUploadResultRules(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-validated", "upload-results-are-validated")
 	digest := "sha256:" + strings.Repeat("e", 64)
 	platforms := func(count int) map[string]string {
 		set := make(map[string]string, count)
@@ -282,6 +288,7 @@ func TestUploadResultRules(t *testing.T) {
 // beyond the credential-v1 bound up to MaxPublicationLineBytes.
 func TestUploadLineBound(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-validated", "an-upload-line-has-the-publication-bounds")
 	line := readFixture(t, "valid", "request-upload.json")
 	if _, err := ParseNegotiatedCredentialRequest(padLine(line, MaxCredentialLineBytes+1), everyCapability); err != nil {
 		t.Errorf("an upload line over %d bytes: %v", MaxCredentialLineBytes, err)
@@ -336,6 +343,7 @@ func readSchema(t *testing.T) []byte {
 // in step with the Go grammars, bounds and enums.
 func TestUploadSchemaTracksWireShape(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-schema-tracks-the-go-contract", "the-upload-schema-tracks-the-go-types")
 	var schema struct {
 		Definitions struct {
 			UploadParams struct {
@@ -409,6 +417,7 @@ func TestUploadSchemaTracksWireShape(t *testing.T) {
 // is refused for the rule its name states, not for another defect.
 func TestUploadInvalidFixturesFailForTheirRule(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-validated", "each-invalid-upload-fixture-fails-for-its-rule")
 	for name, want := range map[string]string{
 		"request-upload-credential-member.json":                 "unknown member \"credential\"",
 		"request-upload-missing-member.json":                    "missing member \"member\"",

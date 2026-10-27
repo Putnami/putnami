@@ -12,7 +12,7 @@
   "requirements": [
     {
       "id": "cloud-uploads-its-registries-in-the-provider-session",
-      "text": "On a hosted run that serves publication-v1, the credential provider echoes uploader-v1 when the engine offers it. Its upload op refuses plan_not_open before open and plan_mismatch for another plan or a member the plan does not publish, refuses registry_not_served for a host outside its publication origins, mints the plan's bearer itself and never answers it, uploads with the SDK upload kit, and answers the stored digest. A failed upload answers artifact_digest_mismatch, artifact_conflict or upload_failed."
+      "text": "On a hosted run that serves publication-v1, the credential provider offers uploader-v1 and uploads every ecosystem of the plan to its publication origins. It mints the plan's bearer itself, uploads with the SDK upload kit, and answers the digest each registry stores."
     }
   ]
 }

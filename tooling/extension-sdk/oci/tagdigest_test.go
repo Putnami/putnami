@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 
+	"go.putnami.dev/protocol/features/spectest"
 	ociproto "go.putnami.dev/protocol/oci"
 )
 
@@ -82,6 +83,7 @@ func TestSupportsTagDigest_Advertised(t *testing.T) {
 }
 
 func TestSupportsTagDigest_NotAdvertised(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-fast-path-is-taken-only-when-advertised", "the-extension-sdk-reads-anything-else-as-no-fast-path")
 	srv := &tagDigestServer{capsStatus: http.StatusOK, capsBody: `{"apis":["something-else/v9"]}`}
 	client, closeFn := newTestTagClient(t, srv.handler())
 	defer closeFn()
@@ -92,6 +94,7 @@ func TestSupportsTagDigest_NotAdvertised(t *testing.T) {
 }
 
 func TestSupportsTagDigest_NotFound(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-fast-path-is-taken-only-when-advertised", "the-extension-sdk-reads-anything-else-as-no-fast-path")
 	srv := &tagDigestServer{capsStatus: http.StatusNotFound}
 	client, closeFn := newTestTagClient(t, srv.handler())
 	defer closeFn()
@@ -102,6 +105,7 @@ func TestSupportsTagDigest_NotFound(t *testing.T) {
 }
 
 func TestSupportsTagDigest_MalformedBody(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-fast-path-is-taken-only-when-advertised", "the-extension-sdk-reads-anything-else-as-no-fast-path")
 	srv := &tagDigestServer{capsStatus: http.StatusOK, capsBody: `not json at all`}
 	client, closeFn := newTestTagClient(t, srv.handler())
 	defer closeFn()
@@ -112,6 +116,7 @@ func TestSupportsTagDigest_MalformedBody(t *testing.T) {
 }
 
 func TestTagDigest_Success(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "one-call-tags-every-ref", "the-extension-sdk-sends-the-repository-digest-and-tags")
 	srv := &tagDigestServer{tagStatus: http.StatusOK}
 	client, closeFn := newTestTagClient(t, srv.handler())
 	defer closeFn()
@@ -138,6 +143,7 @@ func TestTagDigest_Success(t *testing.T) {
 }
 
 func TestTagDigest_ServerError(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "one-call-tags-every-ref", "the-extension-sdk-fails-on-a-server-error")
 	srv := &tagDigestServer{tagStatus: http.StatusInternalServerError}
 	client, closeFn := newTestTagClient(t, srv.handler())
 	defer closeFn()

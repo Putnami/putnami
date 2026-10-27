@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
 
@@ -181,6 +182,7 @@ func TestResolveDigest(t *testing.T) {
 }
 
 func TestApplySessionRefs_StandardFallback(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-fast-path-is-taken-only-when-advertised", "the-extension-sdk-falls-back-to-the-standard-api")
 	srv := httptest.NewServer(registry.New())
 	defer srv.Close()
 	host := strings.TrimPrefix(srv.URL, "http://")
@@ -259,6 +261,7 @@ func (p *putnamiRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestApplySessionRefs_TagDigestFastPath(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "one-call-tags-every-ref", "the-extension-sdk-tags-every-ref-in-one-call")
 	preg := &putnamiRegistry{inner: registry.New()}
 	srv := httptest.NewServer(preg)
 	defer srv.Close()

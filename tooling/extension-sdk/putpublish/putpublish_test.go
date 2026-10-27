@@ -206,6 +206,7 @@ func members() map[distribution.MemberKind]Member {
 }
 
 func TestPublishStoresEveryKindWithoutAChannel(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "a-publish-stores-the-payload-at-its-digest", "the-extension-sdk-stores-every-kind-at-its-payload-digest")
 	for kind, member := range members() {
 		t.Run(string(kind), func(t *testing.T) {
 			registry := newFakeRegistry(t)
@@ -236,6 +237,7 @@ func TestPublishStoresEveryKindWithoutAChannel(t *testing.T) {
 
 func TestPublishReusesAVersionWithTheSameManifest(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "an-upload-reuses-a-version-at-the-same-digest")
+	spectest.Proves(t, "put/immutable-write-contract", "a-publish-stores-the-payload-at-its-digest", "the-extension-sdk-reuses-only-the-same-manifest")
 	registry := newFakeRegistry(t)
 	member := members()[distribution.KindMigration]
 	first, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, member)
@@ -271,6 +273,7 @@ func TestPublishReusesAVersionWithTheSameManifest(t *testing.T) {
 }
 
 func TestPublishAcceptsABlobStoredWithAnotherMediaType(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "an-answer-matches-its-request", "the-extension-sdk-accepts-a-blob-stored-with-another-media-type")
 	registry := newFakeRegistry(t)
 	member := archiveMember()
 	// Another publisher uploaded the linux bytes first, as a raw binary.
@@ -285,6 +288,7 @@ func TestPublishAcceptsABlobStoredWithAnotherMediaType(t *testing.T) {
 }
 
 func TestCheckRefusesAMemberBeforeAnyRequest(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "a-publish-stores-the-payload-at-its-digest", "the-extension-sdk-refuses-a-member-before-any-request")
 	archive := archiveMember()
 	edit := func(base Member, change func(*Member)) Member {
 		base.Blobs = append([]Blob(nil), base.Blobs...)
@@ -365,6 +369,7 @@ func TestPublishSendsOnlyTheBlobBytesItWasGiven(t *testing.T) {
 }
 
 func TestPublishRefusesAnAnswerThatNamesAnotherVersion(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "an-answer-matches-its-request", "the-extension-sdk-refuses-an-answer-of-another-version")
 	member := members()[distribution.KindDoc]
 	otherDigest := "sha256:" + strings.Repeat("a", 64)
 	for name, tc := range map[string]struct {
@@ -456,6 +461,7 @@ func TestPublishRefusesAnAnswerThatNamesAnotherVersion(t *testing.T) {
 }
 
 func TestPublishSendsTheBearerAndReadsTheVersionManifest(t *testing.T) {
+	spectest.Proves(t, "put/immutable-write-contract", "the-publisher-sends-its-bearer", "the-extension-sdk-sends-the-bearer-and-reads-the-manifest")
 	registry := newFakeRegistry(t)
 	member := members()[distribution.KindDoc]
 	if _, err := Publish(context.Background(), testClient(t), registry.server.URL, "another-token", member); err == nil ||

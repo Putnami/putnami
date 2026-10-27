@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	registry "go.putnami.dev/protocol/registry"
 )
 
@@ -223,6 +224,7 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 }
 
 func TestCredentialProviderInitializeWithoutRunCredentialEchoesTheCapability(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-session-ends-at-shutdown-or-eof", "the-cloud-provider-acknowledges-shutdown-and-exits")
 	h := startCredentialServer(t, "", nil, nil)
 	h.send(initializeLine(1, ""))
 	response := h.next(registry.CredentialOpInitialize)
@@ -580,6 +582,7 @@ func TestCredentialProviderHostedReadRefusesWithoutAnIngestBase(t *testing.T) {
 }
 
 func TestCredentialProviderPublishIsAbsence(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "refusal-and-absence-hold-for-the-process", "the-cloud-provider-answers-publish-with-absence")
 	var calls atomic.Int64
 	ingest := deliveryInstall(t, &calls, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -607,6 +610,7 @@ func TestCredentialProviderPublishIsAbsence(t *testing.T) {
 }
 
 func TestCredentialProviderSharesOneDeliveryCallPerPurpose(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "one-call-per-purpose-while-valid", "the-cloud-provider-shares-one-call-per-purpose")
 	var calls atomic.Int64
 	arrived := make(chan struct{}, 4)
 	release := make(chan struct{})
@@ -667,6 +671,7 @@ func TestCredentialProviderShutdownAbandonsAnExchangeInProgress(t *testing.T) {
 }
 
 func TestCredentialProviderExitsOnStdinEOF(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-session-ends-at-shutdown-or-eof", "the-cloud-provider-exits-at-eof")
 	h := startCredentialServer(t, "", nil, nil)
 	h.send(initializeLine(1, ""))
 	h.next(registry.CredentialOpInitialize)
@@ -677,6 +682,7 @@ func TestCredentialProviderExitsOnStdinEOF(t *testing.T) {
 }
 
 func TestCredentialProviderEndsTheSessionOnAnOversizedLine(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-wire-is-strict", "the-cloud-provider-ends-the-session-on-an-oversized-line")
 	server := newCredentialServer(newCapabilityCaller(""), nil, func() error { return nil })
 	line := strings.Repeat("x", registry.MaxCredentialLineBytes+2) + "\n"
 	err := server.serve(strings.NewReader(line), io.Discard, io.Discard)
@@ -686,6 +692,7 @@ func TestCredentialProviderEndsTheSessionOnAnOversizedLine(t *testing.T) {
 }
 
 func TestCredentialProviderRefusesRequestsOutsideTheProtocol(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-wire-is-strict", "the-cloud-provider-refuses-requests-outside-the-protocol")
 	h := startCredentialServer(t, "", nil, nil)
 
 	h.send(credentialLine(1, registry.PurposeRead))
