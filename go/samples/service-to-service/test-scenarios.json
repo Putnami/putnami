@@ -1633,7 +1633,7 @@
       "family": "generation",
       "auth": "n/a",
       "policy": "n/a",
-      "test": "service/clientsync_test.go:TestGeneratedClientInSync",
+      "test": "service/clientsync_test.go:TestARemovedOperationIsDetected",
       "result": "pass"
     },
     {

@@ -276,6 +276,9 @@ func TestPrepare_NormalizesTheRequest(t *testing.T) {
 }
 
 func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "invalid-answers-are-refused", "the-cli-refuses-an-answer-the-contract-refuses")
+	spectest.Proves(t, "collaboration/provider-contract", "exact-identity", "the-cli-makes-a-mutation-that-answers-for-something-else-unresolved")
+	spectest.Proves(t, "collaboration/provider-contract", "exact-identity", "the-cli-refuses-a-read-that-answers-for-something-else")
 	task := collab.Task{Ref: collab.Ref{Source: "local:x", ID: "T-1"}, Revision: "r2", Title: "t", State: collab.TaskStateDone}
 	cases := []struct {
 		name      string
@@ -291,6 +294,9 @@ func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
 		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
 		{"a read answering conflict", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) proto.ToolCallResult {
 			return collabRespond(t, collab.Response{Outcome: collab.OutcomeConflict, Error: &collab.Error{Message: "x"}})
+		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
+		{"a read answering unresolved", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) proto.ToolCallResult {
+			return collabRespond(t, collab.Response{Outcome: collab.OutcomeUnresolved, Error: &collab.Error{Message: "x"}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
 		{"isError disagreeing", "create", "tasks", `{"title":"t","idempotencyKey":"k"}`, func(t *testing.T) proto.ToolCallResult {
 			result := collabOK(t, &collab.TaskCreateResult{Task: task, Created: true})
@@ -354,7 +360,7 @@ func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
 // refuses it as before, and tells the caller of a list how to get the items:
 // a smaller page.size. No other operation gets that advice.
 func TestInterpret_APageAboveTheDocumentBoundAsksForASmallerPageSize(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "bounded-pages", "a-page-above-the-document-bound-asks-for-a-smaller-page-size")
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-pages", "the-cli-asks-for-a-smaller-page-size-above-the-bound")
 	items := make([]collab.Task, collab.DefaultPageSize)
 	for i := range items {
 		items[i] = collab.Task{Ref: collab.Ref{Source: "local:x", ID: fmt.Sprintf("T-%d", i)}, Revision: "r1", Title: "t",
@@ -407,6 +413,7 @@ func TestInterpret_APageAboveTheDocumentBoundAsksForASmallerPageSize(t *testing.
 // Every list request carries the page the advice names, and no other
 // request does.
 func TestRequestedPage_CoversEveryListOperationOfTheCatalog(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "bounded-pages", "the-cli-asks-for-a-smaller-page-size-above-the-bound")
 	pageType := reflect.TypeOf((*collab.PageRequest)(nil))
 	lists := 0
 	for _, spec := range collab.Catalog() {
@@ -435,13 +442,16 @@ func TestRequestedPage_CoversEveryListOperationOfTheCatalog(t *testing.T) {
 }
 
 func TestInterpret_MemoryIdentity(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "exact-identity", "the-cli-makes-a-mutation-that-answers-for-something-else-unresolved")
+	spectest.Proves(t, "collaboration/provider-contract", "exact-identity", "the-cli-refuses-a-read-that-answers-for-something-else")
 	now := "2026-09-24T08:00:00Z"
 	record := collab.MemoryRecord{Ref: collab.Ref{Source: "git:m", ID: "m1"}, Revision: "r1", Kind: collab.MemoryKindMission,
 		Identity: collab.MemoryIdentity{Mission: "other"}, Content: "x",
 		Provenance: collab.Provenance{RecordedAt: now}, Freshness: collab.Freshness{UpdatedAt: now, RetrievedAt: now}}
 	mission := collabBoundCall(t, "memory", "mission", `{"mission":"m1"}`)
-	if envelope := interpretResult(mission, collabOK(t, &collab.MemoryRecordResult{Record: record})); envelope.Outcome != collab.OutcomeUnavailable {
-		t.Errorf("a record of another mission: %s", envelope.Outcome)
+	if envelope := interpretResult(mission, collabOK(t, &collab.MemoryRecordResult{Record: record})); envelope.Outcome != collab.OutcomeUnavailable ||
+		envelope.Error == nil || envelope.Error.Reason != collab.ReasonProviderIdentity {
+		t.Errorf("a record of another mission: %s %+v", envelope.Outcome, envelope.Error)
 	}
 	record.Identity.Mission = "m1"
 	checkpoint := collabBoundCall(t, "memory", "checkpoint", `{"mission":"m1","precondition":{"expectedRevision":"r1"},"idempotencyKey":"k","content":"x"}`)
@@ -454,8 +464,9 @@ func TestInterpret_MemoryIdentity(t *testing.T) {
 	note := record
 	note.Kind = collab.MemoryKindNote
 	context := collabBoundCall(t, "memory", "context", `{"kinds":["mission"],"page":{"size":1}}`)
-	if envelope := interpretResult(context, collabOK(t, &collab.MemoryListResult{Items: []collab.MemoryRecord{note}})); envelope.Outcome != collab.OutcomeUnavailable {
-		t.Errorf("a kind outside the request: %s", envelope.Outcome)
+	if envelope := interpretResult(context, collabOK(t, &collab.MemoryListResult{Items: []collab.MemoryRecord{note}})); envelope.Outcome != collab.OutcomeUnavailable ||
+		envelope.Error == nil || envelope.Error.Reason != collab.ReasonProviderIdentity {
+		t.Errorf("a kind outside the request: %s %+v", envelope.Outcome, envelope.Error)
 	}
 	if envelope := interpretResult(context, collabOK(t, &collab.MemoryListResult{Items: []collab.MemoryRecord{record, record}})); envelope.Outcome != collab.OutcomeUnavailable {
 		t.Errorf("an oversized page: %s", envelope.Outcome)
@@ -467,7 +478,7 @@ func TestInterpret_MemoryIdentity(t *testing.T) {
 }
 
 func TestInterpret_MissionsIdentity(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "missions-identity-and-reconciliation", "a-missions-answer-for-another-mission-or-message-is-unresolved")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-identity-and-reconciliation", "the-cli-makes-a-missions-answer-for-another-mission-or-message-unresolved")
 	syncResult := func(edit func(*collab.MissionsSyncResult)) *collab.MissionsSyncResult {
 		result := &collab.MissionsSyncResult{
 			Session:       collab.SessionStatus{State: collab.SessionStateWorking},
@@ -535,7 +546,7 @@ func TestInterpret_MissionsIdentity(t *testing.T) {
 // reconciled by repeating it, and the hint names that operation, so a valid
 // envelope carries it.
 func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "missions-identity-and-reconciliation", "an-unresolved-missions-write-names-its-repeat")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-identity-and-reconciliation", "the-cli-names-the-repeat-of-an-unresolved-missions-write")
 	spec, _ := collab.Lookup(collab.ContractMissions, 1)
 	for _, op := range spec.Operations {
 		hint := ReconcileHint(collab.ContractMissions, op.Name)
@@ -557,6 +568,10 @@ func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
 }
 
 func TestTransportFailure_ClassifiesByStageAndAccess(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-crashed-mutation-unresolved-with-a-reconcile")
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-or-canceled-mutation-unresolved")
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-read-unavailable-and-retryable")
+	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-provider-that-cannot-start-unavailable")
 	read := collabBoundCall(t, "tasks", "find", `{}`)
 	write := collabBoundCall(t, "tasks", "update", `{"ref":{"source":"local:x","id":"T-1"},"title":"x"}`)
 	cases := []struct {
@@ -607,6 +622,7 @@ func collabJSON(t *testing.T, value any) []byte {
 }
 
 func TestRedactor(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-an-envelope", "the-cli-redacts-every-credential-value")
 	redactor := newRedactor([]string{
 		"GH_TOKEN=ghp_0123456789abcdef", "SHORT_TOKEN=abc", "HOME=/Users/someone-long-enough",
 		"DB_PASSWORD=pa\"ss\\word-long", "NOEQUALS",
@@ -668,7 +684,7 @@ func TestRedactor(t *testing.T) {
 // encoders escape /. Redaction matches the decoded value, so every spelling
 // is removed, and the redacted result keeps its member order.
 func TestRedactor_EverySpellingOfASecretIsRemovedFromAResult(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "no-credential-leakage", "credential-values-are-redacted")
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-an-envelope", "the-cli-redacts-every-credential-value")
 	const secret = "a<b>c&d/pässwörd-long"
 	redactor := newRedactor([]string{"API_TOKEN=" + secret})
 	goSpelling, _ := json.Marshal(map[string]string{"body": "x " + secret + " y"})
@@ -703,7 +719,7 @@ func TestRedactor_EverySpellingOfASecretIsRemovedFromAResult(t *testing.T) {
 // provider that declares preconditions none never receives one, and an
 // operation whose rule takes no precondition carries no such member.
 func TestRequestPrecondition_CoversEveryPreconditionMemberOfTheCatalog(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "capability-discovery", "a-precondition-the-provider-cannot-enforce-is-refused")
+	spectest.Proves(t, "collaboration/provider-contract", "refused-before-the-provider", "the-cli-refuses-a-precondition-the-provider-cannot-enforce")
 	covered := map[string]bool{}
 	for _, spec := range collab.Catalog() {
 		for _, op := range spec.Operations {

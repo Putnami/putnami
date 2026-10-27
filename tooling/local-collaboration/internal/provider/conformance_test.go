@@ -17,6 +17,8 @@ import (
 // TestTheSharedContractScenarios runs the scenarios every tasks and proposals
 // provider passes against a fresh local store.
 func TestTheSharedContractScenarios(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-scenarios", "the-local-provider-passes-the-proposal-scenarios")
+	spectest.Proves(t, "collaboration/provider-contract", "task-scenarios", "the-local-provider-passes-the-task-scenarios")
 	newTarget := func(t *testing.T) providertest.Target {
 		clock := time.Date(2026, 9, 24, 8, 0, 0, 0, time.UTC)
 		return providertest.Target{
@@ -35,7 +37,7 @@ func TestTheSharedContractScenarios(t *testing.T) {
 // a decision the way the store's owner does: by writing a file to the store
 // directory.
 func TestTheMissionsScenarios(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "missions-provider-semantics", "the-local-store-passes-the-missions-scenarios")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-passes-the-missions-scenarios")
 	providertest.RunMissions(t, func(t *testing.T) providertest.Target {
 		clock := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
 		p := &Provider{Now: func() time.Time { return clock }}

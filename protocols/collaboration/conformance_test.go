@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The fixture corpus: fixtures/valid and fixtures/invalid hold one document
@@ -103,6 +104,7 @@ func listFixtures(t *testing.T, dir string) []string {
 }
 
 func TestConformance_ValidFixturesParseClean(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-fixture-corpus", "every-valid-fixture-parses")
 	exp := readExpectations(t)
 	files := listFixtures(t, "valid")
 	if !slices.Equal(files, exp.Valid) {
@@ -122,6 +124,7 @@ func TestConformance_ValidFixturesParseClean(t *testing.T) {
 }
 
 func TestConformance_InvalidFixturesProduceTheirCodes(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-fixture-corpus", "every-invalid-fixture-produces-its-codes")
 	exp := readExpectations(t)
 	files := listFixtures(t, "invalid")
 	listed := make([]string, 0, len(exp.Invalid))
@@ -157,6 +160,7 @@ func TestConformance_InvalidFixturesProduceTheirCodes(t *testing.T) {
 // result and parses the encoding again: what the orchestrator forwards after
 // decoding is exactly what the contract accepts.
 func TestConformance_ValidDocumentsRoundTrip(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-fixture-corpus", "a-valid-document-round-trips")
 	for _, name := range listFixtures(t, "valid") {
 		parts := strings.Split(strings.TrimSuffix(name, ".json"), ".")
 		if parts[0] != "request" && parts[0] != "result" {
@@ -195,6 +199,7 @@ func TestConformance_ValidDocumentsRoundTrip(t *testing.T) {
 }
 
 func TestConformance_EveryCodeIsExercised(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-fixture-corpus", "every-code-is-exercised")
 	exp := readExpectations(t)
 	exercised := map[string]bool{}
 	for _, codes := range exp.Invalid {
