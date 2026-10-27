@@ -172,7 +172,7 @@ func serveMissions(p *Provider, workspace, operation, arguments string) (collab.
 // lands and the other is message.closed, and no decision or message is lost
 // or issued twice.
 func TestConcurrentProcessesAskAndReplyOnce(t *testing.T) {
-	spectest.Proves(t, "cli/collaboration-providers", "missions-provider-semantics", "concurrent-processes-on-one-local-store-ask-and-reply-once")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-asks-and-replies-once-across-concurrent-processes")
 	h := newMissionsHarness(t)
 	writeOwnerFile(t, h.store, store.MessagesDir, "gate.json",
 		ownerMessage{Mission: store.MissionKey{Repository: "acme/app", Key: "issue-7"}, Kind: collab.InboxKindPrompt, Text: "Does the gate pass?"})
