@@ -244,6 +244,21 @@
           }
         },
         {
+          "id": "proposal-comments",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-comment-names-its-review-and-its-file-line",
+              "the-comment-scenario-passes-against-a-correct-provider",
+              "the-github-provider-passes-the-comment-scenario"
+            ]
+          }
+        },
+        {
           "id": "memory-scenarios",
           "stage": "coded",
           "evidenceKinds": [
