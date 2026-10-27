@@ -519,6 +519,32 @@ func TestWorkspaceInstall_RequireOfAWorkspaceModuleNamesTheCause(t *testing.T) {
 	}
 }
 
+// A go command that cannot start writes nothing, so its error is the only
+// cause there is: the diagnostic of a required graph names it, and so does the
+// warning of a skipped one.
+func TestWorkspaceInstall_AGoCommandThatCannotStartNamesItsError(t *testing.T) {
+	t.Parallel()
+	missing := filepath.Join(t.TempDir(), pkgmeta.ExecutableName(runtime.GOOS, "go"))
+	startErr := exec.Command(missing, "version").Run() //nolint:gosec // G204: the test starts a path it chose
+	if startErr == nil {
+		t.Fatalf("%s started", missing)
+	}
+	for _, required := range []bool{true, false} {
+		workspace := jobtest.RealTempDir(t)
+		i := newInstallJob(t, workspace, jobtest.FileURL(t.TempDir()), jobtest.CacheRoot(t), false)
+		w := &install{Job: i.job, goWork: filepath.Join(workspace, "go.work")}
+		w.GoBinary = missing
+		_, ok := w.downloadWith([]string{"GOWORK=off"}, "workspace", workspace, required)
+		want := "Skipping the workspace build list: " + startErr.Error()
+		if required {
+			want = "Failed to resolve the workspace build list: " + startErr.Error()
+		}
+		if ok == required || !i.rec.Contains(want) {
+			t.Errorf("required %t: ok = %t, want %q in:\n%s", required, ok, want, i.rec.Transcript())
+		}
+	}
+}
+
 // namesModuleVersion matches a version of the module, never of a longer path
 // that ends with it.
 func TestNamesModuleVersion(t *testing.T) {

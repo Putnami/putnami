@@ -1,9 +1,12 @@
 package workspacejob_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -22,6 +25,36 @@ import (
 func TestMain(m *testing.M) {
 	jobtest.ServeFake()
 	os.Exit(m.Run())
+}
+
+// A fake go that cannot write its record fails, with the cause on standard
+// error: a missing record must never be the only trace of an invocation.
+func TestRecordingGoFailsWhenItCannotWriteItsRecord(t *testing.T) {
+	t.Parallel()
+	fakes := jobtest.NewFakes(t)
+	goBinary := fakes.RecordingGo(t, jobtest.RequireGo(t))
+	records := ""
+	for _, entry := range fakes.Environ() {
+		if dir, ok := strings.CutPrefix(entry, "JOBTEST_GO_RECORD="); ok {
+			records = dir
+		}
+	}
+	if records == "" {
+		t.Fatal("RecordingGo exported no record directory")
+	}
+	if err := os.Remove(records); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(goBinary, "version") //nolint:gosec // G204: the test starts the fake it linked
+	cmd.Env = jobtest.Env(t, jobtest.FileURL(t.TempDir()), jobtest.CacheRoot(t), fakes.Environ()...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	exit := &exec.ExitError{}
+	if !errors.As(err, &exit) || exit.ExitCode() != 3 ||
+		!strings.Contains(stderr.String(), "fake go cannot write its record: ") || !strings.Contains(stderr.String(), records) {
+		t.Fatalf("fake go without its record directory = %v, stderr %q; want exit status 3 naming %s", err, stderr.String(), records)
+	}
 }
 
 func TestEnvKeepsOrderAndAppliesOverridesToOneCommand(t *testing.T) {

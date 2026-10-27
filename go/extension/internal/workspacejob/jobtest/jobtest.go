@@ -530,7 +530,7 @@ func (r GoRecord) Value(key string) (string, bool) {
 }
 
 // recordGo writes the GoRecord of this invocation into dir.
-func recordGo(dir string, args []string) {
+func recordGo(dir string, args []string) error {
 	record := GoRecord{Args: args, Env: os.Environ()}
 	if netrc := os.Getenv("NETRC"); netrc != "" {
 		state := &NetrcRecord{Path: netrc}
@@ -549,10 +549,10 @@ func recordGo(dir string, args []string) {
 	}
 	data, err := json.Marshal(record)
 	if err != nil {
-		return
+		return err
 	}
 	name := fmt.Sprintf("%020d-%d.json", time.Now().UnixNano(), os.Getpid())
-	_ = os.WriteFile(filepath.Join(dir, name), data, 0o600)
+	return os.WriteFile(filepath.Join(dir, name), data, 0o600)
 }
 
 // TrapExitCode is the status a trap exits with.
@@ -626,10 +626,16 @@ func envName(tool string) string {
 }
 
 // serveGo stops at the blocking request and runs the real go command for every
-// other one, with the same streams and exit status.
+// other one, with the same streams and exit status. A record it cannot write
+// ends it with exit status 3 and the cause on standard error, as a fake that
+// cannot read its answer does: the test would otherwise see a go command that
+// left no record and could not tell why.
 func serveGo(args []string) {
 	if dir := os.Getenv(goRecord); dir != "" {
-		recordGo(dir, args)
+		if err := recordGo(dir, args); err != nil {
+			fmt.Fprintln(os.Stderr, "fake go cannot write its record: "+err.Error()) //nolint:gosec // G705: a test fake reports its own write error to the test
+			os.Exit(3)
+		}
 	}
 	if block := os.Getenv(goBlock); block != "" && strings.Contains(strings.Join(args, " "), block) {
 		if ready := os.Getenv(goReady); ready != "" {
