@@ -17,6 +17,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	put "go.putnami.dev/protocol/put"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/putpublish"
@@ -204,6 +205,7 @@ func archiveMember(projectID, coordinate, version string) releaseset.PlannedMemb
 }
 
 func TestPackArchivesIntoOutboxPacksTheBytesTheDirectPathPublishes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	gzipDir, gzipFiles := writeArchiveDir(t, "putnami-cloud", "darwin-arm64", "linux-x64")
 	templateDir, templateFiles := writeArchiveDir(t, "my-template", "any")
 	cliDir := t.TempDir()
@@ -300,6 +302,7 @@ func TestPackArchivesIntoOutboxRefusesBeforeWritingADescriptor(t *testing.T) {
 // Under publication-v1 the archive step packs its planned member, sends no
 // request, and returns no published result, so the CLI emits no member event.
 func TestPublishArchivesWithResultPacksUnderThePublicationOutbox(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	workspaceRoot := writeArchivePublishWorkspace(t)
 	outbox := filepath.Join(t.TempDir(), "outbox")
 	env := map[string]string{"PUTNAMI_HOME": t.TempDir(), extensionproto.PublicationOutboxEnv: outbox}
@@ -332,6 +335,7 @@ func TestPublishArchivesWithResultPacksUnderThePublicationOutbox(t *testing.T) {
 }
 
 func TestPackConfigMemberPacksTheBytesPublishConfigMemberPublishes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	payload := []byte(`{"formatVersion":"config.authored-member.v1","values":{"region":"eu"}}`)
 	publication := ConfigMemberPublication{Namespace: "workspace-native", Package: "my-app-config", Version: "1.2.3", Payload: payload}
 	direct, srv := newRecordingPutServer(t)
@@ -372,6 +376,7 @@ func TestPackConfigMemberPacksTheBytesPublishConfigMemberPublishes(t *testing.T)
 }
 
 func TestPublishSiteContentMembersPacksTheBytesTheDirectPathPublishes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	ws := writeSiteContentProject(t, `"site-content"`)
 	plan := siteContentPlan("cloud/doc-contents-platform", "canary")
 	direct, srv := newRecordingPutServer(t)
@@ -427,6 +432,7 @@ func TestPublishSiteContentMembersPacksExactlyOneMember(t *testing.T) {
 }
 
 func TestPutOutboxPackerListsEachBlobDigestOnce(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	outbox := filepath.Join(t.TempDir(), "outbox")
 	packer, err := newPutOutboxPacker(outbox)
 	if err != nil {

@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // npmProfile is the reference profile the resolution tests declare. It is the
@@ -36,6 +38,7 @@ func ownerManifest(name string, profiles ...EcosystemProfile) NamedManifest {
 // bytes would accept them — and then diverge the first time one extension edits
 // its copy and the other does not.
 func TestResolveProfilesRefusesTwoOwners(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "one-owner-per-ecosystem-profile", "a-second-owner-or-an-unknown-use-is-refused")
 	_, diags := ResolveProfiles([]NamedManifest{
 		ownerManifest("@putnami/typescript", npmProfile()),
 		ownerManifest("@third/party", npmProfile()),
@@ -55,6 +58,7 @@ func TestResolveProfilesRefusesTwoOwners(t *testing.T) {
 // is a reference, and a reference to nothing would leave a publish job pointing
 // at an ecosystem no registry, coordinate rule or channel encoding exists for.
 func TestResolveProfilesRefusesUnknownUse(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "one-owner-per-ecosystem-profile", "a-second-owner-or-an-unknown-use-is-refused")
 	using := ownerManifest("@putnami/go")
 	using.Manifest.Uses = []string{"oci"}
 
@@ -79,6 +83,7 @@ func TestResolveProfilesRefusesUnknownUse(t *testing.T) {
 // itself is a first-class owner: it satisfies a `uses`, and a manifest that
 // redeclares it collides exactly as a second extension would.
 func TestResolveProfilesAcceptsBuiltinOwner(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "one-owner-per-ecosystem-profile", "a-built-in-owner-satisfies-a-use")
 	builtin := []OwnedProfile{{Owner: "@putnami/extension-sdk", Profile: npmProfile()}}
 
 	using := ownerManifest("@putnami/go")
@@ -109,6 +114,7 @@ func TestResolveProfilesAcceptsBuiltinOwner(t *testing.T) {
 // the portable alphabet AND the profile's encoding — the encoding narrows, it
 // never widens.
 func TestProfileValidatorsUsePatternsAndPortableAlphabet(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "one-owner-per-ecosystem-profile", "a-profile-validates-alone")
 	registry, diags := ResolveProfiles([]NamedManifest{ownerManifest("@putnami/typescript", npmProfile())}, nil)
 	if len(diags) != 0 {
 		t.Fatalf("resolve: %v", diags)
@@ -155,6 +161,7 @@ func TestProfileValidatorsUsePatternsAndPortableAlphabet(t *testing.T) {
 // unknown field is a rejection rather than a silent truncation, and every
 // invariant a member carries into a release set is checked here.
 func TestPublishedMemberIsStrict(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "publication-events-are-strict", "a-published-member-is-strict")
 	const digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 	member, diags := ParsePublishedMember([]byte(`{
@@ -207,6 +214,7 @@ func TestPublishedMemberIsStrict(t *testing.T) {
 // carries no credential. A conflict may carry equal digests: the publisher's
 // reuse rule, not the digests, decides it.
 func TestMemberProbeIsStrict(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "publication-events-are-strict", "a-member-probe-is-strict")
 	const local = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 	const remote = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 	base := `"ecosystem":"npm","coordinate":"@acme/widget","version":"1.2.3","registry":"https://registry.example.test"`
@@ -304,6 +312,7 @@ func TestMemberProbeIsStrict(t *testing.T) {
 // An artifact event's payload is every field but the envelope, so the strict
 // parsers meet exactly what the publisher emitted. The event is not modified.
 func TestArtifactEventPayloadDropsTheEnvelope(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "publication-events-are-strict", "the-payload-drops-the-envelope")
 	event := map[string]any{
 		"v": 2, "type": "artifact", "time": "2026-10-01T00:00:00Z", "level": "info", "message": "m",
 		"id": "npm", "name": "@acme/widget", "kind": MemberProbeEventKind, "path": "",
@@ -368,6 +377,7 @@ var ecosystemInvalidFixtureCodes = map[string][]string{
 // contains: a fixture that started failing for a second, unrelated reason would
 // stop certifying the rule it was written for.
 func TestEcosystemFixturesReportStableCodes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "one-owner-per-ecosystem-profile", "each-ecosystem-fixture-reports-its-code")
 	for name, codes := range ecosystemInvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {
 			m := loadFixtureManifest(t, filepath.Join("fixtures/invalid", name))
@@ -408,6 +418,7 @@ func TestEcosystemFixturesReportStableCodes(t *testing.T) {
 // without knowing the ecosystem, so a declaration that is not an object schema
 // would leave that entry unvalidatable.
 func TestValidateProfileRequiresARegistriesObjectSchema(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "one-owner-per-ecosystem-profile", "a-profile-validates-alone")
 	commands := map[string]CommandDefinition{"publish-npm": {}}
 	for name, raw := range map[string]json.RawMessage{
 		"absent":     nil,

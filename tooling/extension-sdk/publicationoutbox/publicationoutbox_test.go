@@ -44,6 +44,7 @@ func writeNPMOutbox(t *testing.T) (string, extproto.OutboxMember) {
 }
 
 func TestOutboxWriterAndReaderAgree(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-outbox-reads-back-what-it-writes")
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "the-engine-uploads-only-bytes-whose-digest-it-verified")
 	root, member := writeNPMOutbox(t)
 	outbox, err := Read(root)
@@ -145,6 +146,7 @@ func npmDescriptor(registry, tarball string) string {
 }
 
 func TestOutboxReaderRefusesAnInvalidDescriptor(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-outbox-reader-refuses-an-invalid-descriptor")
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "the-descriptor-is-strict-and-bounded")
 	for name, content := range map[string]string{
 		"unknown member":            `{"protocolVersion":1,"members":[],"registry":"https://evil.example"}`,
@@ -237,6 +239,7 @@ func TestOutboxWriterRefusesUnwrittenAndOverlappingArtifacts(t *testing.T) {
 }
 
 func TestOutboxWriterPacksAPutMember(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-outbox-reads-back-what-it-writes")
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "the-engine-uploads-only-bytes-whose-digest-it-verified")
 	root := filepath.Join(t.TempDir(), "outbox")
 	writer, err := NewWriter(root)

@@ -27,7 +27,7 @@ const publishChannelsManifest = `{
 // without the registry effect fails the package job unstamped, the same
 // verdicts as the Go packager.
 func TestCopyHookFiles_StampsPublishChannels(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "publish-tasks-declare-their-channels", "the-npm-packager-stamps-publish-channels")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	projDir := stageSourceManifest(t, publishChannelsManifest)
 	outDir := t.TempDir()
 	if err := copyHookFiles(projDir, outDir, "1.0.0"); err != nil {

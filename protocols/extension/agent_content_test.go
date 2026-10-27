@@ -12,6 +12,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // agentContentValidFixtures are the valid fixtures that declare an
@@ -113,6 +114,7 @@ func TestAgentContent_EmptyContributionDoesNotValidateAnEmptyManifest(t *testing
 // no diagnostic from the new validator, and the base contract as the required
 // stamp. The mutation is the control that proves the validator is wired.
 func TestAgentContent_AdditiveForEveryOtherFixture(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -165,6 +167,7 @@ func TestAgentContent_AdditiveForEveryOtherFixture(t *testing.T) {
 // The valid content fixtures carry the stamp their vocabulary requires, so the
 // negotiating loader reads them.
 func TestAgentContent_ValidFixturesLoad(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	for _, name := range agentContentValidFixtures {
 		t.Run(name, func(t *testing.T) {
 			m, err := LoadManifest(filepath.Join("fixtures/valid", name))
@@ -221,6 +224,7 @@ func contract4Load(path string, data []byte) (*contract4Manifest, error) {
 // content-free extension, which is exactly why this build never produces one:
 // its own loader refuses both.
 func TestAgentContent_OlderReaderRefusesThePackage(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "a-manifest-below-its-rung-does-not-load")
 	path := filepath.Join("fixtures/valid", "agent-content.json")
 	data, err := os.ReadFile(path)
 	if err != nil {

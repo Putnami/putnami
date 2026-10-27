@@ -1,0 +1,102 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "extension/manifest-contract",
+  "outcomes": [
+    "An extension author learns from one strict validator, before a release, whether a CLI will load the manifest and run its tasks as declared",
+    "A CLI never half-reads a manifest written for another contract: it loads the manifest as written or refuses it with the fix",
+    "A cache key misses, rather than falsely hits, when a task's declared contract changes"
+  ],
+  "nonGoals": [
+    "Deciding what a language builds, tests or publishes: each extension owns its commands and tasks",
+    "The host RPC channel of an interactive subcommand: the hostrpc subpackage documents that wire on its own",
+    "The collaboration contracts a tool may implement: protocols/collaboration owns them and their routing"
+  ],
+  "requirements": [
+    {
+      "id": "the-protocol-version-is-pinned",
+      "text": "ProtocolVersion is 3, so a bump moves this one constant and fails its test. ManifestProtocolVersion reports 3 for a manifest that uses a task declaration, a runtime or workspace section, or a finalizer step, and 2 otherwise: every fixture that predates version 3 still reports 2, and each version 3 fixture reports 3."
+    },
+    {
+      "id": "strict-manifests-and-a-fixture-corpus",
+      "text": "The strict parser refuses invalid JSON and an unknown field. Every valid fixture passes the parser, ValidateManifest and FullValidateManifest, and every invalid fixture draws a diagnostic from one of them. Each task contract and lifecycle counter-example reports exactly the codes a consumer keys on, and every diagnostic of the task contract harness also comes out of ValidateManifest."
+    },
+    {
+      "id": "a-contract-matches-or-the-manifest-does-not-load",
+      "text": "LoadManifest refuses a cliContract above the latest contract the CLI reads with an error asking for a newer putnami, and one below the contract the manifest's vocabulary requires, absent included, with an error naming that contract, a re-package and putnami extensions update. A manifest with no command, command group, tool or other contract surface is outside the ladder. A released manifest below the contract stays refused, and no function adapts an older manifest."
+    },
+    {
+      "id": "an-additive-vocabulary-raises-the-contract-floor",
+      "text": "Agent content, a verb vocabulary, command kinds, publish channels, a provisioned toolchain, a group default that takes positionals, input selectors, a source-bound task and a git or release baseline input each raise the contract a manifest requires, only when the manifest uses them. RequiredCLIContract takes the highest rung across the manifest, and a manifest stamped below the rung its vocabulary requires does not load."
+    },
+    {
+      "id": "a-registry-extension-dependency-requires-rung-8",
+      "text": "A manifest that names a registry extension dependency requires contract 8 in its stamp, and the load floor leaves that rung out. CheckDependencyContract refuses a dependent stamped below 8, naming the rung, and passes a stamp of 8; LoadManifest refuses a stamp above the latest contract. The Go packager stamps a dependent at 8 in a put archive and leaves the rung out of an npm package. The CLI reports rung 8 for such a manifest and refuses a stamp above its latest contract, asking for a newer putnami."
+    },
+    {
+      "id": "the-schema-and-the-go-types-agree",
+      "text": "The published JSON Schema and each Go wire struct declare the same fields and closed vocabularies, checked in both directions, and the schema still omits the fields contract 3 deleted. The schema's cliContract maximum is the latest contract the CLI reads, and its description names every rung up to it. The publication outbox schema tracks its Go types the same way."
+    },
+    {
+      "id": "task-contracts-are-exact-owned-and-additive",
+      "text": "A task declaration names exact output paths under a known root, with effects that do not conflict, and each output has one owner across the manifest: task contract validation refuses an overlap, an escape or a conflicting effect. Every declaration feature appears in a valid fixture. A manifest without a declaration, a runtime or a workspace section gets no verdict from those validators, and a defective declaration added to the same manifest does."
+    },
+    {
+      "id": "output-readers-and-publish-channels-follow-their-rules",
+      "text": "An output that its project's dependents read (readByDependents) is a durable output under the project root, else validation reports invalid-output-read-by-dependents. A publish channel list names at least one channel and each once, and only a task with the registry effect lists one: validation refuses any other list with a code for each rule. Normalization sorts the list, so two orders digest identically."
+    },
+    {
+      "id": "task-digests-move-only-with-the-contract",
+      "text": "A task contract's digest is the same across parses and normalizations and leaves its argument unchanged. It moves when a contract member changes and stays when a presentational member changes. The fixture corpus digests match a committed golden, so a change in how a contract hashes is a reviewed diff, not a silent cache key shift. Cache keys, validation and normalization return the same result on every run."
+    },
+    {
+      "id": "declared-paths-follow-one-rule",
+      "text": "Every declared path is relative, stays within its declared root and expands no template. NormalizeRelativePath and NormalizeInputPattern refuse an absolute path, an escape and a template, and agree on every path they both accept."
+    },
+    {
+      "id": "lifecycles-validate-and-fail-in-closed-vocabularies",
+      "text": "ValidateRuntime and ValidateWorkspaceAdapter accept the documented shapes and refuse each rule's counter-example, and runtime preparation does not depend on the workspace. The runtime, workspace and sensitive-output lifecycles report failures in closed, sorted, prefixed snake_case vocabularies, each code documented and none shared with a validation code, and recovery codes stay apart from failure codes."
+    },
+    {
+      "id": "one-owner-per-ecosystem-profile",
+      "text": "ResolveProfiles refuses a second owner of an ecosystem, even an identical copy, naming both manifests, and a use no installed extension or built-in declares, and accepts a use a built-in owns. A profile with an invalid id, a pattern that is not RE2, an unknown channel, a missing publish command, a registries schema that is not an object, or a use of its own id draws a stable code. Coordinates, versions and channel names answer to the profile's patterns and the portable alphabet."
+    },
+    {
+      "id": "publication-events-are-strict",
+      "text": "ParsePublishedMember refuses an unknown field, so no field is dropped from a release set. ParseMemberProbe refuses an unknown field and an unknown state, requires the digests and the reason each state claims, and accepts a tag-move only from an OCI probe. ArtifactEventPayload drops the event envelope and returns the payload a strict parser reads."
+    },
+    {
+      "id": "the-publication-outbox-is-strict-and-bounded",
+      "text": "ParsePublicationOutbox refuses an unknown, duplicate or null member, an escaping, unclean or nested path, an invalid digest, size or identity, an npm registry the managed rules refuse, and a document, member list or put blob list above its bound. ResolveOutboxPath refuses a symbolic link at any step. A member of every ecosystem is accepted, every invalid fixture is refused and every valid fixture accepted."
+    },
+    {
+      "id": "every-first-party-manifest-conforms",
+      "text": "Every extension manifest in this repository loads through the CLI's LoadManifest, stamped at the contract its vocabulary requires, or unstamped when it declares no contract surface. Every manifest the CLI's first-party list names passes the strict parser and FullValidateManifest, and its task declarations conform. The Go, TypeScript and Python extensions each pass their own manifest through FullValidateManifest. A refused first-party manifest fails every test run, not the release."
+    },
+    {
+      "id": "first-party-packagers-stamp-and-gate-the-contract",
+      "text": "The Go and TypeScript packagers stamp a staged manifest at the rung its vocabulary requires and refuse one the protocol refuses: a defective vocabulary, a reserved flag, a wrong-typed surface or a claim above the latest contract. A refused manifest stays unstamped. The extension SDK's builder and content packager stamp the same rung, and its authoring gate runs FullValidateManifest."
+    },
+    {
+      "id": "first-party-publishers-emit-what-the-protocol-reads",
+      "text": "The Go, TypeScript and Cloud publishers emit a published member that validates. The Go, TypeScript and SDK probes pass the strict reader, and the SDK reader refuses what ParseMemberProbe refuses. The Go, TypeScript, SDK and Cloud outbox writers produce a descriptor ParsePublicationOutbox accepts, and the SDK reader refuses an invalid one."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0002-cli-vnext-contracts.md",
+    "protocols/extension/doc/adr/0001-ecosystem-profiles-declared-by-extensions.md",
+    "protocols/extension/doc/adr/0002-runtime-toolchains-are-lock-pinned-under-the-current-contract.md",
+    "protocols/extension/doc/adr/0003-a-declared-directory-output-may-cede-one-subpath.md",
+    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md",
+    "protocols/extension/doc/adr/0005-a-declared-directory-output-may-preserve-workspace-files.md",
+    "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
+    "protocols/extension/doc/adr/0008-workspace-requirement-and-group-default-need-no-contract.md",
+    "protocols/extension/doc/adr/0009-an-optional-project-output-may-ask-to-be-emptied.md",
+    "protocols/extension/doc/adr/0010-a-path-from-output-may-bound-its-path.md",
+    "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
+    "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",
+    "protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md",
+    "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md"
+  ]
+}

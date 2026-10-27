@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // A reader before rung 10 stores and looks up a source-bound entry at its
@@ -15,6 +16,7 @@ import (
 // a task that declares cache.sourceBound therefore needs rung 10, and a lower
 // stamp is refused with the reason.
 func TestASourceBoundTaskRequiresTheSourceBoundCacheContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	manifest := []byte(`{"name":"@test/go","cliContract":9,"commands":{"build":{"run":[{"id":"describe","task":"describe"}]}},"tasks":{"describe":{"kind":"command","command":"echo","inputs":{"sources":{"from":"project","files":["**/*.go"]}},"cache":{"enabled":true,"deterministic":true,"sourceBound":true}}}}`)
 	_, err := NegotiateManifest("go.json", manifest)
 	if err == nil {
@@ -45,6 +47,7 @@ func TestASourceBoundTaskRequiresTheSourceBoundCacheContract(t *testing.T) {
 // Every task counts, and a task that does not declare the field, or declares it
 // false, leaves the floor where its other vocabulary puts it.
 func TestRequiredCLIContractRaisesToSourceBoundOnlyForADeclaringTask(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	bound := TaskDefinition{Kind: "command", Command: "echo", Cache: &TaskCachePolicy{SourceBound: true}}
 	gitInput := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
 		"sources": {From: TaskInputFromProject, Files: []string{"git:**"}},

@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The no-manifest-adaptation ratchet.
@@ -31,6 +33,7 @@ import (
 // the right moment: why is this function named Adapt, and what is it changing
 // about a document its author signed?
 func TestNoManifestAdaptationFunctions(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "no-adaptation-function-returns")
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

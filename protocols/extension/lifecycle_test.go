@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const lifecycleDocPath = "doc/07-lifecycles.md"
@@ -14,6 +16,7 @@ const lifecycleDocPath = "doc/07-lifecycles.md"
 // switching exhaustively on one of these must be able to trust that a code with
 // a "runtime." prefix is a runtime failure and nothing else.
 func TestLifecycleFailureVocabularies(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "lifecycle-codes-are-closed-and-documented")
 	vocabularies := []struct {
 		name   string
 		prefix string
@@ -75,6 +78,7 @@ func TestLifecycleFailureVocabularies(t *testing.T) {
 // manifest could not be executed. Sharing a spelling would make a consumer's
 // switch ambiguous, so the namespaces may never intersect.
 func TestLifecycleFailureCodesAreNotValidationCodes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "lifecycle-codes-are-closed-and-documented")
 	validationCodes := []string{
 		"required-field", "invalid-enum", "invalid-value", "invalid-output-path",
 		"invalid-runtime-path", "invalid-workspace-path", "invalid-template-var",
@@ -101,6 +105,7 @@ func TestLifecycleFailureCodesAreNotValidationCodes(t *testing.T) {
 // a documented code that does not exist — is caught too, because a table entry
 // nobody emits is a promise the CLI does not keep.
 func TestLifecycleFailureCodesAreDocumented(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "lifecycle-codes-are-closed-and-documented")
 	data, err := os.ReadFile(lifecycleDocPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", lifecycleDocPath, err)
@@ -151,6 +156,7 @@ func documentedCodes(doc, prefix string) []string {
 // scan relies on. Without it, a camelCase code would make the reverse half of
 // TestLifecycleFailureCodesAreDocumented silently vacuous.
 func TestLifecycleFailureCodesAreSnakeCase(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "lifecycle-codes-are-closed-and-documented")
 	for _, code := range ValidLifecycleFailureCodes {
 		suffix := code[strings.Index(code, ".")+1:]
 		if !strings.Contains(suffix, "_") {

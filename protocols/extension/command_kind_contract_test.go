@@ -8,6 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // A reader before rung 11 has no representation for a command's kind,
@@ -15,6 +16,7 @@ import (
 // manifest that declares any of them therefore needs rung 11, and a lower
 // stamp is refused with the reason.
 func TestACommandKindRequiresTheCommandKindContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	t.Parallel()
 	manifest := []byte(`{"name":"@test/lang","cliContract":10,"commands":{"check":{"traits":{"kind":"verification"},"run":[{"id":"check","task":"check"}]}},"tasks":{"check":{"kind":"command","command":"echo","timeoutMs":-1}}}`)
 	_, err := NegotiateManifest("lang.json", manifest)
@@ -47,6 +49,7 @@ func TestACommandKindRequiresTheCommandKindContract(t *testing.T) {
 // traits or on a task's batchable policy. Traits or a policy that declare none
 // of them leave the floor where the manifest's other vocabulary puts it.
 func TestEachCommandKindFieldAloneRaisesTheFloor(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	t.Parallel()
 	command := func(traits *CommandTraits) *Manifest {
 		return &Manifest{

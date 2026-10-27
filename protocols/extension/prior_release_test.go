@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 var priorReleaseManifestDir = filepath.Join("testdata", "prior-releases")
@@ -69,6 +70,7 @@ func loadPriorReleaseManifests(t *testing.T) priorReleaseManifestCorpus {
 // provenance and the file set must agree. Editing a fixture to make a loader
 // change pass is a compatibility break with the evidence deleted.
 func TestPriorReleaseManifestsAreImmutable(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "a-released-manifest-below-the-contract-stays-refused")
 	corpus := loadPriorReleaseManifests(t)
 	recorded := make(map[string]bool, len(corpus.Fixtures))
 
@@ -135,6 +137,7 @@ func TestPriorReleaseManifestsAreImmutable(t *testing.T) {
 // form of the budget's exact-match row. A rejection a user cannot act on is a
 // different failure from a rejection, so the remediation text is asserted too.
 func TestPriorReleaseManifestsAreRejectedWithTheDocumentedRemedy(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "a-released-manifest-below-the-contract-stays-refused")
 	corpus := loadPriorReleaseManifests(t)
 	rejected := 0
 
@@ -183,6 +186,7 @@ func TestPriorReleaseManifestsAreRejectedWithTheDocumentedRemedy(t *testing.T) {
 // exemption is not a hole in the ladder, it is the absence of anything
 // for the rule to govern, and the two must not be confused.
 func TestPriorReleaseManifestGovernsTheLadder(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "a-released-manifest-below-the-contract-stays-refused")
 	for _, fixture := range loadPriorReleaseManifests(t).Fixtures {
 		data, err := os.ReadFile(filepath.Join(priorReleaseManifestDir, fixture.File))
 		if err != nil {

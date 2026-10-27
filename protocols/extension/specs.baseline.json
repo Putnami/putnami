@@ -1,0 +1,23 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "extension/manifest-contract#a-contract-matches-or-the-manifest-does-not-load",
+    "extension/manifest-contract#a-registry-extension-dependency-requires-rung-8",
+    "extension/manifest-contract#an-additive-vocabulary-raises-the-contract-floor",
+    "extension/manifest-contract#declared-paths-follow-one-rule",
+    "extension/manifest-contract#every-first-party-manifest-conforms",
+    "extension/manifest-contract#first-party-packagers-stamp-and-gate-the-contract",
+    "extension/manifest-contract#first-party-publishers-emit-what-the-protocol-reads",
+    "extension/manifest-contract#lifecycles-validate-and-fail-in-closed-vocabularies",
+    "extension/manifest-contract#one-owner-per-ecosystem-profile",
+    "extension/manifest-contract#output-readers-and-publish-channels-follow-their-rules",
+    "extension/manifest-contract#publication-events-are-strict",
+    "extension/manifest-contract#strict-manifests-and-a-fixture-corpus",
+    "extension/manifest-contract#task-contracts-are-exact-owned-and-additive",
+    "extension/manifest-contract#task-digests-move-only-with-the-contract",
+    "extension/manifest-contract#the-protocol-version-is-pinned",
+    "extension/manifest-contract#the-publication-outbox-is-strict-and-bounded",
+    "extension/manifest-contract#the-schema-and-the-go-types-agree"
+  ]
+}

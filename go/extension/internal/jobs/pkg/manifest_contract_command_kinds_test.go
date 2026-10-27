@@ -28,7 +28,7 @@ const commandKindManifest = `{
 // command as a plain one, and the fields survive the rewrite. A kind outside
 // the vocabulary fails packaging and leaves the staged manifest as it was.
 func TestGateStampsACommandKind(t *testing.T) {
-	spectest.Proves(t, "go/go-project-toolchain", "command-kinds-and-traits", "the-go-packager-stamps-command-kinds")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
 	for name, form := range map[string]packageForm{"put archive": putArchive, "npm package": npmPackage} {
 		dir := stageManifest(t, commandKindManifest)
 		if err := gateAndStampManifestContract(dir, form); err != nil {

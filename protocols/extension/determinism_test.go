@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestDeriveTaskCacheKey_Deterministic verifies that DeriveTaskCacheKey produces
 // identical output regardless of Go map iteration order. Running this test 100
 // times makes non-determinism very likely to surface.
 func TestDeriveTaskCacheKey_Deterministic(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "cache-keys-and-validation-are-deterministic")
 	inputs := map[string]TaskInputPort{
 		"sources":    {From: "project", Files: []string{"**/*.go", "go.mod"}},
 		"target":     {From: "params"},
@@ -54,6 +56,7 @@ func TestDeriveTaskCacheKey_Deterministic(t *testing.T) {
 // TestValidateManifest_Deterministic verifies that ValidateManifest produces
 // diagnostics in a consistent order regardless of Go map iteration order.
 func TestValidateManifest_Deterministic(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "cache-keys-and-validation-are-deterministic")
 	m := &Manifest{
 		Commands: map[string]CommandDefinition{
 			"zebra": {Run: []PipelineStep{{ID: "s1", Task: "missing-z"}}},
@@ -87,6 +90,7 @@ func TestValidateManifest_Deterministic(t *testing.T) {
 // TestValidatePipelineDAG_Deterministic verifies that ValidatePipelineDAG
 // produces diagnostics in a consistent order.
 func TestValidatePipelineDAG_Deterministic(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "cache-keys-and-validation-are-deterministic")
 	m := &Manifest{
 		Commands: map[string]CommandDefinition{
 			"zebra": {Run: []PipelineStep{
@@ -117,6 +121,7 @@ func TestValidatePipelineDAG_Deterministic(t *testing.T) {
 // TestValidateSchemaRefs_Deterministic verifies that ValidateSchemaRefs
 // produces diagnostics in a consistent order.
 func TestValidateSchemaRefs_Deterministic(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "cache-keys-and-validation-are-deterministic")
 	m := &Manifest{
 		Contracts: &ContractsDefinition{
 			Schemas: map[string]map[string]any{},
@@ -144,6 +149,7 @@ func TestValidateSchemaRefs_Deterministic(t *testing.T) {
 // TestFullValidateManifest_Deterministic verifies the full validation pipeline
 // produces consistent output.
 func TestFullValidateManifest_Deterministic(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "cache-keys-and-validation-are-deterministic")
 	m := &Manifest{
 		Commands: map[string]CommandDefinition{
 			"build": {Run: []PipelineStep{{ID: "s1", Task: "t1"}}},
@@ -167,6 +173,7 @@ func TestFullValidateManifest_Deterministic(t *testing.T) {
 // TestNormalizeManifest_Deterministic verifies that NormalizeManifest produces
 // deterministic cache keys from task inputs regardless of map iteration order.
 func TestNormalizeManifest_Deterministic(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "cache-keys-and-validation-are-deterministic")
 	makeManifest := func() *Manifest {
 		return &Manifest{
 			Tasks: map[string]TaskDefinition{

@@ -11,6 +11,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	bundlepkg "go.putnami.dev/protocol/migration/bundle"
 	"go.putnami.dev/protocol/migration/bundle/publication"
 	put "go.putnami.dev/protocol/put"
@@ -175,6 +176,7 @@ func requireEngineAdmitsMigration(t *testing.T, packed packedOutboxMember, plann
 // selection and the bundle files, and so does this step. Data accepts a stored
 // member only when repacking it reproduces these bytes.
 func TestPackPreparedMigrationPacksTheBytesDataStores(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	prepared := prepareOutboxTestMigration(t)
 	outbox := filepath.Join(t.TempDir(), "outbox")
 	result, err := PackPreparedMigration(outbox, "/"+outboxTestApp, prepared, outboxTestSelection)

@@ -4261,7 +4261,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-dependent-manifest-requires-contract-8"
+              "a-dependent-stamped-below-rung-8-is-skipped"
             ]
           }
         }

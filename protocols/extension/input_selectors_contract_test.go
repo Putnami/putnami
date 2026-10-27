@@ -8,6 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // selectorManifest is a manifest whose extension lists sel:build and whose
@@ -35,6 +36,7 @@ func marshalManifest(t *testing.T, m *Manifest) []byte {
 // A manifest that lists a selector, or names one in a task, requires the
 // input-selectors rung from every origin, and the highest rung wins.
 func TestInputSelectorsRequireTheirContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	listed := &Manifest{Name: "@test/x", Runtime: &RuntimeDefinition{Executable: "bin/x", InputSelectors: []string{"sel:build"}}}
 	named := &Manifest{Name: "@test/x", Tasks: map[string]TaskDefinition{"t": {Cache: &TaskCachePolicy{Key: &TaskCacheKey{Files: []string{"sel:build"}}}}}}
 	misplaced := &Manifest{Name: "@test/x", Tasks: map[string]TaskDefinition{"t": {Inputs: map[string]TaskInputPort{
@@ -65,6 +67,7 @@ func TestInputSelectorsRequireTheirContract(t *testing.T) {
 // A manifest stamped below the rung that names a selector is refused for its
 // selectors, with the remedy that moves it, whatever its earlier stamp meant.
 func TestManifestNamingASelectorBelowItsContractIsRefused(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "a-manifest-below-its-rung-does-not-load")
 	for _, stamp := range []int{6, protocolcli.InputSelectorsContract - 1} {
 		m := selectorManifest()
 		m.CLIContract = stamp

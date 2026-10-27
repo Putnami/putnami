@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const lifecycleFixturePath = "fixtures/valid/lifecycle-v3.json"
 
 func TestValidateRuntime_AcceptedShapes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "the-runtime-section-validates")
 	cases := map[string]RuntimeDefinition{
 		"published extension ships its executable": {
 			Executable: "bin/putnami-sample",
@@ -49,6 +51,7 @@ func TestValidateRuntime_AcceptedShapes(t *testing.T) {
 // TestValidateRuntime_Rules pins one diagnostic code per rule so slice C1 keys
 // on the code rather than on message text.
 func TestValidateRuntime_Rules(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "the-runtime-section-validates")
 	cases := []struct {
 		name    string
 		runtime RuntimeDefinition
@@ -284,6 +287,7 @@ func TestValidateRuntime_Rules(t *testing.T) {
 // CLI-assigned output directory, but no workspace/project location. The
 // executor still owns process isolation for an arbitrary program.
 func TestValidateRuntime_PreparationIsWorkspaceIndependent(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "the-runtime-section-validates")
 	forbidden := []string{
 		"workspaceRoot", "projectRoot", "outputRoot", "cacheRoot",
 		"selectedProjects", "selectedProjectIDs", "selectedProjectPaths", "selectedProjectRoots",
@@ -720,6 +724,7 @@ func TestRuntimeInputSelectorsSchemaAgreesWithTheValidator(t *testing.T) {
 // self-identifying: a manifest carrying it is a v3 manifest even when no task
 // declares a contract.
 func TestRuntimeSectionMakesAManifestV3(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-protocol-version-is-pinned", "a-manifest-reports-the-version-it-uses")
 	m := &Manifest{
 		Tasks:   map[string]TaskDefinition{"build": {Kind: "command", Command: "echo"}},
 		Runtime: &RuntimeDefinition{Executable: "bin/x"},

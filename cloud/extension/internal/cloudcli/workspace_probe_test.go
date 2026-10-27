@@ -15,6 +15,7 @@ import (
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	workspaceproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
@@ -615,6 +616,7 @@ func TestCloudWorkspaceProbeUsesFrameworkOptionPrecedenceAndRejectsInvalidOverri
 }
 
 func TestPublishedArchiveUsesTheNativeRuntimeArtifactEnvelope(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-emits-a-published-member-the-protocol-validates")
 	digest := "sha256:" + strings.Repeat("a", 64)
 	platformDigest := "sha256:" + strings.Repeat("b", 64)
 	var output []string

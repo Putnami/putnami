@@ -468,7 +468,7 @@ func TestBuilder_Tool(t *testing.T) {
 // the additive contract its vocabulary requires — the one stamp a reader that
 // predates agent content refuses instead of dropping the content.
 func TestBuilder_AgentContentStampsTheAdditiveContract(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "agent-content-packaging", "the-manifest-builder-stamps-the-additive-contract")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-stamps-the-rung-its-vocabulary-requires")
 	path := filepath.Join(t.TempDir(), proto.ManifestFilename)
 	builder := New("@sample/contributor", "1.0.0").
 		AgentContent(proto.AgentContentContribution{Path: "agent-content", Source: "agent-src"})
@@ -568,6 +568,7 @@ func TestWriteFile_ReportsIOFailure(t *testing.T) {
 // TestValidate_StandaloneManifest pins the exported entry for authors who
 // assemble a manifest without the builder.
 func TestValidate_StandaloneManifest(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-extension-sdk-authoring-gate-runs-the-full-validator")
 	m := &proto.Manifest{
 		Name: "sample/standalone",
 		Commands: map[string]proto.CommandDefinition{

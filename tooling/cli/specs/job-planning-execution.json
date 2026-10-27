@@ -63,7 +63,7 @@
     },
     {
       "id": "dependents-wait-for-an-output-they-read",
-      "text": "A declared output may state readByDependents: the projects that depend on its project read it, such as a generated client they compile. Only a durable output under the project root may state it, else validation reports invalid-output-read-by-dependents; it needs no CLI contract above 4. Every planned job of a direct or transitive dependent runs after the writer over an ordering edge that never reaches a cache key. Finalizers and jobs already running before the writer take no edge, so the plan stays a DAG."
+      "text": "A declared output may state readByDependents: the projects that depend on its project read it, such as a generated client they compile. The validate command names each output it refuses. Every planned job of a direct or transitive dependent runs after the writer over an ordering edge that never reaches a cache key. Finalizers and jobs already running before the writer take no edge, so the plan stays a DAG."
     },
     {
       "id": "preview-no-effects",
@@ -231,11 +231,11 @@
     },
     {
       "id": "command-kinds-and-traits",
-      "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. Strict validation refuses a value outside each vocabulary. A manifest that declares any of them requires CLI contract 11 wherever it loads from."
+      "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. The validate command names each field outside a vocabulary. Discovery skips a manifest stamped below the contract these need, with the reason."
     },
     {
       "id": "publish-tasks-declare-their-channels",
-      "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The list names at least one channel and each once, is normalized to sorted order, and requires the registry effect; strict validation refuses any other list. A manifest with such a task requires CLI contract 12 wherever it loads from, and a planned job exposes its task's channels."
+      "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The validate command names each task with an invalid list. Discovery skips a manifest stamped below the contract the list needs, with the reason, and a planned job exposes its task's channels."
     },
     {
       "id": "an-extension-manifest-names-its-extension",
@@ -255,7 +255,7 @@
     },
     {
       "id": "a-group-default-takes-positionals",
-      "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Such a manifest declares CLI contract 15; older readers refuse it."
+      "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Discovery skips such a manifest stamped too low, with the reason."
     },
     {
       "id": "a-step-reads-the-changed-files",

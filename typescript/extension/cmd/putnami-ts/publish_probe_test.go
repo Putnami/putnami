@@ -173,6 +173,7 @@ func assertOneTarballRead(t *testing.T, server *recorded.Server, wantAuthorizati
 // with one GET and no npm child process. Every 404 is a response the production
 // registry sent.
 func TestManagedNPMDryRunProbesTheRegistry(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "dry-run-registry-probe", "managed-npm-probe-is-read-only")
 	stagedDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(stagedTarball))
 	otherDigest := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("another tarball")))
@@ -261,6 +262,7 @@ func TestManagedNPMDryRunProbesTheRegistry(t *testing.T) {
 // A dry run with no network access must not pass in silence: a registry that
 // refuses the connection is an unverified verdict whose reason says so.
 func TestManagedNPMDryRunReportsAnUnreachableRegistry(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-probes-pass-the-strict-reader")
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -309,6 +311,7 @@ func TestManagedNPMDryRunProbesThroughThePrivateBroker(t *testing.T) {
 // A registry that refuses an anonymous read is unverified, and the reason says
 // to sign in. The refusal is the one npm.putnami.dev sends.
 func TestManagedNPMProbeReportsARefusedAnonymousRead(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "dry-run-registry-probe", "npm-refusal-is-unverified")
 	managedProbeSeams(t, "", nil)
 	server := recorded.NewServer(t, nil, recordedNPMResponse(t, "anonymous-request.401.http"))
@@ -328,6 +331,7 @@ func TestManagedNPMProbeReportsARefusedAnonymousRead(t *testing.T) {
 // nor an unbounded body. The redirect is not followed: the bearer reaches one
 // recipient.
 func TestManagedNPMProbeRefusesWhatIsNotAnAnswer(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-probes-pass-the-strict-reader")
 	var redirected int
 	target := recorded.NewServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { redirected++ }))
 	subject := memberprobe.Subject{Ecosystem: "npm", Coordinate: "@test/pkg", Version: "1.2.3-r42", Registry: "https://npm.example.test"}
@@ -419,6 +423,7 @@ func unmanagedDryRunCtx(t *testing.T) *pctx.Context {
 // with `npm pack` only to compare a held version, and never runs a command
 // that writes. Every refusal is what npm printed against a real registry.
 func TestUnmanagedNPMDryRunAsksThroughNPM(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-probes-pass-the-strict-reader")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "dry-run-registry-probe", "unmanaged-npm-probe-asks-through-npm")
 	stagedDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(stagedTarball))
 	staged512 := sha512.Sum512(stagedTarball)
