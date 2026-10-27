@@ -143,7 +143,7 @@ func TestMemoryBroker_ConcurrentCompetingAndBroadcast(t *testing.T) {
 // The broker logs into its own sink. Each delivery writes its terminal record
 // before the drain counts it done, and the default sink serializes the records
 // of every test in the binary. On the default sink this drain waited behind the
-// records of the parallel competing test and missed DrainTimeout (#626).
+// records of the parallel competing test and could miss DrainTimeout.
 func TestMemoryBroker_ConcurrentStopDuringPublish(t *testing.T) {
 	spectest.Proves(t, "go/event-delivery", "shutdown", "stop-during-publish-is-race-free")
 	t.Parallel()
@@ -248,8 +248,8 @@ func TestMemoryBroker_ConcurrentStopDuringPublish(t *testing.T) {
 	}
 }
 
-// TestMemoryBroker_PublishRacingStopIsDeliveredOrRefused forces the interleaving
-// of issue #626 with a seam instead of scheduler luck. A publish has seen the
+// TestMemoryBroker_PublishRacingStopIsDeliveredOrRefused forces a publish to
+// race Stop with a seam instead of scheduler luck. A publish has seen the
 // broker running and selected its target. Stop then marks the broker stopped and
 // waits for an in-flight delivery that the test holds. Only then does the publish
 // dispatch. The publish must either be delivered before Stop returns, or be
@@ -325,9 +325,9 @@ func TestMemoryBroker_PublishRacingStopIsDeliveredOrRefused(t *testing.T) {
 }
 
 // TestMemoryBroker_RestartDeliversToBoundedHandler restarts a broker and
-// publishes to a handler with a concurrency limit. Stop used to mark each
-// bounded worker stopping, and Start never cleared the mark, so the restarted
-// broker accepted the publish and silently dropped it.
+// publishes to a handler with a concurrency limit. The restarted broker must
+// deliver the publish: no state that Stop leaves on a bounded worker may make
+// it accept a publish and drop it.
 func TestMemoryBroker_RestartDeliversToBoundedHandler(t *testing.T) {
 	topic := NewTopic[int]("restart.bounded")
 	broker := NewMemoryBroker()
