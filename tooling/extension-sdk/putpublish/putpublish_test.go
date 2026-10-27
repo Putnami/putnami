@@ -584,23 +584,33 @@ func recordWaits(t *testing.T) *[]time.Duration {
 
 // failBlobUploads answers the first count blob uploads, or every one when
 // count is negative, with fault, and hands the others to the registry. It
-// returns the bytes of every blob upload the registry received.
-func failBlobUploads(registry *fakeRegistry, count int, fault func(w http.ResponseWriter)) *[][]byte {
-	sent := &[][]byte{}
+// returns a function that reads the bytes of every blob upload the registry
+// received. The handler runs on the server's goroutine, so the list is shared
+// under a lock: a network round trip orders nothing for the race detector.
+func failBlobUploads(registry *fakeRegistry, count int, fault func(w http.ResponseWriter)) func() [][]byte {
+	var mu sync.Mutex
+	var sent [][]byte
 	registry.answer = func(w http.ResponseWriter, r *http.Request) bool {
 		if !strings.HasSuffix(r.URL.Path, "/blobs") {
 			return false
 		}
 		data, _ := io.ReadAll(r.Body)
-		*sent = append(*sent, data)
-		if count < 0 || len(*sent) <= count {
+		mu.Lock()
+		sent = append(sent, data)
+		failed := count < 0 || len(sent) <= count
+		mu.Unlock()
+		if failed {
 			fault(w)
 			return true
 		}
 		r.Body = io.NopCloser(bytes.NewReader(data))
 		return false
 	}
-	return sent
+	return func() [][]byte {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([][]byte(nil), sent...)
+	}
 }
 
 // answerStatus answers status with the header pairs given and a body that
@@ -678,8 +688,8 @@ func TestUploadBlobRetriesATransientFailure(t *testing.T) {
 			if err := UploadBlob(context.Background(), testClient(t), registry.server.URL, testToken, "acme/doc-contents", blob); err != nil {
 				t.Fatalf("UploadBlob = %v, want the second attempt stored", err)
 			}
-			if len(*sent) != 2 || !bytes.Equal((*sent)[0], (*sent)[1]) || put.Digest((*sent)[1]) != blob.Digest {
-				t.Fatalf("the registry received %d uploads, want the blob bytes twice", len(*sent))
+			if len(sent()) != 2 || !bytes.Equal(sent()[0], sent()[1]) || put.Digest(sent()[1]) != blob.Digest {
+				t.Fatalf("the registry received %d uploads, want the blob bytes twice", len(sent()))
 			}
 			if fmt.Sprint(*waits) != "[1s]" {
 				t.Fatalf("waits = %v, want [1s]", *waits)
@@ -702,8 +712,8 @@ func TestUploadBlobHonorsRetryAfter(t *testing.T) {
 			if err := UploadBlob(context.Background(), testClient(t), registry.server.URL, testToken, "acme/doc-contents", blob); err != nil {
 				t.Fatal(err)
 			}
-			if len(*sent) != 2 || fmt.Sprint(*waits) != want {
-				t.Fatalf("%d uploads waited %v, want 2 uploads that waited %s", len(*sent), *waits, want)
+			if len(sent()) != 2 || fmt.Sprint(*waits) != want {
+				t.Fatalf("%d uploads waited %v, want 2 uploads that waited %s", len(sent()), *waits, want)
 			}
 		})
 	}
@@ -725,8 +735,8 @@ func TestUploadBlobStopsWhenRetryAfterAsksForMoreThanTheCap(t *testing.T) {
 			if want := "blob upload returned 503; the registry asked to wait " + asked + ", more than 30s"; err == nil || err.Error() != want {
 				t.Fatalf("UploadBlob = %v, want %q", err, want)
 			}
-			if len(*sent) != 1 || len(*waits) != 0 {
-				t.Fatalf("%d uploads waited %v, want one upload and no wait", len(*sent), *waits)
+			if len(sent()) != 1 || len(*waits) != 0 {
+				t.Fatalf("%d uploads waited %v, want one upload and no wait", len(sent()), *waits)
 			}
 		})
 	}
@@ -795,8 +805,8 @@ func TestUploadBlobFailsAfterTheAttemptBound(t *testing.T) {
 			if err == nil || err.Error() != tc.want {
 				t.Fatalf("UploadBlob = %v, want %q", err, tc.want)
 			}
-			if len(*sent) != 4 || fmt.Sprint(*waits) != "[1s 2s 4s]" {
-				t.Fatalf("%d uploads waited %v, want 4 uploads that waited [1s 2s 4s]", len(*sent), *waits)
+			if len(sent()) != 4 || fmt.Sprint(*waits) != "[1s 2s 4s]" {
+				t.Fatalf("%d uploads waited %v, want 4 uploads that waited [1s 2s 4s]", len(sent()), *waits)
 			}
 		})
 	}
@@ -814,8 +824,8 @@ func TestUploadBlobFailsAtOnceOnAnotherStatus(t *testing.T) {
 			if want := fmt.Sprintf("blob upload returned %d", status); err == nil || err.Error() != want {
 				t.Fatalf("UploadBlob = %v, want %q", err, want)
 			}
-			if len(*sent) != 1 || len(*waits) != 0 {
-				t.Fatalf("%d uploads waited %v, want one upload and no wait", len(*sent), *waits)
+			if len(sent()) != 1 || len(*waits) != 0 {
+				t.Fatalf("%d uploads waited %v, want one upload and no wait", len(sent()), *waits)
 			}
 		})
 	}
@@ -837,8 +847,8 @@ func TestUploadBlobStopsWhenTheContextEnds(t *testing.T) {
 		if err := UploadBlob(ctx, testClient(t), registry.server.URL, testToken, "acme/doc-contents", blob); !errors.Is(err, context.Canceled) {
 			t.Fatalf("UploadBlob = %v, want context.Canceled", err)
 		}
-		if len(*sent) != 1 {
-			t.Fatalf("%d uploads were sent, want 1", len(*sent))
+		if len(sent()) != 1 {
+			t.Fatalf("%d uploads were sent, want 1", len(sent()))
 		}
 	})
 	t.Run("while the answer arrives", func(t *testing.T) {
@@ -855,8 +865,8 @@ func TestUploadBlobStopsWhenTheContextEnds(t *testing.T) {
 		if err := UploadBlob(ctx, testClient(t), registry.server.URL, testToken, "acme/doc-contents", blob); err == nil {
 			t.Fatal("UploadBlob succeeded after its context ended")
 		}
-		if len(*sent) != 1 || len(*waits) != 0 {
-			t.Fatalf("%d uploads waited %v, want one upload and no wait", len(*sent), *waits)
+		if len(sent()) != 1 || len(*waits) != 0 {
+			t.Fatalf("%d uploads waited %v, want one upload and no wait", len(sent()), *waits)
 		}
 	})
 }
