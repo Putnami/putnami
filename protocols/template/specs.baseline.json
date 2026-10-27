@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "template/manifest-contract#every-fixture-gets-its-verdict",
+    "template/manifest-contract#name-and-description-are-required",
+    "template/manifest-contract#root-declarations-stay-out",
+    "template/manifest-contract#the-lenient-read-answers-identity",
+    "template/manifest-contract#the-strict-parser-refuses-undeclared-members"
+  ]
+}

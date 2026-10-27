@@ -119,7 +119,9 @@ apply the rules of `go.putnami.dev/protocol/qualify` and return the same
 `qualify.*` codes, proven by `test/qualify-conformance.test.ts` over the
 fixture corpus in `protocols/qualify/fixtures`. Only `state === 'passed'`
 (`isQualifyPass`) is a pass; a `passed` verdict without every phase and request
-passed, a matching sha and a clean teardown is refused.
+passed, a matching sha and a clean teardown is refused. These tests prove the
+protocol's feature, `qualify/workload-qualification-contract`, under checks
+named `the-typescript-…`.
 
 ## Maintained contract
 

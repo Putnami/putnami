@@ -112,6 +112,11 @@
         },
         {
           "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/cli-protocol",
+          "producerProject": "/protocols/qualify"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/typescript/framework/runtime",
           "producerProject": "/protocols/runtime"
         },

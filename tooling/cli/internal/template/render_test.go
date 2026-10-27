@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/dirlink"
 )
 
@@ -70,6 +71,7 @@ func TestRenderDirFollowsTheDirectoryLinkATemplateIsInstalledAs(t *testing.T) {
 // configuration, feature, specs and baseline, its installed state and its
 // root dotfiles stay behind; the same names one level down are content.
 func TestRenderDirLeavesOutWhatTheArchiveLeavesOut(t *testing.T) {
+	spectest.Proves(t, "template/manifest-contract", "root-declarations-stay-out", "the-cli-render-leaves-out-the-root-exclusions")
 	src := t.TempDir()
 	for rel, content := range map[string]string{
 		ManifestFilename:          `{"name":"probe"}`,

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "qualify/workload-qualification-contract",
+  "outcomes": [
+    "A Go and a TypeScript reader give the same codes for the same document.",
+    "Two producers derive the same contract, with the same digest, from the same route inventory.",
+    "A verdict names the build it proves, and anything short of a proven pass reads as a non-pass."
+  ],
+  "nonGoals": [
+    "Composing a local target, the command line, its exit codes and its output, which tooling/workload-qualification owns.",
+    "Requesting mutating routes, which needs a safety annotation the route inventory does not carry.",
+    "A member of session.json or of the result envelope: a verdict travels as the envelope's data."
+  ],
+  "requirements": [
+    {
+      "id": "version-1-and-closed-vocabularies",
+      "text": "Contracts and verdicts are protocol version 1. State is the closed vocabulary passed, failed, unsupported, not_run, timed_out, canceled, target_unreachable, digest_mismatch and composition_failed, in which only passed is a pass and ok is no state. The phases are resolve-target, readiness, version-binding, smoke and teardown, in that order. Every validation code and every phase code starts with qualify."
+    },
+    {
+      "id": "one-member-set",
+      "text": "For every object, schemas/contract.json and schemas/verdict.json declare exactly the members of the Go type, and so does the strict decoder's case-sensitive member walk. The verdict schema's state enum, at $defs/state and referenced by state, is the state vocabulary, and its phase name enum is the phase list. Every reader's member shapes, states and phase names match the published schemas."
+    },
+    {
+      "id": "one-fixture-corpus",
+      "text": "fixtures/expectations.json lists exactly the fixtures on disk; a name that starts with contract- is a contract and any other a verdict. Every reader validates each valid fixture without an error and gives each invalid fixture exactly its listed distinct codes, all in the closed validation set. The invalid fixtures hold an unknown and a case-aliased member, a POST request, a wrong digest, version 2, state ok, two incomplete bindings and four passed verdicts without their proof."
+    },
+    {
+      "id": "the-contract-digest-is-canonical",
+      "text": "A contract's digest is sha256: and the lowercase hex SHA-256 of the canonical JSON of its requests: an array, [] when empty, of objects whose members are sorted by name, with no insignificant whitespace and no HTML escaping, so & stays literal. Every reader computes the pinned digests of [] and of the service-to-service fixture."
+    },
+    {
+      "id": "parsing-is-strict",
+      "text": "The Go reader refuses with qualify.parse_error bytes that are not JSON or that a second document follows. Every reader refuses with qualify.parse_error a document that is not an object or has a member of the wrong type. A member the schema does not declare, at any depth, is qualify.unknown_field at its dotted path, such as requests[0].extra."
+    },
+    {
+      "id": "contract-defects-get-their-codes",
+      "text": "Contract validation gives each defect class its code: a version other than 1 is qualify.unsupported_protocol_version, a missing project qualify.required, a source other than http-routes qualify.invalid_source, a malformed digest qualify.invalid_digest, and requests that repeat an id or carry an id other than <method> <path>, a relative path, a maxStatus of 99 or a blank provenance qualify.invalid_request."
+    },
+    {
+      "id": "verdict-defects-get-their-codes",
+      "text": "One code per verdict defect: a url target without url or unknown target kind is invalid_target, an unknown binding kind invalid_binding, a repeated phase or negative phase duration invalid_phase, an unknown phase or request state invalid_state, no project or request id required, status 42 or a negative request duration or count invalid_request, a bad digest invalid_digest, an unknown source kind invalid_source, local time invalid_timestamp, and leftovers on clean or none on partial cleanup invalid_cleanup."
+    },
+    {
+      "id": "a-pass-carries-its-proof",
+      "text": "A passed verdict is refused with qualify.unproven_pass alone when it lacks a phase, has no request, has a phase or request in any other state, has an observed sha that does not start with the expected one, or has a partial cleanup. The unmodified passed-url fixture stays valid."
+    },
+    {
+      "id": "version-1-derives-safe-read-only-requests",
+      "text": "A producer derives a version 1 contract from the putnami.http-routes.v1 inventory and emits only contracts the strict parser admits. It requests each exact, publicEdge route that accepts GET or HEAD once, GET preferred, with maxStatus 499 and the route's provenance, sorted by path and capped at 25. It never requests /livez, /healthz, /readyz or /version, bare or under the platform prefix, nor a path under /debug/pprof or /_putnami."
+    },
+    {
+      "id": "a-verdict-records-every-phase-in-order",
+      "text": "A producer emits only verdicts the strict parser admits. A verdict lists the five phases in order and the contract's requests in contract order, and a phase or request that never started is not_run. The verdict state is passed only when every phase passed; a single phase that did not pass gives the verdict its state, of two failure states the earlier decides, and a verdict with no phase is not_run."
+    },
+    {
+      "id": "a-verdict-binds-to-the-build-it-proves",
+      "text": "An artifact binding records the expected sha and the sha and version /version reports, and passes version-binding only when that sha starts with the expected one; a different or absent sha is digest_mismatch and no smoke request is sent. A tree binding keeps the fingerprint read before the build and passes version-binding only when the worktree still has it once the target is ready; a changed or unreadable tree is digest_mismatch and no request is sent."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0039-derived-smoke-contracts-and-fail-closed-verdicts.md"
+  ]
+}

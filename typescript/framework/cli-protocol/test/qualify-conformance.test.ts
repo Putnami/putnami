@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { specTest } from '@putnami/spectest';
@@ -11,6 +11,9 @@ import {
   QUALIFY_STATES,
   QUALIFY_VERDICT_SCHEMA_ID,
   QUALIFY_VIOLATION_CODE,
+  type QualifyContract,
+  type QualifyRequest,
+  type QualifySource,
   type QualifyVerdict,
   qualifyContractDigest,
   validateQualifyContract,
@@ -27,10 +30,47 @@ import {
 
 const PROTOCOL_DIR = join(__dirname, '../../../../protocols/qualify');
 const FIXTURES = join(PROTOCOL_DIR, 'fixtures');
-const BINDING = {
-  feature: 'typescript/cli-machine-output',
-  requirement: 'qualify-verdict-wire',
-  check: 'shared-qualify-corpus-and-digest',
+// Each test proves a requirement of the qualify protocol's feature under a
+// check of this package's own.
+const SHAPES = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'one-member-set',
+  check: 'the-typescript-shapes-and-vocabulary-match-the-schemas',
+};
+const CORPUS_LIST = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'one-fixture-corpus',
+  check: 'the-typescript-corpus-is-what-expectations-lists',
+};
+const FIXTURE_CODES = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'one-fixture-corpus',
+  check: 'the-typescript-reader-gives-every-fixture-its-listed-codes',
+};
+const DIGEST = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'the-contract-digest-is-canonical',
+  check: 'the-typescript-digest-matches-the-pins',
+};
+const NON_DOCUMENTS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'parsing-is-strict',
+  check: 'the-typescript-reader-refuses-non-documents',
+};
+const CONTRACT_DEFECTS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'contract-defects-get-their-codes',
+  check: 'the-typescript-reader-refuses-malformed-contracts',
+};
+const VERDICT_DEFECTS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'verdict-defects-get-their-codes',
+  check: 'the-typescript-reader-gives-each-verdict-defect-its-code',
+};
+const UNPROVEN_PASS = {
+  feature: 'qualify/workload-qualification-contract',
+  requirement: 'a-pass-carries-its-proof',
+  check: 'the-typescript-reader-refuses-an-unproven-pass',
 };
 
 interface Expectations {
@@ -59,7 +99,7 @@ function fixtureVerdict(name: string): QualifyVerdict {
 }
 
 describe('qualify conformance corpus', () => {
-  test('expectations list every fixture on disk and nothing else', () => {
+  specTest('expectations list every fixture on disk and nothing else', CORPUS_LIST, () => {
     expect(readdirSync(join(FIXTURES, 'valid')).sort()).toEqual([...expectations.valid].sort());
     expect(readdirSync(join(FIXTURES, 'invalid')).sort()).toEqual(Object.keys(expectations.invalid).sort());
     expect(expectations.valid.length).toBeGreaterThan(0);
@@ -67,13 +107,13 @@ describe('qualify conformance corpus', () => {
   });
 
   for (const name of expectations.valid) {
-    specTest(`valid/${name} validates cleanly`, BINDING, async () => {
+    specTest(`valid/${name} validates cleanly`, FIXTURE_CODES, async () => {
       expect(await validateFixture(name, readJSON(join(FIXTURES, 'valid', name)))).toEqual([]);
     });
   }
 
   for (const [name, codes] of Object.entries(expectations.invalid)) {
-    specTest(`invalid/${name} produces ${codes.join(', ')}`, BINDING, async () => {
+    specTest(`invalid/${name} produces ${codes.join(', ')}`, FIXTURE_CODES, async () => {
       const violations = await validateFixture(name, readJSON(join(FIXTURES, 'invalid', name)));
       expect(distinctCodes(violations)).toEqual(codes);
       for (const code of distinctCodes(violations)) {
@@ -82,7 +122,7 @@ describe('qualify conformance corpus', () => {
     });
   }
 
-  specTest('the contract digest bytes match the Go pin', BINDING, async () => {
+  specTest('the contract digest bytes match the Go pin', DIGEST, async () => {
     expect(await qualifyContractDigest([])).toBe(
       'sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
     );
@@ -150,7 +190,7 @@ describe('qualify vocabulary and schema drift', () => {
     }
   }
 
-  specTest('the twin vocabulary and shapes match the published schemas', BINDING, () => {
+  specTest('the twin vocabulary and shapes match the published schemas', SHAPES, () => {
     expect(QUALIFY_PROTOCOL_VERSION).toBe(1);
     expect(verdictSchema.$id).toBe(QUALIFY_VERDICT_SCHEMA_ID);
     expect(contractSchema.$id).toBe(QUALIFY_CONTRACT_SCHEMA_ID);
@@ -169,7 +209,7 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     return JSON.parse(JSON.stringify(value)) as T;
   }
 
-  test('a passed verdict refuses every non-pass phase and request state', () => {
+  specTest('a passed verdict refuses every non-pass phase and request state', UNPROVEN_PASS, () => {
     const base = fixtureVerdict('passed-url.json');
     expect(validateQualifyVerdict(base)).toEqual([]);
     for (const [index] of base.phases.entries()) {
@@ -186,12 +226,28 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
         expect(distinctCodes(validateQualifyVerdict(verdict))).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
       }
     }
-    const partial = clone(base);
-    partial.cleanup = { state: 'partial', leftovers: ['database compose_x'] };
-    expect(distinctCodes(validateQualifyVerdict(partial))).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
+    const proofless: Record<string, (v: QualifyVerdict) => void> = {
+      'partial cleanup': (v) => {
+        v.cleanup = { state: 'partial', leftovers: ['database compose_x'] };
+      },
+      'no teardown phase': (v) => {
+        v.phases = v.phases.filter((phase) => phase.name !== 'teardown');
+      },
+      'no request': (v) => {
+        v.requests = [];
+      },
+      'a different observed sha': (v) => {
+        v.binding.observedSHA = '0000000000000000000000000000000000000000';
+      },
+    };
+    for (const [name, mutate] of Object.entries(proofless)) {
+      const verdict = clone(base);
+      mutate(verdict);
+      expect(distinctCodes(validateQualifyVerdict(verdict)), name).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
+    }
   });
 
-  test('non-documents are parse errors', async () => {
+  specTest('non-documents are parse errors', NON_DOCUMENTS, async () => {
     for (const input of [[], null, 'text', { protocolVersion: '1' }]) {
       expect(distinctCodes(validateQualifyVerdict(input))).toEqual([QUALIFY_VIOLATION_CODE.parseError]);
       expect(distinctCodes(await validateQualifyContract(input))).toEqual([QUALIFY_VIOLATION_CODE.parseError]);
@@ -200,25 +256,59 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     expect(nested).toEqual([{ code: QUALIFY_VIOLATION_CODE.unknownField, path: 'requests[0].extra' }]);
   });
 
-  test('malformed contract requests', async () => {
-    const violations = await validateQualifyContract({
-      protocolVersion: 2,
-      derivedFrom: [{ kind: 'openapi' }],
-      requests: [
-        { id: 'GET /a', method: 'GET', path: '/a', maxStatus: 499, provenance: 'typed-api' },
-        { id: 'GET /a', method: 'GET', path: '/a', maxStatus: 499, provenance: 'typed-api' },
-        { id: 'wrong', method: 'HEAD', path: 'b', maxStatus: 99, provenance: ' ' },
-      ],
-      digest: 'sha256:not-hex',
-    });
-    expect(distinctCodes(violations)).toEqual([
-      QUALIFY_VIOLATION_CODE.invalidDigest,
-      QUALIFY_VIOLATION_CODE.invalidRequest,
+  // One member of a valid contract mutated per case, pinning the one code and
+  // the one path it gives. A case that changes the requests recomputes the
+  // digest, so only its defect shows.
+  const contractBase = readJSON(join(FIXTURES, 'valid', 'contract-service-to-service.json')) as QualifyContract;
+  const contractRules: Record<string, [(c: QualifyContract) => void, string, string]> = {
+    'version 2': [(c) => (c.protocolVersion = 2), QUALIFY_VIOLATION_CODE.unsupportedProtocolVersion, 'protocolVersion'],
+    'missing project': [(c) => (c.project = ''), QUALIFY_VIOLATION_CODE.required, 'project'],
+    'openapi source': [
+      (c) => ((c.derivedFrom[0] as QualifySource).kind = 'openapi'),
       QUALIFY_VIOLATION_CODE.invalidSource,
-      QUALIFY_VIOLATION_CODE.required,
-      QUALIFY_VIOLATION_CODE.unsupportedProtocolVersion,
-    ]);
-  });
+      'derivedFrom[0].kind',
+    ],
+    'malformed digest': [(c) => (c.digest = 'sha256:not-hex'), QUALIFY_VIOLATION_CODE.invalidDigest, 'digest'],
+    'repeated id': [
+      (c) => c.requests.push({ ...(c.requests[0] as QualifyRequest) }),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      `requests[${contractBase.requests.length}].id`,
+    ],
+    'id not method path': [
+      (c) => ((c.requests[0] as QualifyRequest).id = 'wrong'),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].id',
+    ],
+    'relative path': [
+      (c) => {
+        const request = c.requests[0] as QualifyRequest;
+        request.path = 'items';
+        request.id = `${request.method} items`;
+      },
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].path',
+    ],
+    'maxStatus 99': [
+      (c) => ((c.requests[0] as QualifyRequest).maxStatus = 99),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].maxStatus',
+    ],
+    'blank provenance': [
+      (c) => ((c.requests[0] as QualifyRequest).provenance = ' '),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].provenance',
+    ],
+  };
+  for (const [name, [mutate, code, path]] of Object.entries(contractRules)) {
+    specTest(`contract rule: ${name}`, CONTRACT_DEFECTS, async () => {
+      const contract = clone(contractBase);
+      mutate(contract);
+      if (code !== QUALIFY_VIOLATION_CODE.invalidDigest) {
+        contract.digest = await qualifyContractDigest(contract.requests);
+      }
+      expect(await validateQualifyContract(contract)).toEqual([{ code, path }]);
+    });
+  }
 
   const shapeRules: Record<string, [(v: QualifyVerdict) => void, string]> = {
     'url target without url': [(v) => (v.target.url = undefined), QUALIFY_VIOLATION_CODE.invalidTarget],
@@ -267,7 +357,7 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     ],
   };
   for (const [name, [mutate, code]] of Object.entries(shapeRules)) {
-    test(`shape rule: ${name}`, () => {
+    specTest(`shape rule: ${name}`, VERDICT_DEFECTS, () => {
       const verdict = clone(fixtureVerdict('digest-mismatch.json'));
       mutate(verdict);
       expect(distinctCodes(validateQualifyVerdict(verdict))).toEqual([code]);

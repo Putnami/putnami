@@ -1,0 +1,95 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "template",
+  "features": [
+    {
+      "id": "template/manifest-contract",
+      "type": "feature",
+      "name": "Template manifest contract",
+      "outcome": "A tool lists, validates, packages, installs and renders a template from one strict putnami.template.json that declares the template's identity and none of the engine's behaviour, and every tool leaves the same root declarations out of the project.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-strict-parser-refuses-undeclared-members",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-manifest-parses",
+              "an-undeclared-member-is-refused-with-no-manifest",
+              "input-that-is-not-json-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "name-and-description-are-required",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-missing-member-is-its-own-error",
+              "a-nil-manifest-is-refused",
+              "name-and-description-suffice",
+              "an-empty-or-version-only-manifest-is-refused",
+              "the-cli-validate-refuses-an-empty-or-version-only-manifest",
+              "the-cli-validate-accepts-a-manifest-with-a-name-and-a-description"
+            ]
+          }
+        },
+        {
+          "id": "every-fixture-gets-its-verdict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates",
+              "every-invalid-fixture-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "the-lenient-read-answers-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-lenient-read-returns-the-identity",
+              "the-lenient-read-keeps-a-manifest-the-strict-parser-refuses",
+              "the-lenient-read-fails-without-a-json-file"
+            ]
+          }
+        },
+        {
+          "id": "root-declarations-stay-out",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-root-exclusions-are-pinned",
+              "the-cli-render-leaves-out-the-root-exclusions",
+              "the-cli-archive-leaves-out-the-root-exclusions",
+              "the-scaffold-archive-leaves-out-the-root-exclusions"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

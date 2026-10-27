@@ -146,18 +146,16 @@ Evidence still missing for `stable`:
 - only one implementation exists, so the contract has never been read by a
   second runtime.
 
-## Product feature and durable decisions
+## Feature and spec
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcome — "scaffold a new project that builds" — is owned by the
-`projects create` and `templates` command surface of `@putnami/cli` and by the
-templates themselves; this module only fixes the metadata those surfaces read.
-Minting a product feature per protocol module would create one artificial
-identity per technical boundary, which the
-[feature protocol's authoring boundary](../features/README.md) rules out. With
-no feature to detail there is no spec, since a spec details exactly one
-already-authored feature and never mints one.
-
-Durable decisions:
-
-- [ADR 0001 — The template manifest declares identity, not behaviour](doc/adr/0001-manifest-declares-identity-only.md)
+The module owns the feature of its contract, `template/manifest-contract`,
+specified in [`specs/manifest-contract.json`](specs/manifest-contract.json).
+The tests here prove the strict parser, the two required members, the fixture
+corpus, the lenient read and the root entries that stay out of what a template
+ships. The CLI (`tooling/cli`) proves under its own `the-cli-…` checks that
+`templates validate` refuses a manifest without a name and accepts one with a
+name and a description, and that rendering and packaging leave the root
+exclusions out. `@putnami/scaffold` (`tooling/scaffold`) proves under its own
+`the-scaffold-…` check that its template archive leaves them out too. The
+design intent is
+[ADR 0001 — The template manifest declares identity, not behaviour](doc/adr/0001-manifest-declares-identity-only.md).

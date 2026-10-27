@@ -19,10 +19,6 @@
       "text": "Session placement is optional for older records. When present it records both requested and actual execution as local or remote, including a remote request executed locally; malformed values are rejected without changing the session tree identity."
     },
     {
-      "id": "qualify-verdict-wire",
-      "text": "TypeScript and Go validate the same workload-qualification contract and verdict corpus and emit the same qualify.* codes: unknown or case-aliased members, a state outside the closed vocabulary, and a passed verdict without every phase and request passed, a matching sha and a clean teardown are refused. Both compute the same contract digest bytes."
-    },
-    {
       "id": "session-reporter-wire",
       "text": "TypeScript and Go parse the same session-reporter chunk and ACK corpus, verify the bounded base64 payload and SHA-256 digest, and match every per-artifact sequence/offset identity field without introducing a second session result shape."
     },

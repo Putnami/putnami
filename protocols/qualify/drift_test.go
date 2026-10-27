@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func readVerdictFixture(t *testing.T, name string) *Verdict {
@@ -101,6 +102,7 @@ func jsonFieldNames(value any) []string {
 // TestDrift_SchemasMatchGoTypes keeps the published schemas and the Go types
 // on one member set, so neither can gain a wire field the other lacks.
 func TestDrift_SchemasMatchGoTypes(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "one-member-set", "the-schemas-declare-the-go-members")
 	contract := readSchema(t, "contract.json")
 	verdict := readSchema(t, "verdict.json")
 	phases := verdict.Properties["phases"].Items
@@ -147,6 +149,7 @@ func TestDrift_SchemasMatchGoTypes(t *testing.T) {
 // with the Go types, so strictDecode never refuses a member the type declares
 // or admits one it does not.
 func TestDrift_ShapesMatchGoTypes(t *testing.T) {
+	spectest.Proves(t, "qualify/workload-qualification-contract", "one-member-set", "the-strict-walk-declares-the-go-members")
 	cases := []struct {
 		name   string
 		shape  *member
@@ -173,5 +176,21 @@ func TestDrift_ShapesMatchGoTypes(t *testing.T) {
 		if want := jsonFieldNames(tc.goType); !slices.Equal(names, want) {
 			t.Errorf("%s: shape members %v, Go members %v", tc.name, names, want)
 		}
+		// The walk is case-sensitive: a member spelled with its first letter's
+		// case flipped is undeclared, where encoding/json would accept it.
+		for _, name := range names {
+			alias := flipFirstLetterCase(name)
+			if field, ok := firstUnknownMember(map[string]any{alias: nil}, tc.shape, ""); ok || field != alias {
+				t.Errorf("%s: the walk admits the case alias %q of %q", tc.name, alias, name)
+			}
+		}
 	}
+}
+
+func flipFirstLetterCase(name string) string {
+	first := name[:1]
+	if upper := strings.ToUpper(first); upper != first {
+		return upper + name[1:]
+	}
+	return strings.ToLower(first) + name[1:]
 }
