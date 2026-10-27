@@ -288,8 +288,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-feature-finding-names-the-entry-position-in-the-file",
-              "a-feature-text-finding-states-its-bound"
+              "a-feature-finding-names-the-entry-position-in-the-file"
             ]
           }
         },

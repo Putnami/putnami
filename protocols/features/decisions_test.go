@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func reviewOnlyMark() *bool {
@@ -75,6 +76,7 @@ func TestDecisionRegistryRoundTripsCanonically(t *testing.T) {
 // three shapes a reader must never guess at: a wrong or missing protocol
 // version, an unknown member, and an explicit null.
 func TestDecisionRegistryIsStrictOnTheWire(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "ratchets-and-decisions", "the-decision-registry-reader-is-strict")
 	valid := `{"protocolVersion":1,"decisions":[{"id":"D-1","statement":"s","settled":"2026-01-02","settledBy":"a","reviewOnly":true}]}`
 	if registry, findings := ParseAndValidateDecisionRegistry([]byte(valid)); registry == nil || diag.HasErrors(findings) {
 		t.Fatalf("valid registry rejected: %v", findings)
@@ -99,6 +101,7 @@ func TestDecisionRegistryIsStrictOnTheWire(t *testing.T) {
 // a settled decision be silently unenforceable is a registry error, not a
 // skipped entry.
 func TestDecisionRegistryValidationFailsClosed(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "ratchets-and-decisions", "a-decision-that-cannot-be-enforced-is-a-registry-error")
 	neither := scaleToZero()
 	neither.Check = nil
 	both := scaleToZero()
@@ -245,6 +248,7 @@ func TestResolveJSONPointerFollowsRFC6901(t *testing.T) {
 // TestEvaluateDecisionCheckJudgesOneFile is the heart of the gate: what counts
 // as a violation, and what deliberately does not.
 func TestEvaluateDecisionCheckJudgesOneFile(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "ratchets-and-decisions", "a-decision-check-judges-one-file-and-fails-closed")
 	check := scaleToZero().Check
 
 	violating := EvaluateDecisionCheck(check, []byte(`{"scaling":{"minInstances":1}}`))
