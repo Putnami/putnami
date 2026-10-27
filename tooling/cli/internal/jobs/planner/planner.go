@@ -18,6 +18,12 @@ import (
 
 // Plan computes the full execution plan for the given commands and projects.
 // It resolves extensions, expands pipelines, and builds the dependency graph.
+//
+// changedFiles is the run's measured diff, workspace-relative, and nil when
+// the run measured none (`--all`, `--projects`). A step that gates on the
+// changed files (activation.changedFiles) or binds them (a context binding)
+// reads the ones each project owns, so the same diff plans and keys the same
+// steps wherever it is planned.
 func Plan(
 	ws *workspace.Workspace,
 	commands []string,
@@ -26,6 +32,7 @@ func Plan(
 	commandParams map[string]any,
 	disabledJobs []string,
 	disabledExtensions []string,
+	changedFiles []string,
 ) ([]*jobmodel.ScheduledJob, error) {
 	jobMap := extension.BuildJobMap(extensions)
 	commands = extension.ExpandAlsoRunCommands(commands, jobMap)
@@ -37,6 +44,7 @@ func Plan(
 	// so activation-file probes for the same (extension, project) pair are
 	// computed once per Plan invocation.
 	cache := newPlanCache()
+	cache.ownedChangedFiles = workspace.OwnedChangedFiles(ws, changedFiles)
 	for _, project := range ws.Projects {
 		cache.projectRoots[filepath.Clean(filepath.Join(ws.Root, filepath.FromSlash(project.Path)))] = true
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestInvalidFixtureCoverage enforces the "corpus is the spec" contract:
@@ -19,6 +20,7 @@ import (
 // relaxation of a validation rule turns a red fixture green and fails
 // this test.
 func TestInvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-parser-is-strict", "every-data-point-reject-branch-has-a-fixture")
 	metricsParse := func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateMetrics(b); return d }
 
 	// Every invalid metrics fixture must be rejected, and we collect the set of

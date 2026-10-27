@@ -112,7 +112,7 @@ func TestPlan_DependentsWaitForTheGeneratedClientWriter(t *testing.T) {
 		t.Run(commands[0]+"-"+commands[len(commands)-1], func(t *testing.T) {
 			ws, selected := dependentsWorkspace(t)
 			planned, err := Plan(ws, commands, selected,
-				[]*extension.ExtensionDescription{goExtension, loadClientgenExtension(t)}, nil, nil, nil)
+				[]*extension.ExtensionDescription{goExtension, loadClientgenExtension(t)}, nil, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("plan %v: %v", commands, err)
 			}
@@ -120,7 +120,7 @@ func TestPlan_DependentsWaitForTheGeneratedClientWriter(t *testing.T) {
 				t.Fatalf("plan %v is not a DAG: %v", commands, err)
 			}
 			before, err := Plan(ws, commands, selected,
-				[]*extension.ExtensionDescription{goExtension, clientgenWithoutReadByDependents(t)}, nil, nil, nil)
+				[]*extension.ExtensionDescription{goExtension, clientgenWithoutReadByDependents(t)}, nil, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("plan %v without readByDependents: %v", commands, err)
 			}

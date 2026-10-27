@@ -224,6 +224,12 @@ export interface ErrorInfo {
 /** Structured error carried by a failed result. */
 export interface JobError {
   message?: string;
+  /**
+   * Machine-readable failure identifier. `host-unsupported` reports that this
+   * host cannot run the job at all: the failure describes the host, not the
+   * job's inputs, and a consumer that caches failures by input never records
+   * one. Every other value is the producer's own.
+   */
   code?: string;
   /**
    * True when the failure is a deadline the producer's own tool enforced,

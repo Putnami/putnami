@@ -2,8 +2,10 @@
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/web",
   "visibility": "public",
+  "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/http-routes"],
   "options": {
     "package": {
       "npm": true

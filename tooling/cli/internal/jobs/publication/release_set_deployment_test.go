@@ -279,7 +279,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	plan := func(params extension.ParamMap) []*jobmodel.ScheduledJob {
 		t.Helper()
 		planned, err := planner.Plan(ws, []string{"package"}, []*workspace.Project{app},
-			[]*extension.ExtensionDescription{goExtension}, params, nil, nil)
+			[]*extension.ExtensionDescription{goExtension}, params, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("plan package: %v", err)
 		}
@@ -409,7 +409,7 @@ func TestARoutedImageKeepsTheDeploymentMemberKeyable(t *testing.T) {
 	ws.Graph = workspace.BuildGraph(ws.Projects)
 
 	planned, err := planner.Plan(ws, []string{"publish"}, []*workspace.Project{app},
-		[]*extension.ExtensionDescription{goExtension, imagePackager}, nil, nil, nil)
+		[]*extension.ExtensionDescription{goExtension, imagePackager}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan publish: %v", err)
 	}

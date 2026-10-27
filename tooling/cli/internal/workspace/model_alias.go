@@ -190,6 +190,10 @@ var ChangeImpact = model.ChangeImpact
 // claims it as an asset.
 var ProjectOwnersForPath = model.ProjectOwnersForPath
 
+// OwnedChangedFiles returns, for each project that holds a changed file in its
+// own directory, those files relative to the project, sorted and unique.
+var OwnedChangedFiles = model.OwnedChangedFiles
+
 // CollectProjectAssetPaths resolves cross-project asset source paths.
 var CollectProjectAssetPaths = model.CollectProjectAssetPaths
 

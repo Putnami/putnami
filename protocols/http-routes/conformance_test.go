@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 type fixtureExpectations struct {
@@ -29,6 +30,7 @@ func loadExpectations(t *testing.T) fixtureExpectations {
 }
 
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "an-inventory-fails-closed", "every-valid-fixture-validates")
 	expectations := loadExpectations(t)
 	assertFixtureCoverage(t, "fixtures/valid", expectations.Valid)
 	for _, name := range expectations.Valid {
@@ -49,6 +51,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "an-inventory-fails-closed", "every-invalid-fixture-fails-with-its-code")
 	expectations := loadExpectations(t)
 	names := make([]string, 0, len(expectations.Invalid))
 	for name := range expectations.Invalid {
@@ -79,6 +82,7 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 }
 
 func TestConformance_ErrorTaxonomy(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "an-inventory-fails-closed", "every-expected-code-is-registered")
 	for code := range ValidErrorCodes {
 		if code == "" {
 			t.Fatal("empty diagnostic code")

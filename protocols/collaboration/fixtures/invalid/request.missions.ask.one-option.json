@@ -1,0 +1,6 @@
+{
+  "mission": { "repository": "putnami/putnami", "key": "issue-596" },
+  "question": "Ship now?",
+  "options": [{ "id": "yes", "label": "Ship" }],
+  "idempotencyKey": "issue-596/ask/ship"
+}

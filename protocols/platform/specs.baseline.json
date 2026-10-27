@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "platform/operational-endpoints#ok-is-200-and-the-rest-is-503",
+    "platform/operational-endpoints#pprof-is-opt-in",
+    "platform/operational-endpoints#prefixes-normalize-to-one-form",
+    "platform/operational-endpoints#probes-are-discovered-and-bounded",
+    "platform/operational-endpoints#the-endpoint-set-is-canonical",
+    "platform/operational-endpoints#the-envelope-states-one-status",
+    "platform/operational-endpoints#the-error-codes-are-a-closed-set",
+    "platform/operational-endpoints#the-version-is-pinned"
+  ]
+}

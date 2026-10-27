@@ -23,8 +23,8 @@
     "cliContract": {
       "type": "integer",
       "minimum": 4,
-      "maximum": 15,
-      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, and contract 15 a command group whose default subcommand declares positionals. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+      "maximum": 17,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, contract 15 a command group whose default subcommand declares positionals, contract 16 a step that gates on the run's changed files (activation.changedFiles) or binds them (a from: context input binding), and contract 17 a hostHooks member. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
       "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. The CLI installs, pins and loads each registry name (@scope/name) for an extension installed from the artifact store or declared by path, and leaves any other name to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
@@ -98,6 +98,9 @@
     "agentContent": {
       "$ref": "#/$defs/agentContentContribution"
     },
+    "hostHooks": {
+      "$ref": "#/$defs/hostHooksDeclaration"
+    },
     "verbs": {
       "type": "array",
       "minItems": 1,
@@ -131,6 +134,127 @@
     }
   },
   "$defs": {
+    "hostHooksDeclaration": {
+      "type": "object",
+      "description": "Hooks this extension asks the agent hosts to run. Each hook runs one interactive subcommand of this extension through the workspace's launcher. An explicit putnami install, init or upgrade writes them into .claude/settings.json and .codex/hooks.json, only for a workspace that opts into this extension's agent content and binds the collaboration contract named in requires. Declaring it requires cliContract 17 and agentContent.",
+      "additionalProperties": false,
+      "required": ["requires", "command", "hosts"],
+      "properties": {
+        "requires": {
+          "$ref": "#/$defs/hostHooksRequirement"
+        },
+        "command": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "description": "Path of the subcommand every hook runs, from its command group down: [\"agent\", \"hook\"] runs putnami agent hook. It names an interactive subcommand of this manifest."
+        },
+        "hosts": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "description": "The hooks per agent host. The hosts are a closed list.",
+          "properties": {
+            "claude-code": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/hostHookEntry"
+              }
+            },
+            "codex": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/hostHookEntry"
+              }
+            }
+          }
+        }
+      }
+    },
+    "hostHooksRequirement": {
+      "type": "object",
+      "description": "What a workspace provides before the CLI writes the hooks.",
+      "additionalProperties": false,
+      "required": ["contract"],
+      "properties": {
+        "contract": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$",
+          "description": "Collaboration contract the hooks call. The CLI writes the hooks only when the workspace binds it under options.collaboration.<contract>."
+        }
+      }
+    },
+    "hostHookEntry": {
+      "type": "object",
+      "description": "One hook: the host event it runs at and how the command is called there. A PostToolUse hook names at least one tool or MCP tool.",
+      "additionalProperties": false,
+      "required": ["event", "timeoutSeconds"],
+      "allOf": [
+        {
+          "if": {
+            "required": ["event"],
+            "properties": {
+              "event": { "const": "PostToolUse" }
+            }
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["tools"], "properties": { "tools": { "minItems": 1 } } },
+              { "required": ["mcpTools"], "properties": { "mcpTools": { "minItems": 1 } } }
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": ["SessionStart", "PostToolUse", "Stop", "StopFailure"],
+          "description": "Host event the hook runs at. Claude Code runs SessionStart, PostToolUse, Stop and StopFailure; Codex runs SessionStart, PostToolUse and Stop."
+        },
+        "tools": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "description": "PostToolUse only: host tools the hook runs after."
+        },
+        "mcpTools": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+          },
+          "description": "PostToolUse only: Putnami MCP tools the hook runs after, as declared (missions.ask). The CLI renders each one as the host names it."
+        },
+        "args": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_./:=-]+$"
+          },
+          "description": "Arguments the command receives after its path."
+        },
+        "wake": {
+          "type": "boolean",
+          "description": "Claude Code only: start a turn when the command exits 75. Every other exit code leaves the session as it is."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "How long the host lets the hook run."
+        }
+      }
+    },
     "agentContentContribution": {
       "type": "object",
       "description": "Agent instructions this extension ships under its own version: skills, worker profiles, references and helpers with their host adapters. The built content is an agent-artifact tree (putnami.agent-artifact.json plus the files it declares) under path. The authored form names its source; the packaged form binds the built tree by manifestSha256. Declaring it requires cliContract 5, and a workspace receives the content only when it opts in.",
@@ -946,7 +1070,7 @@
     "finalizesRelation": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Explicit invocation-resource cleanup relation. Producer start arms exactly this finalizer; cleanup waits until every consumer reaches a terminal state.",
+      "description": "Explicit invocation-resource cleanup relation. Producer start arms exactly this finalizer; cleanup waits until every consumer the plan holds reaches a terminal state.",
       "required": [
         "producer",
         "consumers"
@@ -990,6 +1114,10 @@
         "contains": {
           "$ref": "#/$defs/stringMap",
           "description": "Map of project-relative file path to a required substring; the step is active only if every file exists and contains its substring."
+        },
+        "changedFiles": {
+          "$ref": "#/$defs/globArray",
+          "description": "Step is active only if at least one of the run's changed files that the project owns, project-relative, matches one of these globs. A run that measured no diff (--all, --projects) has no changed file and plans no gated step. Requires cliContract 16."
         }
       }
     },
@@ -1014,13 +1142,15 @@
             "from": {
               "type": "string",
               "enum": [
-                "command",
                 "context"
               ]
             },
             "path": {
               "type": "string",
-              "description": "JSONPath-like selector."
+              "enum": [
+                "selection.changedFiles"
+              ],
+              "description": "Planner fact to bind. selection.changedFiles is the run's changed files that the target project owns, as sorted, unique, project-relative slash paths; a run that measured no diff binds no value. Requires cliContract 16."
             },
             "default": {}
           }

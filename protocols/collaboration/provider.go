@@ -24,7 +24,7 @@ const contractMetaKey = "putnami.dev/contract"
 
 // ProviderDeclaration is the value of a tool's ProviderMetaKey.
 type ProviderDeclaration struct {
-	// Contract is the contract the tool implements (tasks, proposals, memory).
+	// Contract is the contract the tool implements (tasks, proposals, memory, missions).
 	Contract string `json:"contract"`
 	// Version is the contract version the tool implements.
 	Version int `json:"version"`
@@ -271,7 +271,7 @@ func validPreconditions(value Preconditions) bool {
 
 // OperationKey names one operation of one contract version.
 type OperationKey struct {
-	// Contract is the contract name (tasks, proposals, memory).
+	// Contract is the contract name (tasks, proposals, memory, missions).
 	Contract string
 	// Version is the contract version.
 	Version int
@@ -489,10 +489,26 @@ func pageRequestOf(input any) *PageRequest {
 	return *page
 }
 
-// emptyListsAsEmpty turns a list result's nil items into the empty list the
+// emptyListsAsEmpty turns a result's nil lists into the empty lists the
 // contract requires, so a handler that found nothing may return a nil slice.
 func emptyListsAsEmpty(result any) {
 	switch list := result.(type) {
+	case *MissionsSyncResult:
+		if list.Mission.Plan.Steps == nil {
+			list.Mission.Plan.Steps = []PlanStep{}
+		}
+		if list.Mission.OpenDecisions == nil {
+			list.Mission.OpenDecisions = []OpenDecision{}
+		}
+		if list.Inbox == nil {
+			list.Inbox = []InboxMessage{}
+		}
+		if list.Decisions == nil {
+			list.Decisions = []DecisionStatus{}
+		}
+		if list.Replies == nil {
+			list.Replies = []ReplyStatus{}
+		}
 	case *TaskListResult:
 		if list.Items == nil {
 			list.Items = []Task{}

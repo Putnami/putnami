@@ -1,0 +1,35 @@
+{
+  "session_id": "ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8",
+  "transcript_path": "/home/agent/.claude/projects/-work-repo/ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8.jsonl",
+  "cwd": "/work/repo",
+  "prompt_id": "50054e58-1cf4-49cf-a268-3df3069ab5e6",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "TodoWrite",
+  "tool_input": {
+    "todos": [
+      {
+        "content": "Read the hook docs",
+        "status": "in_progress",
+        "activeForm": "Reading the hook docs"
+      }
+    ]
+  },
+  "tool_response": {
+    "oldTodos": [],
+    "newTodos": [
+      {
+        "content": "Read the hook docs",
+        "status": "in_progress",
+        "activeForm": "Reading the hook docs"
+      }
+    ]
+  },
+  "tool_use_id": "toolu_01Subagent0000000000000000",
+  "duration_ms": 1,
+  "agent_id": "a5f0c2e9d1b7a3c48",
+  "agent_type": "Explore"
+}

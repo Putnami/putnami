@@ -36,6 +36,7 @@ func eventsMention(events []map[string]any, substring string) bool {
 // half: one shared fragment directory, two members, and each member's report
 // carries exactly its own project's observations at its own output path.
 func TestAttachBatchVerificationKeepsPerProjectAttribution(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-go-batch-gives-each-member-its-own-report")
 	workspace := t.TempDir()
 	alphaRoot := filepath.Join(workspace, "alpha")
 	betaRoot := filepath.Join(workspace, "beta")
@@ -156,6 +157,7 @@ replace go.putnami.dev/protocol/diagnostic => `+filepath.Join(repoRoot, "protoco
 // Run, must publish the reserved report artifact with the passing
 // observation resolved to project-relative provenance.
 func TestRun_EndToEndSpecVerification(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-go-test-job-publishes-the-report-of-a-bound-test")
 	dir, ctx := specTestModule(t, "specmod")
 	mustWrite(t, filepath.Join(dir, "specmod.go"), "package specmod\n\nfunc Holds() bool { return true }\n")
 	mustWrite(t, filepath.Join(dir, "specmod_test.go"), `package specmod

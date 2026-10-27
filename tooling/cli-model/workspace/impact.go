@@ -3,6 +3,7 @@ package workspace
 import (
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -1231,6 +1232,45 @@ func ProjectOwnersForPath(ws *Workspace, path string) []*Project {
 		}
 	}
 	return out
+}
+
+// OwnedChangedFiles returns, for each project that holds a changed file in
+// its own directory, those files relative to the project, in slash form,
+// sorted and unique. It is the change a project's own step reads: a project
+// owns a file here only through its directory, the nearest one that holds a
+// project, so a nested project's files are the nested project's, and an asset
+// claim, a declared input, a scope config or a watched root file adds no file.
+// A project reached only through a dependency edge holds none, and a nil or
+// empty list answers nil.
+func OwnedChangedFiles(ws *Workspace, changedFiles []string) map[string][]string {
+	if ws == nil || len(changedFiles) == 0 {
+		return nil
+	}
+	seeds, _ := classifyChangedPaths(ws, changedFiles, ownershipByPath)
+	var owned map[string][]string
+	for _, p := range ws.Projects {
+		dir := filepath.ToSlash(cleanIndexPath(p.Path))
+		var files []string
+		for _, seed := range seeds[p.ID] {
+			if seed.Kind != ImpactSeedPathOwner || seed.Via != dir || seed.File == dir {
+				continue
+			}
+			rel := seed.File
+			if dir != "." {
+				rel = strings.TrimPrefix(rel, dir+"/")
+			}
+			files = append(files, rel)
+		}
+		if len(files) == 0 {
+			continue
+		}
+		sort.Strings(files)
+		if owned == nil {
+			owned = make(map[string][]string)
+		}
+		owned[p.ID] = slices.Compact(files)
+	}
+	return owned
 }
 
 // projectOwnerIndex answers which projects own a workspace-relative path by

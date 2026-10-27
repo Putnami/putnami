@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "http-routes/route-inventory-contract#an-inventory-fails-closed",
+    "http-routes/route-inventory-contract#producers-emit-valid-inventories",
+    "http-routes/route-inventory-contract#the-identifiers-are-pinned",
+    "http-routes/route-inventory-contract#the-serialization-is-canonical",
+    "http-routes/route-inventory-contract#visibility-never-widens"
+  ]
+}

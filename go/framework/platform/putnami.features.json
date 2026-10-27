@@ -12,20 +12,6 @@
       "target": "modeled",
       "requirements": [
         {
-          "id": "bounded-probes",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "probes-run-in-parallel-each-under-its-own-timeout",
-              "a-probe-that-ignores-cancellation-does-not-stall-the-aggregate"
-            ]
-          }
-        },
-        {
           "id": "deferred-discovery",
           "stage": "coded",
           "evidenceKinds": [
@@ -37,25 +23,7 @@
               "a-health-probe-is-discovered-on-the-first-aggregate-request",
               "a-readiness-probe-is-discovered-on-the-first-aggregate-request",
               "a-probe-contributed-by-a-later-configured-plugin-is-still-found",
-              "discovery-walks-from-a-nested-module-to-the-root",
-              "an-explicitly-registered-probe-is-not-overwritten-by-a-discovered-one"
-            ]
-          }
-        },
-        {
-          "id": "endpoint-set",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "core-endpoints-mount-at-the-root",
-              "the-configured-prefix-applies-to-the-core-endpoints",
-              "profiling-handlers-are-off-by-default",
-              "profiling-handlers-mount-when-the-workload-enables-them",
-              "the-configured-prefix-applies-to-the-profiling-handlers"
+              "discovery-walks-from-a-nested-module-to-the-root"
             ]
           }
         },

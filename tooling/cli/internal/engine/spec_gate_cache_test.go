@@ -199,7 +199,7 @@ func newRecoveryPlanFixtureFor(t *testing.T, withTestEnv bool, command string) *
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
 	source := newCachedObservationRecovery(&Request{Commands: []string{command}}, ws,
 		[]*extension.ExtensionDescription{ext}, cache)
-	planned, err := planner.Plan(ws, []string{command}, ws.Projects, source.extensions, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{command}, ws.Projects, source.extensions, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

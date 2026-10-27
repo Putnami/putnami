@@ -292,7 +292,10 @@
       "description": "Structured error information from a failed job.",
       "properties": {
         "message": { "type": "string" },
-        "code": { "type": "string" },
+        "code": {
+          "type": "string",
+          "description": "Machine-readable error code. host-unsupported reports that this host cannot run the job at all: the failure describes the host, not the job's inputs, and a consumer that caches failures by input never records one. Every other value is the producer's own."
+        },
         "timedOut": {
           "type": "boolean",
           "description": "True when the failure is a deadline the producer's own tool enforced, not a verdict its inputs produced. A consumer that caches failures by input never records one."

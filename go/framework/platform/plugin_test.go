@@ -612,7 +612,7 @@ func TestHealthz_NilProbeMetrics_NoPanic(t *testing.T) {
 // time out on its own but leave the fast probes free to report their
 // real status (not "context deadline exceeded").
 func TestHealthz_ParallelProbes_PerProbeTimeout(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "bounded-probes", "probes-run-in-parallel-each-under-its-own-timeout")
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-go-runtime-runs-each-probe-under-its-own-timeout")
 	p := NewPlugin(Config{ProbeTimeout: 100 * time.Millisecond})
 
 	slow := &slowHealthPlugin{name: "slow", delay: 2 * time.Second}
@@ -653,7 +653,7 @@ func TestHealthz_ParallelProbes_PerProbeTimeout(t *testing.T) {
 // out, and still surface the fast probe's real status — even though the
 // stubborn probe's goroutine keeps running for the full 2s in the background.
 func TestHealthz_NonCooperativeProbe_DoesNotStall(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "bounded-probes", "a-probe-that-ignores-cancellation-does-not-stall-the-aggregate")
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-go-runtime-answers-when-a-probe-ignores-cancellation")
 	p := NewPlugin(Config{ProbeTimeout: 100 * time.Millisecond})
 
 	stubborn := &stubbornHealthPlugin{name: "stubborn", delay: 2 * time.Second, started: make(chan struct{})}
@@ -713,7 +713,7 @@ func TestHealthz_NoDataRace_OnConcurrentAddAndAggregate(t *testing.T) {
 }
 
 func TestHealthz_ExplicitAddChecker_WinsOverAutoDiscovery(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "deferred-discovery", "an-explicitly-registered-probe-is-not-overwritten-by-a-discovered-one")
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "the-go-runtime-keeps-an-explicit-probe-over-a-discovered-one")
 	p := NewPlugin(Config{})
 	// Explicit probe registered before Configure.
 	if err := p.AddHealthChecker("db", func(_ context.Context) error { return fmt.Errorf("explicit wins") }); err != nil {
@@ -1001,6 +1001,7 @@ func TestReadyz_DegradedWhenProbeFails(t *testing.T) {
 
 // A plugin implementing both interfaces contributes to both endpoints.
 func TestPlugin_BothInterfaces_ContributesToBothEndpoints(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "probes-are-discovered-and-bounded", "a-probe-with-both-capabilities-feeds-both-aggregates")
 	p := NewPlugin(Config{})
 	root := rootWithServer()
 	root.Use(p)
@@ -1227,6 +1228,7 @@ func TestVersion_OmitsEmptyFields(t *testing.T) {
 // the protocol's canonical validator. If this fails, the framework's
 // wire shape has drifted from the cross-language contract.
 func TestConformance_HealthzEnvelopeMatchesProtocol(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "ok-is-200-and-the-rest-is-503", "a-served-envelope-carries-its-mapped-code")
 	cases := []struct {
 		name   string
 		setup  func(p *Plugin, root *app.Module)
@@ -1288,6 +1290,7 @@ func TestConformance_HealthzEnvelopeMatchesProtocol(t *testing.T) {
 // TestConformance_ReadyzEnvelopeMatchesProtocol is the readiness twin
 // of the healthz conformance test — identical shape rules apply.
 func TestConformance_ReadyzEnvelopeMatchesProtocol(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "a-served-readiness-envelope-validates")
 	p := NewPlugin(Config{})
 	root := rootWithServer()
 	root.Use(p)
@@ -1309,7 +1312,7 @@ func TestConformance_ReadyzEnvelopeMatchesProtocol(t *testing.T) {
 // --- RegisterOn / routing (via http.ServerPlugin.TestServer) ---
 
 func TestRegisterOn_MountsCoreEndpointsAtRoot(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "core-endpoints-mount-at-the-root")
+	spectest.Proves(t, "platform/operational-endpoints", "the-endpoint-set-is-canonical", "core-endpoints-mount-at-the-root")
 	p := NewPlugin(Config{})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1329,7 +1332,7 @@ func TestRegisterOn_MountsCoreEndpointsAtRoot(t *testing.T) {
 }
 
 func TestRegisterOn_AppliesPrefix(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "the-configured-prefix-applies-to-the-core-endpoints")
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "the-configured-prefix-applies-to-the-core-endpoints")
 	p := NewPlugin(Config{Prefix: "/_"})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1350,7 +1353,7 @@ func TestRegisterOn_AppliesPrefix(t *testing.T) {
 // --- pprof ---
 
 func TestPprof_DisabledByDefault(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "profiling-handlers-are-off-by-default")
+	spectest.Proves(t, "platform/operational-endpoints", "pprof-is-opt-in", "profiling-handlers-are-off-by-default")
 	p := NewPlugin(Config{})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1365,7 +1368,7 @@ func TestPprof_DisabledByDefault(t *testing.T) {
 }
 
 func TestPprof_EnabledMountsIndexAndProfile(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "profiling-handlers-mount-when-the-workload-enables-them")
+	spectest.Proves(t, "platform/operational-endpoints", "pprof-is-opt-in", "profiling-handlers-mount-when-the-workload-enables-them")
 	p := NewPlugin(Config{EnablePprof: true})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)
@@ -1393,7 +1396,7 @@ func TestPprof_EnabledMountsIndexAndProfile(t *testing.T) {
 }
 
 func TestPprof_AppliesPrefix(t *testing.T) {
-	spectest.Proves(t, "go/platform-endpoints", "endpoint-set", "the-configured-prefix-applies-to-the-profiling-handlers")
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "the-configured-prefix-applies-to-the-profiling-handlers")
 	p := NewPlugin(Config{Prefix: "/_", EnablePprof: true})
 	server := http.NewServerPlugin(http.ServerConfig{Port: 0})
 	p.RegisterOn(server)

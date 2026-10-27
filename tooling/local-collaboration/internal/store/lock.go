@@ -25,7 +25,7 @@ const lockPoll = 5 * time.Millisecond
 // may hold the same path open, and unlinking it would let a third process
 // lock a different inode.
 func acquire(path string, timeout time.Duration) (*fileLock, error) {
-	file, err := filelock.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
+	file, err := filelock.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,7 @@ func TestPlan_SessionPrerequisitePolicy(t *testing.T) {
 	t.Run("preview suppresses the entire prerequisite subtree", func(t *testing.T) {
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"preview": true, "apps": "/B"}, nil, nil)
+			extension.ParamMap{"preview": true, "apps": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -35,7 +35,7 @@ func TestPlan_SessionPrerequisitePolicy(t *testing.T) {
 		// deployPrerequisite=false.
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B,/C,/D"}, nil, nil)
+			extension.ParamMap{"apps": "/B,/C,/D"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -88,7 +88,7 @@ func TestPlan_SessionPrerequisitePolicy(t *testing.T) {
 
 	t.Run("prerequisite params do not change an explicit publish", func(t *testing.T) {
 		planned, err := Plan(ws, []string{"publish"}, ws.Projects[1:2],
-			[]*extension.ExtensionDescription{cloud, publisher}, nil, nil, nil)
+			[]*extension.ExtensionDescription{cloud, publisher}, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestPlan_SessionPrerequisitePolicy(t *testing.T) {
 	t.Run("explicit prerequisite cannot collide with local prerequisite params", func(t *testing.T) {
 		_, err := Plan(ws, []string{"publish", "deploy"}, ws.Projects[1:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		if err == nil {
 			t.Fatal("Plan accepted one publish identity with explicit and prerequisite-local params")
 		}
@@ -117,7 +117,7 @@ func TestPlan_SessionPrerequisitePolicy(t *testing.T) {
 	t.Run("empty selection override falls back to the current selection", func(t *testing.T) {
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": ""}, nil, nil)
+			extension.ParamMap{"apps": ""}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -156,7 +156,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 				_, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 					[]*extension.ExtensionDescription{cloud, publisher},
-					extension.ParamMap{"apps": "/B"}, nil, nil)
+					extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 				assertSessionPrerequisiteError(t, err, "deploy", "session prerequisite", "command roots", "preview")
 			})
 		}
@@ -177,7 +177,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan rejected unrelated task-local parameters: %v", err)
 		}
@@ -202,7 +202,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy", "promote"}, ws.Projects[1:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "publish", "incompatible", "docker")
 	})
 
@@ -212,7 +212,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[1:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "publish", "already planned", "local parameter")
 	})
 
@@ -224,7 +224,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[1:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "docker", "literal", "local parameter")
 	})
 
@@ -236,7 +236,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[1:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "publishConfig", "publish-config", "literal", "local parameter")
 	})
 
@@ -246,7 +246,7 @@ func TestPlan_SessionPrerequisiteInvocationCollisions(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[1:2],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "publishConfig", "not found", "/B")
 	})
 }
@@ -258,7 +258,7 @@ func TestPlan_SessionPrerequisiteWorkspaceOnceReuse(t *testing.T) {
 	t.Run("compatible constants merge two resolved selections", func(t *testing.T) {
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects,
 			[]*extension.ExtensionDescription{orchestrator, publisher},
-			extension.ParamMap{"appsA": "/A", "appsB": "/B"}, nil, nil)
+			extension.ParamMap{"appsA": "/A", "appsB": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -287,7 +287,7 @@ func TestPlan_SessionPrerequisiteWorkspaceOnceReuse(t *testing.T) {
 		}}
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects,
 			[]*extension.ExtensionDescription{orchestrator, publisher},
-			extension.ParamMap{"appsA": "/A,/B"}, nil, nil)
+			extension.ParamMap{"appsA": "/A,/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "workspace-once", "fromProjectParam", "multiple projects")
 	})
 
@@ -305,7 +305,7 @@ func TestPlan_SessionPrerequisiteWorkspaceOnceReuse(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects,
 			[]*extension.ExtensionDescription{orchestrator, publisher},
-			extension.ParamMap{"appsA": "/A", "appsB": "/B"}, nil, nil)
+			extension.ParamMap{"appsA": "/A", "appsB": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "workspace-once", "publish", "gate policy")
 	})
 
@@ -326,7 +326,7 @@ func TestPlan_SessionPrerequisiteWorkspaceOnceReuse(t *testing.T) {
 
 			_, err := Plan(ws, commands, ws.Projects[:1],
 				[]*extension.ExtensionDescription{orchestrator, publisher},
-				extension.ParamMap{"appsB": "/B"}, nil, nil)
+				extension.ParamMap{"appsB": "/B"}, nil, nil, nil)
 			assertSessionPrerequisiteError(t, err, "workspace-once", "publish", "/A", "gate policy provenance")
 		}
 	})
@@ -344,7 +344,7 @@ func TestPlan_SessionPrerequisiteIndirectCycleRejected(t *testing.T) {
 	}
 
 	_, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
-		[]*extension.ExtensionDescription{cloud}, nil, nil, nil)
+		[]*extension.ExtensionDescription{cloud}, nil, nil, nil, nil)
 	assertSessionPrerequisiteError(t, err, "cycle")
 }
 
@@ -364,7 +364,7 @@ func TestPlan_SessionPrerequisiteFinalizersStayOutsideFunctionalDAG(t *testing.T
 
 	planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 		[]*extension.ExtensionDescription{cloud, publisher},
-		extension.ParamMap{"apps": "/B"}, nil, nil)
+		extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -394,7 +394,7 @@ func TestPlan_SessionPrerequisiteEmptyGateFacts(t *testing.T) {
 
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, `unknown gate "lnti"`)
 	})
 
@@ -407,7 +407,7 @@ func TestPlan_SessionPrerequisiteEmptyGateFacts(t *testing.T) {
 
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -442,7 +442,7 @@ func TestPlan_SessionPrerequisiteEmptyGateFacts(t *testing.T) {
 
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B,/C"}, nil, nil)
+			extension.ParamMap{"apps": "/B,/C"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -470,7 +470,7 @@ func TestPlan_SessionPrerequisiteEmptyGateFacts(t *testing.T) {
 
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -491,7 +491,7 @@ func TestPlan_SessionPrerequisiteTransitiveSelectionUsesOwner(t *testing.T) {
 
 	planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 		[]*extension.ExtensionDescription{cloud, publisher},
-		extension.ParamMap{"apps": "/B"}, nil, nil)
+		extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -517,7 +517,7 @@ func TestPlan_SessionPrerequisiteTransitiveParamsAndFixpoint(t *testing.T) {
 
 		planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{cloud, publisher},
-			extension.ParamMap{"apps": "/B"}, nil, nil)
+			extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -545,7 +545,7 @@ func TestPlan_SessionPrerequisiteTransitiveParamsAndFixpoint(t *testing.T) {
 
 		planned, err := Plan(ws, []string{"publish", "deploy"}, ws.Projects[:1],
 			[]*extension.ExtensionDescription{orchestrator, publisher},
-			extension.ParamMap{"appsB": "/B"}, nil, nil)
+			extension.ParamMap{"appsB": "/B"}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -566,7 +566,7 @@ func TestPlan_SessionPrerequisiteKebabOverrideActivatesCamelCondition(t *testing
 
 	planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 		[]*extension.ExtensionDescription{cloud, publisher},
-		extension.ParamMap{"apps": "/B"}, nil, nil)
+		extension.ParamMap{"apps": "/B"}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -585,7 +585,7 @@ func TestPlan_SessionPrerequisiteInvalidExpressionsFailClosed(t *testing.T) {
 		ws, cloud, publisher := sessionPrerequisiteFixture()
 		cloud.Jobs["deploy"].SessionPrerequisites[0].If = "!params.preview &&"
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
-			[]*extension.ExtensionDescription{cloud, publisher}, nil, nil, nil)
+			[]*extension.ExtensionDescription{cloud, publisher}, nil, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "session prerequisite", "if", "invalid", "!params.preview &&")
 	})
 
@@ -593,7 +593,7 @@ func TestPlan_SessionPrerequisiteInvalidExpressionsFailClosed(t *testing.T) {
 		ws, cloud, publisher := sessionPrerequisiteFixture()
 		cloud.Jobs["deploy"].SessionPrerequisites[0].ProjectIf = "param.deploy.enabled != false"
 		_, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
-			[]*extension.ExtensionDescription{cloud, publisher}, nil, nil, nil)
+			[]*extension.ExtensionDescription{cloud, publisher}, nil, nil, nil, nil)
 		assertSessionPrerequisiteError(t, err, "session prerequisite", "projectIf", "invalid", "param.deploy.enabled != false")
 	})
 }
@@ -637,7 +637,7 @@ func TestPlan_SessionPrerequisiteSharedOwnerGateFrontier(t *testing.T) {
 
 	planned, err := Plan(ws, []string{"deploy"}, ws.Projects[:1],
 		[]*extension.ExtensionDescription{cloud, publisher},
-		extension.ParamMap{"apps": "/B,/E"}, nil, nil)
+		extension.ParamMap{"apps": "/B,/E"}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

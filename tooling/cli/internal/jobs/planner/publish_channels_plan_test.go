@@ -32,7 +32,7 @@ func TestPlan_APublishJobExposesItsTasksPublishChannels(t *testing.T) {
 		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "subject")),
 	}
 	planned, err := Plan(testWorkspace(root, project), []string{"publish"}, []*workspace.Project{project},
-		[]*extension.ExtensionDescription{ext}, nil, nil, nil)
+		[]*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan(publish): %v", err)
 	}
