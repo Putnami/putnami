@@ -226,15 +226,16 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		// These protocols name the acceptance checks of their contracts, which
 		// their own tests and their implementers observe, in the verification
 		// block.
-		filepath.Join("protocols", "database", ManifestFilename):    true,
-		filepath.Join("protocols", "doctor", ManifestFilename):      true,
-		filepath.Join("protocols", "features", ManifestFilename):    true,
-		filepath.Join("protocols", "http-routes", ManifestFilename): true,
-		filepath.Join("protocols", "migration", ManifestFilename):   true,
-		filepath.Join("protocols", "platform", ManifestFilename):    true,
-		filepath.Join("protocols", "runtime", ManifestFilename):     true,
-		filepath.Join("protocols", "telemetry", ManifestFilename):   true,
-		filepath.Join("protocols", "transaction", ManifestFilename): true,
+		filepath.Join("protocols", "collaboration", ManifestFilename): true,
+		filepath.Join("protocols", "database", ManifestFilename):      true,
+		filepath.Join("protocols", "doctor", ManifestFilename):        true,
+		filepath.Join("protocols", "features", ManifestFilename):      true,
+		filepath.Join("protocols", "http-routes", ManifestFilename):   true,
+		filepath.Join("protocols", "migration", ManifestFilename):     true,
+		filepath.Join("protocols", "platform", ManifestFilename):      true,
+		filepath.Join("protocols", "runtime", ManifestFilename):       true,
+		filepath.Join("protocols", "telemetry", ManifestFilename):     true,
+		filepath.Join("protocols", "transaction", ManifestFilename):   true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized

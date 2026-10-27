@@ -22,17 +22,20 @@ import (
 // the verification wire rather than through this file.
 const matrixFeature = "samples/go-first-party-client-matrix"
 
-// TestGeneratedClientInSync regenerates the Go client from the provider's routes
-// through the same pipeline `putnami build` uses (the api.Clients describer reads
-// the OpenAPI spec and runs GenerateClientFromIR) and asserts it matches the
-// committed clients/go/client.gen.go. Drift here means a build would rewrite the
-// committed client. Regenerate intentional changes through the workspace
-// `putnami clientgen` command so source and ownership manifest stay atomic.
-func TestGeneratedClientInSync(t *testing.T) {
-	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "the-committed-client-is-what-the-generator-renders")
-	// The same run proves the other half of the requirement: the render of an
-	// amputated contract below differs from the committed one.
-	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "a-removed-operation-is-detected-rather-than-rendered-through")
+// renderedClient is the Go client the generator renders from the provider's
+// routes, with the inputs a check of the render needs.
+type renderedClient struct {
+	spec      []byte
+	ir        api.SpecIR
+	producers []api.ClientOperationProducer
+	src       string
+}
+
+// renderClient regenerates the Go client from the provider's routes through the
+// same pipeline `putnami build` uses: the api.Clients describer reads the
+// OpenAPI spec and runs GenerateClientFromIR.
+func renderClient(t *testing.T) renderedClient {
+	t.Helper()
 	server := http.NewServerPlugin(http.ServerConfig{})
 	apiPlugin := api.New(server, ClientContract())
 	Register(apiPlugin)
@@ -82,13 +85,24 @@ func TestGeneratedClientInSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate client: %v", err)
 	}
+	return renderedClient{spec: spec, ir: ir, producers: producers, src: src}
+}
+
+// TestGeneratedClientInSync asserts the render matches the committed
+// clients/go/client.gen.go and that the committed manifest owns it. Drift here
+// means a build would rewrite the committed client. Regenerate intentional
+// changes through the workspace `putnami clientgen` command so source and
+// ownership manifest stay atomic.
+func TestGeneratedClientInSync(t *testing.T) {
+	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "the-committed-client-is-what-the-generator-renders")
+	rendered := renderClient(t)
 
 	path := filepath.Join("..", "clients", "go", "client.gen.go")
 	want, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read committed client (run `putnami clientgen --projects %s` to create): %v", ProjectName, err)
 	}
-	if string(want) != src {
+	if string(want) != rendered.src {
 		t.Errorf("committed clients/go/client.gen.go is out of sync with the generator;\nrun: putnami clientgen --projects %s", ProjectName)
 	}
 
@@ -100,19 +114,35 @@ func TestGeneratedClientInSync(t *testing.T) {
 	if len(diagnostics) != 0 {
 		t.Fatalf("generated manifest diagnostics = %v", diagnostics)
 	}
-	contractHash := sha256.Sum256(spec)
+	contractHash := sha256.Sum256(rendered.spec)
 	sourceHash := sha256.Sum256(want)
 	if manifest.ContractSHA256 != fmt.Sprintf("%x", contractHash) || len(manifest.Files) != 1 ||
 		manifest.Files[0].Path != "client.gen.go" || manifest.Files[0].SHA256 != fmt.Sprintf("%x", sourceHash) {
 		t.Fatalf("generated manifest does not own the current provider contract/client: %#v", manifest)
 	}
-	// A removed operation is the contract break a consumer must not discover at
-	// run time. Rendering the amputated contract moves the bytes and leaves the
-	// committed manifest owning an operation the render no longer has, which is
-	// the pair the workspace clientgen guard compares.
-	amputated := ir
+
+	foundStream := false
+	for _, operation := range manifest.Operations {
+		for _, transport := range operation.Transports {
+			foundStream = foundStream || operation.OperationID == "getItems_Id_Watch" && transport.Protocol == clientcontract.TransportSSE
+		}
+	}
+	if !foundStream {
+		t.Fatalf("generated manifest omits provider SSE operation: %#v", manifest.Operations)
+	}
+}
+
+// TestARemovedOperationIsDetected renders the contract without one operation. A
+// removed operation is the contract break a consumer must not discover at run
+// time: the render moves the bytes and leaves the committed manifest owning an
+// operation the render no longer has, which is the pair the workspace
+// clientgen guard compares.
+func TestARemovedOperationIsDetected(t *testing.T) {
+	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "a-removed-operation-is-detected-rather-than-rendered-through")
+	rendered := renderClient(t)
+	amputated := rendered.ir
 	amputated.Services = nil
-	for _, service := range ir.Services {
+	for _, service := range rendered.ir.Services {
 		kept := make([]api.MethodIR, 0, len(service.Methods))
 		for _, method := range service.Methods {
 			if method.Path != "/whoami" {
@@ -127,12 +157,12 @@ func TestGeneratedClientInSync(t *testing.T) {
 	broken, err := api.GenerateClientFromIR(amputated, api.ClientGenOptions{
 		PackageName: ClientPackage,
 		ClientName:  ClientName,
-		Design:      &api.ClientDesignOptions{Operations: producers},
+		Design:      &api.ClientDesignOptions{Operations: rendered.producers},
 	})
 	if err != nil {
 		t.Fatalf("generate client from the amputated contract: %v", err)
 	}
-	if broken == src {
+	if broken == rendered.src {
 		t.Fatal("removing a declared operation rendered the same client")
 	}
 	// The method itself, not the embedded descriptor: a client generated from a
@@ -141,17 +171,7 @@ func TestGeneratedClientInSync(t *testing.T) {
 	if strings.Contains(broken, whoamiMethod) {
 		t.Fatal("the render kept a method for an operation the contract no longer declares")
 	}
-	if !strings.Contains(src, whoamiMethod) {
+	if !strings.Contains(rendered.src, whoamiMethod) {
 		t.Fatal("the committed contract no longer declares the operation this check removes")
-	}
-
-	foundStream := false
-	for _, operation := range manifest.Operations {
-		for _, transport := range operation.Transports {
-			foundStream = foundStream || operation.OperationID == "getItems_Id_Watch" && transport.Protocol == clientcontract.TransportSSE
-		}
-	}
-	if !foundStream {
-		t.Fatalf("generated manifest omits provider SSE operation: %#v", manifest.Operations)
 	}
 }

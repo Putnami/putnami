@@ -11,6 +11,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	extension "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func boolPtr(v bool) *bool { return &v }
@@ -58,6 +59,7 @@ func fullProvider(contract string) map[string]extension.ToolDefinition {
 }
 
 func TestReadProviderOffer_AcceptsACompleteDeclaration(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "a-complete-declaration-is-offered")
 	tools := fullProvider(ContractTasks)
 	tools["local.tasks.claim"] = providerTool(ContractTasks, OperationClaim)
 	for name, def := range fullProvider(ContractProposals) {
@@ -82,6 +84,7 @@ func TestReadProviderOffer_AcceptsACompleteDeclaration(t *testing.T) {
 }
 
 func TestReadProviderOffer_WithdrawsAContractVersionOnAnyError(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "any-declaration-error-withdraws-the-contract-version")
 	cases := []struct {
 		name   string
 		mutate func(map[string]extension.ToolDefinition)
@@ -191,6 +194,7 @@ func TestReadProviderOffer_WithdrawsAContractVersionOnAnyError(t *testing.T) {
 }
 
 func TestReadProviderOffer_SelectionOperationsRequireTheWorkspaceView(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "selection-operations-declare-the-workspace-view")
 	tools := fullProvider(ContractMemory)
 	def := tools["local.memory.context"]
 	def.WorkspaceSelection = false
@@ -202,6 +206,7 @@ func TestReadProviderOffer_SelectionOperationsRequireTheWorkspaceView(t *testing
 }
 
 func TestReadProviderOffer_IgnoresAVersionItDoesNotSpeak(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "a-version-nobody-speaks-draws-one-warning")
 	tools := fullProvider(ContractTasks)
 	future := providerTool(ContractTasks, OperationFind)
 	future.Meta = cloneMeta(future.Meta)
@@ -264,6 +269,7 @@ func routed(contract, operation, arguments string) extension.ToolCallRequest {
 }
 
 func TestServe_RunsTheHandlerOnAValidatedRequest(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "serve-validates-both-sides", "serve-runs-the-handler-on-a-validated-request")
 	var seen Call
 	handlers := map[OperationKey]Handler{
 		{ContractTasks, 1, OperationGet}: func(_ context.Context, call Call) (any, *Failure) {
@@ -285,6 +291,7 @@ func TestServe_RunsTheHandlerOnAValidatedRequest(t *testing.T) {
 }
 
 func TestServe_RefusesWhatTheContractRefuses(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "serve-validates-both-sides", "serve-refuses-what-the-contract-refuses")
 	calls := 0
 	handlers := map[OperationKey]Handler{
 		{ContractTasks, 1, OperationCreate}: func(context.Context, Call) (any, *Failure) {
@@ -318,6 +325,7 @@ func TestServe_RefusesWhatTheContractRefuses(t *testing.T) {
 // of the reconciliation rule: a handler whose effect is unknown never reports
 // a retryable failure for a write.
 func TestServe_AnUncertainHandlerIsUnresolvedForAMutation(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "serve-validates-both-sides", "an-uncertain-handler-is-unresolved-for-a-mutation")
 	panicking := func(context.Context, Call) (any, *Failure) { panic("backend exploded") }
 	badResult := func(context.Context, Call) (any, *Failure) {
 		return &TaskCreateResult{Task: Task{Title: "no ref"}}, nil
@@ -347,6 +355,7 @@ func TestServe_AnUncertainHandlerIsUnresolvedForAMutation(t *testing.T) {
 }
 
 func TestServe_AFailureKeepsItsOutcomeAndCannotRetryUnresolved(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "serve-validates-both-sides", "a-handler-failure-keeps-its-outcome")
 	handlers := map[OperationKey]Handler{
 		{ContractTasks, 1, OperationGet}: func(context.Context, Call) (any, *Failure) {
 			return nil, Fail(OutcomeNotFound, "task.missing", "no task %s", "T-9")
@@ -368,6 +377,7 @@ func TestServe_AFailureKeepsItsOutcomeAndCannotRetryUnresolved(t *testing.T) {
 }
 
 func TestServe_ANilPageIsTheEmptyList(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "serve-validates-both-sides", "a-nil-page-is-the-empty-list")
 	handlers := map[OperationKey]Handler{
 		{ContractTasks, 1, OperationFind}: func(context.Context, Call) (any, *Failure) { return &TaskListResult{}, nil },
 		{ContractProposals, 1, OperationFind}: func(context.Context, Call) (any, *Failure) {
@@ -388,6 +398,7 @@ func TestServe_ANilPageIsTheEmptyList(t *testing.T) {
 }
 
 func TestServe_RejectsAnUndecodableRequest(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "serve-validates-both-sides", "an-undecodable-request-writes-nothing")
 	var out bytes.Buffer
 	err := Serve(context.Background(), strings.NewReader("not json"), &out, nil)
 	if err == nil || out.Len() != 0 {
