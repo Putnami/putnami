@@ -10,11 +10,13 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/protocol/config/authoredmember"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const authoredTestRevision = "0123456789abcdef0123456789abcdef01234567"
 
 func TestPrepareAuthoredConfigBuildsCanonicalSecretFreeProductionMember(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "authored-member", "the-cloud-cli-member-passes-validate")
 	root := authoredConfigWorkspace(t)
 	stubAuthoredGit(t)
 	prepared, err := PrepareAuthoredConfig(map[string]any{

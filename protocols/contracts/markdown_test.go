@@ -5,9 +5,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestRenderMarkdown_IsDeterministicAndContractDerived(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "markdown-reference", "the-reference-follows-the-contract")
 	raw, err := os.ReadFile("fixtures/equivalence/contracts.golden.json")
 	if err != nil {
 		t.Fatal(err)

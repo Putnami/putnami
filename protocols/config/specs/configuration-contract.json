@@ -1,0 +1,65 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "config/configuration-contract",
+  "outcomes": [
+    "The Go and TypeScript extractors produce the same schema hash and the same JSON Schema for the same configuration.",
+    "A value marked sensitive never travels through the plaintext config store or inside an authored member.",
+    "A malformed manifest, entry, request or member is refused with a diagnostic before the server stores it."
+  ],
+  "nonGoals": [
+    "Typed configuration loading, defaults and remote resolution at runtime, which the Go and TypeScript framework packages own.",
+    "A ProtocolVersion constant: the schema hash plays the role of a version.",
+    "Enforcing the advisory constraints a field declares.",
+    "The config server itself and its storage."
+  ],
+  "requirements": [
+    {
+      "id": "fixture-corpus",
+      "text": "Each valid schema manifest, registered schema, config entry, secret entry, delete request and resolve-secrets request fixture parses and validates, and each invalid one is refused: a bad field type, hash prefix or map key, a misplaced composite slot, a missing appName, no configs, an unknown member, an entry with no values or a bad name, a delete with no path, and a secret envelope that is missing or not base64. Validation gives the same diagnostics on every run."
+    },
+    {
+      "id": "strict-manifest",
+      "text": "A publish-time manifest refuses an unknown member and the server-owned registeredAt, which only a registered manifest carries. Validation refuses a missing appName, empty configs, a hash without the sha256: prefix, a field type outside the vocabulary, a duplicate block path and a path with a slash, and accepts a scoped npm or Go module appName. A resolve request needs appName and environment."
+    },
+    {
+      "id": "closed-vocabulary",
+      "text": "The field types are string, int, float, bool, duration, object, array and map, and a map key is string, int or bool. schemas/schema-manifest.json lists exactly these, requires items on an array and keys and values on a map, and forbids those slots on any other type. @putnami/application's vocabulary matches the schema enums."
+    },
+    {
+      "id": "extractors-map-onto-the-vocabulary",
+      "text": "The Go extractor and @putnami/application's extractor map a sensitive field to sensitive: true, a production-unsafe default to productionUnsafeDefault, a nested struct to object fields, a list to array items and a map to keys and values. The Go framework's describe mode maps sensitive, nested, array and map fields the same way. All three refuse a non-primitive map key at build time."
+    },
+    {
+      "id": "canonical-schema-hash",
+      "text": "The schema hash is sha256: and the first 16 hex characters of the SHA-256 of the canonical blocks, with paths and fields sorted recursively, so extraction order does not change it. An unset productionUnsafeDefault adds no byte and a set one changes the hash. The anchor sha256:884119c1a3fd2c7b and the hashes in the nested-hash and production-unsafe fixtures hold in Go and in @putnami/application, which also matches the typed-defaults one."
+    },
+    {
+      "id": "json-schema-rendering",
+      "text": "A manifest renders to the JSON Schema of the nested-hash and typed-defaults goldens in fixtures/jsonschema: each default is the JSON scalar of its declared type, an empty string default is omitted, a production-unsafe default renders x-production-unsafe-default: true, only opt-in fields are required, and an int or bool map key is a constrained string. @putnami/application renders the same goldens."
+    },
+    {
+      "id": "resolution-layers",
+      "text": "Resolution reads five layers with priorities 10 to 50, later winning by deep merge: */*, */env, app/*, app/env and, when a version is given, app/env/version. Without a version there are four. A deep merge overrides a nested key, keeps its siblings and adds new keys."
+    },
+    {
+      "id": "input-names",
+      "text": "environment, path and version accept [a-zA-Z0-9.*_-]+. appName also accepts @ and / but refuses an empty, . or .. segment, so app/../etc and /etc/passwd fail. A name is at most 256 characters and only version may be empty. A values map holds at most 1000 keys. A sealed envelope needs keyUri, wrappedDek, nonce and ciphertext, and refuses one that is not base64."
+    },
+    {
+      "id": "permission-scopes",
+      "text": "AllScopes is exactly config.schema.read, config.schema.write, config.value.read, config.value.write, config.secret.read and config.secret.write."
+    },
+    {
+      "id": "sensitive-decides-the-store",
+      "text": "A sensitive field written through the config store is an error, sensitive-in-config. A secret write whose fields are all non-sensitive is a warning, non-sensitive-in-secret. A write to a path absent from the registered schema is an error, matched on the longest dotted block. A recognized block also refuses an unknown field, a value of the wrong type and an invalid map key, and an unknown block is left to the path check."
+    },
+    {
+      "id": "authored-member",
+      "text": "An authored member is config.authored-member.v1 compact JSON with sorted fields, layers and references, so equivalent input gives the same bytes and descriptor, and its selection fingerprint moves with a value, pin, reference or required flag. A sensitive field carries an exact config-secret:// reference, never a value. A missing required value, a placeholder, an undeclared or overlapping path, a sensitive descendant, and bytes or digests that differ from the rebuild are refused."
+    }
+  ],
+  "decisions": [
+    "protocols/config/doc/adr/0001-sensitive-decides-the-store.md"
+  ]
+}

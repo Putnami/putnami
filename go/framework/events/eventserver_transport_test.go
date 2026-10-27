@@ -82,6 +82,7 @@ func writeEventServerError(t *testing.T, w http.ResponseWriter, status int, retr
 }
 
 func TestEventServerTransportPublishesCanonicalManagedFrame(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "a-managed-publish-is-one-authenticated-post", "the-go-transport-posts-the-canonical-request")
 	var gotAudience string
 	credentials := CredentialSourceFunc(func(_ context.Context, audience string) (string, error) {
 		gotAudience = audience
@@ -161,6 +162,7 @@ func TestEventServerTransportPublishesCanonicalManagedFrame(t *testing.T) {
 }
 
 func TestEventServerTransportGeneratesStableIdentityAndBytesAcrossRetries(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "a-retry-resends-the-same-bytes", "the-go-transport-resends-the-same-bytes")
 	spectest.Proves(t, "go/event-delivery", "retry-boundary", "retry-preserves-stable-event-identity")
 	var mu sync.Mutex
 	var bodies [][]byte
@@ -225,6 +227,7 @@ func TestEventServerTransportGeneratesStableIdentityAndBytesAcrossRetries(t *tes
 }
 
 func TestEventServerTransportClassifiesOutcomes(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "publish-answers-have-four-classes", "the-go-transport-classifies-each-answer")
 	tests := []struct {
 		name      string
 		status    int
@@ -274,6 +277,7 @@ func TestEventServerTransportClassifiesOutcomes(t *testing.T) {
 }
 
 func TestEventServerTransportConsumesSharedValidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "a-managed-publish-is-one-authenticated-post", "the-go-transport-posts-the-canonical-request")
 	fixtures := protoevents.ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "valid")
 	if err != nil {
@@ -330,6 +334,7 @@ func TestEventServerTransportConsumesSharedValidFixtures(t *testing.T) {
 }
 
 func TestEventServerTransportConsumesSharedInvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "managed-publish-requests", "the-go-framework-gives-each-managed-request-its-verdict")
 	fixtures := protoevents.ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "invalid")
 	if err != nil {
@@ -352,6 +357,7 @@ func TestEventServerTransportConsumesSharedInvalidFixtures(t *testing.T) {
 }
 
 func TestEventServerTransportConsumesSharedOutcomeFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "publish-answers-have-four-classes", "the-go-transport-classifies-each-answer")
 	fixtures := protoevents.ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "outcomes")
 	if err != nil {
@@ -426,6 +432,7 @@ func eventServerFixtureWireBody(body json.RawMessage) string {
 }
 
 func TestEventServerTransportNetworkFailureIsAmbiguous(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "publish-answers-have-four-classes", "the-go-transport-classifies-each-answer")
 	client := eventServerDoerFunc(func(*http.Request) (*http.Response, error) {
 		return nil, stderrors.New("connection reset")
 	})
@@ -462,6 +469,7 @@ func TestEventServerTransportCredentialFailureSendsNothingAndRedactsCause(t *tes
 }
 
 func TestEventServerTransportPreflightRejectsAuthorityAndInvalidFrames(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "a-managed-publish-is-one-authenticated-post", "the-go-transport-refuses-an-unadmissible-frame-before-sending")
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		requests.Add(1)

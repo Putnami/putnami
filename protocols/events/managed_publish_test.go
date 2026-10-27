@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestManagedPublishV1_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "managed-publish-requests", "each-managed-request-fixture-gets-its-verdict")
 	fixtures := ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "valid")
 	if err != nil {
@@ -50,6 +52,7 @@ func TestManagedPublishV1_ValidFixtures(t *testing.T) {
 }
 
 func TestManagedPublishV1_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "managed-publish-requests", "each-managed-request-fixture-gets-its-verdict")
 	fixtures := ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "invalid")
 	if err != nil {
@@ -76,6 +79,7 @@ func TestManagedPublishV1_InvalidFixtures(t *testing.T) {
 }
 
 func TestManagedPublishV1_InvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "managed-publish-requests", "the-corpus-holds-every-required-defect")
 	required := []string{
 		"bad-protocol.json",
 		"bad-type.json",
@@ -106,6 +110,7 @@ func TestManagedPublishV1_InvalidFixtureCoverage(t *testing.T) {
 }
 
 func TestManagedPublishV1_ByteStableRetry(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "a-retry-resends-the-same-bytes", "a-mutated-retry-is-refused")
 	first, err := ReadManagedPublishV1Fixture("valid/retry-attempt-1.json")
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +133,7 @@ func TestManagedPublishV1_ByteStableRetry(t *testing.T) {
 }
 
 func TestManagedPublishV1_OutcomeFixtures(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "one-outcome-corpus", "each-outcome-vector-validates-and-every-class-is-present")
 	fixtures := ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "outcomes")
 	if err != nil {
@@ -183,6 +189,7 @@ func TestManagedPublishV1_OutcomeFixtures(t *testing.T) {
 }
 
 func TestManagedPublishV1_RejectsKnownOutcomesClassifiedAsAmbiguous(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "one-outcome-corpus", "a-known-answer-is-never-ambiguous")
 	for _, test := range []struct {
 		name   string
 		status int
@@ -224,6 +231,7 @@ func TestManagedPublishV1_RejectsKnownOutcomesClassifiedAsAmbiguous(t *testing.T
 }
 
 func TestManagedPublishV1_SchemasAreValidJSON(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "managed-publish-requests", "the-managed-schemas-are-json")
 	for _, name := range []string{"managed-publish-frame-v1.json", "managed-publish-outcome-v1.json"} {
 		data, err := os.ReadFile(filepath.Join("schemas", name))
 		if err != nil {

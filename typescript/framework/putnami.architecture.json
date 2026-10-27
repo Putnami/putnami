@@ -93,6 +93,16 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/config"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/contracts"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
           "producerProject": "/protocols/features"
         },
         {
@@ -134,6 +144,11 @@
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/database",
           "producerProject": "/protocols/transaction"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/events",
+          "producerProject": "/protocols/events"
         },
         {
           "kind": "project-dependency",

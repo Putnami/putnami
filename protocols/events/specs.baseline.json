@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "events/event-server-contract#a-managed-publish-is-one-authenticated-post",
+    "events/event-server-contract#a-retry-resends-the-same-bytes",
+    "events/event-server-contract#conformance-manifest",
+    "events/event-server-contract#delivery-profiles",
+    "events/event-server-contract#envelope-and-gateway-corpus",
+    "events/event-server-contract#handler-options",
+    "events/event-server-contract#managed-publish-requests",
+    "events/event-server-contract#one-outcome-corpus",
+    "events/event-server-contract#publish-answers-have-four-classes",
+    "events/event-server-contract#push-admission",
+    "events/event-server-contract#push-wrapper",
+    "events/event-server-contract#the-proto-is-non-normative",
+    "events/event-server-contract#the-receiver-status-is-the-outcome"
+  ]
+}

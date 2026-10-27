@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // sampleManifest builds a representative contract IR exercising every node
@@ -119,6 +121,7 @@ func canonical(t *testing.T, m *Manifest) []byte {
 // manifest is byte-identical across 100 marshals — no map iteration or other
 // nondeterminism leaks into the wire form.
 func TestSerialization_Stable100(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "canonical-bytes", "the-serialization-is-canonical")
 	m := sampleManifest()
 	first := canonical(t, m)
 	for i := range 100 {
@@ -133,6 +136,7 @@ func TestSerialization_Stable100(t *testing.T) {
 // sampleManifest(). This is the cross-language contract — the TypeScript
 // emitter (Slice 3) must produce this same file byte-for-byte.
 func TestSerialization_CanonicalByteForm(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "canonical-bytes", "the-serialization-is-canonical")
 	want, err := os.ReadFile(filepath.Join("fixtures", "valid", "full.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -147,6 +151,7 @@ func TestSerialization_CanonicalByteForm(t *testing.T) {
 // byte-stable for every valid fixture: re-serializing a parsed manifest yields
 // the same bytes the second time, so the wire form is a fixed point.
 func TestRoundTrip_Idempotent(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "canonical-bytes", "the-serialization-is-canonical")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)

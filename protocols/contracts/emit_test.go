@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The emitter goldens live under testdata/ (Go tooling ignores that directory,
@@ -37,6 +39,7 @@ func loadEquivManifest(t *testing.T) *Manifest {
 // anchor: the TypeScript emitter's parity test compares its own serialization
 // against these exact bytes.
 func TestEmitJSONSchema_Golden(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "one-ir-many-lowerings", "the-emitters-match-the-goldens")
 	got, err := MarshalJSONSchema(loadEquivManifest(t))
 	if err != nil {
 		t.Fatalf("marshal JSON schema: %v", err)
@@ -48,6 +51,7 @@ func TestEmitJSONSchema_Golden(t *testing.T) {
 // through go/format.Source, so a mismatch means either an intentional change
 // (regenerate with PUTNAMI_UPDATE_GOLDEN=1) or a regression.
 func TestEmitGo_Golden(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "one-ir-many-lowerings", "the-emitters-match-the-goldens")
 	got, err := EmitGo(loadEquivManifest(t))
 	if err != nil {
 		t.Fatalf("emit Go: %v", err)
@@ -59,6 +63,7 @@ func TestEmitGo_Golden(t *testing.T) {
 // gofmt formatting — a defense against an emitter change that produces
 // well-formatted but unparseable source.
 func TestEmitGo_Parses(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "one-ir-many-lowerings", "the-emitters-match-the-goldens")
 	src, err := EmitGo(loadEquivManifest(t))
 	if err != nil {
 		t.Fatalf("emit Go: %v", err)
@@ -72,6 +77,7 @@ func TestEmitGo_Parses(t *testing.T) {
 // runs — the guard against map-iteration order or other nondeterminism leaking
 // into generated output.
 func TestEmit_Deterministic(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "one-ir-many-lowerings", "the-emitters-match-the-goldens")
 	m := loadEquivManifest(t)
 	schemaFirst, err := MarshalJSONSchema(m)
 	if err != nil {

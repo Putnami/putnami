@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect } from 'bun:test';
 import { type SchemaDefinition, validateSchema } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { contractStruct, contractType, getContractTypeReference, type ContractManifest } from '../../src/contracts';
+
+// Each test proves a requirement of the contracts protocol's feature under a check of this package's own.
+const UNION_VALIDATION = {
+  feature: 'contracts/contract-ir',
+  requirement: 'contract-types-become-components',
+  check: 'the-typescript-runtime-validates-contract-unions',
+};
 
 const manifest: ContractManifest = {
   protocolVersion: 1,
@@ -19,13 +27,13 @@ const manifest: ContractManifest = {
 };
 
 describe('contract runtime schemas', () => {
-  it('exposes an endpoint-compatible struct schema without a cast', () => {
+  specTest('exposes an endpoint-compatible struct schema without a cast', UNION_VALIDATION, () => {
     const schema: SchemaDefinition = contractStruct(manifest, 'Request');
     expect(getContractTypeReference(schema)?.name).toBe('Request');
     expect(() => contractStruct(manifest, 'Change')).toThrow('is not a struct');
   });
 
-  it('validates union shape, discriminator, tag, and variant fields', () => {
+  specTest('validates union shape, discriminator, tag, and variant fields', UNION_VALIDATION, () => {
     const schema = { change: contractType(manifest, 'Change') };
     for (const invalid of ['rename', {}, { kind: 'unknown' }, { kind: 'rename' }, { kind: 'rename', name: 42 }]) {
       expect(validateSchema(schema, { change: invalid }).errors).not.toHaveLength(0);

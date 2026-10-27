@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func testManifest() *SchemaManifest {
@@ -54,6 +55,7 @@ func testManifest() *SchemaManifest {
 }
 
 func TestValidateConfigEntryAgainstSchema_RejectsSensitive(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &ConfigEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -81,6 +83,7 @@ func TestValidateConfigEntryAgainstSchema_RejectsSensitive(t *testing.T) {
 }
 
 func TestValidateConfigEntryAgainstSchema_AllowsPlainFields(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &ConfigEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -98,6 +101,7 @@ func TestValidateConfigEntryAgainstSchema_AllowsPlainFields(t *testing.T) {
 }
 
 func TestValidateConfigEntryAgainstSchema_ValidatesCompositeValues(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &ConfigEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -121,6 +125,7 @@ func TestValidateConfigEntryAgainstSchema_ValidatesCompositeValues(t *testing.T)
 }
 
 func TestValidateConfigEntryAgainstSchema_RejectsCompositePolicyViolations(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &ConfigEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -158,6 +163,7 @@ func TestValidateConfigEntryAgainstSchema_RejectsCompositePolicyViolations(t *te
 }
 
 func TestValidateConfigEntryAgainstSchema_UnknownBlockNoOp(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	// Unknown block paths are handled by ValidatePathInSchema, not here.
 	entry := &ConfigEntry{
 		AppName:     "task-api",
@@ -173,6 +179,7 @@ func TestValidateConfigEntryAgainstSchema_UnknownBlockNoOp(t *testing.T) {
 }
 
 func TestValidateSecretEntryAgainstSchema_WarnsOnNonSensitive(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &SecretEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -195,6 +202,7 @@ func TestValidateSecretEntryAgainstSchema_WarnsOnNonSensitive(t *testing.T) {
 }
 
 func TestValidateSecretEntryAgainstSchema_QuietOnSensitive(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &SecretEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -208,6 +216,7 @@ func TestValidateSecretEntryAgainstSchema_QuietOnSensitive(t *testing.T) {
 }
 
 func TestValidateSecretEntryAgainstSchema_QuietOnNestedSensitive(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &SecretEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -221,6 +230,7 @@ func TestValidateSecretEntryAgainstSchema_QuietOnNestedSensitive(t *testing.T) {
 }
 
 func TestValidateSecretEntryAgainstSchema_QuietOnMapValueSensitive(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &SecretEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -234,6 +244,7 @@ func TestValidateSecretEntryAgainstSchema_QuietOnMapValueSensitive(t *testing.T)
 }
 
 func TestValidateSecretEntryAgainstSchema_WarnsOnMapValuePlaintext(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	entry := &SecretEntry{
 		AppName:     "task-api",
 		Environment: "production",
@@ -247,6 +258,7 @@ func TestValidateSecretEntryAgainstSchema_WarnsOnMapValuePlaintext(t *testing.T)
 }
 
 func TestValidateSecretEntryAgainstSchema_UnknownPathNoOp(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	// Unknown paths handled by ValidatePathInSchema.
 	entry := &SecretEntry{
 		AppName:     "task-api",
@@ -261,6 +273,7 @@ func TestValidateSecretEntryAgainstSchema_UnknownPathNoOp(t *testing.T) {
 }
 
 func TestValidateSecretEntryAgainstSchema_BlockPathQuietOnAtLeastOneSensitive(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	// "database" block has both plaintext and sensitive fields. A block-level
 	// secret entry is plausible (caller chose to encrypt the bundle).
 	entry := &SecretEntry{
@@ -276,6 +289,7 @@ func TestValidateSecretEntryAgainstSchema_BlockPathQuietOnAtLeastOneSensitive(t 
 }
 
 func TestValidateSecretEntryAgainstSchema_BlockPathWarnsOnAllPlaintext(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	// "cache" block has only plaintext fields. Storing the whole block in
 	// the secrets store would over-encrypt non-sensitive config.
 	manifest := &SchemaManifest{
@@ -309,6 +323,7 @@ func TestValidateSecretEntryAgainstSchema_BlockPathWarnsOnAllPlaintext(t *testin
 }
 
 func TestValidatePathInSchema(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	m := testManifest()
 	tests := []struct {
 		path    string
@@ -341,6 +356,7 @@ func TestValidatePathInSchema(t *testing.T) {
 }
 
 func TestValidatePathInSchema_PrefersLongestDottedBlock(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "sensitive-decides-the-store", "each-store-misuse-gets-its-diagnostic")
 	m := &SchemaManifest{
 		AppName: "task-api",
 		Configs: []Block{

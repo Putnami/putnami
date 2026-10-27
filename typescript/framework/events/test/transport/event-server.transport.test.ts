@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { runInContext } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { PUTNAMI_EVENTS_PROTOCOL } from '../../src/protocol';
 import {
   EventServerAmbiguousPublishError,
@@ -9,6 +10,28 @@ import {
   type EventServerTransportConfig,
 } from '../../src/transport/event-server.transport';
 import type { Envelope } from '../../src/transport/transport';
+
+// Each test proves a requirement of the events protocol's feature under a check of this package's own.
+const CANONICAL_REQUEST = {
+  feature: 'events/event-server-contract',
+  requirement: 'a-managed-publish-is-one-authenticated-post',
+  check: 'the-typescript-transport-posts-the-canonical-request',
+};
+const REFUSED_BEFORE_SENDING = {
+  feature: 'events/event-server-contract',
+  requirement: 'a-managed-publish-is-one-authenticated-post',
+  check: 'the-typescript-transport-refuses-an-unadmissible-frame-before-sending',
+};
+const SAME_BYTES = {
+  feature: 'events/event-server-contract',
+  requirement: 'a-retry-resends-the-same-bytes',
+  check: 'the-typescript-transport-resends-the-same-bytes',
+};
+const ANSWER_CLASSES = {
+  feature: 'events/event-server-contract',
+  requirement: 'publish-answers-have-four-classes',
+  check: 'the-typescript-transport-classifies-each-answer',
+};
 
 const TOKEN = 'header.payload.signature';
 
@@ -64,7 +87,7 @@ function config(overrides: Partial<EventServerTransportConfig> = {}): EventServe
 }
 
 describe('EventServerPublisherTransport request contract', () => {
-  it('posts the canonical managed frame with credentials and W3C trace headers', async () => {
+  specTest('posts the canonical managed frame with credentials and W3C trace headers', CANONICAL_REQUEST, async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const audiences: string[] = [];
     const transport = eventServerTransport(
@@ -126,32 +149,36 @@ describe('EventServerPublisherTransport request contract', () => {
     expect(body['topologyGenerationId']).toBeUndefined();
   });
 
-  it('preserves exact request bytes and identity across retryable and ambiguous attempts', async () => {
-    const bodies: string[] = [];
-    let attempt = 0;
-    const transport = eventServerTransport(
-      config({
-        retry: { maxAttempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
-        random: () => 0,
-        sleep: async () => {},
-        fetch: async (_input, init) => {
-          bodies.push(String(init?.body));
-          attempt += 1;
-          if (attempt === 1) return rejected(503, true);
-          if (attempt === 2) throw new Error('connection reset');
-          return accepted();
-        },
-      }),
-    );
+  specTest(
+    'preserves exact request bytes and identity across retryable and ambiguous attempts',
+    SAME_BYTES,
+    async () => {
+      const bodies: string[] = [];
+      let attempt = 0;
+      const transport = eventServerTransport(
+        config({
+          retry: { maxAttempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
+          random: () => 0,
+          sleep: async () => {},
+          fetch: async (_input, init) => {
+            bodies.push(String(init?.body));
+            attempt += 1;
+            if (attempt === 1) return rejected(503, true);
+            if (attempt === 2) throw new Error('connection reset');
+            return accepted();
+          },
+        }),
+      );
 
-    await transport.publish('orders.created', envelope({ dedupeKey: 'outbox-row-7' }));
+      await transport.publish('orders.created', envelope({ dedupeKey: 'outbox-row-7' }));
 
-    expect(bodies).toHaveLength(3);
-    expect(new Set(bodies).size).toBe(1);
-    const body = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>;
-    expect(body['id']).toBe('evt-123');
-    expect(body['dedupeKey']).toBe('outbox-row-7');
-  });
+      expect(bodies).toHaveLength(3);
+      expect(new Set(bodies).size).toBe(1);
+      const body = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>;
+      expect(body['id']).toBe('evt-123');
+      expect(body['dedupeKey']).toBe('outbox-row-7');
+    },
+  );
 
   it('rejects oversized frames before acquiring credentials or sending', async () => {
     let tokenCalls = 0;
@@ -176,38 +203,42 @@ describe('EventServerPublisherTransport request contract', () => {
     expect(fetchCalls).toBe(0);
   });
 
-  it('rejects missing topic versions and reserved authority attributes before sending', async () => {
-    let fetchCalls = 0;
-    const transport = eventServerTransport(
-      config({
-        fetch: async () => {
-          fetchCalls += 1;
-          return accepted();
-        },
-      }),
-    );
+  specTest(
+    'rejects missing topic versions and reserved authority attributes before sending',
+    REFUSED_BEFORE_SENDING,
+    async () => {
+      let fetchCalls = 0;
+      const transport = eventServerTransport(
+        config({
+          fetch: async () => {
+            fetchCalls += 1;
+            return accepted();
+          },
+        }),
+      );
 
-    await expect(transport.publish('orders.created', envelope({ topicVersion: undefined }))).rejects.toBeInstanceOf(
-      EventServerPermanentPublishError,
-    );
-    await expect(
-      transport.publish('orders.created', envelope({ attributes: { workspace_id: 'caller-owned' } })),
-    ).rejects.toBeInstanceOf(EventServerPermanentPublishError);
-    await expect(
-      transport.publish('orders.created', envelope({ attributes: { 'putnami.route': 'fallback' } })),
-    ).rejects.toBeInstanceOf(EventServerPermanentPublishError);
-    await expect(
-      transport.publish('orders.created', envelope({ attributes: { 'auth.subject': 'caller-owned' } })),
-    ).rejects.toBeInstanceOf(EventServerPermanentPublishError);
-    await expect(transport.publish('orders.created', envelope({ channel: 'caller-channel' }))).rejects.toBeInstanceOf(
-      EventServerPermanentPublishError,
-    );
-    expect(fetchCalls).toBe(0);
-  });
+      await expect(transport.publish('orders.created', envelope({ topicVersion: undefined }))).rejects.toBeInstanceOf(
+        EventServerPermanentPublishError,
+      );
+      await expect(
+        transport.publish('orders.created', envelope({ attributes: { workspace_id: 'caller-owned' } })),
+      ).rejects.toBeInstanceOf(EventServerPermanentPublishError);
+      await expect(
+        transport.publish('orders.created', envelope({ attributes: { 'putnami.route': 'fallback' } })),
+      ).rejects.toBeInstanceOf(EventServerPermanentPublishError);
+      await expect(
+        transport.publish('orders.created', envelope({ attributes: { 'auth.subject': 'caller-owned' } })),
+      ).rejects.toBeInstanceOf(EventServerPermanentPublishError);
+      await expect(transport.publish('orders.created', envelope({ channel: 'caller-channel' }))).rejects.toBeInstanceOf(
+        EventServerPermanentPublishError,
+      );
+      expect(fetchCalls).toBe(0);
+    },
+  );
 });
 
 describe('EventServerPublisherTransport outcomes', () => {
-  it('accepts a matching structured 200 response', async () => {
+  specTest('accepts a matching structured 200 response', ANSWER_CLASSES, async () => {
     let calls = 0;
     const transport = eventServerTransport(
       config({
@@ -225,7 +256,7 @@ describe('EventServerPublisherTransport outcomes', () => {
   });
 
   for (const status of [201, 202]) {
-    it(`classifies a matching structured ${status} response as ambiguous`, async () => {
+    specTest(`classifies a matching structured ${status} response as ambiguous`, ANSWER_CLASSES, async () => {
       let calls = 0;
       const transport = eventServerTransport(
         config({
@@ -245,7 +276,7 @@ describe('EventServerPublisherTransport outcomes', () => {
   }
 
   for (const status of [400, 401, 403]) {
-    it(`classifies structured ${status} as permanent without leaking tokens`, async () => {
+    specTest(`classifies structured ${status} as permanent without leaking tokens`, ANSWER_CLASSES, async () => {
       let calls = 0;
       const transport = eventServerTransport(
         config({
@@ -275,7 +306,7 @@ describe('EventServerPublisherTransport outcomes', () => {
   }
 
   for (const status of [400, 401, 403]) {
-    it(`classifies structured ${status} without a retryable hint as ambiguous`, async () => {
+    specTest(`classifies structured ${status} without a retryable hint as ambiguous`, ANSWER_CLASSES, async () => {
       let calls = 0;
       const transport = eventServerTransport(
         config({
@@ -295,7 +326,7 @@ describe('EventServerPublisherTransport outcomes', () => {
   }
 
   for (const status of [429, 503]) {
-    it(`classifies exhausted structured ${status} as retryable`, async () => {
+    specTest(`classifies exhausted structured ${status} as retryable`, ANSWER_CLASSES, async () => {
       let calls = 0;
       const transport = eventServerTransport(
         config({
@@ -321,7 +352,7 @@ describe('EventServerPublisherTransport outcomes', () => {
   }
 
   for (const status of [429, 503]) {
-    it(`honors Retry-After for structured retryable ${status}`, async () => {
+    specTest(`honors Retry-After for structured retryable ${status}`, ANSWER_CLASSES, async () => {
       const delays: number[] = [];
       let calls = 0;
       const transport = eventServerTransport(
@@ -348,7 +379,7 @@ describe('EventServerPublisherTransport outcomes', () => {
   }
 
   for (const status of [429, 503]) {
-    it(`classifies structured ${status} without a retryable hint as ambiguous`, async () => {
+    specTest(`classifies structured ${status} without a retryable hint as ambiguous`, ANSWER_CLASSES, async () => {
       let calls = 0;
       const transport = eventServerTransport(
         config({
@@ -367,7 +398,7 @@ describe('EventServerPublisherTransport outcomes', () => {
     });
   }
 
-  it('classifies a reset, malformed success, and unstructured 5xx as ambiguous', async () => {
+  specTest('classifies a reset, malformed success, and unstructured 5xx as ambiguous', ANSWER_CLASSES, async () => {
     const responses: Array<Response | Error> = [
       new Error('reset'),
       Response.json({ protocol: PUTNAMI_EVENTS_PROTOCOL, id: 'different', topic: 'orders.created' }),
