@@ -912,8 +912,6 @@
             "kind": "acceptance",
             "checks": [
               "every-listed-head-is-resolved-once",
-              "an-empty-channel-releases-with-a-null-expectation",
-              "a-conflict-on-one-channel-writes-nothing",
               "selection-fingerprint-follows-the-package-key",
               "distinct-package-provider-fingerprint-follows-real-package-key",
               "an-empty-channel-measures-against-the-named-baseline",

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func mustRef(t *testing.T, releaseSet *ReleaseSet) ReleaseSetRef {
@@ -43,6 +44,7 @@ func visibilityChain() VisibilityChain {
 }
 
 func TestResolveContractAndExchange(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-resolve-answers-exactly-what-it-asked", "a-resolve-answer-binds-to-its-request")
 	releaseSet := representativeSet()
 	ref := mustRef(t, releaseSet)
 	head := &ChannelHead{Ref: ref, Generation: 42, ReleaseSet: releaseSet}
@@ -144,6 +146,7 @@ func TestResolveContractAndExchange(t *testing.T) {
 }
 
 func TestResolveSelectorIsStrictExclusiveAndCanonical(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-resolve-answers-exactly-what-it-asked", "a-resolve-names-channels-or-one-release")
 	validID := "rs_" + strings.Repeat("a", 64)
 	tests := []struct {
 		name  string
@@ -184,6 +187,7 @@ func TestResolveSelectorIsStrictExclusiveAndCanonical(t *testing.T) {
 }
 
 func TestReleaseContractBindsSetChannelsAndVisibility(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-release-is-one-compare-and-swap", "a-release-answer-binds-to-its-request")
 	releaseSet := representativeSet()
 	ref := mustRef(t, releaseSet)
 	request := ReleaseRequest{
@@ -341,6 +345,7 @@ func TestReleaseContractBindsSetChannelsAndVisibility(t *testing.T) {
 }
 
 func TestChannelSetContract(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-channel-set-moves-one-channel", "a-channel-set-answer-binds-to-its-source")
 	ref := mustRef(t, representativeSet())
 	request := ChannelSetRequest{
 		ProtocolVersion: ProtocolVersion, Namespace: "putnami", Channel: "latest",
@@ -433,6 +438,7 @@ func TestChannelSetContract(t *testing.T) {
 }
 
 func TestChannelStatusContract(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-channel-status-reports-desired-and-observed", "a-channel-status-answer-is-strict")
 	releaseSet := representativeSet()
 	ref := mustRef(t, releaseSet)
 	request := ChannelStatusRequest{ProtocolVersion: ProtocolVersion, Namespace: "putnami", Channel: "latest"}
@@ -488,6 +494,7 @@ func TestChannelStatusContract(t *testing.T) {
 }
 
 func TestParseAndValidateChannelHeadIsStrict(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-resolve-answers-exactly-what-it-asked", "a-head-recomputes-from-its-snapshot")
 	releaseSet := representativeSet()
 	ref := mustRef(t, releaseSet)
 	head := ChannelHead{Ref: ref, Generation: 42, ReleaseSet: releaseSet}
@@ -515,6 +522,7 @@ func TestParseAndValidateChannelHeadIsStrict(t *testing.T) {
 }
 
 func TestPublishOutcomeIsStrictAndTyped(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-publish-outcome-names-one-set", "the-publish-outcome-is-strict")
 	ref := mustRef(t, representativeSet())
 	outcome := ReleaseSetPublishOutcome{
 		ProtocolVersion: ProtocolVersion, Namespace: "putnami", Ref: ref,
@@ -559,6 +567,7 @@ func TestPublishOutcomeIsStrictAndTyped(t *testing.T) {
 }
 
 func TestNilProviderValuesFailClosed(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "parsing-is-strict-and-bounded", "a-nil-provider-value-fails-closed")
 	checks := [][]diag.Diagnostic{
 		ValidateResolveRequest(nil), ValidateResolveResponse(nil), ValidateResolveExchange(nil, nil),
 		ValidateReleaseRequest(nil), ValidateReleaseResponse(nil), ValidateReleaseExchange(nil, nil),

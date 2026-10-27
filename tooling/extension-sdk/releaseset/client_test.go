@@ -12,6 +12,7 @@ import (
 	"time"
 
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func testResolveRequest() *distribution.ResolveRequest {
@@ -23,6 +24,7 @@ func testResolveRequest() *distribution.ResolveRequest {
 }
 
 func TestClientResolveUsesExactBoundedPrivateRequestFile(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-extension-sdk-passes-an-absolute-private-request-file")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
@@ -64,6 +66,7 @@ func TestClientResolveUsesExactBoundedPrivateRequestFile(t *testing.T) {
 // A release-id selector resolves the immutable set instead of a channel, and
 // the answer's generation is 0 because no channel names it.
 func TestClientResolveReadsAnImmutableRelease(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-resolve-answers-exactly-what-it-asked", "the-extension-sdk-resolves-an-immutable-release")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
@@ -89,6 +92,7 @@ func TestClientResolveReadsAnImmutableRelease(t *testing.T) {
 }
 
 func TestClientRejectsMalformedOrContaminatedResponseAndCleansUp(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-extension-sdk-refuses-a-malformed-answer")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
@@ -127,6 +131,7 @@ func TestClientRejectsMalformedOrContaminatedResponseAndCleansUp(t *testing.T) {
 }
 
 func TestClientChannelSetAndChannelStatusUseExactPublicOperations(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-extension-sdk-invokes-the-exact-operations")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
@@ -178,6 +183,7 @@ func TestClientChannelSetAndChannelStatusUseExactPublicOperations(t *testing.T) 
 // A channel-set answer that reports another channel would move a head the
 // caller never named, so the client refuses it rather than reporting success.
 func TestClientChannelSetRefusesAnAnswerAboutAnotherChannel(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-channel-set-moves-one-channel", "the-extension-sdk-refuses-an-answer-about-another-channel")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
@@ -202,6 +208,7 @@ func TestClientChannelSetRefusesAnAnswerAboutAnotherChannel(t *testing.T) {
 // while returning a different set: that would turn a successful CLI command
 // into a silent move to the wrong artifact cohort.
 func TestClientChannelSetBindsSuccessToTheSourceReleaseID(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-channel-set-moves-one-channel", "the-extension-sdk-binds-a-move-to-its-source-release")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)
@@ -226,6 +233,7 @@ func TestClientChannelSetBindsSuccessToTheSourceReleaseID(t *testing.T) {
 }
 
 func TestClientReleaseTransportsMirrorIntentThroughStrictProviderFile(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "mirror-intent-never-changes-the-set", "the-extension-sdk-carries-mirror-intent-to-the-provider")
 	tempDir := t.TempDir()
 	observation := filepath.Join(tempDir, "observed")
 	client := fakeProviderClient(t, tempDir, observation)

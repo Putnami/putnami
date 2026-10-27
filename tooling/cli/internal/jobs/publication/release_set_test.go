@@ -1460,7 +1460,7 @@ func TestPrepareReleaseSetProviderResolutionIsExactAndResolveOnce(t *testing.T) 
 }
 
 func TestPrepareReleaseSetEmptyChannelReleasesWithNullExpectation(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "release-set-channel-advance", "an-empty-channel-releases-with-a-null-expectation")
+	spectest.Proves(t, "distribution/release-set-contract", "a-release-is-one-compare-and-swap", "the-cli-releases-an-empty-channel-with-a-null-expectation")
 	ws, _, _ := releaseSetWorkspace(t)
 	useReleaseSetProvenance(t, nil)
 	provider := &fakeReleaseSetProvider{heads: emptyHead("canary")}

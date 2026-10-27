@@ -683,7 +683,7 @@ func TestReleaseSetE2ERepeatedAllPublishReleasesFromExistingHead(t *testing.T) {
 // release, writes NOTHING — not the set, not the channel that was still where
 // the plan left it — and the failure names every head that moved.
 func TestConflictOnOneChannelWritesNothing(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "release-set-channel-advance", "a-conflict-on-one-channel-writes-nothing")
+	spectest.Proves(t, "distribution/release-set-contract", "a-release-is-one-compare-and-swap", "the-cli-writes-nothing-when-one-channel-conflicts")
 	ctx := context.Background()
 	ledger := newReleaseSetE2ELedger()
 	useReleaseSetE2EProvider(t, ledger)

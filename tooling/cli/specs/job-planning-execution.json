@@ -83,7 +83,7 @@
     },
     {
       "id": "release-set-channel-advance",
-      "text": "Resolve all heads once in the declared distribution namespace (workspace name by default). Measure impact against the first advanced channel, or, when it has no head, against the named baseline channel, resolved with them and never advanced: republish members whose package execution-key fingerprint (excluding embedded version) changed and their dependents; inherit the rest. One release stores the snapshot and advances every channel by compare-and-swap. Any conflict writes nothing and names every head."
+      "text": "Resolve all heads once in the declared distribution namespace (workspace name by default). Measure impact against the first advanced channel, or, when it has no head, against the named baseline channel, resolved with them and never advanced: republish members whose package execution-key fingerprint (excluding embedded version) changed and their dependents; inherit the rest. The snapshot is released through distribution/release-set-contract."
     },
     {
       "id": "release-set-reuse-channel",

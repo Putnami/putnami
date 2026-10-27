@@ -407,6 +407,26 @@ constants, canonicalization, or fixtures into the provider repository. A rollout
 may start only after the pinned module is downloadable independently and its
 embedded corpus passes against the provider implementation.
 
+## Feature and spec
+
+The module owns the feature of its contract, `distribution/release-set-contract`,
+specified in
+[`specs/release-set-contract.json`](specs/release-set-contract.json). The tests
+here prove the identity, the member closure, the canonical bytes and ref, the
+optional provenance, the strict and bounded parsers, channel names and
+visibility, each provider exchange, the publish outcome, mirror intent and the
+embedded corpus. The implementers prove the rest under their own checks:
+
+- `@putnami/cloud-extension` (`the-cloud-extension-…`) serves the provider seam:
+  four exact operations, a checked request file and one answer line.
+- `putnami-extension-sdk` (`the-extension-sdk-…`) calls it: a private request
+  file, the exact operations, and refusal of an answer that does not bind.
+- `@putnami/cli` (`the-cli-…`) expects no head on an empty channel and advances
+  nothing on a conflict.
+
+Which members a publication republishes and which channels it advances stays in
+`cli/job-planning-execution`.
+
 ## Ownership, support, and evidence
 
 - **Owner:** `protocols/distribution`

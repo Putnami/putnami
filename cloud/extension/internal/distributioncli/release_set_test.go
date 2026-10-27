@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	diag "go.putnami.dev/protocol/diagnostic"
 	protocol "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The provider node speaks one line or none: the parent CLI parses stdout as a
@@ -24,6 +25,7 @@ import (
 // after the exchange any more — the CI run reports only its own lifecycle and
 // the release set emits its own channel fact.
 func TestReleaseSetEmitsExactlyOneProtocolLinePerOutcome(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-cloud-extension-prints-one-answer-line-per-outcome")
 	for _, outcome := range []protocol.ReleaseOutcome{
 		protocol.ReleaseOutcomeReleased,
 		protocol.ReleaseOutcomeAlreadyCurrent,
@@ -60,6 +62,7 @@ func TestReleaseSetEmitsExactlyOneProtocolLinePerOutcome(t *testing.T) {
 }
 
 func TestReleaseSetEmitsNothingWhenTheProviderFails(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-cloud-extension-prints-nothing-when-the-provider-fails")
 	release, _ := releaseExchange(t, protocol.ReleaseOutcomeReleased)
 	requestPath := writeReleaseSetRequest(t, release, 0o600)
 	root, env, ioctx, _ := releaseSetDirectBearerFixture(t)
@@ -131,6 +134,7 @@ func TestReleaseSetNamesAMissingMemberAndExitsNonZero(t *testing.T) {
 }
 
 func TestParseReleaseSetInvocationRequiresExactV2Tokens(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-cloud-extension-accepts-only-the-four-operations")
 	path := "/tmp/request.json"
 	for _, operation := range []string{protocol.ResolveCommand, protocol.ReleaseCommand, protocol.ChannelSetCommand, protocol.ChannelStatusCommand} {
 		t.Run(operation, func(t *testing.T) {
@@ -256,6 +260,7 @@ func TestReleaseSetOperationsPostOneStrictV2Exchange(t *testing.T) {
 }
 
 func TestPrepareReleaseSetRequestRejectsMismatchedV2Exchanges(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-cloud-extension-refuses-an-answer-that-does-not-bind")
 	_, baseRef := releaseSetSnapshot(t, "putnami", "0.1.0-base", 'a')
 	targetSet, targetRef := releaseSetSnapshot(t, "putnami", "0.2.0-target", 'b')
 	_, otherRef := releaseSetSnapshot(t, "other", "0.3.0-other", 'c')
@@ -298,6 +303,7 @@ func TestPrepareReleaseSetRequestRejectsMismatchedV2Exchanges(t *testing.T) {
 }
 
 func TestReleaseSetRejectsHostileRequestFilesBeforeNetwork(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-cloud-extension-refuses-a-bad-request-file-before-the-network")
 	root, env, ioctx := distributionWorkflowFixture(t)
 	validRequest := &protocol.ResolveRequest{ProtocolVersion: protocol.ProtocolVersion, Namespace: "putnami", Channels: []string{"canary"}}
 	validPath := writeReleaseSetRequest(t, validRequest, 0o600)
@@ -341,6 +347,7 @@ func TestReleaseSetRejectsHostileRequestFilesBeforeNetwork(t *testing.T) {
 }
 
 func TestReleaseSetRejectsInvalidProviderResponseWithoutStdout(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-provider-seam-is-one-request-file-and-one-answer", "the-cloud-extension-refuses-an-invalid-answer")
 	for _, tc := range []struct {
 		name string
 		body []byte
