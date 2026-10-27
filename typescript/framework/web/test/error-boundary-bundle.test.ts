@@ -61,9 +61,11 @@ const buildBoundary = async (
   target: 'bun' | 'browser',
   exportName: string,
 ): Promise<BuiltBoundaries> => {
-  const stubRoot = mkdtempSync(join(packageRoot, '.boundary-bundle-'));
+  // Both folders live under the ignored node_modules: a folder beside the
+  // sources joins the package's source-v1 binding while it exists.
   const testRoot = join(packageRoot, 'node_modules', '.putnami-test');
   mkdirSync(testRoot, { recursive: true });
+  const stubRoot = mkdtempSync(join(testRoot, 'boundary-stub-'));
   const outputRoot = mkdtempSync(join(testRoot, 'boundary-bundle-'));
   const cleanup = () => {
     rmSync(stubRoot, { recursive: true, force: true });

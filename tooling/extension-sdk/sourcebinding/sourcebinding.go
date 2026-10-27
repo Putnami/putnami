@@ -26,6 +26,13 @@ import (
 // file takes its executable bit from the mode git records for it instead.
 const HostStatsExecBit = runtime.GOOS != "windows"
 
+// readFile and readlink read a path after Record stats it. They are variables
+// so a test can remove the path between the stat and the read.
+var (
+	readFile = os.ReadFile
+	readlink = os.Readlink
+)
+
 // RunGit runs git with args in dir and returns its standard output.
 type RunGit func(dir string, args ...string) (string, error)
 
@@ -34,8 +41,9 @@ type RunGit func(dir string, args ...string) (string, error)
 // the mode and object git's index records for a tracked path; an untracked
 // path passes both empty. statsExecBit selects where a regular file's
 // executable bit comes from (see FileMode); pass HostStatsExecBit. The second
-// result is false for a path that contributes nothing: a deleted file or a
-// directory. runGit reads a gitlink's visible commit.
+// result is false for a path that contributes nothing: a directory, or a file
+// that is deleted before Record reads it, even after Record stats it. runGit
+// reads a gitlink's visible commit.
 func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID string, statsExecBit bool) (protocaps.SourceBindingFile, bool, error) {
 	absPath := filepath.Join(repoRoot, filepath.FromSlash(repoPath))
 	projectRel, err := filepath.Rel(projectRoot, absPath)
@@ -84,7 +92,10 @@ func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID 
 		return protocaps.SourceBindingFile{}, false, nil
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		target, readErr := os.Readlink(absPath)
+		target, readErr := readlink(absPath)
+		if os.IsNotExist(readErr) {
+			return protocaps.SourceBindingFile{}, false, nil
+		}
 		if readErr != nil {
 			return protocaps.SourceBindingFile{}, false, fmt.Errorf("read source symlink %q: %w", repoPath, readErr)
 		}
@@ -93,7 +104,10 @@ func Record(runGit RunGit, repoRoot, projectRoot, repoPath, indexMode, objectID 
 	if !info.Mode().IsRegular() {
 		return protocaps.SourceBindingFile{}, false, fmt.Errorf("source path %q has unsupported mode %s", repoPath, info.Mode())
 	}
-	data, err := os.ReadFile(absPath) //nolint:gosec // path is constrained to the exact project root
+	data, err := readFile(absPath) //nolint:gosec // path is constrained to the exact project root
+	if os.IsNotExist(err) {
+		return protocaps.SourceBindingFile{}, false, nil
+	}
 	if err != nil {
 		return protocaps.SourceBindingFile{}, false, fmt.Errorf("read source path %q: %w", repoPath, err)
 	}

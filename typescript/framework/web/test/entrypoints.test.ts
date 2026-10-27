@@ -344,7 +344,14 @@ export default error().render(function ErrorPage() {
   );
 
   it('preserves ALS-backed document metadata in a standalone compiled executable', async () => {
-    const sourceRoot = mkdtempSync(join(import.meta.dir, '.compiled-document-meta-'));
+    const packageRoot = join(import.meta.dir, '..');
+    // Write the probe under the ignored node_modules, which still resolves this
+    // package's dependencies. A probe beside the sources joins the package's
+    // source-v1 binding while it exists.
+    const testTmpRoot = join(packageRoot, 'node_modules', '.putnami-test');
+    mkdirSync(testTmpRoot, { recursive: true });
+    const sourceRoot = mkdtempSync(join(testTmpRoot, 'compiled-document-meta-'));
+    const documentModule = (name: string) => JSON.stringify(join(packageRoot, 'src', 'client', 'document', name));
     const executableRoot = mkdtempSync(join(tmpdir(), 'putnami-web-document-meta-'));
     const packageEntrypoint = join(sourceRoot, 'package-entry.ts');
     const consumerEntrypoint = join(sourceRoot, 'consumer.ts');
@@ -362,11 +369,11 @@ export default error().render(function ErrorPage() {
       writeFileSync(packagedBundle, '');
       writeFileSync(
         packageEntrypoint,
-        `export { Favicon, HeaderLink } from '../../src/client/document/favicon';
-export { Lang } from '../../src/client/document/lang';
-export { Script } from '../../src/client/document/script';
-export { Style } from '../../src/client/document/style';
-export { SsrDocumentHelper } from '../../src/client/document/document-ssr.helper';
+        `export { Favicon, HeaderLink } from ${documentModule('favicon')};
+export { Lang } from ${documentModule('lang')};
+export { Script } from ${documentModule('script')};
+export { Style } from ${documentModule('style')};
+export { SsrDocumentHelper } from ${documentModule('document-ssr.helper')};
 `,
       );
       writeFileSync(

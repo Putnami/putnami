@@ -177,3 +177,51 @@ func TestRecordOfAGitlink(t *testing.T) {
 		t.Error("a gitlink that is a file was accepted")
 	}
 }
+
+// removeBeforeRead makes *read remove its path before it reads it, as a test
+// that deletes its scratch files does between Record's stat and its read. It
+// swaps a package variable, so a test that calls it must not run in parallel.
+func removeBeforeRead[T any](t *testing.T, read *func(string) (T, error)) {
+	t.Helper()
+	original := *read
+	*read = func(path string) (T, error) {
+		if err := os.Remove(path); err != nil {
+			t.Fatalf("remove %s before the read: %v", path, err)
+		}
+		return original(path)
+	}
+	t.Cleanup(func() { *read = original })
+}
+
+// A regular file removed after Record stats it and before Record reads it
+// contributes nothing, like a file that is already gone at the stat.
+func TestRecordOfARegularFileRemovedBeforeTheReadIsAbsent(t *testing.T) {
+	repo := t.TempDir()
+	project := filepath.Join(repo, "project")
+	writeFile(t, filepath.Join(project, ".scratch", "probe.ts"), "export {};\n", 0o644)
+	removeBeforeRead(t, &readFile)
+
+	record, exists, err := Record(noGit, repo, project, "project/.scratch/probe.ts", "", "", HostStatsExecBit)
+	if err != nil || exists {
+		t.Fatalf("Record = %+v, exists %v, %v; want an absent path and no error", record, exists, err)
+	}
+}
+
+// A symbolic link removed after Record stats it and before Record reads its
+// target contributes nothing either.
+func TestRecordOfASymlinkRemovedBeforeTheReadIsAbsent(t *testing.T) {
+	repo := t.TempDir()
+	project := filepath.Join(repo, "project")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("target", filepath.Join(project, "link")); err != nil {
+		t.Skipf("this host cannot create a symbolic link: %v", err)
+	}
+	removeBeforeRead(t, &readlink)
+
+	record, exists, err := Record(noGit, repo, project, "project/link", "", "", HostStatsExecBit)
+	if err != nil || exists {
+		t.Fatalf("Record = %+v, exists %v, %v; want an absent path and no error", record, exists, err)
+	}
+}

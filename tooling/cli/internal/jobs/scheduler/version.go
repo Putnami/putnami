@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -537,6 +538,17 @@ func (memo *capabilitySourceBindingMemo) sourceBinding(
 			spawnedProcesses++
 		}
 		result.binding, result.unmanaged = "", unmanaged
+		if !unmanaged {
+			// The memo keeps this result until the project's binding is
+			// invalidated, so the cause is reported once for every stamp
+			// and cache key that reads the empty binding.
+			project, relErr := filepath.Rel(repoKey, key)
+			if relErr != nil {
+				project = key
+			}
+			slog.Warn("cannot compute a project's source-v1 binding; its capability stamps carry none",
+				"project", filepath.ToSlash(project), "error", result.err)
+		}
 	}
 	memo.results[key] = result
 	return result, spawnedProcesses
