@@ -176,5 +176,21 @@ func TestDrift_ShapesMatchGoTypes(t *testing.T) {
 		if want := jsonFieldNames(tc.goType); !slices.Equal(names, want) {
 			t.Errorf("%s: shape members %v, Go members %v", tc.name, names, want)
 		}
+		// The walk is case-sensitive: a member spelled with its first letter's
+		// case flipped is undeclared, where encoding/json would accept it.
+		for _, name := range names {
+			alias := flipFirstLetterCase(name)
+			if field, ok := firstUnknownMember(map[string]any{alias: nil}, tc.shape, ""); ok || field != alias {
+				t.Errorf("%s: the walk admits the case alias %q of %q", tc.name, alias, name)
+			}
+		}
 	}
+}
+
+func flipFirstLetterCase(name string) string {
+	first := name[:1]
+	if upper := strings.ToUpper(first); upper != first {
+		return upper + name[1:]
+	}
+	return strings.ToLower(first) + name[1:]
 }
