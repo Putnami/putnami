@@ -724,6 +724,21 @@
           }
         },
         {
+          "id": "coverage-profile-lists-each-block-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "repeated-blocks-merge-as-go-tool-cover-merges-them",
+              "a-solo-profile-lists-each-block-once",
+              "a-batch-members-profile-lists-each-block-once"
+            ]
+          }
+        },
+        {
           "id": "test-host-identity-scrub",
           "stage": "coded",
           "evidenceKinds": [

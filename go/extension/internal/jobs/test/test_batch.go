@@ -699,6 +699,8 @@ func testOutputFailed(output string) bool {
 // package, never to a member whose module path is merely a prefix of it: a
 // nested module's blocks go to the nested project when it is a member and
 // fail the split otherwise, so they can never dilute the parent's coverage.
+// Each member's file lists each block once: `go test` repeats a block for
+// every test binary, and parse.MergeCoverageBlocks merges the repeats.
 func splitBatchCoverage(combinedPath string, projects []*batchProject) error {
 	data, err := os.ReadFile(combinedPath)
 	if err != nil {
@@ -735,7 +737,7 @@ func splitBatchCoverage(combinedPath string, projects []*batchProject) error {
 		if err := os.MkdirAll(filepath.Dir(project.coverFile), 0o755); err != nil {
 			return err
 		}
-		lines := append([]string{mode}, linesByProject[project.ref.ID]...)
+		lines := append([]string{mode}, parse.MergeCoverageBlocks(parse.CoverageMode(mode), linesByProject[project.ref.ID])...)
 		if err := os.WriteFile(project.coverFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 			return err
 		}

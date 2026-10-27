@@ -16,6 +16,7 @@
     "go/go-project-toolchain#command-kinds-and-traits",
     "go/go-project-toolchain#committed-client-drift",
     "go/go-project-toolchain#contract-canonicalization-preserves-declared-order",
+    "go/go-project-toolchain#coverage-profile-lists-each-block-once",
     "go/go-project-toolchain#declared-compile-matrix",
     "go/go-project-toolchain#dry-run-registry-probe",
     "go/go-project-toolchain#explicit-entrypoint",

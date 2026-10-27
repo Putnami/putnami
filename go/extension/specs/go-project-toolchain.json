@@ -128,6 +128,10 @@
       "text": "A project's coverage profile holds the packages its own module owns, listed explicitly rather than matched by a directory pattern. A module nested under the project's directory and reachable through go.work is never instrumented into the project's profile nor charged to it by prefix — on the solo path, in a one-member batch, in a batch that includes the nested module, and under both coverage scopes — and the nested module keeps its own independent measurement."
     },
     {
+      "id": "coverage-profile-lists-each-block-once",
+      "text": "The coverage profile a test run leaves lists each block once, on the solo path and for each member of a batch under both coverage scopes. go test -coverpkg writes every instrumented block once per test binary; the repeats merge the way go tool cover merges them, ORed in set mode and added in count and atomic mode, so the reported coverage and the HTML report do not change. A block listed once keeps its line as go test wrote it."
+    },
+    {
       "id": "bounded-test-output",
       "text": "Test runs emit one deterministic structured outcome summary by default, retain the complete transcript as session-detail log events, bound causal failure diagnostics to the CLI report limits with explicit omission accounting, and let test-verbose change visibility without changing result data or verdicts."
     },
