@@ -3,6 +3,9 @@
   "name": "go.putnami.dev/protocol/doccov",
   "tags": ["go", "protocol"],
   "extensions": ["/go/extension"],
+  "featureAuthority": {
+    "none": "A documentation guard over the sibling protocol packages; it has no wire, no consumer and no user outcome."
+  },
   "disable": {
     "jobs": ["serve"]
   },
