@@ -11,7 +11,8 @@ The manifest declares an `agentContent` contribution, which the CLI builds
 and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
 (`.agents/skills`, `.codex/agents`) under the extension's own version. It also
 declares a compiled runtime, `compiled/putnami-contributor`, which serves
-`putnami change language`, `change verify` and `change finalize`
+`putnami change language`, `change verify`, `change finalize`, `agent hook`
+and `agent attach`
 ([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md),
 [ADR 0005](doc/adr/0005-the-contributor-executable-serves-the-change-noun.md),
 [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)).
@@ -84,6 +85,31 @@ projection. An optional workflow ref on the v2 dossier adds native
 requirement/producer completeness to the existing ready check. Only the
 dossier can compute `Putnami verified` for the declared local scope.
 
+## Agent sessions
+
+The manifest declares host hooks for Claude Code and Codex
+([ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)).
+The core writes them into `.claude/settings.json` and `.codex/hooks.json` when
+the workspace opts into this extension's content and binds the `missions`
+contract. Each hook runs `putnami agent hook`, which the executable serves:
+
+- At session start, the agent receives its mission sheet and the owner's
+  waiting messages.
+- A plan change, an asked decision and a recorded reply are kept locally.
+- At the end of a turn, one sync publishes the state, the plan, the delivered
+  messages, the decisions and the `[ack <id>] <reply>` lines of the last
+  message. A waiting message continues the turn once.
+- A message counts as delivered once the hook wrote it. A hook the host
+  stops before that leaves the message for the next hook.
+- Claude Code waits up to 10 minutes after a turn for the owner's next
+  message; Codex waits up to 180 seconds for the answer to a decision the
+  session asked.
+
+A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
+makes `issue-<n>` the mission of the checkout's branch. A hook never fails a
+turn: a failure leaves one line in `hook.log` under
+`<Putnami home>/contributor/sessions`.
+
 ## What it deliberately excludes
 
 - Backend calls, tracker labels, hosted addresses and memory storage layouts:
@@ -91,7 +117,8 @@ dossier can compute `Putnami verified` for the declared local scope.
   on them.
 - Host permissions, credentials and model access: `.claude/settings.json`,
   `.codex/config.toml` and the host's own configuration stay with the
-  workspace.
+  workspace. The only exception is the hooks this extension declares, which
+  the core writes and removes.
 - The `audit` skill and its workers, which stay hand-authored until their owner
   ships them as a contribution of their own.
 
@@ -107,8 +134,13 @@ dossier can compute `Putnami verified` for the declared local scope.
 - [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
 - [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)
 - [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)
+- [ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)
 
 ## Publication
+
+From this release on, the contributor needs a CLI at contract 17 or later,
+for its host hooks. An older CLI refuses the whole extension. A workspace
+moves its CLI and contributor pins together.
 
 No built-in starter declares this extension: `putnami init` installs nothing of
 it. A workspace asks for it with

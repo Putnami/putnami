@@ -21,6 +21,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	go.putnami.dev/cache v0.0.1 // indirect
 	go.putnami.dev/ctxutil v0.0.0 // indirect
 	go.putnami.dev/protocol/clientcontract v0.0.0 // indirect
@@ -36,6 +37,7 @@ require (
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	go.putnami.dev/security v0.0.1 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

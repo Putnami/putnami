@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func validProjectionDocument() string {
@@ -55,6 +56,7 @@ func TestParseAndValidateSpecCriteriaProjectionAcceptsTheCanonicalForm(t *testin
 }
 
 func TestParseSpecCriteriaProjectionRequiresTheExactVersionToken(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "strict-versioned-documents", "the-projection-reader-refuses-an-inexact-version-an-unknown-field-or-a-null")
 	for _, token := range []string{"0", "2", "1.0", "1e0"} {
 		document := strings.Replace(validProjectionDocument(), `"protocolVersion": 1`, `"protocolVersion": `+token, 1)
 		if projection, _ := ParseSpecCriteriaProjection([]byte(document)); projection != nil {
@@ -64,6 +66,7 @@ func TestParseSpecCriteriaProjectionRequiresTheExactVersionToken(t *testing.T) {
 }
 
 func TestParseSpecCriteriaProjectionRejectsUnknownFieldsAndNulls(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "strict-versioned-documents", "the-projection-reader-refuses-an-inexact-version-an-unknown-field-or-a-null")
 	unknown := strings.Replace(validProjectionDocument(), `"groups": [`, `"verdict": "verified", "groups": [`, 1)
 	if projection, _ := ParseSpecCriteriaProjection([]byte(unknown)); projection != nil {
 		t.Error("a projection carrying an undeclared field was accepted")
@@ -122,6 +125,7 @@ func TestValidateSpecCriteriaProjectionRejectsBrokenGroups(t *testing.T) {
 }
 
 func TestMarshalSpecCriteriaProjectionIsCanonicalAndByteStable(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "canonical-bytes-across-languages", "go-writes-the-criteria-projection-canonically")
 	unsorted := &SpecCriteriaProjection{
 		Schema:          "https://putnami.dev/schemas/putnami-spec-criteria.json",
 		ProtocolVersion: 1,

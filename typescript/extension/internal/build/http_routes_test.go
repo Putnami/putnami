@@ -6,10 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	httproutes "go.putnami.dev/protocol/http-routes"
 )
 
 func TestAggregateHTTPRoutesAcrossFrameworkFragments(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-typescript-aggregate-validates")
 	project := t.TempDir()
 	fragmentDir := filepath.Join(project, ".gen", httpRoutesFragmentDir)
 	if err := os.MkdirAll(fragmentDir, 0o755); err != nil {
@@ -60,6 +62,7 @@ func TestAggregateHTTPRoutesAcrossFrameworkFragments(t *testing.T) {
 }
 
 func TestAggregateHTTPRoutesRejectsUnsupportedPattern(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-typescript-aggregate-refuses-an-unsupported-pattern")
 	project := t.TempDir()
 	fragmentDir := filepath.Join(project, ".gen", httpRoutesFragmentDir)
 	if err := os.MkdirAll(fragmentDir, 0o755); err != nil {

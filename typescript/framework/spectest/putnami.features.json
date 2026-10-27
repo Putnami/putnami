@@ -17,25 +17,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-recorded-verdict-is-the-one-the-runner-observed"]
-          }
-        },
-        {
-          "id": "inert-without-the-adapter",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["no-fragment-directory-means-no-writes-and-the-same-verdicts"]
-          }
-        },
-        {
-          "id": "verdict-or-measurement",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["a-fragment-never-carries-both-a-verdict-and-a-measurement"]
+            "checks": ["the-runner-verdict-is-unchanged"]
           }
         }
       ]

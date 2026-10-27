@@ -1,0 +1,132 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/sessions",
+  "version": "1.0.0",
+  "cliContract": 17,
+  "commandGroups": {
+    "agent": {
+      "description": "Report agent sessions.",
+      "subcommands": {
+        "hook": {
+          "command": "agent-hook",
+          "description": "Run as an agent host hook.",
+          "interactive": true
+        }
+      }
+    }
+  },
+  "commands": {
+    "agent-hook": {
+      "description": "Run as an agent host hook.",
+      "run": [
+        {
+          "id": "hook",
+          "task": "hook-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "hook-exec": {
+      "kind": "command",
+      "command": "echo",
+      "args": [
+        "hook"
+      ]
+    }
+  },
+  "hostHooks": {
+    "requires": {
+      "contract": "missions"
+    },
+    "command": [
+      "agent",
+      "hook"
+    ],
+    "hosts": {
+      "claude-code": [
+        {
+          "event": "SessionStart",
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "PostToolUse",
+          "tools": [
+            "TodoWrite",
+            "TaskCreate"
+          ],
+          "mcpTools": [
+            "missions.ask"
+          ],
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "Stop",
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "Stop",
+          "args": [
+            "--engine",
+            "claude-code",
+            "--idle-wake"
+          ],
+          "wake": true,
+          "timeoutSeconds": 660
+        },
+        {
+          "event": "StopFailure",
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        }
+      ],
+      "codex": [
+        {
+          "event": "SessionStart",
+          "args": [
+            "--engine",
+            "codex"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "PostToolUse",
+          "tools": [
+            "update_plan"
+          ],
+          "mcpTools": [
+            "missions.ask"
+          ],
+          "args": [
+            "--engine",
+            "codex"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "Stop",
+          "args": [
+            "--engine",
+            "codex"
+          ],
+          "timeoutSeconds": 240
+        }
+      ]
+    }
+  }
+}

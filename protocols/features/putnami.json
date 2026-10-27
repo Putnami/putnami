@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/features",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -14,9 +14,11 @@
     },
     "test": {
       "filePatterns": ["fixtures/**", "git:**/putnami.features.json"]
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "Feature intent and evidence are contracts about other subjects, not a feature a user enables."
   }
 }

@@ -22,15 +22,15 @@ import (
 // So this is the full cross product of {absent, one behind, current, latest,
 // one ahead of latest} × {commands, command groups, tools, agent content,
 // verbs, command kinds, publish channels, provisioned toolchain, default
-// positionals, none},
+// positionals, host hooks, none},
 // in one table, next to the doc it mirrors. Ratcheting a row means editing this
 // table and that table together.
 //
 // The additive contracts above the base are opted into: a manifest needs one
 // only when it declares agent content, a verb vocabulary, command kinds,
-// publish channels, a provisioned toolchain candidate or a group default that
-// takes positionals, so the floor a stamp must reach depends on the surface,
-// while the ceiling does not.
+// publish channels, a provisioned toolchain candidate, a group default that
+// takes positionals or host hooks, so the floor a stamp must reach depends on
+// the surface, while the ceiling does not.
 
 // matrixManifest renders a manifest carrying exactly one kind of contract
 // surface at a given declared contract. Contract 0 is written as an ABSENT
@@ -101,6 +101,12 @@ const (
 	changedFilesBindingSurface = `"commands": {"test": {"run": [{"id": "r", "task": "t",
     "with": {"changed-files": {"from": "context", "path": "selection.changedFiles"}}}]}},
   "tasks": {"t": {"kind": "command", "command": "echo"}}`
+
+	hostHooksSurface = `"commandGroups": {"agent": {"subcommands": {"hook": {"command": "hook", "interactive": true}}}},
+  "commands": {"hook": {"run": [{"id": "h", "task": "t"}]}},
+  "tasks": {"t": {"kind": "command", "command": "echo"}},
+  "hostHooks": {"requires": {"contract": "missions"}, "command": ["agent", "hook"],
+    "hosts": {"codex": [{"event": "Stop", "timeoutSeconds": 30}]}}`
 )
 
 func writeMatrixManifest(t *testing.T, body string) string {
@@ -146,6 +152,7 @@ func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
 		{name: "default positionals", body: defaultPositionalsSurface, governs: true, required: protocolcli.DefaultPositionalsContract},
 		{name: "changed-files gate", body: changedFilesGateSurface, governs: true, required: protocolcli.ChangedFilesContract},
 		{name: "changed-files binding", body: changedFilesBindingSurface, governs: true, required: protocolcli.ChangedFilesContract},
+		{name: "host hooks", body: hostHooksSurface, governs: true, required: protocolcli.HostHooksContract},
 		{name: "hook-only", body: hookOnlySurface, governs: false, required: current},
 	}
 	contracts := []struct {
@@ -236,6 +243,7 @@ func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
 		defaultPositionalsSurface:   true,
 		changedFilesGateSurface:     true,
 		changedFilesBindingSurface:  true,
+		hostHooksSurface:            true,
 		hookOnlySurface:             false,
 	}
 	for surface, want := range cases {

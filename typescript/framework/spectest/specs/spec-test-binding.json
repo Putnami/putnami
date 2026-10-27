@@ -15,15 +15,7 @@
   "requirements": [
     {
       "id": "honest-verdict",
-      "text": "A bound test publishes exactly the verdict the runner observed and never alters that verdict: a settled body records passed, a throwing body records failed, a skipped test records skipped, and a body that never settles records nothing. One atomic fragment is written per check, carrying the declaring file and the test name as provenance."
-    },
-    {
-      "id": "inert-without-the-adapter",
-      "text": "Outside a Putnami-provided fragment directory the helpers register every test exactly as the bare runner would, write nothing, and cannot fail a run over reporting."
-    },
-    {
-      "id": "verdict-or-measurement",
-      "text": "A fragment carries an acceptance verdict or a measurement, never both, so a producer can state a number but never its own verdict. A measuring body that threw or was skipped publishes nothing at all, and a published measurement carries the invocation window its body actually covered."
+      "text": "specTest and observeMeasurement wrap bun:test and never change the verdict the runner gives: a suite whose bound body fails still fails, with or without a fragment directory. The fragment they write is the features protocol's, which @putnami/spectest proves under features/feature-contracts."
     }
   ],
   "decisions": []

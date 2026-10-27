@@ -6,7 +6,6 @@
     "go/service-telemetry#duration-precision",
     "go/service-telemetry#endpoint-required",
     "go/service-telemetry#explicit-sampling",
-    "go/service-telemetry#final-flush",
     "go/service-telemetry#lifecycle-purity",
     "go/service-telemetry#never-fails-the-workload",
     "go/service-telemetry#push-transport",

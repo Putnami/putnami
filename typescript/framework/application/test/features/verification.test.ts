@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { serializeFeatureVerificationReport, validateFeatureVerificationReport } from '../../src/features/verification';
 import type {
   FeatureVerificationReport,
@@ -29,26 +30,42 @@ function firstMeasured(report: FeatureVerificationReport): {
 }
 
 describe('feature verification report protocol', () => {
-  it('validates and reproduces the shared Go/TypeScript bytes', () => {
-    const bytes = readFileSync(EQUIVALENCE_FIXTURE, 'utf8');
-    const report = read();
-    expect(validateFeatureVerificationReport(report)).toEqual([]);
-    expect(serializeFeatureVerificationReport(report)).toBe(bytes);
+  specTest(
+    'validates and reproduces the shared Go/TypeScript bytes',
+    {
+      feature: 'features/feature-contracts',
+      requirement: 'canonical-bytes-across-languages',
+      check: 'typescript-reproduces-the-verification-report-golden',
+    },
+    () => {
+      const bytes = readFileSync(EQUIVALENCE_FIXTURE, 'utf8');
+      const report = read();
+      expect(validateFeatureVerificationReport(report)).toEqual([]);
+      expect(serializeFeatureVerificationReport(report)).toBe(bytes);
 
-    report.observations.reverse();
-    expect(serializeFeatureVerificationReport(report)).toBe(bytes);
-  });
+      report.observations.reverse();
+      expect(serializeFeatureVerificationReport(report)).toBe(bytes);
+    },
+  );
 
-  it('rejects every report the Go reader rejects', () => {
-    const fixtures = readdirSync(INVALID_DIR).filter((name) => name.startsWith('verification-'));
-    expect(fixtures.length).toBeGreaterThan(0);
+  specTest(
+    'rejects every report the Go reader rejects',
+    {
+      feature: 'features/feature-contracts',
+      requirement: 'conformance-corpus',
+      check: 'typescript-refuses-every-invalid-verification-fixture',
+    },
+    () => {
+      const fixtures = readdirSync(INVALID_DIR).filter((name) => name.startsWith('verification-'));
+      expect(fixtures.length).toBeGreaterThan(0);
 
-    for (const name of fixtures) {
-      const report = JSON.parse(readFileSync(join(INVALID_DIR, name), 'utf8')) as FeatureVerificationReport;
-      const diagnostics = validateFeatureVerificationReport(report);
-      expect(diagnostics.length, `${name} was accepted by the TypeScript reader`).toBeGreaterThan(0);
-    }
-  });
+      for (const name of fixtures) {
+        const report = JSON.parse(readFileSync(join(INVALID_DIR, name), 'utf8')) as FeatureVerificationReport;
+        const diagnostics = validateFeatureVerificationReport(report);
+        expect(diagnostics.length, `${name} was accepted by the TypeScript reader`).toBeGreaterThan(0);
+      }
+    },
+  );
 
   it('closes the wire at every level so a producer cannot declare its own authority', () => {
     // The payload must not name an issuer, project, source binding, threshold,

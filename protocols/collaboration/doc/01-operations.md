@@ -131,6 +131,112 @@ orchestrator resolves them through its own selection projection and hands the
 provider the resolved `selection` and the workspace membership; the provider
 tool must declare `workspaceSelection`.
 
+## missions v1
+
+| Operation | Access | Required | Destructive | Preconditions | Host-only | Request | Result |
+|---|---|---|---|---|---|---|---|
+| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies` | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
+| `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
+| `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
+
+A mission is named by `{repository, key, title}`. `repository` and `key` are
+the memory identity's `repository` and `mission`, and both are required.
+Together they are the mission's identity, compared exactly. `repository` is
+lowercase, such as `owner/name`: a host sends it so, and a name with an
+uppercase letter is refused. `title` is for display, is not part of the
+identity, and follows the task title bound. A session is `{engine, id}`:
+`engine` is `[a-z0-9-]{1,32}` and names the host that runs the agent, and `id`
+is that host's own session id, `[A-Za-z0-9._:-]{1,128}`.
+
+A **host-only** operation is one the host that runs an agent calls, never the
+agent. The MCP server lists no tool for it, and `missions.capabilities` marks
+it `hostOnly: true`. `putnami missions sync` and the host channel's
+`collaboration.call` route it like any other operation. The agent sees
+`missions.ask` and `missions.reply` as tools. It takes the mission's
+repository and key, and the id of each message, from the session sheet that
+the session hook prints.
+
+A message or decision id is a bare token, 1 to 64 characters of
+`[A-Za-z0-9_-]`, not a reference. One binding means one provider, so an id
+needs no source, and an agent types it. An option id is 1 to 64 characters of
+`[A-Za-z0-9._-]`.
+
+**sync** publishes a session and reads the mission back. `state` is
+`working`, `handed_back`, `waiting` or `failed`. `waitUntil` is required with
+`waiting` and refused with any other state; `error` goes only with `failed`.
+`event` names the host event that caused the sync, `[a-z_]{1,32}`; a provider
+records it and never branches on it. `observedAt` is an RFC 3339 UTC time. A
+provider applies `state` and `plan` only from a sync observed later than the
+last one it applied for the session, so an older sync never overwrites a
+newer one. An absent `plan` leaves the plan unchanged; a plan with no steps
+clears it. A plan holds at most 100 steps, each `{key, status, text}`: `key`
+is a token, unique in its plan, and `status` is `todo`, `doing` or `done`.
+
+- `delivered` (at most 100) lists the inbox messages the host gave the agent;
+  they leave the inbox. Delivering an answer message moves its decision to
+  `acknowledged`.
+- `decisions` (at most 20) lists the decisions the session asked. Sending them
+  binds them to the session, and the result reports their state.
+- `replies` (at most 20) carries the agent's replies, `{message, reply}`, one
+  per message.
+
+`delivered` and `decisions` are sets: a repeated id counts once. A provider
+ignores an id in either list that it does not know or that is not the
+caller's, such as another person's. An id from another mission of the caller
+applies, so a session that changed mission still acknowledges what it
+received before. The ids a sync carries apply whatever its age.
+
+The result's `replies` has one entry per reply the sync carried: `replied`,
+or `refused` with a `reason`. A refused reply is final: the host drops it,
+and it never refuses the sync. The reason is `message.closed` (the message
+holds another reply), `message.not_found` (the provider does not know the
+message) or `message.denied` (the caller may not answer it). The result's
+`decisions` has one entry for each decision the sync named that the provider
+holds for the caller, as `open`, `answered` or `acknowledged`.
+
+The result's `mission` is `{key, title, url, plan, openDecisions}`. It always
+describes the mission the sync named, whatever the sync's age. A provider
+that does not hold that mission answers `{key, title: "", plan: {steps: []},
+openDecisions: []}`. `plan` is the mission's current plan: the plan that the
+session that published last sent, and empty when none did. `openDecisions`
+holds at most 50 decisions that no one answered yet. `inbox` holds at most 50
+messages, oldest first, each `{id, kind, text, createdAt}`. `kind` is `info`,
+`prompt` or `answer`, and an `answer` carries `decision: {id, question,
+answer, option}`, where `option` is the id of the option the owner chose, when
+the answer chose one. On an answer, `decision.answer` is the answer and `text`
+is the provider's display of it. The texts, questions and answers of the
+inbox total at most 64 KiB. `minIntervalMs`, from 5000 to 600000, is the pace
+of routine syncs: a host may sync sooner at session start, at stop and during
+a wait, and a provider does not refuse those syncs. `now` is the provider's
+clock. The result carries no memory checkpoint: a host reads `memory.mission`
+for it.
+
+**ask** records a decision for the mission's owner: a `question` (at most 500
+characters), `context` (at most 4000), 2 to 5 `options` `{id, label,
+consequences}`, an optional `recommendation` `{option, reason}` that names an
+option, and `blocks`, what the decision holds up. The result is `decision:
+{id, state, url, answer, option}`; a new decision is `open` with no answer.
+A decision moves from `open` to `answered` when the owner answers, and to
+`acknowledged` when a sync delivers the message that carries the answer.
+`idempotencyKey` is required. An ask's content is `mission.repository`,
+`mission.key`, `question`, `context`, `options`, `recommendation` and
+`blocks`; `mission.title` is not part of it. The same key with the same
+content returns the decision that key recorded, with `replayed: true`, in any
+state and with its answer once there is one; the same key with other content
+is a `conflict` with reason `idempotency.mismatch`. `ask` takes no session: a
+session binds a decision through `sync.decisions`.
+
+**reply** records the agent's reply to one inbox message, at most 4000
+characters. The message is its natural key: the same reply again replays, and
+another reply is a `conflict` with reason `message.closed`. An unknown message
+is `not_found` with reason `message.not_found`, and a message the caller may
+not answer is `denied` with reason `message.denied`. The result is `message:
+{id, state: "replied"}`. `reply` takes no session: a session claims a message
+through `sync.delivered` and `sync.replies`.
+
+A rate limit is `unavailable` and retryable. An unresolved `sync`, `ask` or
+`reply` is reconciled by repeating the same document.
+
 ## Failures
 
 | Outcome | Written? | Retryable | Carries |

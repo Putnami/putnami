@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // These tests pin the canonical OTLP/JSON bytes and SHA-256 digests that the
@@ -179,21 +181,25 @@ func goldenLogsInput() LogsRequest {
 }
 
 func TestCrossLanguage_Metrics(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "equivalent-input-serializes-to-the-same-bytes", "each-signal-matches-its-golden")
 	checkGolden(t, "metrics.golden.json", goldenMetricsDigest, goldenMetricsInput())
 }
 
 func TestCrossLanguage_Traces(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "equivalent-input-serializes-to-the-same-bytes", "each-signal-matches-its-golden")
 	checkGolden(t, "traces.golden.json", goldenTracesDigest, goldenTracesInput())
 }
 
 func TestCrossLanguage_Logs(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "equivalent-input-serializes-to-the-same-bytes", "each-signal-matches-its-golden")
 	checkGolden(t, "logs.golden.json", goldenLogsDigest, goldenLogsInput())
 }
 
 // checkGolden marshals input canonically, compares against the committed golden
 // bytes, and asserts the digest matches the pinned constant. With
-// UPDATE_GOLDEN=1 it (re)writes the golden file and prints the digest to copy
-// into the constants above.
+// UPDATE_GOLDEN=1 it first (re)writes the golden file and prints the digest to
+// copy into the constants above; the comparison still runs, so the test fails
+// until the pinned digest matches the bytes it wrote.
 func checkGolden(t *testing.T, name, wantDigest string, input any) {
 	t.Helper()
 	got, err := MarshalCanonical(input)
@@ -207,7 +213,6 @@ func checkGolden(t *testing.T, name, wantDigest string, input any) {
 			t.Fatal(err)
 		}
 		t.Logf("wrote %s digest=%s", name, Digest(got))
-		return
 	}
 
 	want, err := os.ReadFile(path)

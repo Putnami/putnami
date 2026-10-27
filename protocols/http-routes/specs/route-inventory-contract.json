@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "http-routes/route-inventory-contract",
+  "outcomes": [
+    "A deployment edge admits exactly the declared routes and methods of a workload",
+    "An inventory in which a public route could reach a private one is refused before it is deployed",
+    "Go and TypeScript producers emit byte-identical inventories with the same digest for the same routes"
+  ],
+  "nonGoals": [
+    "OpenAPI as an input: it cannot describe file-system routes, static outputs or public files, as ADR 0001 records",
+    "Framework-specific route discovery, which each framework owns",
+    "Cloud release ingestion, load-balancer reconciliation and provider resources"
+  ],
+  "requirements": [
+    {
+      "id": "the-identifiers-are-pinned",
+      "text": "The protocol identifier is putnami.http-routes.v1 and the schema URL is https://putnami.dev/schemas/putnami-http-routes-v1.json. The published schema carries that $id and pins that protocol, and its members match the Go types of the manifest, a route and its provenance."
+    },
+    {
+      "id": "an-inventory-fails-closed",
+      "text": "An inventory parses strictly and fails as a whole: an unknown member or protocol, an unsupported pattern, an unsafe escape, a duplicate method or route, a missing provenance or publicEdge, and a digest mismatch are errors with stable codes. Every valid fixture validates, every invalid one fails with its expected code, and every expected code is registered. The TypeScript validator of @putnami/application gives every fixture the same verdict and code."
+    },
+    {
+      "id": "visibility-never-widens",
+      "text": "Two routes of one match language with a shared method are duplicates, whatever their parameter names. Routes of different languages may overlap only when their visibility agrees: a public prefix, template or catch-all that could match a private route with a shared method is http_routes.visibility_overlap. Overlap is computed on segment boundaries."
+    },
+    {
+      "id": "the-serialization-is-canonical",
+      "text": "Canonicalization sorts methods and routes, serializes the protocol and the routes with two-space indentation and one trailing newline, and sets the digest to sha256: and the SHA-256 hex of those bytes. The full fixture yields the committed cross-language golden and its pinned digest, whatever the route order and method case of the input, on every run. The TypeScript serializer reproduces the golden bytes and digest without mutating its input."
+    },
+    {
+      "id": "producers-emit-valid-inventories",
+      "text": "The Go HTTP server describes its typed, manual, stream and static-mount routes, catch-all templates included, as an inventory that validates and is the same on every describe, and it fails on an anonymous wildcard. The TypeScript extension merges the framework fragments into an inventory that validates and is the same on every run, and it fails on an unsupported pattern. The page, action and static-asset routes of @putnami/web canonicalize and pass the strict parser."
+    }
+  ],
+  "decisions": [
+    "protocols/http-routes/doc/adr/0001-route-inventory-is-not-openapi.md"
+  ]
+}

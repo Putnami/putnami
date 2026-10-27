@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/protocol/capabilities"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const testBinding = "source-v1:sha256:0000000000000000000000000000000000000000000000000000000000000000"
@@ -61,6 +62,7 @@ func signatures(findings []diag.Diagnostic) []string {
 }
 
 func TestStrictVersionDispatchUnknownFieldsAndNulls(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "strict-versioned-documents", "the-manifest-reader-refuses-an-inexact-version-an-unknown-field-or-a-null")
 	valid := `{"protocolVersion":1,"namespace":"billing","features":[]}`
 	if manifest, findings := ParseAndValidateManifest([]byte(valid)); manifest == nil || diag.HasErrors(findings) {
 		t.Fatalf("valid: %#v %v", manifest, findings)
@@ -162,6 +164,7 @@ func TestMaturityOrderAndTargetCappingShape(t *testing.T) {
 }
 
 func TestCanonicalSerializationIsDeterministicAndNonMutating(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "canonical-bytes-across-languages", "go-reproduces-the-feature-manifest-golden")
 	data, err := os.ReadFile(filepath.Join("fixtures", "equivalence", "go-typescript-features.golden.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -363,6 +366,7 @@ func TestInvalidPathsAndEnvironmentAreRedactionSafe(t *testing.T) {
 }
 
 func TestValidAndInvalidFixtureCorpus(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "conformance-corpus", "every-fixture-passes-or-fails-the-reader-its-name-selects")
 	for _, name := range []string{
 		"features.json",
 		"features-v2.json",

@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "cli/collaboration-providers",
   "outcomes": [
-    "A workspace chooses its task, change-proposal and memory providers independently, in one place, and changing one never changes another",
+    "A workspace chooses its task, change-proposal, memory and missions providers independently, in one place, and changing one never changes another",
     "An agent and a script call the same operation with the same request and read the same envelope, whether through MCP or the command line",
     "A contract nobody bound, a capability the provider lacks, and a precondition it cannot enforce are refused before anything runs, never reported as done",
     "A write whose outcome is unknown is reported as unresolved with the read that reconciles it, so nobody retries it blindly",
@@ -23,7 +23,7 @@
     },
     {
       "id": "capability-discovery",
-      "text": "capabilities reports, without running the provider, the binding status, the provider, and every operation of the bound version with required, supported, preconditions and description. A binding to an unspoken version, or to a provider that lacks a required or binding-required operation or declares against the contract, is invalid. An optional operation the provider lacks is unsupported, and expectedRevision or mustNotExist sent to a provider declaring preconditions none is unsupported, never dropped."
+      "text": "capabilities reports, without running the provider, the binding status, the provider, and each operation of the bound version with required, supported, preconditions, description and hostOnly when set. A binding to an unknown version, or to a provider that lacks a required operation or breaks the contract, is invalid. A missing optional operation is unsupported, and so are preconditions sent to a provider that declares none."
     },
     {
       "id": "one-route-two-entry-paths",
@@ -48,9 +48,26 @@
     {
       "id": "no-credential-leakage",
       "text": "Provider standard error never reaches an envelope. Every credential-named environment value the provider inherits, and every URL userinfo, is redacted from every envelope message and result by decoded value, whatever the JSON spelling; a result whose secret cannot be removed in place is withheld. A binding whose settings carry a credential-named member, or a URL value with a password or any http(s) user, is invalid, and capability discovery never echoes it."
+    },
+    {
+      "id": "host-only-operations",
+      "text": "An operation the catalog marks host-only is one the host that runs an agent calls, never the agent. The MCP server lists no tool for it, while putnami <contract> <operation> and the host channel's collaboration.call route it like any other operation, to the same envelope, and <contract>.capabilities marks it hostOnly. Only missions.sync is host-only, and only a mutation can be."
+    },
+    {
+      "id": "missions-identity-and-reconciliation",
+      "text": "An ok missions.sync answer describes the mission key the sync named, whatever the sync's age, reports only the decisions it named and answers each reply it carried once; an ok missions.reply answer names the message; a new missions.ask answer is an open decision. Any other answer is unresolved with reason provider.identity_mismatch, and an unresolved missions write names its own repeat as the reconciliation."
+    },
+    {
+      "id": "missions-provider-semantics",
+      "text": "A missions provider keeps one decision per idempotency key: the same content, whatever the mission title, replays it with its answer, and other content is a conflict (idempotency.mismatch). A message takes one reply; another is a conflict (message.closed). A delivered answer acknowledges its decision, a delivered message leaves the inbox, unknown or repeated ids change nothing, and an older sync never overwrites a newer one. Concurrent callers on one store lose no write."
+    },
+    {
+      "id": "contract-names-never-shadow-commands",
+      "text": "No contract takes the name of a built-in command, command path or reserved alias, so putnami <contract> <operation> always reaches the collaboration route and discovers the installed extensions first."
     }
   ],
   "decisions": [
-    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
+    "protocols/collaboration/doc/adr/0003-missions-contract.md"
   ]
 }

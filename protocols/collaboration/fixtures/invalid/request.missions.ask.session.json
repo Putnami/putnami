@@ -1,0 +1,7 @@
+{
+  "mission": { "repository": "putnami/putnami", "key": "issue-596" },
+  "session": { "engine": "host-a", "id": "5b1f0c2e" },
+  "question": "Ship now?",
+  "options": [{ "id": "yes", "label": "Ship" }, { "id": "no", "label": "Wait" }],
+  "idempotencyKey": "issue-596/ask/ship"
+}

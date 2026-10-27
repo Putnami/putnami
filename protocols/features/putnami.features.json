@@ -1,0 +1,184 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "features",
+  "features": [
+    {
+      "id": "features/feature-contracts",
+      "type": "feature",
+      "name": "Feature, spec and verification contracts",
+      "outcome": "Every runtime and tool reads feature declarations, specs, evidence and verification reports through one strict wire, judges each requirement by the same rules, and trusts only what a test or a producer actually observed",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "strict-versioned-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-reader-refuses-an-inexact-version-an-unknown-field-or-a-null",
+              "a-version-1-manifest-refuses-the-verification-field",
+              "the-spec-reader-refuses-an-inexact-version-a-minting-field-or-a-null",
+              "the-projection-reader-refuses-an-inexact-version-an-unknown-field-or-a-null"
+            ]
+          }
+        },
+        {
+          "id": "canonical-bytes-across-languages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-reproduces-the-feature-manifest-golden",
+              "go-reproduces-the-spec-golden",
+              "go-reproduces-the-verification-report-golden",
+              "go-writes-the-criteria-projection-canonically",
+              "typescript-reproduces-the-verification-report-golden",
+              "typescript-reproduces-the-evidence-golden"
+            ]
+          }
+        },
+        {
+          "id": "conformance-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-passes-or-fails-the-reader-its-name-selects",
+              "the-conformance-runners-reproduce-every-equivalence-golden",
+              "the-conformance-pack-names-its-corpus-and-every-vector-exists",
+              "typescript-refuses-every-invalid-verification-fixture"
+            ]
+          }
+        },
+        {
+          "id": "acceptance-verdicts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "evaluation-joins-spec-and-manifest-on-requirement-identity",
+              "an-acceptance-requirement-needs-every-declared-check-to-pass"
+            ]
+          }
+        },
+        {
+          "id": "objective-verdicts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-threshold-is-recomputed-from-the-measured-value",
+              "a-rolling-objective-needs-a-current-window-in-the-declared-environment",
+              "an-unauthored-objective-never-produces-a-verdict"
+            ]
+          }
+        },
+        {
+          "id": "only-enforce-blocks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "enforce-blocks-on-every-unresolved-state-and-on-an-error-finding",
+              "an-unobserved-requirement-is-reported-and-never-blocks"
+            ]
+          }
+        },
+        {
+          "id": "findings-name-file-positions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "manifest-findings-name-their-position-and-bound",
+              "evidence-and-report-findings-name-their-position",
+              "repository-findings-name-the-file-and-the-position",
+              "spec-findings-name-their-position-and-bound",
+              "the-spec-validator-refuses-content-outside-its-bounds",
+              "the-spec-field-set-matches-its-published-schema",
+              "the-sdd-extension-states-the-bound-of-a-feature-text-finding"
+            ]
+          }
+        },
+        {
+          "id": "proof-fragments",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-go-binding-records-the-verdict-testing-recorded",
+              "a-go-measurement-is-published-only-by-a-passing-test",
+              "a-go-binding-writes-nothing-without-the-adapter-directory",
+              "identical-concurrent-observations-collapse-into-one-fragment",
+              "a-typescript-binding-records-the-verdict-the-runner-recorded",
+              "a-typescript-measurement-carries-its-window-and-no-verdict",
+              "a-typescript-binding-writes-nothing-without-the-adapter-directory"
+            ]
+          }
+        },
+        {
+          "id": "one-report-per-project",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-merge-sets-foreign-declarations-aside-and-lets-a-failure-win",
+              "a-fragment-with-a-verdict-and-a-measurement-keeps-only-its-verdict",
+              "agreeing-observations-reduce-silently-and-a-skip-never-erases-a-pass",
+              "the-merge-writes-a-strictly-readable-report-or-nothing",
+              "the-go-test-job-publishes-the-report-of-a-bound-test",
+              "the-go-batch-gives-each-member-its-own-report",
+              "the-python-batch-gives-each-member-its-own-report",
+              "the-python-batch-writes-no-report-without-fragments"
+            ]
+          }
+        },
+        {
+          "id": "ratchets-and-decisions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-specs-baseline-refuses-a-regression-and-counts-growth",
+              "the-decision-registry-reader-is-strict",
+              "a-decision-that-cannot-be-enforced-is-a-registry-error",
+              "a-decision-check-judges-one-file-and-fails-closed"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
