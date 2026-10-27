@@ -1,0 +1,102 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cache/remote-cache-contract",
+  "outcomes": [
+    "A cache provider or a cache server written against the contract and its fixtures works with the CLI",
+    "A failing cache, provider or route degrades to a local build and never fails a run",
+    "A provider stores the provenance the server derives, so a developer client cannot pass its entries off as CI's"
+  ],
+  "nonGoals": [
+    "A JSON Schema: the Go types, the strict parsers and the shared fixtures are the contract",
+    "How the CLI computes keys, trusts entries and decides which files a run restores, which its own features own",
+    "How a provider reads its configuration and how a server stores entries, which each implementation owns",
+    "The Go build cache bridge of the Go extension, which its own shared-build-cache feature owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-versions-are-pinned",
+      "text": "An HTTP message carries protocolVersion 1, and a parser refuses a message of another version. The provider RPC keeps its own version: ProviderProtocolVersion is 2, ProviderProtocolMinVersion is 1, provenance starts at 2 and the v2 opt-in token is provider-protocol-v2, and a test pins each value, so a change is a reviewed bump. A provider envelope of version 1 or 2 parses, and any other version is refused."
+    },
+    {
+      "id": "keys-and-digests-are-content-addresses",
+      "text": "A key is exactly 64 lowercase hex characters. A digest is sha256: followed by 64 lowercase hex characters: DigestOf gives the same digest for the same bytes and another one for other bytes, and another algorithm or form is refused. A bearer token travels as an Authorization Bearer value, and another scheme or an empty token is refused."
+    },
+    {
+      "id": "negotiate-is-strict-and-canonical",
+      "text": "The materialization mode is minimal, toplevel or full. A negotiate request with a wrong version, mode or key is an error, and a repeated key is a warning. A hit in the response carries its result, and a download uses GET. Normalization defaults the version to 1 and the mode to minimal, sorts keys, results, manifest files and downloads, and gives the same output on every run."
+    },
+    {
+      "id": "the-write-path-is-store-then-commit",
+      "text": "A store request carries a valid key and a manifest whose files each have a path and a valid digest, and its response lists PUT uploads: an empty list means every blob is present. A commit request carries the result and the manifest. A result may carry cached events, each with a type. Both requests round-trip through the strict parsers, and normalization sorts manifest files and uploads the same way every time. The CLI uploads cached events only when the provider advertises them."
+    },
+    {
+      "id": "the-batched-write-path-adds-routes-not-fields",
+      "text": "The batched write path keeps protocolVersion 1. A capabilities response lists its capabilities sorted. find-missing takes at most MaxKeysPerRequest blobs and answers PUT uploads. commit-batch takes self-contained entries, each with a result and a manifest, and warns on a repeated key. Each message normalizes in sorted order and round-trips. The Cloud provider sends one store and one commit per entry when the server lacks either route or its capabilities probe gets no answer."
+    },
+    {
+      "id": "accelerators-are-optional",
+      "text": "An upload grant is a URL template with the {digest} placeholder and the PUT method, defaulting to PUT and version 1, and names the status that means the blob exists. An upload batch carries blobs inline, each at most MaxInlineBlobBytes, warns on a repeated digest, answers valid stored digests and sorts by digest. The Cloud provider uses find-missing when upload-batch is not served, and downloads with its own GET a file that download-batch left out or that does not match its digest."
+    },
+    {
+      "id": "run-markers-are-strict",
+      "text": "A run-marker request trims its workspace and branch, drops empty commands and needs the selection all, and a publish request also needs the sha. A marker in a response needs its sha. A lookup without a marker is a miss, a publish answer of false is valid, and an unknown field is refused."
+    },
+    {
+      "id": "side-effecting-tasks-stay-local",
+      "text": "A publish task, alone or with a ~ suffix, is side-effecting and never eligible for the remote cache. Every other task is eligible whatever its duration or output size, and the deprecated break-even parameters change nothing."
+    },
+    {
+      "id": "the-fixture-corpus-is-the-contract",
+      "text": "Each of the 20 HTTP messages and the 21 provider RPC messages has a fixture directory with valid and invalid fixtures. Every valid fixture parses and validates, and every invalid one is refused."
+    },
+    {
+      "id": "the-provider-envelope-is-closed",
+      "text": "A provider request and a response round-trip with their typed payloads and their id, and a nil payload is absent. The op set is closed: initialize, authenticate, prefetch, restore, upload, marker-lookup, marker-write, object-get, object-put, summary and shutdown. A failed response carries an error code, and a restore answers hit, miss or error. The Cloud provider answers each of 24 concurrent restores and acknowledges shutdown after them."
+    },
+    {
+      "id": "the-session-bootstraps-at-version-1",
+      "text": "The CLI sends initialize as a version 1 envelope and payload that lists provider-protocol-v2. With a provider that selects version 2 it sends every later request at version 2, and with a strict version 1 provider it stays at version 1. A result that selects an unsupported version fails initialize."
+    },
+    {
+      "id": "provenance-is-derived-by-the-provider",
+      "text": "Version 2 adds the provenance triple: producer is ci or developer, producerIdentity is opaque, and channel is trusted or hint. A partial triple is refused, and a result without one stays valid. On upload the triple is an untrusted assertion, and the Cloud provider forwards none of it to the server. On a restore hit the Cloud provider returns the triple the authenticated server answered."
+    },
+    {
+      "id": "blobs-cross-through-the-exchange-directory",
+      "text": "A blob crosses between core and the provider as a file at <dir>/<first two hex>/<hex> in the exchange directory, and a malformed digest has no path. The CLI session reads a restored blob there and uploads the entry that names it. The Cloud provider places the blobs of a hit there, content-correct, and skips a digest core lists in knownDigests while the key still restores as a hit."
+    },
+    {
+      "id": "the-run-credential-is-authenticated-once",
+      "text": "A core with a run credential lists run-credential in initialize; without one, initialize is unchanged. A provider that echoes it receives one authenticate with the credential right after initialize, and without the echo core sends none. A refused authenticate fails initialize. A credential is 1 to 16384 bytes of UTF-8 without whitespace, the rule of protocol/registry; a malformed one is never sent, and no formatted value or error shows it. The Cloud provider takes one strict authenticate."
+    },
+    {
+      "id": "result-only-restore-is-negotiated",
+      "text": "Core lists restore-result-only in initialize. Only a provider that echoes it receives RestoreParams.resultOnly and PrefetchParams.resultOnlyKeys; each is absent when unset, so a provider without the echo receives the bytes it already parses. A result-only key is valid, listed once and also listed in keys. A result-only hit carries the result, the full manifest and the provenance, places no file, and is the entry stored under the requested key, else a miss."
+    },
+    {
+      "id": "the-provider-resolves-the-mode",
+      "text": "Core lists provider-configuration in initialize and sends no mode, and normalization leaves an absent mode absent. A provider echoes the capability only when core lists it, and then returns the mode it resolved; strict validation refuses a mode without the echo and an unknown mode. Core materializes in the returned mode, else full."
+    },
+    {
+      "id": "the-object-cache-is-a-negotiated-socket",
+      "text": "object-get and object-put address payloads by a namespace and an id from closed alphabets, and a put carries no channel. Only these two ops are valid on the socket, and the feature adds no version. Core lists object-cache, and takes the path only from a provider that echoes it with the absolute path of a live socket. The CLI exports the path to jobs only under a trust policy other than none. The Cloud provider echoes the absolute socket path, refuses session ops and stores only verified bytes."
+    },
+    {
+      "id": "a-reference-socket-server",
+      "text": "objectcachetest serves the socket contract from memory. It stores a put only when the exchange directory holds bytes that match its digest, places them back on a get, and stamps its own channel. A get filtered by channel misses a filtered object. Namespaces are disjoint, a session op gets unsupported-op, and concurrent connections share one store. The socket lives in the exchange directory, or under a short path when it is too long. Close is idempotent, and Start refuses an empty exchange directory path."
+    },
+    {
+      "id": "every-op-is-best-effort",
+      "text": "Every op is best-effort. In the CLI session a per-op timeout and a non-OK response surface as errors and leave the session usable, and a provider crash fails the op in flight and every later op. In the Cloud provider an upload or an upload window that fails still answers the op, the summary counts no upload, and the session keeps serving."
+    },
+    {
+      "id": "the-reserved-command-selects-the-provider",
+      "text": "The extension that declares the reserved cache-provider command serves the remote cache, whatever its name, with no version floor: a provider named @acme/cache with a SHA-stamped version loads without a notice. Two extensions that declare it fail the load instead of one being picked."
+    }
+  ],
+  "decisions": [
+    "protocols/cache/doc/adr/0001-provider-selection-by-reserved-command.md",
+    "protocols/cache/doc/adr/0002-blob-exchange-directory-boundary.md"
+  ]
+}

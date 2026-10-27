@@ -15,6 +15,7 @@ import (
 	"time"
 
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -408,6 +409,7 @@ func TestCacheProviderEchoesRunCredentialOnlyWhenItCanUseIt(t *testing.T) {
 }
 
 func TestCacheProviderAuthenticateRunsOnceAndStrictly(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-cloud-provider-authenticates-once-and-strictly")
 	var calls atomic.Int64
 	runCredentialEnv(t, &calls, func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusCreated, map[string]any{"protocolVersion": 1, "token": testRunCacheToken, "expiresAt": "2026-10-02T06:00:00Z"})

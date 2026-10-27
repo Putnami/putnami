@@ -19,6 +19,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // decodeResponses parses every output line with the protocol's own response
@@ -125,6 +126,7 @@ func TestRunCacheProviderSession_RoundTrip(t *testing.T) {
 }
 
 func TestProviderSessionRestore_V2ServesAuthenticatedProvenance(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "provenance-is-derived-by-the-provider", "the-cloud-provider-returns-the-servers-provenance")
 	blob := []byte("trusted compiled output")
 	digest := cache.DigestOf(blob)
 	key := strings.Repeat("e", cache.KeyLength)
@@ -182,6 +184,8 @@ func TestProviderSessionRestore_V2ServesAuthenticatedProvenance(t *testing.T) {
 }
 
 func TestProviderSessionUpload_DoesNotForwardAssertedProvenance(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "provenance-is-derived-by-the-provider", "the-cloud-provider-forwards-no-asserted-provenance")
+	enableCacheWritesForTest(t)
 	key := strings.Repeat("f", cache.KeyLength)
 	var commit map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -214,6 +218,9 @@ func TestProviderSessionUpload_DoesNotForwardAssertedProvenance(t *testing.T) {
 		t.Fatalf("upload response = %+v", resp)
 	}
 	_ = s.summary(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 3, Op: cache.OpSummary})
+	if commit == nil {
+		t.Fatal("no commit reached the server, so the test observed no forwarded field")
+	}
 	if _, ok := commit["producer"]; ok {
 		t.Errorf("commit forwarded untrusted producer: %+v", commit)
 	}
@@ -401,6 +408,7 @@ func TestProviderSessionInitialize_Readiness(t *testing.T) {
 // negotiates a hit against a fake cache server, downloads the hit's blob, and
 // lands it content-correct in the blob-exchange directory for core to ingest.
 func TestProviderSessionRestore_Hit(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "blobs-cross-through-the-exchange-directory", "the-cloud-provider-places-only-the-blobs-core-lacks")
 	blob := []byte("compiled output bytes")
 	digest := cache.DigestOf(blob)
 	key := strings.Repeat("a", cache.KeyLength)
@@ -612,6 +620,7 @@ func TestProviderSessionRestore_UncoveredKeyFallsBack(t *testing.T) {
 // (out-of-order responses are the protocol — core matches by ID) and that the
 // shutdown ack still lands last, after in-flight restores drain.
 func TestRunCacheProviderSession_ConcurrentRestores(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "the-cloud-provider-answers-concurrent-requests-by-id")
 	blob := []byte("compiled output bytes")
 	hitKey := strings.Repeat("a", cache.KeyLength)
 	srv, negotiates := countingCacheServer(t, hitKey, blob)
@@ -747,6 +756,7 @@ func TestCacheConfigWireCompatible(t *testing.T) {
 // is not re-downloaded into the exchange directory — core ingests it from its own
 // CAS — yet the key still restores as a hit.
 func TestProviderSessionRestore_KnownDigestSkipped(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "blobs-cross-through-the-exchange-directory", "the-cloud-provider-places-only-the-blobs-core-lacks")
 	blob := []byte("already in core's CAS")
 	digest := cache.DigestOf(blob)
 	key := strings.Repeat("b", cache.KeyLength)
@@ -902,6 +912,7 @@ func TestProviderReadOnlyModeServesReadsWithoutAttemptingWrites(t *testing.T) {
 // every request, the upload is still ACCEPTED, the summary still returns, no
 // upload is counted, and the session keeps serving the next operation.
 func TestCacheUploadFailureNeverChangesTheRunVerdict(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "every-op-is-best-effort", "the-cloud-provider-never-fails-an-op-on-a-failed-upload")
 	enableCacheWritesForTest(t)
 	key := strings.Repeat("b", cache.KeyLength)
 	var storeAttempts atomic.Int64

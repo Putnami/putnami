@@ -1,8 +1,13 @@
 package cache
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestSideEffectingTask(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "side-effecting-tasks-stay-local", "publish-is-side-effecting")
 	cases := map[string]bool{
 		"publish":         true,
 		"publish~npm":     true,
@@ -29,6 +34,7 @@ var paramsVariants = map[string]BreakEvenParams{
 }
 
 func TestWorthRemoteCaching_AdmitsEveryEntry(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "side-effecting-tasks-stay-local", "every-other-task-is-eligible")
 	entries := []struct {
 		name       string
 		durationMs int64
@@ -51,6 +57,7 @@ func TestWorthRemoteCaching_AdmitsEveryEntry(t *testing.T) {
 }
 
 func TestEligibleForRemote_SideEffectsOnly(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "side-effecting-tasks-stay-local", "every-other-task-is-eligible")
 	tests := []struct {
 		name string
 		key  KeyRequest

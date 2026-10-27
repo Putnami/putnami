@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/cache/objectcachetest"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // objectNamespace is the namespace Go's GOCACHEPROG consumer uses.
@@ -48,8 +49,8 @@ func shortExchangeDir(t *testing.T) string {
 		}
 		_ = os.RemoveAll(dir)
 	}
-	//putnami:allow-skip reached only when no temporary directory fits the platform's socket path limit
-	t.Skip("no temporary directory yields a socket path within the platform limit")
+	t.Fatalf("no temporary directory yields a socket path within the platform limit (%d bytes): set TMPDIR to a short directory such as /tmp",
+		maxObjectSocketPath)
 	return ""
 }
 
@@ -613,6 +614,7 @@ func dialObjects(t *testing.T, path string) *objectcachetest.Client {
 // real JSONL framing, per-connection request ids, and real bytes handed through
 // the blob-exchange directory.
 func TestProviderObjectCache_ConformanceFixture(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cloud-provider-echoes-the-absolute-path-of-a-live-socket")
 	f := newFakeObjectServer(t)
 	exchangeDir := shortExchangeDir(t)
 	s, result := startObjectSession(t, f, exchangeDir, coreCapabilities()...)
@@ -716,6 +718,7 @@ func TestProviderObjectCache_NamespacesDoNotShareAnIDSpace(t *testing.T) {
 // process from driving the session: only the two object ops are valid on the
 // socket, so a job can never restore a task entry or publish a run marker.
 func TestProviderObjectCache_RefusesEverySessionOp(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cloud-provider-refuses-a-session-op-on-the-socket")
 	f := newFakeObjectServer(t)
 	exchangeDir := shortExchangeDir(t)
 	_, result := startObjectSession(t, f, exchangeDir, coreCapabilities()...)
@@ -956,6 +959,7 @@ func TestProviderObjectCache_ConcurrentConnections(t *testing.T) {
 // digest it offered never gets them into the CAS, where they would poison that
 // digest for every later reader.
 func TestProviderObjectCache_RefusesMismatchedStagedBytes(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cloud-provider-stores-no-unverified-bytes")
 	f := newFakeObjectServer(t)
 	exchangeDir := shortExchangeDir(t)
 	s, result := startObjectSession(t, f, exchangeDir, coreCapabilities()...)
@@ -1247,6 +1251,34 @@ func TestProviderObjectCache_ShutdownDoesNotWaitOnAnIdleClient(t *testing.T) {
 	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatal("session shutdown blocked on an idle socket client")
+	}
+}
+
+// TestProviderObjectCache_ShutdownRefusesAConnectionAcceptedBeforeTheSweep pins
+// the window between Accept and track. The accept loop can take a connection
+// before the listener closes and track it after the shutdown sweep ran; served,
+// that connection would park its reader until the first-request deadline and
+// hold close for as long. After the sweep, track closes it and refuses it.
+func TestProviderObjectCache_ShutdownRefusesAConnectionAcceptedBeforeTheSweep(t *testing.T) {
+	f := newFakeObjectServer(t)
+	exchangeDir := shortExchangeDir(t)
+	s, _ := startObjectSession(t, f, exchangeDir, coreCapabilities()...)
+	oc := s.objects
+	s.close()
+
+	late, peer := net.Pipe()
+	t.Cleanup(func() { _ = peer.Close() })
+	if oc.track(late) {
+		t.Fatal("track accepted a connection after the shutdown sweep")
+	}
+	oc.connMu.Lock()
+	live := len(oc.conns)
+	oc.connMu.Unlock()
+	if live != 0 {
+		t.Errorf("live connections=%d after shutdown, want 0", live)
+	}
+	if _, err := late.Write([]byte("x")); err == nil {
+		t.Error("track left the refused connection open")
 	}
 }
 

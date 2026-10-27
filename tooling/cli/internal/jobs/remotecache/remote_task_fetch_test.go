@@ -89,10 +89,10 @@ func newFetchTestStore(t *testing.T) *store.CacheManager {
 	return store.NewCacheManager(store.NewLocalStore(t.TempDir()))
 }
 
-// uploadFetchTestEntry publishes the fixture task's entry in a producer store
-// of its own and uploads it to server, as an earlier run on another machine
-// does.
-func uploadFetchTestEntry(t *testing.T) {
+// publishFetchTestEntry publishes the fixture task's entry, with the cached
+// events of result, in a store of its own and returns that store, as a task
+// does when it finishes.
+func publishFetchTestEntry(t *testing.T, result *store.EntryResult) *store.CacheManager {
 	t.Helper()
 	producer := newFetchTestStore(t)
 	staging := t.TempDir()
@@ -105,12 +105,21 @@ func uploadFetchTestEntry(t *testing.T) {
 	}
 	if _, err := producer.IngestTaskEntry(staging, store.TaskEntrySpec{
 		Key:      fetchTestKey,
-		Result:   &store.EntryResult{Status: "success"},
+		Result:   result,
 		Metadata: &store.EntryMetadata{DurationMs: 4000},
 		Outputs:  []store.DeclaredEntryOutput{fetchTestOutput},
 	}); err != nil {
 		t.Fatalf("ingest the producer entry: %v", err)
 	}
+	return producer
+}
+
+// uploadFetchTestEntry publishes the fixture task's entry in a producer store
+// of its own and uploads it to server, as an earlier run on another machine
+// does.
+func uploadFetchTestEntry(t *testing.T) {
+	t.Helper()
+	producer := publishFetchTestEntry(t, &store.EntryResult{Status: "success"})
 	remote := newFetchTestRemote(t, store.CacheTrustAny)
 	remote.UploadTaskEntry(t.Context(), fetchTestKey, fetchTestJob(), producer)
 	remote.DrainUploads()

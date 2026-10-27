@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -11,6 +12,7 @@ import (
 // TestObjectCacheJobEnvFailsClosed covers, at the accessor, every case where
 // the two variables must not be exported at all.
 func TestObjectCacheJobEnvFailsClosed(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-cli-exports-the-socket-only-under-a-trust-policy")
 	var nilCache *RemoteCache
 	if got := nilCache.ObjectCacheJobEnv(); got != nil {
 		t.Fatalf("nil cache env = %v, want none", got)

@@ -20,6 +20,7 @@ import (
 
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // uploadCacheServer is a cache server for the task-cache write path. It serves
@@ -548,6 +549,7 @@ func TestAWindowSendsItsSmallBlobsInOneUploadBatch(t *testing.T) {
 // upload-batch, in the write that opens the session; the small ones after the
 // route answered that it is not served.
 func TestAWindowFallsBackWhenUploadBatchIsNotServed(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "the-cloud-provider-falls-back-when-upload-batch-is-not-served")
 	for _, status := range []int{http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusNotImplemented} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			pinUploadIdle(t, time.Hour)
@@ -638,6 +640,7 @@ func TestTheUploaderRaisesTheBlobBoundForAWindow(t *testing.T) {
 // A commit-batch carries what core built and nothing a caller asserted about
 // who built it: the server derives the producer and the channel from the bearer.
 func TestUploadWindowDoesNotForwardAssertedProvenance(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "provenance-is-derived-by-the-provider", "the-cloud-provider-forwards-no-asserted-provenance")
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	s, exchangeDir := startUploadSession(t, f, io.Discard)
 
@@ -787,6 +790,7 @@ func TestAnIdleUploadWindowFlushesBeforeTheSummary(t *testing.T) {
 // A server without find-missing or commit-batch gets one store and one commit
 // per entry, as before windows.
 func TestUploadsFallBackToOneStoreAndOneCommitPerEntry(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "the-cloud-provider-falls-back-to-a-store-and-a-commit-per-entry")
 	for _, test := range []struct {
 		name         string
 		capabilities []string
@@ -879,6 +883,7 @@ func TestAKeyQueuedTwiceIsCommittedOncePerWindow(t *testing.T) {
 // A window that fails is logged and the run goes on: the summary answers, no
 // entry is counted, and the session keeps serving.
 func TestAFailedUploadWindowNeverChangesTheRunVerdict(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "every-op-is-best-effort", "the-cloud-provider-never-fails-an-op-on-a-failed-upload")
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	f.commitBatchStatus = http.StatusInternalServerError
 	var logw lockedWriter
@@ -934,6 +939,7 @@ func TestARefusedUploadWindowIsReportedAtSummary(t *testing.T) {
 // A probe that gets no answer selects the per-entry path, which every server
 // serves, and is said once for the session, not once per window.
 func TestAnUnansweredProbeSelectsThePerEntryPath(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "the-cloud-provider-falls-back-to-a-store-and-a-commit-per-entry")
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	f.probeDrops = true
 	var logw lockedWriter
