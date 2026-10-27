@@ -50,12 +50,11 @@ type Observer interface {
 }
 
 type subscriptionWorker struct {
-	b        *MemoryBroker
-	sub      *subscription
-	mu       sync.Mutex
-	active   int
-	queue    []Envelope
-	stopping bool
+	b      *MemoryBroker
+	sub    *subscription
+	mu     sync.Mutex
+	active int
+	queue  []Envelope
 }
 
 // MemoryBroker is an in-memory event transport using goroutines and channels.
@@ -73,6 +72,9 @@ type MemoryBroker struct {
 	// restarted.
 	quit chan struct{}
 	logs eventLoggers
+	// beforeDispatch is a test seam. Publish calls it after it has seen the
+	// broker running and selected its targets, and before it dispatches them.
+	beforeDispatch func()
 }
 
 // NewMemoryBroker creates a new in-memory event broker.
@@ -89,12 +91,14 @@ func NewMemoryBroker(config ...MemoryBrokerConfig) *MemoryBroker {
 	}
 }
 
-// Publish sends an envelope to all matching subscribers.
+// Publish sends an envelope to all matching subscribers. A publish that races
+// Stop is either delivered, and Stop waits for it, or refused with
+// events.stopped.
 func (b *MemoryBroker) Publish(ctx context.Context, env Envelope) error {
 	b.mu.RLock()
 	if b.stopped {
 		b.mu.RUnlock()
-		return errors.New(CodeEventsStopped, "broker is stopped")
+		return errBrokerStopped()
 	}
 	subs := b.subscriptions[env.Topic]
 	b.mu.RUnlock()
@@ -105,12 +109,34 @@ func (b *MemoryBroker) Publish(ctx context.Context, env Envelope) error {
 	}
 
 	targets := b.selectTargets(env.Topic, subs, env)
+	if b.beforeDispatch != nil {
+		b.beforeDispatch()
+	}
+	return b.deliver(ctx, env, targets...)
+}
+
+// deliver hands env to every target in one step that Stop cannot split. It
+// holds the broker read lock while it checks that the broker runs and
+// registers each dispatch. Stop marks the broker stopped under the write lock
+// before it drains. So either every dispatch of env is registered before Stop
+// drains, and Stop waits for it, or deliver sees the broker stopped and
+// refuses env with events.stopped.
+func (b *MemoryBroker) deliver(ctx context.Context, env Envelope, targets ...*subscription) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.stopped {
+		return errBrokerStopped()
+	}
 	for _, sub := range targets {
 		if err := sub.worker.enqueue(ctx, env); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func errBrokerStopped() error {
+	return errors.New(CodeEventsStopped, "broker is stopped")
 }
 
 // Subscribe registers a handler for a topic.
@@ -146,7 +172,7 @@ func (b *MemoryBroker) Stop(_ context.Context) error {
 	}
 	for _, subs := range b.subscriptions {
 		for _, sub := range subs {
-			sub.worker.stop()
+			sub.worker.discardQueue()
 		}
 	}
 	b.mu.Unlock()
@@ -206,33 +232,12 @@ func matchesFilter(filter, attrs map[string]string) bool {
 	return true
 }
 
-// dispatch registers and starts a handler goroutine for env. It does not itself
-// re-check stopped: every caller is already ordered against Stop's drain — it
-// either holds the worker lock (which Stop's worker.stop() barrier orders
-// against) or runs inside an already-counted in-flight goroutine (the bounded-
-// concurrency requeue and retry paths), so its inFlight.Add is never from zero.
-// The unlimited-concurrency publish path, which has no such ordering, must use
-// dispatchUnlessStopped instead.
+// dispatch registers and starts a handler goroutine for env. It does not check
+// stopped, because each caller is ordered against Stop's drain: deliver holds
+// the broker read lock on a running broker, and complete runs inside a counted
+// dispatch goroutine, so its inFlight.Add never starts from zero.
 func (b *MemoryBroker) dispatch(ctx context.Context, env Envelope, sub *subscription) {
 	b.inFlight.Add(1)
-	go b.runHandler(ctx, env, sub)
-}
-
-// dispatchUnlessStopped is dispatch for the unlimited-concurrency publish path,
-// the only caller with no happens-before ordering against Stop's drain. It
-// checks stopped and registers the in-flight dispatch atomically under the
-// broker lock; Stop sets stopped under the same lock (write side) before it
-// waits on inFlight, so the two are mutually exclusive. This closes the race
-// where a publisher observed the broker as running, then registered and started
-// a delivery after Stop had already drained and returned.
-func (b *MemoryBroker) dispatchUnlessStopped(ctx context.Context, env Envelope, sub *subscription) {
-	b.mu.RLock()
-	if b.stopped {
-		b.mu.RUnlock()
-		return
-	}
-	b.inFlight.Add(1)
-	b.mu.RUnlock()
 	go b.runHandler(ctx, env, sub)
 }
 
@@ -245,18 +250,18 @@ func (b *MemoryBroker) runHandler(ctx context.Context, env Envelope, sub *subscr
 	b.executeHandler(ctx, env, sub)
 }
 
+// enqueue dispatches env, or queues it while the handler runs at its
+// concurrency limit. Only deliver calls it, under the broker read lock and on a
+// running broker.
 func (w *subscriptionWorker) enqueue(ctx context.Context, env Envelope) error {
 	opts := w.sub.def.Options
 	if opts.Concurrency <= 0 {
-		w.b.dispatchUnlessStopped(ctx, env, w.sub)
+		w.b.dispatch(ctx, env, w.sub)
 		return nil
 	}
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.stopping {
-		return nil
-	}
 	if w.active < opts.Concurrency {
 		w.active++
 		w.b.dispatch(ctx, env, w.sub)
@@ -297,7 +302,7 @@ func (w *subscriptionWorker) complete(ctx context.Context) {
 	if w.active < 0 {
 		w.active = 0
 	}
-	if !w.stopping && len(w.queue) > 0 {
+	if len(w.queue) > 0 {
 		env := w.queue[0]
 		copy(w.queue, w.queue[1:])
 		w.queue = w.queue[:len(w.queue)-1]
@@ -311,10 +316,12 @@ func (w *subscriptionWorker) complete(ctx context.Context) {
 	}
 }
 
-func (w *subscriptionWorker) stop() {
+// discardQueue drops the deliveries that wait for a concurrency slot. Stop
+// calls it under the broker write lock: deliver refuses every later envelope
+// until Start, so the queue stays empty and complete dispatches nothing more.
+func (w *subscriptionWorker) discardQueue() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.stopping = true
 	w.queue = nil
 }
 
@@ -390,7 +397,7 @@ func (b *MemoryBroker) scheduleRetry(ctx context.Context, env Envelope, sub *sub
 		}
 		retryEnv := env
 		retryEnv.Attempt++
-		if err := sub.worker.enqueue(context.Background(), retryEnv); err != nil {
+		if err := b.deliver(context.Background(), retryEnv, sub); err != nil {
 			// The re-delivery could not be queued, so the message is lost. ctx is
 			// read for its trace id and bag only (never for cancellation), so using
 			// the failed delivery's context here keeps the drop correlated.
@@ -446,7 +453,7 @@ func (b *MemoryBroker) sendToDLQ(ctx context.Context, env Envelope, originalErr 
 	accepted := 0
 	var enqueueErr error
 	for _, sub := range subs {
-		if err := sub.worker.enqueue(ctx, dlqEnv); err != nil {
+		if err := b.deliver(ctx, dlqEnv, sub); err != nil {
 			if enqueueErr == nil {
 				enqueueErr = err
 			}

@@ -236,7 +236,7 @@ if err := broker.Stop(ctx); err != nil {
 }
 ```
 
-Publishing to a stopped broker returns an `events.stopped` error.
+Publishing to a stopped broker returns an `events.stopped` error. A publish that races `Stop` is either delivered before `Stop` returns or refused whole with `events.stopped`. A broker restarted with `Start` delivers again to every handler.
 
 ### Dead-Letter Queue
 
