@@ -81,12 +81,13 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: DefaultPositionalsContract for a command group whose default
-// subcommand declares positionals, ProvisionedToolchainContract for a runtime
-// toolchain that
-// declares a provisioned candidate, PublishChannelsContract for a task that
-// declares the publish channels it serves, CommandKindContract for command or
-// verb traits that declare a kind, a workload, rewritesSources or
+// the manifest: HostHooksContract for a hostHooks member, ChangedFilesContract
+// for a step that gates on or binds the run's changed files,
+// DefaultPositionalsContract for a command group whose default subcommand
+// declares positionals, ProvisionedToolchainContract for a runtime toolchain
+// that declares a provisioned candidate, PublishChannelsContract for a task
+// that declares the publish channels it serves, CommandKindContract for
+// command or verb traits that declare a kind, a workload, rewritesSources or
 // consumesReleaseSet, or a task's batchable policy that declares a kind or a
 // phase, SourceBoundCacheContract for a task that declares cache.sourceBound,
 // VerbVocabularyContract for a verb vocabulary, ExtensionDependenciesContract
@@ -159,6 +160,17 @@ func RequiredLoadContract(m *Manifest) int {
 	// there, whatever origin the manifest loads from.
 	if DeclaresDefaultPositionals(m) {
 		required = max(required, protocolcli.DefaultPositionalsContract)
+	}
+	// A change gate and a context binding hold only in a reader that plans
+	// and keys the step on the run's changed files, whatever origin the
+	// manifest loads from.
+	if DeclaresChangedFiles(m) {
+		required = max(required, protocolcli.ChangedFilesContract)
+	}
+	// A host hook reaches the agent host only through a reader that writes
+	// it, whatever origin the manifest loads from.
+	if DeclaresHostHooks(m) {
+		required = max(required, protocolcli.HostHooksContract)
 	}
 	return required
 }

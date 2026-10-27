@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/contributor",
-  "cliContract": 5,
+  "cliContract": 17,
   "runtime": {
     "executable": "compiled/putnami-contributor",
     "toolchains": {
@@ -145,6 +145,37 @@
           ]
         }
       }
+    },
+    "agent": {
+      "description": "Agent sessions: publish a session to its mission through the host hooks.",
+      "subcommands": {
+        "hook": {
+          "description": "Run as an agent host hook: publish the session to its mission and hand the agent the owner's messages.",
+          "command": "agent-hook",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami agent hook --engine claude-code < event.json",
+              "description": "Handle one Claude Code hook event read on standard input"
+            },
+            {
+              "command": "putnami agent hook --engine claude-code --idle-wake < stop.json",
+              "description": "After a turn, wait up to 10 minutes for the owner's next message"
+            }
+          ]
+        },
+        "attach": {
+          "description": "Report the sessions of this checkout and branch to the mission of an issue.",
+          "command": "agent-attach",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami agent attach --issue 596",
+              "description": "Make issue-596 the mission of this checkout's branch"
+            }
+          ]
+        }
+      }
     }
   },
   "commands": {
@@ -277,6 +308,46 @@
           "task": "change-finalize"
         }
       ]
+    },
+    "agent-hook": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Handle one agent host hook event read on standard input, as the hooks this extension declares run it. SessionStart publishes the session and prints its mission sheet and the owner's waiting messages; PostToolUse records a plan change, an asked decision or a recorded reply without calling the provider; Stop publishes the turn's end in one sync and continues the turn with a waiting message; StopFailure publishes the error. It reaches the bound missions provider through the putnami process that launched it, and the memory provider when one is bound. It never fails a turn: every failure exits 0 and leaves one line in hook.log under the Putnami home. With --idle-wake it waits up to 10 minutes after a Claude Code turn and exits 75 with the owner's message on standard error.",
+      "flags": {
+        "engine": {
+          "type": "string",
+          "description": "The agent host that runs the hook: claude-code or codex."
+        },
+        "idle-wake": {
+          "type": "boolean",
+          "description": "After a Claude Code turn, wait for the owner's next message and exit 75 when one arrives."
+        }
+      },
+      "run": [
+        {
+          "id": "hook",
+          "task": "agent-hook"
+        }
+      ]
+    },
+    "agent-attach": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Declare issue-<n> the mission of this checkout's branch: every agent session of the checkout and branch reports to it from its next sync. It writes one file under the Putnami home and calls no provider. A usage error exits 2 and a failure exits 1.",
+      "flags": {
+        "issue": {
+          "type": "string",
+          "description": "The issue number whose mission the sessions report to."
+        }
+      },
+      "run": [
+        {
+          "id": "attach",
+          "task": "agent-attach"
+        }
+      ]
     }
   },
   "tasks": {
@@ -311,6 +382,125 @@
       "cache": false,
       "description": "Publish a draft, or a committed change with current proof, as a proposal.",
       "timeoutMs": 5400000
+    },
+    "agent-hook": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "agent-hook"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Handle one agent host hook event.",
+      "timeoutMs": 660000
+    },
+    "agent-attach": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "agent-attach"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Declare the mission of this checkout's branch.",
+      "timeoutMs": 60000
+    }
+  },
+  "hostHooks": {
+    "requires": {
+      "contract": "missions"
+    },
+    "command": [
+      "agent",
+      "hook"
+    ],
+    "hosts": {
+      "claude-code": [
+        {
+          "event": "SessionStart",
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "PostToolUse",
+          "tools": [
+            "TodoWrite",
+            "TaskCreate",
+            "TaskUpdate"
+          ],
+          "mcpTools": [
+            "missions.ask",
+            "missions.reply"
+          ],
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "Stop",
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "Stop",
+          "args": [
+            "--engine",
+            "claude-code",
+            "--idle-wake"
+          ],
+          "wake": true,
+          "timeoutSeconds": 660
+        },
+        {
+          "event": "StopFailure",
+          "args": [
+            "--engine",
+            "claude-code"
+          ],
+          "timeoutSeconds": 30
+        }
+      ],
+      "codex": [
+        {
+          "event": "SessionStart",
+          "args": [
+            "--engine",
+            "codex"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "PostToolUse",
+          "tools": [
+            "update_plan"
+          ],
+          "mcpTools": [
+            "missions.ask",
+            "missions.reply"
+          ],
+          "args": [
+            "--engine",
+            "codex"
+          ],
+          "timeoutSeconds": 30
+        },
+        {
+          "event": "Stop",
+          "args": [
+            "--engine",
+            "codex"
+          ],
+          "timeoutSeconds": 240
+        }
+      ]
     }
   },
   "agentContent": {

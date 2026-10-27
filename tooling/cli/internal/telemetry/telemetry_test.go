@@ -11,6 +11,7 @@ import (
 	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	otlp "go.putnami.dev/protocol/telemetry"
 	"go.putnami.dev/protocol/telemetry/cliusage"
 	"go.putnami.dev/tooling/cli/internal/hometest"
@@ -484,6 +485,7 @@ func TestEnableStampsCurrentDeviceIDMonth(t *testing.T) {
 }
 
 func TestSessionEventVocabularyGuard(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-cli-records-only-vocabulary-events")
 	c := &Client{config: &Config{Enabled: boolPtr(true)}}
 	c.TrackSessionStart(SessionStart{
 		Commands: []string{"build", "test", "unregistered-command", "build"},
@@ -531,6 +533,7 @@ func TestSessionEventVocabularyGuard(t *testing.T) {
 }
 
 func TestSessionStartWithoutRecordableCommandConformsOnTheWire(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-cli-records-only-vocabulary-events")
 	c := &Client{config: &Config{Enabled: boolPtr(true)}}
 	c.TrackSessionStart(SessionStart{
 		Commands:    []string{"rust-build"},
@@ -641,6 +644,7 @@ func TestSessionStartRecordsOnlyFirstPartyCommands(t *testing.T) {
 }
 
 func TestSessionEventVocabularyGuardRejectsUnapprovedValues(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-cli-records-only-vocabulary-events")
 	tests := []struct {
 		name  string
 		event Event

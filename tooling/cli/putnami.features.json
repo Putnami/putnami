@@ -1658,6 +1658,25 @@
           }
         },
         {
+          "id": "a-step-reads-the-changed-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-gated-step-is-planned-only-for-a-project-that-owns-a-matching-changed-file",
+              "a-run-that-measured-no-diff-plans-no-change-gated-step",
+              "the-owned-changed-files-are-bound-into-the-step",
+              "the-owned-changed-files-key-the-step",
+              "a-frozen-request-plans-the-submitters-changed-files",
+              "cleanup-waits-for-the-consumers-the-plan-holds",
+              "a-manifest-with-a-change-gate-requires-contract-16"
+            ]
+          }
+        },
+        {
           "id": "an-interactive-command-stops-on-its-own-terms",
           "stage": "coded",
           "evidenceKinds": [
@@ -2318,6 +2337,54 @@
               "extensions-install-materializes-only-the-content-it-names",
               "extensions-install-keeps-the-opt-in-when-the-content-fails",
               "extensions-install-reports-the-opt-in-and-the-content"
+            ]
+          }
+        },
+        {
+          "id": "host-hooks-written-on-explicit-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-opted-in-bound-installed-extension-gets-its-hooks",
+              "a-repeated-run-changes-nothing",
+              "no-opt-in-or-no-binding-writes-nothing",
+              "an-explicit-install-writes-the-hooks",
+              "the-implicit-bootstrap-writes-no-hooks"
+            ]
+          }
+        },
+        {
+          "id": "host-hooks-ownership-by-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "putnami-handlers-are-replaced-in-place",
+              "the-person-s-entries-keep-their-bytes",
+              "an-unusable-file-is-left-untouched",
+              "retirement-removes-putnami-handlers"
+            ]
+          }
+        },
+        {
+          "id": "host-hooks-exit-guard",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-exit-75-wakes",
+              "matchers-follow-each-host",
+              "a-source-workspace-runs-its-putnamiw"
             ]
           }
         }
@@ -3030,7 +3097,7 @@
       "id": "cli/collaboration-providers",
       "type": "feature",
       "name": "Collaboration provider contracts",
-      "outcome": "A workspace binds its task, change-proposal and memory backends independently, and a user, a script or an agent calls the same versioned operations through the CLI or MCP without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
+      "outcome": "A workspace binds its task, change-proposal, memory and missions backends independently, and a user, a script or an agent calls the same versioned operations through the CLI or MCP without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -3135,6 +3202,55 @@
               "provider-stderr-never-reaches-an-envelope",
               "credential-values-are-redacted",
               "credential-settings-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "host-only-operations",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-host-only-operation-has-no-mcp-tool",
+              "the-cli-and-the-host-channel-route-a-host-only-operation",
+              "capabilities-mark-a-host-only-operation"
+            ]
+          }
+        },
+        {
+          "id": "missions-identity-and-reconciliation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missions-answer-for-another-mission-or-message-is-unresolved",
+              "an-unresolved-missions-write-names-its-repeat"
+            ]
+          }
+        },
+        {
+          "id": "missions-provider-semantics",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-local-store-passes-the-missions-scenarios",
+              "the-local-owner-answers-and-writes-messages-as-files",
+              "concurrent-processes-on-one-local-store-ask-and-reply-once"
+            ]
+          }
+        },
+        {
+          "id": "contract-names-never-shadow-commands",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-contract-name-is-a-built-in-command"
             ]
           }
         }

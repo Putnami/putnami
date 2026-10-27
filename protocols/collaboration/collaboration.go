@@ -1,7 +1,7 @@
-// Package collaboration defines the collaboration provider contracts: three
+// Package collaboration defines the collaboration provider contracts: four
 // independently bound, independently versioned operation contracts — tasks,
-// change proposals and memory — that a workspace routes to the provider
-// extensions it chooses.
+// change proposals, memory and missions — that a workspace routes to the
+// provider extensions it chooses.
 //
 // A contract is data, not code. The catalog below names every operation of
 // every contract version, whether a provider must implement it, whether it
@@ -25,7 +25,7 @@ import (
 )
 
 // Contract names. Each names a contract that is bound, versioned and
-// discovered independently of the other two.
+// discovered independently of the others.
 const (
 	// ContractTasks finds, reads, creates, updates and transitions work items.
 	ContractTasks = "tasks"
@@ -35,10 +35,14 @@ const (
 	// ContractMemory loads contextual records, reads a mission and saves a
 	// checkpoint against an expected revision.
 	ContractMemory = "memory"
+	// ContractMissions publishes an agent session's state to its mission,
+	// reads the messages waiting for it, asks the mission's owner a decision
+	// and replies to a message.
+	ContractMissions = "missions"
 )
 
 // ContractNames is the closed contract vocabulary in canonical (sorted) order.
-var ContractNames = []string{ContractMemory, ContractProposals, ContractTasks}
+var ContractNames = []string{ContractMemory, ContractMissions, ContractProposals, ContractTasks}
 
 // IsContract reports whether name is a member of the contract vocabulary.
 func IsContract(name string) bool {
@@ -71,6 +75,10 @@ const (
 	OperationMission    = "mission"
 	OperationCheckpoint = "checkpoint"
 	OperationSearch     = "search"
+
+	OperationSync  = "sync"
+	OperationAsk   = "ask"
+	OperationReply = "reply"
 )
 
 // Access classifies an operation as a read or a mutation. It is the contract's
@@ -144,6 +152,11 @@ type OperationSpec struct {
 	// selection projection, so the provider tool must declare
 	// workspaceSelection and never resolve a selector itself.
 	WorkspaceSelection bool
+	// HostOnly operations are called by the host integration that runs an
+	// agent, never by the agent itself. The MCP server lists no tool for
+	// them. The command line and the host channel route them like any other
+	// operation.
+	HostOnly bool
 	// Summary is the provider-neutral, agent-facing description.
 	Summary string
 	// newInput and newResult allocate the request and result documents.
@@ -257,6 +270,35 @@ var catalog = []ContractSpec{
 				Name: OperationSearch, Access: AccessRead, WorkspaceSelection: true,
 				Summary:  "Search memory records by text, narrowed like context. Optional capability.",
 				newInput: alloc[MemorySearchInput](), newResult: alloc[MemoryListResult](),
+			},
+		},
+	},
+	{
+		Name:    ContractMissions,
+		Version: 1,
+		Operations: []OperationSpec{
+			{
+				Name: OperationAsk, Access: AccessMutating, Required: true,
+				Summary: "Ask the mission's owner one decision, with 2 to 5 options. Take the mission's repository and key " +
+					"from the session sheet that the session hook prints. A retry with the same idempotencyKey returns the " +
+					"decision already recorded instead of asking twice; the same key with other content is a conflict. The " +
+					"answer reaches you at the end of a turn or while the session waits. Do not poll for it.",
+				newInput: alloc[MissionsAskInput](), newResult: alloc[MissionsAskResult](),
+			},
+			{
+				Name: OperationReply, Access: AccessMutating, Required: true,
+				Summary: "Reply to one message of the mission's inbox. message is the id shown with the owner's message " +
+					"in the session sheet that the session hook prints. A message takes one reply: the same reply again " +
+					"changes nothing, and another reply is a conflict.",
+				newInput: alloc[MissionsReplyInput](), newResult: alloc[MissionsReplyResult](),
+			},
+			{
+				Name: OperationSync, Access: AccessMutating, Required: true, Destructive: true, HostOnly: true,
+				Summary: "Publish an agent session's state and plan to its mission, acknowledge the messages delivered, " +
+					"bind the decisions the session asked and record its replies, then read the mission and the messages " +
+					"no session received yet. A sync older than the last one applied for the session changes nothing, " +
+					"so a repeat is safe. The host integration calls it, not the agent.",
+				newInput: alloc[MissionsSyncInput](), newResult: alloc[MissionsSyncResult](),
 			},
 		},
 	},

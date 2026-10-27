@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   attr,
   attrsFromStrings,
@@ -43,109 +44,133 @@ const START = '1699999999000000000';
 const TIME = '1700000000000000000';
 
 describe('cross-language OTLP equivalence', () => {
-  it('metrics envelope matches the Go golden digest', () => {
-    const res = resourceFromStrings({
-      'putnami.framework': 'go',
-      'service.name': 'checkout',
-      'service.version': '1.4.2',
-    });
-    const sc = scope('putnami', '1.0.0');
+  specTest(
+    'metrics envelope matches the Go golden digest',
+    {
+      feature: 'telemetry/otlp-push-contract',
+      requirement: 'equivalent-input-serializes-to-the-same-bytes',
+      check: 'the-typescript-renderer-reproduces-each-digest',
+    },
+    () => {
+      const res = resourceFromStrings({
+        'putnami.framework': 'go',
+        'service.name': 'checkout',
+        'service.version': '1.4.2',
+      });
+      const sc = scope('putnami', '1.0.0');
 
-    const httpDuration = metric({
-      name: 'http.duration',
-      unit: 'ms',
-      histogram: histogram(
-        [
-          histogramDataPoint({
-            startTimeUnixNano: START,
-            timeUnixNano: TIME,
-            count: '2',
-            sum: 30,
-            bucketCounts: ['2'],
-            min: 10,
-            max: 20,
-          }),
-        ],
-        TEMPORALITY_DELTA,
-      ),
-    });
-    const httpRequests = metric({
-      name: 'http.requests',
-      unit: '1',
-      sum: sum(
-        [
-          numberDataPoint({
-            attributes: attrsFromStrings({ method: 'GET' }),
-            startTimeUnixNano: START,
-            timeUnixNano: TIME,
-            asInt: '5',
-          }),
-        ],
-        TEMPORALITY_DELTA,
-        true,
-      ),
-    });
-    const queueSize = metric({
-      name: 'queue.size',
-      gauge: gauge([numberDataPoint({ timeUnixNano: TIME, asDouble: 3 })]),
-    });
+      const httpDuration = metric({
+        name: 'http.duration',
+        unit: 'ms',
+        histogram: histogram(
+          [
+            histogramDataPoint({
+              startTimeUnixNano: START,
+              timeUnixNano: TIME,
+              count: '2',
+              sum: 30,
+              bucketCounts: ['2'],
+              min: 10,
+              max: 20,
+            }),
+          ],
+          TEMPORALITY_DELTA,
+        ),
+      });
+      const httpRequests = metric({
+        name: 'http.requests',
+        unit: '1',
+        sum: sum(
+          [
+            numberDataPoint({
+              attributes: attrsFromStrings({ method: 'GET' }),
+              startTimeUnixNano: START,
+              timeUnixNano: TIME,
+              asInt: '5',
+            }),
+          ],
+          TEMPORALITY_DELTA,
+          true,
+        ),
+      });
+      const queueSize = metric({
+        name: 'queue.size',
+        gauge: gauge([numberDataPoint({ timeUnixNano: TIME, asDouble: 3 })]),
+      });
 
-    const req = metricsRequest([resourceMetrics(res, [scopeMetrics(sc, [httpDuration, httpRequests, queueSize])])]);
-    expect(digest(marshalCanonical(req))).toBe(GOLDEN_METRICS_DIGEST);
-  });
+      const req = metricsRequest([resourceMetrics(res, [scopeMetrics(sc, [httpDuration, httpRequests, queueSize])])]);
+      expect(digest(marshalCanonical(req))).toBe(GOLDEN_METRICS_DIGEST);
+    },
+  );
 
-  it('traces envelope matches the Go golden digest', () => {
-    const res = resourceFromStrings({ 'putnami.framework': 'go', 'service.name': 'checkout' });
-    const sc = scope('putnami', '1.0.0');
+  specTest(
+    'traces envelope matches the Go golden digest',
+    {
+      feature: 'telemetry/otlp-push-contract',
+      requirement: 'equivalent-input-serializes-to-the-same-bytes',
+      check: 'the-typescript-renderer-reproduces-each-digest',
+    },
+    () => {
+      const res = resourceFromStrings({ 'putnami.framework': 'go', 'service.name': 'checkout' });
+      const sc = scope('putnami', '1.0.0');
 
-    const serverSpan = span({
-      traceId: '5b8efff798038103d269b633813fc60c',
-      spanId: 'eee19b7ec3c1b174',
-      name: 'GET /checkout',
-      kind: 2,
-      startTimeUnixNano: '1700000000000000000',
-      endTimeUnixNano: '1700000000125000000',
-      attributes: sortAttrs([attr('http.method', stringVal('GET')), attr('http.status_code', intVal(200))]),
-      status: spanStatus(1),
-    });
-    const clientSpan = span({
-      traceId: '5b8efff798038103d269b633813fc60c',
-      spanId: 'f0e1d2c3b4a59687',
-      parentSpanId: 'eee19b7ec3c1b174',
-      name: 'SELECT carts',
-      kind: 3,
-      startTimeUnixNano: '1700000000010000000',
-      endTimeUnixNano: '1700000000040000000',
-      status: spanStatus(2, 'deadline exceeded'),
-    });
+      const serverSpan = span({
+        traceId: '5b8efff798038103d269b633813fc60c',
+        spanId: 'eee19b7ec3c1b174',
+        name: 'GET /checkout',
+        kind: 2,
+        startTimeUnixNano: '1700000000000000000',
+        endTimeUnixNano: '1700000000125000000',
+        attributes: sortAttrs([attr('http.method', stringVal('GET')), attr('http.status_code', intVal(200))]),
+        status: spanStatus(1),
+      });
+      const clientSpan = span({
+        traceId: '5b8efff798038103d269b633813fc60c',
+        spanId: 'f0e1d2c3b4a59687',
+        parentSpanId: 'eee19b7ec3c1b174',
+        name: 'SELECT carts',
+        kind: 3,
+        startTimeUnixNano: '1700000000010000000',
+        endTimeUnixNano: '1700000000040000000',
+        status: spanStatus(2, 'deadline exceeded'),
+      });
 
-    const req = tracesRequest([resourceSpans(res, [scopeSpans(sc, [serverSpan, clientSpan])])]);
-    expect(digest(marshalCanonical(req))).toBe(GOLDEN_TRACES_DIGEST);
-  });
+      const req = tracesRequest([resourceSpans(res, [scopeSpans(sc, [serverSpan, clientSpan])])]);
+      expect(digest(marshalCanonical(req))).toBe(GOLDEN_TRACES_DIGEST);
+    },
+  );
 
-  it('logs envelope matches the Go golden digest', () => {
-    const res = resourceFromStrings({ 'putnami.framework': 'go', 'service.name': 'checkout' });
-    const sc = scope('putnami', '1.0.0');
+  specTest(
+    'logs envelope matches the Go golden digest',
+    {
+      feature: 'telemetry/otlp-push-contract',
+      requirement: 'equivalent-input-serializes-to-the-same-bytes',
+      check: 'the-typescript-renderer-reproduces-each-digest',
+    },
+    () => {
+      const res = resourceFromStrings({ 'putnami.framework': 'go', 'service.name': 'checkout' });
+      const sc = scope('putnami', '1.0.0');
 
-    const infoRecord = logRecord({
-      timeUnixNano: '1700000000000000000',
-      observedTimeUnixNano: '1700000000000000000',
-      severityNumber: 9,
-      severityText: 'info',
-      body: stringVal('request handled'),
-      attributes: attrsFromStrings({ route: '/checkout' }),
-    });
-    const errorRecord = logRecord({
-      timeUnixNano: '1700000000500000000',
-      severityNumber: 17,
-      severityText: 'error',
-      body: stringVal('payment failed'),
-      attributes: attrsFromStrings({ 'error.code': 'card_declined' }),
-      traceId: '5b8efff798038103d269b633813fc60c',
-      spanId: 'eee19b7ec3c1b174',
-    });
+      const infoRecord = logRecord({
+        timeUnixNano: '1700000000000000000',
+        observedTimeUnixNano: '1700000000000000000',
+        severityNumber: 9,
+        severityText: 'info',
+        body: stringVal('request handled'),
+        attributes: attrsFromStrings({ route: '/checkout' }),
+      });
+      const errorRecord = logRecord({
+        timeUnixNano: '1700000000500000000',
+        severityNumber: 17,
+        severityText: 'error',
+        body: stringVal('payment failed'),
+        attributes: attrsFromStrings({ 'error.code': 'card_declined' }),
+        traceId: '5b8efff798038103d269b633813fc60c',
+        spanId: 'eee19b7ec3c1b174',
+      });
 
-    const req = logsRequest([resourceLogs(res, [scopeLogs(sc, [infoRecord, errorRecord])])]);
-    expect(digest(marshalCanonical(req))).toBe(GOLDEN_LOGS_DIGEST);
-  });
+      const req = logsRequest([resourceLogs(res, [scopeLogs(sc, [infoRecord, errorRecord])])]);
+      expect(digest(marshalCanonical(req))).toBe(GOLDEN_LOGS_DIGEST);
+    },
+  );
 });

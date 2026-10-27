@@ -14,6 +14,9 @@
   "tasks": {
     "test~test": {
       "timeoutMs": 1200000
+    },
+    "test~test-race": {
+      "timeoutMs": 1200000
     }
   },
   "options": {

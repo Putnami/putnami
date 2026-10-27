@@ -1,0 +1,9 @@
+{
+  "session_id": "01a15d8d-8dda-7830-92b9-2112bcd234d7",
+  "transcript_path": "/home/agent/.codex/sessions/2026/10/21/rollout-2026-10-21T10-22-01-01a15d8d-8dda-7830-92b9-2112bcd234d7.jsonl",
+  "cwd": "/work/repo",
+  "hook_event_name": "SessionStart",
+  "model": "example-model",
+  "permission_mode": "bypassPermissions",
+  "source": "startup"
+}

@@ -94,7 +94,11 @@ func buildPlan(
 		}
 	}
 
-	planned, err := planner.Plan(ws, req.Commands, selectedProjects, extensions, req.CommandParams, disabledJobs, disabledExts)
+	// The measured diff, nil without one: a step that gates on or binds the
+	// changed files plans and keys from it, on the submitter and on the
+	// executing side of a frozen request alike (selectFrozenProjects).
+	planned, err := planner.Plan(ws, req.Commands, selectedProjects, extensions, req.CommandParams, disabledJobs, disabledExts,
+		req.selectionEvidence.changedPaths)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: plan: %v\n", err)
 		return nil, ExitError

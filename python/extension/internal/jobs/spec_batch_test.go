@@ -36,6 +36,7 @@ func specEnvValue(env []string, key string) string {
 }
 
 func TestTestBatchMergesSpecFragmentsPerProject(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-python-batch-gives-each-member-its-own-report")
 	stubSync(t)
 	ctx := makeTestBatchWorkspace(t)
 
@@ -117,6 +118,7 @@ func TestTestBatchMergesSpecFragmentsPerProject(t *testing.T) {
 // TestTestBatchWithoutFragmentsWritesNoReport pins the optionalEmpty half: a
 // suite that bound nothing produces no report file and no artifact row.
 func TestTestBatchWithoutFragmentsWritesNoReport(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-python-batch-writes-no-report-without-fragments")
 	stubSync(t)
 	ctx := makeTestBatchWorkspace(t)
 	stubRunner(t, func(_ context.Context, _ string, _, _ []string) (string, error) {

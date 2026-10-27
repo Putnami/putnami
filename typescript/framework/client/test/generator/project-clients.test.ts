@@ -588,6 +588,68 @@ describe('generateProjectClients (TypeScript)', () => {
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
+  specTest(
+    'writes a putnami.json that declares featureAuthority.none when the output has none',
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'client-project-document',
+      check: 'a-new-client-gets-a-putnami-json-declaring-feature-authority-none',
+    },
+    () => {
+      const root = setupProject({
+        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
+        '.gen/schema/openapi.json': firstPartySpec(),
+        '.editorconfig': 'root = true\n[*]\nindent_style = space\nindent_size = 4\n',
+        'biome.json': JSON.stringify({ formatter: { enabled: true, useEditorconfig: true } }),
+      });
+
+      const result = generateProjectClients(root);
+      const document = readFileSync(join(root, 'clients/ts/putnami.json'), 'utf8');
+      expect(JSON.parse(document)).toEqual({
+        $schema: 'https://putnami.dev/schemas/putnami-project.json',
+        name: '@example/widgets-client',
+        type: 'library',
+        tags: ['ts', 'generated-client'],
+        extensions: ['@putnami/typescript'],
+        featureAuthority: {
+          none: 'Generated client code mirrors provider-owned operations and does not own a separate user outcome.',
+        },
+      });
+      // Biome rendered it with the provider's configuration: the EditorConfig
+      // indentation, and the short array on one line.
+      expect(document).toContain('\n    "tags": ["ts", "generated-client"],\n');
+      const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
+      expect(manifest.files.map((file: { path: string }) => file.path)).not.toContain('putnami.json');
+      expect(result.files).not.toContain('clients/ts/putnami.json');
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
+  specTest(
+    'keeps an existing putnami.json byte for byte',
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'client-project-document',
+      check: 'an-existing-putnami-json-is-kept-byte-for-byte',
+    },
+    () => {
+      const existing = '{"name":"@example/widgets-client","tags":["hand-edited"]}\n';
+      const root = setupProject({
+        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
+        '.gen/schema/openapi.json': firstPartySpec(),
+        'clients/ts/putnami.json': existing,
+      });
+
+      const result = generateProjectClients(root);
+      expect(result.generated).toBe(true);
+      expect(readFileSync(join(root, 'clients/ts/putnami.json'), 'utf8')).toBe(existing);
+      const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
+      expect(manifest.files.map((file: { path: string }) => file.path)).not.toContain('putnami.json');
+      expect(result.files).not.toContain('clients/ts/putnami.json');
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
   test(
     'throws when the ts target is enabled but no spec exists',
     () => {

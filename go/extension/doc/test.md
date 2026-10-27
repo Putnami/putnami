@@ -12,6 +12,7 @@ Runs Go tests with `go test -json`, parses results into structured metrics, and 
 - Parses `coverage.out` for per-file statement coverage
 - Emits metrics for test counts and coverage percentage
 - Warns on files with zero coverage
+- Runs the race detector on the packages a change touched, after the test run (see [Race detector on changed packages](#race-detector-on-changed-packages))
 
 **Activation:** Any project containing `go.mod` or `*_test.go` files.
 
@@ -141,6 +142,50 @@ putnami test .
 
 ```bash
 putnami test . --race
+```
+
+`--race` runs every package under the race detector, in the test run itself.
+
+### Race detector on changed packages
+
+When the run measured a diff, as `putnami test --impacted` does, `test` also
+runs a `test-race` step in each project that owns a changed Go or testdata
+file outside `.gen`. The step runs `go test -race` on the packages the change
+touched:
+
+- the directory of each changed `.go` file the project owns;
+- for a changed file under a `testdata` directory, the package that holds that
+  directory.
+
+The step runs after `test`, once it passed. It measures no coverage, writes no
+file, runs no benchmark and reports no test counts: its counts are a log line,
+and the command's test totals are the test step's. A project the change
+reaches only through a dependency runs no race step, and a run without a diff
+(`--all`, `--projects`) runs none. No package list is maintained: the change
+decides the packages.
+
+The CLI binds the changed Go and testdata files to the step, so they key its
+cache entry: the same change answers from the cache, another change runs
+again, and an edit to another file, such as a README, does not.
+
+`--timeout` does not apply to the step. Its deadline is the task's,
+`tasks["test~test-race"].timeoutMs` in `putnami.json` (600000 ms by default),
+and the step passes `go test -timeout` below it.
+
+`--race` replaces the step, because it already runs every package under the
+detector. `--no-race-changed` turns the step off. With either flag, the step
+skips itself.
+
+The race detector needs a supported platform and, everywhere except macOS, cgo
+and a C compiler. Off macOS, the step sets `CGO_ENABLED=1`. When the platform
+has no race detector, `go env CC` names a compiler that is not on `PATH`, or no
+test runs under the detector, the step fails with a diagnostic that names
+`--no-race-changed`. Putnami does not cache that failure: the next run tries
+again.
+
+```bash
+# Skip the race step on a host without a C compiler
+putnami test --impacted --no-race-changed
 ```
 
 ### Filter tests
@@ -409,6 +454,7 @@ from config.
 | `--enforce-coverage` | `true` | Enforce each project's `coverage-threshold`. On by default so a drop fails the run that caused it. `--no-enforce-coverage` keeps measuring and reporting but never fails. Distinct from `--coverage`, so it never overrides a project's `coverage: false` opt-out |
 | `--coverage` | `true` | Per-project coverage policy, and the sole authority on whether a run instruments. Set `false` (typically in project config) to opt a project out of coverage entirely and skip the instrumentation cost |
 | `--race` | `false` | Enable race detector |
+| `--race-changed` | `true` | Run the race detector on the packages a change touched, in a step after the test run. Planned only when the run measured a diff and the project owns a changed Go or testdata file outside `.gen`; `--race` replaces it. `--no-race-changed` turns it off. See [Race detector on changed packages](#race-detector-on-changed-packages) |
 | `--timeout <duration>` | — | Test timeout (e.g. `30s`, `5m`) |
 | `--short` | `false` | Run only tests that check `testing.Short()` |
 | `--run <pattern>` | — | Run only tests matching this regex pattern |

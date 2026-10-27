@@ -65,14 +65,17 @@ func SharedConsumerReason(consumer *jobmodel.ScheduledJob, first, second *Invoca
 }
 
 // ResolveInvocationRelations turns every `runOn: finally` plan node into a
-// resolved relation, dropping any whose producer or consumer frontier is not in
-// the plan.
+// resolved relation, dropping any whose producer is not in the plan or whose
+// consumer frontier has no planned member.
 //
-// A dropped relation leaves its finalizer inert rather than half-wired: the
-// frontier is the contract's completion signal, and a finalizer that cannot see
-// its whole frontier would run at an arbitrary moment. Pipeline expansion can
-// legitimately remove a step (a plan-time `if`), so this is a normal outcome and
-// not an error.
+// The frontier is the authored consumers the plan holds. Pipeline expansion can
+// legitimately remove a consumer (a plan-time `if`, an activation gate), and a
+// consumer the plan does not hold never runs, so it never uses the resource:
+// cleanup waits for every consumer that can. A relation with no planned
+// consumer is dropped and leaves its finalizer inert rather than half-wired:
+// the frontier is the contract's completion signal, and an empty one gives the
+// finalizer no defined moment to run at. A dropped relation is a normal
+// outcome and not an error.
 //
 // The function is PURE in the plan apart from the producer stamp it attaches,
 // which is idempotent, so Plan and the scheduler can both call it and cannot
@@ -101,16 +104,12 @@ func ResolveInvocationRelations(planned []*jobmodel.ScheduledJob) []*InvocationR
 			continue
 		}
 		consumers := make([]*jobmodel.ScheduledJob, 0, len(relation.Consumers))
-		complete := len(relation.Consumers) > 0
 		for _, authored := range relation.Consumers {
-			consumer := byStep[invocationStepKey(finalizer, strings.TrimSpace(authored))]
-			if consumer == nil {
-				complete = false
-				break
+			if consumer := byStep[invocationStepKey(finalizer, strings.TrimSpace(authored))]; consumer != nil {
+				consumers = append(consumers, consumer)
 			}
-			consumers = append(consumers, consumer)
 		}
-		if !complete {
+		if len(consumers) == 0 {
 			continue
 		}
 		provider := ""

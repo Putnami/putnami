@@ -479,7 +479,7 @@ Three additions to a declared output and one explicit pipeline relation:
 | `kind: "runtime-file"` | A file whose content only means anything inside the invocation that wrote it — a connection string for a container that dies with the run, a socket path. Never captured, never restored |
 | `scope: "invocation"` | The output is confined to the current CLI invocation: written to its private scratch (mode `0600` when sensitive), never captured, discarded when the invocation ends |
 | `sensitive: true` | The output's path and bytes must never reach an event, a result, a session record, telemetry, or cache traffic |
-| `runOn: "finally"` + `finalizes` | The containing step is the finalizer. `producer` start arms it exactly once; cleanup waits for every named `consumer` to reach a terminal state |
+| `runOn: "finally"` + `finalizes` | The containing step is the finalizer. `producer` start arms it exactly once; cleanup waits for every named `consumer` the plan holds to reach a terminal state |
 
 `scope` defaults to `durable`: every output declared before this vocabulary
 existed outlives the invocation and is captured, exactly as before.
@@ -494,7 +494,7 @@ existed outlives the invocation and is captured, exactly as before.
 | An invocation-scoped output leaves `root` unset | The invocation scratch is not a staging root; naming one says two contradictory things about where the file lands |
 | A task with an invocation-scoped output sets `cache: false` | A cache hit would report success without ever creating the artifact |
 | `finalizes.producer` uses a task with an invocation-scoped output | The relation is part of this artifact primitive, not a generic teardown mechanism |
-| Every `finalizes.consumer` is downstream of the producer | The complete completion frontier is explicit and mechanically derivable |
+| Every `finalizes.consumer` is downstream of the producer | The completion frontier is explicit, and the plan's share of it is mechanically derivable: a consumer an `if` or an activation gate removed never runs and is not waited for |
 | A finalizer has no ordinary `dependsOn` | Trigger and frontier come only from `finalizes`, so they cannot conflict |
 | No step may bind an input from a `runOn: "finally"` step | A finalizer runs regardless of outcome and produces no result a dependent can consume |
 | Neither a finalizer task nor a command may export its result | Cleanup has no data result; success or failure is reported only as lifecycle status |
@@ -520,9 +520,10 @@ Sensitive bytes and paths remain confined to the private tree.
 ### Execution and cache identity
 
 - Cache negotiation happens **before** materialization. Because `finalizes`
-  names the producer and complete consumer frontier, an all-hit frontier prunes
-  the producer and its finalizer together; any consumer miss keeps the producer
-  and arms exactly one finalizer.
+  names the producer and its consumers, an all-hit frontier of the consumers
+  the plan holds prunes the producer and its finalizer together; any consumer
+  miss keeps the producer and arms exactly one finalizer. A plan that holds no
+  consumer leaves the finalizer inert.
 - A relation whose producer sometimes performs an imperative side effect beyond
   serving its frontier can declare `finalizes.pruneIf`, a plan-time expression
   over command params. Core prunes an all-hit frontier only when the expression

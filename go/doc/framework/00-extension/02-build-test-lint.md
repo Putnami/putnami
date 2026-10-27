@@ -44,12 +44,42 @@ Useful options:
 
 - `--coverage`
 - `--race`
+- `--no-race-changed`
 - `--timeout <duration>`
 - `--run <pattern>`
 - `--count <n>`
 - `--shuffle`
 - `--bench <pattern>`
 - `--coverage-threshold <pct>`
+
+### The race detector on changed packages
+
+When a run measures a diff, such as `putnami test --impacted`, `test` also runs
+`go test -race` on the packages the change touched, in a `test-race` step after
+the test step passes:
+
+- The packages are the directory of each changed Go file, and the package that
+  holds a changed `testdata` directory, in the project that owns the file.
+  Generated `.gen` code is left out.
+- A project the change reaches only through a dependency runs no race step.
+  A run without a diff, such as `--all` or `--projects`, runs none.
+- The changed files key the step, so the same change reuses the stored
+  verdict.
+- The step measures no coverage. It reports its counts in a log line, never as
+  the command's test totals. Its failures are diagnostics.
+- `--timeout` does not apply to it. Its own deadline is its task's
+  (`tasks["test~test-race"].timeoutMs` in `putnami.json`, 600000 ms by
+  default), and its `go test -timeout` sits below that deadline.
+
+`--race` replaces the step: the test step runs every package under the
+detector. `--no-race-changed` turns the step off.
+
+Off macOS, the race detector builds through cgo, so the step sets
+`CGO_ENABLED=1` and needs the C compiler `go env CC` names on `PATH`. A host
+that cannot run the detector fails the step with a message that names
+`--no-race-changed`. Putnami does not cache that failure, so the next run tries
+again, for example after you install a compiler. On macOS the detector needs no
+C compiler.
 
 ## Lint
 

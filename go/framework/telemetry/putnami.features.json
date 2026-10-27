@@ -68,19 +68,6 @@
           }
         },
         {
-          "id": "final-flush",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-metric-reader-flushes-once-more-during-provider-shutdown"
-            ]
-          }
-        },
-        {
           "id": "lifecycle-purity",
           "stage": "coded",
           "evidenceKinds": [
@@ -105,7 +92,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-collector-error-is-dropped-rather-than-propagated",
               "the-log-sink-batches-records-onto-a-background-flush"
             ]
           }

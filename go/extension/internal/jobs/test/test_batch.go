@@ -127,15 +127,15 @@ type batchSummary struct {
 
 // runGoCommand is the job's one subprocess seam, for the solo and the batch
 // path alike, so tests can serve `go list` and `go test` from the same mock.
-// A `go test` transcript is both streams interleaved. A `go list` result is
-// data on stdout alone: its stderr, such as the exit-0 warning that a
-// wildcard matched no packages, must never read as a package, so it is
-// returned only with a failure.
+// A `go test` transcript is both streams interleaved. A `go list` or `go env`
+// result is data on stdout alone: its stderr, such as the exit-0 warning that
+// a wildcard matched no packages, must never read as a package or a setting,
+// so it is returned only with a failure.
 var runGoCommand = func(binary string, args []string, dir string, env []string) ([]byte, error) {
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	if len(args) == 0 || args[0] != "list" {
+	if len(args) == 0 || (args[0] != "list" && args[0] != "env") {
 		return cmd.CombinedOutput()
 	}
 	var stdout, stderr bytes.Buffer

@@ -1,9 +1,14 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/spectest",
+  "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/features"],
   "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/features/schemas/**"]
+    },
     "package": {
       "npm": true
     },

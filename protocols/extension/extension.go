@@ -78,6 +78,12 @@ type Manifest struct {
 	// AgentContentContract, and a workspace receives the content only when it
 	// opts in.
 	AgentContent *AgentContentContribution `json:"agentContent,omitempty"`
+	// HostHooks declares the hooks this extension asks the agent hosts to run
+	// (see host_hooks.go). Nil means the extension declares none. Declaring it
+	// requires cliContract HostHooksContract, and the CLI writes the hooks only
+	// for a workspace that opts into the extension's agent content and binds
+	// the collaboration contract the hooks require.
+	HostHooks *HostHooksDeclaration `json:"hostHooks,omitempty"`
 	// Verbs is the verb vocabulary this extension declares, in display order:
 	// each verb's description, aliases, default traits and related commands
 	// (see verb_vocabulary.go). Nil means the extension declares none.
@@ -211,7 +217,8 @@ type ToolCallRequest struct {
 // settings verbatim. The orchestrator writes it from the workspace binding;
 // the arguments member is the operation's validated request document.
 type ToolProviderCall struct {
-	// Contract is the contract name: "tasks", "proposals" or "memory".
+	// Contract is the contract name: "tasks", "proposals", "memory" or
+	// "missions".
 	Contract string `json:"contract"`
 	// Version is the contract version the workspace bound.
 	Version int `json:"version"`
@@ -507,8 +514,8 @@ const (
 	// existed.
 	StepRunOnSuccess = "success"
 	// StepRunOnFinally marks the containing step as the finalizer in an explicit
-	// FinalizesRelation. Producer start arms it exactly once and Consumers are
-	// the complete terminal frontier it waits for, regardless of whether they
+	// FinalizesRelation. Producer start arms it exactly once and it waits for
+	// each of the Consumers the plan holds, regardless of whether they
 	// succeeded, failed, or were canceled.
 	StepRunOnFinally = "finally"
 )
@@ -542,8 +549,8 @@ type PipelineStep struct {
 	// this field keeps its exact behavior.
 	RunOn string `json:"runOn,omitempty"`
 	// Finalizes is the explicit invocation-resource relation for a finalizer.
-	// Producer arms cleanup when it starts; Consumers are the complete terminal
-	// frontier cleanup waits for. It is required exactly when RunOn is finally.
+	// Producer arms cleanup when it starts; cleanup waits for each of the
+	// Consumers the plan holds. It is required exactly when RunOn is finally.
 	Finalizes  *FinalizesRelation `json:"finalizes,omitempty"`
 	Activation *StepActivation    `json:"activation,omitempty"`
 	Cache      *StepCacheOverride `json:"cache,omitempty"`
@@ -565,7 +572,8 @@ type FinalizesRelation struct {
 	// Producer is the local step whose start arms the finalizer.
 	Producer string `json:"producer"`
 	// Consumers is the complete set of local steps allowed to use the
-	// invocation artifacts. Cleanup waits until each reaches a terminal state.
+	// invocation artifacts. Cleanup waits until each the plan holds reaches a
+	// terminal state; a consumer the plan dropped never uses them.
 	Consumers []string `json:"consumers"`
 	// PruneIf is an optional plan-time expression over command params. The
 	// relation is eligible for all-hit frontier pruning only when it evaluates
@@ -622,7 +630,24 @@ type StepActivation struct {
 	// step is active only if every listed file exists and contains its
 	// substring. Empty means no content gate.
 	Contains map[string]string `json:"contains,omitempty"`
+	// ChangedFiles lists glob patterns matched against the run's changed files
+	// that the target project owns, project-relative; the step is active only
+	// if at least one of them matches. Empty means no change gate. A run that
+	// measured no diff (`--all`, `--projects`) has no changed file, so a gated
+	// step is never planned there. It is the vocabulary of
+	// protocolcli.ChangedFilesContract.
+	ChangedFiles []string `json:"changedFiles,omitempty"`
 }
+
+// InputBindingFromContext is the `from` of an input binding that reads a
+// planner fact. ContextPathChangedFiles is the one fact it resolves.
+const InputBindingFromContext = "context"
+
+// ContextPathChangedFiles is the context path of the run's changed files that
+// the target project owns: project-relative slash paths, sorted and unique. A
+// run that measured no diff binds no value, and the task receives no
+// parameter. It is the vocabulary of protocolcli.ChangedFilesContract.
+const ContextPathChangedFiles = "selection.changedFiles"
 
 // TaskDefinition describes an atomic executable unit.
 type TaskDefinition struct {
@@ -1026,7 +1051,8 @@ type InputBinding struct {
 	Value    any  `json:"value,omitempty"`
 	HasValue bool `json:"-"` // set by custom unmarshaller
 
-	// Context/command binding
+	// Context binding: From is InputBindingFromContext and Path names the
+	// planner fact (ContextPathChangedFiles).
 	From    string `json:"from,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Default any    `json:"default,omitempty"`

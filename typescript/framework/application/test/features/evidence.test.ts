@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { serializeFeatureEvidenceDocument, validateFeatureEvidenceDocument } from '../../src/features/evidence';
 import type { FeatureEvidenceDocument } from '../../src/features/evidence.types';
 
@@ -10,15 +11,23 @@ const EQUIVALENCE_FIXTURE = join(
 );
 
 describe('feature evidence protocol', () => {
-  it('validates and reproduces the shared Go/TypeScript bytes', () => {
-    const bytes = readFileSync(EQUIVALENCE_FIXTURE, 'utf8');
-    const document = JSON.parse(bytes) as FeatureEvidenceDocument;
-    expect(validateFeatureEvidenceDocument(document)).toEqual([]);
-    expect(serializeFeatureEvidenceDocument(document)).toBe(bytes);
+  specTest(
+    'validates and reproduces the shared Go/TypeScript bytes',
+    {
+      feature: 'features/feature-contracts',
+      requirement: 'canonical-bytes-across-languages',
+      check: 'typescript-reproduces-the-evidence-golden',
+    },
+    () => {
+      const bytes = readFileSync(EQUIVALENCE_FIXTURE, 'utf8');
+      const document = JSON.parse(bytes) as FeatureEvidenceDocument;
+      expect(validateFeatureEvidenceDocument(document)).toEqual([]);
+      expect(serializeFeatureEvidenceDocument(document)).toBe(bytes);
 
-    document.evidence.reverse();
-    expect(serializeFeatureEvidenceDocument(document)).toBe(bytes);
-  });
+      document.evidence.reverse();
+      expect(serializeFeatureEvidenceDocument(document)).toBe(bytes);
+    },
+  );
 
   it('rejects invalid source authority and contribution identities deterministically', () => {
     const document = JSON.parse(readFileSync(EQUIVALENCE_FIXTURE, 'utf8')) as FeatureEvidenceDocument;

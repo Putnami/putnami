@@ -1,6 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/typescript-templates-proof",
+  "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension"],
   "featureAuthority": { "owner": "tooling/project-scaffolding" },

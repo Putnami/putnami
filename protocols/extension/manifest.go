@@ -28,6 +28,9 @@ import (
 // nothing: each is exactly the part of a manifest an older reader would drop
 // without a word, so an unstamped manifest that declares one must not load as
 // if it were hook-only.
+//
+// Host hooks need no term of their own: a valid hostHooks member names a
+// subcommand of the manifest's own command groups, which already count.
 func DeclaresContractSurface(m *Manifest) bool {
 	if m == nil {
 		return false
@@ -57,15 +60,17 @@ func LoadManifest(path string) (*Manifest, error) {
 //     never half-interpreted; the remedy is a newer putnami.
 //   - contract from RequiredLoadContract up to LatestContract → enforce
 //     strictly: the packager stamped compliance, so a reserved global-flag
-//     shadow is a hard error.
+//     shadow is a hard error, and so is, from ChangedFilesContract, an input
+//     binding source the planner does not resolve.
 //   - contract absent (0) or below RequiredLoadContract → hard error naming
 //     the fix. The stamp is what proves an extension speaks the contracts its
 //     manifest relies on — the four that move together at 3 (task contract
 //     v3, job context v2, runtime event protocol v2, lock format v2), the
 //     session prerequisites of 4, and, for a manifest that declares agent
 //     content, a verb vocabulary, command kinds, publish channels, a
-//     provisioned toolchain candidate, input selectors or a group default that
-//     takes positionals, the additive contract 5, 9, 11, 12, 13, 14 or 15.
+//     provisioned toolchain candidate, input selectors, a group default that
+//     takes positionals, a step that reads the run's changed files or host
+//     hooks, the additive contract 5, 9, 11, 12, 13, 14, 15, 16 or 17.
 //     Loading a manifest stamped below that would run a task whose outputs
 //     the scheduler cannot capture from a declaration, or accept agent
 //     content a reader of its stamp never had to represent.
@@ -100,6 +105,13 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 		if diags := ValidateNoReservedFlagShadows(&m); diag.HasErrors(diags) {
 			return nil, fmt.Errorf("extension manifest %s has reserved global flag shadows: %s", path, formatDiagnostics(diags))
 		}
+		// From ChangedFilesContract, every input binding names a source the
+		// planner resolves.
+		if m.CLIContract >= protocolcli.ChangedFilesContract {
+			if diags := validateManifestBindingSources(&m); diag.HasErrors(diags) {
+				return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+			}
+		}
 		return &m, nil
 	case !DeclaresContractSurface(&m):
 		// Hook-only: nothing the contract governs, and nothing the packager
@@ -112,6 +124,10 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.HostHooksContract:
+			reason = " for its host hooks"
+		case required == protocolcli.ChangedFilesContract:
+			reason = " for a step that reads the run's changed files"
 		case required == protocolcli.DefaultPositionalsContract:
 			reason = " for a default subcommand that takes positionals"
 		case required == protocolcli.InputSelectorsContract:

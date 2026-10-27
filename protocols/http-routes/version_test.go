@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestVersionIdentifiersArePinned(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "the-identifiers-are-pinned", "the-version-identifiers-are-pinned")
 	if Protocol != "putnami.http-routes.v1" {
 		t.Fatalf("Protocol = %q; matching or wire changes require a new major identifier", Protocol)
 	}

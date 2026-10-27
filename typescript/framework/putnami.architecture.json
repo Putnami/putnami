@@ -92,8 +92,38 @@
       "bindings": [
         {
           "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/http-routes"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/platform"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/telemetry"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/typescript/framework/cli-protocol",
           "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/spectest",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/web",
+          "producerProject": "/protocols/http-routes"
         }
       ],
       "justification": "The TypeScript framework packages implement wire contracts the protocols domain owns: they write, read or replay a protocol's shapes and fixtures, and their tests prove the protocol's requirements. Each protocol owns its contract; a package holds a reference to it and owns none of its meaning."

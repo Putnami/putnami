@@ -68,6 +68,7 @@ func assertValidReport(t *testing.T, report doctor.Report) {
 // Summary.Waived, clears the gate) without dropping it from the report. It also
 // exercises path-form waiver scope ("app" → "/app").
 func TestDoctorWaivers_LiveSuppresses(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "putnami-doctor-applies-waivers-by-the-contract", "a-live-waiver-suppresses-with-provenance")
 	report, err := DoctorRun("testdata/doctor/waivers-live", []*workspace.Project{waiverApp()}, doctor.ProfileProduction, atClock(t, "2027-01-01T00:00:00Z"))
 	if err != nil {
 		t.Fatalf("a live waiver over the only blocking finding must clear the gate (exit 0), got: %v", err)
@@ -99,6 +100,7 @@ func TestDoctorWaivers_LiveSuppresses(t *testing.T) {
 // finding (fail closed) and surfaces a doctor.waiver_expired hygiene finding of
 // its own; the underlying finding stays at full severity and still blocks.
 func TestDoctorWaivers_ExpiredStillBlocks(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "putnami-doctor-applies-waivers-by-the-contract", "a-stale-waiver-becomes-a-finding")
 	report, err := DoctorRun("testdata/doctor/waivers-expired", []*workspace.Project{waiverApp()}, doctor.ProfileProduction, atClock(t, "2027-01-01T00:00:00Z"))
 	if err == nil {
 		t.Fatal("an expired waiver must not suppress its finding; the gate must still block (exit 2)")
@@ -134,6 +136,7 @@ func TestDoctorWaivers_ExpiredStillBlocks(t *testing.T) {
 // becomes a doctor.waiver_unknown_code finding and matches nothing, so the real
 // finding it never covered still blocks.
 func TestDoctorWaivers_UnknownCode(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "putnami-doctor-applies-waivers-by-the-contract", "a-stale-waiver-becomes-a-finding")
 	report, err := DoctorRun("testdata/doctor/waivers-unknown", []*workspace.Project{waiverApp()}, doctor.ProfileProduction, atClock(t, "2027-01-01T00:00:00Z"))
 	if err == nil {
 		t.Fatal("an unknown-code waiver suppresses nothing; the underlying finding must still block")
@@ -163,6 +166,7 @@ func TestDoctorWaivers_UnknownCode(t *testing.T) {
 // SAME code (here a critical missing secret) the author never named keeps
 // blocking. This is the fail-closed fix for over-broad (code, project) waivers.
 func TestDoctorWaivers_FieldScopedSuppressesOnlyItsField(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "putnami-doctor-applies-waivers-by-the-contract", "a-field-narrows-a-waiver")
 	report, err := DoctorRun("testdata/doctor/waivers-field-scoped", []*workspace.Project{waiverApp()}, doctor.ProfileProduction, atClock(t, "2027-01-01T00:00:00Z"))
 	if err == nil {
 		t.Fatal("a server.port-scoped waiver must not clear the sibling critical database.password; the gate must still block")
@@ -194,6 +198,7 @@ func TestDoctorWaivers_FieldScopedSuppressesOnlyItsField(t *testing.T) {
 // keeps the deliberate broad behavior — it accepts every finding of its code in
 // the project — so the existing (code, project) form is unchanged.
 func TestDoctorWaivers_FieldlessWaivesEverySameCodeFinding(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "putnami-doctor-applies-waivers-by-the-contract", "a-field-narrows-a-waiver")
 	report, err := DoctorRun("testdata/doctor/waivers-broad-code", []*workspace.Project{waiverApp()}, doctor.ProfileProduction, atClock(t, "2027-01-01T00:00:00Z"))
 	if err != nil {
 		t.Fatalf("a field-less waiver accepts every missing-config finding, clearing the gate: %v", err)
@@ -215,6 +220,7 @@ func TestDoctorWaivers_FieldlessWaivesEverySameCodeFinding(t *testing.T) {
 // dev, where the underlying findings alone would not block. This is the
 // load-bearing safety invariant: a broken file never grants a silent exception.
 func TestDoctorWaivers_MalformedFailsClosed(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "putnami-doctor-applies-waivers-by-the-contract", "an-invalid-waiver-file-waives-nothing")
 	for _, profile := range []doctor.Profile{doctor.ProfileProduction, doctor.ProfileDev} {
 		report, err := DoctorRun("testdata/doctor/waivers-malformed", []*workspace.Project{waiverApp()}, profile, atClock(t, "2027-01-01T00:00:00Z"))
 		if err == nil {
@@ -290,6 +296,7 @@ func TestDoctorWaivers_UnreadableFailsClosed(t *testing.T) {
 // scope (empty project matches /app) and the workspace-scope value on the
 // resulting hygiene finding.
 func TestDoctorWaivers_DateOnlyBoundary(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "expiry-is-data-in-the-contract", "the-cli-evaluates-expiry-on-an-injected-clock")
 	tests := []struct {
 		name   string
 		clock  string
@@ -337,6 +344,7 @@ func TestDoctorWaivers_DateOnlyBoundary(t *testing.T) {
 // UTC = the following midnight), plus the fail-closed treatment of an
 // unparsable value.
 func TestWaiverExpired(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "expiry-is-data-in-the-contract", "the-cli-evaluates-expiry-on-an-injected-clock")
 	tests := []struct {
 		name    string
 		expires string

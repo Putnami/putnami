@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { parseAndValidateEnvelope } from '../../src/platform';
 
 // Cross-language envelope conformance: the TS platform protocol port must
@@ -24,21 +25,31 @@ function fixtures(kind: 'valid' | 'invalid'): string[] {
 const valid = fixtures('valid');
 const invalid = fixtures('invalid');
 
+const binding = {
+  feature: 'platform/operational-endpoints',
+  requirement: 'the-envelope-states-one-status',
+  check: 'the-typescript-port-gives-every-envelope-fixture-its-verdict',
+};
+
 describe('platform envelope fixtures (cross-language conformance)', () => {
-  it('finds the shared fixture corpus on disk', () => {
+  specTest('finds the shared fixture corpus on disk', binding, () => {
     // Guard against a silently-empty glob (moved/renamed fixtures) turning
-    // the it.each suites below into no-ops — the Go twin fails the same way.
+    // the loops below into no-ops — the Go twin fails the same way.
     expect(valid.length).toBeGreaterThan(0);
     expect(invalid.length).toBeGreaterThan(0);
   });
 
-  it.each(valid)('valid/%s parses and validates with no diagnostics', (name) => {
-    const data = readFileSync(join(FIXTURE_DIR, 'valid', name), 'utf8');
-    expect(parseAndValidateEnvelope(data).diagnostics).toEqual([]);
+  specTest('every valid fixture parses and validates with no diagnostics', binding, () => {
+    for (const name of valid) {
+      const data = readFileSync(join(FIXTURE_DIR, 'valid', name), 'utf8');
+      expect(parseAndValidateEnvelope(data).diagnostics, name).toEqual([]);
+    }
   });
 
-  it.each(invalid)('invalid/%s produces at least one diagnostic', (name) => {
-    const data = readFileSync(join(FIXTURE_DIR, 'invalid', name), 'utf8');
-    expect(parseAndValidateEnvelope(data).diagnostics.length).toBeGreaterThan(0);
+  specTest('every invalid fixture produces at least one diagnostic', binding, () => {
+    for (const name of invalid) {
+      const data = readFileSync(join(FIXTURE_DIR, 'invalid', name), 'utf8');
+      expect(parseAndValidateEnvelope(data).diagnostics.length, name).toBeGreaterThan(0);
+    }
   });
 });

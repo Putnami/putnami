@@ -1,10 +1,10 @@
 # Repository adoption matrix
 
-This repository maps **95 of its 151 projects** to **10 architecture domains**.
+This repository maps **96 of its 152 projects** to **10 architecture domains**.
 The other **56 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, the standalone area detector, the 2 Cloud runtime destinations,
 the Cloud CLI extension with its 14 generated clients, and the new development
-verb vocabulary. Every one of the 151 appears in a table below, mapped or
+verb vocabulary. Every one of the 152 appears in a table below, mapped or
 excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -33,7 +33,7 @@ an unmapped project is simply invisible to it. This file is that second half.
 | `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
 | `typescript-framework` | `framework` | 14 | `typescript/framework/putnami.architecture.json` |
 | `extension-providers` | `extension-providers` | 8 | `go/extension/putnami.architecture.json` |
-| `cli` | `cli` | 3 | `tooling/cli/putnami.architecture.json` |
+| `cli` | `cli` | 4 | `tooling/cli/putnami.architecture.json` |
 | `sdd` | `sdd` | 1 | `tooling/sdd-extension/putnami.architecture.json` |
 | `extension-sdk` | `tooling` | 1 | `tooling/extension-sdk/putnami.architecture.json` |
 | `agent-workflows` | `tooling` | 1 | `tooling/contributor/putnami.architecture.json` |
@@ -175,7 +175,7 @@ authority is what it reports, not what it builds.
 | `/tooling/local-collaboration` | `@putnami/local-collaboration` | The task and proposal provider results for the local file-backed store. |
 | `/tooling/memory-store` | `@putnami/memory-store` | The memory provider results for the file and Git stores: context selection and compare-and-set checkpoints. |
 
-### `cli` — 3 projects
+### `cli` — 4 projects
 
 **Membership test:** the project decides how a workspace resolves, how work is
 planned, scheduled, and cached, or what the model of those things is. Internal
@@ -187,6 +187,7 @@ contracts only.
 | `/tooling/cli` | `@putnami/cli` | Workspace resolution, the planner and scheduler, caching, command dispatch, and the `/tooling/doc` reference. |
 | `/tooling/cli-documents` | `@putnami/cli-documents` | The gates over this repository's own documents: the governance surface, the contributor recipe, the release plan and its verdict, the public-cut candidate and the shipped manifests. A separate project so that their repository-wide inputs key only these tests. |
 | `/tooling/cli-model` | `@putnami/cli-model` | The CLI's data model — the workspace graph, extension descriptions, job definitions — extracted so it can be depended on without the orchestrator. It is an unpublished internal companion and no workspace project may import it. |
+| `/tooling/windows-vet` | `@putnami/windows-vet` | The Windows compile gate: `go vet` of every `go.work` module for windows/amd64. A separate project so that its key holds only the Go sources, module files and `go.work`. |
 
 ### `sdd` — 1 project
 
