@@ -225,6 +225,7 @@ func TestReadItemHistoryRefusedAdmissionReachesTheConsumerBeforeAnyMessage(t *te
 	if stream != nil {
 		t.Fatal("a refused admission returned a stream handle")
 	}
+	rejected := acquisitions.Load()
 
 	// The refused credential is dropped once, and the next open acquires a new
 	// one and reads the feed — the refusal is not sticky.
@@ -242,6 +243,9 @@ func TestReadItemHistoryRefusedAdmissionReachesTheConsumerBeforeAnyMessage(t *te
 	}
 	if revisions != 3 {
 		t.Fatalf("revisions after refresh = %d, want the whole feed", revisions)
+	}
+	if got := acquisitions.Load(); got != rejected+1 {
+		t.Fatalf("token acquisitions = %d, want %d", got, rejected+1)
 	}
 }
 

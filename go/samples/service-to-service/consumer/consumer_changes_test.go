@@ -199,7 +199,7 @@ func sequence(to int64) []int64 {
 // after the terminal.
 func TestAChangeFeedContinuesOnAnotherInstanceAfterTheLastChangeTheCallerReceived(t *testing.T) {
 	spectest.Proves(t, matrixFeature, continuationRequirement,
-		"a-cursor-stream-continues-on-another-instance-after-the-last-delivered-change")
+		"the-go-consumer-continues-after-the-last-delivered-change-on-another-instance")
 	first, second := newProviderInstance(t), newProviderInstance(t)
 	front := newChangeFront(t, first)
 	generated := boundClient(t, sampleBinding(front.URL))
@@ -290,7 +290,7 @@ func TestAChangeFeedContinuesOnAnotherInstanceAfterTheLastChangeTheCallerReceive
 // never reopens after a typed terminal.
 func TestAPositionTheProviderNeverIssuedIsItsTypedRefusal(t *testing.T) {
 	spectest.Proves(t, matrixFeature, continuationRequirement,
-		"a-position-the-provider-never-issued-is-its-typed-refusal")
+		"the-go-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal")
 	front := newChangeFront(t, newProviderInstance(t))
 	generated := boundClient(t, sampleBinding(front.URL))
 	forged := "r999999"
