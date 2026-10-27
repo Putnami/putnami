@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // memory is the smallest provider that honors the tasks and proposals
@@ -277,6 +278,8 @@ func memoryTarget(t *testing.T, creates bool) Target {
 }
 
 func TestTheScenariosPassAgainstACorrectProvider(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-scenarios", "the-proposal-scenarios-pass-against-a-correct-provider")
+	spectest.Proves(t, "collaboration/provider-contract", "task-scenarios", "the-task-scenarios-pass-against-a-correct-provider")
 	createsNothing := func(name string) bool {
 		return strings.Contains(name, "empty_page") || strings.Contains(name, "finds_nothing") || strings.Contains(name, "another_source")
 	}
@@ -285,6 +288,7 @@ func TestTheScenariosPassAgainstACorrectProvider(t *testing.T) {
 }
 
 func TestNormalizeGivesListsAnExplicitPage(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "scenarios-normalize-requests", "a-list-request-gets-an-explicit-page")
 	if got := string(normalize("tasks", "find", `{}`, "")); got != `{"page":{"size":20}}` {
 		t.Errorf("tasks.find normalized to %s", got)
 	}

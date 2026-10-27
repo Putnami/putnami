@@ -339,7 +339,9 @@ the generated package it imports and carries no test of its own.
 Each run publishes the checks this sample's feature declares
 (`putnami.features.json`) through `spectest.Proves`, and the merged report lands
 in the project's `putnami-feature-verification` artifact. Verification runs in
-`report` mode: the sample is tagged `e2e`, which an enforcing gate blocks on.
+`enforce` mode against the [spec](specs/go-first-party-client-matrix.json): a
+run that names the sample fails when a check fails or is not observed. Name the
+consumer project too, because its tests prove the TypeScript consumer's checks.
 
 ## Use the typed client
 
