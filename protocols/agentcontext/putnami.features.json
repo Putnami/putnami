@@ -1,0 +1,145 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "agent-context",
+  "features": [
+    {
+      "id": "agent-context/aggregated-agent-context",
+      "type": "feature",
+      "name": "Aggregated agent context",
+      "outcome": "An agent, or an index it feeds, can read one deterministic, reference-only, redaction-safe document per project that states what the project is, without walking the repository and without receiving file content, sensitive values or a stored copy that can go stale",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "pinned-versions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-accepts-only-the-current-version-of-each-shape",
+              "the-document-version-is-2-and-the-overrides-version-is-1",
+              "a-document-with-another-version-fails-validation"
+            ]
+          }
+        },
+        {
+          "id": "conformance-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-document-fixture-validates-clean",
+              "every-invalid-document-fixture-fails-with-a-taxonomy-code",
+              "every-valid-overrides-fixture-validates-clean",
+              "every-invalid-overrides-fixture-fails-with-a-taxonomy-code"
+            ]
+          }
+        },
+        {
+          "id": "canonical-deterministic-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-canonical-form-is-identical-across-100-marshals",
+              "the-canonical-bytes-equal-the-committed-full-fixtures",
+              "a-parsed-valid-fixture-reserializes-to-a-fixed-point",
+              "go-cli-producer-is-byte-stable-for-identical-inputs"
+            ]
+          }
+        },
+        {
+          "id": "strict-parse",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-document-field-fails-parsing-and-returns-no-document",
+              "an-unknown-overrides-field-fails-parsing-and-returns-no-overrides",
+              "malformed-json-is-a-parse-error",
+              "trailing-data-after-the-document-is-a-parse-error"
+            ]
+          }
+        },
+        {
+          "id": "publish-safety-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-nil-document-fails-the-gate",
+              "a-flagged-sensitive-path-without-the-flag-fails-the-gate",
+              "an-oversized-string-fails-the-gate-as-embedded-content",
+              "a-non-relative-path-fails-the-gate",
+              "a-duplicate-reference-fails-the-gate",
+              "go-cli-producer-emits-no-bytes-when-the-gate-fails"
+            ]
+          }
+        },
+        {
+          "id": "paths-are-workspace-relative-and-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "unsafe-path-shapes-are-not-workspace-relative",
+              "an-escaping-identity-path-fails-validation-and-the-gate",
+              "a-non-canonical-spelling-of-a-sensitive-path-fails-the-gate"
+            ]
+          }
+        },
+        {
+          "id": "tests-section-and-diagnostic-taxonomy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-absence-reason-rules-of-the-tests-section-are-enforced",
+              "a-pack-without-an-id-is-rejected",
+              "tests-policy-is-an-unknown-field-and-absent-from-the-schema",
+              "every-diagnostic-code-is-in-the-closed-taxonomy"
+            ]
+          }
+        },
+        {
+          "id": "a-producer-emits-a-valid-document-and-writes-nothing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-cli-context-pack-prints-the-documents-and-writes-nothing",
+              "go-cli-producer-applies-author-overrides-and-the-document-passes-the-gate",
+              "go-cli-producer-refuses-a-malformed-overrides-file",
+              "the-overrides-file-path-is-schema-agent-context-overrides-json"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

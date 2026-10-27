@@ -9,11 +9,17 @@ require (
 
 require go.putnami.dev/protocol/config v0.0.0 // indirect
 
+require go.putnami.dev/protocol/features v0.0.0
+
 replace go.putnami.dev/protocol/contracts => ../contracts
 
 replace go.putnami.dev/protocol/config => ../config
 
 replace go.putnami.dev/protocol/diagnostic => ../diagnostic
+
+replace go.putnami.dev/protocol/capabilities => ../capabilities
+
+replace go.putnami.dev/protocol/features => ../features
 
 // The v0.1 series predates the open-source cut: its sources will not exist in
 // the public repository, whose history starts at the v0.2.0 initial commit.

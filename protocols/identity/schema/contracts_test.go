@@ -8,6 +8,7 @@ import (
 
 	contracts "go.putnami.dev/protocol/contracts"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // loadManifest strict-parses and validates the committed manifest, failing the
@@ -28,6 +29,7 @@ func loadManifest(t *testing.T) (*contracts.Manifest, []byte) {
 // TestManifestIdentity pins the contract identity and the protocol version the
 // manifest is authored against.
 func TestManifestIdentity(t *testing.T) {
+	spectest.Proves(t, "identity/consumer-side-vocabulary", "one-manifest-identity-and-version", "the-manifest-parses-validates-and-names-the-identity-contract")
 	m, _ := loadManifest(t)
 	if m.Name != "go.putnami.dev/protocol/identity" {
 		t.Errorf("manifest name = %q, want %q", m.Name, "go.putnami.dev/protocol/identity")
@@ -40,6 +42,7 @@ func TestManifestIdentity(t *testing.T) {
 // TestManifestVocabulary pins the claims and principal kinds the frameworks
 // actually consume, so a vocabulary change is a deliberate, reviewed edit.
 func TestManifestVocabulary(t *testing.T) {
+	spectest.Proves(t, "identity/consumer-side-vocabulary", "reviewed-claim-and-principal-vocabulary", "the-manifest-pins-claims-principal-kinds-and-enum-values")
 	m, _ := loadManifest(t)
 
 	wantClaims := []string{"sub", "iss", "client_id", "roles", "scope", "aud", "exp"}
@@ -137,6 +140,7 @@ func TestManifestVocabulary(t *testing.T) {
 // and asserts byte-identity, mirroring `putnami contracts check` in the regular
 // test gate: the canonical IR, Go type twin, JSON Schema, and generated docs.
 func TestCommittedArtifactsAreFresh(t *testing.T) {
+	spectest.Proves(t, "identity/consumer-side-vocabulary", "committed-twins-are-fresh", "go-committed-artifacts-match-a-fresh-generation")
 	m, committed := loadManifest(t)
 
 	canonical, err := json.MarshalIndent(m, "", "  ")

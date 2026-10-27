@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { specTest } from '@putnami/runtime/spectest';
 import { type ContractManifest, emitTypeScript } from '../../src/contracts';
 import { AuthDecision, ClaimName, PrincipalKind } from '../../src/security/identity.constants';
 
@@ -24,13 +25,21 @@ function enumPairs(manifest: ContractManifest, name: string): Record<string, str
 }
 
 describe('identity contract twin', () => {
-  it('committed contracts.gen.ts is byte-identical to a fresh emitTypeScript', () => {
-    // Fails if the committed twin drifts from the IR — regenerate with the
-    // ContractTwinPlugin (`emitTypeScript` is golden-pinned, never reimplemented).
-    const got = emitTypeScript(loadManifest());
-    const want = readFileSync(twinPath, 'utf8');
-    expect(got).toBe(want);
-  });
+  specTest(
+    'committed contracts.gen.ts is byte-identical to a fresh emitTypeScript',
+    {
+      feature: 'identity/consumer-side-vocabulary',
+      requirement: 'committed-twins-are-fresh',
+      check: 'typescript-application-twin-matches-a-fresh-emission',
+    },
+    () => {
+      // Fails if the committed twin drifts from the IR — regenerate with the
+      // ContractTwinPlugin (`emitTypeScript` is golden-pinned, never reimplemented).
+      const got = emitTypeScript(loadManifest());
+      const want = readFileSync(twinPath, 'utf8');
+      expect(got).toBe(want);
+    },
+  );
 
   it('emits the twin deterministically', () => {
     const manifest = loadManifest();
@@ -40,13 +49,21 @@ describe('identity contract twin', () => {
     }
   });
 
-  it('adopted ClaimName/PrincipalKind/AuthDecision constants mirror the contract enums', () => {
-    // Pins the in-project vocabulary to the contract: a rename or wire-value
-    // change in the manifest fails here instead of silently diverging from the
-    // Go framework's adopted constants.
-    const manifest = loadManifest();
-    expect({ ...ClaimName }).toEqual(enumPairs(manifest, 'ClaimName'));
-    expect({ ...PrincipalKind }).toEqual(enumPairs(manifest, 'PrincipalKind'));
-    expect({ ...AuthDecision }).toEqual(enumPairs(manifest, 'AuthDecision'));
-  });
+  specTest(
+    'adopted ClaimName/PrincipalKind/AuthDecision constants mirror the contract enums',
+    {
+      feature: 'identity/consumer-side-vocabulary',
+      requirement: 'adopted-constants-mirror-the-enums',
+      check: 'typescript-application-constants-equal-the-manifest-enums',
+    },
+    () => {
+      // Pins the in-project vocabulary to the contract: a rename or wire-value
+      // change in the manifest fails here instead of silently diverging from the
+      // Go framework's adopted constants.
+      const manifest = loadManifest();
+      expect({ ...ClaimName }).toEqual(enumPairs(manifest, 'ClaimName'));
+      expect({ ...PrincipalKind }).toEqual(enumPairs(manifest, 'PrincipalKind'));
+      expect({ ...AuthDecision }).toEqual(enumPairs(manifest, 'AuthDecision'));
+    },
+  );
 });

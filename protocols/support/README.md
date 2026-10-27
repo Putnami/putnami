@@ -180,9 +180,12 @@ takes exactly the evidence the table above requires of anything else.
 
 - **Producer**: humans. The workspace-root catalog is authored and reviewed; no
   build step emits it, and no generator may write it.
-- **Consumers**: this module's own canonical-authority gate and the CLI's
-  `specs validate` completeness check. There is no site consumer — a generated
-  view must link to the root file instead of copying its values.
+- **Consumers**: this module's own canonical-authority gate, the CLI's
+  `specs validate` completeness check, and the API checks of `validate` in
+  `go/extension/internal/jobs/apicheck` and
+  `typescript/extension/internal/apicheck`, which check only a project the
+  catalog lists as stable. There is no site consumer — a generated view must
+  link to the root file instead of copying its values.
 - **Versioning**: `ProtocolVersion` is the exact integer `1`. Readers accept no
   other token, and `schemas/putnami-support.json` pins the same constant, so the
   editor validation and the parser cannot disagree.
@@ -203,10 +206,12 @@ takes exactly the evidence the table above requires of anything else.
   the only implementation, so no cross-implementation parity is promised. The
   v1 vocabulary is still evolving and has no consumer outside this repository,
   so `stable` would over-promise.
-- **User-facing feature**: none, deliberately. A support status is product
-  policy about other subjects, not a feature a user enables. The durable
+- **Feature**: `support/support-catalog`, specified in
+  [`specs/support-catalog.json`](specs/support-catalog.json). The module owns the
+  feature of its contract; the extensions that gate a project on its status
+  prove the `stable-only-consumers` requirement in their own tests. The durable
   decisions behind this module live in [`doc/adr/`](doc/adr/) and are linked
-  from specs the way
+  from the spec the way
   [`protocols/features`](../features/README.md#specs-and-durable-decisions)
   defines.
 

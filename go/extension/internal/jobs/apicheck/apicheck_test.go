@@ -327,7 +327,7 @@ func TestAnUncommittedRemovalIsChecked(t *testing.T) {
 }
 
 func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
-	spectest.Proves(t, feature, requirement, "a-preview-or-experimental-project-is-not-checked")
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "go-extension-skips-a-preview-or-experimental-project")
 	f := newFixture(t, catalog("package", "experimental"))
 	f.write("lib/greet/greet.go", waveOnlySource)
 	f.commit("feat: drop the greeting")
@@ -346,7 +346,7 @@ func TestAPreviewOrExperimentalProjectIsSkipped(t *testing.T) {
 }
 
 func TestAProjectTheCatalogDoesNotListIsSkipped(t *testing.T) {
-	spectest.Proves(t, feature, requirement, "an-unlisted-project-is-not-checked-when-a-catalog-exists")
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "go-extension-skips-a-project-the-catalog-does-not-list")
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"go.example.com/other","kind":"package","status":"stable"}]}`)
 	f.write("lib/greet/greet.go", waveOnlySource)
 	f.commit("feat: drop the greeting")
@@ -582,6 +582,7 @@ func TestAContextWithoutTagsIsCheckedWhenThereIsNoCatalog(t *testing.T) {
 }
 
 func TestAWorkspaceWithoutACatalogChecksEveryProject(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "go-extension-checks-every-project-without-a-catalog")
 	t.Parallel()
 	f := newFixture(t, "")
 	f.write("lib/greet/greet.go", waveOnlySource)
@@ -591,6 +592,7 @@ func TestAWorkspaceWithoutACatalogChecksEveryProject(t *testing.T) {
 }
 
 func TestAnInvalidCatalogFailsTheTask(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "stable-only-consumers", "go-extension-fails-on-an-invalid-catalog")
 	t.Parallel()
 	f := newFixture(t, `{"protocolVersion":1,"entries":[{"id":"x","kind":"package","status":"beta"}]}`)
 	_, err := Check(f.root, f.project, projectName, f.tags, Options{})

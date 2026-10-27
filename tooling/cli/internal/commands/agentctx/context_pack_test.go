@@ -150,6 +150,7 @@ func buildFixtureWorkspace(t *testing.T) (*workspace.Workspace, *workspace.Proje
 // secret-declaring infra manifest as secret/sensitive AND records its path in
 // the sensitive set the gate runs with.
 func TestBuildDocument_Deterministic(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "canonical-deterministic-bytes", "go-cli-producer-is-byte-stable-for-identical-inputs")
 	ws, app := buildFixtureWorkspace(t)
 
 	doc, opts, err := BuildDocument(ws, app, fixtureLanguages, fixtureRevision, fixtureVersion)
@@ -399,6 +400,7 @@ func printedPackIDs(t *testing.T, out string) []string {
 // selector prints nothing, and no run writes a file.
 func TestContextPackCommand_PrintsTheDocumentsAndWritesNothing(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "context-pack-prints-the-documents-and-writes-nothing")
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "a-producer-emits-a-valid-document-and-writes-nothing", "go-cli-context-pack-prints-the-documents-and-writes-nothing")
 	root := makeLoadableFixture(t)
 	before := treeOutsideState(t, root)
 
@@ -444,6 +446,7 @@ func TestContextPackCommand_PrintsTheDocumentsAndWritesNothing(t *testing.T) {
 // bytes are produced (the document is never written), and the machine-readable
 // violation travels on the error.
 func TestCanonicalDocumentBytes_FailsClosedOnUnflaggedSensitive(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "publish-safety-fails-closed", "go-cli-producer-emits-no-bytes-when-the-gate-fails")
 	sensitivePath := "svc/app/infra/requirements.json"
 	doc := &agentcontext.Document{
 		Schema:          agentContextSchemaURI,
@@ -665,6 +668,7 @@ func TestBuildDocument_Docs(t *testing.T) {
 // opts.SensitivePaths, and the document still passes the fail-closed
 // publish-safety gate BECAUSE it is flagged.
 func TestBuildDocument_OverridesApplied(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "a-producer-emits-a-valid-document-and-writes-nothing", "go-cli-producer-applies-author-overrides-and-the-document-passes-the-gate")
 	ws, app := buildFixtureWorkspace(t)
 	write := func(rel, content string) {
 		abs := filepath.Join(ws.Root, filepath.FromSlash(rel))
@@ -928,6 +932,7 @@ func TestBuildTestsSection_NoCapabilities(t *testing.T) {
 // overrides file makes BuildDocument fail closed with an exit-2 classified error
 // rather than being silently ignored.
 func TestBuildDocument_OverridesMalformedFailsClosed(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "a-producer-emits-a-valid-document-and-writes-nothing", "go-cli-producer-refuses-a-malformed-overrides-file")
 	ws, app := buildFixtureWorkspace(t)
 	abs := filepath.Join(ws.Root, "svc", "app", "schema", "agent-context.overrides.json")
 	if err := os.WriteFile(abs, []byte(`{"protocolVersion":1,"bogus":true}`), 0o644); err != nil {

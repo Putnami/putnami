@@ -437,7 +437,7 @@ project answers with the field in one of two ways:
 ```json
 {
   "featureAuthority": {
-    "none": "A support status is product policy about other subjects, not a feature a user enables."
+    "none": "Generated client code mirrors provider-owned operations and does not own a separate user outcome."
   }
 }
 ```

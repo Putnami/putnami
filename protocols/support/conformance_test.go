@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // workspaceRoot returns the checked-in workspace root, or skips. The gates in
@@ -28,6 +29,7 @@ func workspaceRoot(t *testing.T) string {
 }
 
 func TestConformanceFixtures(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "strict-canonical-catalog", "valid-fixtures-are-canonical-and-invalid-fixtures-are-rejected")
 	forEachFixture(t, "fixtures/valid/*.json", func(t *testing.T, path string, data []byte) {
 		catalog, diagnostics := ParseAndValidateCatalog(data)
 		if catalog == nil || diag.HasErrors(diagnostics) {

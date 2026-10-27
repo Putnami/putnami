@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "support/support-catalog",
+  "outcomes": [
+    "The support catalog is strict, canonical JSON with closed status and subject-kind vocabularies and one exact protocol version",
+    "Validation reports every independent finding with a stable code, so an author fixes a catalog in one pass",
+    "A consumer that gates a project on its support status checks only the projects the catalog lists as stable",
+    "The documentation of a classified subject repeats its reviewed status, and the criteria to promote or demote a status are written down"
+  ],
+  "nonGoals": [
+    "Putting an owner or evidence field on the wire",
+    "Making a support status a feature maturity level, or ordering the two vocabularies against one another",
+    "Discovering project-local catalogs or generating a second inventory of the root catalog",
+    "Migrating or rewriting an authored catalog mechanically",
+    "Scoring promotion criteria in code"
+  ],
+  "requirements": [
+    {
+      "id": "closed-vocabularies-and-exact-version",
+      "text": "A support catalog has three statuses (stable, preview, experimental) and three subject kinds (protocol, package, feature). No other value is valid, and no feature maturity value is a status. The protocol version is the exact integer token 1: a newer number, string, float, exponent, signed integer or null is rejected. The rejection of a newer version names the accepted token and the protocolVersion field."
+    },
+    {
+      "id": "strict-canonical-catalog",
+      "text": "The reader rejects a catalog that is not strict JSON with one finding and returns no catalog: a float or missing version, an unknown field, a duplicate field at any depth, an explicit null, a trailing value, a non-object and malformed input. The writer sorts a copy of the entries by kind, then by ID, round-trips through the reader and is idempotent. Every valid fixture is byte-equal to the writer's output, and every invalid fixture reports an error with a known code."
+    },
+    {
+      "id": "validation-reports-independent-findings",
+      "text": "Validation reports each independent finding with its own code: an invalid version, kind, subject ID, status and parity, and a duplicate entry. A nil or empty catalog is an error. A subject ID with a dot segment or an empty segment is invalid. An experimental entry cannot be the default."
+    },
+    {
+      "id": "a-documented-status-is-read-from-the-support-section",
+      "text": "A subject's documented status is read from its support section: the first heading whose title has the word support, up to the next heading of that level, with fenced examples removed. The declared status is the first one written there as inline code, and the section links the catalog. A disagreement names its cause: no section, no status, a different status, or no catalog link. A matching declaration gives no reason."
+    },
+    {
+      "id": "stable-only-consumers",
+      "text": "A consumer that gates a project on its support status checks the project only when the catalog lists it as stable. A preview or experimental project and a project the catalog does not list are skipped without an error. A workspace without a catalog checks every project. An invalid catalog fails the check."
+    },
+    {
+      "id": "promotion-ladder-is-documented",
+      "text": "The README promotion section has a status table with exactly one row per valid status. It states the ladder from experimental to preview to stable, has Promotion and Demotion subsections, and names default: false, GOVERNANCE.md and the standing @putnami/python decision."
+    }
+  ],
+  "decisions": [
+    "protocols/support/doc/adr/0001-support-entry-ownership-and-evidence.md",
+    "protocols/support/doc/adr/0002-promotion-and-demotion-criteria.md"
+  ]
+}

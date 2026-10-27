@@ -20,12 +20,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestProtocolVersionIsAnExactIntegerToken pins the rejection across every
 // spelling of the accepted value a producer might emit. Each of these decodes
 // to 1 in a lenient reader; none of them is the token this contract accepts.
 func TestProtocolVersionIsAnExactIntegerToken(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "closed-vocabularies-and-exact-version", "only-the-exact-integer-1-is-accepted-as-the-protocol-version")
 	catalogWith := func(token string) string {
 		return fmt.Sprintf(`{"protocolVersion":%s,"entries":[{"id":"@putnami/cli","kind":"package","status":"stable"}]}`, token)
 	}
@@ -72,6 +75,7 @@ func TestProtocolVersionIsAnExactIntegerToken(t *testing.T) {
 // The catalog is hand-authored, so the only fix is to edit the file — which the
 // message has to say, because there is no command that does it.
 func TestProtocolVersionRejectionNamesTheAcceptedToken(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "closed-vocabularies-and-exact-version", "a-newer-version-is-rejected-with-the-accepted-token-and-field")
 	_, diagnostics := ParseCatalog([]byte(`{"protocolVersion":2,"entries":[]}`))
 	if len(diagnostics) != 1 {
 		t.Fatalf("diagnostics = %#v, want exactly one", diagnostics)

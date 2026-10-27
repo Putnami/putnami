@@ -103,6 +103,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/identity"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
           "producerProject": "/protocols/platform"
         },
         {

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "identity/consumer-side-vocabulary",
+  "outcomes": [
+    "Every framework reads the same claim keys, produces the same principal kinds and reports the same authorization decision labels",
+    "A change to the vocabulary is one reviewed manifest edit, regenerated and checked together",
+    "Metric counter keys and the decision log attribute stay stable across the Go and TypeScript runtimes"
+  ],
+  "nonGoals": [
+    "Declaring issuer-side vocabulary such as scopes, grants or consent",
+    "Validating tokens or authorizing requests: the frameworks own those behaviors",
+    "Making the TypeScript constants authoritative: they mirror the manifest"
+  ],
+  "requirements": [
+    {
+      "id": "one-manifest-identity-and-version",
+      "text": "The identity vocabulary is authored once, as the manifest schema/contracts.json. The manifest passes strict parsing and validation, names go.putnami.dev/protocol/identity, and declares the contracts protocol version in force."
+    },
+    {
+      "id": "reviewed-claim-and-principal-vocabulary",
+      "text": "The manifest declares exactly the claims sub, iss, client_id, roles, scope, aud and exp, in that order, and exactly the principal kinds user and apikey. It declares exactly the enums ClaimName, PrincipalKind and AuthDecision, each constant keeping its pinned name and wire value. It declares no scopes, capabilities or grants."
+    },
+    {
+      "id": "committed-twins-are-fresh",
+      "text": "Every committed artifact is a pure function of the manifest. The manifest is in canonical form. The Go twin, the JSON Schema and the reference tables match a fresh generation byte for byte. The committed TypeScript twin matches a fresh TypeScript emission byte for byte."
+    },
+    {
+      "id": "adopted-constants-mirror-the-enums",
+      "text": "The Go security decision labels equal the generated AuthDecision constants. The TypeScript ClaimName, PrincipalKind and AuthDecision constants equal the manifest enum names and wire values."
+    }
+  ],
+  "decisions": [
+    "protocols/identity/doc/adr/0001-consumer-side-vocabulary-compiled-from-one-manifest.md"
+  ]
+}
