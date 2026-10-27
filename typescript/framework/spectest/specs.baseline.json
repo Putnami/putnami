@@ -1,7 +1,5 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
-  "executableRequirements": [
-    "typescript/spec-test-binding#honest-verdict"
-  ]
+  "executableRequirements": ["typescript/spec-test-binding#honest-verdict"]
 }
