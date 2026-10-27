@@ -242,16 +242,18 @@ behind it:
 - [the SDK owns the neutral half of every shared lifecycle](doc/adr/0001-the-sdk-owns-the-neutral-half-of-a-lifecycle.md);
 - [a provisioned secret lives in exactly one artifact](doc/adr/0002-a-secret-lives-in-one-artifact.md).
 
-The contract covers wire conformance of the emitter and its log forwarding,
-build-time manifest validation with a non-aliasing builder, subprocess control,
-the host-identity variable list, checkout-independent generation paths, the
-machine-cache eviction policy, credential confinement and test-environment mode
-selection, neutral infra aggregation, the single writer of the
-package→publish metadata index, and the tree fingerprint. The wire contracts
+The contract covers the emitter's log forwarding, build-time manifest validation
+with a non-aliasing builder, subprocess control, the host-identity variable
+list, checkout-independent generation paths, the machine-cache eviction policy,
+credential confinement and test-environment mode selection, neutral infra
+aggregation, the single writer of the package→publish metadata index, and the
+tree fingerprint. The wire contracts
 themselves belong to [`protocols/extension`](../../protocols/extension),
 [`protocols/job`](../../protocols/job) and
 [`protocols/runtime`](../../protocols/runtime); this module is the Go authoring
-library over them, and there is no authoring SDK for other languages.
+library over them, and there is no authoring SDK for other languages. The
+emitter's wire conformance is a requirement of the runtime protocol's feature,
+`runtime/event-stream`, which the `jsonl` tests here prove.
 Before v1.0.0, minor `0.x` releases may contain documented breaking changes —
 see [RELEASE.md](../../RELEASE.md).
 
