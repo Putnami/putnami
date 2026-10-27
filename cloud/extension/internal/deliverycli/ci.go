@@ -38,6 +38,7 @@ import (
 	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	perrors "go.putnami.dev/errors"
+	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
 )
 
@@ -126,6 +127,25 @@ type CIRunResponse struct {
 	// only when the request asks for it with `reuse=true`. Absent on a run that
 	// reused nothing, and on a host that predates the query.
 	Reuse *CIRunReuse `json:"reuse,omitempty"`
+	// Verdict is the run's stored verdict in brief, enriched by the server on
+	// the single-run get only when the request asks for it with
+	// `verdict=true`. Absent on a run with no verdict yet, and on a host that
+	// predates the query.
+	Verdict *CIRunVerdict `json:"verdict,omitempty"`
+	// verdictUnread is set by `view` when the server could not read the
+	// verdict and the run was read again without it. It is not on the wire.
+	verdictUnread bool
+}
+
+// CIRunVerdict mirrors apis.CIRunVerdictResponse: the answer of the run's
+// verdict, the mark of one that passed (verified or checked), how many gaps
+// it found, and the revision and time it was computed at.
+type CIRunVerdict struct {
+	Answer     string    `json:"answer"`
+	Mark       string    `json:"mark,omitempty"`
+	Gaps       int       `json:"gaps"`
+	Revision   int       `json:"revision"`
+	ComputedAt time.Time `json:"computedAt"`
 }
 
 // CIRunReuse mirrors apis.CIRunReuseResponse: where a run's reused members came
@@ -539,13 +559,13 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		{"command": "cloud ci enable|disable|subscription", "description": "manage the live CI subscription; enable accepts --runner-channel stable|canary"},
 		{"command": "cloud channels follow <namespace> stable|canary", "description": "change a producer track; an rs_ id pins an exact release and --runner-channel changes the runner atomically"},
 		{"command": "cloud ci list", "description": "list workspace CI runs, newest first (--limit N, default 20, 0 for the whole window; filtered by the server with --repo/--branch/--sha/--ref/--pr/--status/--phase/--age)"},
-		{"command": "cloud ci view <run>", "description": "show one run with its per-phase attempts, and — when it failed — the failing step, the failing tasks, and their file:line diagnostics; for a run that reused release-set members, the channel, source revision and members it reused"},
+		{"command": "cloud ci view <run>", "description": "show one run with its per-phase attempts and its verdict in brief, and — when it failed — the failing step, the failing tasks, and their file:line diagnostics; for a run that reused release-set members, the channel, source revision and members it reused"},
 		{"command": "cloud ci start --repo <o/r> --sha <sha> --reason <why>", "description": "manually start a run for a pushed SHA (--ref/--branch/--pr/--phases/--size/--max-parallel/--no-cache optional)"},
 		{"command": "cloud ci cancel <run> --reason <why>", "description": "idempotently cancel a run"},
 		{"command": "cloud ci retry <run> --reason <why>", "description": "retry a run (whole run, or --phase <p>, with --size/--no-cache/--max-parallel)"},
 		{"command": "cloud ci logs <run>", "description": "read a run's logs, rendered for humans (--raw for the runner's protocol records); --follow tails live (--phase/--project/--q/--level/--from/--to/--cursor/--limit)"},
 		{"command": "cloud ci status", "description": "CI readiness checks, queue, last run reuse, and runs and spend over 7 days"},
-		{"command": "cloud ci usage", "description": "aggregate the workspace's runs over a window (--window <dur>, default 168h) by substrate, profile, source, gate wall, estimated spend, and billed cost per day"},
+		{"command": "cloud ci usage", "description": "aggregate the workspace's runs over a window (--window <dur>, default 168h) by substrate, profile, source, gate wall, estimated spend, billed cost per day, merges by verdict with the verified share, and deploys per day"},
 		{"command": "cloud ci insights <run>", "description": "one run's contracted gate report — CPU balance sheet, cache economics, scheduler shape, per-command and per-job detail (--output=json for the whole document)"},
 		{"command": "cloud ci timings <run>", "description": "one run's per-task timeline — absolute start, end and CPU share per task, longest wall first — so a run's critical path can be reconstructed (--limit N, default 40, 0 for every row; --output=json emits the whole table unless --limit asks for fewer)"},
 		{"command": "cloud ci timings <run> --against <other-run>", "description": "why each task of the run executed instead of being served by the cache, read against a run that could have filled it: no cache key, a key that changed, or the same key with no entry"},
@@ -975,7 +995,7 @@ func ciView(params map[string]any, args []string, workspaceRoot string, env map[
 	// The resolved id is discarded: everything below keys off resp.ID, which is the
 	// server's own answer and therefore the authoritative one.
 	resp, _, err := ciRunRequest(reqCtx, ctx, run, func(id string) (*CIRunResponse, error) {
-		return ciGetRunQuery(reqCtx, ctx, "view", id, ciViewRunQuery())
+		return ciGetViewRun(reqCtx, ctx, id)
 	})
 	if err != nil {
 		return err
@@ -988,6 +1008,26 @@ func ciView(params map[string]any, args []string, workspaceRoot string, env map[
 	failures, truncatedTasks := ciViewDiagnostics(reqCtx, ctx, resp)
 	ciRenderFailures(ioctx, failures, truncatedTasks)
 	return nil
+}
+
+// ciGetViewRun reads the run `view` renders. The server answers the whole read
+// with a 500 when the run's verdict cannot be read, so a 500 reads the run once
+// more without the verdict and marks it unread: the rest of the view still
+// prints. Any other error, and a second failure, is the read's own answer.
+func ciGetViewRun(reqCtx context.Context, ctx *clicore.WorkspaceContext, id string) (*CIRunResponse, error) {
+	resp, err := ciGetRunQuery(reqCtx, ctx, "view", id, ciViewRunQuery())
+	var se ciStatusError
+	if err == nil || !errors.As(err, &se) || se.status != http.StatusInternalServerError {
+		return resp, err
+	}
+	query := ciViewRunQuery()
+	query.Verdict = nil
+	resp, err = ciGetRunQuery(reqCtx, ctx, "view", id, query)
+	if err != nil {
+		return nil, err
+	}
+	resp.verdictUnread = true
+	return resp, nil
 }
 
 // ciViewDiagnostics fetches the gate's file-anchored diagnostics for a run that
@@ -1717,6 +1757,45 @@ type CIUsageResponse struct {
 	Gate           map[string]CIUsageWallSummary `json:"gate,omitempty"`
 	Spend          CIUsageSpend                  `json:"spend"`
 	Billed         *CIUsageBilled                `json:"billed,omitempty"`
+	// Efficacy passes through as the generated client decodes it: `usage`
+	// prints only whether it could be read.
+	Efficacy            json.RawMessage `json:"efficacy,omitempty"`
+	EfficacyUnavailable bool            `json:"efficacyUnavailable,omitempty"`
+	Merges              *CIUsageMerges  `json:"merges,omitempty"`
+	MergesUnavailable   bool            `json:"mergesUnavailable,omitempty"`
+	Deploys             *CIUsageDeploys `json:"deploys,omitempty"`
+	DeploysUnavailable  bool            `json:"deploysUnavailable,omitempty"`
+}
+
+// CIUsageMerges mirrors apis.CIUsageMerges: the pull requests merged into the
+// workspace's repository over the window, how many needed a person, how many
+// had a declaration change approved at their head, and each merge counted once by the level of
+// its head's newest run verdict, so the levels sum to Merged.
+type CIUsageMerges struct {
+	Repository   string         `json:"repository"`
+	Merged       int            `json:"merged"`
+	NeededPerson int            `json:"neededPerson"`
+	Approved     int            `json:"approved"`
+	LowerBound   bool           `json:"lowerBound"`
+	Verdicts     map[string]int `json:"verdicts"`
+}
+
+// CIUsageDeploys mirrors apis.CIUsageDeploys: the deployment runs opened in
+// every environment over the window, with one entry per UTC day the window
+// touches, oldest first, a day without a run included.
+type CIUsageDeploys struct {
+	Opened int                `json:"opened"`
+	Ready  int                `json:"ready"`
+	Failed int                `json:"failed"`
+	Days   []CIUsageDeployDay `json:"days"`
+}
+
+// CIUsageDeployDay mirrors apis.CIUsageDeployDay.
+type CIUsageDeployDay struct {
+	Day    string `json:"day"`
+	Opened int    `json:"opened"`
+	Ready  int    `json:"ready"`
+	Failed int    `json:"failed"`
 }
 
 // CIUsageBilled mirrors apis.CIUsageBilled: the cost the GCP billing export
@@ -1793,6 +1872,81 @@ func ciRenderUsage(ioctx clicore.IO, u *CIUsageResponse) {
 	ioctx.Stdout(fmt.Sprintf("Spend (%s, %s, over %d runs with a measured duration):", label, u.Spend.Currency, u.Spend.RunsWithDuration))
 	ioctx.Stdout(fmt.Sprintf("  spot=%.2f  cloudrun=%.2f  total=%.2f", u.Spend.SpotEUR, u.Spend.CloudRunEUR, u.Spend.TotalEUR))
 	ciRenderBilled(ioctx, u.Billed)
+	ciRenderMerges(ioctx, u.Merges, u.MergesUnavailable)
+	ciRenderDeploys(ioctx, u.Deploys, u.DeploysUnavailable)
+	if u.EfficacyUnavailable {
+		ioctx.Stdout(ciEfficacyUnavailable)
+	}
+}
+
+// The lines a rollup prints in place of a section the server could not read:
+// its unavailable flag means a read failed, and the next request reads again.
+// A section that is absent without the flag (no bound repository, no
+// deployment history on the host) prints nothing.
+const (
+	ciMergesUnavailable   = "merges: could not be read; try again later"
+	ciDeploysUnavailable  = "deploys: could not be read; try again later"
+	ciEfficacyUnavailable = "merge efficacy: could not be read; try again later"
+)
+
+// ciRenderMerges prints the merges of the window: the counts, the share of
+// merges whose verdict is verified, then each verdict level. Every counted
+// merge counts at exactly one level, so the share is over the merges counted.
+// A lower bound marks the title: some merges of the window are not counted.
+func ciRenderMerges(ioctx clicore.IO, m *CIUsageMerges, unavailable bool) {
+	if unavailable {
+		ioctx.Stdout(ciMergesUnavailable)
+		return
+	}
+	if m == nil {
+		return
+	}
+	title := "Merges into " + dash(m.Repository)
+	if m.LowerBound {
+		title += " (lower bound)"
+	}
+	ioctx.Stdout(title + ":")
+	ioctx.Stdout(fmt.Sprintf("  merged=%d  needed a person=%d  declaration approved=%d", m.Merged, m.NeededPerson, m.Approved))
+	if line := ciVerifiedShareLine(m); line != "" {
+		ioctx.Stdout("  " + line)
+	}
+	ciRenderCountSection(ioctx, "Merges by verdict", m.Verdicts)
+}
+
+// ciVerifiedShareLine is the share of merges whose verdict level is verified,
+// or "" when the window holds no merge.
+func ciVerifiedShareLine(m *CIUsageMerges) string {
+	if m.Merged <= 0 {
+		return ""
+	}
+	verified := m.Verdicts[ciproto.MarkVerified]
+	share := fmt.Sprintf("%d%%", int(math.Round(100*float64(verified)/float64(m.Merged))))
+	// Rounding must not claim every merge, or none, when that is not so.
+	switch {
+	case share == "100%" && verified < m.Merged:
+		share = "99%"
+	case share == "0%" && verified > 0:
+		share = "<1%"
+	}
+	return fmt.Sprintf("verified: %d of %d merges (%s)", verified, m.Merged, share)
+}
+
+// ciRenderDeploys prints the deployment runs of the window: one line per UTC
+// day, oldest first, then the window's totals.
+func ciRenderDeploys(ioctx clicore.IO, d *CIUsageDeploys, unavailable bool) {
+	if unavailable {
+		ioctx.Stdout(ciDeploysUnavailable)
+		return
+	}
+	if d == nil {
+		return
+	}
+	ioctx.Stdout("Deploys (every environment, per UTC day, oldest first; the first and the last day are partial):")
+	ioctx.Stdout(fmt.Sprintf("  %-10s  %6s  %6s  %6s", "day", "opened", "ready", "failed"))
+	for _, day := range d.Days {
+		ioctx.Stdout(fmt.Sprintf("  %-10s  %6d  %6d  %6d", day.Day, day.Opened, day.Ready, day.Failed))
+	}
+	ioctx.Stdout(fmt.Sprintf("  %-10s  %6d  %6d  %6d", "window", d.Opened, d.Ready, d.Failed))
 }
 
 // ciBilledUnavailable is the line a rollup without a billed section prints.
@@ -2594,11 +2748,12 @@ func ciGetRun(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, id st
 // ciViewRunQuery is the single-run read `view` sends. detail asks for the
 // members only `view` renders: each failed task's error and output, and the
 // session record's delivery account. reuse asks for the release-set members the
-// run reused. A host older than them declares no query and answers without
-// them, which `view` renders as before.
+// run reused. verdict asks for the run's stored verdict in brief. A host older
+// than them declares no query and answers without them, which `view` renders
+// as before.
 func ciViewRunQuery() deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery {
 	on := true
-	return deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery{Detail: &on, Reuse: &on}
+	return deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery{Detail: &on, Reuse: &on, Verdict: &on}
 }
 
 // ciGetRunQuery reads one run by id with the query the caller built.
@@ -3022,6 +3177,7 @@ func ciRenderRunDetail(ioctx clicore.IO, run *CIRunResponse) {
 	if line := ciSessionLine(run.Session); line != "" {
 		ioctx.Stdout("Session:    " + line)
 	}
+	ioctx.Stdout("Verdict:    " + ciVerdictLine(run))
 	ciRenderReuse(ioctx, run.Reuse)
 	if len(run.Phases) == 0 {
 		ciRenderFailedTasks(ioctx, run.FailedTasks, run.FailedTasksOmitted)
@@ -3252,6 +3408,46 @@ func ciSessionLine(s *CIRunSession) string {
 		return "complete (" + parts + ")"
 	}
 	return "incomplete (" + parts + ")"
+}
+
+// The verdict lines of a run that carries no verdict. A run still going has
+// none yet. A run that ended without one tested no tree, or its change could
+// not be named, and gets none. The server could not read the verdict of an
+// unread one.
+const (
+	ciVerdictNotComputed = "not computed yet"
+	ciVerdictNone        = "none"
+	ciVerdictUnread      = "could not be read"
+)
+
+// ciVerdictLine renders a run's verdict in brief: the answer, the mark of one
+// that passed, the gap count, and the revision and time it was computed at.
+// A run without a verdict reads one of the lines above; the view still
+// succeeds.
+func ciVerdictLine(run *CIRunResponse) string {
+	v := run.Verdict
+	switch {
+	case run.verdictUnread:
+		return ciVerdictUnread
+	case v != nil && strings.TrimSpace(v.Answer) != "":
+	case run.Conclusion != "":
+		return ciVerdictNone
+	default:
+		return ciVerdictNotComputed
+	}
+	line := v.Answer
+	if v.Mark != "" {
+		line += " (" + v.Mark + ")"
+	}
+	gaps := "gaps"
+	if v.Gaps == 1 {
+		gaps = "gap"
+	}
+	line += fmt.Sprintf(", %d %s, verdict revision %d", v.Gaps, gaps, v.Revision)
+	if !v.ComputedAt.IsZero() {
+		line += ", computed " + ciFormatTime(v.ComputedAt)
+	}
+	return line
 }
 
 func ciSessionPartText(p CIRunSessionPart) string {
