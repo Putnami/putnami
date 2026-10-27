@@ -399,13 +399,20 @@ func taskCacheParamNames(job *jobmodel.ScheduledJob) map[string]struct{} {
 	for name := range job.JobDef.BoundParams {
 		names[name] = struct{}{}
 	}
-	for name := range job.JobDef.Flags {
-		names[name] = struct{}{}
+	// A flag with a ciDefault keys only the tasks that declare it, above: its
+	// value differs between CI and local runs, so the fail-safe would split
+	// every task of the command between them.
+	for name, def := range job.JobDef.Flags {
+		if def.CIDefault == nil {
+			names[name] = struct{}{}
+		}
 	}
 	if job.Extension != nil {
 		if command := job.Extension.Jobs[jobmodel.JobCommandName(job)]; command != nil {
-			for name := range command.Flags {
-				names[name] = struct{}{}
+			for name, def := range command.Flags {
+				if def.CIDefault == nil {
+					names[name] = struct{}{}
+				}
 			}
 		}
 	}

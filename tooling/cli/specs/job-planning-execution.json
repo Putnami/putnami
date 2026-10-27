@@ -258,6 +258,10 @@
       "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Discovery skips such a manifest stamped too low, with the reason."
     },
     {
+      "id": "a-flag-takes-its-ci-default-when-ci-is-set",
+      "text": "A manifest flag may declare a ciDefault, which replaces its default when the CI environment variable is set. Workspace options, project options and an explicit flag still win over it, and help shows both defaults. A flag with a ciDefault keys only the tasks that declare it as an input, so a CI run and a local run of any other task of the command share one cache entry."
+    },
+    {
       "id": "a-step-reads-the-changed-files",
       "text": "A step can gate on the run's changed files (activation.changedFiles) and bind them (from: context, path selection.changedFiles). It is planned only for a project whose own directory holds a matching changed file, and binds the files its gate selects, project-relative and sorted, into its parameters and cache key; other steps' keys ignore the change. A run without a diff plans it nowhere; a portable request plans from the submitter's paths. A finalizer waits for planned consumers. It needs CLI contract 16."
     },

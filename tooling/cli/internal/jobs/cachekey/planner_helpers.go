@@ -1,6 +1,9 @@
 package cachekey
 
 import (
+	"os"
+	"strings"
+
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -14,7 +17,7 @@ var ProjectWalkExcludedDirs = map[string]bool{
 // evaluation (mergeCommandParams) and the job context file (BuildJobContext)
 // into a single bag, lowest to highest priority:
 //
-//  1. Manifest flag defaults
+//  1. Manifest flag defaults (a flag's ciDefault when CI is set)
 //  2. Workspace config defaults (configDefaults)
 //  3. Job definition defaults (jobDefaults, nil to skip)
 //  4. Project-level options (options.{cmd}, options.{ext}, options.{ext}:{cmd})
@@ -33,10 +36,11 @@ func MergeParamLayers(
 
 	// Manifest flag defaults (lowest priority — overridden by everything else)
 	flagDefaults := make(extension.ParamMap)
+	ci := InCI()
 	if jobDef.Flags != nil {
 		for name, def := range jobDef.Flags {
-			if def.Default != nil {
-				flagDefaults[name] = def.Default
+			if value := def.DefaultFor(ci); value != nil {
+				flagDefaults[name] = value
 			}
 		}
 	}
@@ -74,4 +78,10 @@ func MergeParamLayers(
 	ApplyProjectedParamLayer(params, commandParams)
 
 	return params
+}
+
+// InCI reports whether the CI environment variable is set, the signal a flag's
+// ciDefault replaces its default on.
+func InCI() bool {
+	return strings.TrimSpace(os.Getenv("CI")) != ""
 }

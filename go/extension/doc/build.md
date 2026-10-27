@@ -364,7 +364,11 @@ those bytes.
 
 ## Execution Flow
 
-1. **Tidy** (unless `--skip-deps`):
+1. **Tidy** (unless `--skip-deps`). With `--tidy=false`, the default when the
+   `CI` environment variable is set, build runs `go mod tidy -diff` instead and
+   writes neither file: an untidy module fails with the diff and names
+   `putnami build --tidy --projects <project>`
+   ([ADR 0014](adr/0014-a-check-run-in-ci-writes-no-source.md)). Otherwise:
    - Scans Go imports for matches against workspace modules
    - Adds `replace` directives to `go.mod` for workspace dependencies
    - Runs `go mod tidy`, unless the environment disables module downloads
@@ -977,6 +981,7 @@ putnami-go gocacheprog: object cache served 182 objects, offered 3
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--skip-deps` | `false` | Skip `go mod tidy` and dependency sync |
+| `--tidy` | `true`; `false` when `CI` is set | Run `go mod tidy`. Off, check the module files with `go mod tidy -diff` and fail on a diff |
 | `--readonly` | `false` | Use `--mod readonly` (same as `--mod readonly`) |
 | `--mod <mode>` | — | Module download mode: `readonly`, `vendor`, or `mod` |
 | `--target` / `-t` | — | Cross-compile for one platform instead of the host: `os/arch` (e.g. `linux/amd64`). Wins over `platforms` |

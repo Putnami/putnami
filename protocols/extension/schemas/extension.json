@@ -462,6 +462,25 @@
             }
           ]
         },
+        "ciDefault": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
         "required": {
           "type": "boolean"
         },

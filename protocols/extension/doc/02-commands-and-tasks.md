@@ -138,6 +138,8 @@ Step IDs only need to be unique inside one extension command. When two active co
 
 Flags with the same name across active contributors must have identical definitions. Identical shared flags are accepted; conflicting definitions fail validation before execution. Unique extension-specific flags remain available in `params`.
 
+A flag may declare `ciDefault` next to `default`. When the `CI` environment variable is set to a non-blank value, the CLI uses `ciDefault` in its place; options and an explicit flag still win. Every flag of a command keys every task of the command, except a flag with a `ciDefault`: it keys only the tasks that declare it as an input, so CI and local runs share the entries of the other tasks ([ADR 0016](adr/0016-a-flag-may-declare-a-ci-default.md)).
+
 Command groups can act as aliases by pointing a subcommand at the same flat command:
 
 ```json
