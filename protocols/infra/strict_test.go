@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // findCode returns true if diags contains a diagnostic with the given code.
@@ -32,6 +33,7 @@ func TestParsePerProjectManifest_Valid(t *testing.T) {
 }
 
 func TestParsePerProjectManifest_UnknownField(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "an-unknown-member-is-refused")
 	data := []byte(`{"protocolVersion": 2, "unknownField": true}`)
 	m, diags := ParsePerProjectManifest(data)
 	if m != nil {
@@ -43,6 +45,7 @@ func TestParsePerProjectManifest_UnknownField(t *testing.T) {
 }
 
 func TestParsePerProjectManifest_RuntimeInLibrary(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "a-runtime-block-is-workload-only")
 	data := []byte(`{"protocolVersion": 2, "runtime": {"ingress": {"domain": "x"}}}`)
 	_, diags := ParsePerProjectManifest(data)
 	if !findCode(diags, ErrorCodeRuntimeInLibrary) {
@@ -51,6 +54,7 @@ func TestParsePerProjectManifest_RuntimeInLibrary(t *testing.T) {
 }
 
 func TestParsePerProjectManifest_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "bytes-that-are-not-json-are-a-parse-error")
 	_, diags := ParsePerProjectManifest([]byte("{not json"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected parse error")
@@ -61,6 +65,7 @@ func TestParsePerProjectManifest_InvalidJSON(t *testing.T) {
 }
 
 func TestValidatePerProjectManifest_InvalidName(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "names-follow-their-patterns")
 	m := &PerProjectManifest{
 		ProtocolVersion: ProtocolVersion,
 		Databases:       []Database{{Name: "Bad!Name", Engine: EnginePostgres}},
@@ -75,6 +80,7 @@ func TestValidatePerProjectManifest_InvalidName(t *testing.T) {
 // secret name accepts uppercase letters where every other resource name
 // stays lowercase.
 func TestValidate_SecretNameIsAConfigKey(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "names-follow-their-patterns")
 	perProject := &PerProjectManifest{ProtocolVersion: ProtocolVersion, Secrets: []string{"crm.apiKey", "DB_PASSWORD"}}
 	if diags := ValidatePerProjectManifest(perProject); diag.HasErrors(diags) {
 		t.Errorf("per-project camelCase secret: unexpected errors: %v", diags)
@@ -100,6 +106,7 @@ func TestValidate_SecretNameIsAConfigKey(t *testing.T) {
 }
 
 func TestValidatePerProjectManifest_InvalidEngine(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "the-version-and-the-engine-are-closed")
 	m := &PerProjectManifest{
 		ProtocolVersion: ProtocolVersion,
 		Databases:       []Database{{Name: "primary", Engine: "mongo"}},
@@ -111,6 +118,7 @@ func TestValidatePerProjectManifest_InvalidEngine(t *testing.T) {
 }
 
 func TestValidatePerProjectManifest_InvalidProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "the-version-and-the-engine-are-closed")
 	// 99 is not the supported protocol version, so the parser rejects it.
 	m := &PerProjectManifest{ProtocolVersion: 99}
 	diags := ValidatePerProjectManifest(m)
@@ -126,6 +134,7 @@ func TestValidatePerProjectManifest_InvalidProtocolVersion(t *testing.T) {
 // other test stayed green — the 99 case above cannot catch that, because 99
 // is rejected either way.
 func TestValidatePerProjectManifest_PreviousProtocolVersionIsRejected(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "the-version-and-the-engine-are-closed")
 	for v := 1; v < ProtocolVersion; v++ {
 		m := &PerProjectManifest{ProtocolVersion: v}
 		diags := ValidatePerProjectManifest(m)
@@ -145,6 +154,7 @@ func TestValidatePerProjectManifest_PreviousProtocolVersionIsRejected(t *testing
 // ownership change — and the aggregator turns this into a warning, so the
 // message is the author's only signal.
 func TestParseAggregatedManifest_RemovedCostPolicyFieldNamesTheMigration(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "an-unknown-member-is-refused")
 	for field, body := range map[string]string{
 		"min":     `{"protocolVersion": 2, "workload": "w", "runtime": {"scaling": {"min": 1}}}`,
 		"billing": `{"protocolVersion": 2, "workload": "w", "runtime": {"billing": "instance-based"}}`,
@@ -165,6 +175,7 @@ func TestParseAggregatedManifest_RemovedCostPolicyFieldNamesTheMigration(t *test
 }
 
 func TestValidatePerProjectManifest_EmptySchedule(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "a-schedule-is-a-5-field-cron")
 	m := &PerProjectManifest{
 		ProtocolVersion: ProtocolVersion,
 		ScheduledJobs:   []ScheduledJob{{Name: "rollup", Schedule: ""}},
@@ -176,6 +187,7 @@ func TestValidatePerProjectManifest_EmptySchedule(t *testing.T) {
 }
 
 func TestValidatePerProjectManifest_InvalidSchedule(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "a-schedule-is-a-5-field-cron")
 	// Non-empty schedules that are not well-formed 5-field cron strings.
 	cases := []struct {
 		name     string
@@ -201,6 +213,7 @@ func TestValidatePerProjectManifest_InvalidSchedule(t *testing.T) {
 }
 
 func TestValidatePerProjectManifest_WhitespaceScheduleIsEmptyNotInvalid(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "a-schedule-is-a-5-field-cron")
 	// A whitespace-only schedule is reported as empty, never as invalid —
 	// validateScheduledJob returns after the empty check so the two codes
 	// don't both fire for the same value.
@@ -218,6 +231,7 @@ func TestValidatePerProjectManifest_WhitespaceScheduleIsEmptyNotInvalid(t *testi
 }
 
 func TestValidateCronExpression(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "a-schedule-is-a-5-field-cron")
 	valid := []string{
 		"* * * * *",
 		"0 2 * * *",
@@ -266,6 +280,7 @@ func TestValidateCronExpression(t *testing.T) {
 }
 
 func TestValidateAggregatedManifest_MissingWorkload(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "every-aggregated-entry-carries-its-provenance")
 	m := &AggregatedManifest{ProtocolVersion: ProtocolVersion}
 	diags := ValidateAggregatedManifest(m)
 	if !findCode(diags, ErrorCodeMissingWorkload) {
@@ -274,6 +289,7 @@ func TestValidateAggregatedManifest_MissingWorkload(t *testing.T) {
 }
 
 func TestValidateAggregatedManifest_InvalidContributor(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "every-aggregated-entry-carries-its-provenance")
 	m := &AggregatedManifest{
 		ProtocolVersion: ProtocolVersion,
 		Workload:        "w",
@@ -289,6 +305,7 @@ func TestValidateAggregatedManifest_InvalidContributor(t *testing.T) {
 }
 
 func TestValidateAggregatedManifest_EmptyProjectInSource(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "every-aggregated-entry-carries-its-provenance")
 	m := &AggregatedManifest{
 		ProtocolVersion: ProtocolVersion,
 		Workload:        "w",
@@ -304,6 +321,7 @@ func TestValidateAggregatedManifest_EmptyProjectInSource(t *testing.T) {
 }
 
 func TestValidateAggregatedManifest_MissingSources(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "every-aggregated-entry-carries-its-provenance")
 	m := &AggregatedManifest{
 		ProtocolVersion: ProtocolVersion,
 		Workload:        "w",
@@ -326,6 +344,7 @@ func TestValidateAggregatedManifest_MissingSources(t *testing.T) {
 }
 
 func TestValidateAggregatedManifest_RuntimeScalingNegative(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "a-negative-scaling-value-is-refused")
 	neg := -1
 	cases := []struct {
 		name    string
@@ -350,6 +369,7 @@ func TestValidateAggregatedManifest_RuntimeScalingNegative(t *testing.T) {
 }
 
 func TestValidateAggregatedManifest_RuntimeScalingZeroIsValid(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "a-negative-scaling-value-is-refused")
 	zero := 0
 	m := &AggregatedManifest{
 		ProtocolVersion: ProtocolVersion,
@@ -365,6 +385,7 @@ func TestValidateAggregatedManifest_RuntimeScalingZeroIsValid(t *testing.T) {
 }
 
 func TestParsePerProjectManifest_NestedRuntimeNotMisclassified(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "an-unknown-member-is-refused")
 	// A nested object containing a "runtime" key inside an unknown
 	// top-level field must NOT be reported as runtime_in_library — it
 	// is a generic unknown_field rejection on the outer key. This guards
@@ -383,6 +404,7 @@ func TestParsePerProjectManifest_NestedRuntimeNotMisclassified(t *testing.T) {
 }
 
 func TestValidateContributor(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "names-schedules-provenance-and-scaling-are-validated", "every-aggregated-entry-carries-its-provenance")
 	cases := []struct {
 		c    ContributorID
 		want bool
@@ -406,6 +428,7 @@ func TestValidateContributor(t *testing.T) {
 }
 
 func TestParseAggregatedManifest_UnknownField(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "an-unknown-member-is-refused")
 	data := []byte(`{"protocolVersion": 2, "workload": "w", "extra": true}`)
 	_, diags := ParseAggregatedManifest(data)
 	if !findCode(diags, ErrorCodeUnknownField) {

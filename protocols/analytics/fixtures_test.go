@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // userAgentCase is one row of fixtures/user-agents.json. The Go side of the
@@ -36,6 +38,7 @@ type referrerCase struct {
 // classifier emit a value the database vocabulary forbids and still pass its own
 // conformance run, so membership is checked here, on the owning side.
 func TestUserAgentFixtures(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "classification-follows-the-shared-corpus", "every-user-agent-case-expects-enum-members")
 	var cases []userAgentCase
 	readFixture(t, "user-agents.json", &cases)
 	if len(cases) < 25 {
@@ -82,6 +85,7 @@ func TestUserAgentFixtures(t *testing.T) {
 // respects the storage bound, so the TypeScript side has a truncation case that
 // actually truncates.
 func TestReferrerFixtures(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "classification-follows-the-shared-corpus", "every-referrer-case-expects-a-bounded-enum-member")
 	var cases []referrerCase
 	readFixture(t, "referrers.json", &cases)
 	if len(cases) < 12 {
@@ -123,6 +127,7 @@ func TestReferrerFixtures(t *testing.T) {
 // as lowercase substrings, so an uppercase entry would never match anything and
 // would silently shrink the filter.
 func TestBotsFixture(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "bots-are-one-shared-list", "the-bot-list-is-lowercase-and-unique")
 	var document struct {
 		Tokens []string `json:"tokens"`
 	}
@@ -152,6 +157,7 @@ func TestBotsFixture(t *testing.T) {
 // real browser always sends a User-Agent, so counting a missing one as human
 // would make the cheapest forgery the one that inflates the audience.
 func TestIsBotUserAgentTreatsAbsenceAsAutomation(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "bots-are-one-shared-list", "an-absent-user-agent-is-a-bot")
 	for _, ua := range []string{"", " ", "\t\n"} {
 		if !IsBotUserAgent(ua) {
 			t.Errorf("IsBotUserAgent(%q) = false, want true", ua)

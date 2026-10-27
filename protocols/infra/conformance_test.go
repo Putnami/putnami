@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ValidFixtures parses + validates every JSON file under
@@ -14,6 +15,7 @@ import (
 // aggregated fixtures use the aggregated schema id. The fixture's
 // $schema field selects which parser to run.
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "every-valid-fixture-validates-and-every-invalid-one-is-refused")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -56,6 +58,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 // only legal on a workload. An aggregated invalid fixture must carry the
 // `workload` key that isAggregatedFixture routes on.
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "every-valid-fixture-validates-and-every-invalid-one-is-refused")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)

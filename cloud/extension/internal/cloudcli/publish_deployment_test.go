@@ -15,6 +15,7 @@ import (
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
 	"go.putnami.dev/protocol/put"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -330,6 +331,7 @@ func refusingDeploymentClient(requests *int) IO {
 }
 
 func TestManagedDeploymentPublishStoresTheDeclarationByteForByteAndEmitsTheMember(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-cloud-publish-stores-the-declaration-byte-for-byte")
 	declaration := canonicalDeploymentDeclaration(t)
 	root := deploymentPublishFixture(t, declaration)
 	bearer := jwt(map[string]any{"aud": "distribution", "scope": "put", "sub": "fixture-publisher"})
@@ -410,6 +412,7 @@ func TestManagedDeploymentPublishDryRunReadsAndChecksWithoutRegistryAccess(t *te
 }
 
 func TestManagedDeploymentPublishFailsOnAMissingOrInvalidDeclaration(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-cloud-publish-refuses-a-non-canonical-declaration")
 	valid := canonicalDeploymentDeclaration(t)
 	var indented bytes.Buffer
 	if err := json.Indent(&indented, valid, "", "  "); err != nil {

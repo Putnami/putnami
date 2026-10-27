@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/infraagg"
@@ -47,6 +48,7 @@ func TestDisableHTTP2_NilRuntimeIsANoOp(_ *testing.T) {
 // End to end through the registered task: a TypeScript workload's emitted
 // manifest and its defaults sidecar both carry the opt-out.
 func TestBuildInfra_EmitsTypeScriptRuntimeCompatibility(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-typescript-extension-turns-http2-off")
 	root := t.TempDir()
 	appRoot := filepath.Join(root, "app")
 	if err := os.MkdirAll(appRoot, 0o755); err != nil {
@@ -120,6 +122,7 @@ func readRuntimeFile(t *testing.T, path string) *infra.Runtime {
 // into the declaration, and the bytes are the canonical form of build-infra's
 // manifest.
 func TestPackageDeployment_DeclaresBuildInfrasAggregate(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-typescript-extension-declares-the-aggregate-in-canonical-bytes")
 	root := t.TempDir()
 	appRoot := filepath.Join(root, "app")
 	if err := os.MkdirAll(filepath.Join(appRoot, "infra"), 0o755); err != nil {

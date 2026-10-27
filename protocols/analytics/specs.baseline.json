@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "analytics/collection-wire-contract#a-batch-is-decoded-strictly-and-validated",
+    "analytics/collection-wire-contract#bots-are-one-shared-list",
+    "analytics/collection-wire-contract#classification-follows-the-shared-corpus",
+    "analytics/collection-wire-contract#lengths-are-utf-8-bytes",
+    "analytics/collection-wire-contract#the-fixture-corpus-is-the-contract",
+    "analytics/collection-wire-contract#the-version-codes-and-bounds-are-pinned",
+    "analytics/collection-wire-contract#the-vocabulary-is-closed"
+  ]
+}

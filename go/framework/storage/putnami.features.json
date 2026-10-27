@@ -19,7 +19,6 @@
             "kind": "acceptance",
             "checks": [
               "binding-and-constrained-stat-forward",
-              "cross-runtime-backend-conformance",
               "filesystem-backend-copy",
               "filesystem-backend-failed-put-keeps-object",
               "filesystem-backend-round-trip",

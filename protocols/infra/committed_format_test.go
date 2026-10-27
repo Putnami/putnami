@@ -3,6 +3,8 @@ package infra
 import (
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestMarshalCommittedShape pins the committed layout: objects and
@@ -10,6 +12,7 @@ import (
 // collapse. This is the exact shape Biome's expand:"auto" formatter leaves
 // untouched.
 func TestMarshalCommittedShape(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-committed-form-is-the-formatter-fixed-point")
 	m := PerProjectManifest{
 		Schema:          PerProjectSchemaURL,
 		ProtocolVersion: ProtocolVersion,
@@ -52,6 +55,7 @@ func TestMarshalCommittedShape(t *testing.T) {
 // array opens at column 13 (2 indent + len(`"secrets": `)), so a single element
 // of length L collapses while 13 + len(`["X…"]`) <= 120, i.e. L <= 103.
 func TestMarshalCommittedScalarArrayFitsThreshold(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-committed-form-is-the-formatter-fixed-point")
 	for _, tc := range []struct {
 		length        int
 		wantCollapsed bool
@@ -80,6 +84,7 @@ func TestMarshalCommittedScalarArrayFitsThreshold(t *testing.T) {
 // scheduledJobs entry after "secrets", the comma after the array's `]` shifts
 // the threshold down by one (L <= 102 collapses).
 func TestMarshalCommittedCountsTrailingComma(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-committed-form-is-the-formatter-fixed-point")
 	for _, tc := range []struct {
 		length        int
 		wantCollapsed bool
@@ -107,6 +112,7 @@ func TestMarshalCommittedCountsTrailingComma(t *testing.T) {
 // TestMarshalCommittedExpandsLongScalarArray confirms an overflowing scalar
 // array falls back to one element per line, exactly like MarshalIndent.
 func TestMarshalCommittedExpandsLongScalarArray(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-committed-form-is-the-formatter-fixed-point")
 	long := make([]string, 0, 12)
 	for i := 0; i < 12; i++ {
 		long = append(long, strings.Repeat("topic", 4))

@@ -1,9 +1,18 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { Bucket } from '../src/bucket/bucket.builders';
 import { bucketRegistry } from '../src/bucket/bucket.registry';
 import { buildStorageInfraManifest } from '../src/infra';
+
+// GOLDEN proves a requirement of the infra protocol's feature under a check of
+// this package's own.
+const GOLDEN = {
+  feature: 'infra/infrastructure-requirements-contract',
+  requirement: 'producers-emit-the-shared-goldens',
+  check: 'the-typescript-storage-producer-emits-its-golden',
+};
 
 // EQUIVALENCE_FIXTURE_PATH is the shared golden file the Go storage
 // producer asserts against too. Both languages writing identical bytes to
@@ -22,7 +31,7 @@ describe('cross-language equivalence', () => {
   // Counterpart: go/framework/storage/cross_language_test.go.
   // Same conceptual inputs, same golden output. A change to either
   // implementation that breaks byte-equivalence fails both tests.
-  it('storage producer matches the shared golden fixture', async () => {
+  specTest('storage producer matches the shared golden fixture', GOLDEN, async () => {
     // Inputs are unsorted on purpose so the test also covers the
     // deterministic name sort, and they mix with-retention and
     // without-retention buckets so the omitempty handling is exercised

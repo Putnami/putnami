@@ -92,6 +92,11 @@
       "bindings": [
         {
           "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/analytics",
+          "producerProject": "/protocols/analytics"
+        },
+        {
+          "kind": "project-dependency",
           "consumerProject": "/typescript/framework/application",
           "producerProject": "/protocols/capabilities"
         },
@@ -138,12 +143,37 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/database",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/database",
           "producerProject": "/protocols/transaction"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/document",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/events",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/migration",
+          "producerProject": "/protocols/infra"
         },
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/migration",
           "producerProject": "/protocols/migration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/runtime",
+          "producerProject": "/protocols/infra"
         },
         {
           "kind": "project-dependency",
@@ -154,6 +184,11 @@
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/spectest",
           "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/storage",
+          "producerProject": "/protocols/infra"
         },
         {
           "kind": "project-dependency",

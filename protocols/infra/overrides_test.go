@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func sampleAggregated() AggregatedManifest {
@@ -28,6 +29,7 @@ func sampleAggregated() AggregatedManifest {
 }
 
 func TestApplyOverrides_NilIgnoreIsNoop(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-ignore-rule-drops-its-entry")
 	m := sampleAggregated()
 	out, diags := ApplyOverrides(m, Overrides{})
 	if len(diags) != 0 {
@@ -39,6 +41,7 @@ func TestApplyOverrides_NilIgnoreIsNoop(t *testing.T) {
 }
 
 func TestApplyOverrides_DropsDatabaseByIdentity(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-ignore-rule-drops-its-entry")
 	m := sampleAggregated()
 	ov := Overrides{Ignore: &IgnoreRules{
 		Databases: []DatabaseRef{{Name: "primary", Engine: EnginePostgres}},
@@ -56,6 +59,7 @@ func TestApplyOverrides_DropsDatabaseByIdentity(t *testing.T) {
 }
 
 func TestApplyOverrides_DropsByName(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-ignore-rule-drops-its-entry")
 	m := sampleAggregated()
 	ov := Overrides{Ignore: &IgnoreRules{
 		Storage:       []string{"images"},
@@ -85,6 +89,7 @@ func TestApplyOverrides_DropsByName(t *testing.T) {
 }
 
 func TestApplyOverrides_EmptyEventsBlockBecomesNil(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-ignore-rule-drops-its-entry")
 	m := sampleAggregated()
 	ov := Overrides{Ignore: &IgnoreRules{
 		Events: &EventsRef{Publishes: []string{"a.created"}, Subscribes: []string{"b.updated"}},
@@ -96,6 +101,7 @@ func TestApplyOverrides_EmptyEventsBlockBecomesNil(t *testing.T) {
 }
 
 func TestApplyOverrides_UnusedRuleWarns(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-unused-rule-warns")
 	m := sampleAggregated()
 	ov := Overrides{Ignore: &IgnoreRules{
 		Storage:   []string{"does-not-exist"},
@@ -117,6 +123,7 @@ func TestApplyOverrides_UnusedRuleWarns(t *testing.T) {
 }
 
 func TestApplyOverrides_DoesNotMutateInput(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-ignore-rule-drops-its-entry")
 	m := sampleAggregated()
 	ov := Overrides{Ignore: &IgnoreRules{Storage: []string{"images"}}}
 	_, _ = ApplyOverrides(m, ov)
@@ -126,6 +133,7 @@ func TestApplyOverrides_DoesNotMutateInput(t *testing.T) {
 }
 
 func TestParseOverrides_RejectsUnknownField(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "the-overrides-reader-is-strict")
 	_, diags := ParseOverrides([]byte(`{"ignore":{},"bogus":1}`))
 	if !findCode(diags, ErrorCodeUnknownField) {
 		t.Errorf("want %s, got %v", ErrorCodeUnknownField, diags)
@@ -133,6 +141,7 @@ func TestParseOverrides_RejectsUnknownField(t *testing.T) {
 }
 
 func TestValidateOverrides_BadEngineAndName(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "the-overrides-reader-is-strict")
 	ov := &Overrides{Ignore: &IgnoreRules{
 		Databases: []DatabaseRef{{Name: "ok", Engine: "oracle"}},
 		Storage:   []string{"BadName"},
@@ -147,6 +156,7 @@ func TestValidateOverrides_BadEngineAndName(t *testing.T) {
 }
 
 func TestValidateOverrides_IgnoresASecretByConfigKey(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "an-ignore-rule-drops-its-entry")
 	ov := &Overrides{Ignore: &IgnoreRules{Secrets: []string{"crm.apiKey"}, Storage: []string{"Uploads"}}}
 	diags := ValidateOverrides(ov)
 	if len(diags) != 1 || diags[0].Code != ErrorCodeInvalidName || diags[0].Field != "ignore.storage[0]" {
@@ -155,6 +165,7 @@ func TestValidateOverrides_IgnoresASecretByConfigKey(t *testing.T) {
 }
 
 func TestLoadOverrides_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "the-overrides-reader-is-strict")
 	dir := t.TempDir()
 	path := filepath.Join(dir, OverridesFilename)
 	content := `{"$schema":"x","ignore":{"secrets":["legacy"]}}`

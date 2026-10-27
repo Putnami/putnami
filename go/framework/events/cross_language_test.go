@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // equivalenceFixturePath is the shared golden file the TypeScript events
@@ -23,6 +25,7 @@ const equivalenceFixturePath = "../../../protocols/infra/fixtures/equivalence/ev
 // the same golden file. A change to either implementation that breaks
 // byte-equivalence fails both tests.
 func TestCrossLanguageEquivalence_Events(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "producers-emit-the-shared-goldens", "the-go-events-producer-emits-its-golden")
 	publishes := []string{"order.shipped", "order.created", "order.created"}
 	subscribes := []string{"payment.settled"}
 

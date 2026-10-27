@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
 )
 
@@ -30,6 +31,7 @@ const equivalenceFixturePath = "../../../protocols/infra/fixtures/equivalence/mi
 // against the same golden file. A change to either implementation that breaks
 // byte-equivalence fails both tests.
 func TestCrossLanguageEquivalence_Migration(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "producers-emit-the-shared-goldens", "the-go-migration-producer-emits-its-golden")
 	r := NewRegistry()
 	mustAdd(t, r,
 		schemaSource{

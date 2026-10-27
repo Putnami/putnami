@@ -6,9 +6,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestWriteSidecarWritesAtomic(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "each-producer-owns-one-fragment")
 	dir := t.TempDir()
 
 	err := WriteSidecar(dir, "database", PerProjectManifest{
@@ -44,6 +47,7 @@ func TestWriteSidecarWritesAtomic(t *testing.T) {
 }
 
 func TestWriteSidecarRemovesFileWhenEmpty(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "each-producer-owns-one-fragment")
 	dir := t.TempDir()
 	if err := WriteSidecar(dir, "storage", PerProjectManifest{
 		Storage: []StorageBucket{{Name: "uploads"}},
@@ -63,6 +67,7 @@ func TestWriteSidecarRemovesFileWhenEmpty(t *testing.T) {
 }
 
 func TestWriteSidecarMultipleProducersCoexist(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "each-producer-owns-one-fragment")
 	dir := t.TempDir()
 
 	if err := WriteSidecar(dir, "database", PerProjectManifest{
@@ -85,6 +90,7 @@ func TestWriteSidecarMultipleProducersCoexist(t *testing.T) {
 }
 
 func TestWriteSidecarRejectsInvalidSlug(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "each-producer-owns-one-fragment")
 	dir := t.TempDir()
 	for _, slug := range []string{"", "Database", "with space", "../escape", "/leading"} {
 		if err := WriteSidecar(dir, slug, PerProjectManifest{
@@ -96,6 +102,7 @@ func TestWriteSidecarRejectsInvalidSlug(t *testing.T) {
 }
 
 func TestRemoveSidecarMissingFileIsNoOp(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "each-producer-owns-one-fragment")
 	dir := t.TempDir()
 	if err := RemoveSidecar(dir, "events"); err != nil {
 		t.Fatalf("RemoveSidecar on missing file: %v", err)

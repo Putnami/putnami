@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "grpc-services/service-inventory-contract#a-service-is-identified-by-name-transport-and-base-path",
+    "grpc-services/service-inventory-contract#an-inventory-fails-closed",
+    "grpc-services/service-inventory-contract#each-source-kind-joins-the-route-inventory-its-own-way",
+    "grpc-services/service-inventory-contract#the-identifiers-are-pinned",
+    "grpc-services/service-inventory-contract#the-serialization-is-canonical"
+  ]
+}

@@ -97,6 +97,7 @@ func busyPort(t *testing.T) int {
 }
 
 func TestServiceInventory_NativeListsRegisteredServicesAndStreaming(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "each-source-kind-joins-the-route-inventory-its-own-way", "the-go-grpc-server-lists-every-registered-method")
 	spectest.Proves(t, "go/grpc-services", "service-inventory", "native-inventory-lists-registered-methods-and-streaming")
 	calls := 0
 	plugin := NewPlugin(Config{Port: busyPort(t)}).Register(registerHealth(&calls)).WithReflection(true)
@@ -172,7 +173,7 @@ func TestServiceInventory_ReflectionAppearsOnlyWhenEnabled(t *testing.T) {
 }
 
 func TestServiceInventory_GatewayJoinsItsPrefixRoute(t *testing.T) {
-	spectest.Proves(t, "go/grpc-services", "service-inventory", "gateway-service-joins-its-prefix-route")
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "each-source-kind-joins-the-route-inventory-its-own-way", "the-go-grpc-gateway-joins-one-prefix-post-route-per-service")
 	for _, prefix := range []string{"", "/rpc"} {
 		t.Run("prefix="+prefix, func(t *testing.T) {
 			server := phttp.NewServerPlugin(phttp.ServerConfig{Port: 0})
@@ -272,7 +273,7 @@ func bridgeApplication(t *testing.T) *app.Application {
 }
 
 func TestServiceInventory_BridgeMethodsJoinExactPOSTRoutes(t *testing.T) {
-	spectest.Proves(t, "go/grpc-services", "service-inventory", "bridge-methods-join-exact-post-routes")
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "each-source-kind-joins-the-route-inventory-its-own-way", "the-go-grpc-bridge-joins-one-exact-post-route-per-method")
 	a := bridgeApplication(t)
 	out := describeInventory(t, a)
 	services, _ := readServiceInventory(t, out)
@@ -389,7 +390,7 @@ func TestServiceInventory_RepeatedConfigureListsEachServiceOnce(t *testing.T) {
 }
 
 func TestServiceInventory_IdenticalServicesCollapseAndConflictsFail(t *testing.T) {
-	spectest.Proves(t, "go/grpc-services", "service-inventory", "conflicting-services-fail-the-describe")
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "a-service-is-identified-by-name-transport-and-base-path", "the-go-grpc-plugins-collapse-identical-services-and-fail-on-a-conflict")
 	calls := 0
 	identical := app.New(inventoryProject)
 	identical.Use(NewPlugin(Config{}).Register(registerHealth(&calls)))

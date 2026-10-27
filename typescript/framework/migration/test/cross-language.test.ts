@@ -54,9 +54,9 @@ describe('cross-language equivalence', () => {
   specTest(
     'migration producer matches the shared golden fixture',
     {
-      feature: 'typescript/migration-orchestration',
-      requirement: 'infra-aggregation',
-      check: 'the-producer-output-matches-the-shared-golden-fixture',
+      feature: 'infra/infrastructure-requirements-contract',
+      requirement: 'producers-emit-the-shared-goldens',
+      check: 'the-typescript-migration-producer-emits-its-golden',
     },
     async () => {
       // Two sources target (primary, postgres) with different schemas (sorted

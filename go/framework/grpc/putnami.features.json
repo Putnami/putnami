@@ -139,13 +139,10 @@
             "checks": [
               "native-inventory-lists-registered-methods-and-streaming",
               "reflection-is-listed-only-when-enabled",
-              "gateway-service-joins-its-prefix-route",
-              "bridge-methods-join-exact-post-routes",
               "a-targeted-describe-writes-the-whole-inventory",
               "use-for-describe-is-refused",
               "repeated-configure-lists-each-service-once",
-              "an-empty-surface-writes-an-empty-inventory",
-              "conflicting-services-fail-the-describe"
+              "an-empty-surface-writes-an-empty-inventory"
             ]
           }
         }

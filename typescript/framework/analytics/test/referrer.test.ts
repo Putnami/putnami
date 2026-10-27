@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { classifyReferrer, extractUtm, NO_HOST, normalizePath, truncateUtf8 } from '../src/server/enrich/referrer';
 import {
   MAX_PATH_LEN,
@@ -9,6 +10,14 @@ import {
   REFERRER_TYPES,
   utf8Bytes,
 } from '../src/server/sanitize/vocabulary';
+
+// Each binding proves a requirement of the analytics protocol's feature
+// under a check of this package's own.
+const REFERRER_CORPUS = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'classification-follows-the-shared-corpus',
+  check: 'the-typescript-referrer-classifier-matches-every-case',
+};
 
 const FIXTURES_DIR = join(__dirname, '../../../../protocols/analytics/fixtures');
 
@@ -21,12 +30,12 @@ interface ReferrerFixture {
 const FIXTURES = JSON.parse(readFileSync(join(FIXTURES_DIR, 'referrers.json'), 'utf8')) as ReferrerFixture[];
 
 describe('classifyReferrer', () => {
-  it('reads the whole shared corpus', () => {
+  specTest('reads the whole shared corpus', REFERRER_CORPUS, () => {
     expect(FIXTURES).toHaveLength(12);
   });
 
   for (const fixture of FIXTURES) {
-    it(`classifies ${fixture.referrer.slice(0, 60) || '(none)'}`, () => {
+    specTest(`classifies ${fixture.referrer.slice(0, 60) || '(none)'}`, REFERRER_CORPUS, () => {
       const info = classifyReferrer(fixture.referrer, new URL(fixture.origin).host);
 
       // The corpus writes an absent referrer as the empty string; the folded

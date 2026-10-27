@@ -7,9 +7,12 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSchemaFieldParity(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-identifiers-are-pinned", "the-schema-members-and-enums-match-the-go-types")
 	data, err := os.ReadFile("schemas/grpc-services.json")
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +33,7 @@ func TestSchemaFieldParity(t *testing.T) {
 }
 
 func TestSchemaEnumParity(t *testing.T) {
+	spectest.Proves(t, "grpc-services/service-inventory-contract", "the-identifiers-are-pinned", "the-schema-members-and-enums-match-the-go-types")
 	data, err := os.ReadFile("schemas/grpc-services.json")
 	if err != nil {
 		t.Fatal(err)
