@@ -4,13 +4,14 @@
   "visibility": "public",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/protocols/http-routes", "/protocols/platform", "/protocols/telemetry"],
+  "dependencies": ["/protocols/features", "/protocols/http-routes", "/protocols/platform", "/protocols/telemetry"],
   "options": {
     "test": {
       "filePatterns": [
         "../../../protocols/capabilities/fixtures/v2/equivalence/**",
         "../../../protocols/clientcontract/fixtures/**",
         "../../../protocols/clientcontract/schemas/**",
+        "../../../protocols/features/fixtures/**",
         "../../../protocols/http-routes/fixtures/**",
         "../../../protocols/platform/fixtures/envelope/**"
       ]

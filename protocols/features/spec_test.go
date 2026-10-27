@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func basicSpec(feature string) *Spec {
@@ -39,6 +40,7 @@ func jsonFieldNames(t *testing.T, value any) []string {
 }
 
 func TestSpecStrictVersionUnknownFieldsAndNulls(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "strict-versioned-documents", "the-spec-reader-refuses-an-inexact-version-a-minting-field-or-a-null")
 	valid := `{"protocolVersion":1,"feature":"billing/invoicing","outcomes":["A customer issues an invoice"],"requirements":[]}`
 	if spec, findings := ParseAndValidateSpec([]byte(valid)); spec == nil || diag.HasErrors(findings) {
 		t.Fatalf("valid: %#v %v", spec, findings)
@@ -92,6 +94,7 @@ func TestSpecStrictVersionUnknownFieldsAndNulls(t *testing.T) {
 }
 
 func TestSpecPublicFieldSetStaysMinimal(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "the-spec-field-set-matches-its-published-schema")
 	wantSpecFields := []string{"$schema", "protocolVersion", "feature", "outcomes", "nonGoals", "requirements", "decisions"}
 	if got := jsonFieldNames(t, Spec{}); !slices.Equal(got, wantSpecFields) {
 		t.Fatalf("spec field set drifted: %v", got)
@@ -131,6 +134,7 @@ func TestSpecPublicFieldSetStaysMinimal(t *testing.T) {
 }
 
 func TestSpecCanonicalSerializationIsDeterministicAndNonMutating(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "canonical-bytes-across-languages", "go-reproduces-the-spec-golden")
 	data, err := os.ReadFile(filepath.Join("fixtures", "equivalence", "human-authored-spec.golden.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -138,6 +142,10 @@ func TestSpecCanonicalSerializationIsDeterministicAndNonMutating(t *testing.T) {
 	spec, findings := ParseAndValidateSpec(data)
 	if spec == nil || diag.HasErrors(findings) {
 		t.Fatalf("golden: %v", findings)
+	}
+	golden, err := MarshalSpec(spec)
+	if err != nil || !bytes.Equal(golden, data) {
+		t.Fatalf("the parsed golden does not serialize back to its committed bytes: %v", err)
 	}
 	spec.Requirements = append([]SpecRequirement{spec.Requirements[1]}, spec.Requirements[0])
 	spec.Decisions = append(spec.Decisions, "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md")
@@ -204,6 +212,7 @@ func TestSpecCanonicalSerializationIsDeterministicAndNonMutating(t *testing.T) {
 }
 
 func TestSpecLocalValidationBoundaries(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "the-spec-validator-refuses-content-outside-its-bounds")
 	spec := basicSpec("billing/invoicing")
 	spec.Outcomes = []string{}
 	if findings := ValidateSpec(spec); !hasCode(findings, ErrorCodeInvalidID) {
@@ -264,6 +273,7 @@ func TestSpecLocalValidationBoundaries(t *testing.T) {
 }
 
 func TestSpecDiagnosticsNameFilePositions(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "spec-findings-name-their-position-and-bound")
 	spec := basicSpec("billing/invoicing")
 	spec.Requirements = []SpecRequirement{
 		{ID: "zeta-export", Text: "An export states its format in the response content type."},
