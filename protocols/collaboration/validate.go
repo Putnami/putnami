@@ -284,6 +284,9 @@ func ValidateInput(input any) []diag.Diagnostic {
 			c.commit("commit", in.Commit)
 		}
 		c.idempotencyKey(in.IdempotencyKey)
+	case *ProposalCommentsInput:
+		c.ref("ref", in.Ref)
+		c.page(in.Page)
 	case *ProposalMergeInput:
 		c.ref("ref", in.Ref)
 		c.commit("expectedHeadCommit", in.ExpectedHeadCommit)
@@ -342,7 +345,7 @@ func ValidateResult(result any) []diag.Diagnostic {
 		for i := range r.Items {
 			c.task(fmt.Sprintf("items[%d]", i), r.Items[i])
 		}
-		c.nextCursor("page.next", r.Page.Next)
+		c.nextCursor(r.Page.Next)
 	case *TaskResult:
 		c.task("task", r.Task)
 	case *TaskCreateResult:
@@ -355,7 +358,7 @@ func ValidateResult(result any) []diag.Diagnostic {
 		for i := range r.Items {
 			c.proposal(fmt.Sprintf("items[%d]", i), r.Items[i])
 		}
-		c.nextCursor("page.next", r.Page.Next)
+		c.nextCursor(r.Page.Next)
 	case *ProposalUpsertResult:
 		c.proposal("proposal", r.Proposal)
 	case *ProposalResult:
@@ -369,13 +372,20 @@ func ValidateResult(result any) []diag.Diagnostic {
 		}
 	case *ProposalReviewResult:
 		c.review("review", r.Review)
+	case *ProposalCommentListResult:
+		c.itemsPresent(r.Items == nil)
+		c.listBound("items", len(r.Items))
+		for i := range r.Items {
+			c.comment(fmt.Sprintf("items[%d]", i), r.Items[i])
+		}
+		c.nextCursor(r.Page.Next)
 	case *MemoryListResult:
 		c.itemsPresent(r.Items == nil)
 		c.listBound("items", len(r.Items))
 		for i := range r.Items {
 			c.record(fmt.Sprintf("items[%d]", i), r.Items[i])
 		}
-		c.nextCursor("page.next", r.Page.Next)
+		c.nextCursor(r.Page.Next)
 	case *MemoryRecordResult:
 		c.record("record", r.Record)
 	case *MemoryCheckpointResult:
@@ -653,9 +663,10 @@ func (c *checker) page(page *PageRequest) {
 	}
 }
 
-func (c *checker) nextCursor(field, cursor string) {
+// nextCursor checks the page.next cursor of a list result.
+func (c *checker) nextCursor(cursor string) {
 	if len(cursor) > MaxCursorLength || strings.ContainsAny(cursor, " \t\n\r") {
-		c.errorf(ErrorCodeInvalidPage, field, "a cursor is at most %d characters without whitespace", MaxCursorLength)
+		c.errorf(ErrorCodeInvalidPage, "page.next", "a cursor is at most %d characters without whitespace", MaxCursorLength)
 	}
 }
 
@@ -870,6 +881,35 @@ func (c *checker) review(field string, review Review) {
 	}
 	c.optionalToken(field+".author", review.Author)
 	c.timestamp(field+".submittedAt", review.SubmittedAt, false)
+}
+
+// comment checks one proposal comment. A line is a line of a file, so it
+// needs the file's path; a path alone is a comment whose line is gone.
+func (c *checker) comment(field string, comment ProposalComment) {
+	c.ref(field+".ref", comment.Ref)
+	c.url(field+".url", comment.URL)
+	c.optionalToken(field+".author", comment.Author)
+	c.timestamp(field+".submittedAt", comment.SubmittedAt, false)
+	if comment.Review != nil {
+		c.ref(field+".review", *comment.Review)
+	}
+	if comment.Path != "" {
+		c.bounded(field+".path", comment.Path, MaxLocatorLength, true)
+	}
+	switch {
+	case comment.Line == nil:
+	case *comment.Line < 1:
+		c.errorf(ErrorCodeInvalidValue, field+".line", "a line is a positive number; the first line is 1")
+	case comment.Path == "":
+		c.errorf(ErrorCodeRequired, field+".path", "a comment on a line names the file the line belongs to")
+	}
+	if comment.Commit != "" {
+		c.commit(field+".commit", comment.Commit)
+	}
+	if strings.TrimSpace(comment.Body) == "" {
+		c.errorf(ErrorCodeRequired, field+".body", "a comment has a body")
+	}
+	c.bytesLimit(field+".body", comment.Body, MaxBodyBytes)
 }
 
 func (c *checker) record(field string, record MemoryRecord) {

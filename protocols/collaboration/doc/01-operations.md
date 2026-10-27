@@ -74,6 +74,7 @@ enforces it.
 | `upsert` | mutating | yes | yes | declared | `change` (plus optional `headCommit`), `title`, `body`, `draft`, `expectedRevision` | `proposal`, `created` |
 | `status` | read | yes | — | — | `ref` | `proposal`, `checks`, `reviews` |
 | `review` | mutating | yes | no | — | `ref`, `verdict`, `body`, `commit`, `idempotencyKey` | `review`, `created` |
+| `comments` | read | no | — | — | `ref`, `page` | `items: [comment]`, `page` |
 | `merge` | mutating | no | yes | — | `ref`, `expectedHeadCommit`, `method` | `proposal` (state `merged`) |
 
 A proposal is `ref`, `revision`, `url`, `change` (`repository`, `base`,
@@ -99,6 +100,17 @@ so, and no check is listed). A review is `ref`, `url`, `verdict` (`approve`,
 `comment`, `request_changes`), `commit`, `author`, `submittedAt`. `merge`
 refuses a head that moved from `expectedHeadCommit`; offering it authorizes
 nobody to merge.
+
+`comments` lists what people wrote on one proposal. A comment is `ref` and
+`body`, plus, when known, `url`, `author`, `submittedAt`, `review` (the ref of
+the review it belongs to) and the file line it is anchored to: `path`, `line`
+(the first line is 1) and `commit`, the commit whose file `line` refers to,
+which is not necessarily the commit the comment was written on. A comment on
+no file has no `path`. A comment on a whole file, and one whose line was
+deleted or is no longer in the change, has a `path` and no `line`. A `line`
+never comes without its `path`. The comment and its review are in the source
+of the proposal. A provider that offers `comments` lists the body of a
+published review once across pages, naming that review.
 
 ## memory v1
 

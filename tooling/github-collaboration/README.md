@@ -83,7 +83,7 @@ GitHub token, from everything it writes.
 | Contract | Offered | Not offered |
 |---|---|---|
 | tasks v1 | `find`, `get`, `create`, `update`, `transition`, `assign`, `link` | `claim` |
-| proposals v1 | `find`, `upsert`, `status`, `review`, `merge` (with `allowMerge`) | — |
+| proposals v1 | `find`, `upsert`, `status`, `review`, `comments`, `merge` (with `allowMerge`) | — |
 
 - **States.** An open issue is `blocked`, `in_progress` or `open` by the first
   of those states whose label it carries, and `open` without one. A closed
@@ -127,6 +127,19 @@ GitHub token, from everything it writes.
 - **Reviews.** `status` lists submitted reviews; pending and dismissed ones are
   not reported. GitHub refuses an approval or a change request by the pull
   request's author: that is `invalid`.
+- **Comments.** `comments` lists the body of each submitted review, then each
+  comment on a file line, then each conversation comment, each list by
+  ascending identifier. A review body is listed without the hidden comment that records an
+  idempotency key, and a review whose body is empty, or still pending, is no
+  comment; a dismissed review's body is listed. A review body names its own
+  review, and a line comment names the review it was written in, with its
+  `path`, `line` and `commit`: the commit GitHub positions the comment on now,
+  whose file `line` refers to. A comment on a whole file, on a deleted line or
+  on a line that left the diff has a `path` and no `line`. A conversation comment
+  names no review and no file. Review bodies are read whole, at most 1,000
+  reviews as for `status`, and listed by review identifier: GitHub lists
+  reviews in submission order, and a review started as a draft keeps the
+  older identifier it got then.
 - **Merge** needs `allowMerge` and an `expectedHeadCommit` that is still the
   head. Binding the provider authorizes nobody to merge.
 
@@ -134,7 +147,9 @@ GitHub token, from everything it writes.
 
 - A reference is `{"source": "github:<owner>/<name>", "id": "<number>"}`,
   lowercase, with the host before the owner on another host
-  (`github:ghe.example.com/acme/app`). A review is `review-<id>`. A source is
+  (`github:ghe.example.com/acme/app`). A review is `review-<id>`. A comment is
+  its review's `review-<id>` for a review body, `line-<id>` for a line
+  comment and `comment-<id>` for a conversation comment. A source is
   compared case-insensitively, and results always carry the lowercase form. A
   reference from another source is `not_found`.
 - A revision is a digest of what a task or proposal shows and a caller can
@@ -154,7 +169,8 @@ GitHub token, from everything it writes.
   `query`. Both trail recent writes: an issue appears in them seconds after
   its create was answered, and in the search sometimes minutes after. GitHub's
   search serves the first 1,000 matches of a query: a `query` traversal ends
-  there, with no next page.
+  there, with no next page. A `comments` cursor also names the list it
+  resumes: reviews, line comments or conversation comments.
 - GitHub moves a pull request's head seconds after its branch. When `find`
   or `upsert` names a `headCommit` that the branch already points at, an open
   pull request still behind it is read again until it catches up, so its

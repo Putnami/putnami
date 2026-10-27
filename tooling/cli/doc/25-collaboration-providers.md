@@ -141,8 +141,8 @@ provider chose.
 tasks, proposals and missions over a store directory inside the workspace
 (`.putnami/collaboration/local` unless `settings.root` says otherwise). It
 needs no account and no network. It runs no hosted checks — `proposals status`
-always reports checks `unsupported` — and offers no merge, assignment,
-hierarchy or claim. You own its missions: you answer a decision and send a
+always reports checks `unsupported` — and offers no comments, merge,
+assignment, hierarchy or claim. You own its missions: you answer a decision and send a
 message by writing a file in the store directory. Memory providers are
 separate extensions.
 
@@ -156,4 +156,5 @@ Neither backend needs an account or a hosted service.
 [`@putnami/github-collaboration`](../../github-collaboration/README.md)
 implements **tasks** and **proposals** on GitHub issues and pull requests. It
 reads the credential the way `gh` does, maps task states to labels through its
-binding settings, and offers merge only as an optional capability.
+binding settings, lists what people wrote on a pull request through
+`proposals comments`, and offers merge only as an optional capability.

@@ -28,7 +28,7 @@ describes every operation.
 | Contract | Required | Optional |
 |---|---|---|
 | `tasks` v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
-| `proposals` v1 | `find`, `upsert`, `status`, `review` | `merge` |
+| `proposals` v1 | `find`, `upsert`, `status`, `review` | `comments`, `merge` |
 | `memory` v1 | `context`, `mission`, `checkpoint` | `search` |
 | `missions` v1 | `sync`, `ask`, `reply` | — |
 
@@ -108,7 +108,8 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
 - [`providertest`](providertest/providertest.go) holds the tasks, proposals,
   memory and missions scenarios every provider runs (`RunTasks`,
   `RunProposals`, `RunMemory`, `RunMissions`); it names nothing a particular
-  backend defines, so a provider can run it against a shared one.
+  backend defines, so a provider can run it against a shared one. A scenario
+  of an optional operation runs only against a provider that offers it.
   `@putnami/memory-store` runs `RunMemory` against its file backend, its Git
   backend and its Git backend behind a bare remote. No provider in this
   repository implements missions yet: `RunMissions` runs against an in-test

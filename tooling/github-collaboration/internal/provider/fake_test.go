@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -43,6 +44,8 @@ type fakeGitHub struct {
 	issues        map[int]*fakeIssue
 	pulls         map[int]*fakePull
 	reviews       map[int][]*fakeReview
+	lineComments  map[int][]*fakeComment
+	conversation  map[int][]*fakeComment
 	branches      map[string]string
 	forks         map[string]string
 	parents       map[int]int
@@ -116,6 +119,28 @@ type fakeReview struct {
 	submitted time.Time
 }
 
+// fakeComment is a line comment, which lineComments keeps per pull request,
+// or a conversation comment, which conversation keeps per issue, oldest first.
+// A line comment with line 0 is outdated: GitHub answers its line as null.
+type fakeComment struct {
+	id      int64
+	user    string
+	body    string
+	path    string
+	line    int
+	commit  string
+	review  int64
+	created time.Time
+	// url replaces the html_url GitHub answers.
+	url string
+	// side is "LEFT" for a comment on a deleted line, whose line is in the
+	// old file, and "RIGHT" when empty.
+	side string
+	// subjectType is "file" for a comment on the whole file, which GitHub
+	// answers with line 1, and "line" when empty.
+	subjectType string
+}
+
 // fault changes the answer to the next matching requests.
 type fault struct {
 	method string
@@ -143,6 +168,7 @@ func newFakeGitHub(t *testing.T) *fakeGitHub {
 		clock:         time.Date(2026, 9, 24, 8, 0, 0, 0, time.UTC),
 		next:          1, nextID: 1000,
 		issues: map[int]*fakeIssue{}, pulls: map[int]*fakePull{}, reviews: map[int][]*fakeReview{},
+		lineComments: map[int][]*fakeComment{}, conversation: map[int][]*fakeComment{},
 		branches: map[string]string{
 			"main":    strings.Repeat("a", 40),
 			"topic-a": strings.Repeat("b", 40),
@@ -280,6 +306,8 @@ var routes = []struct {
 	{"PATCH", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)$`), (*fakeGitHub).patchPull},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/reviews$`), (*fakeGitHub).listReviews},
 	{"POST", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/reviews$`), (*fakeGitHub).createReview},
+	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/comments$`), (*fakeGitHub).listLineComments},
+	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/issues/([0-9]+)/comments$`), (*fakeGitHub).listConversation},
 	{"PUT", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/pulls/([0-9]+)/merge$`), (*fakeGitHub).mergePull},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/git/ref/heads/(.+)$`), (*fakeGitHub).getRef},
 	{"GET", regexp.MustCompile(`^/repos/([^/]+)/([^/]+)/commits/([0-9a-f]+)/check-runs$`), (*fakeGitHub).listCheckRuns},
@@ -889,6 +917,63 @@ func (f *fakeGitHub) createReview(w http.ResponseWriter, r *http.Request, match 
 	f.nextID++
 	f.reviews[number] = append(f.reviews[number], review)
 	writeJSON(w, http.StatusOK, f.reviewJSON(number, review))
+}
+
+// comment adds a comment created now, with the next identifier, the way
+// GitHub numbers it.
+func (f *fakeGitHub) comment(comment fakeComment) *fakeComment {
+	comment.id, comment.created = f.nextID, f.tick()
+	f.nextID++
+	return &comment
+}
+
+func (f *fakeGitHub) commentURL(number int, comment *fakeComment, anchor string) string {
+	if comment.url != "" {
+		return comment.url
+	}
+	return fmt.Sprintf("https://github.com/%s/%s/pull/%d#%s%d", f.owner, f.name, number, anchor, comment.id)
+}
+
+func (f *fakeGitHub) listLineComments(w http.ResponseWriter, r *http.Request, match []string) {
+	number := f.number(match[3])
+	if f.pulls[number] == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
+		return
+	}
+	// Without a sort, GitHub lists line comments by ascending identifier,
+	// which is the order the fake answers.
+	if query := r.URL.Query(); query.Has("sort") || query.Has("direction") {
+		f.t.Errorf("line comments listed with a sort, which GitHub then follows instead of the identifier order: %s", r.URL.RawQuery)
+	}
+	comments := make([]map[string]any, 0, len(f.lineComments[number]))
+	for _, comment := range f.lineComments[number] {
+		var line, review any
+		if comment.line > 0 {
+			line = comment.line
+		}
+		if comment.review > 0 {
+			review = comment.review
+		}
+		side, subject := cmp.Or(comment.side, "RIGHT"), cmp.Or(comment.subjectType, "line")
+		comments = append(comments, map[string]any{"id": comment.id, "pull_request_review_id": review, "user": map[string]any{"login": comment.user},
+			"body": comment.body, "path": comment.path, "line": line, "side": side, "subject_type": subject, "commit_id": comment.commit,
+			"html_url": f.commentURL(number, comment, "discussion_r"), "created_at": comment.created.Format(time.RFC3339)})
+	}
+	writeJSON(w, http.StatusOK, orEmpty(paginate(w, r, comments)))
+}
+
+func (f *fakeGitHub) listConversation(w http.ResponseWriter, r *http.Request, match []string) {
+	number := f.number(match[3])
+	if f.issues[number] == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
+		return
+	}
+	comments := make([]map[string]any, 0, len(f.conversation[number]))
+	for _, comment := range f.conversation[number] {
+		comments = append(comments, map[string]any{"id": comment.id, "user": map[string]any{"login": comment.user}, "body": comment.body,
+			"html_url": f.commentURL(number, comment, "issuecomment-"), "created_at": comment.created.Format(time.RFC3339)})
+	}
+	writeJSON(w, http.StatusOK, orEmpty(paginate(w, r, comments)))
 }
 
 func (f *fakeGitHub) mergePull(w http.ResponseWriter, r *http.Request, match []string) {

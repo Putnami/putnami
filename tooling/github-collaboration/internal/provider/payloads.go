@@ -102,6 +102,34 @@ type ghReview struct {
 	SubmittedAt string  `json:"submitted_at"`
 }
 
+// ghReviewComment is a comment on a file of a pull request's diff, or on one
+// of its lines. Line is null once the line is no longer in the diff. A comment
+// on the whole file has subject_type "file" and line 1; a comment on a deleted
+// line has side "LEFT" and the line's number in the old file.
+type ghReviewComment struct {
+	ID                  int64   `json:"id"`
+	PullRequestReviewID *int64  `json:"pull_request_review_id"`
+	User                *ghUser `json:"user"`
+	Body                string  `json:"body"`
+	Path                string  `json:"path"`
+	Line                *int    `json:"line"`
+	Side                string  `json:"side"`
+	SubjectType         string  `json:"subject_type"`
+	CommitID            string  `json:"commit_id"`
+	HTMLURL             string  `json:"html_url"`
+	CreatedAt           string  `json:"created_at"`
+}
+
+// ghIssueComment is a comment on the conversation of an issue or a pull
+// request.
+type ghIssueComment struct {
+	ID        int64   `json:"id"`
+	User      *ghUser `json:"user"`
+	Body      string  `json:"body"`
+	HTMLURL   string  `json:"html_url"`
+	CreatedAt string  `json:"created_at"`
+}
+
 type ghRef struct {
 	Object struct {
 		SHA string `json:"sha"`

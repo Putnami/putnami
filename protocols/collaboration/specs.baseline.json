@@ -17,6 +17,7 @@
     "collaboration/provider-contract#one-closed-catalog",
     "collaboration/provider-contract#one-fixture-corpus",
     "collaboration/provider-contract#one-outcome-per-envelope",
+    "collaboration/provider-contract#proposal-comments",
     "collaboration/provider-contract#proposal-scenarios",
     "collaboration/provider-contract#refused-before-the-provider",
     "collaboration/provider-contract#scenarios-normalize-requests",

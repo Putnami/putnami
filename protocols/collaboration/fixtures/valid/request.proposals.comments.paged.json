@@ -1,0 +1,10 @@
+{
+  "ref": {
+    "source": "github:acme/app",
+    "id": "7"
+  },
+  "page": {
+    "size": 50,
+    "cursor": "l.p1.n2041"
+  }
+}

@@ -234,7 +234,7 @@ func TestRoutedOperations_ABrokenBindingKeepsWhatItPromised(t *testing.T) {
 func collabBoundCall(t *testing.T, contract, operation, arguments string) *providerCall {
 	t.Helper()
 	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":1}}}}`)
-	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviderTools(t, contract, "claim", "merge", "search", "assign", "link"))}, nil)
+	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviderTools(t, contract, "claim", "comments", "merge", "search", "assign", "link"))}, nil)
 	call, answer := prepareCall(read, resolution, operation, json.RawMessage(arguments))
 	if answer != nil {
 		t.Fatalf("prepareCall refused: %+v", answer.Error)
@@ -328,6 +328,17 @@ func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
 					Change: collab.Change{Repository: "r", Base: "main", Head: "h"}},
 				Checks: collab.Checks{State: collab.ChecksStateNone},
 			})
+		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
+		{"comments from another source", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) proto.ToolCallResult {
+			return collabOK(t, &collab.ProposalCommentListResult{Items: []collab.ProposalComment{{Ref: collab.Ref{Source: "local:y", ID: "C-1"}, Body: "b"}}})
+		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
+		{"a comment naming a review from another source", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) proto.ToolCallResult {
+			return collabOK(t, &collab.ProposalCommentListResult{Items: []collab.ProposalComment{{Ref: collab.Ref{Source: "local:x", ID: "C-1"},
+				Review: &collab.Ref{Source: "local:y", ID: "R-1"}, Body: "b"}}})
+		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
+		{"comments above the page size", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"page":{"size":1}}`, func(t *testing.T) proto.ToolCallResult {
+			comment := collab.ProposalComment{Ref: collab.Ref{Source: "local:x", ID: "C-1"}, Body: "b"}
+			return collabOK(t, &collab.ProposalCommentListResult{Items: []collab.ProposalComment{comment, comment}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
 		{"a review of another commit", "review", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"verdict":"approve","body":"b","commit":"abcdef1","idempotencyKey":"k"}`, func(t *testing.T) proto.ToolCallResult {
 			return collabOK(t, &collab.ProposalReviewResult{Review: collab.Review{Ref: collab.Ref{Source: "local:x", ID: "R"}, Verdict: collab.ReviewVerdictApprove, Commit: "1234567"}, Created: true})

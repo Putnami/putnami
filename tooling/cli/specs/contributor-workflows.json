@@ -40,6 +40,10 @@
       "text": "Instructions name worker profiles, never models; host metadata supplies the model mapping."
     },
     {
+      "id": "intent-first-publication",
+      "text": "When an outcome changes a feature declaration, spec, specs baseline, architecture manifest, decisions file or ADR, build commits those declarations alone and pushes them to its draft before any code. It goes on without waiting, reads reviews and comments before each later checkpoint and before ready, answers a comment on a declaration on the proposal, and gives a declaration changed after its approval its own commit. A change with no declaration keeps the milestone order."
+    },
+    {
       "id": "change-finalize-parity",
       "text": "putnami change finalize, launched by the core and served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as goldens recorded from putnami proposals finalize, the core command it replaced, for a draft seed, a hosted gate and a usage error."
     },
@@ -52,6 +56,7 @@
     "tooling/contributor/doc/adr/0001-one-contributor-extension.md",
     "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
     "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md",
-    "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md"
+    "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md",
+    "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md"
   ]
 }

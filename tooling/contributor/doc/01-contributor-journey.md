@@ -6,7 +6,10 @@ coordinated multi-unit work. It does not select backlog work. A named task may
 be claimed only when that action is explicitly authorized. By default, build
 publishes its own proposal: a draft once the plan is settled, a pushed
 checkpoint at each milestone, and ready for review once the final local gate
-passes. `--local` or a mandate that says to stay local keeps the run local. A
+passes. When the outcome changes a declaration, the first checkpoint holds the
+declarations only, so a reviewer can correct the intent while the code is
+written
+([ADR 0008](adr/0008-build-pushes-its-intent-before-its-code.md)). `--local` or a mandate that says to stay local keeps the run local. A
 request alone grants no task claim, merge or deployment.
 
 1. **Understand the outcome.** Read repository instructions, the accepted
@@ -27,8 +30,14 @@ request alone grants no task claim, merge or deployment.
    and `adr` for a durable choice. Each is proportional, with a reason when a
    new stage has no role. `review` challenges a material proposed artifact in
    a distinct context against exact source and relevant context versions.
-4. **Implement.** Delegate bounded files and acceptance to the policy's worker
-   tier. Preserve scope positions, original findings and refs. Integrate
+4. **Implement.** When the outcome changes a feature declaration, spec,
+   specs baseline, architecture manifest, decisions file or ADR, commit those
+   declarations alone and push them to the draft first. Do not wait for an
+   approval. Before each later checkpoint, read the reviews with
+   `proposals status` and the comments with `proposals comments`, handle each
+   comment on a declaration, and answer it with `proposals review`. A
+   declaration changed after its approval goes in its own commit. Delegate
+   bounded files and acceptance to the policy's worker tier. Preserve scope positions, original findings and refs. Integrate
    serially and freeze the candidate before independent code review or gate
    evidence. A multi-project unit need not become several proposals.
 5. **Review and repair.** An independent `review` context covers

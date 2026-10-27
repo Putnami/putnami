@@ -3,6 +3,7 @@ package collaboration
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -66,6 +67,15 @@ func maximalProposal() Proposal {
 		proposal.Assignees = append(proposal.Assignees, numbered(i, MaxTokenLength))
 	}
 	return proposal
+}
+
+// maximalComment is a comment on a file line with every member at its bound.
+func maximalComment() ProposalComment {
+	review, line := maximalRef(1), math.MaxInt64
+	return ProposalComment{
+		Ref: maximalRef(0), URL: maximalURL(0), Author: fill(MaxTokenLength), SubmittedAt: maximalTimestamp, Review: &review,
+		Path: fill(MaxLocatorLength), Line: &line, Commit: maximalCommit, Body: fill(MaxBodyBytes),
+	}
 }
 
 func maximalRecord() MemoryRecord {
@@ -192,14 +202,15 @@ func TestMaxDocumentBytesHoldsEveryMaximalDocument(t *testing.T) {
 	record := maximalRecord()
 	checkpoint.Sources, checkpoint.Evidence = record.Sources, record.Evidence
 	results := map[string]any{
-		"tasks.get":         &TaskResult{Task: maximalTask()},
-		"tasks.find":        &TaskListResult{Items: []Task{maximalTask()}, Page: Page{Next: cursor}},
-		"proposals.find":    &ProposalListResult{Items: []Proposal{maximalProposal()}, Page: Page{Next: cursor}},
-		"proposals.status":  func() *ProposalStatusResult { s := maximalStatus(); return &s }(),
-		"memory.mission":    &MemoryRecordResult{Record: record},
-		"memory.checkpoint": &MemoryCheckpointResult{Record: record, Replayed: true},
-		"memory.context":    &MemoryListResult{Items: []MemoryRecord{record}, Page: Page{Next: cursor}},
-		"missions.sync":     maximalSyncResult(),
+		"tasks.get":          &TaskResult{Task: maximalTask()},
+		"tasks.find":         &TaskListResult{Items: []Task{maximalTask()}, Page: Page{Next: cursor}},
+		"proposals.find":     &ProposalListResult{Items: []Proposal{maximalProposal()}, Page: Page{Next: cursor}},
+		"proposals.status":   func() *ProposalStatusResult { s := maximalStatus(); return &s }(),
+		"proposals.comments": &ProposalCommentListResult{Items: []ProposalComment{maximalComment()}, Page: Page{Next: cursor}},
+		"memory.mission":     &MemoryRecordResult{Record: record},
+		"memory.checkpoint":  &MemoryCheckpointResult{Record: record, Replayed: true},
+		"memory.context":     &MemoryListResult{Items: []MemoryRecord{record}, Page: Page{Next: cursor}},
+		"missions.sync":      maximalSyncResult(),
 		"missions.ask": &MissionsAskResult{Decision: MissionDecision{
 			ID: maximalID(0), State: DecisionStateAnswered, URL: maximalURL(0), Answer: fill(MaxInboxTextLength), Option: maximalID(0),
 		}, Replayed: true},

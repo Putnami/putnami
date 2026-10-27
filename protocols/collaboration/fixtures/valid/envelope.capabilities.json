@@ -22,6 +22,12 @@
     },
     "operations": [
       {
+        "name": "comments",
+        "access": "read",
+        "required": false,
+        "supported": false
+      },
+      {
         "name": "find",
         "access": "read",
         "required": true,

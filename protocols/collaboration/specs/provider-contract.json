@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "one-closed-catalog",
-      "text": "Each contract speaks only version 1, and an unknown contract none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers merge; memory requires checkpoint, context and mission and offers search; missions requires ask, reply and sync. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey. Only missions.sync is host-only, and only a mutation can be."
+      "text": "Each contract speaks only version 1, and an unknown contract none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers comments and merge; memory requires checkpoint, context and mission and offers search; missions requires ask, reply and sync. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey. Only missions.sync is host-only, and only a mutation can be."
     },
     {
       "id": "well-formed-operations",
@@ -56,7 +56,7 @@
     },
     {
       "id": "bounded-documents",
-      "text": "page.size is 0 to 100 in schema and validator alike, and cursor and next share one length bound. The maximal results of tasks.get and find, proposals.find and status, memory.mission, context and checkpoint, and the maximal checkpoint request, fit the 4 MiB document bound. Serve shortens a page that would exceed it, so a traversal lists each item once with at most two handler calls per page, and answers unavailable with provider.invalid_response, after one repeat, for a handler that ignores the page size."
+      "text": "page.size is 0 to 100 in schema and validator, and cursor and next share one length bound. The maximal results of tasks.get and find, proposals.find, status and comments, memory.mission, context and checkpoint, and the maximal checkpoint request, fit the 4 MiB document bound. Serve shortens a page that would exceed it, so a traversal lists each item once with at most two handler calls a page, and answers unavailable with provider.invalid_response, after one repeat, for a handler that ignores the page size."
     },
     {
       "id": "bounded-pages",
@@ -73,6 +73,10 @@
     {
       "id": "proposal-scenarios",
       "text": "Every proposals provider passes providertest.RunProposals, which reports what it creates to Track: a head with no proposal finds items []; upsert opens one proposal per exact base and head, a repeat updates it under a new revision, and a stale expectedRevision is a conflict; each head has its own proposal; a review repeats by its idempotencyKey, other content under it is idempotency.mismatch, and status lists it once; labels and assignees agree between answers; another source's reference is not_found."
+    },
+    {
+      "id": "proposal-comments",
+      "text": "proposals.comments, an optional read, lists in bounded pages what people wrote on one proposal. A comment is ref and body, plus, when known, url, author, submittedAt, the review it belongs to, and the path, line and commit of the file line it is anchored to; a comment on no file line has no path. A provider that offers it passes providertest.RunProposals's comment scenario: the body of a published review is listed once across pages, naming that review."
     },
     {
       "id": "memory-scenarios",
@@ -118,6 +122,7 @@
   "decisions": [
     "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
     "protocols/collaboration/doc/adr/0002-the-contracts-are-published-as-preview.md",
-    "protocols/collaboration/doc/adr/0003-missions-contract.md"
+    "protocols/collaboration/doc/adr/0003-missions-contract.md",
+    "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md"
   ]
 }

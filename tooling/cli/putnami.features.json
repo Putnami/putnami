@@ -3253,6 +3253,17 @@
           }
         },
         {
+          "id": "intent-first-publication",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-build-loop-pushes-declarations-before-code"
+            ]
+          }
+        },
+        {
           "id": "change-finalize-parity",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

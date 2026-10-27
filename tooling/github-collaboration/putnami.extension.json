@@ -411,6 +411,37 @@
       "cwd": "{workspaceRoot}",
       "timeoutMs": 120000
     },
+    "github-collaboration.proposals.comments": {
+      "description": "List what people wrote on a pull request, oldest first: the body of each submitted review without the hidden idempotency comment, each comment on a file line with its path, line and commit, both naming their review, then each conversation comment. A review with an empty body is no comment, and a line comment whose line left the diff keeps its path without a line.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The proposals.comments request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "read",
+          "readOnly": true,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "proposals",
+          "version": 1,
+          "operation": "comments"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000
+    },
     "github-collaboration.proposals.merge": {
       "description": "Merge a pull request whose head is still the expected commit. Refused before anything is sent unless settings.allowMerge is true; binding this provider authorizes nobody to merge.",
       "inputSchema": {

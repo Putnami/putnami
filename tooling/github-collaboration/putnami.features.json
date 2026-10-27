@@ -62,6 +62,21 @@
           }
         },
         {
+          "id": "proposal-comments",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "comments-list-review-bodies-line-comments-and-conversation-once",
+              "a-review-body-is-listed-without-its-idempotency-marker",
+              "an-outdated-line-comment-keeps-its-path-without-a-line"
+            ]
+          }
+        },
+        {
           "id": "reconciled-writes",
           "stage": "coded",
           "evidenceKinds": [

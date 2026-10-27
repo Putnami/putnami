@@ -14,12 +14,14 @@ import (
 
 // memory is the smallest provider that honors the tasks and proposals
 // contracts: the scenarios must pass against it, so a scenario that fails a
-// correct provider fails here first.
+// correct provider fails here first. It lists the body of every review as a
+// comment.
 type memory struct {
 	mu        sync.Mutex
 	tasks     []collab.Task
 	proposals []collab.Proposal
 	reviews   map[string][]collab.Review
+	comments  map[string][]collab.ProposalComment
 	keys      map[string]keyed
 }
 
@@ -31,7 +33,7 @@ type keyed struct {
 const memorySource = "memory:scenarios"
 
 func newMemory() *memory {
-	return &memory{reviews: map[string][]collab.Review{}, keys: map[string]keyed{}}
+	return &memory{reviews: map[string][]collab.Review{}, comments: map[string][]collab.ProposalComment{}, keys: map[string]keyed{}}
 }
 
 func (m *memory) handlers() map[collab.OperationKey]collab.Handler {
@@ -49,6 +51,13 @@ func (m *memory) handlers() map[collab.OperationKey]collab.Handler {
 		key("proposals", "status"): m.status,
 		key("proposals", "review"): m.review,
 	}
+}
+
+// withComments is the memory provider offering proposals.comments.
+func (m *memory) withComments() map[collab.OperationKey]collab.Handler {
+	handlers := m.handlers()
+	handlers[collab.OperationKey{Contract: "proposals", Version: 1, Operation: "comments"}] = m.listComments
+	return handlers
 }
 
 func bump(revision string) string {
@@ -253,8 +262,23 @@ func (m *memory) review(_ context.Context, call collab.Call) (any, *collab.Failu
 	}
 	review := collab.Review{Ref: collab.Ref{Source: memorySource, ID: "v" + strconv.Itoa(len(m.keys)+1)}, Verdict: in.Verdict}
 	m.reviews[in.Ref.ID] = append(m.reviews[in.Ref.ID], review)
+	if strings.TrimSpace(in.Body) != "" {
+		m.comments[in.Ref.ID] = append(m.comments[in.Ref.ID], collab.ProposalComment{Ref: collab.Ref{Source: memorySource, ID: "c" + review.Ref.ID},
+			Review: &review.Ref, Body: in.Body})
+	}
 	m.keys["review:"+in.IdempotencyKey] = keyed{id: review.Ref.ID, digest: digest}
 	return &collab.ProposalReviewResult{Review: review, Created: true}, nil
+}
+
+func (m *memory) listComments(_ context.Context, call collab.Call) (any, *collab.Failure) {
+	in := call.Input.(*collab.ProposalCommentsInput)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.proposal(in.Ref) < 0 {
+		return nil, notFound(in.Ref)
+	}
+	items, next := pageOf(m.comments[in.Ref.ID], in.Page)
+	return &collab.ProposalCommentListResult{Items: items, Page: next}, nil
 }
 
 // memoryTarget is a fresh in-memory provider. A scenario that creates items
@@ -269,7 +293,7 @@ func memoryTarget(t *testing.T, creates bool) Target {
 		})
 	}
 	return Target{
-		Handlers:      newMemory().handlers(),
+		Handlers:      newMemory().withComments(),
 		WorkspaceRoot: t.TempDir(),
 		Base:          "main",
 		Heads:         [2]string{"topic-a", "topic-b"},
@@ -285,6 +309,36 @@ func TestTheScenariosPassAgainstACorrectProvider(t *testing.T) {
 	}
 	RunTasks(t, func(t *testing.T) Target { return memoryTarget(t, !createsNothing(t.Name())) })
 	RunProposals(t, func(t *testing.T) Target { return memoryTarget(t, !createsNothing(t.Name())) })
+}
+
+// TestTheCommentScenarioPassesAgainstACorrectProvider: the comment scenario
+// passes against a provider that lists every review body once, and is
+// skipped for one that does not offer comments, whose other scenarios still
+// run.
+func TestTheCommentScenarioPassesAgainstACorrectProvider(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-comments", "the-comment-scenario-passes-against-a-correct-provider")
+	const scenario = "comments_list_a_review's_body_once_across_pages"
+	ran := map[bool]bool{}
+	for _, offered := range []bool{true, false} {
+		t.Run("offered "+strconv.FormatBool(offered), func(t *testing.T) {
+			RunProposals(t, func(t *testing.T) Target {
+				skipped := !offered && strings.HasSuffix(t.Name(), scenario)
+				target := memoryTarget(t, !skipped && !strings.Contains(t.Name(), "finds_nothing") && !strings.Contains(t.Name(), "another_source"))
+				if !offered {
+					target.Handlers = newMemory().handlers()
+				}
+				t.Cleanup(func() {
+					if strings.HasSuffix(t.Name(), scenario) {
+						ran[offered] = !t.Skipped()
+					}
+				})
+				return target
+			})
+		})
+	}
+	if !ran[true] || ran[false] {
+		t.Fatalf("the comment scenario ran %v with comments offered and %v without; want only with", ran[true], ran[false])
+	}
 }
 
 func TestNormalizeGivesListsAnExplicitPage(t *testing.T) {

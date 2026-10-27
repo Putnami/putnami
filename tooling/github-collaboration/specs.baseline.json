@@ -6,6 +6,7 @@
     "tooling/github-collaboration#credential-safety",
     "tooling/github-collaboration#exact-proposal-identity",
     "tooling/github-collaboration#honest-failures",
+    "tooling/github-collaboration#proposal-comments",
     "tooling/github-collaboration#reconciled-writes",
     "tooling/github-collaboration#reported-publication",
     "tooling/github-collaboration#truthful-manifest"

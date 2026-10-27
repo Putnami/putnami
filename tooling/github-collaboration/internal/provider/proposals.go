@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"net/url"
@@ -696,7 +697,7 @@ func (s *proposalSession) renderReview(review *ghReview) (collab.Review, bool) {
 		return collab.Review{}, false
 	}
 	result := collab.Review{
-		Ref:         collab.Ref{Source: s.repo.source, ID: "review-" + strconv.FormatInt(review.ID, 10)},
+		Ref:         s.reviewRef(review.ID),
 		URL:         displayURL(review.HTMLURL),
 		Verdict:     verdict,
 		Commit:      commit(review.CommitID),
@@ -706,6 +707,12 @@ func (s *proposalSession) renderReview(review *ghReview) (collab.Review, bool) {
 		result.Author = token(review.User.Login)
 	}
 	return result, true
+}
+
+// reviewRef is the reference of a review: a review and its body, listed as a
+// comment, share it.
+func (s *proposalSession) reviewRef(id int64) collab.Ref {
+	return collab.Ref{Source: s.repo.source, ID: "review-" + strconv.FormatInt(id, 10)}
 }
 
 // reviewRequest is what a review's idempotency digest covers.
@@ -803,6 +810,208 @@ func (s *proposalSession) reviewWithKey(number int, marker idempotency) (*ghRevi
 		}
 	}
 	return nil, nil
+}
+
+// A comments answer walks three lists of a pull request in a fixed order, each
+// by ascending identifier: its reviews, for their bodies, its line comments
+// and its conversation comments. Its cursor is the list it resumes, "r", "l"
+// or "c", a dot, and that list's own cursor, so each comment present
+// throughout a traversal is listed once.
+
+// commentSource is one list of comments: list fills at most size comments
+// resuming at from, and answers that list's next cursor.
+type commentSource struct {
+	prefix string
+	list   func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure)
+}
+
+// comments lists what people wrote on a pull request: the bodies of its
+// submitted reviews, its line comments and its conversation comments.
+func (s *proposalSession) comments(input any) (any, *collab.Failure) {
+	in, failure := inputOf[*collab.ProposalCommentsInput](input)
+	if failure != nil {
+		return nil, failure
+	}
+	pull, failure := s.pull(in.Ref)
+	if failure != nil {
+		return nil, failure
+	}
+	size, from := collab.DefaultPageSize, ""
+	if in.Page != nil {
+		if in.Page.Size > 0 {
+			size = in.Page.Size
+		}
+		from = in.Page.Cursor
+	}
+	number := strconv.Itoa(pull.Number)
+	sources := []commentSource{
+		{"r", func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
+			return s.reviewBodies(pull.Number, size, from)
+		}},
+		{"l", func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
+			return commentsOf(listed[ghReviewComment](s, s.repo.path("pulls", number, "comments"), nil, "the line comments of pull request #"+number),
+				func(comment *ghReviewComment) int64 { return comment.ID }, s.lineComment, size, from)
+		}},
+		{"c", func(size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
+			return commentsOf(listed[ghIssueComment](s, s.repo.path("issues", number, "comments"), nil, "the conversation comments of pull request #"+number),
+				func(comment *ghIssueComment) int64 { return comment.ID }, s.conversationComment, size, from)
+		}},
+	}
+	start := 0
+	if from != "" {
+		prefix, rest, cut := strings.Cut(from, ".")
+		start = slices.IndexFunc(sources, func(source commentSource) bool { return source.prefix == prefix })
+		if !cut || rest == "" || start < 0 {
+			return nil, collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "cursor %q was not issued by this provider", from)
+		}
+		from = rest
+	}
+	result := &collab.ProposalCommentListResult{Items: []collab.ProposalComment{}}
+	for _, source := range sources[start:] {
+		// Once the page is full, a list is still asked for a page of none:
+		// it answers a cursor only when a comment remains in it.
+		items, next, failure := source.list(size-len(result.Items), from)
+		if failure != nil {
+			return nil, failure
+		}
+		result.Items = append(result.Items, items...)
+		if next != "" {
+			result.Page.Next = source.prefix + "." + next
+			return result, nil
+		}
+		from = ""
+	}
+	return result, nil
+}
+
+// listed pages one GitHub list, in GitHub's order; what names it in a
+// failure.
+func listed[T any](s *proposalSession, path string, query url.Values, what string) fetchPage[T] {
+	return func(page int) ([]T, bool, *collab.Failure) {
+		paged := url.Values{"per_page": {strconv.Itoa(githubPageSize)}, "page": {strconv.Itoa(page)}}
+		for name, values := range query {
+			paged[name] = values
+		}
+		var items []T
+		header, err := s.client.Get(s.ctx, path, paged, &items)
+		if err != nil {
+			return nil, false, fail(err, "list %s", what)
+		}
+		return items, github.HasNext(header), nil
+	}
+}
+
+// commentsOf fills a page of the comments one GitHub list renders. GitHub
+// lists line comments and conversation comments by ascending identifier when
+// no sort is asked for, the order collect resumes in.
+func commentsOf[T any](fetch fetchPage[T], id func(*T) int64, render func(*T) (collab.ProposalComment, bool), size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
+	kept := func(item T) bool {
+		_, comment := render(&item)
+		return comment
+	}
+	items, next, failure := collect(fetch, func(item T) int { return int(id(&item)) }, kept, size, from)
+	if failure != nil {
+		return nil, "", failure
+	}
+	comments := make([]collab.ProposalComment, 0, len(items))
+	for i := range items {
+		comment, _ := render(&items[i])
+		comments = append(comments, comment)
+	}
+	return comments, next, nil
+}
+
+var reviewCursorPattern = regexp.MustCompile(`^n([0-9]{1,19})$`)
+
+// reviewBodies fills a page of review bodies. GitHub lists the reviews of a
+// pull request in submission order, and a review started as a pending draft
+// keeps the lower identifier it got then, so it is listed after newer reviews
+// once submitted. Every review is therefore read, as status reads them, and
+// paged by ascending identifier: the cursor "n<id>" is the last identifier a
+// page listed. A review submitted during a traversal below that identifier is
+// not listed by it; every review submitted throughout is listed once.
+func (s *proposalSession) reviewBodies(number, size int, from string) ([]collab.ProposalComment, string, *collab.Failure) {
+	var after int64
+	if from != "" {
+		match := reviewCursorPattern.FindStringSubmatch(from)
+		var err error
+		if match != nil {
+			after, err = strconv.ParseInt(match[1], 10, 64)
+		}
+		if match == nil || err != nil {
+			return nil, "", collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "cursor %q was not issued by this provider", from)
+		}
+	}
+	reviews, failure := s.reviews(number)
+	if failure != nil {
+		return nil, "", failure
+	}
+	slices.SortFunc(reviews, func(a, b ghReview) int { return cmp.Compare(a.ID, b.ID) })
+	comments := make([]collab.ProposalComment, 0, size)
+	for i := range reviews {
+		if reviews[i].ID <= after {
+			continue
+		}
+		comment, kept := s.reviewComment(&reviews[i])
+		if !kept {
+			continue
+		}
+		if len(comments) == size {
+			return comments, "n" + strconv.FormatInt(after, 10), nil
+		}
+		comments = append(comments, comment)
+		after = reviews[i].ID
+	}
+	return comments, "", nil
+}
+
+// reviewComment renders the body of a submitted review, without the
+// idempotency marker this provider records in it. A pending review and a
+// review whose body is empty are no comment.
+func (s *proposalSession) reviewComment(review *ghReview) (collab.ProposalComment, bool) {
+	text, _ := splitMarker(review.Body)
+	body := boundedBody(text)
+	if review.State == "PENDING" || strings.TrimSpace(body) == "" {
+		return collab.ProposalComment{}, false
+	}
+	ref, belongsTo := s.reviewRef(review.ID), s.reviewRef(review.ID)
+	return collab.ProposalComment{Ref: ref, URL: displayURL(review.HTMLURL), Author: author(review.User),
+		SubmittedAt: timestamp(review.SubmittedAt), Review: &belongsTo, Commit: commit(review.CommitID), Body: body}, true
+}
+
+// lineComment renders a comment on a file of the diff or on one of its lines.
+// Only a line of the file at the comment's commit is reported: a comment on
+// the whole file, on a deleted line (whose number is in the old file) or on a
+// line that left the diff keeps its path without a line.
+func (s *proposalSession) lineComment(comment *ghReviewComment) (collab.ProposalComment, bool) {
+	body := boundedBody(comment.Body)
+	if strings.TrimSpace(body) == "" {
+		return collab.ProposalComment{}, false
+	}
+	result := collab.ProposalComment{Ref: collab.Ref{Source: s.repo.source, ID: "line-" + strconv.FormatInt(comment.ID, 10)},
+		URL: displayURL(comment.HTMLURL), Author: author(comment.User), SubmittedAt: timestamp(comment.CreatedAt),
+		Commit: commit(comment.CommitID), Body: body}
+	if comment.PullRequestReviewID != nil && *comment.PullRequestReviewID > 0 {
+		review := s.reviewRef(*comment.PullRequestReviewID)
+		result.Review = &review
+	}
+	onNewLine := comment.SubjectType != "file" && comment.Side != "LEFT"
+	if result.Path = filePath(comment.Path); result.Path != "" && onNewLine && comment.Line != nil && *comment.Line > 0 {
+		line := *comment.Line
+		result.Line = &line
+	}
+	return result, true
+}
+
+// conversationComment renders a comment on the conversation of a pull
+// request: it belongs to no review and no file.
+func (s *proposalSession) conversationComment(comment *ghIssueComment) (collab.ProposalComment, bool) {
+	body := boundedBody(comment.Body)
+	if strings.TrimSpace(body) == "" {
+		return collab.ProposalComment{}, false
+	}
+	return collab.ProposalComment{Ref: collab.Ref{Source: s.repo.source, ID: "comment-" + strconv.FormatInt(comment.ID, 10)},
+		URL: displayURL(comment.HTMLURL), Author: author(comment.User), SubmittedAt: timestamp(comment.CreatedAt), Body: body}, true
 }
 
 // merge merges a pull request whose head is still the expected commit, only

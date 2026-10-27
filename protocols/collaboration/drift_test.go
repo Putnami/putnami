@@ -144,6 +144,7 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 		{"Checks", proposals.Defs["checks"], Checks{}},
 		{"Check", proposals.Defs["check"], Check{}},
 		{"Review", proposals.Defs["review"], Review{}},
+		{"ProposalComment", proposals.Defs["comment"], ProposalComment{}},
 		{"MemoryIdentity", memory.Defs["identity"], MemoryIdentity{}},
 		{"Evidence", memory.Defs["evidence"], Evidence{}},
 		{"MemoryRecord", memory.Defs["record"], MemoryRecord{}},

@@ -29,6 +29,10 @@
       "text": "Every proposal answer lists its labels and assignees, [] when absent, with revision covering both. Upsert applies assignAuthor and inheritLabelPrefixes and reports unresolved dropped additions. Label inheritance uses deduplicated exact issue references: Closes and non-closing Refs, including configured-host issue URLs for same or cross-repository tasks; foreign-host URLs never trigger reads. Partial delivery preserves related-task labels without closing the parent."
     },
     {
+      "id": "proposal-comments",
+      "text": "comments lists, once across pages, every comment of a pull request: each review's body without the provider's idempotency marker, each line comment with its path, line and commit, both naming their review, and each conversation comment. A review with an empty body is no comment, and a line comment whose line no longer exists in the diff keeps its path without a line."
+    },
+    {
       "id": "reconciled-writes",
       "text": "Every write is sent once. After a lost answer or a 5xx, the provider reads the repository back and answers from what it finds, never with a second issue, pull request or review; a keyed repeat finds its issue before GitHub lists it, past deleted, moved and discussion numbers, as GitHub names them; a lookup that cannot finish creates nothing and says whether a retry can succeed; an unestablished outcome is unresolved, never retryable, and names what settles it; a partly applied write names what exists."
     },
@@ -47,6 +51,7 @@
   ],
   "decisions": [
     "tooling/github-collaboration/doc/adr/0001-github-collaboration-provider.md",
-    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
+    "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md"
   ]
 }

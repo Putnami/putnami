@@ -55,7 +55,7 @@ treat `checked` as best effort against a concurrent writer.
 
 Run `<contract> capabilities` before relying on an optional operation or on
 hosted checks. A provider may report checks `unsupported`, offer no `merge`,
-`assign` or `claim`, or state `preconditions: none`. Report the subset used.
+`comments`, `assign` or `claim`, or state `preconditions: none`. Report the subset used.
 An assignee is information, never an exclusive lease; only `claim` on a
 provider that offers it is exclusive.
 

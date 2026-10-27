@@ -57,7 +57,9 @@ is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
 it does not select backlog work. It publishes its own proposal by default
 ([ADR 0003](doc/adr/0003-build-publishes-its-proposal-by-default.md)), and
-`--local` keeps a run local.
+`--local` keeps a run local. When the outcome changes a declaration, the first
+checkpoint holds the declarations only
+([ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)).
 
 Worker profiles: `fix-light`, `fix-standard`, `fix-heavy` and `epic-analyst`,
 each one body for both hosts with host metadata beside it.
@@ -135,6 +137,7 @@ turn: a failure leaves one line in `hook.log` under
 - [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)
 - [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)
 - [ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)
+- [ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)
 
 ## Publication
 

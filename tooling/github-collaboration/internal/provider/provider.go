@@ -72,18 +72,19 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		return collab.OperationKey{Contract: contract, Version: 1, Operation: operation}
 	}
 	return map[collab.OperationKey]collab.Handler{
-		key(collab.ContractTasks, collab.OperationFind):       p.taskHandler((*taskSession).find),
-		key(collab.ContractTasks, collab.OperationGet):        p.taskHandler((*taskSession).get),
-		key(collab.ContractTasks, collab.OperationCreate):     p.taskHandler((*taskSession).create),
-		key(collab.ContractTasks, collab.OperationUpdate):     p.taskHandler((*taskSession).update),
-		key(collab.ContractTasks, collab.OperationTransition): p.taskHandler((*taskSession).transition),
-		key(collab.ContractTasks, collab.OperationAssign):     p.taskHandler((*taskSession).assign),
-		key(collab.ContractTasks, collab.OperationLink):       p.taskHandler((*taskSession).link),
-		key(collab.ContractProposals, collab.OperationFind):   p.proposalHandler((*proposalSession).find),
-		key(collab.ContractProposals, collab.OperationUpsert): p.proposalHandler((*proposalSession).upsert),
-		key(collab.ContractProposals, collab.OperationStatus): p.proposalHandler((*proposalSession).status),
-		key(collab.ContractProposals, collab.OperationReview): p.proposalHandler((*proposalSession).publish),
-		key(collab.ContractProposals, collab.OperationMerge):  p.proposalHandler((*proposalSession).merge),
+		key(collab.ContractTasks, collab.OperationFind):         p.taskHandler((*taskSession).find),
+		key(collab.ContractTasks, collab.OperationGet):          p.taskHandler((*taskSession).get),
+		key(collab.ContractTasks, collab.OperationCreate):       p.taskHandler((*taskSession).create),
+		key(collab.ContractTasks, collab.OperationUpdate):       p.taskHandler((*taskSession).update),
+		key(collab.ContractTasks, collab.OperationTransition):   p.taskHandler((*taskSession).transition),
+		key(collab.ContractTasks, collab.OperationAssign):       p.taskHandler((*taskSession).assign),
+		key(collab.ContractTasks, collab.OperationLink):         p.taskHandler((*taskSession).link),
+		key(collab.ContractProposals, collab.OperationFind):     p.proposalHandler((*proposalSession).find),
+		key(collab.ContractProposals, collab.OperationUpsert):   p.proposalHandler((*proposalSession).upsert),
+		key(collab.ContractProposals, collab.OperationStatus):   p.proposalHandler((*proposalSession).status),
+		key(collab.ContractProposals, collab.OperationReview):   p.proposalHandler((*proposalSession).publish),
+		key(collab.ContractProposals, collab.OperationComments): p.proposalHandler((*proposalSession).comments),
+		key(collab.ContractProposals, collab.OperationMerge):    p.proposalHandler((*proposalSession).merge),
 	}
 }
 
@@ -455,6 +456,23 @@ func boundedBody(value string) string {
 		cut--
 	}
 	return value[:cut]
+}
+
+// filePath keeps a path the contract accepts as the file of a comment: one
+// line of at most MaxLocatorLength characters. Any other is dropped.
+func filePath(value string) string {
+	if strings.TrimSpace(value) == "" || utf8.RuneCountInString(value) > collab.MaxLocatorLength || strings.ContainsAny(value, "\r\n\x00") {
+		return ""
+	}
+	return value
+}
+
+// author is the login of a user the contract accepts as a token.
+func author(user *ghUser) string {
+	if user == nil {
+		return ""
+	}
+	return token(user.Login)
 }
 
 // token keeps a value the contract accepts as a token: printable, without

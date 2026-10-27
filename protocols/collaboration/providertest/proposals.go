@@ -9,7 +9,9 @@ import (
 
 // RunProposals runs the proposals v1 scenarios, each against a fresh target.
 // Each scenario may open proposals on the target's two heads, so a target
-// against a real backend supplies fresh heads for every scenario.
+// against a real backend supplies fresh heads for every scenario. The comment
+// scenario runs only against a provider that offers proposals.comments, and
+// is skipped for any other.
 func RunProposals(t *testing.T, newTarget func(t *testing.T) Target) {
 	t.Helper()
 	scenarios := []struct {
@@ -20,6 +22,7 @@ func RunProposals(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"upsert keeps one open proposal per exact identity", proposalsUpsertOnce},
 		{"each exact head has its own proposal", proposalsExactIdentity},
 		{"status reports reviews, and a review key replays", proposalsStatusAndReviews},
+		{"comments list a review's body once across pages", proposalsComments},
 		{"a reference from another source is not found", proposalsForeignReferences},
 	}
 	for _, scenario := range scenarios {
@@ -163,6 +166,57 @@ func proposalsStatusAndReviews(t *testing.T, s *Session) {
 	if !slices.Contains(collab.ValidChecksStates, status.Checks.State) {
 		t.Fatalf("checks state %q", status.Checks.State)
 	}
+}
+
+// maxCommentPages bounds the pages of one comment the comment scenario reads
+// on a proposal it opened: a backend may add a few comments of its own, never
+// this many.
+const maxCommentPages = 50
+
+// proposalsComments: the body of a review published on a fresh proposal is
+// listed once across pages of one comment, naming that review. A provider
+// that does not offer comments skips it.
+func proposalsComments(t *testing.T, s *Session) {
+	if !s.offers("proposals", "comments") {
+		t.Skip("the provider does not offer proposals.comments")
+	}
+	run := Unique(t)
+	proposal := s.upsert(0, "Commented proposal "+run, "").Proposal
+	ref := refJSON(proposal.Ref)
+	body := "Scenario comment " + run + "."
+	var review collab.ProposalReviewResult
+	s.OK("proposals", "review", `{"ref":`+ref+`,"verdict":"comment","body":`+quote(body)+`,"idempotencyKey":`+quote("providertest-comment-"+run)+`}`, &review)
+	listed, cursor := 0, ""
+	for pages := 0; ; pages++ {
+		if pages == maxCommentPages {
+			t.Fatalf("the comments of proposal %s/%s did not end after %d pages of one", proposal.Ref.Source, proposal.Ref.ID, pages)
+		}
+		page := `{"size":1}`
+		if cursor != "" {
+			page = `{"size":1,"cursor":` + quote(cursor) + `}`
+		}
+		var result collab.ProposalCommentListResult
+		s.OK("proposals", "comments", `{"ref":`+ref+`,"page":`+page+`}`, &result)
+		if len(result.Items) > 1 {
+			t.Fatalf("a page of one comment carried %d", len(result.Items))
+		}
+		for _, comment := range result.Items {
+			if comment.Body != body {
+				continue
+			}
+			listed++
+			if comment.Review == nil || *comment.Review != review.Review.Ref {
+				t.Fatalf("the body of review %s/%s names review %+v", review.Review.Ref.Source, review.Review.Ref.ID, comment.Review)
+			}
+		}
+		if cursor = result.Page.Next; cursor == "" {
+			break
+		}
+	}
+	if listed != 1 {
+		t.Fatalf("the body of the published review is listed %d times, want once", listed)
+	}
+	s.Fails("proposals", "comments", `{"ref":`+refJSON(foreignRef)+`}`, collab.OutcomeNotFound)
 }
 
 func proposalsForeignReferences(t *testing.T, s *Session) {
