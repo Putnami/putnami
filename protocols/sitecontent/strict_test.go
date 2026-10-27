@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestFormatVersionCompatibility(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-versions-are-pinned", "a-reader-accepts-only-its-format-major")
 	if !CompatibleFormatVersion("1.0") {
 		t.Fatal("1.0 should be compatible")
 	}
@@ -24,6 +26,7 @@ func TestFormatVersionCompatibility(t *testing.T) {
 }
 
 func TestValidRelPath(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "paths-mounts-and-digests-follow-one-grammar", "a-payload-path-is-relative-and-clean")
 	valid := []string{"docs/cloud/index.html", ".well-known/putnami.json"}
 	for _, path := range valid {
 		if !ValidRelPath(path) {
@@ -40,6 +43,7 @@ func TestValidRelPath(t *testing.T) {
 }
 
 func TestValidateManifest_DuplicateFile(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-is-closed-and-strict", "a-duplicate-path-is-refused")
 	m := validPayloadManifest()
 	m.Files = append(m.Files, m.Files[0])
 	diags := ValidateManifest(&m)
@@ -49,6 +53,7 @@ func TestValidateManifest_DuplicateFile(t *testing.T) {
 }
 
 func TestSchemaIDMatchesFixture(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-is-closed-and-strict", "the-valid-manifests-parse")
 	data, err := os.ReadFile("fixtures/valid/bundle.json")
 	if err != nil {
 		t.Fatal(err)
@@ -66,6 +71,7 @@ func TestSchemaIDMatchesFixture(t *testing.T) {
 // A fixture proves the parser rejects a bad manifest; this proves the exact
 // digest grammar an implementer must reproduce, which no single fixture pins.
 func TestValidDigest(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "paths-mounts-and-digests-follow-one-grammar", "a-digest-is-bare-lowercase-hex")
 	valid := []string{
 		"1a31f208b4e0b7759528b7af8580d7beb300ba849259987113d8b8d7718ff4a5",
 	}
@@ -93,6 +99,7 @@ func TestValidDigest(t *testing.T) {
 // TestValidMountPrefix pins the mount-prefix reject path (strict.go:279): only
 // absolute, normalized, lowercase, non-root, no-trailing-slash paths are valid.
 func TestValidMountPrefix(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "paths-mounts-and-digests-follow-one-grammar", "a-mount-is-a-clean-absolute-prefix")
 	valid := []string{"/docs", "/docs/cloud", "/a-b/c_d"}
 	for _, p := range valid {
 		if !ValidMountPrefix(p) {
@@ -123,6 +130,7 @@ func TestValidMountPrefix(t *testing.T) {
 // least one invalid fixture. A fixture nobody rejects, or a rule no fixture
 // reaches, would let a second implementation disagree while both suites pass.
 func TestInvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-is-closed-and-strict", "the-invalid-manifests-are-refused")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "sitecontent/content-bundle-contract#a-newer-major-falls-back-and-a-bad-envelope-fails-closed",
+    "sitecontent/content-bundle-contract#mounts-partition-the-url-space",
+    "sitecontent/content-bundle-contract#paths-mounts-and-digests-follow-one-grammar",
+    "sitecontent/content-bundle-contract#the-manifest-is-closed-and-strict",
+    "sitecontent/content-bundle-contract#the-manifest-travels-inside-the-archive",
+    "sitecontent/content-bundle-contract#the-payload-matches-the-manifest",
+    "sitecontent/content-bundle-contract#the-versions-are-pinned"
+  ]
+}

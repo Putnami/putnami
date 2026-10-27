@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // representativeRevision is the source revision every representative member was
@@ -51,6 +52,7 @@ func findDiagnostic(diagnostics []diag.Diagnostic, code, field string) bool {
 }
 
 func TestCanonicalReleaseSetBytesNormalizesWithoutMutation(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-canonical-bytes-are-the-identity", "the-canonical-bytes-match-the-golden")
 	input := representativeSet()
 	before, err := json.Marshal(input)
 	if err != nil {
@@ -87,6 +89,7 @@ func TestCanonicalReleaseSetBytesNormalizesWithoutMutation(t *testing.T) {
 }
 
 func TestDeriveReleaseSetRefUsesSameSHA256Hex(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-canonical-bytes-are-the-identity", "the-id-and-the-digest-share-one-hash")
 	ref, diagnostics := DeriveReleaseSetRef(representativeSet())
 	if diag.HasErrors(diagnostics) {
 		t.Fatalf("derive ref: %v", diagnostics)
@@ -100,6 +103,7 @@ func TestDeriveReleaseSetRefUsesSameSHA256Hex(t *testing.T) {
 }
 
 func TestParseCanonicalReleaseSetRejectsEquivalentNonCanonicalBytes(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-canonical-bytes-are-the-identity", "non-canonical-bytes-are-refused")
 	canonical, diagnostics := CanonicalReleaseSetBytes(representativeSet())
 	if diag.HasErrors(diagnostics) {
 		t.Fatal(diagnostics)
@@ -117,6 +121,7 @@ func TestParseCanonicalReleaseSetRejectsEquivalentNonCanonicalBytes(t *testing.T
 }
 
 func TestValidateReleaseSetPinsClosureAndExactSelectors(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "a-release-set-is-closed-over-its-members", "each-member-defect-gets-its-code")
 	tests := []struct {
 		name   string
 		mutate func(*ReleaseSet)
@@ -208,6 +213,7 @@ func TestValidateReleaseSetPinsClosureAndExactSelectors(t *testing.T) {
 }
 
 func TestNormalizeReleaseSetCopiesProvenanceWithoutAliasing(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-canonical-bytes-are-the-identity", "normalization-never-aliases-its-input")
 	input := representativeSet()
 	normalized := NormalizeReleaseSet(input)
 	archive := normalized.Members[0]
@@ -230,6 +236,7 @@ func TestNormalizeReleaseSetCopiesProvenanceWithoutAliasing(t *testing.T) {
 }
 
 func TestStrictParsingRejectsAmbiguousJSON(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "parsing-is-strict-and-bounded", "ambiguous-json-is-refused")
 	minimal := `{"protocolVersion":2,"namespace":"putnami","members":[]`
 	tests := []struct {
 		name  string
@@ -328,6 +335,7 @@ func TestStrictParsingRejectsAmbiguousJSON(t *testing.T) {
 }
 
 func TestStrictParsingBoundsInput(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "parsing-is-strict-and-bounded", "an-input-above-4-mib-is-refused")
 	input := bytes.Repeat([]byte{' '}, MaxJSONBytes+1)
 	if parsed, diagnostics := ParseReleaseSet(input); parsed != nil || !findDiagnostic(diagnostics, ErrorCodeBoundsExceeded, "") {
 		t.Fatalf("oversized JSON not rejected: %#v %v", parsed, diagnostics)
@@ -335,6 +343,7 @@ func TestStrictParsingBoundsInput(t *testing.T) {
 }
 
 func TestValidationBoundsDiagnostics(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "parsing-is-strict-and-bounded", "diagnostics-are-capped-at-128")
 	set := representativeSet()
 	set.Members = make([]ReleaseSetMember, MaxDiagnostics+10)
 	for i := range set.Members {
@@ -353,6 +362,7 @@ func TestValidationBoundsDiagnostics(t *testing.T) {
 }
 
 func TestCommandTokensAreExact(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-protocol-identity-is-pinned", "the-protocol-tokens-and-grammars-are-pinned")
 	got := []string{ProviderExecutable, ProviderCommandName, CloudCommand, ReleaseSetCommand, ResolveCommand, ReleaseCommand, ChannelSetCommand, ChannelStatusCommand, RequestFileFlag}
 	want := []string{"putnami", "cloud-release-set", "cloud", "release-set", "resolve", "release", "channel-set", "channel-status", "--request-file"}
 	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
@@ -370,6 +380,7 @@ func TestCommandTokensAreExact(t *testing.T) {
 }
 
 func TestReleaseSetRefValidationRejectsMismatch(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-canonical-bytes-are-the-identity", "a-ref-whose-id-and-digest-differ-is-refused")
 	ref := ReleaseSetRef{ID: "rs_" + strings.Repeat("a", 64), Digest: "sha256:" + strings.Repeat("b", 64)}
 	if diagnostics := ValidateReleaseSetRef("ref", ref); !findDiagnostic(diagnostics, ErrorCodeRefMismatch, "ref") {
 		t.Fatalf("mismatched ref accepted: %v", diagnostics)
@@ -383,6 +394,7 @@ func TestReleaseSetRefValidationRejectsMismatch(t *testing.T) {
 }
 
 func TestVisibilityOrderAndMax(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "channels-are-portable-and-visibility-only-widens", "visibility-only-widens")
 	if VisibilityInternal.Rank() != 0 || VisibilityPrivate.Rank() != 1 || VisibilityPublic.Rank() != 2 {
 		t.Fatal("visibility ranks drifted")
 	}
@@ -411,6 +423,7 @@ func TestVisibilityOrderAndMax(t *testing.T) {
 }
 
 func TestEncodeTagAsChannel(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "channels-are-portable-and-visibility-only-widens", "a-git-tag-encodes-as-a-portable-channel")
 	cases := []struct {
 		tag  string
 		want string
@@ -467,6 +480,7 @@ func attributedSet() *ReleaseSet {
 // attribution is carried through normalization into canonical bytes, and two
 // sets that differ only in attribution are two different immutable sets.
 func TestMemberAttributionIsOptionalAndPartOfIdentity(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "optional-provenance-is-part-of-identity", "attribution-is-optional-and-part-of-identity")
 	legacy := representativeSet()
 	legacyCanonical, diagnostics := CanonicalReleaseSetBytes(legacy)
 	if diag.HasErrors(diagnostics) {
@@ -523,6 +537,7 @@ func TestMemberAttributionIsOptionalAndPartOfIdentity(t *testing.T) {
 // TestAttributedReleaseSetRoundTripsThroughStrictDecoding pins the wire half:
 // the strict reader accepts both spellings, and every closed kind is admitted.
 func TestAttributedReleaseSetRoundTripsThroughStrictDecoding(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "optional-provenance-is-part-of-identity", "attribution-round-trips-through-strict-decoding")
 	canonical, diagnostics := CanonicalReleaseSetBytes(attributedSet())
 	if diag.HasErrors(diagnostics) {
 		t.Fatalf("canonicalize: %v", diagnostics)
@@ -592,6 +607,7 @@ func TestAttributedReleaseSetRoundTripsThroughStrictDecoding(t *testing.T) {
 // derived before the field existed, a set with it is a different immutable
 // set, and the field survives normalization and the strict reader.
 func TestSourceTreeIsOptionalAndPartOfIdentity(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "optional-provenance-is-part-of-identity", "the-source-tree-is-optional-and-part-of-identity")
 	legacy := representativeSet()
 	legacyCanonical, diagnostics := CanonicalReleaseSetBytes(legacy)
 	if diag.HasErrors(diagnostics) {
@@ -657,6 +673,7 @@ func TestSourceTreeIsOptionalAndPartOfIdentity(t *testing.T) {
 // groups members by role branches on exactly these seven tokens, and a new
 // token is appended after every existing one.
 func TestMemberKindVocabularyIsClosed(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "optional-provenance-is-part-of-identity", "the-kind-vocabulary-is-closed")
 	want := []MemberKind{"image", "config", "migration", "doc", "library", "archive", "deployment"}
 	if len(MemberKinds) != len(want) {
 		t.Fatalf("kind vocabulary drifted: %v", MemberKinds)
@@ -678,6 +695,7 @@ func TestMemberKindVocabularyIsClosed(t *testing.T) {
 // reader and the canonical projection, its set derives a pinned ref, and a
 // spelling that is not the token is still refused as an unknown kind.
 func TestDeploymentMemberRoundTripsAndANearMissStaysUnknown(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "optional-provenance-is-part-of-identity", "a-deployment-member-round-trips")
 	fixtureBytes := mustFixture(t, "fixtures/valid/deployment-member.json")
 	fixture, diagnostics := ParseAndValidateReleaseSet(fixtureBytes)
 	if fixture == nil || diag.HasErrors(diagnostics) {
@@ -733,6 +751,7 @@ func mustFixture(t *testing.T, name string) []byte {
 }
 
 func TestMemberProjectIDDropsTheLeadingSlash(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "optional-provenance-is-part-of-identity", "a-member-project-drops-the-leading-slash")
 	for id, want := range map[string]string{
 		"/sites/putnami.dev": "sites/putnami.dev",
 		"sites/putnami.dev":  "sites/putnami.dev",

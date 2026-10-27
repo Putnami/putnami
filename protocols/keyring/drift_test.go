@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -130,6 +132,7 @@ func assertFieldParity(t *testing.T, name string, schemaFields, goFields []strin
 // TestDrift_KeyringFields asserts the private keyring document and its private
 // JWK item stay in lockstep with the schema.
 func TestDrift_KeyringFields(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-schemas-match-the-go-types", "the-schema-fields-match-the-go-types")
 	schema := readSchema(t, keyringSchemaPath)
 	assertFieldParity(t, "PrivateKeyring",
 		objectProperties(t, schema, "properties"),
@@ -143,6 +146,7 @@ func TestDrift_KeyringFields(t *testing.T) {
 // with the schema — and, critically, that the public JWK schema carries none of
 // the private-material fields.
 func TestDrift_JWKSFields(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-schemas-match-the-go-types", "the-schema-fields-match-the-go-types")
 	schema := readSchema(t, jwksSchemaPath)
 	assertFieldParity(t, "JWKS",
 		objectProperties(t, schema, "properties"),
@@ -160,6 +164,7 @@ func TestDrift_JWKSFields(t *testing.T) {
 
 // TestDrift_RequiredFields pins the schema's required-field sets.
 func TestDrift_RequiredFields(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-schemas-match-the-go-types", "the-required-fields-are-pinned")
 	cases := []struct {
 		name string
 		path string
@@ -190,6 +195,7 @@ func TestDrift_RequiredFields(t *testing.T) {
 // TestDrift_ProtocolVersionPinned asserts the keyring schema pins
 // protocolVersion to the current ProtocolVersion.
 func TestDrift_ProtocolVersionPinned(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-schemas-match-the-go-types", "the-schema-pins-the-protocol-version")
 	var schema struct {
 		Properties struct {
 			ProtocolVersion struct {
@@ -216,6 +222,7 @@ func TestDrift_ProtocolVersionPinned(t *testing.T) {
 // TestDrift_EnumParity asserts the closed enums in the schemas match the Go enum
 // values, so a schema edit that drops or adds a value fails the guard.
 func TestDrift_EnumParity(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-schemas-match-the-go-types", "the-schema-enums-match-the-go-enums")
 	keyring := readSchema(t, keyringSchemaPath)
 	jwks := readSchema(t, jwksSchemaPath)
 	digest := readSchema(t, digestSchemaPath)
@@ -244,6 +251,7 @@ func assertEnum(t *testing.T, name string, got, want []string) {
 // valid digest fixture and rejects the structurally-malformed ones, so the
 // schema and the strict parser agree on the digest string shape.
 func TestDrift_DigestSchemaPattern(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-digest-grammar-is-strict", "the-digest-schema-pattern-agrees-with-the-parser")
 	var schema struct {
 		Pattern string `json:"pattern"`
 	}

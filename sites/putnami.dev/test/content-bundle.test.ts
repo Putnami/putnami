@@ -74,17 +74,41 @@ function blobFor(files: Record<string, string>, overrides: Partial<Manifest> = {
 
 const codes = (result: { diagnostics: { code: string }[] }) => result.diagnostics.map((d) => d.code);
 
+// The site proves these requirements of the protocols/sitecontent contract
+// under checks named after it.
+const bundleContract = (requirement: string, check: string) => ({
+  feature: 'sitecontent/content-bundle-contract',
+  requirement,
+  check,
+});
+const sameHash = bundleContract('paths-mounts-and-digests-follow-one-grammar', 'the-site-hashes-the-fixture-like-go');
+const sameGrammar = bundleContract('paths-mounts-and-digests-follow-one-grammar', 'the-site-applies-the-same-grammar');
+const verdict = bundleContract('the-payload-matches-the-manifest', 'the-site-gives-the-payload-corpus-its-verdict');
+const newer = 'a-newer-major-falls-back-and-a-bad-envelope-fails-closed';
+const newerMajor = bundleContract(newer, 'the-site-gates-a-newer-major');
+const newerFirst = bundleContract(newer, 'the-site-gates-a-newer-major-before-strict-decoding');
+const badEnvelope = bundleContract(newer, 'the-site-fails-closed-on-a-version-that-is-not-a-string');
+const fallsBack = bundleContract(newer, 'the-site-falls-back-to-baked-content-on-a-newer-major');
+const unknown = bundleContract('the-manifest-is-closed-and-strict', 'the-site-refuses-an-unknown-field');
+const duplicates = bundleContract(
+  'the-manifest-is-closed-and-strict',
+  'the-site-refuses-a-duplicate-path-and-overlapping-mounts',
+);
+const prefixes = bundleContract('mounts-partition-the-url-space', 'the-site-matches-the-go-prefix-semantics');
+const mountAbove = bundleContract('mounts-partition-the-url-space', 'the-site-refuses-a-bundle-above-its-content');
+const overlaps = bundleContract('mounts-partition-the-url-space', 'the-site-refuses-overlapping-bundles');
+
 // ---------------------------------------------------------------------------
 // Contract rules — ported from the protocols/sitecontent fixture corpus
 // ---------------------------------------------------------------------------
 
 describe('sitecontent contract (Go parity)', () => {
-  it('pins the shared fixture digest so TS and Go hash identically', () => {
+  specTest('pins the shared fixture digest so TS and Go hash identically', sameHash, () => {
     // protocols/sitecontent/fixtures/payload/valid-bundle.json
     expect(sha256Hex(bytes('hello cloud\n'))).toBe('1a31f208b4e0b7759528b7af8580d7beb300ba849259987113d8b8d7718ff4a5');
   });
 
-  it('verifies a valid bundle (fixtures/payload/valid-bundle)', () => {
+  specTest('verifies a valid bundle (fixtures/payload/valid-bundle)', verdict, () => {
     const files = { 'docs/99-cloud/index.md': 'hello cloud\n', 'docs/99-cloud/guides/start.md': '# Start\n' };
     const result = verifyBundleArchive(blobFor(files));
     expect(result.diagnostics).toEqual([]);
@@ -92,25 +116,25 @@ describe('sitecontent contract (Go parity)', () => {
     expect(new TextDecoder().decode(result.bundle?.files.get('docs/99-cloud/index.md'))).toBe('hello cloud\n');
   });
 
-  it('rejects a traversal entry (fixtures/payload/traversal-attempt)', () => {
+  specTest('rejects a traversal entry (fixtures/payload/traversal-attempt)', verdict, () => {
     const manifest = manifestFor({ 'docs/99-cloud/index.md': 'hello cloud\n' });
     const blob = buildBlob(manifest, [{ name: '../docs/99-cloud/escape.md', data: 'escape\n' }]);
     expect(codes(verifyBundleArchive(blob))).toEqual([ErrorCodes.InvalidPath, ErrorCodes.MissingFile]);
   });
 
-  it('rejects a file outside every mount (fixtures/payload/mount-escape)', () => {
+  specTest('rejects a file outside every mount (fixtures/payload/mount-escape)', verdict, () => {
     const manifest = manifestFor({ 'docs/99-cloud/index.md': 'hello cloud\n' });
     const blob = buildBlob(manifest, [{ name: 'blog/index.md', data: 'hello cloud\n' }]);
     expect(codes(verifyBundleArchive(blob))).toEqual([ErrorCodes.PathOutsideMount, ErrorCodes.MissingFile]);
   });
 
-  it('rejects symlinks (fixtures/payload/symlink)', () => {
+  specTest('rejects symlinks (fixtures/payload/symlink)', verdict, () => {
     const manifest = manifestFor({ 'docs/99-cloud/index.md': 'hello cloud\n' });
     const blob = buildBlob(manifest, [{ name: 'docs/99-cloud/index.md', typeflag: '2', linkname: '../../secret.md' }]);
     expect(codes(verifyBundleArchive(blob))).toEqual([ErrorCodes.InvalidSymlink, ErrorCodes.MissingFile]);
   });
 
-  it('rejects an unlisted payload file (fixtures/payload/unlisted-file)', () => {
+  specTest('rejects an unlisted payload file (fixtures/payload/unlisted-file)', verdict, () => {
     const manifest = manifestFor({ 'docs/99-cloud/index.md': 'hello cloud\n' });
     const blob = buildBlob(manifest, [
       { name: 'docs/99-cloud/index.md', data: 'hello cloud\n' },
@@ -119,13 +143,13 @@ describe('sitecontent contract (Go parity)', () => {
     expect(codes(verifyBundleArchive(blob))).toEqual([ErrorCodes.UnlistedFile]);
   });
 
-  it('rejects a digest mismatch (fixtures/payload/digest-mismatch)', () => {
+  specTest('rejects a digest mismatch (fixtures/payload/digest-mismatch)', verdict, () => {
     const manifest = manifestFor({ 'docs/99-cloud/index.md': 'hello cloud\n' });
     const blob = buildBlob(manifest, [{ name: 'docs/99-cloud/index.md', data: 'changed\n' }]);
     expect(codes(verifyBundleArchive(blob))).toEqual([ErrorCodes.DigestMismatch]);
   });
 
-  it('gates on a newer format major (fixtures/payload/newer-format-version)', () => {
+  specTest('gates on a newer format major (fixtures/payload/newer-format-version)', newerMajor, () => {
     const result = verifyBundleArchive(
       blobFor({ 'docs/99-cloud/index.md': 'hello cloud\n' }, { formatVersion: '2.0' }),
     );
@@ -134,7 +158,7 @@ describe('sitecontent contract (Go parity)', () => {
     expect(codes(result)).toEqual([ErrorCodes.InvalidFormatVersion]);
   });
 
-  it('gates a newer major before strict-decoding its unknown manifest shape', () => {
+  specTest('gates a newer major before strict-decoding its unknown manifest shape', newerFirst, () => {
     const result = verifyBundleArchive(
       buildBlob({ formatVersion: '2.0', replacementManifest: { layout: 'not-a-v1-shape' } }, []),
     );
@@ -143,21 +167,21 @@ describe('sitecontent contract (Go parity)', () => {
     expect(codes(result)).toEqual([ErrorCodes.InvalidFormatVersion]);
   });
 
-  it('fails closed when the version envelope is not a string', () => {
+  specTest('fails closed when the version envelope is not a string', badEnvelope, () => {
     const result = verifyBundleArchive(buildBlob({ formatVersion: 2 }, []));
     expect(result.newerFormatMajor).toBe(false);
     expect(result.bundle).toBeNull();
     expect(result.diagnostics.length).toBeGreaterThan(0);
   });
 
-  it('rejects unknown manifest fields (fixtures/invalid/unknown-field)', () => {
+  specTest('rejects unknown manifest fields (fixtures/invalid/unknown-field)', unknown, () => {
     const manifest = { ...manifestFor({ 'docs/99-cloud/index.md': 'x\n' }), extra: true };
     const parsed = parseManifest(JSON.stringify(manifest));
     expect(parsed.manifest).toBeNull();
     expect(parsed.diagnostics.map((d) => d.code)).toEqual([ErrorCodes.UnknownField]);
   });
 
-  it('rejects duplicate manifest paths and intra-bundle mount overlap', () => {
+  specTest('rejects duplicate manifest paths and intra-bundle mount overlap', duplicates, () => {
     const dup = manifestFor({ 'docs/99-cloud/index.md': 'x\n' });
     dup.files.push({ ...dup.files[0] });
     expect(validateManifest(dup).map((d) => d.code)).toContain(ErrorCodes.DuplicateFile);
@@ -169,7 +193,7 @@ describe('sitecontent contract (Go parity)', () => {
     expect(validateManifest(overlapping).map((d) => d.code)).toContain(ErrorCodes.MountCollision);
   });
 
-  it('matches the Go prefix-overlap semantics', () => {
+  specTest('matches the Go prefix-overlap semantics', prefixes, () => {
     expect(urlInPrefix('/docs/cloud', '/docs')).toBe(true);
     expect(urlInPrefix('/docs-cloud', '/docs')).toBe(false);
     expect(prefixesConflict('/docs/a', '/docs/a')).toBe(true);
@@ -178,7 +202,7 @@ describe('sitecontent contract (Go parity)', () => {
     expect(prefixesConflict('/docs/a', '/')).toBe(true);
   });
 
-  it('matches the Go path/mount/digest grammar', () => {
+  specTest('matches the Go path/mount/digest grammar', sameGrammar, () => {
     expect(validRelPath('docs/a/b.md')).toBe(true);
     for (const bad of ['', '/abs.md', 'a/../b.md', 'a//b.md', 'a\\b.md', './a.md', '..']) {
       expect(validRelPath(bad)).toBe(false);
@@ -598,7 +622,7 @@ describe('materializeContentBundles', () => {
     ).rejects.toThrow(/sitecontent\.invalid_path/);
   });
 
-  it('always falls back to baked content on a newer format major (CI included)', async () => {
+  specTest('always falls back to baked content on a newer format major (CI included)', fallsBack, async () => {
     const blob = blobFor(FILES, { formatVersion: '2.0' });
     for (const ci of [true, false]) {
       const site = makeSite([lockEntryFor(blob)]);
@@ -634,7 +658,7 @@ describe('materializeContentBundles', () => {
     },
   );
 
-  it('hard-errors on a parent-prefix collision (bundle mounting above local content)', async () => {
+  specTest('hard-errors on a parent-prefix collision (bundle mounting above local content)', mountAbove, async () => {
     const blob = blobFor({ 'docs/index.md': 'x\n' }, { mounts: [{ urlPrefix: '/docs' }] });
     const site = makeSite([lockEntryFor(blob)]);
     await expect(materializeContentBundles(site.options({ fetchBlob: () => Promise.resolve(blob) }))).rejects.toThrow(
@@ -642,7 +666,7 @@ describe('materializeContentBundles', () => {
     );
   });
 
-  it('hard-errors when two bundles claim overlapping mounts', async () => {
+  specTest('hard-errors when two bundles claim overlapping mounts', overlaps, async () => {
     const blobA = blobFor(FILES);
     const blobB = blobFor(
       { 'docs/99-cloud/sub/index.md': 'x\n' },

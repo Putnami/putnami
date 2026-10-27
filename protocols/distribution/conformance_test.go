@@ -3,9 +3,12 @@ package distribution
 import (
 	"bytes"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestEmbeddedConformance(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-embedded-corpus-is-the-conformance-suite", "the-embedded-corpus-gets-its-verdict")
 	results := RunEmbeddedConformance()
 	if len(results) < 10 {
 		t.Fatalf("embedded corpus unexpectedly small: %d", len(results))
@@ -18,6 +21,7 @@ func TestEmbeddedConformance(t *testing.T) {
 }
 
 func TestEmbeddedFixturesReturnFreshCopies(t *testing.T) {
+	spectest.Proves(t, "distribution/release-set-contract", "the-embedded-corpus-is-the-conformance-suite", "the-embedded-fixtures-are-fresh-copies")
 	first := EmbeddedConformanceFixtures()
 	second := EmbeddedConformanceFixtures()
 	if len(first) == 0 || len(first) != len(second) {

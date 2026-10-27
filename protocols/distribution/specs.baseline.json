@@ -1,0 +1,20 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "distribution/release-set-contract#a-channel-set-moves-one-channel",
+    "distribution/release-set-contract#a-channel-status-reports-desired-and-observed",
+    "distribution/release-set-contract#a-release-is-one-compare-and-swap",
+    "distribution/release-set-contract#a-release-set-is-closed-over-its-members",
+    "distribution/release-set-contract#a-resolve-answers-exactly-what-it-asked",
+    "distribution/release-set-contract#channels-are-portable-and-visibility-only-widens",
+    "distribution/release-set-contract#mirror-intent-never-changes-the-set",
+    "distribution/release-set-contract#optional-provenance-is-part-of-identity",
+    "distribution/release-set-contract#parsing-is-strict-and-bounded",
+    "distribution/release-set-contract#the-canonical-bytes-are-the-identity",
+    "distribution/release-set-contract#the-embedded-corpus-is-the-conformance-suite",
+    "distribution/release-set-contract#the-protocol-identity-is-pinned",
+    "distribution/release-set-contract#the-provider-seam-is-one-request-file-and-one-answer",
+    "distribution/release-set-contract#the-publish-outcome-names-one-set"
+  ]
+}

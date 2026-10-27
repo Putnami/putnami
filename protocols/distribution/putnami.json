@@ -3,17 +3,22 @@
   "name": "go.putnami.dev/protocol/distribution",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
   },
   "options": {
+    "test": {
+      "filePatterns": ["fixtures/**", "schemas/**"]
+    },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "A release-set wire contract is distribution infrastructure, not an independently enabled product outcome."
   }
 }

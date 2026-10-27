@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 type archiveFixture struct {
@@ -25,6 +26,7 @@ type archiveFixture struct {
 }
 
 func TestVerifyArchive_Fixtures(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "the-archive-corpus-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/archive/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +94,7 @@ func TestVerifyArchive_Fixtures(t *testing.T) {
 }
 
 func TestVerifyArchive_GatesNewerMajorBeforeStrictManifestDecode(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "a-newer-major-falls-back-and-a-bad-envelope-fails-closed", "a-newer-major-gates-before-strict-decoding")
 	blob := buildPayload(t, []payloadFixtureEntry{{
 		Type: "file",
 		Path: ManifestEntryName,
@@ -114,6 +117,7 @@ func TestVerifyArchive_GatesNewerMajorBeforeStrictManifestDecode(t *testing.T) {
 }
 
 func TestVerifyArchive_InvalidVersionEnvelopeFailsClosed(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "a-newer-major-falls-back-and-a-bad-envelope-fails-closed", "a-version-that-is-not-a-string-fails-closed")
 	blob := buildPayload(t, []payloadFixtureEntry{{
 		Type: "file",
 		Path: ManifestEntryName,
@@ -127,6 +131,7 @@ func TestVerifyArchive_InvalidVersionEnvelopeFailsClosed(t *testing.T) {
 }
 
 func TestBuildArchive_RoundTripDeterministic(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "a-built-archive-is-deterministic-and-verifies")
 	files := map[string][]byte{
 		"docs/cloud/index.html":      []byte("hello cloud\n"),
 		"docs/cloud/guides/start.md": []byte("# Start\n"),
@@ -163,6 +168,7 @@ func TestBuildArchive_RoundTripDeterministic(t *testing.T) {
 }
 
 func TestBuildArchive_RejectsNonConformant(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "a-nonconformant-archive-is-not-built")
 	data := []byte("orphan\n")
 	sum := sha256.Sum256(data)
 	m := Manifest{
@@ -180,6 +186,7 @@ func TestBuildArchive_RejectsNonConformant(t *testing.T) {
 }
 
 func TestBuildArchive_RejectsReservedName(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-travels-inside-the-archive", "a-nonconformant-archive-is-not-built")
 	m := validPayloadManifest()
 	blob, diags := BuildArchive(&m, map[string][]byte{ManifestEntryName: []byte("{}")})
 	if blob != nil || !hasCode(diags, ErrorCodeInvalidPayloadEntry) {

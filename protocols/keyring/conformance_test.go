@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // loadFixture reads and JSON-decodes a fixture file into v (lenient decode: the
@@ -58,6 +59,7 @@ type digestCorpus struct {
 // diagnostic code the fixture pins (so relaxing any one parser check turns a red
 // fixture green and fails here).
 func TestDigestCorpus(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-digest-grammar-is-strict", "the-digest-corpus-gets-its-verdict")
 	var c digestCorpus
 	loadFixture(t, "fixtures/digests.json", &c)
 	if len(c.Valid) == 0 || len(c.Invalid) == 0 {
@@ -113,6 +115,7 @@ type keyStateCorpus struct {
 // AllKeyStates, terminal states match KeyState.Terminal, and every declared
 // transition's legality matches the Transition validator.
 func TestKeyStateCorpus(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-key-state-machine-is-closed", "the-state-corpus-gets-its-verdict")
 	var c keyStateCorpus
 	loadFixture(t, "fixtures/key-states.json", &c)
 
@@ -171,6 +174,7 @@ var privateJWKFields = []string{"d", "p", "q", "dp", "dq", "qi", "k"}
 // private-material field names — the structural invariant this test exists to
 // pin.
 func TestKeyringProjection(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-public-projection-fails-closed", "the-projection-corpus-gets-its-verdict")
 	var c keyringCorpus
 	loadFixture(t, "fixtures/keyrings.json", &c)
 	if len(c.Cases) == 0 {
@@ -214,6 +218,22 @@ func TestKeyringProjection(t *testing.T) {
 				t.Errorf("projected JWKS leaks keyring state: %s", raw)
 			}
 		})
+	}
+}
+
+// TestPublicJWKS_AnOmittedStateIsActive pins the default a minimal keyring
+// relies on: a key that omits its state is projected as an active key.
+func TestPublicJWKS_AnOmittedStateIsActive(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "an-omitted-state-is-active", "a-key-without-a-state-is-published")
+	kr, diags := ParseAndValidatePrivateKeyring([]byte(`{"protocolVersion":1,"keys":[` +
+		`{"kty":"EC","kid":"ec-no-state","use":"sig","alg":"ES256","crv":"P-256",` +
+		`"x":"ldU7ev5JtThfL1ZQYHDQ0bdKtF5zBA6x532O6OMqMSE","y":"iWyo5Oba6r0hs9qJkOe5YjQjnrfK9dwWmlP6_Uj3Xlw"}]}`))
+	if diag.HasErrors(diags) {
+		t.Fatalf("keyring without a state rejected: %v", diags)
+	}
+	projected := PublicJWKS(kr)
+	if len(projected.Keys) != 1 || projected.Keys[0].Kid != "ec-no-state" {
+		t.Fatalf("a key without a state was not published: %+v", projected)
 	}
 }
 
@@ -293,6 +313,7 @@ func structuralJWTCheck(v jwtVector) []diag.Diagnostic {
 // structural checks (and its header alg matches the declared algorithm); every
 // invalid vector fails at least one structural check.
 func TestJWTVectors(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "jwt-vectors-verify-in-both-languages", "the-jwt-corpus-gets-its-structural-verdict")
 	var c jwtCorpus
 	loadFixture(t, "fixtures/jwt-vectors.json", &c)
 	if len(c.Valid) == 0 || len(c.Invalid) == 0 {
@@ -352,6 +373,7 @@ func decodeHeaderAlg(t *testing.T, token string) string {
 // registered in ValidErrorCodes and that the registry has no extras, so the
 // taxonomy stays complete.
 func TestErrorCodesRegistered(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "every-error-code-is-registered", "the-error-registry-is-complete")
 	codes := []string{
 		ErrorCodeParseError,
 		ErrorCodeUnknownField,

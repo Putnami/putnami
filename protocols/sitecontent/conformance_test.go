@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
@@ -14,12 +15,14 @@ import (
 // surface and is distinct from a bundle's FormatVersion (the on-the-wire bundle
 // format a consumer gates on).
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-versions-are-pinned", "the-protocol-version-is-pinned")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
 }
 
 func TestConformance_ValidManifestFixtures(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-is-closed-and-strict", "the-valid-manifests-parse")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +49,7 @@ func TestConformance_ValidManifestFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidManifestFixtures(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-manifest-is-closed-and-strict", "the-invalid-manifests-are-refused")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
