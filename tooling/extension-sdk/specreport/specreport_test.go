@@ -91,6 +91,7 @@ func specProject(t *testing.T) string {
 // observation per check, and an active contradiction must reach core), and
 // an observation the wire refuses is dropped alone with a warning.
 func TestProjectReportResolvesProvenanceAndFailsClosed(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-merge-sets-foreign-declarations-aside-and-lets-a-failure-win")
 	root := specProject(t)
 	inside := filepath.Join(root, "logger_test.go")
 	fragments := []spectest.Fragment{
@@ -135,6 +136,7 @@ func TestProjectReportResolvesProvenanceAndFailsClosed(t *testing.T) {
 // reduction and a self-declared threshold result never reaches core as a
 // measurement.
 func TestProjectReportMapsMeasurementFragments(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "a-fragment-with-a-verdict-and-a-measurement-keeps-only-its-verdict")
 	root := specProject(t)
 	inside := filepath.Join(root, "logger_test.go")
 	measurement := &spectest.FragmentMeasurement{Name: "logger.flush.duration", Aggregation: "p95", Value: 12.5, Unit: "ms"}
@@ -304,6 +306,7 @@ func TestProjectReportCanonicalizesFilesystemAliases(t *testing.T) {
 // one observation survives, its provenance is the first in (path, symbol)
 // order, no warning is drawn, and a skip never erases a real pass.
 func TestProjectReportReducesAgreeingObservationsSilently(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "agreeing-observations-reduce-silently-and-a-skip-never-erases-a-pass")
 	root := specProject(t)
 	inside := filepath.Join(root, "logger_test.go")
 	fragments := []spectest.Fragment{
@@ -325,6 +328,7 @@ func TestProjectReportReducesAgreeingObservationsSilently(t *testing.T) {
 }
 
 func TestMergeSoloWritesTheReservedArtifact(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-merge-writes-a-strictly-readable-report-or-nothing")
 	root := specProject(t)
 	fragmentsDir := t.TempDir()
 	outDir := t.TempDir()
@@ -364,6 +368,7 @@ func TestMergeSoloWritesTheReservedArtifact(t *testing.T) {
 }
 
 func TestMergeSoloWritesNothingWithoutObservations(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-merge-writes-a-strictly-readable-report-or-nothing")
 	outDir := t.TempDir()
 	_ = captureEvents(t, func(emit *jsonl.Emitter) {
 		MergeSolo(emit, t.TempDir(), specProject(t), outDir)

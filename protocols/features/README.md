@@ -675,8 +675,14 @@ Go/TypeScript/Python-authored and hand-authored vectors live under
   marshallers, the pure verification evaluator, valid/invalid fixture corpora,
   reusable conformance runners, and Go/TypeScript/Python-authored equivalence
   vectors exercise the wire contracts.
+- **Feature and spec**: `features/feature-contracts`, specified in
+  [`specs/feature-contracts.json`](specs/feature-contracts.json). The protocol
+  owns the feature of its contract. The Go tests here, the shared fragment
+  merger in `tooling/extension-sdk/specreport`, the Go and Python test jobs, the
+  TypeScript readers of `@putnami/application` and the TypeScript test binding
+  `@putnami/spectest`, whose fragments follow the same contract, prove its
+  requirements.
 - **Boundary**: the feature-intent, evidence, provisional design-graph, spec,
   and verification-report contracts are still evolving, and no consumer outside
-  this repository is guaranteed. No producer emits a verification report yet,
-  and no gate consumes one. Those constraints keep the reviewed status at
+  this repository is guaranteed. Those constraints keep the reviewed status at
   `preview`.
