@@ -237,6 +237,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("protocols", "features", ManifestFilename):      true,
 		filepath.Join("protocols", "http-routes", ManifestFilename):   true,
 		filepath.Join("protocols", "identity", ManifestFilename):      true,
+		filepath.Join("protocols", "job", ManifestFilename):           true,
 		filepath.Join("protocols", "platform", ManifestFilename):      true,
 		filepath.Join("protocols", "qualify", ManifestFilename):       true,
 		filepath.Join("protocols", "runtime", ManifestFilename):       true,

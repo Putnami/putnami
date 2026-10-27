@@ -1,0 +1,12 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "job/execution-context#every-reject-branch-has-a-fixture",
+    "job/execution-context#parameters-resolve-alike",
+    "job/execution-context#strict-producers-lenient-consumers",
+    "job/execution-context#the-cli-produces-a-conforming-context",
+    "job/execution-context#the-version-is-read-from-the-document",
+    "job/execution-context#version-1-stays-frozen"
+  ]
+}
