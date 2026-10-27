@@ -2,9 +2,9 @@ package deliverycli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -31,14 +31,17 @@ func pinUploadDrain(t *testing.T, stall, budget, shutdown time.Duration) {
 }
 
 // holdBlob makes the server read the PUT of a staged blob and never answer it,
-// until the test ends.
-func (f *uploadCacheServer) holdBlob(t *testing.T, file cache.FileEntry) {
+// until the test ends. The channel it returns is closed once the server holds
+// the first PUT of the blob.
+func (f *uploadCacheServer) holdBlob(t *testing.T, file cache.FileEntry) <-chan struct{} {
 	t.Helper()
-	release := make(chan struct{})
+	release, held := make(chan struct{}), make(chan struct{})
 	f.mu.Lock()
 	f.blobHold[file.Digest] = release
+	f.blobHeld[file.Digest] = held
 	f.mu.Unlock()
 	t.Cleanup(func() { close(release) })
+	return held
 }
 
 // within runs fn and fails the test when it has not returned after limit. It
@@ -109,19 +112,42 @@ func TestTheSummaryAnswersWhenAnUploadStalls(t *testing.T) {
 	pinUploadDrain(t, stall, 20*time.Second, time.Second)
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	var logw lockedWriter
-	s, exchangeDir := startUploadSession(t, f, &logw)
+	s, exchangeDir, clock := startDrainSession(t, f, &logw)
 	stalled := stageBlob(t, exchangeDir, "an output the storage never acknowledges")
-	f.holdBlob(t, stalled)
+	held := f.holdBlob(t, stalled)
 	mustUpload(t, s, uploadKey(0), stalled)
 	mustUpload(t, s, uploadKey(1), stalled)
 
+	// The summary answers once its clock reaches the stall bound, and not
+	// before: the clock stops short of the bound first. It moves once the
+	// storage holds the PUT, when the upload can no longer move forward.
+	answered := make(chan *cache.SummaryResult, 1)
+	go func() { answered <- mustSummary(t, s) }()
+	select {
+	case <-held:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the blob PUT did not reach the storage")
+	}
+	waiting, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	if !clock.awaitWaiter(waiting) {
+		t.Fatal("the summary never waited on its clock")
+	}
+	clock.advance(stall - time.Millisecond)
+	select {
+	case stats := <-answered:
+		t.Fatalf("the summary answered %+v before the stall bound: it did not wait for the upload", stats)
+	default:
+	}
+	clock.advance(time.Millisecond)
 	var stats *cache.SummaryResult
-	took := within(t, 10*time.Second, "the summary", func() { stats = mustSummary(t, s) })
+	select {
+	case stats = <-answered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the summary did not answer once its clock reached the stall bound")
+	}
 	if stats.UploadedCount != 0 || stats.UploadedBytes != 0 {
 		t.Fatalf("summary counted %d entries / %d bytes of a window that is not stored", stats.UploadedCount, stats.UploadedBytes)
-	}
-	if took < stall {
-		t.Fatalf("the summary answered after %s, before the stall bound: it did not wait for the upload", took)
 	}
 	log := logw.String()
 	for _, want := range []string{"upload drain: no upload moved forward for 500ms", "2 entries are not stored yet", "the summary does not count them"} {
@@ -131,53 +157,63 @@ func TestTheSummaryAnswersWhenAnUploadStalls(t *testing.T) {
 	}
 
 	// The stalled upload is not waited for a second time: the shutdown that
-	// follows the summary answers at once.
-	again := within(t, 10*time.Second, "the second drain", func() {
-		s.drainBackground(time.Now().Add(10*time.Second), "they are dropped")
+	// follows the summary answers without its clock moving at all.
+	within(t, 10*time.Second, "the second drain", func() {
+		s.drainBackground(clock.now().Add(10*time.Second), "they are dropped")
 	})
-	if again > stall/2 {
-		t.Errorf("a drain that already gave up on a stall waited %s again", again)
-	}
 }
 
-// slowWindows queues n entries that each fill a window of their own, against a
-// server that takes delay to answer each commit-batch.
-func slowWindows(t *testing.T, s *providerSession, f *uploadCacheServer, exchangeDir string, n int, delay time.Duration) {
+// startDrainSession opens a writing provider session against f whose run-end
+// drain reads a clock the test moves.
+func startDrainSession(t *testing.T, f *uploadCacheServer, logw io.Writer) (*providerSession, string, *fakeClock) {
+	t.Helper()
+	s, exchangeDir := startUploadSession(t, f, logw)
+	clock := &fakeClock{t: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)}
+	s.clock = clock
+	return s, exchangeDir, clock
+}
+
+// slowWindows queues n entries, one window each, against a server whose every
+// commit-batch takes perWindow on clock. A commit-batch waits until a drain
+// waits on clock: the windows move only while a drain watches them, and each
+// one moves the drain's clock by perWindow exactly, however long the machine
+// takes to run it.
+func slowWindows(t *testing.T, s *providerSession, f *uploadCacheServer, clock *fakeClock, exchangeDir string, n int, perWindow time.Duration) {
 	t.Helper()
 	f.mu.Lock()
-	f.commitDelay = delay
-	f.mu.Unlock()
-	// One staged blob under enough paths that two entries do not fit one
-	// commit-batch body: each entry is then stored in its own window.
-	output := stageBlob(t, exchangeDir, "output")
-	files := make([]cache.FileEntry, 3000)
-	for i := range files {
-		files[i] = cache.FileEntry{Path: fmt.Sprintf("out/%04d", i), Digest: output.Digest, Size: output.Size}
+	f.onCommit = func(ctx context.Context) {
+		if clock.awaitWaiter(ctx) {
+			clock.advance(perWindow)
+		}
 	}
+	f.mu.Unlock()
+	output := stageBlob(t, exchangeDir, "output")
 	for i := range n {
-		mustUpload(t, s, uploadKey(i), files...)
+		mustUpload(t, s, uploadKey(i), output)
 	}
 }
 
 // The stall bound is a bound on silence, not on the upload: a run whose
 // windows take longer in all than the bound, and keep moving, is stored whole.
-// Each window leaves the bound more than 2s of slack, so a loaded machine that
-// pauses the upload between two windows does not read as a stall.
+// The drain reads a clock that only the windows move, so the result does not
+// depend on how fast the machine runs them.
 func TestTheSummaryWaitsForUploadsThatStillMove(t *testing.T) {
 	pinUploadIdle(t, time.Hour)
+	pinUploadWindowEntries(t, 1)
 	const stall, perWindow, windows = 3 * time.Second, 400 * time.Millisecond, 10
 	pinUploadDrain(t, stall, 40*time.Second, time.Second)
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	var logw lockedWriter
-	s, exchangeDir := startUploadSession(t, f, &logw)
-	slowWindows(t, s, f, exchangeDir, windows, perWindow)
+	s, exchangeDir, clock := startDrainSession(t, f, &logw)
+	slowWindows(t, s, f, clock, exchangeDir, windows, perWindow)
 
+	start := clock.now()
 	var stats *cache.SummaryResult
-	took := within(t, 30*time.Second, "the summary", func() { stats = mustSummary(t, s) })
+	within(t, 30*time.Second, "the summary", func() { stats = mustSummary(t, s) })
 	if stats.UploadedCount != windows {
 		t.Fatalf("summary counted %d entries, want all %d: the drain cut uploads that still moved (log: %s)", stats.UploadedCount, windows, logw.String())
 	}
-	if took <= stall {
+	if took := clock.now().Sub(start); took <= stall {
 		t.Fatalf("the drain took %s, not longer than the stall bound %s: the test proves nothing", took, stall)
 	}
 	if c := f.counts(); len(c.windows) != windows {
@@ -193,12 +229,13 @@ func TestTheSummaryWaitsForUploadsThatStillMove(t *testing.T) {
 // stored by then.
 func TestTheSummaryStopsAtItsBudgetWhileUploadsStillMove(t *testing.T) {
 	pinUploadIdle(t, time.Hour)
+	pinUploadWindowEntries(t, 1)
 	const budget, perWindow, windows = 300 * time.Millisecond, 150 * time.Millisecond, 12
 	pinUploadDrain(t, 30*time.Second, budget, 30*time.Second)
 	f := newUploadCacheServer(t, batchedCapabilities()...)
 	var logw lockedWriter
-	s, exchangeDir := startUploadSession(t, f, &logw)
-	slowWindows(t, s, f, exchangeDir, windows, perWindow)
+	s, exchangeDir, clock := startDrainSession(t, f, &logw)
+	slowWindows(t, s, f, clock, exchangeDir, windows, perWindow)
 
 	// The windows take 1.8 s in all, six times the budget: a summary that
 	// waited for them would count them all.
@@ -213,11 +250,13 @@ func TestTheSummaryStopsAtItsBudgetWhileUploadsStillMove(t *testing.T) {
 	}
 
 	// The uploads were not canceled: the shutdown's drain stores the rest.
-	s.drainBackground(time.Now().Add(30*time.Second), "they are dropped")
+	within(t, 30*time.Second, "the second drain", func() {
+		s.drainBackground(clock.now().Add(30*time.Second), "they are dropped")
+	})
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if len(f.committed) != windows {
-		t.Fatalf("committed entries = %d after the second drain, want all %d", len(f.committed), windows)
+		t.Fatalf("committed entries = %d after the second drain, want all %d (log: %s)", len(f.committed), windows, logw.String())
 	}
 }
 

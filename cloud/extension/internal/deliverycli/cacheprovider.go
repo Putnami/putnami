@@ -97,8 +97,10 @@ type providerSession struct {
 
 	bg         background    // background prefetch + upload + restore work
 	restoreSem chan struct{} // bounds concurrent restore transfers
-	// limits are the run-end drain bounds, read once here (see cachedrain.go).
+	// limits are the run-end drain bounds, read once here, and clock the
+	// clock the drain reads them on (see cachedrain.go).
 	limits drainLimits
+	clock  drainClock
 	// now is the session's clock and transferMaxAge the age past which a
 	// restore negotiates a key again before it downloads (see
 	// restoreTransferMaxAge). A test replaces them.
@@ -210,6 +212,7 @@ func newProviderSession(workspaceRoot string, logw io.Writer) *providerSession {
 		known:           make(map[string]bool),
 		restoreSem:      make(chan struct{}, restoreConcurrency),
 		limits:          readDrainLimits(),
+		clock:           wallClock{},
 		now:             time.Now,
 	}
 	s.transferMaxAge = restoreTransferMaxAge
@@ -454,7 +457,7 @@ func runCacheProviderSession(in io.Reader, out io.Writer, logw io.Writer, worksp
 	shutdown := false
 	defer func() {
 		if !shutdown {
-			sess.drainUploader(time.Now().Add(sess.limits.budget), "they are dropped")
+			sess.drainUploader(sess.clock.now().Add(sess.limits.budget), "they are dropped")
 		}
 		sess.close()
 	}()
@@ -519,7 +522,7 @@ func runCacheProviderSession(in io.Reader, out io.Writer, logw io.Writer, worksp
 			// summary already drained, so this wait is over at once unless
 			// core sent no summary.
 			shutdown = true
-			sess.drainBackground(time.Now().Add(sess.limits.shutdown), "they are dropped")
+			sess.drainBackground(sess.clock.now().Add(sess.limits.shutdown), "they are dropped")
 		}
 		resp := sess.handle(req)
 		if err := writeResp(resp); err != nil {
@@ -1313,7 +1316,7 @@ func (s *providerSession) markerWrite(req *cache.ProviderRequest, p *cache.Marke
 // are not canceled here; they go on until the shutdown, and the counts leave
 // them out.
 func (s *providerSession) summary(req *cache.ProviderRequest) *cache.ProviderResponse {
-	deadline := time.Now().Add(s.limits.budget)
+	deadline := s.clock.now().Add(s.limits.budget)
 	s.drainUploads()
 	s.objects.drain()
 	s.objects.report()

@@ -3,6 +3,7 @@ package deliverycli
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,12 +61,14 @@ type uploadCacheServer struct {
 	// keys the server fails a whole commit-batch for, with a 500. blobStatus
 	// is the failure answered to the PUT of a digest. blobHold makes the PUT
 	// of a digest wait, once its body is read, until the channel is closed or
-	// the client goes away. commitDelay delays every commit-batch answer.
+	// the client goes away; blobHeld is closed once it holds that PUT. onCommit,
+	// when set, runs before every commit-batch answer, with the request's
+	// context.
 	findMissingFailures, commitBatchFailures int
 	poisoned                                 map[string]bool
 	blobStatus                               map[string]int
-	blobHold                                 map[string]chan struct{}
-	commitDelay                              time.Duration
+	blobHold, blobHeld                       map[string]chan struct{}
+	onCommit                                 func(context.Context)
 	// committed are the keys a commit-batch answered as committed, and
 	// blobPuts counts the PUTs received, the failed ones included.
 	committed map[string]bool
@@ -89,6 +92,7 @@ func newUploadCacheServer(t *testing.T, capabilities ...string) *uploadCacheServ
 		poisoned:     map[string]bool{},
 		blobStatus:   map[string]int{},
 		blobHold:     map[string]chan struct{}{},
+		blobHeld:     map[string]chan struct{}{},
 		committed:    map[string]bool{},
 		windowSeen:   make(chan struct{}, 64),
 	}
@@ -141,6 +145,10 @@ func (f *uploadCacheServer) handle(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.blobPuts++
 		status, hold := f.blobStatus[digest], f.blobHold[digest]
+		if held := f.blobHeld[digest]; hold != nil && held != nil {
+			close(held)
+			delete(f.blobHeld, digest)
+		}
 		f.mu.Unlock()
 		if hold != nil {
 			select {
@@ -159,7 +167,7 @@ func (f *uploadCacheServer) handle(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == cache.UploadBatchPath:
 		f.uploadBatch(w, body)
 	case r.URL.Path == cache.CommitBatchPath:
-		f.commitBatch(w, body)
+		f.commitBatch(w, r, body)
 	case r.URL.Path == cache.StorePath:
 		var req cache.StoreRequest
 		_ = json.Unmarshal(body, &req)
@@ -243,7 +251,7 @@ func (f *uploadCacheServer) uploadBatch(w http.ResponseWriter, body []byte) {
 	writeJSON(w, http.StatusOK, cache.UploadBatchResponse{ProtocolVersion: cache.ProtocolVersion, Stored: stored})
 }
 
-func (f *uploadCacheServer) commitBatch(w http.ResponseWriter, body []byte) {
+func (f *uploadCacheServer) commitBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 	var req cache.CommitBatchRequest
 	_ = json.Unmarshal(body, &req)
 	keys := make([]string, 0, len(req.Entries))
@@ -270,10 +278,10 @@ func (f *uploadCacheServer) commitBatch(w http.ResponseWriter, body []byte) {
 	}
 	f.windows = append(f.windows, keys)
 	f.commitBatchBodies = append(f.commitBatchBodies, body)
-	delay := f.commitDelay
+	onCommit := f.onCommit
 	f.mu.Unlock()
-	if delay > 0 {
-		time.Sleep(delay)
+	if onCommit != nil {
+		onCommit(r.Context())
 	}
 	if status != 0 {
 		http.Error(w, "commit-batch is down", status)
