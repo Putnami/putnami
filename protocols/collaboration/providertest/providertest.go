@@ -48,7 +48,9 @@ import (
 
 // Target is one provider under test.
 type Target struct {
-	// Handlers is the provider's dispatch table, as collaboration.Serve takes it.
+	// Handlers is the provider's dispatch table, as collaboration.Serve takes
+	// it. A scenario of an optional operation runs only when Handlers answers
+	// that operation.
 	Handlers map[collab.OperationKey]collab.Handler
 	// WorkspaceRoot is the workspace the routed request names.
 	WorkspaceRoot string
@@ -187,6 +189,12 @@ func (s *Session) Eventually(contract, operation, arguments string, into any, ch
 	}
 }
 
+// offers reports whether the provider answers an operation of version 1.
+func (s *Session) offers(contract, operation string) bool {
+	_, offered := s.target.Handlers[collab.OperationKey{Contract: contract, Version: 1, Operation: operation}]
+	return offered
+}
+
 func (s *Session) track(contract string, ref collab.Ref) {
 	if s.target.Track != nil {
 		s.target.Track(contract, ref)
@@ -219,6 +227,8 @@ func normalize(contract, operation, arguments, workspace string) json.RawMessage
 	case *collab.TaskFindInput:
 		page(&in.Page)
 	case *collab.ProposalFindInput:
+		page(&in.Page)
+	case *collab.ProposalCommentsInput:
 		page(&in.Page)
 	case *collab.MemoryContextInput:
 		page(&in.Page)

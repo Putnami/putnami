@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "line-2041"
+      },
+      "line": 42,
+      "body": "A line of which file?"
+    }
+  ],
+  "page": {}
+}

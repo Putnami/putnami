@@ -102,7 +102,7 @@ func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 			t.Errorf("tools/list lacks %s", want)
 		}
 	}
-	for _, absent := range []string{"proposals.merge", "tasks.claim", "memory.context", "local-collaboration.tasks.find"} {
+	for _, absent := range []string{"proposals.comments", "proposals.merge", "tasks.claim", "memory.context", "local-collaboration.tasks.find"} {
 		if tools[absent] {
 			t.Errorf("tools/list advertises %s", absent)
 		}

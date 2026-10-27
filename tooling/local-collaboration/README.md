@@ -44,7 +44,7 @@ extension runtime).
 | Contract | Offered | Not offered |
 |---|---|---|
 | tasks v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
-| proposals v1 | `find`, `upsert`, `status`, `review` | `merge` |
+| proposals v1 | `find`, `upsert`, `status`, `review` | `comments`, `merge` |
 | missions v1 | `sync` (host-only), `ask`, `reply` | — |
 
 - It runs **no hosted checks**: `proposals status` always reports

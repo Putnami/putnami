@@ -30,7 +30,8 @@ const (
 	// ContractTasks finds, reads, creates, updates and transitions work items.
 	ContractTasks = "tasks"
 	// ContractProposals finds or creates the change proposal for an exact
-	// repository/base/head, reads its status and checks, and publishes reviews.
+	// repository/base/head, reads its status, checks and comments, and
+	// publishes reviews.
 	ContractProposals = "proposals"
 	// ContractMemory loads contextual records, reads a mission and saves a
 	// checkpoint against an expected revision.
@@ -66,10 +67,11 @@ const (
 	OperationLink       = "link"
 	OperationClaim      = "claim"
 
-	OperationUpsert = "upsert"
-	OperationStatus = "status"
-	OperationReview = "review"
-	OperationMerge  = "merge"
+	OperationUpsert   = "upsert"
+	OperationStatus   = "status"
+	OperationReview   = "review"
+	OperationMerge    = "merge"
+	OperationComments = "comments"
 
 	OperationContext    = "context"
 	OperationMission    = "mission"
@@ -306,6 +308,13 @@ var catalog = []ContractSpec{
 		Name:    ContractProposals,
 		Version: 1,
 		Operations: []OperationSpec{
+			{
+				Name: OperationComments, Access: AccessRead,
+				Summary: "List what people wrote on a proposal: review bodies, comments on a file line and conversation " +
+					"comments, each with the review and the file line it belongs to when known. Optional capability. " +
+					"Results are bounded pages.",
+				newInput: alloc[ProposalCommentsInput](), newResult: alloc[ProposalCommentListResult](),
+			},
 			{
 				Name: OperationFind, Access: AccessRead, Required: true,
 				Summary:  "Find the change proposals for an exact repository, base and head. Results are bounded pages.",

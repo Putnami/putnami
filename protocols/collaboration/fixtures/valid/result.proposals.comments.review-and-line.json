@@ -1,0 +1,61 @@
+{
+  "items": [
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "review-3012"
+      },
+      "url": "https://github.com/acme/app/pull/7#pullrequestreview-3012",
+      "author": "octocat",
+      "submittedAt": "2026-09-24T08:05:00Z",
+      "review": {
+        "source": "github:acme/app",
+        "id": "review-3012"
+      },
+      "commit": "55e2a8e42",
+      "body": "The route needs a test for a foreign reference."
+    },
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "line-2041"
+      },
+      "url": "https://github.com/acme/app/pull/7#discussion_r2041",
+      "author": "octocat",
+      "submittedAt": "2026-09-24T08:05:00Z",
+      "review": {
+        "source": "github:acme/app",
+        "id": "review-3012"
+      },
+      "path": "tooling/cli/internal/mcp/collaboration_route.go",
+      "line": 42,
+      "commit": "55e2a8e42",
+      "body": "Refuse a comment of another source here."
+    },
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "line-2042"
+      },
+      "review": {
+        "source": "github:acme/app",
+        "id": "review-3012"
+      },
+      "path": "tooling/cli/doc/25-collaboration-providers.md",
+      "commit": "55e2a8e42",
+      "body": "This line moved since; the comment keeps its file."
+    },
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "comment-5150"
+      },
+      "author": "hubot",
+      "submittedAt": "2026-09-24T09:00:00Z",
+      "body": "Rebased on main."
+    }
+  ],
+  "page": {
+    "next": "c.p1.n5150"
+  }
+}

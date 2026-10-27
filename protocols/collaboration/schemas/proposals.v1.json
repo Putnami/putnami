@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-collaboration-proposals.v1.json",
   "title": "Putnami change proposals contract, version 1",
-  "description": "Request (<operation>Input) and result (<operation>Result) documents of every proposals v1 operation. Required: find, upsert, status, review. Optional: merge.",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every proposals v1 operation. Required: find, upsert, status, review. Optional: comments, merge.",
   "$defs": {
     "proposalState": {
       "type": "string",
@@ -89,6 +89,23 @@
         "submittedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
       }
     },
+    "comment": {
+      "type": "object",
+      "description": "One text someone wrote on a proposal: a review's body, a comment on one line of a file, or a comment on the proposal as a whole. A comment on no file line has no path.",
+      "additionalProperties": false,
+      "required": ["ref", "body"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "author": { "$ref": "collaboration.json#/$defs/token" },
+        "submittedAt": { "$ref": "collaboration.json#/$defs/timestamp" },
+        "review": { "$ref": "collaboration.json#/$defs/ref", "description": "The review the comment belongs to." },
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "The repository-relative path of the file the comment is anchored to." },
+        "line": { "type": "integer", "minimum": 1, "description": "The line of path, in the file at commit, the comment is anchored to; absent when that line no longer exists. Never present without path." },
+        "commit": { "$ref": "collaboration.json#/$defs/commit" },
+        "body": { "type": "string", "minLength": 1 }
+      }
+    },
     "findInput": {
       "type": "object",
       "additionalProperties": false,
@@ -166,6 +183,24 @@
       "properties": {
         "review": { "$ref": "#/$defs/review" },
         "created": { "type": "boolean" }
+      }
+    },
+    "commentsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "commentsResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "page"],
+      "properties": {
+        "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/comment" } },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
       }
     },
     "mergeInput": {

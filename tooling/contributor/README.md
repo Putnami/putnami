@@ -57,7 +57,9 @@ is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
 it does not select backlog work. It publishes its own proposal by default
 ([ADR 0003](doc/adr/0003-build-publishes-its-proposal-by-default.md)), and
-`--local` keeps a run local.
+`--local` keeps a run local. When the outcome changes a declaration, the first
+checkpoint holds the declarations only
+([ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)).
 
 Worker profiles: `fix-light`, `fix-standard`, `fix-heavy` and `epic-analyst`,
 each one body for both hosts with host metadata beside it.

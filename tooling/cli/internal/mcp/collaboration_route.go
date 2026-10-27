@@ -149,6 +149,8 @@ func normalize(input any, workspaceName string) {
 		page(&in.Page)
 	case *collab.ProposalFindInput:
 		page(&in.Page)
+	case *collab.ProposalCommentsInput:
+		page(&in.Page)
 	case *collab.MemoryContextInput:
 		page(&in.Page)
 		identity(&in.Identity)
@@ -262,6 +264,8 @@ func requestedPage(input any) *collab.PageRequest {
 	case *collab.TaskFindInput:
 		return in.Page
 	case *collab.ProposalFindInput:
+		return in.Page
+	case *collab.ProposalCommentsInput:
 		return in.Page
 	case *collab.MemoryContextInput:
 		return in.Page
@@ -505,6 +509,8 @@ func proposalMismatch(input, result any) (string, bool) {
 		return sameRef("proposal", status.Proposal.Ref, in.Ref), true
 	case *collab.ProposalReviewInput:
 		return reviewMismatch(in, result), true
+	case *collab.ProposalCommentsInput:
+		return commentsMismatch(in, result), true
 	case *collab.ProposalMergeInput:
 		merged, wrong := resultAs[*collab.ProposalResult](result)
 		if wrong != "" {
@@ -546,6 +552,30 @@ func reviewMismatch(in *collab.ProposalReviewInput, result any) string {
 	}
 	if in.Commit != "" && review.Review.Commit != "" && !sameCommit(review.Review.Commit, in.Commit) {
 		return fmt.Sprintf("review of commit %s, requested %s", review.Review.Commit, in.Commit)
+	}
+	return ""
+}
+
+// commentsMismatch checks a page of comments against its request. A comment
+// names no proposal, so only the page size and the source of what it names
+// can be checked: the comment and its review are in the source of the
+// requested proposal.
+func commentsMismatch(in *collab.ProposalCommentsInput, result any) string {
+	list, wrong := resultAs[*collab.ProposalCommentListResult](result)
+	if wrong != "" {
+		return wrong
+	}
+	if len(list.Items) > in.Page.Size {
+		return fmt.Sprintf("%d items for a page of %d", len(list.Items), in.Page.Size)
+	}
+	for _, comment := range list.Items {
+		if comment.Ref.Source != in.Ref.Source {
+			return fmt.Sprintf("comment %s/%s, requested proposal %s/%s", comment.Ref.Source, comment.Ref.ID, in.Ref.Source, in.Ref.ID)
+		}
+		if comment.Review != nil && comment.Review.Source != in.Ref.Source {
+			return fmt.Sprintf("comment %s names review %s/%s, requested proposal %s/%s", comment.Ref.ID, comment.Review.Source, comment.Review.ID,
+				in.Ref.Source, in.Ref.ID)
+		}
 	}
 	return ""
 }

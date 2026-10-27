@@ -9,8 +9,9 @@ Own the requested outcome, whether it arrives as an intention, a specified
 task, an existing proposal, or a coordinated epic. This is the one
 implementation, review, repair and evidence loop. A request to build an
 outcome authorizes the work toward it and the publication of its own proposal:
-a draft once the plan is settled, a pushed checkpoint at each milestone, and
-ready for review once the final local gate and dossier pass. It does not
+a draft once the plan is settled, the declarations as its first checkpoint when
+the outcome changes one, a pushed checkpoint at each milestone, and ready for
+review once the final local gate and dossier pass. It does not
 authorize choosing backlog work, claiming a task, merging or deploying. A named
 task may be claimed only when the mandate explicitly authorizes the claim.
 
@@ -100,6 +101,13 @@ their dependent stage and remain explicit in a handoff. Use repository or
 provider references that another supported host can read when available.
 
 ## Implement and verify
+
+When the outcome changes a feature declaration, spec, specs baseline,
+architecture manifest, decisions file or ADR, commit those declarations alone
+and push them to the draft before any implementation commit. Continue with
+the code without waiting. Before each later checkpoint, read the reviews and
+comments, handle each comment on a declaration and answer it on the proposal.
+The loop's "Intent first" section gives the order.
 
 Follow the single [loop](../../../.agents/skills/build/references/loop.md)
 for ownership, tier, freeze, independent candidate review, repair, one

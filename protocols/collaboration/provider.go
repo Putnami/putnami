@@ -449,6 +449,8 @@ func listItemSizes(result any) ([]int, error) {
 		return encodedSizes(list.Items)
 	case *ProposalListResult:
 		return encodedSizes(list.Items)
+	case *ProposalCommentListResult:
+		return encodedSizes(list.Items)
 	case *MemoryListResult:
 		return encodedSizes(list.Items)
 	}
@@ -475,6 +477,8 @@ func pageRequestOf(input any) *PageRequest {
 	case *TaskFindInput:
 		page = &in.Page
 	case *ProposalFindInput:
+		page = &in.Page
+	case *ProposalCommentsInput:
 		page = &in.Page
 	case *MemoryContextInput:
 		page = &in.Page
@@ -516,6 +520,10 @@ func emptyListsAsEmpty(result any) {
 	case *ProposalListResult:
 		if list.Items == nil {
 			list.Items = []Proposal{}
+		}
+	case *ProposalCommentListResult:
+		if list.Items == nil {
+			list.Items = []ProposalComment{}
 		}
 	case *MemoryListResult:
 		if list.Items == nil {

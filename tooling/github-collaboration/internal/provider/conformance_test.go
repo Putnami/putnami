@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/collaboration/providertest"
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -12,10 +13,15 @@ import (
 // TestTheSharedContractScenarios runs the scenarios every tasks and proposals
 // provider passes, against a fresh fake GitHub each time, through the same
 // handlers and redaction the runtime uses. Like GitHub, the fake lists a new
-// issue only some time after its create was answered.
+// issue only some time after its create was answered. The provider offers
+// proposals.comments, so the comment scenario runs rather than skips.
 func TestTheSharedContractScenarios(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "task-scenarios", "the-github-provider-passes-the-task-scenarios")
 	spectest.Proves(t, "collaboration/provider-contract", "proposal-scenarios", "the-github-provider-passes-the-proposal-scenarios")
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-comments", "the-github-provider-passes-the-comment-scenario")
+	if _, offered := (&Provider{}).Handlers()[collab.OperationKey{Contract: collab.ContractProposals, Version: 1, Operation: collab.OperationComments}]; !offered {
+		t.Fatal("the provider does not offer proposals.comments, so the comment scenario would skip")
+	}
 	newTarget := func(contract string) func(t *testing.T) providertest.Target {
 		return func(t *testing.T) providertest.Target {
 			h := newHarness(t)

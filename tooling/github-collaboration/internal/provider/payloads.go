@@ -102,6 +102,30 @@ type ghReview struct {
 	SubmittedAt string  `json:"submitted_at"`
 }
 
+// ghReviewComment is a comment on a line of a pull request's diff. Line is
+// null once the line is no longer in the diff.
+type ghReviewComment struct {
+	ID                  int64   `json:"id"`
+	PullRequestReviewID *int64  `json:"pull_request_review_id"`
+	User                *ghUser `json:"user"`
+	Body                string  `json:"body"`
+	Path                string  `json:"path"`
+	Line                *int    `json:"line"`
+	CommitID            string  `json:"commit_id"`
+	HTMLURL             string  `json:"html_url"`
+	CreatedAt           string  `json:"created_at"`
+}
+
+// ghIssueComment is a comment on the conversation of an issue or a pull
+// request.
+type ghIssueComment struct {
+	ID        int64   `json:"id"`
+	User      *ghUser `json:"user"`
+	Body      string  `json:"body"`
+	HTMLURL   string  `json:"html_url"`
+	CreatedAt string  `json:"created_at"`
+}
+
 type ghRef struct {
 	Object struct {
 		SHA string `json:"sha"`

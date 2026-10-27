@@ -384,10 +384,14 @@ func TestServe_ANilPageIsTheEmptyList(t *testing.T) {
 			return &ProposalListResult{}, nil
 		},
 		{ContractMemory, 1, OperationSearch}: func(context.Context, Call) (any, *Failure) { return &MemoryListResult{}, nil },
+		{ContractProposals, 1, OperationComments}: func(context.Context, Call) (any, *Failure) {
+			return &ProposalCommentListResult{}, nil
+		},
 	}
 	for _, request := range []extension.ToolCallRequest{
 		routed(ContractTasks, OperationFind, `{}`),
 		routed(ContractProposals, OperationFind, `{"change":{"base":"main","head":"h"}}`),
+		routed(ContractProposals, OperationComments, `{"ref":{"source":"local:x","id":"P-1"}}`),
 		routed(ContractMemory, OperationSearch, `{"query":"q"}`),
 	} {
 		response := serveCall(t, request, handlers)
