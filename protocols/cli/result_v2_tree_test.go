@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The gated-tree fingerprint.
@@ -40,6 +42,7 @@ func sessionFileWithTree() SessionFile {
 }
 
 func TestSessionFileTreeRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "the-tree-member-is-optional-and-strict")
 	want := sessionFileWithTree()
 	data, err := json.Marshal(want)
 	if err != nil {
@@ -62,6 +65,7 @@ func TestSessionFileTreeRoundTrip(t *testing.T) {
 // that could not determine the tree says nothing rather than claiming a clean
 // one, so absence is the only spelling of "unknown".
 func TestSessionFileTreeIsOptional(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "the-tree-member-is-optional-and-strict")
 	file := sessionFileWithTree()
 	file.Tree = nil
 	data, err := json.Marshal(file)
@@ -80,6 +84,7 @@ func TestSessionFileTreeIsOptional(t *testing.T) {
 // SessionTree.Dirty: a present block always states dirtiness, so `false` must
 // survive marshaling instead of being elided the way an omitempty member is.
 func TestSessionFileTreeDirtyIsKnownWhenPresent(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "the-tree-member-is-optional-and-strict")
 	file := sessionFileWithTree()
 	file.Tree.Dirty = false
 	data, err := json.Marshal(file)
@@ -95,6 +100,7 @@ func TestSessionFileTreeDirtyIsKnownWhenPresent(t *testing.T) {
 }
 
 func TestSessionFileTreeRejectsMalformedMembers(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "the-tree-member-is-optional-and-strict")
 	cases := []struct {
 		name  string
 		tree  map[string]any

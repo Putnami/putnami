@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "cli/machine-contract#a-commit-is-read-one-way",
+    "cli/machine-contract#exit-codes-and-error-classification",
+    "cli/machine-contract#one-run-verdict-on-every-surface",
+    "cli/machine-contract#one-validator-and-a-shared-corpus",
+    "cli/machine-contract#output-modes-and-the-result-envelope",
+    "cli/machine-contract#reserved-flags-and-the-extension-contract",
+    "cli/machine-contract#session-members-are-additive",
+    "cli/machine-contract#test-cases-are-bounded",
+    "cli/machine-contract#the-bounded-stream-keeps-its-promises",
+    "cli/machine-contract#the-cli-emits-conforming-documents",
+    "cli/machine-contract#the-command-surface-names-breaking-changes",
+    "cli/machine-contract#the-report-is-a-bounded-projection",
+    "cli/machine-contract#the-reporting-wire",
+    "cli/machine-contract#the-schemas-and-the-types-agree",
+    "cli/machine-contract#version-2-is-the-only-machine-contract"
+  ]
+}

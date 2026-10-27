@@ -213,14 +213,18 @@ Evidence behind `stable`:
 
 ## Product feature and durable decisions
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcomes it serves — a CLI whose exit codes mean something, and machine output an
-agent can parse — are delivered by `@putnami/cli` itself, which is what the
-support catalog classifies as a package. A feature per protocol module would
-create one artificial product identity per technical boundary, which the
-[feature protocol's authoring boundary](../features/README.md) rules out. With no
-feature to detail there is no spec, since a spec details exactly one
-already-authored feature and never mints one.
+The module owns the feature of its contract, `cli/machine-contract`, specified
+in [`specs/machine-contract.json`](specs/machine-contract.json). Three
+implementations prove its requirements, each under checks of its own. The Go
+tests here prove the Go validators, schemas and bounds. `@putnami/cli` proves
+that the documents it writes validate and match the committed goldens, in
+`tooling/cli/internal/cli/wire_golden_v2_test.go`, and that its exit codes, its
+session verdict and its bounded stream follow the contract.
+`@putnami/cli-protocol` proves its TypeScript validator against the same
+schemas and the same conformance corpus, in its `the-typescript-...` checks.
+`@putnami/cli` keeps the features of its commands, and `@putnami/cli-protocol`
+keeps its exports, its violation order and, until the `qualify` slice, `qualify-verdict-wire`
+under `typescript/cli-machine-output`.
 
 Durable decisions (both scope `protocols/cli` explicitly):
 

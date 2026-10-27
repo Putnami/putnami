@@ -6,9 +6,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestMachineOutputBudgetsAreFixedByMode(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "budgets-are-fixed-by-mode")
 	normal, ok := MachineOutputBudgetFor(MachineOutputModeNormal)
 	if !ok {
 		t.Fatal("normal machine-output mode has no budget")
@@ -42,6 +45,7 @@ func TestMachineOutputBudgetsAreFixedByMode(t *testing.T) {
 }
 
 func TestSelectMachineOutputKeepsHardPartitionsAndArrivalOrder(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "selection-keeps-partitions-and-order")
 	ordinary := func(rawBytes int) machineOutputLine {
 		return machineOutputLine{
 			raw:  bytes.Repeat([]byte{'o'}, rawBytes),
@@ -82,6 +86,7 @@ func TestSelectMachineOutputKeepsHardPartitionsAndArrivalOrder(t *testing.T) {
 }
 
 func TestSelectMachineOutputNormalSuppressesDebugAndVerboseAdmitsIt(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "selection-keeps-partitions-and-order")
 	line := func(level string) machineOutputLine {
 		return machineOutputLine{
 			raw:  []byte(level),
@@ -128,6 +133,7 @@ func TestSelectMachineOutputNormalSuppressesDebugAndVerboseAdmitsIt(t *testing.T
 }
 
 func TestMachineOutputFailurePriorityVocabulary(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "classifiers-are-closed-and-agree")
 	tests := []struct {
 		name   string
 		record SessionStreamRecord
@@ -161,6 +167,7 @@ func TestMachineOutputFailurePriorityVocabulary(t *testing.T) {
 }
 
 func TestMachineOutputDebugDetailVocabulary(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "classifiers-are-closed-and-agree")
 	tests := []struct {
 		name   string
 		record SessionStreamRecord
@@ -189,6 +196,7 @@ func TestMachineOutputDebugDetailVocabulary(t *testing.T) {
 // the selection with. A disagreement would make the CLI's own bounded stream
 // fail ValidateSessionStream.
 func TestMachineOutputClassifiersAgreeOnDecodedRecords(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "classifiers-are-closed-and-agree")
 	records := []SessionStreamRecord{
 		{Record: RecordTestCase, TestCase: &TestCase{Name: "TestA", Suite: "a", Status: TestCaseStatusPassed}},
 		{Record: RecordTestCase, TestCase: &TestCase{Name: "TestA", Suite: "a", Status: TestCaseStatusSkipped, Output: "later"}},
@@ -219,6 +227,7 @@ func TestMachineOutputClassifiersAgreeOnDecodedRecords(t *testing.T) {
 }
 
 func TestSelectMachineOutputTreatsEveryTestCaseAsDebugDetail(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "selection-keeps-partitions-and-order")
 	line := func(status string) machineOutputLine {
 		return machineOutputLine{
 			raw:  []byte(status),
@@ -255,6 +264,7 @@ func TestSelectMachineOutputTreatsEveryTestCaseAsDebugDetail(t *testing.T) {
 }
 
 func TestSanitizeMachineOutputValue(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "output-is-sanitized-and-valid-utf-8")
 	secretValues := []string{
 		"AK" + "IA" + strings.Repeat("A", 16),
 		"AS" + "IA" + strings.Repeat("B", 16),
@@ -306,6 +316,7 @@ func TestSanitizeMachineOutputValue(t *testing.T) {
 }
 
 func TestUnpairedJSONSurrogateDetection(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "output-is-sanitized-and-valid-utf-8")
 	tests := []struct {
 		raw  string
 		want bool
@@ -325,6 +336,7 @@ func TestUnpairedJSONSurrogateDetection(t *testing.T) {
 }
 
 func TestValidateSessionStreamRejectsRawInvalidUTF8(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "output-is-sanitized-and-valid-utf-8")
 	final := testBoundedFinalLine(t)
 	invalid := []byte{'{', '"', 'x', '"', ':', '"', 0xff, '"', '}', '\n'}
 	live := append(append([]byte(nil), invalid...), final...)

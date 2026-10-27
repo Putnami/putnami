@@ -1900,9 +1900,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "errors-map-to-stable-exit-codes",
-              "session-exit-derives-from-the-canonical-reduction",
-              "an-interrupt-is-a-distinct-aborted-status",
               "an-interactive-run-that-passes-its-deadline-exits-one-and-names-it",
               "an-interactive-child-that-ends-from-a-signal-exits-one-and-names-it",
               "an-interactive-child-that-ends-from-sigint-is-an-interrupted-run"
@@ -1919,8 +1916,7 @@
             "kind": "acceptance",
             "checks": [
               "the-stream-is-bounded-failure-first-sanitized-and-recorded",
-              "normal-suppresses-and-verbose-admits-debug-detail",
-              "failure-capacity-is-reserved-after-exhaustion"
+              "the-output-mode-never-changes-the-run-verdict"
             ]
           }
         },

@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The v2 result contract's cross-language corpus.
@@ -121,6 +123,7 @@ func (c conformanceCase) document(t *testing.T) []byte {
 
 // TestConformanceCorpus runs every case and requires the exact violation set.
 func TestConformanceCorpus(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "every-corpus-case-meets-its-expectation")
 	manifest := loadConformanceManifest(t)
 	for _, testCase := range manifest.Cases {
 		t.Run(testCase.ID, func(t *testing.T) {
@@ -233,6 +236,7 @@ func assertSortedViolations(t *testing.T, testCase conformanceCase) {
 // every violation code must be exercised, so a code added without a case — or a
 // case deleted — is a test failure rather than an untested contract clause.
 func TestConformanceCorpus_Complete(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-corpus-is-complete-and-unique")
 	manifest := loadConformanceManifest(t)
 
 	documents := map[DocumentKind]bool{}
@@ -277,6 +281,7 @@ func TestConformanceCorpus_Complete(t *testing.T) {
 
 // TestConformanceCorpus_UniqueIDs keeps case ids addressable across runtimes.
 func TestConformanceCorpus_UniqueIDs(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "the-corpus-is-complete-and-unique")
 	manifest := loadConformanceManifest(t)
 	seen := map[string]bool{}
 	for _, testCase := range manifest.Cases {
@@ -302,6 +307,7 @@ func TestConformanceCorpus_UniqueIDs(t *testing.T) {
 // TestConformanceCorpus_Header pins the corpus header against the Go constants,
 // including the document vocabulary the TypeScript runner also switches on.
 func TestConformanceCorpus_Header(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "every-corpus-case-meets-its-expectation")
 	manifest := loadConformanceManifest(t)
 	if manifest.Protocol != "putnami.cli.result.v2" {
 		t.Errorf("corpus protocol = %q, want %q", manifest.Protocol, "putnami.cli.result.v2")
@@ -322,6 +328,7 @@ func TestConformanceCorpus_Header(t *testing.T) {
 // stable id, the languages both runners implement, and a corpus pointer that
 // resolves.
 func TestConformancePack(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "one-validator-and-a-shared-corpus", "every-corpus-case-meets-its-expectation")
 	data, err := os.ReadFile(conformancePackPath)
 	if err != nil {
 		t.Fatal(err)

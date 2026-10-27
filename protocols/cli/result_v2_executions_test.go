@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The physical execution ledger.
@@ -82,6 +84,7 @@ func sessionFileWithExecutions() SessionFile {
 // TestSessionFileExecutionsRoundTrip pins the ledger through the wire: every
 // member survives marshal/unmarshal, and the resulting document validates.
 func TestSessionFileExecutionsRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "executions-round-trip-and-resolve")
 	want := sessionFileWithExecutions()
 	data, err := json.Marshal(want)
 	if err != nil {
@@ -103,6 +106,7 @@ func TestSessionFileExecutionsRoundTrip(t *testing.T) {
 // file written before the ledger existed — no executions, no executionId —
 // still validates unchanged.
 func TestSessionFileExecutionsAreOptional(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "executions-round-trip-and-resolve")
 	file := sessionFileWithExecutions()
 	file.Executions = nil
 	for i := range file.Tasks {
@@ -125,6 +129,7 @@ func TestSessionFileExecutionsAreOptional(t *testing.T) {
 // attempt that ran, so the contract must let a producer report it. Dropping it
 // would be the under-count the ledger exists to prevent.
 func TestSessionFileAcceptsASupersededExecution(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "executions-round-trip-and-resolve")
 	file := sessionFileWithExecutions()
 	if file.Executions[1].Tasks != 0 {
 		t.Fatalf("fixture's superseded execution reports %d tasks, want 0", file.Executions[1].Tasks)
@@ -141,6 +146,7 @@ func TestSessionFileAcceptsASupersededExecution(t *testing.T) {
 // TestSessionFileRejectsDanglingExecutionID is the referential rule: a record
 // may reference no execution, but never one the document does not declare.
 func TestSessionFileRejectsDanglingExecutionID(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "executions-round-trip-and-resolve")
 	file := sessionFileWithExecutions()
 	file.Tasks[1].ExecutionID = "exec-9"
 	data, err := json.Marshal(file)
@@ -158,6 +164,7 @@ func TestSessionFileRejectsDanglingExecutionID(t *testing.T) {
 // invariant under logical fan-out, while the task list still attributes to
 // every project.
 func TestSessionFileExecutionsAggregateOnce(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "executions-round-trip-and-resolve")
 	file := sessionFileWithExecutions()
 
 	// 4200+610 for the batch, plus 380+45 for the superseded attempt. The

@@ -3,9 +3,12 @@ package cli
 import (
 	"errors"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestReservedGlobalFlagsReturnsIndependentCopy(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "the-registry-is-duplicate-free-and-copied")
 	a := ReservedGlobalFlags()
 	if len(a) == 0 {
 		t.Fatal("ReservedGlobalFlags returned an empty set")
@@ -17,6 +20,7 @@ func TestReservedGlobalFlagsReturnsIndependentCopy(t *testing.T) {
 }
 
 func TestReservedGlobalFlagsHygiene(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "the-registry-is-duplicate-free-and-copied")
 	seenLong := map[string]bool{}
 	seenShort := map[string]bool{}
 	for _, f := range ReservedGlobalFlags() {
@@ -40,6 +44,7 @@ func TestReservedGlobalFlagsHygiene(t *testing.T) {
 }
 
 func TestIsReservedGlobalFlag(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "lookups-and-shadow-checks-agree")
 	cases := []struct {
 		token string
 		want  bool
@@ -81,6 +86,7 @@ func TestIsReservedGlobalFlag(t *testing.T) {
 }
 
 func TestLookupReservedGlobalFlag(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "lookups-and-shadow-checks-agree")
 	f, ok := LookupReservedGlobalFlag("--output=text")
 	if !ok {
 		t.Fatal("expected --output to be reserved")
@@ -100,6 +106,7 @@ func TestLookupReservedGlobalFlag(t *testing.T) {
 }
 
 func TestValidateNoReservedShadow(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "reserved-flags-and-the-extension-contract", "lookups-and-shadow-checks-agree")
 	if err := ValidateNoReservedShadow("target", "race", "mytag"); err != nil {
 		t.Errorf("expected no collision for non-reserved names, got %v", err)
 	}

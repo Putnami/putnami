@@ -232,6 +232,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		// their own tests and their implementers observe, in the verification
 		// block.
 		filepath.Join("protocols", "agentcontext", ManifestFilename):  true,
+		filepath.Join("protocols", "cli", ManifestFilename):           true,
 		filepath.Join("protocols", "collaboration", ManifestFilename): true,
 		filepath.Join("protocols", "doctor", ManifestFilename):        true,
 		filepath.Join("protocols", "extension", ManifestFilename):     true,

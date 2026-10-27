@@ -1,8 +1,13 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestOutputModeIsStructured(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "output-modes-resolve-one-way")
 	structured := []OutputMode{OutputJSON, OutputJSONL}
 	for _, m := range structured {
 		if !m.IsStructured() {
@@ -18,6 +23,7 @@ func TestOutputModeIsStructured(t *testing.T) {
 }
 
 func TestResolveOutputMode(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "output-modes-resolve-one-way")
 	cases := []struct {
 		name    string
 		raw     string

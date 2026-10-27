@@ -338,7 +338,7 @@ func TestWriteStructuredFailureEmitsEnvelope(t *testing.T) {
 // function, so the decision either holds here or holds nowhere outside job runs.
 func TestWriteStructuredFailureReportsAnInterruptAsAborted(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "an-interrupt-is-a-distinct-aborted-status")
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-cli-reports-an-interrupt-as-aborted-with-exit-130")
 	var out, errBuf bytes.Buffer
 
 	code := writeStructuredFailure(&out, &errBuf, protocolcli.OutputJSONL, "deps install",

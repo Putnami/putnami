@@ -134,7 +134,9 @@ this is a binding, not a second contract. The contract itself belongs to
 `go.putnami.dev/protocol/cli`; the types here are pinned field-by-field against
 its published schemas, and the same committed corpus that the Go reader executes
 runs in this package's tests, so a divergence between the two readers fails
-here.
+here. Those tests prove requirements of the `cli/machine-contract` feature under
+`the-typescript-...` checks; the package's own specification keeps its
+exports and its violation order.
 
 Before v1.0.0, follow the workspace
 [compatibility policy](../../../RELEASE.md): a breaking change is allowed in a

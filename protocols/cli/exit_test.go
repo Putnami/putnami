@@ -1,11 +1,16 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 // TestExitCodeValues pins the exit-code taxonomy. These values are a public
 // contract branched on by scripts, CI, and agents; a change here is a breaking
 // change and must be deliberate.
 func TestExitCodeValues(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-exit-code-values-stay-fixed")
 	cases := map[string]struct {
 		got, want int
 	}{

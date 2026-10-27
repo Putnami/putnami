@@ -1967,6 +1967,10 @@ func TestProviderObjectCache_APersistent401Latches(t *testing.T) {
 	waitUntil(t, "the write path to latch on the persistent 401", func() bool {
 		return s.objects.writeRefusedLatched()
 	})
+	// The latch is set under the lock and its line is logged after the lock is
+	// released, so the worker that latched may still be writing it: drain the
+	// workers before reading the log, as the 403 test does.
+	s.objects.drain()
 	if log := logw.String(); !strings.Contains(log, "refused this run's object write (HTTP 401)") {
 		t.Errorf("the latch must state its status, got %q", log)
 	}

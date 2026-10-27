@@ -4,10 +4,15 @@
   "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/protocols/qualify"],
+  "dependencies": ["/protocols/cli", "/protocols/qualify"],
   "options": {
     "test": {
-      "filePatterns": ["../../../protocols/qualify/fixtures/**", "../../../protocols/qualify/schemas/**"]
+      "filePatterns": [
+        "../../../protocols/cli/conformance/**",
+        "../../../protocols/cli/schemas/**",
+        "../../../protocols/qualify/fixtures/**",
+        "../../../protocols/qualify/schemas/**"
+      ]
     },
     "package": {
       "npm": true
