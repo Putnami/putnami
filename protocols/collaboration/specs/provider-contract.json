@@ -56,7 +56,7 @@
     },
     {
       "id": "bounded-documents",
-      "text": "page.size is 0 to 100 in schema and validator alike, and cursor and next share one length bound. The maximal results of tasks.get and find, proposals.find and status, memory.mission, context and checkpoint, and the maximal checkpoint request, fit the 4 MiB document bound. Serve shortens a page that would exceed it, so a traversal lists each item once with at most two handler calls per page, and answers unavailable with provider.invalid_response, after one repeat, for a handler that ignores the page size."
+      "text": "page.size is 0 to 100 in schema and validator, and cursor and next share one length bound. The maximal results of tasks.get and find, proposals.find, status and comments, memory.mission, context and checkpoint, and the maximal checkpoint request, fit the 4 MiB document bound. Serve shortens a page that would exceed it, so a traversal lists each item once with at most two handler calls a page, and answers unavailable with provider.invalid_response, after one repeat, for a handler that ignores the page size."
     },
     {
       "id": "bounded-pages",
