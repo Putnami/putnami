@@ -15,7 +15,7 @@
   "requirements": [
     {
       "id": "identity-is-declared-and-never-downgraded",
-      "text": "A binding that holds one of the two credentials of an alternative fails in the consumer with a client credential error, and the provider receives no request. A forwarded user identity comes from the consumer's own inbound request, and the provider names that user. An operation that declares neither a user credential nor an api key carries neither. A WebSocket server stream fails before any message with 401 when its key is missing and with 403 when the key lacks the scope."
+      "text": "A binding that holds one of the two credentials of an alternative fails in the consumer with a client credential error, and the provider receives no request. A forwarded user identity comes from the consumer's own inbound request, and the provider names that user. An operation that declares neither a user credential nor an api key carries neither. A WebSocket server stream fails before any message with 401 when its key is unknown and with 403 when the key lacks the scope."
     },
     {
       "id": "a-result-is-what-the-contract-declared",

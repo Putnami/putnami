@@ -26,7 +26,7 @@
     },
     {
       "id": "a-call-is-observable-and-ends-with-its-application",
-      "text": "The call span is a child of the inbound request span, the attempt span a child of the call span, and the provider receives the attempt span as traceparent. Each unary call and each stream counts once in rpc.client.calls under its protocol. No export carries a secret, payload, query string or unbounded label. A raw octet call is traced and counted once without its octets. A client kept after its application stopped refuses every call with the client-closed code, and the provider sees none."
+      "text": "The call span is a child of the inbound request span, the attempt span a child of the call span, and the provider receives the attempt span as traceparent. Each unary call and each stream counts once in rpc.client.calls under its protocol. No export carries a secret, payload, query string or unbounded label. A raw octet call is traced and counted once without its octets. A client kept after its application stopped refuses REST and Connect calls with the client-closed code, and the provider sees none."
     },
     {
       "id": "generation-is-deterministic-and-a-break-is-detected",
