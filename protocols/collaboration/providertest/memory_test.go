@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // memoryStore is the smallest provider that honors the memory contract: one
@@ -135,6 +136,7 @@ func refusal(reason, current, format string, args ...any) *collab.Failure {
 }
 
 func TestTheMemoryScenariosPassAgainstACorrectProvider(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "memory-scenarios", "the-memory-scenarios-pass-against-a-correct-provider")
 	RunMemory(t, func(t *testing.T) Target {
 		target := memoryTarget(t, !strings.Contains(t.Name(), "unknown_mission"))
 		store := newMemoryStore()
@@ -146,6 +148,7 @@ func TestTheMemoryScenariosPassAgainstACorrectProvider(t *testing.T) {
 }
 
 func TestNormalizeNamesTheServedWorkspace(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "scenarios-normalize-requests", "a-memory-request-names-the-served-workspace")
 	got := string(normalize(collab.ContractMemory, collab.OperationCheckpoint,
 		`{"mission":"m","idempotencyKey":"k","content":"c","precondition":{"mustNotExist":true}}`, "served"))
 	if !strings.Contains(got, `"identity":{"workspace":"served"}`) {

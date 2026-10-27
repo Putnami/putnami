@@ -1,0 +1,392 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "collaboration",
+  "features": [
+    {
+      "id": "collaboration/provider-contract",
+      "type": "feature",
+      "name": "Collaboration provider contracts",
+      "outcome": "A workspace binds its tasks, proposals, memory and missions to providers written in any language, and every caller and provider exchange one closed, versioned, strictly validated set of documents whose outcomes say whether a write happened, pinned by one catalog, one schema set, one fixture corpus and shared scenarios every provider passes.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "one-closed-catalog",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-version-names-its-required-and-optional-operations",
+              "every-creating-mutation-carries-an-idempotency-key",
+              "only-missions-sync-is-host-only"
+            ]
+          }
+        },
+        {
+          "id": "well-formed-operations",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-operation-is-well-formed"
+            ]
+          }
+        },
+        {
+          "id": "strict-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-contract-version-or-operation-is-refused",
+              "a-malformed-document-is-refused",
+              "bounds-and-timestamps-are-validated"
+            ]
+          }
+        },
+        {
+          "id": "one-fixture-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-parses",
+              "every-invalid-fixture-produces-its-codes",
+              "a-valid-document-round-trips",
+              "every-code-is-exercised"
+            ]
+          }
+        },
+        {
+          "id": "schemas-track-the-go-types",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "operation-schemas-match-the-go-types",
+              "entity-schemas-match-the-go-types",
+              "enums-match-the-go-vocabularies",
+              "every-input-schema-is-self-contained"
+            ]
+          }
+        },
+        {
+          "id": "one-outcome-per-envelope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-envelope-carries-one-outcome",
+              "a-reconcile-hint-names-a-catalog-operation"
+            ]
+          }
+        },
+        {
+          "id": "independent-bindings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-contract-is-bound-on-its-own",
+              "an-invalid-binding-drops-only-its-contract",
+              "a-malformed-binding-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "no-credential-in-a-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-named-setting-is-refused",
+              "a-url-carrying-a-credential-is-refused",
+              "credential-names-are-recognized-across-spellings",
+              "the-cli-reports-a-credential-setting-without-echoing-it"
+            ]
+          }
+        },
+        {
+          "id": "truthful-provider-declarations",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-complete-declaration-is-offered",
+              "any-declaration-error-withdraws-the-contract-version",
+              "selection-operations-declare-the-workspace-view",
+              "a-version-nobody-speaks-draws-one-warning",
+              "the-local-provider-manifest-draws-no-diagnostic",
+              "the-github-provider-manifest-draws-no-diagnostic",
+              "the-memory-store-manifest-draws-no-diagnostic",
+              "the-cli-refuses-a-call-to-a-withdrawn-contract-version"
+            ]
+          }
+        },
+        {
+          "id": "serve-validates-both-sides",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "serve-runs-the-handler-on-a-validated-request",
+              "serve-refuses-what-the-contract-refuses",
+              "an-uncertain-handler-is-unresolved-for-a-mutation",
+              "a-handler-failure-keeps-its-outcome",
+              "a-nil-page-is-the-empty-list",
+              "an-undecodable-request-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "bounded-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "page-bounds-match-the-schema",
+              "every-maximal-document-fits-the-bound",
+              "serve-shortens-a-page-above-the-bound",
+              "serve-refuses-a-handler-that-ignores-the-page-size"
+            ]
+          }
+        },
+        {
+          "id": "bounded-pages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-answers-empty-and-paginated-lists",
+              "the-cli-refuses-a-page-above-the-requested-size",
+              "the-cli-asks-for-a-smaller-page-size-above-the-bound"
+            ]
+          }
+        },
+        {
+          "id": "absent-is-not-empty",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "absent-and-empty-members-survive-a-re-encoding"
+            ]
+          }
+        },
+        {
+          "id": "task-scenarios",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-task-scenarios-pass-against-a-correct-provider",
+              "the-local-provider-passes-the-task-scenarios",
+              "the-github-provider-passes-the-task-scenarios"
+            ]
+          }
+        },
+        {
+          "id": "proposal-scenarios",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-proposal-scenarios-pass-against-a-correct-provider",
+              "the-local-provider-passes-the-proposal-scenarios",
+              "the-github-provider-passes-the-proposal-scenarios"
+            ]
+          }
+        },
+        {
+          "id": "memory-scenarios",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-memory-scenarios-pass-against-a-correct-provider",
+              "the-memory-store-passes-the-memory-scenarios-on-every-backend"
+            ]
+          }
+        },
+        {
+          "id": "missions-provider-semantics",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-missions-scenarios-pass-against-a-correct-provider",
+              "the-local-provider-passes-the-missions-scenarios",
+              "the-local-provider-takes-owner-answers-and-messages-from-files",
+              "the-local-provider-asks-and-replies-once-across-concurrent-processes"
+            ]
+          }
+        },
+        {
+          "id": "scenarios-normalize-requests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-list-request-gets-an-explicit-page",
+              "a-memory-request-names-the-served-workspace"
+            ]
+          }
+        },
+        {
+          "id": "refused-before-the-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-refuses-an-operation-the-provider-does-not-offer",
+              "the-cli-refuses-a-precondition-the-provider-cannot-enforce"
+            ]
+          }
+        },
+        {
+          "id": "exact-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-refuses-a-read-that-answers-for-something-else",
+              "the-cli-makes-a-mutation-that-answers-for-something-else-unresolved"
+            ]
+          }
+        },
+        {
+          "id": "missions-identity-and-reconciliation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-makes-a-missions-answer-for-another-mission-or-message-unresolved",
+              "the-cli-names-the-repeat-of-an-unresolved-missions-write"
+            ]
+          }
+        },
+        {
+          "id": "uncertain-writes-are-unresolved",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-makes-a-provider-that-cannot-start-unavailable",
+              "the-cli-makes-a-timed-out-read-unavailable-and-retryable",
+              "the-cli-makes-a-timed-out-or-canceled-mutation-unresolved",
+              "the-cli-makes-a-crashed-mutation-unresolved-with-a-reconcile"
+            ]
+          }
+        },
+        {
+          "id": "invalid-answers-are-refused",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-refuses-an-answer-the-contract-refuses",
+              "the-cli-keeps-a-provider-failure-outcome"
+            ]
+          }
+        },
+        {
+          "id": "no-credential-in-an-envelope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-keeps-provider-stderr-out-of-envelopes",
+              "the-cli-redacts-every-credential-value"
+            ]
+          }
+        },
+        {
+          "id": "callers-never-repeat-an-unresolved-write",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-contributor-stops-an-unresolved-write-without-a-retry"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

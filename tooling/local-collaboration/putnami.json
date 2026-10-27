@@ -29,6 +29,6 @@
     }
   },
   "featureAuthority": {
-    "owner": "cli/collaboration-providers"
+    "owner": "collaboration/provider-contract"
   }
 }

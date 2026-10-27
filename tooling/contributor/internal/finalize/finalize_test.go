@@ -513,7 +513,7 @@ func TestDraftSeedAndLegacyEmptyCommitAllowLaterPartial(t *testing.T) {
 
 func TestCurrentProofAndReadbackGuardWrites(t *testing.T) {
 	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "the-read-back-carries-what-the-upsert-answered")
-	spectest.Proves(t, "tooling/contributor-executable", "provider-neutral-publication", "an-unresolved-write-stops-without-a-retry")
+	spectest.Proves(t, "collaboration/provider-contract", "callers-never-repeat-an-unresolved-write", "the-contributor-stops-an-unresolved-write-without-a-retry")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
 	provider.dropLabels = true

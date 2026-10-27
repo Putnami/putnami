@@ -344,8 +344,10 @@ The sample is tagged `e2e`, so `--impacted` skips it: name the projects.
 
 Each run publishes the checks this sample's feature declares
 (`putnami.features.json`) through `specTest`, and the merged report lands in the
-project's `putnami-feature-verification` artifact. Verification runs in `report`
-mode: the sample is tagged `e2e`, which an enforcing gate blocks on.
+project's `putnami-feature-verification` artifact. Verification runs in
+`enforce` mode against the [spec](specs/ts-first-party-client-matrix.json): a
+run that names the sample fails when a check fails or is not observed. Name the
+Go client project too, because its tests prove the Go consumer's checks.
 
 Contract: [`@putnami/client`](../../framework/client/README.md) —
 [service-clients specification](../../framework/client/specs/service-clients.json).
