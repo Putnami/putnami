@@ -919,7 +919,7 @@ func checkLintControl(t *testing.T, env []string, golangci, config string) error
 		out, err := cmd.CombinedOutput()
 		for _, name := range planted {
 			if err == nil || !strings.Contains(string(out), filepath.FromSlash(name)) || !strings.Contains(string(out), "errcheck") {
-				return fmt.Errorf("golangci-lint run from %s did not report the unchecked error planted in %s (%v), so it would not report a template's findings either. Either a directory of that path matches an exclusions.paths entry of %s, errcheck is no longer enabled there, or the control module did not load:\n%s",
+				return fmt.Errorf("golangci-lint run from %s did not report the unchecked error planted in %s (%w), so it would not report a template's findings either. Either a directory of that path matches an exclusions.paths entry of %s, errcheck is no longer enabled there, or the control module did not load:\n%s",
 					dir, name, err, config, out)
 			}
 		}
