@@ -76,12 +76,12 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 		}
 		ws.targets = append(ws.targets, "~"+name, "gr"+name, "n"+name, "/"+dir, dir)
 	}
-	config, err := json.Marshal(map[string]any{
-		"name":           "hostile-ws",
-		"includes":       includes,
-		"projectAliases": projectAliases,
-		"groups":         groups,
-	})
+	config, err := json.Marshal(struct {
+		Name           string            `json:"name"`
+		Includes       []string          `json:"includes"`
+		ProjectAliases map[string]string `json:"projectAliases"`
+		Groups         map[string]string `json:"groups"`
+	}{"hostile-ws", includes, projectAliases, groups})
 	if err != nil {
 		t.Fatal(err)
 	}
