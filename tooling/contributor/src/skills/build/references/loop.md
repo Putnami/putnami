@@ -68,9 +68,11 @@ decision record (ADR).
    answer. A provider that does not offer `comments` answers `unsupported`:
    report that the run cannot read comments, and read the review verdicts
    alone.
-4. An approval names the commit it reviewed. A declaration that changes after
-   an approval goes in its own commit, which touches declarations only, so the
-   reviewer sees what changed since the approval.
+4. An approval names the commit it reviewed: a review with verdict `approve`,
+   or a comment that reports the approval of one declaration file. A
+   declaration that changes after its approval goes in its own commit, which
+   touches declarations only, so the reviewer sees what changed since the
+   approval.
 5. The proposal turns ready for review when the final local gate and the
    dossier pass, as below. An approval is not required for ready.
 
