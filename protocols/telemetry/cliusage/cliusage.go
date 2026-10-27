@@ -99,6 +99,8 @@ var Commands = []string{
 	"deploy",
 	"generate",
 	"validate",
+	"agent-attach",
+	"agent-hook",
 	"cache-provider",
 	"change-finalize",
 	"change-language",

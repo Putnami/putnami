@@ -142,6 +142,143 @@
           }
         }
       ]
+    },
+    {
+      "id": "tooling/agent-session-hooks",
+      "type": "feature",
+      "name": "Agent session hooks",
+      "outcome": "A Claude Code or Codex session publishes its state, plan, delivered messages, decisions and replies to its mission through the hooks @putnami/contributor declares, and receives the owner's messages and answers",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "session-start-sheet",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "session-start-syncs-and-prints-the-mission-sheet",
+              "the-sheet-quotes-agent-text-within-4-kib",
+              "the-sheet-carries-the-mission-checkpoint",
+              "waiting-messages-arrive-whole-within-the-context-bound"
+            ]
+          }
+        },
+        {
+          "id": "tool-use-capture",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "post-tool-use-records-the-plan-without-git-or-provider",
+              "a-subagent-plan-is-not-the-session-plan",
+              "a-busy-session-spools-the-tool-call",
+              "an-asked-decision-binds-on-the-next-sync",
+              "a-recorded-reply-wins-over-an-ack-line",
+              "the-manifest-hooks-only-the-session-tools"
+            ]
+          }
+        },
+        {
+          "id": "stop-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "stop-publishes-in-one-sync",
+              "a-waiting-message-continues-the-turn-once",
+              "codex-waits-for-an-open-decision",
+              "a-message-counts-as-delivered-once-written",
+              "stop-failure-publishes-the-error",
+              "a-refused-reply-is-dropped"
+            ]
+          }
+        },
+        {
+          "id": "idle-wake",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-idle-wake-exits-75-only-on-a-waiting-message",
+              "the-idle-wake-ends-after-its-window"
+            ]
+          }
+        },
+        {
+          "id": "fail-open",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-failure-exits-0-with-a-log-line",
+              "a-run-without-a-channel-exits-0",
+              "a-transport-error-redials-and-keeps-the-queue"
+            ]
+          }
+        },
+        {
+          "id": "bounded-calls",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-budgets-fit-the-declared-timeouts"
+            ]
+          }
+        },
+        {
+          "id": "mission-target",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "attach-declares-the-mission-of-the-branch",
+              "the-repository-comes-from-origin-without-host-or-credential"
+            ]
+          }
+        },
+        {
+          "id": "host-channel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-hook-reaches-the-provider-through-the-host-channel"
+            ]
+          }
+        }
+      ],
+      "surface": {
+        "commands": [
+          "agent attach",
+          "agent hook"
+        ]
+      }
     }
   ]
 }

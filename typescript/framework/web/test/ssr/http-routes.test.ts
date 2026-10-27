@@ -6,6 +6,7 @@ import {
   parseAndValidateHttpRoutes,
   serializeCanonicalHttpRoutes,
 } from '@putnami/application/http-routes';
+import { specTest } from '@putnami/runtime/spectest';
 import { buildWebAssetHttpRoutes, buildWebPageHttpRoutes } from '../../src/ssr/http-routes';
 
 /**
@@ -101,76 +102,92 @@ describe('web HTTP route generation', () => {
     ).toEqual(expect.objectContaining({ path: '/docs/*' }));
   });
 
-  it('commits a page and its action as one GET,HEAD and one POST file-route at the same path', () => {
-    const routes = committedRoutes([
-      ...buildWebPageHttpRoutes([
-        { route: '/', evidencePath: 'src/app/page.tsx', hasAction: false },
-        { route: '/blog/:slug', evidencePath: 'src/app/blog/[slug]/page.tsx', hasAction: true },
-      ]),
-      ...buildWebAssetHttpRoutes('public', ['/react/hydrate.ABC123.js']),
-    ]);
+  specTest(
+    'commits a page and its action as one GET,HEAD and one POST file-route at the same path',
+    {
+      feature: 'http-routes/route-inventory-contract',
+      requirement: 'producers-emit-valid-inventories',
+      check: 'the-web-routes-pass-the-strict-parser',
+    },
+    () => {
+      const routes = committedRoutes([
+        ...buildWebPageHttpRoutes([
+          { route: '/', evidencePath: 'src/app/page.tsx', hasAction: false },
+          { route: '/blog/:slug', evidencePath: 'src/app/blog/[slug]/page.tsx', hasAction: true },
+        ]),
+        ...buildWebAssetHttpRoutes('public', ['/react/hydrate.ABC123.js']),
+      ]);
 
-    const blog = routes.filter((route) => route.path === '/blog/{slug}');
-    expect(blog).toEqual([
-      expect.objectContaining({
-        match: 'template',
-        methods: ['GET', 'HEAD'],
-        provenance: expect.objectContaining({
-          sourceKind: 'file-route',
-          evidencePath: 'src/app/blog/[slug]/page.tsx',
+      const blog = routes.filter((route) => route.path === '/blog/{slug}');
+      expect(blog).toEqual([
+        expect.objectContaining({
+          match: 'template',
+          methods: ['GET', 'HEAD'],
+          provenance: expect.objectContaining({
+            sourceKind: 'file-route',
+            evidencePath: 'src/app/blog/[slug]/page.tsx',
+          }),
         }),
-      }),
-      expect.objectContaining({
-        match: 'template',
-        methods: ['POST'],
-        provenance: expect.objectContaining({
-          sourceKind: 'file-route',
-          evidencePath: 'src/app/blog/[slug]/action.ts',
+        expect.objectContaining({
+          match: 'template',
+          methods: ['POST'],
+          provenance: expect.objectContaining({
+            sourceKind: 'file-route',
+            evidencePath: 'src/app/blog/[slug]/action.ts',
+          }),
         }),
-      }),
-    ]);
+      ]);
 
-    const { pages, actions, pageFiles } = classify(routes);
-    expect(pages.map((route) => route.path)).toEqual(['/', '/blog/{slug}']);
-    expect(actions.map((route) => [route.path, route.provenance.evidencePath])).toEqual([
-      ['/blog/{slug}', 'src/app/blog/[slug]/action.ts'],
-    ]);
-    expect([...pageFiles]).toEqual(['src/app/page.tsx', 'src/app/blog/[slug]/page.tsx']);
-    // The hashed-asset prefix serves GET and HEAD too, and is no page.
-    expect(routes).toContainEqual(
-      expect.objectContaining({
-        match: 'prefix',
-        path: '/react/',
-        methods: ['GET', 'HEAD'],
-        provenance: expect.objectContaining({ sourceKind: 'static-mount' }),
-      }),
-    );
-  });
+      const { pages, actions, pageFiles } = classify(routes);
+      expect(pages.map((route) => route.path)).toEqual(['/', '/blog/{slug}']);
+      expect(actions.map((route) => [route.path, route.provenance.evidencePath])).toEqual([
+        ['/blog/{slug}', 'src/app/blog/[slug]/action.ts'],
+      ]);
+      expect([...pageFiles]).toEqual(['src/app/page.tsx', 'src/app/blog/[slug]/page.tsx']);
+      // The hashed-asset prefix serves GET and HEAD too, and is no page.
+      expect(routes).toContainEqual(
+        expect.objectContaining({
+          match: 'prefix',
+          path: '/react/',
+          methods: ['GET', 'HEAD'],
+          provenance: expect.objectContaining({ sourceKind: 'static-mount' }),
+        }),
+      );
+    },
+  );
 
-  it('counts one page file for every route a static expansion produces', () => {
-    const routes = committedRoutes(
-      buildWebPageHttpRoutes([
-        {
-          route: '/docs/*',
-          evidencePath: 'src/app/docs/[...page]/page.tsx',
-          hasAction: true,
-          expandedPaths: ['/docs/getting-started', '/docs/reference/config', '/docs/reference/cli'],
-        },
-      ]),
-    );
+  specTest(
+    'counts one page file for every route a static expansion produces',
+    {
+      feature: 'http-routes/route-inventory-contract',
+      requirement: 'producers-emit-valid-inventories',
+      check: 'the-web-routes-pass-the-strict-parser',
+    },
+    () => {
+      const routes = committedRoutes(
+        buildWebPageHttpRoutes([
+          {
+            route: '/docs/*',
+            evidencePath: 'src/app/docs/[...page]/page.tsx',
+            hasAction: true,
+            expandedPaths: ['/docs/getting-started', '/docs/reference/config', '/docs/reference/cli'],
+          },
+        ]),
+      );
 
-    const { pages, actions, pageFiles } = classify(routes);
-    expect(pages.map((route) => route.path)).toEqual([
-      '/docs/getting-started',
-      '/docs/reference/cli',
-      '/docs/reference/config',
-    ]);
-    expect(pageFiles).toEqual(new Set(['src/app/docs/[...page]/page.tsx']));
-    expect(actions.map((route) => route.path)).toEqual(pages.map((route) => route.path));
-    expect(new Set(actions.map((route) => route.provenance.evidencePath))).toEqual(
-      new Set(['src/app/docs/[...page]/action.ts']),
-    );
-  });
+      const { pages, actions, pageFiles } = classify(routes);
+      expect(pages.map((route) => route.path)).toEqual([
+        '/docs/getting-started',
+        '/docs/reference/cli',
+        '/docs/reference/config',
+      ]);
+      expect(pageFiles).toEqual(new Set(['src/app/docs/[...page]/page.tsx']));
+      expect(actions.map((route) => route.path)).toEqual(pages.map((route) => route.path));
+      expect(new Set(actions.map((route) => route.provenance.evidencePath))).toEqual(
+        new Set(['src/app/docs/[...page]/action.ts']),
+      );
+    },
+  );
 
   it('collapses hashed build assets to bounded prefixes', () => {
     expect(buildWebAssetHttpRoutes('public', ['/react/hydrate.ABC123.js', '/react/chunk.DEF456.js'])).toEqual([

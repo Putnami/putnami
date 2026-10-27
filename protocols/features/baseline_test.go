@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func ratchetBaseline(projects ...SpecsBaselineProject) *SpecsBaseline {
@@ -188,6 +189,7 @@ func TestProjectSpecsBaselineValidationIsClosed(t *testing.T) {
 // of enforce or losing a recorded requirement is an error naming the reviewed
 // policy change; growth in either direction is legal and only counted.
 func TestCompareSpecsBaselineIsShrinkOnly(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "ratchets-and-decisions", "the-specs-baseline-refuses-a-regression-and-counts-growth")
 	baseline := ratchetBaseline(
 		enforcedProject("/go/framework/logger", "go/structured-logging#lifecycle", "go/structured-logging#record"),
 		enforcedProject("/go/framework/parallel", "go/bounded-parallel-work#ordering"),

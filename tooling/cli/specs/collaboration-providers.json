@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "cli/collaboration-providers",
   "outcomes": [
-    "A workspace chooses its task, change-proposal and memory providers independently, in one place, and changing one never changes another",
+    "A workspace chooses its task, change-proposal, memory and missions providers independently, in one place, and changing one never changes another",
     "An agent and a script call the same operation with the same request and read the same envelope, whether through MCP or the command line",
     "A contract nobody bound, a capability the provider lacks, and a precondition it cannot enforce are refused before anything runs, never reported as done",
     "A write whose outcome is unknown is reported as unresolved with the read that reconciles it, so nobody retries it blindly",
@@ -23,7 +23,7 @@
     },
     {
       "id": "capability-discovery",
-      "text": "capabilities reports, without running the provider, the binding status, the provider, and every operation of the bound version with required, supported, preconditions and description. A binding to an unspoken version, or to a provider that lacks a required or binding-required operation or declares against the contract, is invalid."
+      "text": "capabilities reports, without running the provider, the binding status, the provider, and each operation of the bound version with required, supported, preconditions, description and hostOnly when set. A binding to an unknown version, or to a provider that lacks a required operation or breaks the contract, is invalid."
     },
     {
       "id": "one-route-two-entry-paths",
@@ -32,9 +32,18 @@
     {
       "id": "truthful-annotations",
       "text": "Every routed MCP tool carries readOnlyHint true exactly for a read operation, destructiveHint true for an operation that may modify existing state, and contract metadata whose access agrees."
+    },
+    {
+      "id": "host-only-operations",
+      "text": "An operation the catalog marks host-only is one the host that runs an agent calls, never the agent. The MCP server lists no tool for it, while putnami <contract> <operation> and the host channel's collaboration.call route it like any other operation, to the same envelope, and <contract>.capabilities marks it hostOnly."
+    },
+    {
+      "id": "contract-names-never-shadow-commands",
+      "text": "No contract takes the name of a built-in command, command path or reserved alias, so putnami <contract> <operation> always reaches the collaboration route and discovers the installed extensions first."
     }
   ],
   "decisions": [
-    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md"
+    "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
+    "protocols/collaboration/doc/adr/0003-missions-contract.md"
   ]
 }

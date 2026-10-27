@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "one-closed-catalog",
-      "text": "Each contract speaks only version 1, and an unknown contract none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers merge; memory requires checkpoint, context and mission and offers search. tasks.create, proposals.review and memory.checkpoint take an idempotencyKey."
+      "text": "Each contract speaks only version 1, and an unknown contract none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers merge; memory requires checkpoint, context and mission and offers search; missions requires ask, reply and sync. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey. Only missions.sync is host-only, and only a mutation can be."
     },
     {
       "id": "well-formed-operations",
@@ -79,6 +79,10 @@
       "text": "Every memory provider passes providertest.RunMemory: an unknown mission has no record; a mustNotExist checkpoint is created, repeated by its key, refused as idempotency.mismatch with other content and as record.exists a second time; a stale revision is revision.conflict with current; another instance resumes and repeats; of 6 concurrent checkpoints or creations exactly one lands; pages list records once at any size; a record stays in its workspace; the largest checkpoint reads back unchanged."
     },
     {
+      "id": "missions-provider-semantics",
+      "text": "A missions provider keeps one decision per idempotency key: the same content, whatever the mission title, replays it with its answer, and other content is a conflict (idempotency.mismatch). A message takes one reply; another is a conflict (message.closed). A delivered answer acknowledges its decision, a delivered message leaves the inbox, unknown or repeated ids change nothing, and an older sync never overwrites a newer one. Concurrent callers on one store lose no write."
+    },
+    {
       "id": "scenarios-normalize-requests",
       "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
     },
@@ -89,6 +93,10 @@
     {
       "id": "exact-identity",
       "text": "A result is about what the request named. The CLI answers unavailable a read that answers for another task, proposal, head or mission, or with a state or kind outside its filter; and unresolved, not retryable, with a reconcile, a mutation that does: an update or upsert for another item, head or head commit, a transition to another state, a claim for another holder or still held after release, a review of another commit, a merge that did not merge, or a checkpoint that kept its revision."
+    },
+    {
+      "id": "missions-identity-and-reconciliation",
+      "text": "An ok missions.sync answer describes the mission key the sync named, whatever the sync's age, reports only the decisions it named and answers each reply it carried once; an ok missions.reply answer names the message; a new missions.ask answer is an open decision. Any other answer is unresolved with reason provider.identity_mismatch, and an unresolved missions write names its own repeat as the reconciliation."
     },
     {
       "id": "uncertain-writes-are-unresolved",
@@ -109,6 +117,7 @@
   ],
   "decisions": [
     "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
-    "protocols/collaboration/doc/adr/0002-the-contracts-are-published-as-preview.md"
+    "protocols/collaboration/doc/adr/0002-the-contracts-are-published-as-preview.md",
+    "protocols/collaboration/doc/adr/0003-missions-contract.md"
   ]
 }

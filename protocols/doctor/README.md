@@ -78,13 +78,16 @@ engine.
     carry `waivedBy`. Validation recomputes and rejects a summary that lies.
 - **WaiverFile** (`doctor.waivers.json`, workspace root) —
   `{ $schema?, protocolVersion, waivers[] }`.
-  - **Waiver** — `{ code, project?, owner, reason, expires }`. An empty
-    `project` makes the waiver apply workspace-wide; a set `project` scopes it.
+  - **Waiver** — `{ code, project?, field?, owner, reason, expires }`. An
+    empty `project` makes the waiver apply workspace-wide; a set `project`
+    scopes it, and a set `field` narrows it to the one finding whose first
+    evidence field matches.
 
 ### Waiver semantics and the expiry boundary
 
-A waiver matches a finding by `code` and, when `project` is set, by project. The
-committed file is the reviewed record of accepted findings.
+A waiver matches a finding by `code`, by project when `project` is set, and by
+the first evidence field when `field` is set. The committed file is the reviewed
+record of accepted findings.
 
 **Expiry is data, never evaluated here.** A `Waiver.expires` and a
 `Finding.waivedBy.expires` are validated only for *parsability* (RFC 3339 date
@@ -200,20 +203,15 @@ See [Fixtures](#fixtures) above for why the two corpora are separate.
 - **`default` and `parity`**: no claim is recorded on either axis. Omission is
   not a denial — see the support vocabulary.
 
-## Specs and durable decisions
+## Feature and spec
 
-There is deliberately **no user-facing feature or spec for this module**. What a
-user wants is to be told, before promoting a workload, what would break — and
-that outcome is owned by the `putnami doctor` command, not by the JSON its
-report travels in. A product feature per technical wire contract would be a
-promise with no user behind it and a second authority beside the schema.
-
-The user-facing surface that owns the outcome is **`putnami doctor`** together
-with the committed `doctor.waivers.json` workflow. A spec for a doctor change
-belongs with that command.
-
-Durable decisions recorded here:
-
-- [`doc/adr/0001-frozen-check-code-taxonomy.md`](doc/adr/0001-frozen-check-code-taxonomy.md)
-  — a check code is frozen from the moment it merges, adding a code is additive
-  and does not bump the version, and every code carries a baked remediation.
+The module owns the feature of its contract, `doctor/readiness-report-contract`,
+specified in [`specs/readiness-report-contract.json`](specs/readiness-report-contract.json).
+The tests here prove its requirements, and so does `putnami doctor`
+(`tooling/cli/internal/commands/doctor`), whose waiver matching, expiry
+evaluation and waiver findings are checked against this package. The command
+keeps the feature of what it delivers, the readiness gate of
+`cli/diagnostics-results`. The design intent lives in
+[`doc/adr/0001-frozen-check-code-taxonomy.md`](doc/adr/0001-frozen-check-code-taxonomy.md):
+a check code is frozen from the moment it merges, adding a code is additive and
+does not bump the version, and every code carries a baked remediation.

@@ -107,6 +107,7 @@ use (
 	./tooling/memory-store
 	./tooling/scaffold
 	./tooling/sdd-extension
+	./tooling/windows-vet
 	./typescript/extension
 	./typescript/samples/10-service-to-service/clients/go
 )

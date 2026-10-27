@@ -1,0 +1,25 @@
+{
+  "session_id": "01a15d8d-8dda-7830-92b9-2112bcd234d7",
+  "turn_id": "01a15d8d-92ca-76b3-a046-067e49d895ac",
+  "transcript_path": "/home/agent/.codex/sessions/2026/10/21/rollout-2026-10-21T10-22-01-01a15d8d-8dda-7830-92b9-2112bcd234d7.jsonl",
+  "cwd": "/work/repo",
+  "hook_event_name": "PostToolUse",
+  "model": "example-model",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "update_plan",
+  "tool_input": {
+    "explanation": "Five files, one per call.",
+    "plan": [
+      {
+        "step": "Write f1.txt to f5.txt",
+        "status": "in_progress"
+      },
+      {
+        "step": "Report",
+        "status": "pending"
+      }
+    ]
+  },
+  "tool_response": "Plan updated",
+  "tool_use_id": "exec-31e1b4e4-0f13-4c0f-8979-bf2cf6ab1da5"
+}

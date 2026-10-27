@@ -115,6 +115,45 @@ their values from closed vocabularies ([Verbs](06-verbs.md#command-kinds)):
 }
 ```
 
+### Host Hooks
+
+The top-level `hostHooks` member declares the hooks an extension asks the agent
+hosts to run. Each hook runs one interactive subcommand of the extension, so
+the command's exit code reaches the host unchanged.
+
+```json
+{
+  "hostHooks": {
+    "requires": { "contract": "missions" },
+    "command": ["agent", "hook"],
+    "hosts": {
+      "claude-code": [
+        { "event": "SessionStart", "args": ["--engine", "claude-code"], "timeoutSeconds": 30 },
+        { "event": "PostToolUse", "tools": ["TodoWrite"], "mcpTools": ["missions.ask", "missions.reply"],
+          "args": ["--engine", "claude-code"], "timeoutSeconds": 30 },
+        { "event": "Stop", "args": ["--engine", "claude-code", "--idle-wake"], "wake": true, "timeoutSeconds": 660 }
+      ],
+      "codex": [
+        { "event": "Stop", "args": ["--engine", "codex"], "timeoutSeconds": 240 }
+      ]
+    }
+  }
+}
+```
+
+| Rule | Code |
+|------|------|
+| The extension declares `agentContent`: the `extension:<name>` opt-in into its content also enables its hooks | `host-hooks-without-agent-content` |
+| `requires.contract` names a collaboration contract: lowercase letters, digits and hyphens | `required-field`, `invalid-host-hooks-contract` |
+| `command` names a group and an interactive subcommand of this manifest, and any nested subcommand under it | `required-field`, `invalid-host-hooks-command` |
+| A host is `claude-code` or `codex`, and lists at least one hook | `unknown-host-hooks-host`, `empty-host-hooks` |
+| An event is one its host runs: `SessionStart`, `PostToolUse`, `Stop` and `StopFailure` for Claude Code; `SessionStart`, `PostToolUse` and `Stop` for Codex | `unknown-host-hook-event` |
+| Only `PostToolUse` names `tools` (host tool names) and `mcpTools` (namespaced Putnami MCP tool names, without a hyphen), and it names at least one of them; no name repeats | `invalid-host-hook-matcher` |
+| Every argument is letters, digits and `_ . / : = -`, so the shell reads it as written | `invalid-host-hook-args` |
+| Only a Claude Code hook declares `wake` | `invalid-host-hook-wake` |
+| `timeoutSeconds` is from 1 to 3600 | `invalid-host-hook-timeout` |
+| No two hooks of a host run the same command at the same point | `duplicate-host-hook` |
+
 ### Task Contract (`declares`)
 
 Every rule below fires only on a task that carries a `declares` block, so a
@@ -188,10 +227,11 @@ declares a `provisioned` candidate,
 `protocols/cli.InputSelectorsContract` (14) for `runtime.inputSelectors` or a
 task file pattern that names an input selector,
 `protocols/cli.DefaultPositionalsContract` (15) for a command group whose
-default subcommand declares positionals, or
+default subcommand declares positionals,
 `protocols/cli.ChangedFilesContract` (16) for a step that gates on the run's
 changed files (`activation.changedFiles`) or binds them (`from: context`,
-`path: selection.changedFiles`). Rung 6 named the
+`path: selection.changedFiles`), or
+`protocols/cli.HostHooksContract` (17) for a `hostHooks` member. Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
@@ -200,7 +240,7 @@ tool, or agent-content surface, and to a verb vocabulary. A non-conforming manif
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15 and 16 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 and 17 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, input selectors, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content and nothing else requires
@@ -251,9 +291,13 @@ binds `selection.changedFiles` from `context` requires contract 16 wherever it
 loads from: a reader at 16 plans the step only for a project that owns a
 matching changed file and binds those files into the step's cache key, and an
 older reader would plan the step on every run and key it without them.
+`RequiredLoadContract` includes that rung too. A manifest that declares
+`hostHooks` requires contract 17 wherever it loads from: a reader at 17 writes
+the declared hooks into the agent hosts' hook files on an explicit install,
+init or upgrade, and an older reader would install the extension without them.
 `RequiredLoadContract` includes that rung too. The reader loads every stamp
 from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (16):
+`protocols/cli.LatestContract` (17):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -294,7 +338,7 @@ rejected like any other future manifest. `TestLoadManifest_CompatibilityMatrix`
 product of {absent, one behind, current, latest, one ahead} × {commands,
 command groups, tools, agent content, verbs, command kinds, publish channels,
 provisioned toolchain, default positionals, changed-files gate, changed-files
-binding, none}. Ratcheting a row means editing that table and
+binding, host hooks, none}. Ratcheting a row means editing that table and
 this one together.
 
 ### The packaging ratchet

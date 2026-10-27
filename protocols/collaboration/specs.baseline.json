@@ -10,6 +10,8 @@
     "collaboration/provider-contract#independent-bindings",
     "collaboration/provider-contract#invalid-answers-are-refused",
     "collaboration/provider-contract#memory-scenarios",
+    "collaboration/provider-contract#missions-identity-and-reconciliation",
+    "collaboration/provider-contract#missions-provider-semantics",
     "collaboration/provider-contract#no-credential-in-a-binding",
     "collaboration/provider-contract#no-credential-in-an-envelope",
     "collaboration/provider-contract#one-closed-catalog",

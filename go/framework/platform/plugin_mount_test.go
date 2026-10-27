@@ -83,6 +83,7 @@ func TestPlugin_MountsItselfOnTheApplicationServer(t *testing.T) {
 }
 
 func TestPlugin_SelfMountAppliesThePrefix(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "a-runtime-mounts-under-the-prefix")
 	server := http.NewServerPlugin(http.ServerConfig{})
 	a := app.New("platform-prefix")
 	a.Use(server)
@@ -159,6 +160,7 @@ func TestPlugin_ConfiguringAgainRegistersOnce(t *testing.T) {
 }
 
 func TestPlugin_SelfMountedAggregatesAreUnavailableUntilStart(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-endpoint-set-is-canonical", "a-runtime-gates-the-aggregates-and-not-liveness")
 	server := http.NewServerPlugin(http.ServerConfig{})
 	a := app.New("platform-before-start")
 	a.Use(server)

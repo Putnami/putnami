@@ -28,6 +28,34 @@ const (
 	MaxLocatorLength = 1024
 )
 
+// Bounds on the members of the missions contract. A member that means what
+// a member of another contract means uses that member's bound: the mission
+// key and repository and a plan step key are tokens, the title is a title, a
+// list without its own bound holds at most MaxListMembers, and the inbox
+// texts total at most MaxContentBytes. An id's pattern carries its own
+// length. Lengths count characters.
+const (
+	MaxModelLength        = 128
+	MaxBranchLength       = 256
+	MaxLastMessageLength  = 4096
+	MaxErrorLength        = 1024
+	MaxPlanStepTextLength = 300
+	MaxSyncDecisions      = 20
+	MaxSyncReplies        = 20
+	MaxReplyLength        = 4000
+	MaxQuestionLength     = 500
+	MaxContextLength      = 4000
+	MinDecisionOptions    = 2
+	MaxDecisionOptions    = 5
+	MaxOptionLabelLength  = 200
+	MaxExplanationLength  = 1000
+	MaxOpenDecisions      = 50
+	MaxInboxMessages      = 50
+	MaxInboxTextLength    = 8192
+	MinSyncIntervalMs     = 5000
+	MaxSyncIntervalMs     = 600000
+)
+
 var (
 	sourcePattern         = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}:\S+$`)
 	idempotencyKeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:/-]{1,128}$`)
@@ -35,6 +63,18 @@ var (
 	digestPattern         = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	// timestampPattern is RFC 3339 with an optional fraction.
 	timestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$`)
+	// enginePattern names the host that runs an agent session.
+	enginePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+	// eventPattern is a host event name, kept for display only.
+	eventPattern = regexp.MustCompile(`^[a-z_]{1,32}$`)
+	// missionIDPattern is a bare message or decision id of the missions
+	// contract. An agent types it, so it is short and needs no source.
+	missionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+	// sessionIDPattern is a host's session id. A provider can key a session
+	// on its engine and this id.
+	sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
+	// optionIDPattern names one option of a decision.
+	optionIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 )
 
 // ParseRequest strictly decodes and validates the request document of one
@@ -187,7 +227,7 @@ func ValidateInput(input any) []diag.Diagnostic {
 		if in.State != "" {
 			c.taskState("state", in.State)
 		}
-		c.idempotencyKey("idempotencyKey", in.IdempotencyKey)
+		c.idempotencyKey(in.IdempotencyKey)
 	case *TaskUpdateInput:
 		c.ref("ref", in.Ref)
 		c.optionalToken("expectedRevision", in.ExpectedRevision)
@@ -243,7 +283,7 @@ func ValidateInput(input any) []diag.Diagnostic {
 		if in.Commit != "" {
 			c.commit("commit", in.Commit)
 		}
-		c.idempotencyKey("idempotencyKey", in.IdempotencyKey)
+		c.idempotencyKey(in.IdempotencyKey)
 	case *ProposalMergeInput:
 		c.ref("ref", in.Ref)
 		c.commit("expectedHeadCommit", in.ExpectedHeadCommit)
@@ -270,7 +310,7 @@ func ValidateInput(input any) []diag.Diagnostic {
 		c.identity("identity", in.Identity)
 		c.sameMission(in.Mission, in.Identity)
 		c.precondition("precondition", in.Precondition)
-		c.idempotencyKey("idempotencyKey", in.IdempotencyKey)
+		c.idempotencyKey(in.IdempotencyKey)
 		c.bounded("title", in.Title, MaxTitleLength, false)
 		c.bytesLimit("content", in.Content, MaxContentBytes)
 		if strings.TrimSpace(in.Content) == "" {
@@ -278,6 +318,13 @@ func ValidateInput(input any) []diag.Diagnostic {
 		}
 		c.refs("sources", in.Sources)
 		c.evidence("evidence", in.Evidence)
+	case *MissionsSyncInput:
+		c.syncInput(in)
+	case *MissionsAskInput:
+		c.askInput(in)
+	case *MissionsReplyInput:
+		c.missionID("message", in.Message)
+		c.text("reply", in.Reply, MaxReplyLength, true)
 	case *CapabilitiesInput:
 	default:
 		c.errorf(ErrorCodeUnknownOperation, "", "no request validator for %T", input)
@@ -336,6 +383,15 @@ func ValidateResult(result any) []diag.Diagnostic {
 		if r.Record.Kind != MemoryKindMission {
 			c.errorf(ErrorCodeInvalidValue, "record.kind", "a checkpoint writes a mission record")
 		}
+	case *MissionsSyncResult:
+		c.syncResult(r)
+	case *MissionsAskResult:
+		c.missionDecision("decision", r.Decision)
+	case *MissionsReplyResult:
+		c.missionID("message.id", r.Message.ID)
+		if r.Message.State != ReplyStateReplied {
+			c.errorf(ErrorCodeInvalidState, "message.state", "a recorded reply leaves its message %q, not %q", ReplyStateReplied, r.Message.State)
+		}
 	case *Capabilities:
 		c.diags = append(c.diags, validateCapabilities(r)...)
 	default:
@@ -366,6 +422,9 @@ func validateCapabilities(capabilities *Capabilities) []diag.Diagnostic {
 		}
 		if op.Preconditions != "" && !slices.Contains(ValidPreconditions, op.Preconditions) {
 			c.errorf(ErrorCodeInvalidValue, field+".preconditions", "unknown preconditions %q", op.Preconditions)
+		}
+		if op.HostOnly && op.Access != AccessMutating {
+			c.errorf(ErrorCodeInvalidValue, field+".hostOnly", "only a mutation is host-only")
 		}
 	}
 	return c.diags
@@ -492,7 +551,9 @@ func (c *checker) optionalToken(field, value string) {
 	}
 }
 
-func (c *checker) idempotencyKey(field, value string) {
+// idempotencyKey checks the idempotencyKey member of a request.
+func (c *checker) idempotencyKey(value string) {
+	const field = "idempotencyKey"
 	if value == "" {
 		c.errorf(ErrorCodeRequired, field, "%s is required: it is what makes a retry safe", field)
 		return
@@ -829,6 +890,335 @@ func (c *checker) record(field string, record MemoryRecord) {
 	c.optionalToken(field+".provenance.recordedBy", record.Provenance.RecordedBy)
 	c.timestamp(field+".freshness.updatedAt", record.Freshness.UpdatedAt, true)
 	c.timestamp(field+".freshness.retrievedAt", record.Freshness.RetrievedAt, true)
+}
+
+// text checks a member that may span lines: at most limit characters and no
+// NUL character.
+func (c *checker) text(field, value string, limit int, required bool) {
+	if required && strings.TrimSpace(value) == "" {
+		c.errorf(ErrorCodeRequired, field, "%s is required", field)
+		return
+	}
+	if utf8.RuneCountInString(value) > limit {
+		c.errorf(ErrorCodeTooLarge, field, "%s exceeds %d characters", field, limit)
+	}
+	if strings.ContainsRune(value, 0) {
+		c.errorf(ErrorCodeInvalidValue, field, "%s contains a NUL character", field)
+	}
+}
+
+// missionID checks a bare message or decision id.
+func (c *checker) missionID(field, value string) {
+	if value == "" {
+		c.errorf(ErrorCodeRequired, field, "%s is required", field)
+		return
+	}
+	if !missionIDPattern.MatchString(value) {
+		c.errorf(ErrorCodeInvalidValue, field, "%s must be 1 to 64 letters, digits, underscores or hyphens", field)
+	}
+}
+
+// missionIDs checks a set of bare ids of at most limit members. A repeated
+// id counts once, so a repeat is not an error.
+func (c *checker) missionIDs(field string, ids []string, limit int) {
+	if len(ids) > limit {
+		c.errorf(ErrorCodeTooLarge, field, "at most %d members", limit)
+	}
+	for i, id := range ids {
+		c.missionID(fmt.Sprintf("%s[%d]", field, i), id)
+	}
+}
+
+// optionID checks the id of a decision option.
+func (c *checker) optionID(field, value string) {
+	if value == "" {
+		c.errorf(ErrorCodeRequired, field, "%s is required", field)
+		return
+	}
+	if !optionIDPattern.MatchString(value) {
+		c.errorf(ErrorCodeInvalidValue, field, "%s must be 1 to 64 letters, digits, dots, underscores or hyphens", field)
+	}
+}
+
+// missionName checks a mission name. The repository and the key together
+// are the mission's identity, compared exactly: both are required tokens, and
+// the repository holds no uppercase letter, so one repository has one
+// spelling.
+func (c *checker) missionName(field string, name MissionName) {
+	c.token(field+".repository", name.Repository)
+	if strings.ContainsFunc(name.Repository, func(r rune) bool { return r >= 'A' && r <= 'Z' }) {
+		c.errorf(ErrorCodeInvalidValue, field+".repository", "%s.repository is lowercase, such as owner/name", field)
+	}
+	c.token(field+".key", name.Key)
+	c.bounded(field+".title", name.Title, MaxTitleLength, false)
+}
+
+func (c *checker) session(field string, session SessionRef) {
+	switch {
+	case session.Engine == "":
+		c.errorf(ErrorCodeRequired, field+".engine", "%s.engine is required", field)
+	case !enginePattern.MatchString(session.Engine):
+		c.errorf(ErrorCodeInvalidValue, field+".engine", "%s.engine must be 1 to 32 lowercase letters, digits or hyphens", field)
+	}
+	switch {
+	case session.ID == "":
+		c.errorf(ErrorCodeRequired, field+".id", "%s.id is required", field)
+	case !sessionIDPattern.MatchString(session.ID):
+		c.errorf(ErrorCodeInvalidValue, field+".id", "%s.id must be 1 to 128 letters, digits, dots, colons, underscores or hyphens", field)
+	}
+}
+
+func (c *checker) sessionState(field string, state SessionState) {
+	if !slices.Contains(ValidSessionStates, state) {
+		c.errorf(ErrorCodeInvalidState, field, "unknown session state %q", state)
+	}
+}
+
+func (c *checker) plan(field string, plan MissionPlan) {
+	if plan.Steps == nil {
+		c.errorf(ErrorCodeRequired, field+".steps", "%s.steps is required; an empty plan is []", field)
+		return
+	}
+	c.listBound(field+".steps", len(plan.Steps))
+	seen := map[string]bool{}
+	for i, step := range plan.Steps {
+		entry := fmt.Sprintf("%s.steps[%d]", field, i)
+		c.token(entry+".key", step.Key)
+		if seen[step.Key] {
+			c.errorf(ErrorCodeInvalidValue, entry+".key", "step key %q is repeated", step.Key)
+		}
+		seen[step.Key] = true
+		if !slices.Contains(ValidPlanStepStatuses, step.Status) {
+			c.errorf(ErrorCodeInvalidState, entry+".status", "unknown step status %q", step.Status)
+		}
+		c.bounded(entry+".text", step.Text, MaxPlanStepTextLength, true)
+	}
+}
+
+// utcTimestamp checks a required RFC 3339 timestamp in UTC.
+func (c *checker) utcTimestamp(field, value string) {
+	c.timestamp(field, value, true)
+	if timestampPattern.MatchString(value) && !strings.HasSuffix(value, "Z") {
+		c.errorf(ErrorCodeInvalidTimestamp, field, "%s is in UTC and ends in Z", field)
+	}
+}
+
+func (c *checker) syncInput(in *MissionsSyncInput) {
+	c.session("session", in.Session)
+	c.missionName("mission", in.Mission)
+	switch {
+	case in.Event == "":
+		c.errorf(ErrorCodeRequired, "event", "event is required")
+	case !eventPattern.MatchString(in.Event):
+		c.errorf(ErrorCodeInvalidValue, "event", "event must be 1 to 32 lowercase letters or underscores")
+	}
+	c.sessionState("state", in.State)
+	c.utcTimestamp("observedAt", in.ObservedAt)
+	c.bounded("model", in.Model, MaxModelLength, false)
+	c.bounded("branch", in.Branch, MaxBranchLength, false)
+	c.text("lastMessage", in.LastMessage, MaxLastMessageLength, false)
+	c.text("error", in.Error, MaxErrorLength, false)
+	if in.Error != "" && in.State != SessionStateFailed {
+		c.errorf(ErrorCodeInvalidValue, "error", "only a failed session reports an error")
+	}
+	switch {
+	case in.State == SessionStateWaiting:
+		c.timestamp("waitUntil", in.WaitUntil, true)
+	case in.WaitUntil != "":
+		c.errorf(ErrorCodeInvalidValue, "waitUntil", "only a waiting session reports waitUntil")
+	}
+	if in.Plan != nil {
+		c.plan("plan", *in.Plan)
+	}
+	c.missionIDs("delivered", in.Delivered, MaxListMembers)
+	c.missionIDs("decisions", in.Decisions, MaxSyncDecisions)
+	if len(in.Replies) > MaxSyncReplies {
+		c.errorf(ErrorCodeTooLarge, "replies", "at most %d members", MaxSyncReplies)
+	}
+	seen := map[string]bool{}
+	for i, reply := range in.Replies {
+		entry := fmt.Sprintf("replies[%d]", i)
+		c.missionID(entry+".message", reply.Message)
+		if seen[reply.Message] {
+			c.errorf(ErrorCodeInvalidValue, entry+".message", "message %q takes one reply", reply.Message)
+		}
+		seen[reply.Message] = true
+		c.text(entry+".reply", reply.Reply, MaxReplyLength, true)
+	}
+}
+
+func (c *checker) askInput(in *MissionsAskInput) {
+	c.missionName("mission", in.Mission)
+	c.text("question", in.Question, MaxQuestionLength, true)
+	c.text("context", in.Context, MaxContextLength, false)
+	if len(in.Options) < MinDecisionOptions || len(in.Options) > MaxDecisionOptions {
+		c.errorf(ErrorCodeInvalidValue, "options", "a decision offers %d to %d options", MinDecisionOptions, MaxDecisionOptions)
+	}
+	ids := map[string]bool{}
+	for i, option := range in.Options {
+		entry := fmt.Sprintf("options[%d]", i)
+		c.optionID(entry+".id", option.ID)
+		if ids[option.ID] {
+			c.errorf(ErrorCodeInvalidValue, entry+".id", "option %q is repeated", option.ID)
+		}
+		ids[option.ID] = true
+		c.bounded(entry+".label", option.Label, MaxOptionLabelLength, true)
+		c.text(entry+".consequences", option.Consequences, MaxExplanationLength, false)
+	}
+	if recommendation := in.Recommendation; recommendation != nil {
+		if !ids[recommendation.Option] {
+			c.errorf(ErrorCodeInvalidValue, "recommendation.option", "recommendation.option %q names no option", recommendation.Option)
+		}
+		c.text("recommendation.reason", recommendation.Reason, MaxExplanationLength, false)
+	}
+	c.text("blocks", in.Blocks, MaxExplanationLength, false)
+	c.idempotencyKey(in.IdempotencyKey)
+}
+
+func (c *checker) decisionState(field string, state DecisionState) {
+	if !slices.Contains(ValidDecisionStates, state) {
+		c.errorf(ErrorCodeInvalidState, field, "unknown decision state %q", state)
+	}
+}
+
+func (c *checker) missionDecision(field string, decision MissionDecision) {
+	c.missionID(field+".id", decision.ID)
+	c.decisionState(field+".state", decision.State)
+	c.url(field+".url", decision.URL)
+	c.text(field+".answer", decision.Answer, MaxInboxTextLength, false)
+	if decision.Answer != "" && decision.State == DecisionStateOpen {
+		c.errorf(ErrorCodeInvalidState, field+".answer", "an open decision has no answer")
+	}
+	c.answerOption(field, decision.Option, decision.Answer)
+}
+
+// answerOption checks the option an answer chose: an option id, and only
+// beside the answer it chose.
+func (c *checker) answerOption(field, option, answer string) {
+	if option == "" {
+		return
+	}
+	c.optionID(field+".option", option)
+	if answer == "" {
+		c.errorf(ErrorCodeInvalidValue, field+".option", "an option goes with the answer that chose it")
+	}
+}
+
+func (c *checker) syncResult(r *MissionsSyncResult) {
+	c.sessionState("session.state", r.Session.State)
+	mission := r.Mission
+	c.token("mission.key", mission.Key)
+	c.bounded("mission.title", mission.Title, MaxTitleLength, false)
+	c.url("mission.url", mission.URL)
+	c.plan("mission.plan", mission.Plan)
+	if mission.OpenDecisions == nil {
+		c.errorf(ErrorCodeRequired, "mission.openDecisions", "mission.openDecisions is required; none is []")
+	}
+	if len(mission.OpenDecisions) > MaxOpenDecisions {
+		c.errorf(ErrorCodeTooLarge, "mission.openDecisions", "at most %d members", MaxOpenDecisions)
+	}
+	for i, decision := range mission.OpenDecisions {
+		entry := fmt.Sprintf("mission.openDecisions[%d]", i)
+		c.missionID(entry+".id", decision.ID)
+		c.text(entry+".question", decision.Question, MaxQuestionLength, true)
+	}
+	c.inbox(r.Inbox)
+	if r.Decisions == nil {
+		c.errorf(ErrorCodeRequired, "decisions", "decisions is required; none is []")
+	}
+	if len(r.Decisions) > MaxSyncDecisions {
+		c.errorf(ErrorCodeTooLarge, "decisions", "at most %d members: one per decision the sync named", MaxSyncDecisions)
+	}
+	seen := map[string]bool{}
+	for i, decision := range r.Decisions {
+		entry := fmt.Sprintf("decisions[%d]", i)
+		c.missionID(entry+".id", decision.ID)
+		if seen[decision.ID] {
+			c.errorf(ErrorCodeInvalidValue, entry+".id", "decision %q is repeated", decision.ID)
+		}
+		seen[decision.ID] = true
+		c.decisionState(entry+".state", decision.State)
+	}
+	c.replyStatuses(r.Replies)
+	if r.MinIntervalMs < MinSyncIntervalMs || r.MinIntervalMs > MaxSyncIntervalMs {
+		c.errorf(ErrorCodeInvalidValue, "minIntervalMs", "minIntervalMs must be between %d and %d", MinSyncIntervalMs, MaxSyncIntervalMs)
+	}
+	c.timestamp("now", r.Now, true)
+}
+
+func (c *checker) inbox(messages []InboxMessage) {
+	if messages == nil {
+		c.errorf(ErrorCodeRequired, "inbox", "inbox is required; an empty inbox is []")
+	}
+	if len(messages) > MaxInboxMessages {
+		c.errorf(ErrorCodeTooLarge, "inbox", "at most %d members", MaxInboxMessages)
+	}
+	total := 0
+	seen := map[string]bool{}
+	for i, message := range messages {
+		entry := fmt.Sprintf("inbox[%d]", i)
+		c.missionID(entry+".id", message.ID)
+		if seen[message.ID] {
+			c.errorf(ErrorCodeInvalidValue, entry+".id", "message %q is repeated", message.ID)
+		}
+		seen[message.ID] = true
+		if !slices.Contains(ValidInboxKinds, message.Kind) {
+			c.errorf(ErrorCodeInvalidValue, entry+".kind", "unknown inbox kind %q", message.Kind)
+		}
+		c.text(entry+".text", message.Text, MaxInboxTextLength, true)
+		c.timestamp(entry+".createdAt", message.CreatedAt, true)
+		total += len(message.Text)
+		switch decision := message.Decision; {
+		case decision == nil && message.Kind == InboxKindAnswer:
+			c.errorf(ErrorCodeRequired, entry+".decision", "an answer names the decision it answers")
+		case decision == nil:
+		case message.Kind != InboxKindAnswer:
+			c.errorf(ErrorCodeInvalidValue, entry+".decision", "only an answer names a decision")
+		default:
+			c.missionID(entry+".decision.id", decision.ID)
+			c.text(entry+".decision.question", decision.Question, MaxQuestionLength, true)
+			c.text(entry+".decision.answer", decision.Answer, MaxInboxTextLength, true)
+			c.answerOption(entry+".decision", decision.Option, decision.Answer)
+			total += len(decision.Question) + len(decision.Answer)
+		}
+	}
+	if total > MaxContentBytes {
+		c.errorf(ErrorCodeTooLarge, "inbox", "the inbox texts exceed %d bytes", MaxContentBytes)
+	}
+}
+
+func (c *checker) replyStatuses(replies []ReplyStatus) {
+	if replies == nil {
+		c.errorf(ErrorCodeRequired, "replies", "replies is required; none is []")
+	}
+	if len(replies) > MaxSyncReplies {
+		c.errorf(ErrorCodeTooLarge, "replies", "at most %d members", MaxSyncReplies)
+	}
+	seen := map[string]bool{}
+	for i, reply := range replies {
+		entry := fmt.Sprintf("replies[%d]", i)
+		c.missionID(entry+".message", reply.Message)
+		if seen[reply.Message] {
+			c.errorf(ErrorCodeInvalidValue, entry+".message", "message %q is repeated", reply.Message)
+		}
+		seen[reply.Message] = true
+		switch reply.State {
+		case ReplyStateReplied:
+			if reply.Reason != "" {
+				c.errorf(ErrorCodeInvalidValue, entry+".reason", "only a refused reply carries a reason")
+			}
+		case ReplyStateRefused:
+			switch {
+			case reply.Reason == "":
+				c.errorf(ErrorCodeRequired, entry+".reason", "a refused reply says why")
+			case !slices.Contains(ValidReplyRefusals, reply.Reason):
+				c.errorf(ErrorCodeInvalidValue, entry+".reason", "unknown refusal %q; a refused reply is %s", reply.Reason,
+					strings.Join(ValidReplyRefusals, ", "))
+			}
+		default:
+			c.errorf(ErrorCodeInvalidState, entry+".state", "unknown reply state %q", reply.State)
+		}
+	}
 }
 
 // isToken reports whether value is a bounded run of printable characters

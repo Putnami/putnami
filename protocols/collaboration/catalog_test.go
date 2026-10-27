@@ -17,6 +17,7 @@ func TestCatalog_RequiredOperationsAreTheContract(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "one-closed-catalog", "every-version-names-its-required-and-optional-operations")
 	want := map[string][]string{
 		ContractMemory:    {OperationCheckpoint, OperationContext, OperationMission},
+		ContractMissions:  {OperationAsk, OperationReply, OperationSync},
 		ContractProposals: {OperationFind, OperationReview, OperationStatus, OperationUpsert},
 		ContractTasks:     {OperationCreate, OperationFind, OperationGet, OperationTransition, OperationUpdate},
 	}
@@ -105,6 +106,7 @@ func TestCatalog_MutationsThatCreateCarryIdempotencyKeys(t *testing.T) {
 		{ContractTasks, 1, OperationCreate},
 		{ContractProposals, 1, OperationReview},
 		{ContractMemory, 1, OperationCheckpoint},
+		{ContractMissions, 1, OperationAsk},
 	} {
 		spec, _ := Lookup(key.Contract, key.Version)
 		op, _ := spec.Operation(key.Operation)
@@ -112,6 +114,28 @@ func TestCatalog_MutationsThatCreateCarryIdempotencyKeys(t *testing.T) {
 		if !slices.Contains(members, "idempotencyKey") {
 			t.Errorf("%s input has no idempotencyKey: %v", key, members)
 		}
+	}
+}
+
+// TestCatalog_HostOnlyOperations pins which operations only a host calls:
+// missions.sync alone. A host-only operation is a mutation, because a read has
+// no reason to hide from an agent.
+func TestCatalog_HostOnlyOperations(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-closed-catalog", "only-missions-sync-is-host-only")
+	var hostOnly []string
+	for _, spec := range Catalog() {
+		for _, op := range spec.Operations {
+			if !op.HostOnly {
+				continue
+			}
+			hostOnly = append(hostOnly, spec.Name+"."+op.Name)
+			if op.Access != AccessMutating {
+				t.Errorf("%s.%s is host-only and not a mutation", spec.Name, op.Name)
+			}
+		}
+	}
+	if want := []string{ContractMissions + "." + OperationSync}; !slices.Equal(hostOnly, want) {
+		t.Errorf("host-only operations = %v, want %v", hostOnly, want)
 	}
 }
 

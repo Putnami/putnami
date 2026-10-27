@@ -7,12 +7,14 @@
 //	putnami-contributor language <mode> [flags]   (putnami change language)
 //	putnami-contributor verify [flags]            (putnami change verify)
 //	putnami-contributor finalize [flags]          (putnami change finalize)
+//	putnami-contributor agent-hook [flags]        (putnami agent hook)
+//	putnami-contributor agent-attach [flags]      (putnami agent attach)
 //
-// It answers the runtime handshake, serves the change commands that moved
-// here, and refuses every other invocation. putnami launches a change command
-// as an interactive subcommand and appends --putnamiContext <file>. finalize
-// reads the output mode and the project selection from that job context; the
-// other commands ignore it.
+// It answers the runtime handshake, serves the change and agent commands, and
+// refuses every other invocation. putnami launches each command as an
+// interactive subcommand and appends --putnamiContext <file>. finalize reads
+// the output mode and the project selection from that job context; the other
+// commands ignore it.
 package main
 
 import (
@@ -27,6 +29,7 @@ import (
 	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 
+	"go.putnami.dev/tooling/contributor/internal/agentsession"
 	"go.putnami.dev/tooling/contributor/internal/finalize"
 	"go.putnami.dev/tooling/contributor/internal/host"
 	"go.putnami.dev/tooling/contributor/internal/language"
@@ -45,11 +48,12 @@ var runtimeVersion string
 // path of the job context file.
 const contextFlag = "--putnamiContext"
 
-// languageRemedy and finalizeRemedy name the launch that opens the host
-// channel, for a run that needs the channel and has none.
+// agentHookRemedy, languageRemedy and finalizeRemedy name the launch that
+// opens the host channel, for a run that needs the channel and has none.
 const (
-	languageRemedy = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
-	finalizeRemedy = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
+	agentHookRemedy = "the hook reaches the missions provider only when putnami launches it as `putnami agent hook`"
+	languageRemedy  = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
+	finalizeRemedy  = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
 )
 
 // run is main with its process dependencies passed in. It returns the exit
@@ -79,7 +83,13 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "finalize" {
 		return runFinalize(args[1:], contextFile, stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify and finalize commands")
+	if len(args) > 0 && args[0] == "agent-hook" {
+		return runAgentHook(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "agent-attach" {
+		return runAgentAttach(args[1:], stdout, stderr)
+	}
+	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, agent-hook and agent-attach commands")
 	return 2
 }
 
@@ -191,6 +201,31 @@ func runFinalize(args []string, contextFile string, stdout, stderr io.Writer) in
 	defer stop()
 	command := finalize.Command{Root: root, ContextFile: contextFile, Host: channel, Stdout: stdout, Stderr: stderr}
 	return command.Run(ctx, args)
+}
+
+// runAgentHook runs putnami agent hook in the workspace root, which is the
+// working directory putnami launches the command in. It reaches the missions
+// provider only through the host channel, which it takes out of the
+// environment before it starts any process. It exits 0 on every path but
+// the idle wake's, which exits agentsession.ExitWake to bring a message.
+func runAgentHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	channel := host.Take(agentHookRemedy)
+	defer func() { _ = channel.Close() }()
+	root, _ := os.Getwd()
+	return agentsession.Hook(context.Background(), agentsession.NewEnv(root, channel), args, stdin, stdout, stderr)
+}
+
+// runAgentAttach runs putnami agent attach in the workspace root. It writes
+// one file and calls no provider.
+func runAgentAttach(args []string, stdout, stderr io.Writer) int {
+	channel := host.Take("")
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "agent attach: %v\n", err)
+		return 1
+	}
+	return agentsession.Attach(context.Background(), agentsession.NewEnv(root, channel), args, stdout, stderr)
 }
 
 func main() {

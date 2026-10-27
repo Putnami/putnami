@@ -7,7 +7,7 @@
       "id": "collaboration/provider-contract",
       "type": "feature",
       "name": "Collaboration provider contracts",
-      "outcome": "A workspace binds its tasks, proposals and memory to providers written in any language, and every caller and provider exchange one closed, versioned, strictly validated set of documents whose outcomes say whether a write happened, pinned by one catalog, one schema set, one fixture corpus and shared scenarios every provider passes.",
+      "outcome": "A workspace binds its tasks, proposals, memory and missions to providers written in any language, and every caller and provider exchange one closed, versioned, strictly validated set of documents whose outcomes say whether a write happened, pinned by one catalog, one schema set, one fixture corpus and shared scenarios every provider passes.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -21,7 +21,8 @@
             "kind": "acceptance",
             "checks": [
               "every-version-names-its-required-and-optional-operations",
-              "every-creating-mutation-carries-an-idempotency-key"
+              "every-creating-mutation-carries-an-idempotency-key",
+              "only-missions-sync-is-host-only"
             ]
           }
         },
@@ -257,6 +258,22 @@
           }
         },
         {
+          "id": "missions-provider-semantics",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-missions-scenarios-pass-against-a-correct-provider",
+              "the-local-provider-passes-the-missions-scenarios",
+              "the-local-owner-answers-and-writes-messages-as-files",
+              "concurrent-processes-on-one-local-store-ask-and-reply-once"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [
@@ -295,6 +312,20 @@
             "checks": [
               "the-cli-refuses-a-read-that-answers-for-something-else",
               "the-cli-makes-a-mutation-that-answers-for-something-else-unresolved"
+            ]
+          }
+        },
+        {
+          "id": "missions-identity-and-reconciliation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-makes-a-missions-answer-for-another-mission-or-message-unresolved",
+              "the-cli-names-the-repeat-of-an-unresolved-missions-write"
             ]
           }
         },

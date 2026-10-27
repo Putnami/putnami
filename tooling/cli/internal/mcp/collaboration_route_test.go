@@ -472,6 +472,96 @@ func TestInterpret_MemoryIdentity(t *testing.T) {
 	}
 }
 
+func TestInterpret_MissionsIdentity(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-identity-and-reconciliation", "the-cli-makes-a-missions-answer-for-another-mission-or-message-unresolved")
+	syncResult := func(edit func(*collab.MissionsSyncResult)) *collab.MissionsSyncResult {
+		result := &collab.MissionsSyncResult{
+			Session:       collab.SessionStatus{State: collab.SessionStateWorking},
+			Mission:       collab.MissionView{Key: "issue-596", Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}},
+			Inbox:         []collab.InboxMessage{},
+			Decisions:     []collab.DecisionStatus{{ID: "D-1", State: collab.DecisionStateOpen}},
+			Replies:       []collab.ReplyStatus{{Message: "M-1", State: collab.ReplyStateReplied}},
+			MinIntervalMs: collab.MinSyncIntervalMs, Now: "2026-10-26T09:00:00Z",
+		}
+		if edit != nil {
+			edit(result)
+		}
+		return result
+	}
+	sync := collabBoundCall(t, "missions", "sync", `{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"putnami/putnami","key":"issue-596"},`+
+		`"event":"stop","state":"working","observedAt":"2026-10-26T09:00:00Z","decisions":["D-1"],"replies":[{"message":"M-1","reply":"yes"}]}`)
+	ask := collabBoundCall(t, "missions", "ask", `{"mission":{"repository":"putnami/putnami","key":"issue-596"},"question":"Ship?",`+
+		`"options":[{"id":"yes","label":"Ship"},{"id":"no","label":"Wait"}],"idempotencyKey":"k"}`)
+	reply := collabBoundCall(t, "missions", "reply", `{"message":"M-1","reply":"yes"}`)
+	cases := []struct {
+		name    string
+		call    *providerCall
+		result  any
+		outcome collab.Outcome
+	}{
+		{"a sync answered as asked", sync, syncResult(nil), collab.OutcomeOK},
+		{"a sync answered with the empty view of the mission it named", sync, syncResult(func(r *collab.MissionsSyncResult) {
+			r.Session.State = collab.SessionStateHandedBack
+			r.Mission = collab.MissionView{Key: "issue-596", Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}}
+		}), collab.OutcomeOK},
+		{"a sync answered for another mission", sync, syncResult(func(r *collab.MissionsSyncResult) { r.Mission.Key = "issue-1" }), collab.OutcomeUnresolved},
+		{"a sync reporting a decision it did not name", sync, syncResult(func(r *collab.MissionsSyncResult) {
+			r.Decisions = append(r.Decisions, collab.DecisionStatus{ID: "D-2", State: collab.DecisionStateOpen})
+		}), collab.OutcomeUnresolved},
+		{"a sync that drops a reply", sync, syncResult(func(r *collab.MissionsSyncResult) { r.Replies = []collab.ReplyStatus{} }), collab.OutcomeUnresolved},
+		{"a sync answering a reply it did not carry", sync, syncResult(func(r *collab.MissionsSyncResult) {
+			r.Replies = append(r.Replies, collab.ReplyStatus{Message: "M-2", State: collab.ReplyStateReplied})
+		}), collab.OutcomeUnresolved},
+		{"a sync whose reply is refused", sync, syncResult(func(r *collab.MissionsSyncResult) {
+			r.Replies = []collab.ReplyStatus{{Message: "M-1", State: collab.ReplyStateRefused, Reason: collab.ReasonMessageClosed}}
+		}), collab.OutcomeOK},
+		{"a new open decision", ask, &collab.MissionsAskResult{Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateOpen}}, collab.OutcomeOK},
+		{"a new decision already answered", ask, &collab.MissionsAskResult{Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateAnswered, Answer: "yes"}},
+			collab.OutcomeUnresolved},
+		{"a replayed decision answered since", ask, &collab.MissionsAskResult{
+			Decision: collab.MissionDecision{ID: "D-1", State: collab.DecisionStateAnswered, Answer: "yes", Option: "yes"}, Replayed: true}, collab.OutcomeOK},
+		{"a reply to the message", reply, &collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: "M-1", State: collab.ReplyStateReplied}}, collab.OutcomeOK},
+		{"a reply to another message", reply, &collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: "M-2", State: collab.ReplyStateReplied}},
+			collab.OutcomeUnresolved},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			envelope := interpretResult(tc.call, collabOK(t, tc.result))
+			if envelope.Outcome != tc.outcome {
+				t.Fatalf("outcome %s, want %s: %+v", envelope.Outcome, tc.outcome, envelope.Error)
+			}
+			if tc.outcome == collab.OutcomeUnresolved && envelope.Error.Reason != collab.ReasonProviderIdentity {
+				t.Errorf("reason %s, want %s", envelope.Error.Reason, collab.ReasonProviderIdentity)
+			}
+		})
+	}
+}
+
+// TestReconcileHint_AMissionsWriteNamesItsRepeat: every missions mutation is
+// reconciled by repeating it, and the hint names that operation, so a valid
+// envelope carries it.
+func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-identity-and-reconciliation", "the-cli-names-the-repeat-of-an-unresolved-missions-write")
+	spec, _ := collab.Lookup(collab.ContractMissions, 1)
+	for _, op := range spec.Operations {
+		hint := ReconcileHint(collab.ContractMissions, op.Name)
+		contract, operation, ok := collab.ReconcileOperation(collab.ContractMissions, hint)
+		if !ok || contract != collab.ContractMissions || operation != op.Name {
+			t.Errorf("the %s hint %q names %s.%s", op.Name, hint, contract, operation)
+		}
+		envelope := collab.Envelope{Contract: collab.ContractMissions, Version: 1, Operation: op.Name, Outcome: collab.OutcomeUnresolved,
+			Error: &collab.Error{Message: "lost", Reconcile: hint}}
+		if diags := collab.ValidateEnvelope(&envelope); diags != nil {
+			t.Errorf("an unresolved %s envelope is refused: %v", op.Name, diags)
+		}
+	}
+	call := collabBoundCall(t, "missions", "reply", `{"message":"M-1","reply":"yes"}`)
+	envelope := interpretResult(call, collabRespond(t, collab.Response{Outcome: collab.OutcomeUnresolved, Error: &collab.Error{Message: "lost"}}))
+	if envelope.Error.Reconcile != ReconcileHint(collab.ContractMissions, collab.OperationReply) {
+		t.Errorf("an unresolved reply carries the hint %q", envelope.Error.Reconcile)
+	}
+}
+
 func TestTransportFailure_ClassifiesByStageAndAccess(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-crashed-mutation-unresolved-with-a-reconcile")
 	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-or-canceled-mutation-unresolved")
