@@ -34,9 +34,9 @@ func runGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// TestRunCompileLeavesNoUntrackedFileInTheProject reproduces #632: Bun ran
-// from the project root, so its temporary executable was an untracked file of
-// the project while the compile ran. The workspace ignores .putnami, as the
+// TestRunCompileLeavesNoUntrackedFileInTheProject guards the working directory
+// of the compile: from the project root, Bun's temporary executable was an
+// untracked file of the project while the compile ran. The workspace ignores .putnami, as the
 // .gitignore that putnami init writes does, and holds the compile output there.
 func TestRunCompileLeavesNoUntrackedFileInTheProject(t *testing.T) {
 	if runtime.GOOS == "windows" {
