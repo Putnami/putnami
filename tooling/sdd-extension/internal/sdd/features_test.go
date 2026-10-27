@@ -160,8 +160,8 @@ func TestFeaturesValidateCarriesTypedFailureData(t *testing.T) {
 func TestFeaturesValidateNamesAnEntryByItsFilePosition(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "feature-findings-name-file-positions",
 		"a-feature-finding-names-the-entry-position-in-the-file")
-	spectest.Proves(t, "tooling/specification-driven-development", "feature-findings-name-file-positions",
-		"a-feature-text-finding-states-its-bound")
+	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions",
+		"the-sdd-extension-states-the-bound-of-a-feature-text-finding")
 	ws := featureCommandsWorkspace(t, false)
 	writeFixtureFile(t, filepath.Join(ws.Root, "app", featureproto.ManifestFilename), `{
   "protocolVersion": 1,

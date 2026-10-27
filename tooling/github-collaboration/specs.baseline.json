@@ -3,7 +3,6 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "tooling/github-collaboration#configurable-state-mapping",
-    "tooling/github-collaboration#contract-scenarios",
     "tooling/github-collaboration#credential-safety",
     "tooling/github-collaboration#exact-proposal-identity",
     "tooling/github-collaboration#honest-failures",

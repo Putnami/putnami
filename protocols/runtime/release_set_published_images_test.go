@@ -6,9 +6,12 @@ import (
 	goruntime "runtime"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestReleaseSetPublishedImagesCanonicalRoundTrip(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-release-set-outcome-is-one-opaque-payload", "published-images-are-canonical-strict-and-private")
 	images := []ReleaseSetPublishedImage{
 		{Project: "svc/beta", Digest: "sha256:" + strings.Repeat("b", 64)},
 		{Project: "svc/alpha", Digest: "sha256:" + strings.Repeat("a", 64)},
@@ -32,6 +35,7 @@ func TestReleaseSetPublishedImagesCanonicalRoundTrip(t *testing.T) {
 }
 
 func TestReleaseSetPublishedImagesRejectsNonCanonicalOrUntrustedFiles(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-release-set-outcome-is-one-opaque-payload", "published-images-are-canonical-strict-and-private")
 	for name, data := range map[string]string{
 		"unsorted":      `{"protocolVersion":1,"published":[{"project":"z","digest":"sha256:` + strings.Repeat("a", 64) + `"},{"project":"a","digest":"sha256:` + strings.Repeat("b", 64) + `"}]}`,
 		"duplicate":     `{"protocolVersion":1,"published":[{"project":"a","digest":"sha256:` + strings.Repeat("a", 64) + `"},{"project":"a","digest":"sha256:` + strings.Repeat("b", 64) + `"}]}`,

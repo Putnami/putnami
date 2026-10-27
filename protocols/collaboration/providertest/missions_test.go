@@ -11,6 +11,7 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // missionsStore is the smallest provider that honors the missions contract:
@@ -251,5 +252,6 @@ func missionsTarget(t *testing.T, store *missionsStore) Target {
 }
 
 func TestTheMissionsScenariosPassAgainstACorrectProvider(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-missions-scenarios-pass-against-a-correct-provider")
 	RunMissions(t, func(t *testing.T) Target { return missionsTarget(t, newMissionsStore()) })
 }

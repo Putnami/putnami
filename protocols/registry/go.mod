@@ -11,6 +11,8 @@ require (
 
 require go.putnami.dev/protocol/cli v0.0.0 // indirect
 
+replace go.putnami.dev/protocol/capabilities => ../capabilities
+
 replace go.putnami.dev/protocol/cli => ../cli
 
 replace go.putnami.dev/protocol/diagnostic => ../diagnostic
@@ -18,6 +20,8 @@ replace go.putnami.dev/protocol/diagnostic => ../diagnostic
 replace go.putnami.dev/protocol/distribution => ../distribution
 
 replace go.putnami.dev/protocol/extension => ../extension
+
+replace go.putnami.dev/protocol/features => ../features
 
 replace go.putnami.dev/protocol/runtime => ../runtime
 

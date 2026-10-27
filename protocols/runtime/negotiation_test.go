@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestNegotiatedVersion_Total pins the resolution table. Every input must map
 // to a version this package knows: an emitter reads this result and stamps it
 // on every line, so an unresolved input would mean an unstampable stream.
 func TestNegotiatedVersion_Total(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "the-resolution-is-total-and-defaults-to-1")
 	cases := []struct {
 		raw  string
 		want int
@@ -44,6 +46,7 @@ func TestNegotiatedVersion_Total(t *testing.T) {
 // invoked without an advertisement — a 0.2.x CLI, a hand-run extension binary —
 // speaks v1.
 func TestNegotiatedVersionFromEnv_DefaultsToV1(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "the-resolution-is-total-and-defaults-to-1")
 	if got := NegotiatedVersionFromEnv(nil); got != ProtocolVersion {
 		t.Errorf("nil lookup = %d, want %d", got, ProtocolVersion)
 	}
@@ -62,6 +65,7 @@ func TestNegotiatedVersionFromEnv_DefaultsToV1(t *testing.T) {
 // reading side agree: whatever a CLI advertises, the SDK resolves to the same
 // version. They share this file precisely so they cannot drift apart.
 func TestAdvertisedVersionEnv_RoundTrips(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "the-resolution-is-total-and-defaults-to-1")
 	for _, version := range []int{ProtocolVersion, ProtocolVersion2, 7, -3} {
 		entry := AdvertisedVersionEnv(version)
 		prefix := AcceptedVersionEnv + "="
@@ -80,6 +84,7 @@ func TestAdvertisedVersionEnv_RoundTrips(t *testing.T) {
 // a v2 emitter stamps v2 on EVERY line, not only on the readiness one, because
 // ValidateEventStream rejects a stream that carries more than one version.
 func TestEmitter_StreamVersionIsUniform(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "every-line-carries-the-stream-version")
 	var buf bytes.Buffer
 	e := NewEmitterForVersion(&buf, ProtocolVersion2)
 	if e.Version() != ProtocolVersion2 || !e.SupportsReady() {
@@ -126,6 +131,7 @@ func TestEmitter_StreamVersionIsUniform(t *testing.T) {
 // default constructor is unchanged, so a build that links this package without
 // negotiating emits the same bytes it always did.
 func TestEmitter_DefaultStreamStaysV1(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "every-line-carries-the-stream-version")
 	var buf bytes.Buffer
 	e := NewEmitter(&buf)
 	if e.Version() != ProtocolVersion || e.SupportsReady() {
@@ -153,6 +159,7 @@ func TestEmitter_DefaultStreamStaysV1(t *testing.T) {
 // (mixed-protocol-version) are both wire violations, so the only correct
 // behavior is to refuse.
 func TestEmitter_ReadyRejectedOnV1Stream(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "a-version-1-stream-never-carries-ready")
 	var buf bytes.Buffer
 	err := NewEmitter(&buf).Ready(ReadyData{
 		Target:    ReadyTargetServer,
@@ -170,6 +177,7 @@ func TestEmitter_ReadyRejectedOnV1Stream(t *testing.T) {
 // version does not produce an unknown-version stream: it falls back to v1, the
 // vocabulary every consumer understands.
 func TestNewEmitterForVersion_UnknownVersionFailsClosed(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "one-stream-one-negotiated-version", "the-resolution-is-total-and-defaults-to-1")
 	for _, version := range []int{0, -1, 99} {
 		var buf bytes.Buffer
 		e := NewEmitterForVersion(&buf, version)

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
@@ -14,12 +15,14 @@ import (
 // against this constant in validate.go, so a bump here without a corresponding
 // migration of every emitter and the fixture corpus would break conformance.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-versions-are-pinned", "the-version-constants-stay-1-and-2")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
 }
 
 func TestConformance_ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-fixture-corpus-holds-both-versions", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/*.jsonl")
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +53,7 @@ func TestConformance_ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-fixture-corpus-holds-both-versions", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/*.jsonl")
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +85,7 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 }
 
 func TestConformance_ValidFixture_MinimalStream(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-fixture-corpus-holds-both-versions", "every-fixture-gets-its-verdict")
 	data := `{"v":1,"type":"result","data":{"status":"OK"}}`
 	events, err := DecodeAll(strings.NewReader(data))
 	if err != nil {

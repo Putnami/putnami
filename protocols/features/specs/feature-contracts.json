@@ -1,0 +1,60 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "features/feature-contracts",
+  "outcomes": [
+    "Every Putnami runtime and tool reads and writes feature declarations, specs, evidence and verification reports through one strict, canonical wire",
+    "A spec gate judges each requirement by the same rules, from observations that tests and producers actually recorded",
+    "A finding names the file position to fix, and the committed specs baseline and decisions change only through a reviewed edit"
+  ],
+  "nonGoals": [
+    "Deciding a verdict in a test or a producer: they report observations, and the gate recomputes every verdict from the authored criterion",
+    "Choosing which projects a session runs or which findings fail a command: the spec gate and validate own those choices"
+  ],
+  "requirements": [
+    {
+      "id": "strict-versioned-documents",
+      "text": "The manifest reader accepts version 1 or 2, the spec and projection readers only 1, and the evidence and report readers refuse 2. The manifest and spec readers refuse a missing, null, string, decimal, exponent, duplicated or unknown version; the projection reader an unknown, decimal or exponent one. Each refuses an unknown field and an explicit null. A version 1 manifest refuses the verification field. A spec refuses the fields that would mint a feature, a stage, an owner, evidence or a graph node."
+    },
+    {
+      "id": "canonical-bytes-across-languages",
+      "text": "Serializing a feature manifest, a spec, a verification report or a criteria projection gives canonical bytes: repeated runs and parse and serialize round trips give the same bytes, and the caller's data is never reordered. Go reproduces the committed feature, spec and verification goldens byte for byte. The TypeScript readers validate the verification report and evidence goldens and reproduce their bytes whatever the order of their observations or records."
+    },
+    {
+      "id": "conformance-corpus",
+      "text": "Every valid fixture and equivalence golden passes its strict reader. Every invalid fixture fails the reader its name prefix selects: features-, spec-, verification- or evidence-. The three fixtures that only a workspace can decide fail the repository validators. The conformance runners accept each equivalence golden, reproduce its bytes and round-trip it unchanged. The conformance pack names its corpus, and every vector it lists exists. The TypeScript reader refuses every invalid verification fixture."
+    },
+    {
+      "id": "acceptance-verdicts",
+      "text": "Evaluation joins each spec requirement to the manifest requirement of the same id: one without a criterion is unexecutable, and one the manifest does not declare is unmapped. An acceptance requirement is verified only when every declared check passed. A skipped, unobserved or duplicated check leaves it missing, and a failed check contradicts it. An observation of an undeclared check is reported and grants nothing. An observation of another feature is never joined. Authored order never changes the result."
+    },
+    {
+      "id": "objective-verdicts",
+      "text": "A threshold check is judged by recomputing the authored objective from the measured value, inclusive at the target. A producer's own passed verdict, or a measurement of another metric, aggregation or unit, leaves it missing. A rolling objective is verified only by a window as long as declared, in the declared environment, ending by the evaluation instant, within the freshness bound; otherwise it is stale. A missed objective contradicts it. An objective nobody authored leaves it missing and grants nothing."
+    },
+    {
+      "id": "only-enforce-blocks",
+      "text": "Only enforce mode blocks a group. It blocks on a requirement that is unmapped, unexecutable, missing, stale or contradicted, and on an error finding over the group's own inputs, but not on a warning. A requirement whose checks no source could observe is counted as unobserved and never blocks. The verification record keeps that state through its strict reader."
+    },
+    {
+      "id": "findings-name-file-positions",
+      "text": "A finding names the file position of what it refuses, such as features[0].requirements[1].verification.checks[1], after the file path when a repository validator reports it. A duplicate names the position of its first declaration, and a text over 512 bytes states the bound. A spec without outcomes, with a non-canonical id, blank text, a control character, a duplicate decision or a decision link outside doc/adr is refused. The spec field set matches its published schema."
+    },
+    {
+      "id": "proof-fragments",
+      "text": "A test binds itself to one declared check. When it ends, its binding writes one fragment with the feature, requirement and check, the declaring file and test, and the runner's verdict: passed, failed or skipped. A measurement carries its observed window and no verdict, and only a passing test writes one. Without the adapter's fragment directory nothing is written. Go's spectest.Proves and @putnami/spectest's specTest both hold this; Go collapses identical concurrent observations into one fragment."
+    },
+    {
+      "id": "one-report-per-project",
+      "text": "The test job merges the fragments into one verification report per project. A declaration outside the reporting project is set aside. Observations of one check reduce to one: a failure beats a pass, and a pass beats a skip. A fragment with a verdict and a measurement keeps only its verdict. An observation the wire refuses is dropped alone. The written report passes the strict reader, and a run without observations writes none. Each member of a Go or Python batch gets only its own observations."
+    },
+    {
+      "id": "ratchets-and-decisions",
+      "text": "Against the committed specs baseline, a project that leaves enforce mode or loses a recorded executable requirement is an error naming the baseline file; growth is only counted, and a missing baseline is initial adoption. The decision registry reader refuses a wrong version, an unknown member, an explicit null and a trailing value. A decision that could not be enforced is a registry error. A decision check judges one JSON file, compares numbers by value and counts an unreadable file as a violation."
+    }
+  ],
+  "decisions": [
+    "protocols/features/doc/adr/0001-minimal-spec-contract.md",
+    "protocols/features/doc/adr/0002-executable-requirement-criteria.md"
+  ]
+}
