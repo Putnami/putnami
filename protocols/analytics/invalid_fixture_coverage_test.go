@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_InvalidFixturesCoverEveryCode holds the "corpus is the spec"
@@ -18,6 +20,7 @@ import (
 // JSON, which a corpus of .json files cannot hold; validate_test.go pins it
 // directly instead.
 func TestConformance_InvalidFixturesCoverEveryCode(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-fixture-corpus-is-the-contract", "every-code-but-parse-error-has-a-fixture")
 	produced := make(map[string]bool, len(ValidErrorCodes))
 	for _, path := range fixturePaths(t, "invalid") {
 		for _, code := range codesOf(t, path) {
@@ -55,6 +58,7 @@ func TestConformance_InvalidFixturesCoverEveryCode(t *testing.T) {
 // edit to a valid page view, and putting an action property on a page view is
 // both misplaced and, by design, still checked for shape.
 func TestConformance_InvalidFixtureNamesMatchCodes(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-fixture-corpus-is-the-contract", "each-invalid-fixture-is-named-after-its-code")
 	for _, path := range fixturePaths(t, "invalid") {
 		stem := strings.TrimSuffix(filepath.Base(path), ".json")
 		want := "analytics." + stem

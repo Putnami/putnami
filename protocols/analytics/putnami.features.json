@@ -1,0 +1,129 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "analytics",
+  "features": [
+    {
+      "id": "analytics/collection-wire-contract",
+      "type": "feature",
+      "name": "Web analytics collection wire contract",
+      "outcome": "A browser tracker and a server ingest exchange page views and actions over one closed, versioned wire whose vocabulary, bounds and fixture corpus both runtimes share, so what an anonymous visitor can write is bounded by construction",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-codes-and-bounds-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-1",
+              "the-18-error-codes-are-a-closed-set",
+              "the-bounds-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "the-vocabulary-is-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-closed-enum-has-its-members-and-its-predicate",
+              "form-submit-is-refused-on-the-wire",
+              "the-typescript-classifier-emits-only-enum-members"
+            ]
+          }
+        },
+        {
+          "id": "a-batch-is-decoded-strictly-and-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-envelope-rules-hold",
+              "decode-failures-are-classified",
+              "a-decode-failure-never-reaches-validation",
+              "a-diagnostic-names-the-event-index"
+            ]
+          }
+        },
+        {
+          "id": "lengths-are-utf-8-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-path-bound-counts-bytes",
+              "a-utm-bound-counts-bytes",
+              "the-typescript-measure-counts-utf-8-bytes"
+            ]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-batch-validates-and-every-invalid-one-is-refused",
+              "every-code-but-parse-error-has-a-fixture",
+              "each-invalid-fixture-is-named-after-its-code",
+              "the-golden-batch-conforms",
+              "the-typescript-sanitizer-accepts-every-valid-batch",
+              "the-typescript-sanitizer-drops-each-invalid-batch-with-its-code",
+              "the-typescript-sanitizer-accepts-the-golden-batch"
+            ]
+          }
+        },
+        {
+          "id": "bots-are-one-shared-list",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-bot-list-is-lowercase-and-unique",
+              "an-absent-user-agent-is-a-bot",
+              "the-typescript-bot-list-equals-the-fixture",
+              "the-typescript-filter-counts-an-absent-user-agent-as-a-bot"
+            ]
+          }
+        },
+        {
+          "id": "classification-follows-the-shared-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-user-agent-case-expects-enum-members",
+              "every-referrer-case-expects-a-bounded-enum-member",
+              "the-typescript-classifier-matches-every-user-agent-case",
+              "the-typescript-referrer-classifier-matches-every-case"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

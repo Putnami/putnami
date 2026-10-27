@@ -5,7 +5,11 @@
   "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/analytics"],
   "options": {
+    "test": {
+      "filePatterns": ["../../../protocols/analytics/fixtures/**"]
+    },
     "package": {
       "npm": true
     },

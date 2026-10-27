@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -73,6 +74,7 @@ func TestValidateBatch_HappyPath(t *testing.T) {
 
 // TestValidateBatch_Envelope covers the three envelope rules of the contract.
 func TestValidateBatch_Envelope(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "a-batch-is-decoded-strictly-and-validated", "the-envelope-rules-hold")
 	tests := []struct {
 		name      string
 		mutate    func(*Batch)
@@ -103,6 +105,7 @@ func TestValidateBatch_Envelope(t *testing.T) {
 // TestValidateBatch_MaxEventsIsAccepted pins the inclusive upper bound: a batch
 // of exactly MaxEvents is the size ceiling, not the first rejection.
 func TestValidateBatch_MaxEventsIsAccepted(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "a-batch-is-decoded-strictly-and-validated", "the-envelope-rules-hold")
 	events := make([]Event, MaxEvents)
 	for i := range events {
 		events[i] = validPageView()
@@ -122,6 +125,7 @@ func TestValidateBatch_NilIsARefusal(t *testing.T) {
 // TestValidateBatch_FieldPathsCarryTheEventIndex pins that a diagnostic points
 // at the offending event, not merely at the batch: a sanitizer drops per event.
 func TestValidateBatch_FieldPathsCarryTheEventIndex(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "a-batch-is-decoded-strictly-and-validated", "a-diagnostic-names-the-event-index")
 	bad := validPageView()
 	bad.EventID = "not-a-uuid"
 	requireDiagnostic(t, ValidateBatch(batchOf(validPageView(), bad)), ErrorCodeInvalidEventID, "events[1].eventId")
@@ -363,6 +367,7 @@ func TestValidateEvent_IsDeterministicOverMaps(t *testing.T) {
 // the contract distinguishes. Flattening them into parse_error would leave a
 // sanitizer unable to tell a hostile body from a version skew.
 func TestParseBatchStrict_ClassifiesDecodeFailures(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "a-batch-is-decoded-strictly-and-validated", "decode-failures-are-classified")
 	tests := []struct {
 		name     string
 		body     string
@@ -398,6 +403,7 @@ func TestParseBatchStrict_ClassifiesDecodeFailures(t *testing.T) {
 // the diagnostic. The standard library only puts it in the message text, so this
 // is the one place the extraction is checked.
 func TestParseBatchStrict_NamesTheUnknownField(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "a-batch-is-decoded-strictly-and-validated", "decode-failures-are-classified")
 	_, diags := ParseBatchStrict([]byte(`{"protocolVersion": 1, "events": [{"title": "x"}]}`))
 	if len(diags) != 1 || diags[0].Field != "title" {
 		t.Fatalf("diagnostics = %v, want one naming field %q", diags, "title")
@@ -408,6 +414,7 @@ func TestParseBatchStrict_NamesTheUnknownField(t *testing.T) {
 // decode never reaches the validator: validating a half-decoded batch would
 // report rule violations the sender cannot act on.
 func TestParseAndValidateBatch_StopsAtDecodeFailure(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "a-batch-is-decoded-strictly-and-validated", "a-decode-failure-never-reaches-validation")
 	batch, diags := ParseAndValidateBatch([]byte("not json"))
 	if batch != nil {
 		t.Errorf("batch = %#v, want nil", batch)
@@ -491,6 +498,7 @@ func equalStrings(a, b []string) bool {
 // code units would accept a 300-character Cyrillic path this package rejects at
 // 600 bytes. The README states the rule; these cases are what make it binding.
 func TestValidatePageBoundsAreBytes(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "lengths-are-utf-8-bytes", "a-path-bound-counts-bytes")
 	// "я" is two bytes in UTF-8 and one JavaScript string unit.
 	const twoByteRune = "я"
 
@@ -520,6 +528,7 @@ func TestValidatePageBoundsAreBytes(t *testing.T) {
 // TestValidateUTMBoundIsBytes pins the same unit on a campaign value, so the
 // rule is not pinned only where the path happens to enforce it.
 func TestValidateUTMBoundIsBytes(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "lengths-are-utf-8-bytes", "a-utm-bound-counts-bytes")
 	value := strings.Repeat("я", MaxUTMLen/2+1)
 	if runes := len([]rune(value)); runes > MaxUTMLen {
 		t.Fatalf("case is vacuous: %d runes already exceeds %d", runes, MaxUTMLen)

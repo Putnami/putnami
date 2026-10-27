@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestGoldenBatchConformsToVocabulary proves the single importable fixture is a
 // conforming batch, so a consumer that needs a reference payload can import
 // GoldenBatchJSON instead of vendoring a copy that nothing validates.
 func TestGoldenBatchConformsToVocabulary(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-fixture-corpus-is-the-contract", "the-golden-batch-conforms")
 	batch, diags := ParseAndValidateBatch(GoldenBatchJSON)
 	if diag.HasErrors(diags) {
 		t.Fatalf("golden batch failed validation: %v", diags)
@@ -39,6 +41,7 @@ func TestGoldenBatchConformsToVocabulary(t *testing.T) {
 // read the embedded bytes; if the two could drift, "both runtimes agree on the
 // golden" would be a claim about two different documents.
 func TestGoldenBatchMatchesItsFixtureFile(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-fixture-corpus-is-the-contract", "the-golden-batch-conforms")
 	onDisk, err := os.ReadFile(filepath.Join("fixtures", "equivalence", "batch.golden.json"))
 	if err != nil {
 		t.Fatal(err)
