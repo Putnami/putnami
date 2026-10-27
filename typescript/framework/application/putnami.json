@@ -4,7 +4,13 @@
   "visibility": "public",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/protocols/features", "/protocols/http-routes", "/protocols/identity", "/protocols/platform", "/protocols/telemetry"],
+  "dependencies": [
+    "/protocols/features",
+    "/protocols/http-routes",
+    "/protocols/identity",
+    "/protocols/platform",
+    "/protocols/telemetry"
+  ],
   "options": {
     "test": {
       "filePatterns": [
