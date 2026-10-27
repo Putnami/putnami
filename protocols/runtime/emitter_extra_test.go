@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // decodeLine unmarshals a single emitted JSONL line into a generic object so a
@@ -24,6 +26,7 @@ func decodeLine(t *testing.T, line []byte) map[string]any {
 // and non-colliding extras are preserved. Exercised through both ArtifactData
 // and SummaryData, the two public entry points into emitWithExtra.
 func TestEmitWithExtra_TypedFieldsWinAndExtrasSurvive(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "typed-fields-win-and-extras-survive")
 	t.Run("ArtifactData", func(t *testing.T) {
 		var buf bytes.Buffer
 		em := NewEmitter(&buf)
@@ -86,6 +89,7 @@ func TestEmitWithExtra_TypedFieldsWinAndExtrasSurvive(t *testing.T) {
 // TestLogContext covers LogContext, which forwards structured context and
 // optional error details from child processes.
 func TestLogContext(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "an-emitted-line-round-trips")
 	var buf bytes.Buffer
 	em := NewEmitter(&buf)
 	if err := em.LogContext(LevelError, "child failed",
@@ -122,6 +126,7 @@ func TestLogContext(t *testing.T) {
 // CLI's published-artifacts renderer. This asserts the fields survive an
 // emit → decode round trip.
 func TestPublishRecordRoundTrip(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-emitter-writes-lines-the-parser-reads", "typed-fields-win-and-extras-survive")
 	rec := PublishRecord{
 		Registry:     "docker",
 		Name:         "oci.putnami.dev/team/thing",

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "runtime/event-stream",
+  "outcomes": [
+    "A job written in any language reports through one documented stream, and the CLI renders, replays and reacts to it without knowing the language",
+    "A served workload says it is ready with a typed event, so the watcher never guesses from a log line",
+    "A new version reaches a stream only when the CLI asks for it, and an older reader keeps the bytes it always read"
+  ],
+  "nonGoals": [
+    "The outer session-stream record the CLI writes around these events: protocols/cli owns it",
+    "The fields of a release-set outcome: the distribution protocol owns and validates them"
+  ],
+  "requirements": [
+    {
+      "id": "the-versions-are-pinned",
+      "text": "ProtocolVersion stays 1 and ProtocolVersion2 stays 2, and each schema pins v to its constant, so a version bump is a reviewed migration. The version 1 schema keeps pinning v to 1 and never admits the version 2 ready type."
+    },
+    {
+      "id": "one-stream-one-negotiated-version",
+      "text": "A stream's version is resolved once from PUTNAMI_RUNTIME_EVENTS before its first line, and every input resolves to a known version: no advertisement, or an unknown one, is version 1. The writing and the reading side share the resolution. The emitter stamps the resolved version on every line, the default emitter stays version 1, and a stream that carries two versions is invalid."
+    },
+    {
+      "id": "version-2-adds-only-ready",
+      "text": "Version 2 accepts every version 1 event type and adds only ready. Version 1 refuses ready, an emitter on a version 1 stream refuses to write one, and a version outside the known set is refused. Every version 1 fixture still validates at version 1."
+    },
+    {
+      "id": "events-parse-and-validate-by-type",
+      "text": "ParseEvent decodes the log, progress, metric, phase, diagnostic, artifact, result and meta events, and a line that is not JSON is an error. ValidateEvent requires each type's members and refuses a nil event and an unknown type. The Decoder reads one event per line, skips blank lines and ends cleanly at the end of its input."
+    },
+    {
+      "id": "a-stream-ends-with-one-result",
+      "text": "A valid stream carries exactly one result event, as its last line: a stream without one, with two, or with a line after it is invalid. A ready event may repeat, so a restarted workload announces readiness again in a valid stream."
+    },
+    {
+      "id": "the-emitter-writes-lines-the-parser-reads",
+      "text": "The Emitter writes one JSON object per line that ParseEvent reads back. A result carries its error, and its timedOut member only when set, so a stream that never sets it keeps its bytes. A typed field wins over a colliding extra key and the other extras survive. LogContext forwards structured context and error details, and a published-artifact record survives an emit and a decode."
+    },
+    {
+      "id": "readiness-is-typed-and-canonical",
+      "text": "A ready event names a known target, and a server target names its endpoints, each with a known scheme, a host and a port; a missing or malformed payload is refused. An endpoint's URL derives from its scheme, host, port and path, endpoints sort canonically, and the same readiness facts produce the same bytes whatever order the listeners bound in. ExtractReadyData reads the payload back."
+    },
+    {
+      "id": "a-workload-announces-readiness-in-a-log-line",
+      "text": "A workload announces readiness under the reserved putnami.ready log key. Extraction canonicalizes the endpoints before it validates them, so a marker written in bind order is accepted and produces the same event. A malformed marker yields no readiness rather than an invalid line, and a log line without the marker yields none."
+    },
+    {
+      "id": "result-payloads-are-typed-and-bounded",
+      "text": "A result's data carries the typed per-verb payloads ExtractResultPayloads reads, and none when it has none. A test summary refuses negative counts and more outcomes than its total, and a coverage summary refuses a percentage over 100, an unknown granularity and more covered units than total. The test-case payload refers to the CLI contract's testCase and restates none of it."
+    },
+    {
+      "id": "a-release-set-outcome-is-one-opaque-payload",
+      "text": "A successful managed publication carries exactly one release-set outcome at the result's releaseSet data, kept as opaque bytes and described by the distribution protocol's schema. A dry run, a CAS conflict or a failure carries none, and a missing, duplicate or misplaced outcome is refused. The published-images file is canonical, strict and private, or it is refused."
+    },
+    {
+      "id": "the-schemas-and-the-go-types-agree",
+      "text": "Every closed vocabulary, the event types of both versions, the log levels, the result and phase statuses, the diagnostic severities, the coverage granularities and the ready vocabularies, is held against its schema by a drift test, and so are the result error's members. The exported vocabularies are sorted, so a harness that enumerates them prints one order."
+    },
+    {
+      "id": "a-fixture-corpus-holds-both-versions",
+      "text": "Every valid stream fixture of each version validates and every invalid one fails, and a stream of a single result decodes. Each version 2 reject branch is triggered by a fixture, so relaxing a readiness rule turns a red fixture green and fails the suite."
+    },
+    {
+      "id": "this-module-owns-only-the-inner-event",
+      "text": "This module declares the event a job subprocess writes and nothing around it: the outer session-stream record belongs to protocols/cli, and no job or session envelope is declared here."
+    },
+    {
+      "id": "the-extension-sdk-emits-a-conforming-stream",
+      "text": "The extension SDK's emitter writes this wire shape at the version the CLI advertises, resolved through this module, and falls back to version 1 for an unknown one. A typed ready marker appears only from version 2. It never writes an invalid line: it drops a value the protocol cannot represent, reports a ready event it cannot write at version 1, keeps the log line of a malformed marker, and writes a timed-out result that parses. It announces readiness again on every restart."
+    },
+    {
+      "id": "the-typescript-runtime-emits-and-validates-a-conforming-stream",
+      "text": "In TypeScript, @putnami/runtime gives every fixture of both versions the Go verdict and refuses a version 1 ready event and a mixed-version stream. Its emitter writes a valid line of every event type, in the Go SDK's shape for meta, result, summary, ready and timed-out result lines, drops a non-finite metric, stamps one version per line and writes no version 1 ready event. It resolves PUTNAMI_RUNTIME_EVENTS as the Go helper does, sorts endpoints by byte order, and a malformed readiness marker yields none."
+    },
+    {
+      "id": "the-cli-arms-on-typed-readiness",
+      "text": "The CLI's serve watcher arms on a typed ready event, including a workload target with no endpoint, and never on the listening log line. It ignores a ready event stamped version 1 and a ready payload it cannot act on."
+    }
+  ],
+  "decisions": [
+    "protocols/runtime/doc/adr/0001-one-stream-one-negotiated-version.md",
+    "protocols/runtime/doc/adr/0002-delete-the-producerless-stream-envelopes.md"
+  ]
+}

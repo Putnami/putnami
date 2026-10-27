@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -136,6 +137,7 @@ func TestServeReadinessIsNeverLogScraped(t *testing.T) {
 }
 
 func TestServeReadySignal_ClosesOnTypedReadyEvent(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-cli-arms-on-typed-readiness", "the-cli-arms-on-a-ready-event")
 	var signal serveReadySignal
 	ready := signal.reset()
 
@@ -153,6 +155,7 @@ func TestServeReadySignal_ClosesOnTypedReadyEvent(t *testing.T) {
 // the `workload` target. The watcher must not require an address it was never
 // promised.
 func TestServeReadySignal_ClosesOnWorkloadReadiness(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-cli-arms-on-typed-readiness", "the-cli-arms-on-a-ready-event")
 	var signal serveReadySignal
 	ready := signal.reset()
 
@@ -169,6 +172,7 @@ func TestServeReadySignal_ClosesOnWorkloadReadiness(t *testing.T) {
 // on is now inert. This is the assertion that fails if the probe is ever wired
 // back in beside the typed consumer.
 func TestServeReadySignal_IgnoresTheListeningLogLine(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-cli-arms-on-typed-readiness", "the-cli-arms-on-a-ready-event")
 	var signal serveReadySignal
 	ready := signal.reset()
 
@@ -185,6 +189,7 @@ func TestServeReadySignal_IgnoresTheListeningLogLine(t *testing.T) {
 // the type. Arming on it would trust a stream that has already contradicted its
 // own envelope, so it fails closed.
 func TestServeReadySignal_IgnoresReadyEventAtProtocolV1(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-cli-arms-on-typed-readiness", "the-cli-ignores-readiness-it-cannot-trust")
 	var signal serveReadySignal
 	ready := signal.reset()
 
@@ -203,6 +208,7 @@ func TestServeReadySignal_IgnoresReadyEventAtProtocolV1(t *testing.T) {
 // rejections fail closed — an unarmed watcher costs a hot reload, while arming
 // early restarts a server that has not bound its port.
 func TestServeReadySignal_IgnoresUnactionableReadyPayloads(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-cli-arms-on-typed-readiness", "the-cli-ignores-readiness-it-cannot-trust")
 	// A target the protocol does not define, stated through the protocol's own
 	// payload type: the vocabulary is closed, so an extension inventing a member
 	// of it is making a claim no consumer can act on.
