@@ -210,8 +210,10 @@ func bashCommands(t *testing.T, script string) []string {
 	scanner := bufio.NewScanner(strings.NewReader(script))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if words, ok := strings.CutPrefix(line, `local commands="`); ok {
-			return strings.Fields(strings.TrimSuffix(words, `"`))
+		// The list is one single-quoted word of compgen words; a plain command
+		// name is a bare word inside it.
+		if words, ok := strings.CutPrefix(line, `local commands='`); ok {
+			return strings.Fields(strings.TrimSuffix(words, `'`))
 		}
 	}
 	t.Fatalf("no command list in the bash completion:\n%s", script)

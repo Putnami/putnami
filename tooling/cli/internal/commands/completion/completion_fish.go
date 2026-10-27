@@ -73,7 +73,7 @@ end
 		if desc == "" {
 			desc = "Run " + cmd + " job"
 		}
-		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a %s -d %s\n", fishQuote(cmd), fishQuote(desc))
+		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a %s -d %s\n", fishArguments(cmd), fishQuote(desc))
 	}
 
 	iox.Fprintf(w, "\n# Structured commands\n")
@@ -83,7 +83,7 @@ end
 		if desc == "" {
 			desc = sc
 		}
-		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a '%s' -d %s\n", sc, fishQuote(desc))
+		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a %s -d %s\n", fishArguments(sc), fishQuote(desc))
 	}
 
 	iox.Fprintf(w, "\n# Subcommands\n")
@@ -94,14 +94,16 @@ end
 	sort.Strings(subcommandPaths)
 	for _, path := range subcommandPaths {
 		for _, sub := range ctx.subcommands[path] {
-			iox.Fprintf(w, "complete -c putnami -n '__putnami_complete_children %s' -a '%s'\n", fishPathArgs(path), sub)
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
+				fishCondition("__putnami_complete_children", strings.Fields(path)...), fishArguments(sub))
 		}
 	}
 
 	// The word after a group whose default takes a project positional.
 	for _, group := range ctx.projectPositionalGroups() {
 		for _, id := range ctx.projectIDs {
-			iox.Fprintf(w, "complete -c putnami -n '__putnami_complete_children %s' -a '%s' -d 'project'\n", fishPathArgs(group), id)
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s -d 'project'\n",
+				fishCondition("__putnami_complete_children", strings.Fields(group)...), fishArguments(id))
 		}
 	}
 
@@ -110,10 +112,10 @@ end
 	for _, flag := range ctx.globalFlags {
 		condition := ""
 		if flag.JobOnly {
-			condition = "-n 'not __putnami_core_root' "
+			condition = "-n " + fishCondition("not __putnami_core_root") + " "
 		}
-		iox.Fprintf(w, "complete -c putnami %s-l '%s' -d %s\n",
-			condition, strings.TrimPrefix(flag.Long, "--"), fishQuote(flag.Description))
+		iox.Fprintf(w, "complete -c putnami %s-l %s -d %s\n",
+			condition, fishQuote(strings.TrimPrefix(flag.Long, "--")), fishQuote(flag.Description))
 	}
 
 	iox.Fprintf(w, "\n# Structured command flags\n")
@@ -124,17 +126,17 @@ end
 	sort.Strings(keys)
 	for _, key := range keys {
 		flags := ctx.structuredFlags[key]
-		condition := "__putnami_seen_path " + fishPathArgs(key)
+		condition := fishCondition("__putnami_seen_path", strings.Fields(key)...)
 		valueKeyPrefix := key + " "
 		for _, flag := range flags {
 			shortFlag := strings.TrimPrefix(flag.Long, "--")
-			option := "complete -c putnami -n '" + condition + "' -l '" + shortFlag + "' -d " + fishQuote(flag.Description)
+			option := "complete -c putnami -n " + condition + " -l " + fishQuote(shortFlag) + " -d " + fishQuote(flag.Description)
 			if values, ok := ctx.structuredFlagValues[valueKeyPrefix+flag.Long]; ok && len(values) > 0 {
 				var names []string
 				for _, value := range values {
 					names = append(names, value.Value)
 				}
-				option += " -a '" + strings.Join(names, " ") + "'"
+				option += " -a " + fishArguments(names...)
 			}
 			if flag.ValueName != "" {
 				option += " -r"
@@ -145,8 +147,8 @@ end
 
 	// Output format completion
 	iox.Fprintf(w, "\n# Output format values\n")
-	iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from --output' -a '%s'\n",
-		strings.Join(ctx.globalFlagValues("--output"), " "))
+	iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
+		fishCondition("__fish_seen_subcommand_from", "--output"), fishArguments(ctx.globalFlagValues("--output")...))
 
 	// --projects accepts any target form ResolveTarget understands:
 	// IDs, names, basenames, and aliases.
@@ -157,50 +159,47 @@ end
 	projectTargets = append(projectTargets, aliasNames(ctx.aliases)...)
 	if len(projectTargets) > 0 {
 		iox.Fprintf(w, "\n# Project targets (for --projects flag value)\n")
-		iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from --projects' -a '%s'\n",
-			strings.Join(projectTargets, " "))
+		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
+			fishCondition("__fish_seen_subcommand_from", "--projects"), fishArguments(projectTargets...))
 	}
 
 	// --exclude matches project names.
 	if len(ctx.projects) > 0 && ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, "\n# Project names (for --exclude flag value)\n")
-		iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from --exclude' -a '%s'\n",
-			strings.Join(ctx.projects, " "))
+		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
+			fishCondition("__fish_seen_subcommand_from", "--exclude"), fishArguments(ctx.projects...))
 	}
 
 	// Positional project targets after job commands: IDs, names, basenames, aliases.
 	if len(ctx.projectIDs) > 0 || len(ctx.projects) > 0 || len(ctx.projectBasenames) > 0 || len(ctx.aliases) > 0 {
-		jobList := strings.Join(ctx.commands, " ")
+		afterJob := fishCondition("__fish_seen_subcommand_from", ctx.commands...)
 		iox.Fprintf(w, "\n# Project targets (positional argument after job commands)\n")
 		for _, id := range ctx.projectIDs {
-			iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from %s' -a '%s' -d 'project'\n", jobList, id)
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s -d 'project'\n", afterJob, fishArguments(id))
 		}
 		for _, name := range ctx.projects {
-			iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from %s' -a '%s' -d 'project'\n", jobList, name)
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s -d 'project'\n", afterJob, fishArguments(name))
 		}
 		for _, base := range ctx.projectBasenames {
-			iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from %s' -a '%s' -d 'project'\n", jobList, base)
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s -d 'project'\n", afterJob, fishArguments(base))
 		}
 		for _, a := range ctx.aliases {
 			desc := a.Description
 			if desc == "" {
 				desc = "alias"
 			}
-			iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from %s' -a '%s' -d %s\n", jobList, a.Value, fishQuote(desc))
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s -d %s\n", afterJob, fishArguments(a.Value), fishQuote(desc))
 		}
 	}
 }
 
-func fishPathArgs(path string) string {
-	return strings.Join(strings.Fields(path), " ")
-}
-
-// fishQuote single-quotes a description for a fish `complete -d` argument.
-// Inside fish single quotes only \' and \\ are escapes, and an unescaped
-// apostrophe does not end the string quietly: it swallows the REST OF THE FILE
-// until the next quote, silently dropping every completion after it. The
-// descriptions are catalog prose ("Don't abort on first failure"), so this is
-// not hypothetical.
+// fishQuote single-quotes a value as one fish word, read once: a description
+// for `complete -d`, a flag name for `complete -l`, or a word of the script
+// itself. Inside fish single quotes only \' and \\ are escapes, and an
+// unescaped apostrophe does not end the string quietly: it swallows the REST OF
+// THE FILE until the next quote, silently dropping every completion after it.
+// The descriptions are catalog prose ("Don't abort on first failure"), so this
+// is not hypothetical.
 func fishQuote(value string) string {
 	replacer := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 	return "'" + replacer.Replace(value) + "'"
@@ -213,4 +212,41 @@ func fishQuoteAll(values []string) []string {
 		quoted[i] = fishQuote(value)
 	}
 	return quoted
+}
+
+// fishWord quotes a value as one fish word, unless fish reads it as itself.
+func fishWord(value string) string {
+	if plainWord(value) {
+		return value
+	}
+	return fishQuote(value)
+}
+
+// fishWords renders values as fish words separated by spaces (fishWord).
+func fishWords(values []string) string {
+	words := make([]string, len(values))
+	for i, value := range values {
+		words[i] = fishWord(value)
+	}
+	return strings.Join(words, " ")
+}
+
+// fishArguments renders values as the argument of `complete -a`. Fish reads
+// that string twice: once with the script, and again when it completes, where
+// it splits the string into words and expands variables and command
+// substitutions. Each value is quoted for the second read and the whole list
+// for the first, so a name such as "p $l" or "x(cmd)" is one literal candidate.
+func fishArguments(values ...string) string {
+	return fishQuote(fishWords(values))
+}
+
+// fishCondition renders the argument of `complete -n`: the command function,
+// which the generator writes, followed by args. Fish runs that string as a
+// command when it completes, so each arg is quoted for that read and the whole
+// string for the first: a ";" or an apostrophe in a name stays in the name.
+func fishCondition(function string, args ...string) string {
+	if len(args) == 0 {
+		return fishQuote(function)
+	}
+	return fishQuote(function + " " + fishWords(args))
 }

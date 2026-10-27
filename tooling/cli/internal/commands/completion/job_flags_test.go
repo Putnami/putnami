@@ -258,8 +258,9 @@ func TestCompletionOffersAJobFlagOnlyAfterACommandThatTakesIt(t *testing.T) {
 	if !strings.Contains(fish.String(), ` 'p $l;x'`) {
 		t.Error("fish does not quote an alias name in its core-command check")
 	}
-	if !strings.Contains(fish.String(), `-a 'p $l;x' -d `) {
-		t.Error("fish does not quote an alias name it completes as a command")
+	// Fish reads an -a string a second time, so the name is quoted twice.
+	if !strings.Contains(fish.String(), `-a '\'p $l;x\'' -d `) {
+		t.Error("fish does not quote an alias name it completes as a command for both reads")
 	}
 	if !strings.Contains(fish.String(), "complete -c putnami -n 'not __putnami_core_root' -l 'dry-run'") {
 		t.Error("fish offers --dry-run after a core command")

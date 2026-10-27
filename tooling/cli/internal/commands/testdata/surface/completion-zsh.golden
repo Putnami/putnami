@@ -577,7 +577,7 @@ _putnami() {
                         _describe -t project-names 'project name' projects
                         _describe -t project-names 'project name' project_basenames
                     elif [[ "${prev}" == "--output" ]]; then
-                        compadd text json jsonl cloud-logging
+                        compadd -- text json jsonl cloud-logging
                     elif [[ "${cur}" == -* ]]; then
                         local -a cmd_flags
                         _putnami_flags_for "${path}"

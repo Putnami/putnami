@@ -109,21 +109,17 @@ _putnami() {
 	iox.Fprintf(w, "    )\n\n")
 
 	if len(ctx.projects) > 0 {
-		iox.Fprintf(w, "    projects=(%s)\n\n", strings.Join(ctx.projects, " "))
+		iox.Fprintf(w, "    projects=(%s)\n\n", zshDescribeNames(ctx.projects))
 	}
 
 	// Project path basenames (short-form targets like "http", "application").
 	if len(ctx.projectBasenames) > 0 {
-		iox.Fprintf(w, "    project_basenames=(%s)\n\n", strings.Join(ctx.projectBasenames, " "))
+		iox.Fprintf(w, "    project_basenames=(%s)\n\n", zshDescribeNames(ctx.projectBasenames))
 	}
 
 	// Project IDs for /path completion
 	if len(ctx.projectIDs) > 0 {
-		iox.Fprintf(w, "    local -a project_ids=(")
-		for _, id := range ctx.projectIDs {
-			iox.Fprintf(w, "'%s' ", id)
-		}
-		iox.Fprintf(w, ")\n\n")
+		iox.Fprintf(w, "    local -a project_ids=(%s)\n\n", zshDescribeNames(ctx.projectIDs))
 	}
 
 	// Project aliases for bare-word completion
@@ -198,7 +194,7 @@ _putnami() {
 `)
 	}
 	iox.Fprintf(w, `                    elif [[ "${prev}" == "--output" ]]; then
-                        compadd %s
+                        compadd -- %s
                     elif [[ "${cur}" == -* ]]; then
                         local -a cmd_flags
                         _putnami_flags_for "${path}"
@@ -208,7 +204,7 @@ _putnami() {
                         _describe -t project-ids 'project ID' project_ids
                         _describe -t project-names 'project name' projects
                         _describe -t project-names 'project name' project_basenames
-`, strings.Join(ctx.globalFlagValues("--output"), " "))
+`, bashWords(ctx.globalFlagValues("--output")))
 	if len(ctx.aliases) > 0 {
 		iox.Fprintf(w, "                        _describe -t aliases 'project alias' project_aliases\n")
 	}
@@ -237,7 +233,7 @@ func writeZshSubcommandCases(w io.Writer, ctx completionContext) {
 		iox.Fprintf(w, "        %s)\n", bashQuote(key))
 		iox.Fprintf(w, "            reply=(\n")
 		for _, sub := range subs {
-			iox.Fprintf(w, "                %s\n", bashQuote(sub))
+			iox.Fprintf(w, "                %s\n", bashQuote(zshDescribeName(sub)))
 		}
 		iox.Fprintf(w, "            )\n")
 		iox.Fprintf(w, "            ;;\n")
@@ -286,7 +282,24 @@ func writeZshFlagCases(w io.Writer, ctx completionContext) {
 // POSIX "'\”" escape that zsh shares, and routing every entry through here
 // means a new description cannot reintroduce it.
 func zshDescribeEntry(name, description string) string {
-	return bashQuote(name + ":" + description)
+	return bashQuote(zshDescribeName(name) + ":" + description)
+}
+
+// zshDescribeName escapes a name for a _describe entry. _describe reads the
+// name up to the first colon that no backslash escapes, then removes the
+// backslashes, so a colon in a name would start its description.
+func zshDescribeName(name string) string {
+	return strings.NewReplacer(`\`, `\\`, `:`, `\:`).Replace(name)
+}
+
+// zshDescribeNames renders names as the words of a zsh array that _describe
+// reads: each name is one word (bashWord) and escaped for _describe.
+func zshDescribeNames(names []string) string {
+	words := make([]string, len(names))
+	for i, name := range names {
+		words[i] = bashWord(zshDescribeName(name))
+	}
+	return strings.Join(words, " ")
 }
 
 // zshFlagSpec renders one zsh completion spec: "--name[description]" for a
@@ -320,7 +333,7 @@ func writeZshValueCases(w io.Writer, ctx completionContext) {
 		iox.Fprintf(w, "                    %s)\n", bashQuote(key))
 		iox.Fprintf(w, "                        cmd_values=(\n")
 		for _, value := range values {
-			entry := value.Value
+			entry := zshDescribeName(value.Value)
 			if value.Description != "" {
 				entry += ":" + value.Description
 			}
