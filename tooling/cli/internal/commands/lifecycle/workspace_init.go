@@ -369,6 +369,14 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
+	// Write the host hooks the opted-in extensions declare (ADR 0081). It
+	// runs here, not beside the MCP registration, because the workspace
+	// config and the extensions exist only now. A new workspace binds no
+	// collaboration contract, so this writes nothing until one is bound.
+	for _, change := range agentctx.RegisterHostHooks(cwd, wsCfg, os.Stderr) {
+		iox.Fprintf(os.Stdout, "  ✓ %s\n", change.Description())
+	}
+
 	// Pin what the extensions answer, then run workspace-install, which runs
 	// the toolchains the lock pins.
 	if err := installInitWorkspace(ctx, cwd, wsCfg, env); err != nil {

@@ -347,6 +347,99 @@
       ],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 30000
+    },
+    "local-collaboration.missions.sync": {
+      "description": "Publish an agent session's state and plan to its local mission, then read the mission and the inbox. Before it answers, the store takes the decision answers and messages its owner wrote as files in the store directory; nothing leaves the machine.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The missions.sync request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "missions",
+          "version": 1,
+          "operation": "sync"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000
+    },
+    "local-collaboration.missions.ask": {
+      "description": "Ask the local mission's owner one decision. The owner answers it by writing answers/<decision>.json in the store directory. A repeated idempotency key returns the decision already recorded; the same key with other content is a conflict.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The missions.ask request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "missions",
+          "version": 1,
+          "operation": "ask"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000
+    },
+    "local-collaboration.missions.reply": {
+      "description": "Reply to one message of the local mission's inbox. A message takes one reply: the same reply again changes nothing, and another reply is a conflict.",
+      "inputSchema": {
+        "type": "object",
+        "description": "The missions.reply request document of go.putnami.dev/protocol/collaboration version 1."
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "putnami.dev/contract": {
+          "access": "mutating",
+          "readOnly": false,
+          "supportsDryRun": false
+        },
+        "putnami.dev/provider": {
+          "contract": "missions",
+          "version": 1,
+          "operation": "reply"
+        }
+      },
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider-tool"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000
     }
   }
 }

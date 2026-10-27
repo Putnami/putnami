@@ -424,6 +424,17 @@ func upgradeArtifactPhases(ctx context.Context, wsRoot string, cfg *wsproto.Conf
 	} else if agentctx.RegisterMCPServer(wsRoot, os.Stderr) {
 		iox.Fprintln(os.Stdout, "  ✓ putnami MCP server registered in .mcp.json")
 	}
+	// The host hooks follow the extensions the upgrade resolved: a hook a
+	// new release declares is written, one it dropped is removed (ADR 0081).
+	if flags.DryRun {
+		for _, change := range agentctx.PlanHostHooks(wsRoot, wsproto.Load(wsRoot), os.Stderr) {
+			iox.Fprintf(os.Stdout, "  Would change %s: host hooks %s\n", change.File, change.Action)
+		}
+	} else {
+		for _, change := range agentctx.RegisterHostHooks(wsRoot, wsproto.Load(wsRoot), os.Stderr) {
+			iox.Fprintf(os.Stdout, "  ✓ %s\n", change.Description())
+		}
+	}
 
 	iox.Fprintln(os.Stdout, "\n  Templates")
 	if err := extensions.TemplatesUpdateWithOptions(ctx, wsRoot, cfg, nil, artifactOptions, ""); err != nil {

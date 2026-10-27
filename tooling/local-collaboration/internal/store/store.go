@@ -1,13 +1,14 @@
 // Package store is the local collaboration provider's file store: one JSON
 // document holding every task, proposal, review and idempotency key of one
-// store directory.
+// store directory, and a second one holding its missions (missions.go).
 //
 // Every write is a read-modify-write under an exclusive lock on the store's
 // lock file, and lands by atomic rename, so concurrent writers serialize, a
 // comparison against a revision and the write that follows it are one step,
-// and a reader never sees a torn document. A writer waits for the lock at
-// most Store.LockTimeout, then fails with ErrBusy having written nothing.
-// Readers take no lock: the rename is their consistency.
+// and a reader never sees a torn document. Both documents share the one lock.
+// A writer waits for the lock at most Store.LockTimeout, then fails with
+// ErrBusy having written nothing. Readers take no lock: the rename is their
+// consistency.
 package store
 
 import (
@@ -150,37 +151,52 @@ func (e *WriteError) Unwrap() error { return e.Err }
 // the first time receives its StoreID before change runs, so change can
 // issue references.
 func (s *Store) Update(change func(*State) error) (*State, error) {
-	if err := os.MkdirAll(s.root, 0o755); err != nil {
-		return nil, &WriteError{Err: fmt.Errorf("create the local store: %w", err)}
+	var written *State
+	err := s.locked(func() error {
+		state, err := s.Read()
+		if err != nil {
+			return &WriteError{Err: err}
+		}
+		if state.StoreID == "" {
+			id, err := newStoreID()
+			if err != nil {
+				return &WriteError{Err: err}
+			}
+			state.StoreID = id
+		}
+		if err := change(state); err != nil {
+			return err
+		}
+		encoded, err := json.MarshalIndent(state, "", "  ")
+		if err != nil {
+			return &WriteError{Err: fmt.Errorf("encode the local store: %w", err)}
+		}
+		if err := writeAtomically(s.root, stateFile, append(encoded, '\n')); err != nil {
+			return err
+		}
+		written = state
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return written, nil
+}
+
+// locked runs one read-modify-write under the store's exclusive lock,
+// creating the store directory first, readable by the store's user only. A
+// lock another writer holds longer than LockTimeout fails with ErrBusy before
+// run starts.
+func (s *Store) locked(run func() error) error {
+	if err := os.MkdirAll(s.root, 0o700); err != nil {
+		return &WriteError{Err: fmt.Errorf("create the local store: %w", err)}
 	}
 	lock, err := acquire(filepath.Join(s.root, lockFile), s.LockTimeout)
 	if err != nil {
-		return nil, &WriteError{Err: fmt.Errorf("lock the local store: %w", err)}
+		return &WriteError{Err: fmt.Errorf("lock the local store: %w", err)}
 	}
 	defer lock.release()
-
-	state, err := s.Read()
-	if err != nil {
-		return nil, &WriteError{Err: err}
-	}
-	if state.StoreID == "" {
-		id, err := newStoreID()
-		if err != nil {
-			return nil, &WriteError{Err: err}
-		}
-		state.StoreID = id
-	}
-	if err := change(state); err != nil {
-		return nil, err
-	}
-	encoded, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return nil, &WriteError{Err: fmt.Errorf("encode the local store: %w", err)}
-	}
-	if err := writeAtomically(s.root, stateFile, append(encoded, '\n')); err != nil {
-		return nil, err
-	}
-	return state, nil
+	return run()
 }
 
 // writeAtomically writes a temporary file, syncs it, and renames it over

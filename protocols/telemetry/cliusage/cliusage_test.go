@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	telemetry "go.putnami.dev/protocol/telemetry"
 )
 
@@ -50,6 +51,7 @@ func endAttrs() map[string]telemetry.AnyValue {
 }
 
 func TestValidateRecordAcceptsConformingEvents(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "a-conforming-record-validates")
 	failure := endAttrs()
 	failure[AttrSuccess] = telemetry.BoolVal(false)
 	failure[AttrErrorCategory] = telemetry.StringVal(ErrorCategoryFailure)
@@ -71,6 +73,7 @@ func TestValidateRecordAcceptsConformingEvents(t *testing.T) {
 }
 
 func TestValidateRecordRejectsViolations(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "a-record-outside-the-vocabulary-is-refused")
 	tests := []struct {
 		name string
 		want string // expected error code
@@ -161,6 +164,7 @@ func TestValidateRecordRejectsViolations(t *testing.T) {
 }
 
 func TestValidateRecordRejectsSessionEndViolations(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "a-record-outside-the-vocabulary-is-refused")
 	tests := []struct {
 		name string
 		want string
@@ -199,6 +203,7 @@ func TestValidateRecordRejectsSessionEndViolations(t *testing.T) {
 }
 
 func TestValidateLogsRejectsForeignService(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "a-foreign-service-is-refused")
 	req := telemetry.LogsRequest{ResourceLogs: []telemetry.ResourceLogs{{
 		Resource: telemetry.ResourceFromStrings(map[string]string{telemetry.AttrServiceName: "other-service"}),
 		ScopeLogs: []telemetry.ScopeLogs{{
@@ -209,6 +214,7 @@ func TestValidateLogsRejectsForeignService(t *testing.T) {
 }
 
 func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "a-conforming-record-validates")
 	t.Parallel()
 	attrs := startAttrs()
 	attrs[AttrCommands] = telemetry.StringVal("clientgen,validate-workspace,cloud-deploy")
@@ -220,6 +226,7 @@ func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
 // TestValidateRecordAcceptsTheDevWorkloadCommands holds the vocabulary to the
 // compose and qualify groups of @putnami/dev and the commands they run.
 func TestValidateRecordAcceptsTheDevWorkloadCommands(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "released-command-names-stay", "released-names-stay-in-the-vocabulary")
 	t.Parallel()
 	for _, command := range []string{"compose", "compose-up", "qualify", "qualify-run"} {
 		if !IsCommand(command) {
@@ -244,6 +251,7 @@ var releasedCommands = []string{
 }
 
 func TestCommandVocabularyKeepsEveryReleasedName(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "released-command-names-stay", "released-names-stay-in-the-vocabulary")
 	t.Parallel()
 	for _, command := range releasedCommands {
 		if !IsCommand(command) {
@@ -255,6 +263,7 @@ func TestCommandVocabularyKeepsEveryReleasedName(t *testing.T) {
 // Every name is one comma-free, lowercase token: the wire joins the list with
 // commas, and the receiver publishes each name as an aggregate key.
 func TestCommandVocabularyNamesAreUniqueTokens(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "released-command-names-stay", "names-are-unique-tokens")
 	t.Parallel()
 	token := regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 	seen := make(map[string]bool, len(Commands))
@@ -270,6 +279,7 @@ func TestCommandVocabularyNamesAreUniqueTokens(t *testing.T) {
 }
 
 func TestRequiredAttributesAreAllowed(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "every-required-attribute-is-allowed")
 	for event, required := range RequiredAttributes {
 		allowed := AllowedAttributes[event]
 		if allowed == nil {

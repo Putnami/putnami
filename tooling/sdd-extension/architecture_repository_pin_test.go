@@ -422,7 +422,13 @@ func authoredTypeScriptFrameworkDomain() *arch.Builder {
 				arch.Status(archproto.StatusActive),
 				arch.Facts("wire_contract_definitions"),
 				arch.Justification("The TypeScript framework packages implement wire contracts the protocols domain owns: they write, read or replay a protocol's shapes and fixtures, and their tests prove the protocol's requirements. Each protocol owns its contract; a package holds a reference to it and owns none of its meaning."),
+				arch.Bind("/typescript/framework/application", "/protocols/features"),
+				arch.Bind("/typescript/framework/application", "/protocols/http-routes"),
+				arch.Bind("/typescript/framework/application", "/protocols/platform"),
+				arch.Bind("/typescript/framework/application", "/protocols/telemetry"),
 				arch.Bind("/typescript/framework/cli-protocol", "/protocols/qualify"),
+				arch.Bind("/typescript/framework/spectest", "/protocols/features"),
+				arch.Bind("/typescript/framework/web", "/protocols/http-routes"),
 			),
 		)
 }
@@ -540,7 +546,7 @@ func authoredAgentWorkflowsDomain() *arch.Builder {
 		).
 		Owns(
 			arch.Concept("agent-workflows.public-agent-workflows", archproto.OwnershipModel,
-				"The agent workflows Putnami publishes and consumes: the agent content of the @putnami/contributor extension, with its source skills and worker bodies, the host metadata written beside them, the discovery layout, and the declared content policy that decides what may ship under the extension's identity. The repository-root .agents, .claude, and .codex trees are generated from this source; only the audit skill and host policy files stay outside this authority."),
+				"The agent workflows Putnami publishes and consumes: the agent content of the @putnami/contributor extension, with its source skills and worker bodies, the host metadata written beside them, the discovery layout, and the declared content policy that decides what may ship under the extension's identity. The repository-root .agents, .claude, and .codex trees are generated from this source, and the host hooks the manifest declares are written by the core; only the audit skill and the rest of the host policy files stay outside this authority."),
 		).
 		Export(archproto.Export{
 			ID:          "agent-workflows.artifact-source.v1",

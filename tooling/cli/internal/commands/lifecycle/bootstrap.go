@@ -24,8 +24,9 @@ const (
 
 	// noAutoInstallEnv opts out of first-use auto-install entirely — for CI
 	// pipelines that prefer to run `putnami install` as an explicit, isolated
-	// step rather than have it triggered by the first command.
-	noAutoInstallEnv = "PUTNAMI_NO_AUTO_INSTALL"
+	// step rather than have it triggered by the first command, and for every
+	// host hook command.
+	noAutoInstallEnv = shared.NoAutoInstallEnv
 )
 
 // bootstrappedWorkspaces dedupes EnsureWorkspaceBootstrap to once per workspace

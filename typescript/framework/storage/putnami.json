@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/storage",
   "visibility": "public",
+  "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "options": {

@@ -331,7 +331,8 @@ is isolated to that extension, leaving the core MCP session available.
 
 A tool whose `_meta` also carries `putnami.dev/provider`
 (`{"contract": "tasks", "version": 1, "operation": "find"}`) implements one
-operation of a collaboration contract — tasks, change proposals or memory. It
+operation of a collaboration contract — tasks, change proposals, memory or
+missions. It
 is never advertised under its own name. A workspace binds a provider in
 `options.collaboration` of `putnami.workspace.json`, and Putnami then exposes
 the operation as the MCP tool `tasks.find` and the command `putnami tasks find`,

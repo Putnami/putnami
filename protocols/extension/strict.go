@@ -369,6 +369,10 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	// declares none.
 	diags = append(diags, ValidateAgentContent(m)...)
 
+	// The host hooks (host_hooks.go). Inert for a manifest that declares
+	// none.
+	diags = append(diags, ValidateHostHooks(m)...)
+
 	// The verb vocabulary (verb_vocabulary.go). Inert for a manifest that
 	// declares none.
 	diags = append(diags, ValidateVerbs(m)...)

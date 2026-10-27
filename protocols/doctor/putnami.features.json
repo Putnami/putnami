@@ -1,0 +1,165 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "doctor",
+  "features": [
+    {
+      "id": "doctor/readiness-report-contract",
+      "type": "feature",
+      "name": "Readiness report contract",
+      "outcome": "putnami doctor reports production-readiness findings and reads the reviewed waivers through two strict, versioned shapes and a frozen check-code taxonomy, so a committed waiver file keeps its meaning across releases",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-pins-the-version",
+              "the-waiver-file-name-is-fixed"
+            ]
+          }
+        },
+        {
+          "id": "check-codes-are-frozen",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-code-has-its-remediation",
+              "the-enums-are-closed"
+            ]
+          }
+        },
+        {
+          "id": "the-parsers-are-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-member-is-refused",
+              "malformed-json-is-a-parse-error",
+              "validation-stops-at-a-parse-error",
+              "a-missing-document-is-a-parse-error"
+            ]
+          }
+        },
+        {
+          "id": "a-finding-is-complete",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-report-header-is-checked",
+              "a-finding-lacks-nothing",
+              "a-waived-finding-names-its-waiver"
+            ]
+          }
+        },
+        {
+          "id": "the-summary-agrees",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-disagreeing-summary-is-refused",
+              "an-agreeing-summary-passes"
+            ]
+          }
+        },
+        {
+          "id": "a-waiver-is-reviewed-and-unique",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-waiver-lacks-nothing",
+              "a-duplicate-waiver-is-refused",
+              "a-narrower-scope-is-not-a-duplicate"
+            ]
+          }
+        },
+        {
+          "id": "expiry-is-data-in-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-expiry-is-a-date-or-a-timestamp",
+              "the-cli-evaluates-expiry-on-an-injected-clock"
+            ]
+          }
+        },
+        {
+          "id": "the-serialization-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-bytes-are-stable",
+              "the-full-fixtures-pin-the-bytes",
+              "a-parsed-fixture-reserializes-to-itself"
+            ]
+          }
+        },
+        {
+          "id": "the-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates",
+              "every-invalid-fixture-fails-with-a-known-code",
+              "the-diagnostic-codes-are-closed"
+            ]
+          }
+        },
+        {
+          "id": "putnami-doctor-applies-waivers-by-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-live-waiver-suppresses-with-provenance",
+              "a-field-narrows-a-waiver",
+              "a-stale-waiver-becomes-a-finding",
+              "an-invalid-waiver-file-waives-nothing"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
