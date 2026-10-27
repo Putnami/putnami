@@ -268,8 +268,8 @@
             "checks": [
               "the-missions-scenarios-pass-against-a-correct-provider",
               "the-local-provider-passes-the-missions-scenarios",
-              "the-local-owner-answers-and-writes-messages-as-files",
-              "concurrent-processes-on-one-local-store-ask-and-reply-once"
+              "the-local-provider-takes-owner-answers-and-messages-from-files",
+              "the-local-provider-asks-and-replies-once-across-concurrent-processes"
             ]
           }
         },

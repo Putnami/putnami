@@ -295,6 +295,9 @@ func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
 		{"a read answering conflict", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) proto.ToolCallResult {
 			return collabRespond(t, collab.Response{Outcome: collab.OutcomeConflict, Error: &collab.Error{Message: "x"}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
+		{"a read answering unresolved", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) proto.ToolCallResult {
+			return collabRespond(t, collab.Response{Outcome: collab.OutcomeUnresolved, Error: &collab.Error{Message: "x"}})
+		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
 		{"isError disagreeing", "create", "tasks", `{"title":"t","idempotencyKey":"k"}`, func(t *testing.T) proto.ToolCallResult {
 			result := collabOK(t, &collab.TaskCreateResult{Task: task, Created: true})
 			result.IsError = true
@@ -446,8 +449,9 @@ func TestInterpret_MemoryIdentity(t *testing.T) {
 		Identity: collab.MemoryIdentity{Mission: "other"}, Content: "x",
 		Provenance: collab.Provenance{RecordedAt: now}, Freshness: collab.Freshness{UpdatedAt: now, RetrievedAt: now}}
 	mission := collabBoundCall(t, "memory", "mission", `{"mission":"m1"}`)
-	if envelope := interpretResult(mission, collabOK(t, &collab.MemoryRecordResult{Record: record})); envelope.Outcome != collab.OutcomeUnavailable {
-		t.Errorf("a record of another mission: %s", envelope.Outcome)
+	if envelope := interpretResult(mission, collabOK(t, &collab.MemoryRecordResult{Record: record})); envelope.Outcome != collab.OutcomeUnavailable ||
+		envelope.Error == nil || envelope.Error.Reason != collab.ReasonProviderIdentity {
+		t.Errorf("a record of another mission: %s %+v", envelope.Outcome, envelope.Error)
 	}
 	record.Identity.Mission = "m1"
 	checkpoint := collabBoundCall(t, "memory", "checkpoint", `{"mission":"m1","precondition":{"expectedRevision":"r1"},"idempotencyKey":"k","content":"x"}`)
@@ -460,8 +464,9 @@ func TestInterpret_MemoryIdentity(t *testing.T) {
 	note := record
 	note.Kind = collab.MemoryKindNote
 	context := collabBoundCall(t, "memory", "context", `{"kinds":["mission"],"page":{"size":1}}`)
-	if envelope := interpretResult(context, collabOK(t, &collab.MemoryListResult{Items: []collab.MemoryRecord{note}})); envelope.Outcome != collab.OutcomeUnavailable {
-		t.Errorf("a kind outside the request: %s", envelope.Outcome)
+	if envelope := interpretResult(context, collabOK(t, &collab.MemoryListResult{Items: []collab.MemoryRecord{note}})); envelope.Outcome != collab.OutcomeUnavailable ||
+		envelope.Error == nil || envelope.Error.Reason != collab.ReasonProviderIdentity {
+		t.Errorf("a kind outside the request: %s %+v", envelope.Outcome, envelope.Error)
 	}
 	if envelope := interpretResult(context, collabOK(t, &collab.MemoryListResult{Items: []collab.MemoryRecord{record, record}})); envelope.Outcome != collab.OutcomeUnavailable {
 		t.Errorf("an oversized page: %s", envelope.Outcome)

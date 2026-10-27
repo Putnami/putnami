@@ -86,7 +86,7 @@ func refusal(t *testing.T, s *store.Store, dir, name string) string {
 // stays untaken, as it is, with a note that says why, without failing any
 // call.
 func TestTheOwnerAnswersAndWritesMessagesAsFiles(t *testing.T) {
-	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-owner-answers-and-writes-messages-as-files")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-takes-owner-answers-and-messages-from-files")
 	h := newMissionsHarness(t)
 
 	writeRaw(t, h.store, store.MessagesDir, "gate.json", []byte(`{"mission":{"repository":"acme/app","key":"issue-7"},"kind":"prompt","text":"Does the gate pass?"}`))

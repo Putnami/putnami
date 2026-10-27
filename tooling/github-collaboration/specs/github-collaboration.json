@@ -42,7 +42,7 @@
     },
     {
       "id": "truthful-manifest",
-      "text": "The manifest passes the extension protocol's strict validation and the collaboration offer check, declares preconditions checked where GitHub cannot compare and write in one step, and marks every tool as reaching outside the machine. Its link tool states that a task's parent is outside the revision, which link does not move."
+      "text": "The manifest passes the extension protocol's strict validation, declares preconditions checked where GitHub cannot compare and write in one step, and marks every tool as reaching outside the machine. Its link tool states that a task's parent is outside the revision, which link does not move."
     }
   ],
   "decisions": [

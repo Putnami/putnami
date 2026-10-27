@@ -5,9 +5,7 @@
   "outcomes": [
     "A workspace chooses its task, change-proposal, memory and missions providers independently, in one place, and changing one never changes another",
     "An agent and a script call the same operation with the same request and read the same envelope, whether through MCP or the command line",
-    "A contract nobody bound, a capability the provider lacks, and a precondition it cannot enforce are refused before anything runs, never reported as done",
-    "A write whose outcome is unknown is reported as unresolved with the read that reconciles it, so nobody retries it blindly",
-    "Credentials stay with the provider: no binding, request, envelope or log carries one"
+    "A contract nobody bound and a capability the provider lacks are refused before anything runs, never reported as done"
   ],
   "nonGoals": [
     "Choosing a provider when the workspace binds none, or substituting another backend when the bound one fails",
@@ -27,7 +25,7 @@
     },
     {
       "id": "one-route-two-entry-paths",
-      "text": "putnami <contract> <operation> --input and the MCP tool <contract>.<operation> share one route: the request is validated and normalized, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both print the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
+      "text": "putnami <contract> <operation> --input and the MCP tool <contract>.<operation> share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both print the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
     },
     {
       "id": "truthful-annotations",

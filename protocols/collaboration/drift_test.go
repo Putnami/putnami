@@ -340,6 +340,9 @@ func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
 // the schema accepts exactly what the orchestrator accepts.
 func TestDrift_PageBoundsMatchTheValidator(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "bounded-documents", "page-bounds-match-the-schema")
+	if MaxPageSize != 100 {
+		t.Errorf("MaxPageSize is %d, want 100", MaxPageSize)
+	}
 	common := readSchemaNode(t, CommonSchemaFile)
 	size := common.Defs["pageRequest"].Properties["size"]
 	bound := func(name string, got *int, want int) {

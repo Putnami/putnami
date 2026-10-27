@@ -5,7 +5,7 @@
   "outcomes": [
     "A provider written against the contracts passes the shared scenarios, and the CLI offers it without a change of its own.",
     "A caller tells a refused, missing, conflicting and uncertain write apart, and knows which read settles an uncertain one.",
-    "No binding, request or envelope carries a credential."
+    "No binding or envelope carries a credential."
   ],
   "nonGoals": [
     "Provider discovery, routing, the RPC bridge and the CLI commands, which cli/collaboration-providers owns.",
@@ -92,7 +92,7 @@
     },
     {
       "id": "exact-identity",
-      "text": "A result is about what the request named. The CLI answers unavailable a read that answers for another task, proposal, head or mission, or with a state or kind outside its filter; and unresolved, not retryable, with a reconcile, a mutation that does: an update or upsert for another item, head or head commit, a transition to another state, a claim for another holder or still held after release, a review of another commit, a merge that did not merge, or a checkpoint that kept its revision."
+      "text": "The CLI answers unavailable with provider.identity_mismatch a read that answers for another task, proposal, head or mission, or with a state or kind outside its filter; and unresolved, not retryable, with a reconcile, a mutation that does: an update or upsert for another item, head or head commit, a transition to another state, a claim for another holder or still held after release, a review of another commit, a merge that did not merge, or a checkpoint that kept its revision."
     },
     {
       "id": "missions-identity-and-reconciliation",
@@ -104,7 +104,7 @@
     },
     {
       "id": "invalid-answers-are-refused",
-      "text": "The CLI refuses a provider answer the contract refuses, with provider.invalid_response: two answer blocks, or a read answering conflict, make the read unavailable; an isError that contradicts the outcome, or an invalid result, makes a mutation unresolved. A provider that answers a failure keeps its outcome."
+      "text": "The CLI refuses a provider answer the contract refuses, with provider.invalid_response: two answer blocks, or a read answering conflict or unresolved, make the read unavailable; an isError that contradicts the outcome, or an invalid result, makes a mutation unresolved. A provider that answers a failure keeps its outcome."
     },
     {
       "id": "no-credential-in-an-envelope",
