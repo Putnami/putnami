@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The test-case payload has one definition, the CLI result contract's testCase.
 // The runtime schema refers to it and restates none of its members or bounds.
 func TestTestCasesSchemaReferencesTheCLIContract(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "result-payloads-are-typed-and-bounded", "test-cases-have-one-definition")
 	const authority = "https://putnami.dev/schemas/putnami-cli-result-v2.json#/$defs/testCase"
 	data, err := os.ReadFile(filepath.Join("schemas", "payloads.json"))
 	if err != nil {
@@ -42,6 +44,7 @@ func TestTestCasesSchemaReferencesTheCLIContract(t *testing.T) {
 }
 
 func TestExtractResultPayloads(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "result-payloads-are-typed-and-bounded", "result-payloads-are-extracted")
 	data := map[string]any{
 		"testSummary":     map[string]any{"total": 10, "passed": 8, "failed": 1, "skipped": 1, "failureDetailsTruncated": 3},
 		"coverageSummary": map[string]any{"percentage": 81.5, "granularity": "statements", "covered": 163, "total": 200},
@@ -69,6 +72,7 @@ func TestExtractResultPayloads(t *testing.T) {
 }
 
 func TestExtractResultPayloads_Empty(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "result-payloads-are-typed-and-bounded", "result-payloads-are-extracted")
 	ts, cs, ls, err := ExtractResultPayloads(nil)
 	if err != nil || ts != nil || cs != nil || ls != nil {
 		t.Errorf("nil data should yield nil payloads, got %v %v %v %v", ts, cs, ls, err)
@@ -76,6 +80,7 @@ func TestExtractResultPayloads_Empty(t *testing.T) {
 }
 
 func TestValidateTestSummary(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "result-payloads-are-typed-and-bounded", "summaries-refuse-impossible-counts")
 	bad := &TestSummary{Total: 2, Passed: 2, Failed: 1}
 	if diags := ValidateTestSummary(bad); !diag.HasErrors(diags) {
 		t.Error("overcounted summary should produce errors")
@@ -91,6 +96,7 @@ func TestValidateTestSummary(t *testing.T) {
 }
 
 func TestValidateCoverageSummary(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "result-payloads-are-typed-and-bounded", "summaries-refuse-impossible-counts")
 	cases := []CoverageSummary{
 		{Percentage: 120, Granularity: CoverageLines},
 		{Percentage: 50, Granularity: "loops"},

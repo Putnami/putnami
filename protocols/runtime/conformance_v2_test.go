@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The v2 corpus lives in its own directory instead of joining fixtures/valid.
@@ -19,6 +20,7 @@ import (
 // TestConformance_ProtocolVersion2 pins the v2 version constant the same way
 // TestConformance_ProtocolVersion pins v1: a bump is a migration, not an edit.
 func TestConformance_ProtocolVersion2(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-versions-are-pinned", "the-version-constants-stay-1-and-2")
 	if ProtocolVersion2 != 2 {
 		t.Fatalf("ProtocolVersion2 = %d, want 2 — bumping requires a migration story", ProtocolVersion2)
 	}
@@ -34,6 +36,7 @@ func TestConformance_ProtocolVersion2(t *testing.T) {
 }
 
 func TestConformance_V2ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-fixture-corpus-holds-both-versions", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/v2/valid/*.jsonl")
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +70,7 @@ func TestConformance_V2ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_V2InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-fixture-corpus-holds-both-versions", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/v2/invalid/*.jsonl")
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +103,7 @@ func TestConformance_V2InvalidFixtures(t *testing.T) {
 // fixture green and fails here, the same contract protocols/job's
 // TestInvalidFixtureCoverage enforces.
 func TestConformance_V2InvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-fixture-corpus-holds-both-versions", "every-version-2-reject-branch-has-a-fixture")
 	files, err := filepath.Glob("fixtures/v2/invalid/*.jsonl")
 	if err != nil {
 		t.Fatal(err)
@@ -142,6 +147,7 @@ func TestConformance_V2InvalidFixtureCoverage(t *testing.T) {
 // one. A validator that started rejecting the second ready would silently break
 // restart detection for the watcher.
 func TestConformance_V2ServeRestartReadiness(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-stream-ends-with-one-result", "readiness-repeats-per-serve-iteration")
 	f, err := os.Open("fixtures/v2/valid/serve-restart.jsonl")
 	if err != nil {
 		t.Fatal(err)
@@ -183,6 +189,7 @@ func TestConformance_V2ServeRestartReadiness(t *testing.T) {
 // TestConformance_V1FixturesUnchangedByV2 is the additivity guard: the v1
 // corpus must still validate exactly as before, with every event at v1.
 func TestConformance_V1FixturesUnchangedByV2(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "version-2-adds-only-ready", "the-version-1-corpus-is-unchanged")
 	files, err := filepath.Glob("fixtures/valid/*.jsonl")
 	if err != nil {
 		t.Fatal(err)
