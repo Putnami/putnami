@@ -181,12 +181,16 @@ _putnami_flags_for() {
 # _putnami_reply offers the words of the compgen word list $1 that start with
 # the current word. compgen expands each word of the list once, so the list
 # holds quoted words; each reply is quoted again, so the command line reads it
-# back as the same word.
+# back as the same word. Bash 3.2 leaves a leading "~" bare, which the command
+# line would expand to a home directory.
 _putnami_reply() {
     COMPREPLY=()
     local match quoted
     while IFS= read -r match; do
         printf -v quoted '%q' "${match}"
+        if [[ "${quoted}" == \~* ]]; then
+            quoted="\\${quoted}"
+        fi
         COMPREPLY+=("${quoted}")
     done < <(compgen -W "$1" -- "${cur}")
 }

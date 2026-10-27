@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,9 +16,10 @@ import (
 )
 
 // hostileNames are workspace names that a shell reads as code, or as several
-// words, unless the script quotes them for every read. A name that runs code
-// creates a file whose name starts with "pwned-" in the shell's working
-// directory.
+// words, or as another word, unless the script quotes them for every read. A
+// name that runs code creates a file whose name starts with "pwned-" in the
+// shell's working directory. "y:z\w" holds the colon and the backslash that
+// zsh's _describe reads.
 var hostileNames = []string{
 	"a$(touch pwned-a)",
 	"b(touch pwned-b)",
@@ -27,12 +29,15 @@ var hostileNames = []string{
 	"g`touch pwned-g`",
 	"x';touch pwned-x;'",
 	`h"$(touch pwned-h)"`,
+	`y:z\w`,
 }
 
 // hostileWorkspace is a workspace whose command aliases, project aliases,
-// groups and project names are the hostileNames, with a prefix per kind. The
-// command aliases of "lint-docs" are job commands; those of "projects" are core
-// commands.
+// groups, project names and project directories are the hostileNames, with a
+// prefix per kind. A project directory gives the project its ID and its
+// basename. The command aliases of "lint-docs" are job commands; those of
+// "projects" are core commands. A project alias also starts with "~", which
+// bash reads as a home directory.
 type hostileWorkspace struct {
 	root     string
 	cfg      *wsproto.Config
@@ -51,9 +56,13 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 		ws.cfg.Aliases["j"+name] = "lint-docs"
 		ws.cfg.Aliases["k"+name] = "projects"
 		ws.commands = append(ws.commands, "j"+name, "k"+name)
-		projectAliases["pa"+name] = "/flow"
+		projectAliases["~"+name] = "/flow"
 		groups["gr"+name] = "/flow"
-		dir := "hostile" + strconv.Itoa(i)
+		dir := "q" + strings.ReplaceAll(name, `\`, "")
+		if runtime.GOOS == "windows" {
+			// Windows refuses a quote or a colon in a file name.
+			dir = "q" + strconv.Itoa(i)
+		}
 		includes = append(includes, dir)
 		project, err := json.Marshal(map[string]string{"name": "n" + name})
 		if err != nil {
@@ -65,7 +74,7 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 		if err := os.WriteFile(filepath.Join(root, dir, "putnami.json"), project, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		ws.targets = append(ws.targets, "pa"+name, "gr"+name, "n"+name)
+		ws.targets = append(ws.targets, "~"+name, "gr"+name, "n"+name, "/"+dir, dir)
 	}
 	config, err := json.Marshal(map[string]any{
 		"name":           "hostile-ws",
@@ -81,7 +90,9 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 	}
 	ctx := gatherCompletionContext(root, ws.cfg, nil)
 	for _, target := range ws.targets {
-		if !slices.Contains(ctx.projects, target) && !slices.ContainsFunc(ctx.aliases, func(a completionValue) bool { return a.Value == target }) {
+		if !slices.Contains(ctx.projects, target) && !slices.Contains(ctx.projectIDs, target) &&
+			!slices.Contains(ctx.projectBasenames, target) &&
+			!slices.ContainsFunc(ctx.aliases, func(a completionValue) bool { return a.Value == target }) {
 			t.Fatalf("the workspace does not load the target %q", target)
 		}
 	}
