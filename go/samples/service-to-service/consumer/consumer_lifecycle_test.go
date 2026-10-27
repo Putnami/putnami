@@ -68,9 +68,9 @@ func startStoppableConsumer(t *testing.T, options client.ServicesOptions) (*item
 }
 
 // Stopping the consumer application closes the registry its generated clients
-// were built from. A client retained past the stop refuses every call with the
-// registry's one stable code, and nothing reaches the provider — anonymous or
-// credentialed, REST or Connect, unary or streamed.
+// were built from. A client retained past the stop refuses REST and Connect
+// calls with the registry's one stable code, and nothing reaches the provider:
+// anonymous and api-key REST, Connect unary and a Connect server stream.
 func TestARetainedClientRefusesEveryCallAfterItsApplicationStopped(t *testing.T) {
 	spectest.Proves(t, matrixFeature, "a-call-is-observable-and-ends-with-its-application", "a-retained-client-refuses-every-call-after-its-application-stopped")
 	baseURL, wire := realConnectProvider(t)

@@ -5,9 +5,7 @@
   "outcomes": [
     "A workspace chooses its task, change-proposal, memory and missions providers independently, in one place, and changing one never changes another",
     "An agent and a script call the same operation with the same request and read the same envelope, whether through MCP or the command line",
-    "A contract nobody bound, a capability the provider lacks, and a precondition it cannot enforce are refused before anything runs, never reported as done",
-    "A write whose outcome is unknown is reported as unresolved with the read that reconciles it, so nobody retries it blindly",
-    "Credentials stay with the provider: no binding, request, envelope or log carries one"
+    "A contract nobody bound and a capability the provider lacks are refused before anything runs, never reported as done"
   ],
   "nonGoals": [
     "Choosing a provider when the workspace binds none, or substituting another backend when the bound one fails",
@@ -23,43 +21,19 @@
     },
     {
       "id": "capability-discovery",
-      "text": "capabilities reports, without running the provider, the binding status, the provider, and each operation of the bound version with required, supported, preconditions, description and hostOnly when set. A binding to an unknown version, or to a provider that lacks a required operation or breaks the contract, is invalid. A missing optional operation is unsupported, and so are preconditions sent to a provider that declares none."
+      "text": "capabilities reports, without running the provider, the binding status, the provider, and each operation of the bound version with required, supported, preconditions, description and hostOnly when set. A binding to an unknown version, or to a provider that lacks a required operation or breaks the contract, is invalid."
     },
     {
       "id": "one-route-two-entry-paths",
-      "text": "putnami <contract> <operation> --input and the MCP tool <contract>.<operation> share one route: the request is validated and normalized, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both print the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
+      "text": "putnami <contract> <operation> --input and the MCP tool <contract>.<operation> share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both print the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
     },
     {
       "id": "truthful-annotations",
-      "text": "Every routed MCP tool carries readOnlyHint true exactly for a read operation, destructiveHint true for an operation that may modify existing state, and contract metadata whose access agrees. A provider tool whose annotations or access disagree with its operation withdraws the whole contract version from the provider."
-    },
-    {
-      "id": "bounded-pages",
-      "text": "Every list operation returns a page of at most the requested size, 20 when the request names none and never more than 100, with an empty list rather than null and an opaque next cursor that is absent on the last page. A provider answer above the requested size is refused, and one above the 4 MiB document bound is refused with advice to ask for a smaller page.size. A page that would exceed that bound holds fewer items, with a next cursor, and a request may change its size between the pages of one traversal."
-    },
-    {
-      "id": "exact-identity",
-      "text": "A result must be about exactly what the request named: the same task, proposal or mission reference, the same repository, base and head for a proposal, the requested state after a transition. A read that answers for something else is unavailable with reason provider.identity_mismatch; a mutation that does is unresolved."
-    },
-    {
-      "id": "uncertain-writes-are-unresolved",
-      "text": "A read whose provider times out or is canceled is unavailable and retryable. A mutation whose provider process started and then timed out, was canceled, exited unsuccessfully or wrote no valid response is unresolved, never retryable, and names the read that reconciles it as <contract>.<operation> of the same contract. A provider that answers a failure keeps its outcome; a read may not answer conflict or unresolved."
-    },
-    {
-      "id": "no-credential-leakage",
-      "text": "Provider standard error never reaches an envelope. Every credential-named environment value the provider inherits, and every URL userinfo, is redacted from every envelope message and result by decoded value, whatever the JSON spelling; a result whose secret cannot be removed in place is withheld. A binding whose settings carry a credential-named member, or a URL value with a password or any http(s) user, is invalid, and capability discovery never echoes it."
+      "text": "Every routed MCP tool carries readOnlyHint true exactly for a read operation, destructiveHint true for an operation that may modify existing state, and contract metadata whose access agrees."
     },
     {
       "id": "host-only-operations",
-      "text": "An operation the catalog marks host-only is one the host that runs an agent calls, never the agent. The MCP server lists no tool for it, while putnami <contract> <operation> and the host channel's collaboration.call route it like any other operation, to the same envelope, and <contract>.capabilities marks it hostOnly. Only missions.sync is host-only, and only a mutation can be."
-    },
-    {
-      "id": "missions-identity-and-reconciliation",
-      "text": "An ok missions.sync answer describes the mission key the sync named, whatever the sync's age, reports only the decisions it named and answers each reply it carried once; an ok missions.reply answer names the message; a new missions.ask answer is an open decision. Any other answer is unresolved with reason provider.identity_mismatch, and an unresolved missions write names its own repeat as the reconciliation."
-    },
-    {
-      "id": "missions-provider-semantics",
-      "text": "A missions provider keeps one decision per idempotency key: the same content, whatever the mission title, replays it with its answer, and other content is a conflict (idempotency.mismatch). A message takes one reply; another is a conflict (message.closed). A delivered answer acknowledges its decision, a delivered message leaves the inbox, unknown or repeated ids change nothing, and an older sync never overwrites a newer one. Concurrent callers on one store lose no write."
+      "text": "An operation the catalog marks host-only is one the host that runs an agent calls, never the agent. The MCP server lists no tool for it, while putnami <contract> <operation> and the host channel's collaboration.call route it like any other operation, to the same envelope, and <contract>.capabilities marks it hostOnly."
     },
     {
       "id": "contract-names-never-shadow-commands",

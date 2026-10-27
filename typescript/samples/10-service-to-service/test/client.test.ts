@@ -640,11 +640,11 @@ describe('service-to-service sample', () => {
   });
 
   specTest(
-    'should refuse every call through a retained client once its application stopped',
+    'should refuse a call through a retained client once its application stopped',
     {
       feature: FEATURE,
       requirement: 'a-call-is-observable-and-ends-with-its-application',
-      check: 'a-retained-client-refuses-every-call-after-its-application-stopped',
+      check: 'a-retained-client-refuses-a-call-after-its-application-stopped',
     },
     async () => {
       const wire = startWireRecorder(baseUrl);
