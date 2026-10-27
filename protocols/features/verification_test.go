@@ -246,6 +246,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("protocols", "support", ManifestFilename):       true,
 		filepath.Join("protocols", "telemetry", ManifestFilename):     true,
 		filepath.Join("protocols", "template", ManifestFilename):      true,
+		filepath.Join("protocols", "workspace", ManifestFilename):     true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized

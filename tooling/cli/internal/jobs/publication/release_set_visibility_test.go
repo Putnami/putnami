@@ -238,6 +238,7 @@ func TestVisibilityChainRulesAnswerSilentProjects(t *testing.T) {
 // are refused, whether the project declared the level or inherited it: either
 // silent choice could widen what the other side meant to keep narrow.
 func TestVisibilityChainRefusesADeclarationAndARuleThatDisagree(t *testing.T) {
+	spectest.Proves(t, "cli/channels", "project-declares-its-distribution-visibility", "publish-refuses-a-members-rule-that-disagrees")
 	policy := &ciproto.Distribution{
 		Namespace: "putnami",
 		Members:   []ciproto.MemberPolicy{{Select: ciproto.Selectors{"tag:public-lib", "tag:go"}, Visibility: "public"}},
@@ -255,6 +256,7 @@ func TestVisibilityChainRefusesADeclarationAndARuleThatDisagree(t *testing.T) {
 
 // A putnami.json block that states no level, or an unknown one, fails closed.
 func TestVisibilityChainRefusesAnUnknownDeclaredLevel(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "visibility-and-distribution-fail-closed", "the-cli-refuses-a-declared-distribution-level-that-is-unknown-or-missing")
 	for _, level := range []string{"everyone", ""} {
 		if _, err := BuildVisibilityChain(distributionWorkspace(t, level, "private"), nil, "", visibilityMembers()); err == nil {
 			t.Errorf("project level %q was accepted", level)

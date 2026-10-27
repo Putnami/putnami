@@ -7,9 +7,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestIsToolchainResolveInvocationMatchesOnlyTheReservedCall(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	cases := []struct {
 		name string
 		args []string
@@ -35,6 +38,7 @@ func TestIsToolchainResolveInvocationMatchesOnlyTheReservedCall(t *testing.T) {
 }
 
 func TestToolchainResolveControlArgsIsTheSpawnShape(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	args := ToolchainResolveControlArgs()
 	if !IsToolchainResolveInvocation(args) {
 		t.Fatalf("ToolchainResolveControlArgs() = %q, which IsToolchainResolveInvocation rejects", args)
@@ -58,6 +62,7 @@ func encodedToolchainResolveRequest(t *testing.T) *bytes.Buffer {
 }
 
 func TestServeToolchainResolveRoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	asked := validToolchainResolveRequest()
 	asked.Identities = []string{"golangci-lint", "go", "go"}
 	var request bytes.Buffer
@@ -101,6 +106,7 @@ func TestServeToolchainResolveRoundTrip(t *testing.T) {
 }
 
 func TestServeToolchainResolveDeclinesOtherInvocations(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	for _, args := range [][]string{{"build"}, ProbeControlArgs()} {
 		var stdout bytes.Buffer
 		handled, err := ServeToolchainResolve(args, strings.NewReader(""), &stdout,
@@ -118,6 +124,7 @@ func TestServeToolchainResolveDeclinesOtherInvocations(t *testing.T) {
 }
 
 func TestServeToolchainResolveRequiresAnAnswerFunction(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var stdout bytes.Buffer
 	handled, err := ServeToolchainResolve(ToolchainResolveControlArgs(), encodedToolchainResolveRequest(t), &stdout, nil)
 	if !handled || err == nil {
@@ -129,6 +136,7 @@ func TestServeToolchainResolveRequiresAnAnswerFunction(t *testing.T) {
 }
 
 func TestServeToolchainResolveRejectsAnUnreadableRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	// A member this protocol version does not know, a request the contract
 	// rejects, and a document followed by log output are each a question the
 	// extension cannot fully read.
@@ -161,6 +169,7 @@ func TestServeToolchainResolveRejectsAnUnreadableRequest(t *testing.T) {
 }
 
 func TestServeToolchainResolveWritesNothingWhenTheAnswerFails(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var stdout bytes.Buffer
 	sentinel := errors.New("go.dev unreachable")
 	handled, err := ServeToolchainResolve(ToolchainResolveControlArgs(), encodedToolchainResolveRequest(t), &stdout,
@@ -178,6 +187,7 @@ func TestServeToolchainResolveWritesNothingWhenTheAnswerFails(t *testing.T) {
 // An answer the core would reject is rejected on the extension's side, before
 // a byte reaches stdout.
 func TestServeToolchainResolveRejectsAnAnswerTheContractRejects(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	cases := map[string]func(*ToolchainResolveResult){
 		"unasked identity": func(r *ToolchainResolveResult) {
 			r.Toolchains["bun"] = ToolchainResolution{Problem: &ToolchainProblem{Message: "not asked"}}
@@ -221,6 +231,7 @@ func TestServeToolchainResolveRejectsAnAnswerTheContractRejects(t *testing.T) {
 // The answer function receives a copy: editing it cannot widen the question
 // its answer is checked against.
 func TestServeToolchainResolveChecksTheAnswerAgainstTheCoreRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var stdout bytes.Buffer
 	handled, err := ServeToolchainResolve(ToolchainResolveControlArgs(), encodedToolchainResolveRequest(t), &stdout,
 		func(r ToolchainResolveRequest) (ToolchainResolveResult, error) {
@@ -239,6 +250,7 @@ func TestServeToolchainResolveChecksTheAnswerAgainstTheCoreRequest(t *testing.T)
 }
 
 func TestDecodeToolchainResolveDocumentRejectsTrailingEmptyAndOversized(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	for name, input := range map[string][]byte{
 		"trailing data": []byte(`{"version":1,"extension":"x"}` + "\ninfo: done\n"),
 		"empty":         []byte("   \n"),
@@ -259,6 +271,7 @@ func TestDecodeToolchainResolveDocumentRejectsTrailingEmptyAndOversized(t *testi
 // The probe and the toolchain-resolve call share one document reader; the
 // probe's messages are part of its contract and stay exact.
 func TestDecodeProbeDocumentMessagesAreExact(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	cases := map[string]struct {
 		input []byte
 		want  string
@@ -280,6 +293,7 @@ func TestDecodeProbeDocumentMessagesAreExact(t *testing.T) {
 }
 
 func TestEncodeToolchainResolveRequestStampsAndNormalizes(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	request := validToolchainResolveRequest()
 	request.Version = 99
 	request.Identities = []string{"golangci-lint", "go", "golangci-lint"}
@@ -303,6 +317,7 @@ func TestEncodeToolchainResolveRequestStampsAndNormalizes(t *testing.T) {
 }
 
 func TestEncodeToolchainResolveRequestRejectsAnInvalidRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	request := validToolchainResolveRequest()
 	request.Platform = "darwin-arm64"
 	var buf bytes.Buffer
@@ -318,6 +333,7 @@ func TestEncodeToolchainResolveRequestRejectsAnInvalidRequest(t *testing.T) {
 // The exchange is byte-stable: one answer, however its maps were built,
 // produces one document.
 func TestServeToolchainResolveIsByteStable(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	rendered := make([]string, 0, 2)
 	for i := 0; i < 2; i++ {
 		var stdout bytes.Buffer

@@ -240,8 +240,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "nearest-ancestor-line-wins",
-              "nested-line-is-refused"
+              "the-loader-maps-each-line-to-its-tag-pattern"
             ]
           }
         },
@@ -254,7 +253,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "project-override-replaces-the-entry"
+              "each-project-reads-the-entry-of-its-ecosystem"
             ]
           }
         },
@@ -2691,7 +2690,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "putnami-json-declares-the-member-level"
+              "putnami-json-declares-the-member-level",
+              "publish-refuses-a-members-rule-that-disagrees"
             ]
           }
         },
@@ -2999,7 +2999,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-source-sentinel-round-trips-and-a-metadata-refresh-leaves-it-intact"
+              "pin-shows-a-lock-with-the-reserved-literal-as-built-from-this-workspace",
+              "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it",
+              "pin-remove-clears-the-source-sentinel",
+              "pin-replaces-the-source-sentinel"
             ]
           }
         },

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
@@ -81,6 +82,7 @@ func TestRefreshLockMetadataWithResultSkipsByteIdenticalLockWrite(t *testing.T) 
 // the sentinel. Either way the next `putnami install` would dirty a committed
 // lock.
 func TestRefreshLockMetadataLeavesTheSourceWorkspaceSentinelIntact(t *testing.T) {
+	spectest.Proves(t, "cli/engine-provenance", "source-workspace-declaration", "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it")
 	ws := t.TempDir()
 	lf := &lockfile.LockFile{
 		Version:    lockfile.FormatVersionV3,

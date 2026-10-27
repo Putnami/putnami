@@ -488,6 +488,7 @@ the languages it owns:
 | Go extension | `go/extension/cmd/putnami-go` |
 | TypeScript extension | `typescript/extension/cmd/putnami-ts` |
 | Python extension | `python/extension/cmd/putnami-python` |
+| Cloud extension | `cloud/extension/internal/cloudcli` |
 
 An extension answers `__putnami toolchain-resolve` for the lock identities its
 manifest lists in `runtime.resolves`, and `__putnami input-resolve` for the
@@ -604,19 +605,21 @@ Evidence behind `stable`:
 - a provider conformance suite that replays fixtures as real providers;
 - determinism tests over validation output, extension-name ordering, scope
   name-pattern resolution and agent-artifact canonical bytes;
-- three independent probe producers (Go, TypeScript and Python extensions)
-  and a consumer that reads every contract here.
+- four independent probe producers (Go, TypeScript, Python and Cloud
+  extensions) and a consumer that reads every contract here;
+- the `workspace/workspace-contract` spec, whose every requirement a bound test
+  proves, here or in the implementation that answers it.
 
 ## Product feature and durable decisions
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcomes it underpins — a workspace whose projects are discovered correctly, and
-an install that is reproducible — are owned by the CLI commands and the language
-extensions that deliver them. A feature per protocol module would create one
-artificial product identity per technical boundary, which the
-[feature protocol's authoring boundary](../features/README.md) rules out. With no
-feature to detail there is no spec, since a spec details exactly one
-already-authored feature and never mints one.
+The module owns the feature of its contract, `workspace/workspace-contract`,
+specified in [`specs/workspace-contract.json`](specs/workspace-contract.json).
+The tests here prove its requirements, and so do the implementations: the Go,
+TypeScript, Python and Cloud extensions prove that they answer the reserved
+calls and leave every other call to its owner, and `@putnami/cli` proves that
+it reads each answer through this module and that its loader applies the line
+and registry rules. The CLI commands and the language extensions keep the features of what they
+deliver.
 
 Durable decisions:
 

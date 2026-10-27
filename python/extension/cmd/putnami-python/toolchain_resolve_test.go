@@ -72,6 +72,7 @@ func TestToolchainResolve_ServesTheControlCall(t *testing.T) {
 // A workspace the extension cannot read is no answer: the call fails and
 // writes nothing to stdout.
 func TestToolchainResolve_WritesNothingWhenItCannotAnswer(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-python-extension-writes-nothing-it-cannot-answer")
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "pyproject.toml"), 0o755); err != nil {
 		t.Fatal(err)

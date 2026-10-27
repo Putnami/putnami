@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -23,6 +25,7 @@ func writeFile(t *testing.T, path, content string) {
 // --- Config tests ---
 
 func TestLoad_Empty(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "load-merges-two-layers-and-never-the-current-project")
 	root := t.TempDir()
 	cfg := Load(root)
 	if cfg == nil {
@@ -31,6 +34,7 @@ func TestLoad_Empty(t *testing.T) {
 }
 
 func TestLoad_WorkspaceFile(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "load-merges-two-layers-and-never-the-current-project")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, WorkspaceConfigFilename), `{
 		"name": "test-ws",
@@ -57,6 +61,7 @@ func TestLoad_WorkspaceFile(t *testing.T) {
 // project's options.package.docker into the shared Config, scheduling docker
 // packaging for every project (libraries included → "compile output not found").
 func TestLoad_DoesNotMergeCwdProjectOptions(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "load-merges-two-layers-and-never-the-current-project")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, WorkspaceConfigFilename), `{"name": "test-ws"}`)
 	// A project subdirectory that opts into docker packaging.
@@ -80,6 +85,7 @@ func TestLoad_DoesNotMergeCwdProjectOptions(t *testing.T) {
 }
 
 func TestGetCommandDefaults_MergeOrder(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "command-defaults-merge-in-a-fixed-order")
 	c := &Config{
 		Options: map[string]map[string]any{
 			"*":                         {"a": 1, "b": 2, "c": 3, "d": 4},
@@ -105,6 +111,7 @@ func TestGetCommandDefaults_MergeOrder(t *testing.T) {
 }
 
 func TestGetCommandDefaults_Empty(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "command-defaults-merge-in-a-fixed-order")
 	c := &Config{}
 	defaults := c.GetCommandDefaults("build", "")
 	if len(defaults) != 0 {
@@ -113,6 +120,7 @@ func TestGetCommandDefaults_Empty(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	target := &Config{
 		Name:           "ws",
 		Baseline:       "origin/main",
@@ -151,6 +159,7 @@ func TestMergeWorkspaceConfig(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfig_Hooks(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	target := &Config{
 		Hooks: &HooksConfig{
 			Commands: map[string]*HookPhaseConfig{
@@ -179,6 +188,7 @@ func TestMergeWorkspaceConfig_Hooks(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfig_Disable(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	target := &Config{}
 	source := &Config{
 		Disable: &DisableConfig{
@@ -198,6 +208,7 @@ func TestMergeWorkspaceConfig_Disable(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfig_Store(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	mb := func(n int64) *int64 { return &n }
 
 	// Global scope sets a budget + grace; workspace scope overrides the budget
@@ -225,6 +236,7 @@ func TestMergeWorkspaceConfig_Store(t *testing.T) {
 // per-field overlay the store block uses: a later scope replaces the value it
 // authors, and a scope that authors nothing leaves the earlier one intact.
 func TestMergeWorkspaceConfig_Sessions(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	keep := func(n int) *int { return &n }
 
 	target := &Config{Sessions: &SessionsConfig{Keep: keep(20)}}
@@ -245,6 +257,7 @@ func TestMergeWorkspaceConfig_Sessions(t *testing.T) {
 // pointer's purpose: an absent block stays nil so a reader can tell "unset"
 // (use the default) from an authored value.
 func TestWorkspaceConfig_SessionsRoundtrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "an-absent-member-stays-distinct-from-a-zero")
 	var authored Config
 	if err := json.Unmarshal([]byte(`{"sessions": {"keep": 200}}`), &authored); err != nil {
 		t.Fatalf("unmarshal sessions: %v", err)
@@ -273,6 +286,7 @@ func TestWorkspaceConfig_SessionsRoundtrip(t *testing.T) {
 // --- ProjectConfig tests ---
 
 func TestLoadProjectConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFilename), `{
 		"name": "my-app",
@@ -293,6 +307,7 @@ func TestLoadProjectConfig(t *testing.T) {
 }
 
 func TestLoadProjectConfig_Missing(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	cfg := LoadProjectConfig(t.TempDir())
 	if cfg != nil {
 		t.Error("expected nil for missing project config")
@@ -300,6 +315,7 @@ func TestLoadProjectConfig_Missing(t *testing.T) {
 }
 
 func TestLoadProjectConfig_Invalid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFilename), `{invalid}`)
 
@@ -310,6 +326,7 @@ func TestLoadProjectConfig_Invalid(t *testing.T) {
 }
 
 func TestLoadProjectConfigWithDiagnostics_StrictTaskTuning(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "task-tuning-is-strict-and-the-rest-lenient")
 	for _, tc := range []struct {
 		name   string
 		config string
@@ -357,6 +374,7 @@ func TestLoadProjectConfigWithDiagnostics_StrictTaskTuning(t *testing.T) {
 }
 
 func TestLoadProjectConfigWithDiagnostics_RemainsLenientOutsideTasks(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "task-tuning-is-strict-and-the-rest-lenient")
 	root := t.TempDir()
 	// `name` remains a legacy-lenient field, while the valid tasks block must
 	// not accidentally make the whole config strict.
@@ -369,6 +387,7 @@ func TestLoadProjectConfigWithDiagnostics_RemainsLenientOutsideTasks(t *testing.
 }
 
 func TestProjectConfig_Roundtrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "a-rewrite-keeps-the-authored-form-and-bytes")
 	cfg := &ProjectConfig{
 		Name:         "test",
 		Tags:         []string{"go"},
@@ -398,6 +417,7 @@ func TestProjectConfig_Roundtrip(t *testing.T) {
 // --- ScopeConfig tests ---
 
 func TestLoadScopeChain_NoFiles(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "framework", "app")
 	os.MkdirAll(project, 0o755)
@@ -409,6 +429,7 @@ func TestLoadScopeChain_NoFiles(t *testing.T) {
 }
 
 func TestLoadScopeChain_SingleAncestor(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "framework", "app")
 
@@ -432,6 +453,7 @@ func TestLoadScopeChain_SingleAncestor(t *testing.T) {
 }
 
 func TestLoadScopeChain_DeepestWins(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "framework", "app")
 
@@ -461,6 +483,7 @@ func TestLoadScopeChain_DeepestWins(t *testing.T) {
 // workspace-relative slash paths. A putnami.json with no scope field is not a
 // source, because it contributed nothing.
 func TestLoadScopeChainWithSources_NamesTheFilesItMerged(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "framework", "libs", "app")
 
@@ -489,6 +512,7 @@ func TestLoadScopeChainWithSources_NamesTheFilesItMerged(t *testing.T) {
 // scope wins, and a file that declares only that level is a scope source: the
 // level is inherited, so a change to it is a change to every project below.
 func TestLoadScopeChain_DistributionDeepestWins(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "framework", "app")
 
@@ -513,6 +537,7 @@ func TestLoadScopeChain_DistributionDeepestWins(t *testing.T) {
 }
 
 func TestScanAllScopes_Aggregation(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "two-scopes-cannot-claim-one-alias-or-group")
 	root := t.TempDir()
 
 	writeFile(t, filepath.Join(root, WorkspaceConfigFilename), `{
@@ -539,6 +564,7 @@ func TestScanAllScopes_Aggregation(t *testing.T) {
 }
 
 func TestScanAllScopes_DuplicateAlias(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "two-scopes-cannot-claim-one-alias-or-group")
 	root := t.TempDir()
 
 	writeFile(t, filepath.Join(root, "a", ConfigFilename), `{
@@ -555,6 +581,7 @@ func TestScanAllScopes_DuplicateAlias(t *testing.T) {
 }
 
 func TestReadScopeConfig_WithIncludes(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "a-scope-is-recognized-from-both-sides")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFilename), `{
 		"includes": ["app", "http"],
@@ -571,6 +598,7 @@ func TestReadScopeConfig_WithIncludes(t *testing.T) {
 }
 
 func TestReadScopeConfig_Empty(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "a-scope-is-recognized-from-both-sides")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFilename), `{}`)
 
@@ -585,6 +613,7 @@ func TestReadScopeConfig_Empty(t *testing.T) {
 // successfully parse the same file, since the schema accepts project fields
 // alongside scope fields when activate is true.
 func TestReadScopeConfig_ActivatedExample(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "a-scope-is-recognized-from-both-sides")
 	root := t.TempDir()
 	// Verbatim from tooling/cli/doc/05-configuration.md.
 	writeFile(t, filepath.Join(root, ConfigFilename), `{
@@ -621,6 +650,7 @@ func TestReadScopeConfig_ActivatedExample(t *testing.T) {
 }
 
 func TestResolveNamePattern(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	sc := &ScopeConfig{
 		PublishConfig: map[string]map[string]any{
 			"npm": {"namePattern": "@putnami/{name}"},
@@ -633,6 +663,7 @@ func TestResolveNamePattern(t *testing.T) {
 }
 
 func TestResolveNamePattern_Nil(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	var sc *ScopeConfig
 	if got := sc.ResolveNamePattern("app"); got != "" {
 		t.Errorf("nil scope should return empty, got %q", got)
@@ -642,6 +673,7 @@ func TestResolveNamePattern_Nil(t *testing.T) {
 // --- Resolve helpers ---
 
 func TestIsWorkspaceConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "load-merges-two-layers-and-never-the-current-project")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, WorkspaceConfigFilename), `{}`)
 
@@ -651,6 +683,7 @@ func TestIsWorkspaceConfig(t *testing.T) {
 }
 
 func TestIsWorkspaceConfig_Missing(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "load-merges-two-layers-and-never-the-current-project")
 	if IsWorkspaceConfig(t.TempDir()) {
 		t.Error("expected false when no workspace config")
 	}
@@ -666,6 +699,7 @@ func TestIsWorkspaceConfig_Missing(t *testing.T) {
 // own coverage.
 
 func TestGetCommandDefaults_GlobalOnly(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "command-defaults-merge-in-a-fixed-order")
 	c := &Config{
 		Options: map[string]map[string]any{
 			"*": {"verbose": true, "coverage": true},
@@ -681,6 +715,7 @@ func TestGetCommandDefaults_GlobalOnly(t *testing.T) {
 }
 
 func TestGetCommandDefaults_CommandOverridesGlobal(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "command-defaults-merge-in-a-fixed-order")
 	c := &Config{
 		Options: map[string]map[string]any{
 			"*":    {"fix": false, "coverage": true},
@@ -697,6 +732,7 @@ func TestGetCommandDefaults_CommandOverridesGlobal(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfig_HooksFromNil(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	target := &Config{}
 	source := &Config{
 		Hooks: &HooksConfig{
@@ -717,6 +753,7 @@ func TestMergeWorkspaceConfig_HooksFromNil(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfig_ProjectAliasesAndGroups(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	target := &Config{}
 	source := &Config{
 		ProjectAliases: map[string]string{"app": "/ts/fw/app"},
@@ -737,6 +774,7 @@ func TestMergeWorkspaceConfig_ProjectAliasesAndGroups(t *testing.T) {
 // wholesale by the deepest scope that names it, not merged key by key — a
 // half-inherited registry/namePattern pair would publish to the wrong place.
 func TestLoadScopeChain_PublishConfigDeepestWins(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "the-deepest-scope-wins")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "samples", "app")
 
@@ -764,6 +802,7 @@ func TestLoadScopeChain_PublishConfigDeepestWins(t *testing.T) {
 }
 
 func TestScanAllScopes_DuplicateGroup(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "two-scopes-cannot-claim-one-alias-or-group")
 	root := t.TempDir()
 
 	writeFile(t, filepath.Join(root, "typescript", ConfigFilename), `{
@@ -782,6 +821,7 @@ func TestScanAllScopes_DuplicateGroup(t *testing.T) {
 // includes is still a scope. TestReadScopeConfig_Empty pins the other side —
 // `{}` is not — so the recognition rule is bounded from both directions.
 func TestReadScopeConfig_IncludesOnlyIsScope(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "a-scope-is-recognized-from-both-sides")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFilename), `{
 		"includes": ["app"]
@@ -797,6 +837,7 @@ func TestReadScopeConfig_IncludesOnlyIsScope(t *testing.T) {
 }
 
 func TestReadScopeConfig_LineOnlyIsScope(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "scopes-resolve-through-one-chain", "a-scope-is-recognized-from-both-sides")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFilename), `{
 		"line": {"tag": "ts/v{version}"}

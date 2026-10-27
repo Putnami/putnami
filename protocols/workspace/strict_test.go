@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseWorkspaceConfig_Valid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	data := []byte(`{
 		"name": "my-workspace",
 		"includes": ["app"]
@@ -24,6 +26,7 @@ func TestParseWorkspaceConfig_Valid(t *testing.T) {
 }
 
 func TestParseWorkspaceConfig_UnknownField(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	data := []byte(`{"name": "w", "unknownField": true}`)
 	c, diags := ParseWorkspaceConfig(data)
 	if c != nil {
@@ -35,6 +38,7 @@ func TestParseWorkspaceConfig_UnknownField(t *testing.T) {
 }
 
 func TestParseWorkspaceConfig_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	_, diags := ParseWorkspaceConfig([]byte("{bad"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for invalid JSON")
@@ -42,6 +46,7 @@ func TestParseWorkspaceConfig_InvalidJSON(t *testing.T) {
 }
 
 func TestValidateWorkspaceConfig_Nil(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	diags := ValidateWorkspaceConfig(nil)
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for nil config")
@@ -49,6 +54,7 @@ func TestValidateWorkspaceConfig_Nil(t *testing.T) {
 }
 
 func TestValidateWorkspaceConfig_MissingName(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	c := &Config{}
 	diags := ValidateWorkspaceConfig(c)
 	found := false
@@ -63,6 +69,7 @@ func TestValidateWorkspaceConfig_MissingName(t *testing.T) {
 }
 
 func TestValidateWorkspaceConfig_Valid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	c := &Config{Name: "ws"}
 	diags := ValidateWorkspaceConfig(c)
 	if diag.HasErrors(diags) {
@@ -71,6 +78,7 @@ func TestValidateWorkspaceConfig_Valid(t *testing.T) {
 }
 
 func TestNormalizeWorkspaceConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	c := &Config{}
 	NormalizeWorkspaceConfig(c)
 	if c.Options == nil {
@@ -91,10 +99,12 @@ func TestNormalizeWorkspaceConfig(t *testing.T) {
 }
 
 func TestNormalizeWorkspaceConfig_Nil(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	NormalizeWorkspaceConfig(nil) // should not panic
 }
 
 func TestParseAndValidateWorkspaceConfig_Valid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	data := []byte(`{"name": "ws"}`)
 	c, diags := ParseAndValidateWorkspaceConfig(data)
 	if diag.HasErrors(diags) {
@@ -109,6 +119,7 @@ func TestParseAndValidateWorkspaceConfig_Valid(t *testing.T) {
 }
 
 func TestParseProjectConfig_Valid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	data := []byte(`{"name": "my-project"}`)
 	c, diags := ParseProjectConfig(data)
 	if diag.HasErrors(diags) {
@@ -120,6 +131,7 @@ func TestParseProjectConfig_Valid(t *testing.T) {
 }
 
 func TestParseProjectConfig_UnknownField(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	data := []byte(`{"name": "p", "unknownField": true}`)
 	c, diags := ParseProjectConfig(data)
 	if c != nil {
@@ -131,6 +143,7 @@ func TestParseProjectConfig_UnknownField(t *testing.T) {
 }
 
 func TestValidateProjectConfig_Nil(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	diags := ValidateProjectConfig(nil)
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected error for nil config")
@@ -138,6 +151,7 @@ func TestValidateProjectConfig_Nil(t *testing.T) {
 }
 
 func TestValidateProjectConfig_MissingName(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	c := &ProjectConfig{}
 	diags := ValidateProjectConfig(c)
 	if !diag.HasErrors(diags) {
@@ -149,6 +163,7 @@ func TestValidateProjectConfig_MissingName(t *testing.T) {
 // must stay an answer, not an off switch: a block that says nothing, or says
 // two things, would silence completeness tooling while explaining neither.
 func TestValidateProjectConfig_FeatureAuthorityMustSayExactlyOneThing(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "a-feature-authority-states-exactly-one-thing")
 	for _, test := range []struct {
 		name      string
 		authority *ProjectFeatureAuthority
@@ -178,6 +193,7 @@ func TestValidateProjectConfig_FeatureAuthorityMustSayExactlyOneThing(t *testing
 // would break configs that parse today, and staying silent would leave the
 // author believing the block does something.
 func TestValidateProjectConfig_JobsWarnAndAreNotRejected(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "a-declared-jobs-block-is-reported-not-rejected")
 	c := &ProjectConfig{
 		Name: "p",
 		Jobs: map[string]json.RawMessage{
@@ -219,6 +235,7 @@ func TestValidateProjectConfig_JobsWarnAndAreNotRejected(t *testing.T) {
 // descope exists to end, just with nothing inside the braces. A nil map (absent
 // key, or `"jobs": null`) is genuinely undeclared and stays quiet.
 func TestValidateProjectConfig_EmptyJobsBlockIsReported(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "a-declared-jobs-block-is-reported-not-rejected")
 	empty := ValidateProjectConfig(&ProjectConfig{Name: "p", Jobs: map[string]json.RawMessage{}})
 	if diag.HasErrors(empty) {
 		t.Fatalf("an empty `jobs` block must not be a hard rejection: %v", diag.Errors(empty))
@@ -247,6 +264,7 @@ func TestValidateProjectConfig_EmptyJobsBlockIsReported(t *testing.T) {
 }
 
 func TestValidateProjectConfig_Valid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	c := &ProjectConfig{Name: "p"}
 	diags := ValidateProjectConfig(c)
 	if diag.HasErrors(diags) {
@@ -255,6 +273,7 @@ func TestValidateProjectConfig_Valid(t *testing.T) {
 }
 
 func TestValidateProjectTaskTuning_TimeoutMustBePositive(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "task-tuning-is-strict-and-the-rest-lenient")
 	ptr := func(v int) *int { return &v }
 
 	for _, tc := range []struct {
@@ -307,6 +326,7 @@ func TestValidateProjectTaskTuning_TimeoutMustBePositive(t *testing.T) {
 }
 
 func TestNormalizeProjectConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	c := &ProjectConfig{}
 	NormalizeProjectConfig(c)
 	if c.Options == nil {
@@ -321,10 +341,12 @@ func TestNormalizeProjectConfig(t *testing.T) {
 }
 
 func TestNormalizeProjectConfig_Nil(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "validation-requires-a-name-and-normalization-fills-empty-maps")
 	NormalizeProjectConfig(nil) // should not panic
 }
 
 func TestParseAndValidateProjectConfig_Valid(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	data := []byte(`{"name": "p"}`)
 	c, diags := ParseAndValidateProjectConfig(data)
 	if diag.HasErrors(diags) {
@@ -336,6 +358,7 @@ func TestParseAndValidateProjectConfig_Valid(t *testing.T) {
 }
 
 func TestParseAndValidateProjectConfig_ParseError(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "an-unknown-field-or-invalid-json-is-refused")
 	_, diags := ParseAndValidateProjectConfig([]byte("{bad"))
 	if !diag.HasErrors(diags) {
 		t.Fatal("expected parse error")

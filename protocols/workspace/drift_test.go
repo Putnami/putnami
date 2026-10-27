@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // jsonSchemaProperties extracts the top-level property names from a JSON Schema file.
@@ -148,6 +149,7 @@ func jsonSchemaObjectProperties(t *testing.T, schemaPath, property string) []str
 }
 
 func TestDrift_WorkspaceConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaProperties(t, "schemas/workspace.json")
 	goFields := goTypeJSONFields(t, Config{})
 
@@ -155,6 +157,7 @@ func TestDrift_WorkspaceConfig(t *testing.T) {
 }
 
 func TestDrift_AgentArtifactManifest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaProperties(t, "schemas/agent-artifact.json")
 	goFields := goTypeJSONFields(t, AgentArtifactManifest{})
 
@@ -162,6 +165,7 @@ func TestDrift_AgentArtifactManifest(t *testing.T) {
 }
 
 func TestDrift_Lock(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "Lock", jsonSchemaProperties(t, "schemas/lock.json"), goTypeJSONFields(t, Lock{}))
 	assertFieldParity(t, "LockAgentArtifactEntry",
 		jsonSchemaMapEntryProperties(t, "schemas/lock.json", "agentArtifacts"),
@@ -182,6 +186,7 @@ func TestDrift_Lock(t *testing.T) {
 // exactly the fields an editor completes from the schema, so a field that only
 // reaches the Go struct is invisible to the person writing the config.
 func TestDrift_HookPhaseConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaDefinitionProperties(t, "schemas/workspace.json", "hookPhaseConfig")
 	goFields := goTypeJSONFields(t, HookPhaseConfig{})
 
@@ -192,6 +197,7 @@ func TestDrift_HookPhaseConfig(t *testing.T) {
 // `keep` is the single knob an editor completes from the schema, so a field that
 // only reaches the Go struct is invisible to the person writing the config.
 func TestDrift_SessionsConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaObjectProperties(t, "schemas/workspace.json", "sessions")
 	goFields := goTypeJSONFields(t, SessionsConfig{})
 
@@ -202,6 +208,7 @@ func TestDrift_SessionsConfig(t *testing.T) {
 // retained 0 would be readable as "unlimited" or as "delete everything", so the
 // value is never accepted and neither reading can be guessed.
 func TestDrift_SessionsKeepExcludesZero(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	data, err := os.ReadFile("schemas/workspace.json")
 	if err != nil {
 		t.Fatal(err)
@@ -227,6 +234,7 @@ func TestDrift_SessionsKeepExcludesZero(t *testing.T) {
 }
 
 func TestDrift_ProjectConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaProperties(t, "schemas/project.json")
 	goFields := goTypeJSONFields(t, ProjectConfig{})
 
@@ -234,6 +242,7 @@ func TestDrift_ProjectConfig(t *testing.T) {
 }
 
 func TestDrift_ProjectTypeIncludesFirstClassImage(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	data, err := os.ReadFile("schemas/project.json")
 	if err != nil {
 		t.Fatal(err)
@@ -255,6 +264,7 @@ func TestDrift_ProjectTypeIncludesFirstClassImage(t *testing.T) {
 }
 
 func TestDrift_ProjectTaskTuning(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaDefinitionProperties(t, "schemas/project.json", "taskTuning")
 	goFields := goTypeJSONFields(t, ProjectTaskTuning{})
 
@@ -270,6 +280,7 @@ func TestDrift_ProjectTaskTuning(t *testing.T) {
 // them, and a CLI that plans none of it. Re-modeling the shape here without
 // wiring it into planning must fail loudly, not ship as documentation.
 func TestDrift_ProjectJobsStayUnmodeled(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	data, err := os.ReadFile("schemas/project.json")
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
@@ -317,6 +328,7 @@ func TestDrift_ProjectJobsStayUnmodeled(t *testing.T) {
 }
 
 func TestDrift_ScopeConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	// scope.json is a dual-purpose schema: a putnami.json with `activate: true`
 	// also acts as a project, so the schema accepts the union of scope and
 	// project fields. The union is enforced/restricted at runtime by the
@@ -345,6 +357,7 @@ func TestDrift_ScopeConfig(t *testing.T) {
 // TestDrift_ProjectDistribution pins the distribution block against its
 // schema; the scope schema references the same definition.
 func TestDrift_ProjectDistribution(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaObjectProperties(t, "schemas/project.json", "distribution")
 	goFields := goTypeJSONFields(t, DistributionConfig{})
 
@@ -355,6 +368,7 @@ func TestDrift_ProjectDistribution(t *testing.T) {
 // is what an author writes and what `version tag` reads back, so a field that
 // only reaches the Go struct is a field no editor completes.
 func TestDrift_ScopeLine(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	schemaFields := jsonSchemaObjectProperties(t, "schemas/scope.json", "line")
 	goFields := goTypeJSONFields(t, LineConfig{})
 
@@ -362,6 +376,7 @@ func TestDrift_ScopeLine(t *testing.T) {
 }
 
 func TestWorkspaceConfig_ExtensionsArray(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "extensions-accept-the-array-and-the-map")
 	input := `{"extensions": ["@putnami/go", "@putnami/typescript"]}`
 	var cfg Config
 	if err := json.Unmarshal([]byte(input), &cfg); err != nil {
@@ -378,6 +393,7 @@ func TestWorkspaceConfig_ExtensionsArray(t *testing.T) {
 }
 
 func TestWorkspaceConfig_ExtensionsObject(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "extensions-accept-the-array-and-the-map")
 	input := `{"extensions": {"@putnami/go": "^1.0.0", "@putnami/typescript": "^2.0.0"}}`
 	var cfg Config
 	if err := json.Unmarshal([]byte(input), &cfg); err != nil {
@@ -392,6 +408,7 @@ func TestWorkspaceConfig_ExtensionsObject(t *testing.T) {
 }
 
 func TestWorkspaceConfig_ExtensionsRoundtrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "extensions-accept-the-array-and-the-map")
 	// Array form round-trips as array
 	cfg := Config{
 		Extensions: ExtensionsConfig{List: map[string]string{
@@ -412,6 +429,7 @@ func TestWorkspaceConfig_ExtensionsRoundtrip(t *testing.T) {
 }
 
 func TestWorkspaceConfig_HooksRoundtrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "an-absent-member-stays-distinct-from-a-zero")
 	input := `{
 		"hooks": {
 			"cli": {"before": ["echo start"]},
@@ -439,6 +457,7 @@ func TestWorkspaceConfig_HooksRoundtrip(t *testing.T) {
 // through JSON. Both are pointers so "absent" stays distinguishable from
 // "explicitly 0 / false", which is what makes the merge below well-defined.
 func TestWorkspaceConfig_HookContractRoundtrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "an-absent-member-stays-distinct-from-a-zero")
 	input := `{
 		"hooks": {
 			"cli": {"before": ["./scripts/pre.sh"], "timeoutMs": 5000, "loginShell": true}
@@ -472,6 +491,7 @@ func TestWorkspaceConfig_HookContractRoundtrip(t *testing.T) {
 // execution contract is replaced by the later scope, and silence at the later
 // scope leaves the earlier contract intact.
 func TestMergeHookPhase_ContractOverridesCommandsAccumulate(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	global := &HookPhaseConfig{
 		Before:     []string{"global-before"},
 		TimeoutMs:  intPtr(1000),
@@ -514,6 +534,7 @@ func boolPtr(v bool) *bool { return &v }
 // field would turn the same config into a rejected parse (strict) or an even
 // quieter drop (lenient).
 func TestProjectConfig_JobsParseButStayOpaque(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-parsing-is-strict", "a-declared-jobs-block-is-reported-not-rejected")
 	input := `{
 		"name": "p",
 		"jobs": {
@@ -577,6 +598,7 @@ func assertFieldParity(t *testing.T, typeName string, schemaFields, goFields []s
 // uses, and pins the archive executable pattern's verdict on each shape it
 // must refuse.
 func TestLockSchemaToolchainRulesAgreeWithTheValidator(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "schema-rules-agree-with-the-validator")
 	type stringRule struct {
 		Pattern   string   `json:"pattern"`
 		MaxLength int      `json:"maxLength"`
@@ -698,6 +720,7 @@ func TestLockSchemaToolchainRulesAgreeWithTheValidator(t *testing.T) {
 // branches on, and additionally pins the structural facts that make the schema's
 // two shapes mutually exclusive.
 func TestLockSchemaAgreesWithTheCLIEntryValidator(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "schema-rules-agree-with-the-validator")
 	var schema struct {
 		Properties struct {
 			CLI struct {

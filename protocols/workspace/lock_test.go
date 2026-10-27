@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // v5GoEntryJSON is a valid version 5 go entry for one platform, with extra
@@ -17,6 +18,7 @@ func v5GoEntryJSON(extra string) string {
 }
 
 func TestLockVersionCompatibilityMatrix(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "the-version-window-is-2-to-5")
 	tests := []struct {
 		name string
 		data string
@@ -57,6 +59,7 @@ func TestLockVersionCompatibilityMatrix(t *testing.T) {
 }
 
 func TestMarshalLockProjectsVersionVocabularyWithoutMutation(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "a-lock-writes-only-its-version-vocabulary")
 	protocolVersion := 2
 	lock := &Lock{
 		Version:        2,
@@ -79,6 +82,7 @@ func TestMarshalLockProjectsVersionVocabularyWithoutMutation(t *testing.T) {
 }
 
 func TestParseLockRejectsTrailingDocument(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "the-version-window-is-2-to-5")
 	_, diags := ParseLock([]byte(`{"version":4,"extensions":{},"templates":{}} {}`))
 	if !hasDiagnosticCode(diags, "parse-error") {
 		t.Fatalf("trailing lock document was accepted: %v", diags)
@@ -86,6 +90,7 @@ func TestParseLockRejectsTrailingDocument(t *testing.T) {
 }
 
 func TestMigrateLockToCurrentIsExplicitDeepAndDeterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "migration-is-explicit-and-refuses-pins-without-archives")
 	protocolVersion := 2
 	legacy := &Lock{
 		Version: LockVersion - 1,
@@ -144,6 +149,7 @@ func TestMigrateLockToCurrentIsExplicitDeepAndDeterministic(t *testing.T) {
 // one error per entry, in identity order, instead of writing a version 5 lock
 // whose entries name no archive.
 func TestMigrateLockToCurrentRefusesToolchainPinsWithoutArchives(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "migration-is-explicit-and-refuses-pins-without-archives")
 	for _, version := range []int{3, 4} {
 		legacy := &Lock{
 			Version: version,
@@ -175,6 +181,7 @@ func TestMigrateLockToCurrentRefusesToolchainPinsWithoutArchives(t *testing.T) {
 }
 
 func TestMigrateLockToCurrentDetachesToolchainArchives(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "migration-is-explicit-and-refuses-pins-without-archives")
 	current := &Lock{
 		Version:    LockVersion,
 		Toolchains: map[string]LockToolchainEntry{"go": validV5GoEntry()},
@@ -194,6 +201,7 @@ func TestMigrateLockToCurrentDetachesToolchainArchives(t *testing.T) {
 }
 
 func TestValidateLockAgentArtifactIntegrityAndDiagnosticOrder(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "an-agent-artifact-entry-binds-its-archive-and-manifest")
 	lock := &Lock{
 		Version:    LockVersion,
 		Extensions: map[string]LockEntry{},
@@ -222,6 +230,7 @@ func TestValidateLockAgentArtifactIntegrityAndDiagnosticOrder(t *testing.T) {
 // a published pin without a version is unreproducible, and a sentinel WITH one
 // claims a published artifact the workspace does not have.
 func TestValidateLockCLISourceWorkspaceSentinel(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "the-cli-entry-has-two-exclusive-shapes")
 	base := func(cli *LockCLIEntry) *Lock {
 		return &Lock{
 			Version:    LockVersion,
@@ -285,6 +294,7 @@ func TestValidateLockCLISourceWorkspaceSentinel(t *testing.T) {
 // re-serializing a committed lock would dirty it — and a lock that a routine
 // command rewrites is one nobody can review.
 func TestMarshalLockKeepsSourceWorkspaceEntryExact(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "the-cli-entry-has-two-exclusive-shapes")
 	lock := &Lock{
 		Version:    LockVersion,
 		CLI:        &LockCLIEntry{Source: LockCLISourceWorkspace},
@@ -327,6 +337,7 @@ func validV5GoEntry() LockToolchainEntry {
 // toolchain-resolve answer share validateLockToolchainPin, so this table binds
 // both.
 func TestValidateLockVersion5ToolchainEntryRules(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "a-version-5-toolchain-entry-names-its-archives")
 	editArchive := func(edit func(*LockToolchainArchive)) func(*LockToolchainEntry) {
 		return func(e *LockToolchainEntry) {
 			archive := e.Archives["darwin/arm64"]
@@ -411,6 +422,7 @@ func TestValidateLockVersion5ToolchainEntryRules(t *testing.T) {
 }
 
 func TestValidateLockToolchainDiagnosticsAreDeterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "a-version-5-toolchain-entry-names-its-archives")
 	broken := func() LockToolchainEntry {
 		entry := validV5GoEntry()
 		entry.Source = "https://go.dev/dl/"
@@ -438,6 +450,7 @@ func TestValidateLockToolchainDiagnosticsAreDeterministic(t *testing.T) {
 // MarshalLock writes each toolchain entry in its lock version's vocabulary,
 // whatever the in-memory value carries, and never edits the caller's value.
 func TestMarshalLockProjectsToolchainVocabularyWithoutMutation(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-is-read-at-its-recorded-version", "a-lock-writes-only-its-version-vocabulary")
 	for _, tc := range []struct {
 		version int
 		keep    string
@@ -513,6 +526,7 @@ func lockedGoSHA256(lock, platform string) (version, digest string) {
 // same eight-space platform lines as the integrities map, and the reader keeps
 // the last one. Archives must therefore be written before integrities.
 func TestMarshalLockWritesIntegritiesAfterArchives(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "archives-are-written-before-integrities")
 	bun := validV5GoEntry()
 	bun.Version = "1.3.14"
 	lock := &Lock{
