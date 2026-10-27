@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -132,6 +133,12 @@ type fakeComment struct {
 	created time.Time
 	// url replaces the html_url GitHub answers.
 	url string
+	// side is "LEFT" for a comment on a deleted line, whose line is in the
+	// old file, and "RIGHT" when empty.
+	side string
+	// subjectType is "file" for a comment on the whole file, which GitHub
+	// answers with line 1, and "line" when empty.
+	subjectType string
 }
 
 // fault changes the answer to the next matching requests.
@@ -947,8 +954,9 @@ func (f *fakeGitHub) listLineComments(w http.ResponseWriter, r *http.Request, ma
 		if comment.review > 0 {
 			review = comment.review
 		}
+		side, subject := cmp.Or(comment.side, "RIGHT"), cmp.Or(comment.subjectType, "line")
 		comments = append(comments, map[string]any{"id": comment.id, "pull_request_review_id": review, "user": map[string]any{"login": comment.user},
-			"body": comment.body, "path": comment.path, "line": line, "commit_id": comment.commit,
+			"body": comment.body, "path": comment.path, "line": line, "side": side, "subject_type": subject, "commit_id": comment.commit,
 			"html_url": f.commentURL(number, comment, "discussion_r"), "created_at": comment.created.Format(time.RFC3339)})
 	}
 	writeJSON(w, http.StatusOK, orEmpty(paginate(w, r, comments)))

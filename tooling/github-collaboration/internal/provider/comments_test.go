@@ -244,3 +244,41 @@ func TestAnOutdatedLineCommentKeepsItsPathWithoutALine(t *testing.T) {
 		t.Fatalf("a comment on a path the contract cannot carry: %+v", unnamed)
 	}
 }
+
+// TestOnlyALineOfTheNewFileIsReported: GitHub answers a comment on a whole
+// file with line 1, and a comment on a deleted line with that line's number
+// in the old file. Neither is a line of the file at the comment's commit, so
+// each keeps its path, commit and review without a line, while a comment on
+// a line of the new file keeps it.
+func TestOnlyALineOfTheNewFileIsReported(t *testing.T) {
+	spectest.Proves(t, feature, "proposal-comments", "an-outdated-line-comment-keeps-its-path-without-a-line")
+	sha := strings.Repeat("b", 40)
+	for name, tc := range map[string]struct {
+		comment fakeComment
+		line    int
+	}{
+		"a comment on the whole file": {fakeComment{path: "src/a.go", line: 1, subjectType: "file"}, 0},
+		"a comment on a deleted line": {fakeComment{path: "src/a.go", line: 935, side: "LEFT"}, 0},
+		"a comment on a new line":     {fakeComment{path: "src/a.go", line: 935, side: "RIGHT"}, 935},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			proposal := h.openProposal("Commented file")
+			n := number(t, proposal.Ref)
+			review := h.review(n, "octocat", "COMMENTED", "")
+			tc.comment.user, tc.comment.body, tc.comment.commit, tc.comment.review = "octocat", "See here.", sha, review.id
+			h.lineComment(n, tc.comment)
+			listed := h.comments(proposal.Ref, 20, nil)
+			if len(listed) != 1 {
+				t.Fatalf("comments %+v", listed)
+			}
+			comment := listed[0]
+			if comment.Path != "src/a.go" || comment.Commit != sha || comment.Review == nil || comment.Review.ID != "review-"+strconv.FormatInt(review.id, 10) {
+				t.Fatalf("the comment lost its path, commit or review: %+v", comment)
+			}
+			if got := comment.Line; (tc.line == 0) != (got == nil) || got != nil && *got != tc.line {
+				t.Fatalf("line %v, want %d (0 for none)", got, tc.line)
+			}
+		})
+	}
+}

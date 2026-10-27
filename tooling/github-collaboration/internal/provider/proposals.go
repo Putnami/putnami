@@ -979,8 +979,10 @@ func (s *proposalSession) reviewComment(review *ghReview) (collab.ProposalCommen
 		SubmittedAt: timestamp(review.SubmittedAt), Review: &belongsTo, Commit: commit(review.CommitID), Body: body}, true
 }
 
-// lineComment renders a comment on a file line of the diff. A comment whose
-// line left the diff keeps its path without a line.
+// lineComment renders a comment on a file of the diff or on one of its lines.
+// Only a line of the file at the comment's commit is reported: a comment on
+// the whole file, on a deleted line (whose number is in the old file) or on a
+// line that left the diff keeps its path without a line.
 func (s *proposalSession) lineComment(comment *ghReviewComment) (collab.ProposalComment, bool) {
 	body := boundedBody(comment.Body)
 	if strings.TrimSpace(body) == "" {
@@ -993,7 +995,8 @@ func (s *proposalSession) lineComment(comment *ghReviewComment) (collab.Proposal
 		review := s.reviewRef(*comment.PullRequestReviewID)
 		result.Review = &review
 	}
-	if result.Path = filePath(comment.Path); result.Path != "" && comment.Line != nil && *comment.Line > 0 {
+	onNewLine := comment.SubjectType != "file" && comment.Side != "LEFT"
+	if result.Path = filePath(comment.Path); result.Path != "" && onNewLine && comment.Line != nil && *comment.Line > 0 {
 		line := *comment.Line
 		result.Line = &line
 	}

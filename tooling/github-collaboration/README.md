@@ -134,8 +134,8 @@ GitHub token, from everything it writes.
   comment; a dismissed review's body is listed. A review body names its own
   review, and a line comment names the review it was written in, with its
   `path`, `line` and `commit`: the commit GitHub positions the comment on now,
-  whose file `line` refers to. A line comment whose line left the diff, and a
-  comment on a whole file, have a `path` and no `line`. A conversation comment
+  whose file `line` refers to. A comment on a whole file, on a deleted line or
+  on a line that left the diff has a `path` and no `line`. A conversation comment
   names no review and no file. Review bodies are read whole, at most 1,000
   reviews as for `status`, and listed by review identifier: GitHub lists
   reviews in submission order, and a review started as a draft keeps the
