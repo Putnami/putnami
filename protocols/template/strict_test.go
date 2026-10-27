@@ -1,6 +1,7 @@
 package template
 
 import (
+	"slices"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -96,11 +97,17 @@ func TestParseAndValidateManifest_ParseError(t *testing.T) {
 }
 
 func TestParseAndValidateManifest_ValidationError(t *testing.T) {
-	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "an-empty-manifest-is-refused")
-	data := []byte(`{}`)
-	_, diags := ParseAndValidateManifest(data)
-	if !diag.HasErrors(diags) {
-		t.Fatal("expected validation errors for empty manifest")
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "an-empty-or-version-only-manifest-is-refused")
+	for _, input := range []string{`{}`, `{"version":"1.0.0"}`} {
+		_, diags := ParseAndValidateManifest([]byte(input))
+		errs := diag.Errors(diags)
+		fields := make([]string, 0, len(errs))
+		for _, d := range errs {
+			fields = append(fields, d.Field)
+		}
+		if !slices.Equal(fields, []string{"name", "description"}) {
+			t.Errorf("%s: errors at %v, want name and description", input, fields)
+		}
 	}
 }
 

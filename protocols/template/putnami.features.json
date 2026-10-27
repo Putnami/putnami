@@ -38,8 +38,8 @@
               "each-missing-member-is-its-own-error",
               "a-nil-manifest-is-refused",
               "name-and-description-suffice",
-              "an-empty-manifest-is-refused",
-              "the-cli-validate-refuses-a-manifest-without-a-name",
+              "an-empty-or-version-only-manifest-is-refused",
+              "the-cli-validate-refuses-an-empty-or-version-only-manifest",
               "the-cli-validate-accepts-a-manifest-with-a-name-and-a-description"
             ]
           }

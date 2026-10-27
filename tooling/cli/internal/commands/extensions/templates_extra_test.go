@@ -241,19 +241,23 @@ func TestTemplatesValidate_NoTemplateFilesOK(t *testing.T) {
 }
 
 func TestTemplatesValidate_InvalidManifest(t *testing.T) {
-	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "the-cli-validate-refuses-a-manifest-without-a-name")
-	dir := t.TempDir()
-	// Missing required "name" should fail strict validation.
-	if err := os.WriteFile(filepath.Join(dir, "putnami.template.json"), []byte(`{"version":"1.0.0"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	spectest.Proves(t, "template/manifest-contract", "name-and-description-are-required", "the-cli-validate-refuses-an-empty-or-version-only-manifest")
+	// A manifest without a name and a description fails strict validation.
+	for _, manifest := range []string{`{}`, `{"version":"1.0.0"}`} {
+		t.Run(manifest, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "putnami.template.json"), []byte(manifest), 0o644); err != nil {
+				t.Fatal(err)
+			}
 
-	out, err := sharedtest.CaptureStdout(t, func() error { return TemplatesValidate([]string{dir}) })
-	if err == nil {
-		t.Fatal("expected error for invalid manifest")
-	}
-	if !strings.Contains(out, "Validation failed") {
-		t.Errorf("output = %q, want validation failure block", out)
+			out, err := sharedtest.CaptureStdout(t, func() error { return TemplatesValidate([]string{dir}) })
+			if err == nil {
+				t.Fatal("expected error for invalid manifest")
+			}
+			if !strings.Contains(out, "Validation failed") {
+				t.Errorf("output = %q, want validation failure block", out)
+			}
+		})
 	}
 }
 
