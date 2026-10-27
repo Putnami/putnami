@@ -203,6 +203,131 @@ func TestCIViewJSONCarriesTheReuse(t *testing.T) {
 	assertExactKeys(t, "run reused member", members[0], []string{"ecosystem", "coordinate", "version"})
 }
 
+// `view` asks the server for the run's verdict with `verdict=true` and prints
+// it in brief: the answer, the mark, the gap count, the verdict revision and
+// when it was computed. `--output=json` carries it in the `verdict` member.
+func TestCIViewRendersTheRunVerdict(t *testing.T) {
+	computed := time.Date(2026, 10, 22, 9, 30, 0, 0, time.UTC)
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: CIRunResponse{
+			ID: "run-1", Status: "completed", Conclusion: "success",
+			Verdict: &CIRunVerdict{Answer: "passed", Mark: "verified", Gaps: 0, Revision: 2, ComputedAt: computed},
+		}},
+	}}
+	lines, err := captureCI(t, fake, []string{"view", "run-1"})
+	if err != nil {
+		t.Fatalf("view: %v", err)
+	}
+	want := "Verdict:    passed (verified), 0 gaps, verdict revision 2, computed " + ciFormatTime(computed)
+	if out := strings.Join(lines, "\n"); !strings.Contains(out+"\n", want+"\n") {
+		t.Fatalf("view output never showed %q:\n%s", want, out)
+	}
+	asked := false
+	for _, req := range fake.requests {
+		if req.Path == "/v1/workspaces/ws-acme/runs/run-1" && strings.Contains("&"+req.Query+"&", "&verdict=true&") {
+			asked = true
+		}
+	}
+	if !asked {
+		t.Fatalf("view never asked for the verdict (verdict=true): %+v", fake.requests)
+	}
+
+	lines, err = captureCI(t, fake, []string{"view", "run-1", "--output", "json"})
+	if err != nil || len(lines) != 1 {
+		t.Fatalf("view --output=json: %v, %d lines", err, len(lines))
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &doc); err != nil {
+		t.Fatalf("decode %s: %v", lines[0], err)
+	}
+	assertExactKeys(t, "run verdict", doc["verdict"], []string{"answer", "mark", "gaps", "revision", "computedAt"})
+}
+
+// A run without a verdict says so in one line and the view still succeeds: a
+// run still going has none yet, and one that ended without a verdict has none.
+// A verdict that did not pass carries no mark, and one gap reads singular.
+func TestCIViewSaysWhenARunHasNoVerdict(t *testing.T) {
+	for _, tc := range []struct {
+		run  CIRunResponse
+		want string
+	}{
+		{CIRunResponse{ID: "run-1", Status: "running"}, "Verdict:    not computed yet\n"},
+		{CIRunResponse{ID: "run-1", Status: "completed", Conclusion: "success"}, "Verdict:    none\n"},
+	} {
+		fake := &ciFakeServer{responses: map[string]ciStubResponse{
+			"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: tc.run},
+		}}
+		lines, err := captureCI(t, fake, []string{"view", "run-1"})
+		if err != nil {
+			t.Fatalf("view of a %s run without a verdict failed: %v", tc.run.Status, err)
+		}
+		if out := strings.Join(lines, "\n"); !strings.Contains(out+"\n", tc.want) {
+			t.Fatalf("view of a %s run without a verdict never showed %q:\n%s", tc.run.Status, tc.want, out)
+		}
+		lines, err = captureCI(t, fake, []string{"view", "run-1", "--output", "json"})
+		if err != nil || len(lines) != 1 {
+			t.Fatalf("view --output=json of a run without a verdict: %v, %v", err, lines)
+		}
+		var doc map[string]any
+		if err := json.Unmarshal([]byte(lines[0]), &doc); err != nil {
+			t.Fatalf("decode %s: %v", lines[0], err)
+		}
+		if _, ok := doc["verdict"]; ok {
+			t.Fatalf("view --output=json of a run without a verdict carries one: %s", lines[0])
+		}
+	}
+
+	failed := &CIRunResponse{Conclusion: "failure", Verdict: &CIRunVerdict{Answer: "failed", Gaps: 1, Revision: 1}}
+	if got := ciVerdictLine(failed); got != "failed, 1 gap, verdict revision 1" {
+		t.Fatalf("failed verdict line = %q", got)
+	}
+	if got := ciVerdictLine(&CIRunResponse{Verdict: &CIRunVerdict{}}); got != "not computed yet" {
+		t.Fatalf("empty verdict line = %q", got)
+	}
+}
+
+// The server answers the whole run read with a 500 when the verdict cannot be
+// read. `view` then reads the run again without the verdict, says the verdict
+// could not be read, and prints the rest of the run as before.
+func TestCIViewReadsTheRunAgainWhenItsVerdictCannotBeRead(t *testing.T) {
+	fake := &ciFakeServer{responseSequences: map[string][]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {
+			{status: http.StatusInternalServerError, body: map[string]any{"error": "run verdicts could not be read"}},
+			{status: 200, body: CIRunResponse{ID: "run-1", Status: "completed", Conclusion: "success", Repo: "acme/app"}},
+		},
+	}}
+	lines, err := captureCI(t, fake, []string{"view", "run-1"})
+	if err != nil {
+		t.Fatalf("view after an unreadable verdict failed: %v", err)
+	}
+	out := strings.Join(lines, "\n") + "\n"
+	for _, want := range []string{"Run:        run-1\n", "Repo:       acme/app\n", "Verdict:    could not be read\n"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("view output never showed %q:\n%s", want, out)
+		}
+	}
+	var queries []string
+	for _, req := range fake.requests {
+		if req.Path == "/v1/workspaces/ws-acme/runs/run-1" {
+			queries = append(queries, req.Query)
+		}
+	}
+	if len(queries) != 2 || queries[0] != "detail=true&reuse=true&verdict=true" || queries[1] != "detail=true&reuse=true" {
+		t.Fatalf("view run reads = %q, want the verdict read then one without it", queries)
+	}
+
+	// A second failure is the read's own answer.
+	fake = &ciFakeServer{responseSequences: map[string][]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {
+			{status: http.StatusInternalServerError, body: map[string]any{"error": "run verdicts could not be read"}},
+			{status: http.StatusInternalServerError, body: map[string]any{"error": "store down"}},
+		},
+	}}
+	if _, err := captureCI(t, fake, []string{"view", "run-1"}); err == nil {
+		t.Fatal("view succeeded when the run read failed twice")
+	}
+}
+
 func TestCILogsRendersProtocolRecordsForHumans(t *testing.T) {
 	fake := &ciFakeServer{responses: map[string]ciStubResponse{
 		"GET /v1/workspaces/ws-acme/runs/run-1/logs": {status: 200, body: CIRunLogsResponse{

@@ -625,6 +625,194 @@ func TestCIUsageJSONCarriesTheBilledCost(t *testing.T) {
 	}
 }
 
+// weeklyUsage is a rollup with the merges and the deploys of the window.
+func weeklyUsage() CIUsageResponse {
+	usage := billedUsage()
+	usage.Merges = &CIUsageMerges{
+		Repository: "acme/app", Merged: 40, NeededPerson: 14, Approved: 5,
+		Verdicts: map[string]int{"verified": 12, "checked": 10, "failed": 3, "canceled": 2, "none": 13},
+	}
+	usage.Deploys = &CIUsageDeploys{
+		Opened: 5, Ready: 3, Failed: 1,
+		Days: []CIUsageDeployDay{
+			{Day: "2026-10-20", Opened: 3, Ready: 2, Failed: 1},
+			{Day: "2026-10-21", Opened: 0},
+			{Day: "2026-10-22", Opened: 2, Ready: 1},
+		},
+	}
+	usage.Efficacy = json.RawMessage(`{"formulaVersion":1,"repository":"acme/app"}`)
+	return usage
+}
+
+// TestCIUsageRendersTheMergesAndTheDeploys pins the weekly numbers: the merge
+// counts, the share of merges whose verdict is verified, each verdict level,
+// then one line per deploy day and the window's totals.
+func TestCIUsageRendersTheMergesAndTheDeploys(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: weeklyUsage()},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage"})
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	want := []string{
+		"Merges into acme/app:",
+		"  merged=40  needed a person=14  declaration approved=5",
+		"  verified: 12 of 40 merges (30%)",
+		"Merges by verdict:",
+		"  canceled             2",
+		"  checked              10",
+		"  failed               3",
+		"  none                 13",
+		"  verified             12",
+		"Deploys (every environment, per UTC day, oldest first; the first and the last day are partial):",
+		"  day         opened   ready  failed",
+		"  2026-10-20       3       2       1",
+		"  2026-10-21       0       0       0",
+		"  2026-10-22       2       1       0",
+		"  window           5       3       1",
+	}
+	if len(lines) < len(want) {
+		t.Fatalf("usage printed %d lines, want at least %d:\n%s", len(lines), len(want), strings.Join(lines, "\n"))
+	}
+	if got := lines[len(lines)-len(want):]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("usage ends with:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if out := strings.Join(lines, "\n"); strings.Contains(out, "not available") || strings.Contains(out, "could not be read") {
+		t.Fatalf("a rollup with every section says one is missing:\n%s", out)
+	}
+}
+
+// TestCIUsageMarksALowerBoundOnTheMerges pins that a rollup whose merges are a
+// lower bound says so in the merges title, decoded from the server's answer.
+func TestCIUsageMarksALowerBoundOnTheMerges(t *testing.T) {
+	usage := weeklyUsage()
+	usage.Merges.LowerBound = true
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: usage},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage"})
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	if out := strings.Join(lines, "\n"); !strings.Contains(out+"\n", "Merges into acme/app (lower bound):\n") {
+		t.Fatalf("usage with lowerBound:true never marked the merges title:\n%s", out)
+	}
+}
+
+// TestCIUsageSaysWhichSectionsAreNotAvailable pins the one line each section
+// the server could not read prints in its place, and that a section absent
+// without the flag prints nothing.
+func TestCIUsageSaysWhichSectionsAreNotAvailable(t *testing.T) {
+	usage := billedUsage()
+	usage.MergesUnavailable, usage.DeploysUnavailable, usage.EfficacyUnavailable = true, true, true
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: usage},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage"})
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	want := []string{
+		"merges: could not be read; try again later",
+		"deploys: could not be read; try again later",
+		"merge efficacy: could not be read; try again later",
+	}
+	if len(lines) < len(want) || !reflect.DeepEqual(lines[len(lines)-len(want):], want) {
+		t.Fatalf("usage ends with:\n%s\nwant:\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+	}
+	if out := strings.Join(lines, "\n"); strings.Contains(out, "Merges into") || strings.Contains(out, "Deploys (") {
+		t.Fatalf("an unavailable section also printed its table:\n%s", out)
+	}
+
+	io, out := renderIO()
+	ciRenderMerges(io, nil, false)
+	ciRenderDeploys(io, nil, false)
+	if out.String() != "" {
+		t.Fatalf("absent sections printed %q", out.String())
+	}
+}
+
+// TestCIVerifiedShareLine pins the share line: verified merges over every
+// merge of the window, rounded to a whole percent, a missing verified level
+// counting as zero, and no line when the window holds no merge.
+func TestCIVerifiedShareLine(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		merges CIUsageMerges
+		want   string
+	}{
+		{"share", CIUsageMerges{Merged: 3, Verdicts: map[string]int{"verified": 2, "none": 1}}, "verified: 2 of 3 merges (67%)"},
+		{"no verified level", CIUsageMerges{Merged: 4, Verdicts: map[string]int{"checked": 4}}, "verified: 0 of 4 merges (0%)"},
+		{"all verified", CIUsageMerges{Merged: 2, Verdicts: map[string]int{"verified": 2}}, "verified: 2 of 2 merges (100%)"},
+		{"rounds up to every merge", CIUsageMerges{Merged: 400, Verdicts: map[string]int{"verified": 399, "none": 1}}, "verified: 399 of 400 merges (99%)"},
+		{"rounds down to no merge", CIUsageMerges{Merged: 400, Verdicts: map[string]int{"verified": 1, "none": 399}}, "verified: 1 of 400 merges (<1%)"},
+		{"no merge", CIUsageMerges{Verdicts: map[string]int{}}, ""},
+	} {
+		if got := ciVerifiedShareLine(&tc.merges); got != tc.want {
+			t.Errorf("%s: share line = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+
+	io, out := renderIO()
+	ciRenderMerges(io, &CIUsageMerges{Repository: "acme/app", LowerBound: true, Verdicts: map[string]int{}}, false)
+	if got := out.String(); !strings.Contains(got, "Merges into acme/app (lower bound):") || strings.Contains(got, "verified:") || !strings.Contains(got, "  (none)") {
+		t.Fatalf("a window without a merge rendered:\n%s", got)
+	}
+}
+
+// TestCIUsageJSONCarriesTheMergesAndTheDeploys pins the structured output:
+// the merges, the deploys and the efficacy travel with the provider's keys,
+// and the unavailable flags appear only when set.
+func TestCIUsageJSONCarriesTheMergesAndTheDeploys(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: weeklyUsage()},
+	}}
+	lines, err := captureCI(t, fake, []string{"usage", "--output", "json"})
+	if err != nil || len(lines) != 1 {
+		t.Fatalf("usage --output=json: %v, %d lines", err, len(lines))
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &doc); err != nil {
+		t.Fatalf("decode %s: %v", lines[0], err)
+	}
+	assertExactKeys(t, "usage merges", doc["merges"], []string{"repository", "merged", "neededPerson", "approved", "lowerBound", "verdicts"})
+	assertExactKeys(t, "usage deploys", doc["deploys"], []string{"opened", "ready", "failed", "days"})
+	days, _ := doc["deploys"].(map[string]any)["days"].([]any)
+	if len(days) != 3 {
+		t.Fatalf("deploy days = %v, want 3", days)
+	}
+	assertExactKeys(t, "usage deploy day", days[0], []string{"day", "opened", "ready", "failed"})
+	assertExactKeys(t, "usage efficacy", doc["efficacy"], []string{"formulaVersion", "repository"})
+	for _, flag := range []string{"mergesUnavailable", "deploysUnavailable", "efficacyUnavailable"} {
+		if _, ok := doc[flag]; ok {
+			t.Fatalf("a rollup with every section carries %s: %s", flag, lines[0])
+		}
+	}
+
+	usage := billedUsage()
+	usage.MergesUnavailable, usage.DeploysUnavailable, usage.EfficacyUnavailable = true, true, true
+	fake = &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/ci/usage": {status: 200, body: usage},
+	}}
+	lines, err = captureCI(t, fake, []string{"usage", "--output", "json"})
+	if err != nil || len(lines) != 1 {
+		t.Fatalf("usage --output=json with unavailable sections: %v, %d lines", err, len(lines))
+	}
+	doc = map[string]any{}
+	if err := json.Unmarshal([]byte(lines[0]), &doc); err != nil {
+		t.Fatalf("decode %s: %v", lines[0], err)
+	}
+	for _, flag := range []string{"mergesUnavailable", "deploysUnavailable", "efficacyUnavailable"} {
+		if doc[flag] != true {
+			t.Fatalf("usage --output=json %s = %v, want true: %s", flag, doc[flag], lines[0])
+		}
+	}
+	if doc["merges"] != nil || doc["deploys"] != nil {
+		t.Fatalf("unavailable sections carry data: %s", lines[0])
+	}
+}
+
 // TestCIInsightsRendersTheGateReport pins the verb→request shape and the two
 // facts a deep dive is FOR: the CPU balance sheet renders with its utilization,
 // and the report's own 64-task bound is stated rather than presented as a total.

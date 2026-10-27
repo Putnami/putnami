@@ -170,6 +170,37 @@ listed. A run that reused nothing prints no `Reused:` section.
 `--output=json` carries the same facts in the `reuse` member. A server that
 predates the `reuse` query leaves the section out.
 
+`view` also prints the run's verdict in brief on a `Verdict:` line: the
+answer, the mark of a verdict that passed (`verified` or `checked`), the gap
+count, the verdict revision and when it was computed. A run still going reads
+`Verdict:    not computed yet`. A run that ended without a verdict reads
+`Verdict:    none`: it tested no tree, or its change cannot be named, so it
+gets no verdict. When the server cannot read the verdict, `view` reads the run
+again without it and prints `Verdict:    could not be read`; the rest of the
+view prints as before. `--output=json` carries the same facts in the `verdict`
+member.
+
+## CI usage
+
+`putnami cloud ci usage [--window <duration>]` prints the workspace's CI
+rollup over the window, seven days by default. After the runs and the spend,
+it prints the pull requests merged into the workspace's repository: how many
+merged, how many needed a person, how many had a declaration change approved
+at their head, the share whose verdict is verified (for example
+`verified: 12 of 40 merges (30%)`, omitted when nothing merged), and the
+merges by verdict level. Every counted merge counts at exactly one level, so
+the share is over the merges counted. A share that rounds to 100% while one
+merge is not verified prints 99%, and one that rounds to 0% while one is
+prints `<1%`. A `(lower bound)` title means some merges of the window are not
+counted: the window starts before merges began to be recorded, or it holds
+more than 1,000 merges. It then prints the deployment runs of every
+environment per UTC day, oldest first, with the ones that settled ready and
+the ones that failed. When a read of the merges, the deploys or the merge
+efficacy failed, `usage` prints one line in its place, for example
+`merges: could not be read; try again later`. `--output=json` carries the `merges`, `deploys` and `efficacy`
+members and the `mergesUnavailable`, `deploysUnavailable` and
+`efficacyUnavailable` flags as the server sent them.
+
 ## Live workspace CI settings
 
 `putnami cloud ci enable` creates or enables the current workspace's operational
@@ -564,7 +595,8 @@ putnami cloud channels follow <namespace> <stable|canary|rs_id>  # what the work
 putnami cloud ci init|validate|fmt|explain         # author putnami.ci.json
 putnami cloud ci report --conclusion success       # report a delivery-run outcome
 putnami cloud ci status                            # CI readiness checks, queue, last run reuse, runs and spend over 7 days
-putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, and the release-set members it reused
+putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, its verdict, and the release-set members it reused
+putnami cloud ci usage [--window <duration>]       # runs, spend, billed cost, merges by verdict, and deploys over the window
 putnami cloud cache [status]                       # the build cache config, its identity, and the reuse of the last CI run
 putnami cloud cache disable [--remove]             # disable (enabled:false) or delete the cache config
 putnami cloud source connect [--repo owner/name] [--replace]  # browser-assisted GitHub authorization; structured mode requires --repo
