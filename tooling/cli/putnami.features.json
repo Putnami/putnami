@@ -1656,6 +1656,21 @@
           }
         },
         {
+          "id": "a-flag-takes-its-ci-default-when-ci-is-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-ci-default-replaces-the-default-when-ci-is-set",
+              "an-explicit-flag-wins-over-the-ci-default",
+              "a-flag-with-a-ci-default-keys-only-the-tasks-that-declare-it"
+            ]
+          }
+        },
+        {
           "id": "a-step-reads-the-changed-files",
           "stage": "coded",
           "evidenceKinds": [

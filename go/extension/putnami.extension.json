@@ -52,6 +52,7 @@
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
         "skip-deps": { "type": "boolean", "default": false, "description": "Skip dependency refresh" },
+        "tidy": { "type": "boolean", "default": true, "ciDefault": false, "description": "Run `go mod tidy` before compiling. Off, build checks that go.mod and go.sum are tidy with `go mod tidy -diff`, writes neither, and fails with the diff. Off by default when CI is set." },
         "readonly": { "type": "boolean", "default": false, "description": "Use module download mode readonly" },
         "mod": { "type": "string", "description": "Module download mode: readonly, vendor, or mod" },
         "target": { "type": "string", "short": "-t", "description": "Cross-compile for one platform instead of the host (GOOS/GOARCH, e.g., linux/amd64). Wins over `platforms`." },
@@ -99,7 +100,12 @@
           "id": "tidy",
           "task": "build-tidy",
           "dependsOn": ["^tidy", "config-merge"],
-          "if": "!params.skip-deps"
+          "if": "!params.skip-deps && params.tidy"
+        },
+        {
+          "id": "tidy-check",
+          "task": "build-tidy-check",
+          "if": "!params.skip-deps && !params.tidy"
         },
         {
           "id": "generate",
@@ -221,7 +227,8 @@
         "fix": {
           "type": "boolean",
           "default": true,
-          "description": "Auto-fix issues where possible (golangci-lint only)"
+          "ciDefault": false,
+          "description": "Auto-fix issues where possible (golangci-lint only). Off by default when CI is set: lint then writes no source and names the command that applies the fixes."
         },
         "config": { "type": "string", "description": "Custom config path for golangci-lint" },
         "new": {
@@ -903,6 +910,34 @@
       },
       "outputs": {
         "data": { "description": "Tidy result" }
+      },
+      "cache": {
+        "noOutput": true,
+        "enabled": true
+      },
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-tidy-check": {
+      "description": "Check that the project's go.mod and go.sum are tidy with `go mod tidy -diff`, the read-only counterpart of build-tidy that build runs with --tidy=false. It writes no file, so it declares no source mutation and orders no reader of the project after it. A diff fails the task and names the command that applies it. GOPROXY and PUTNAMI_OFFLINE_DEPENDENCIES are cache-key inputs for the reason build-tidy states: with module downloads disabled, the check is the same no-op. A check that could not resolve the module graph is an uncacheable skip, so a network failure is never recorded.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["build", "--phase", "tidy-check"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "inputs": {
+        "modules": { "from": "project", "files": ["go.mod", "go.sum"] },
+        "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
+        "GOPROXY": { "from": "env" },
+        "PUTNAMI_OFFLINE_DEPENDENCIES": { "from": "env" },
+        "extensionVersion": { "from": "runtime" }
+      },
+      "outputs": {
+        "data": { "description": "Tidy check result" }
       },
       "cache": {
         "noOutput": true,

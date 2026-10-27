@@ -347,6 +347,22 @@
           }
         },
         {
+          "id": "a-check-run-writes-no-source",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "with-ci-set-lint-and-build-schedule-no-step-that-writes-sources",
+              "an-untidy-module-fails-the-check-and-names-the-command-that-tidies-it",
+              "a-tidy-module-passes-the-check",
+              "a-read-only-lint-failure-names-the-command-that-applies-the-fixes"
+            ]
+          }
+        },
+        {
           "id": "image-input-producers",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -139,6 +139,9 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 					result := parse.LintErrors(outStr, ctx.WorkspaceRoot, ctx.Project.FullPath, emit)
 					totalErrors += result.Errors
 					totalFiles += result.Files
+					if !fix {
+						emit.Diagnostic("info", fixHint(ctx.Project.Name), "", 0)
+					}
 				}
 				emit.PhaseEnd("golangci-lint", "failed")
 			}
@@ -274,6 +277,13 @@ func parseLintOptions(params pctx.Params, args []string) lintOptions {
 		skipGuard: cli.FlagBool(flags, skipGuardParam,
 			params.Bool(skipGuardParam, true, "skipGuard")),
 	}
+}
+
+// fixHint names the command that applies the fixes a read-only golangci-lint
+// run reports. A run is read-only with --fix=false, the default when CI is set.
+func fixHint(project string) string {
+	return "golangci-lint applies the fixes it can with --fix, the default outside CI: run `putnami lint --fix --projects " +
+		project + "` and commit the result"
 }
 
 // skipGuardParam turns the skip guard off when false. It rides with the

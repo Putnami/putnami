@@ -153,6 +153,7 @@ Commands only activate for projects that match `activationFiles` patterns. If no
 | `short` | `string?` | Short alias (e.g., `"-r"`) |
 | `description` | `string?` | Help text |
 | `default` | `any?` | Default value |
+| `ciDefault` | `any?` | Default value when the `CI` environment variable is set. The flag then keys only the tasks that declare it as an input |
 | `required` | `boolean?` | Whether the flag must be provided |
 | `choices` | `string[]?` | Valid values for `string` or `array` types |
 

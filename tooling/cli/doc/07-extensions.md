@@ -128,7 +128,7 @@ Commands are the public API of an extension — they map to CLI job commands lik
 | `priority` | `int` | Higher priority runs earlier in the deterministic contributor order when multiple extensions provide the same command |
 | `quiet` | `bool` | Suppress from job recap output |
 | `traits` | `CommandTraits` | Orchestration hints that replace the verb's default traits wholesale: `heavy`, `requiresRunnable`, `injectPublishChannels` and `sideEffects`. From CLI contract 11, `kind` (`verification`, `criteria`, `diagnostics` or `files`) says what the host reads from the command's results, `workload` (`serve` or `once`) how it runs, and `rewritesSources` and `consumesReleaseSet` its effects; a batchable task's `batchable.kind` and `batchable.phase` describe its shared invocation. The CLI reads `kind`, `workload`, `rewritesSources`, `batchable.kind` and `batchable.phase`, not yet `consumesReleaseSet`, and a manifest that declares any of them requires contract 11 — see [Command Kinds](../../../protocols/extension/doc/06-verbs.md#command-kinds) |
-| `flags` | `map[string]FlagDef` | Additional CLI flags this command accepts |
+| `flags` | `map[string]FlagDef` | Additional CLI flags this command accepts. A flag's `ciDefault` replaces its `default` when the `CI` environment variable is set |
 | `defaults` | `map[string]string` | Default parameter values |
 | `run` | `PipelineStep[]` | Pipeline steps forming a DAG |
 | `outputs` | `map[string]Binding` | Output bindings extracted from step results |

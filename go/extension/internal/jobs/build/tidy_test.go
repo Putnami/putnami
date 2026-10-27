@@ -564,3 +564,91 @@ func captureEvents(t *testing.T, fn func(emit *jsonl.Emitter)) []map[string]any 
 	}
 	return events
 }
+
+// --- tidy-check ---
+//
+// A build run with --tidy=false, the default when CI is set, checks that the
+// module files are tidy and writes neither of them.
+
+const checkRunRequirement = "a-check-run-writes-no-source"
+
+// runTidyCheckIn runs the tidy-check phase on a module of its own and returns
+// the status and the events it emitted.
+func runTidyCheckIn(t *testing.T, dir string) (string, []map[string]any) {
+	t.Helper()
+	if _, err := toolchain.ResolveGo(); err != nil {
+		t.Skipf("go toolchain unavailable: %v", err)
+	}
+	t.Setenv("GOWORK", "off")
+	t.Setenv("GOFLAGS", "")
+	t.Setenv("GOPROXY", "file://"+filepath.ToSlash(t.TempDir()))
+	var status string
+	events := captureEvents(t, func(emit *jsonl.Emitter) {
+		var err error
+		status, _, err = Run(&pctx.Context{
+			Project: pctx.Project{Name: "app", FullPath: dir},
+		}, emit, []string{"--phase", "tidy-check"})
+		if err != nil {
+			t.Errorf("Run tidy-check: %v", err)
+		}
+	})
+	return status, events
+}
+
+func TestRunTidyCheck_AnUntidyModuleFailsNamingTheCommand(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", checkRunRequirement,
+		"an-untidy-module-fails-the-check-and-names-the-command-that-tidies-it")
+	dir := t.TempDir()
+	// Tidy drops the requirement no package imports, without a download.
+	untidy := "module example.com/app\n\ngo 1.24\n\nrequire example.com/dep v1.0.0\n"
+	writeTidyFile(t, dir, "go.mod", untidy)
+	writeTidyFile(t, dir, "main.go", "package main\n\nfunc main() {}\n")
+
+	status, events := runTidyCheckIn(t, dir)
+
+	if status != "FAILED" {
+		t.Fatalf("status = %q, want FAILED for an untidy go.mod", status)
+	}
+	var named bool
+	for _, ev := range events {
+		if ev["type"] != "diagnostic" {
+			continue
+		}
+		if msg, _ := ev["message"].(string); strings.Contains(msg, "putnami build --tidy --projects app") {
+			named = true
+		}
+	}
+	if !named {
+		t.Errorf("no diagnostic names `putnami build --tidy --projects app`, got %+v", events)
+	}
+	if got := readTidyFile(t, dir, "go.mod"); got != untidy {
+		t.Errorf("go.mod = %q, want the content the check found: %q", got, untidy)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "go.sum")); !os.IsNotExist(err) {
+		t.Errorf("go.sum stat = %v, want the file the check found: absent", err)
+	}
+}
+
+func TestRunTidyCheck_ATidyModulePasses(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", checkRunRequirement, "a-tidy-module-passes-the-check")
+	dir := t.TempDir()
+	writeTidyFile(t, dir, "go.mod", "module example.com/app\n\ngo 1.24\n")
+	writeTidyFile(t, dir, "main.go", "package main\n\nfunc main() {}\n")
+
+	status, events := runTidyCheckIn(t, dir)
+
+	if status != "OK" {
+		t.Fatalf("status = %q, want OK for a tidy go.mod; events %+v", status, events)
+	}
+}
+
+func TestTidyCheckMessage_CarriesTheDiff(t *testing.T) {
+	dir := t.TempDir()
+	writeTidyFile(t, dir, "go.mod", "module example.com/app\n")
+	msg := tidyCheckMessage("app", dir, "--- go.mod\n+++ go.mod\n+go 1.26\n")
+	for _, want := range []string{"example.com/app is not tidy", "putnami build --tidy --projects app", "+go 1.26"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message %q lacks %q", msg, want)
+		}
+	}
+}

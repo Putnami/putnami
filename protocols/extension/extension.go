@@ -1036,12 +1036,26 @@ func DeriveTaskCacheKey(inputs map[string]TaskInputPort) TaskCacheKey {
 
 // FlagDefinition describes a CLI flag declared in a manifest.
 type FlagDefinition struct {
-	Type        string   `json:"type"`
-	Short       string   `json:"short,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Default     any      `json:"default,omitempty"`
-	Required    bool     `json:"required,omitempty"`
-	Choices     []string `json:"choices,omitempty"`
+	Type        string `json:"type"`
+	Short       string `json:"short,omitempty"`
+	Description string `json:"description,omitempty"`
+	Default     any    `json:"default,omitempty"`
+	// CIDefault replaces Default when the CI environment variable is set, so a
+	// check run in CI can default to a read-only step. A flag that declares it
+	// keys only the tasks that declare it as an input: keying every task of
+	// the command would split each of them between CI and local runs.
+	CIDefault any      `json:"ciDefault,omitempty"`
+	Required  bool     `json:"required,omitempty"`
+	Choices   []string `json:"choices,omitempty"`
+}
+
+// DefaultFor returns the default a run uses: CIDefault when ci is true and the
+// flag declares one, Default otherwise.
+func (f FlagDefinition) DefaultFor(ci bool) any {
+	if ci && f.CIDefault != nil {
+		return f.CIDefault
+	}
+	return f.Default
 }
 
 // InputBinding is a union type for step input wiring.

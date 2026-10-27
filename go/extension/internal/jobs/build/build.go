@@ -36,6 +36,7 @@ import (
 //     archive matrix, and channel scoping owns narrowing it per channel.
 const (
 	phaseTidy         = "tidy"
+	phaseTidyCheck    = "tidy-check"
 	phaseCompile      = "compile"
 	phaseCrossCompile = "cross-compile"
 )
@@ -105,6 +106,14 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	goBinary, err := toolchain.ResolveGo()
 	if err != nil {
 		return "FAILED", nil, err
+	}
+
+	// --- Phase: tidy-check ---
+	// The read-only counterpart of tidy, which a build runs with --tidy=false
+	// (the default when CI is set): it reports an untidy go.mod or go.sum and
+	// never writes either.
+	if phase == phaseTidyCheck {
+		return runTidyCheck(ctx, emit, goBinary)
 	}
 
 	// --- Phase: tidy ---
@@ -729,6 +738,51 @@ func copyFile(src, dst string) error {
 // command. It is a log rather than a diagnostic: a run configured to resolve no
 // module is doing what it was asked, on every project it selects.
 const tidyOfflineMessage = "module downloads are disabled (GOPROXY=off): go mod tidy is not run and go.mod/go.sum are left as committed"
+
+// runTidyCheck runs `go mod tidy -diff`, which prints the changes tidy would
+// make and writes nothing. A diff fails the task and names the command that
+// applies it. A check that could not resolve the module graph is a warning and
+// an uncacheable SKIP, like a failed tidy, so a network failure is never
+// recorded. With module downloads disabled, the check is the same no-op as tidy.
+func runTidyCheck(ctx *pctx.Context, emit *jsonl.Emitter, goBinary string) (string, map[string]any, error) {
+	env := toolchain.WorkspaceBuildEnv(os.Environ(), moduleRoot(ctx), goBinary)
+	if toolchain.ModuleDownloadsDisabled(env) {
+		emit.Log("info", tidyOfflineMessage)
+		return "OK", nil, nil
+	}
+	emit.PhaseStart("setup")
+	cmd := exec.Command(goBinary, "mod", "tidy", "-diff")
+	cmd.Dir = ctx.Project.FullPath
+	cmd.Env = env
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
+	err := cmd.Run()
+	switch {
+	case err == nil:
+		emit.PhaseEnd("setup", "success")
+		return "OK", nil, nil
+	case strings.TrimSpace(stdout.String()) != "":
+		emit.Diagnostic("error", tidyCheckMessage(ctx.Project.Name, ctx.Project.FullPath, stdout.String()), "go.mod", 0)
+		emit.PhaseEnd("setup", "failed")
+		return "FAILED", nil, nil
+	default:
+		emit.Diagnostic("warning", tidyFailureMessage(ctx.WorkspaceRoot, ctx.Project.FullPath, stderr.String()), "", 0)
+		emit.PhaseEnd("setup", "skipped")
+		return "SKIP", nil, nil
+	}
+}
+
+// tidyCheckMessage reports an untidy module with the diff tidy would apply and
+// the command that applies it.
+func tidyCheckMessage(project, projectDir, diff string) string {
+	module := toolchain.GoModModulePath(filepath.Join(projectDir, "go.mod"))
+	if module == "" {
+		module = filepath.Base(projectDir)
+	}
+	return fmt.Sprintf("go.mod or go.sum of %s is not tidy: run `putnami build --tidy --projects %s` and commit the result\n%s",
+		module, project, strings.TrimSpace(diff))
+}
 
 // tidyFailureMessage builds the warning diagnostic for a failed `go mod tidy`.
 // Module-mode tidy ignores go.work, so a go.mod missing a relative replace for
