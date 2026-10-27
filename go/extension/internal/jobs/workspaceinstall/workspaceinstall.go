@@ -527,10 +527,10 @@ func (w *install) downloadWith(env []string, label, dir string, required bool) (
 	out, errOut, err := w.Split(env, w.GoBinary, "-C", dir, "list", "-m", "-f", buildListTemplate, "all")
 	if err != nil {
 		if required {
-			w.Emit.Diagnostic("error", "Failed to resolve the "+label+" build list: "+errOut+w.workspaceModuleHint(errOut), "", 0)
+			w.Emit.Diagnostic("error", "Failed to resolve the "+label+" build list: "+failureCause(errOut, err)+w.workspaceModuleHint(errOut), "", 0)
 			return 0, false
 		}
-		w.Emit.Log("warn", "Skipping the "+label+" build list: "+errOut)
+		w.Emit.Log("warn", "Skipping the "+label+" build list: "+failureCause(errOut, err))
 		return 0, true
 	}
 
@@ -555,11 +555,21 @@ func (w *install) downloadWith(env []string, label, dir string, required bool) (
 		end := min(start+downloadBatch, len(coordinates))
 		args := append([]string{"-C", dir, "mod", "download"}, coordinates[start:end]...)
 		if output, err := w.Combined(env, w.GoBinary, args...); err != nil {
-			w.Emit.Diagnostic("error", "Failed to download the "+label+" build list: "+output, "", 0)
+			w.Emit.Diagnostic("error", "Failed to download the "+label+" build list: "+failureCause(output, err), "", 0)
 			return 0, false
 		}
 	}
 	return len(coordinates), true
+}
+
+// failureCause is what a failed go command said or, when it said nothing, its
+// error: a command that could not start, or that a signal ended, writes
+// nothing, and its error is then the only cause there is.
+func failureCause(output string, err error) string {
+	if output != "" || err == nil {
+		return output
+	}
+	return err.Error()
 }
 
 func sortedUnique(values []string) []string {
