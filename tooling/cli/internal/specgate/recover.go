@@ -15,15 +15,18 @@ import (
 //
 // A spec-owning project's requirements are attested by `spectest.Proves` calls
 // that live wherever the code they protect lives — routinely NOT in the owner
-// itself. Two shapes occur, and both are real in this repository: a library the
-// owner depends on (a workload's requirement proven by its core library), and a
+// itself. Three shapes occur, and all are real in this repository: a library the
+// owner depends on (a workload's requirement proven by its core library), a
 // direct dependent that implements the owner's contract
 // (`architecture/executable-contracts` is owned by protocols/architecture and
 // proven by tooling/sdd-extension; `go/api-contracts` is owned by
-// go/framework/api and proven by openapi, proto and grpc). Under a narrowed
-// selection (`--impacted`, `--projects`) the planner schedules neither shape's
-// `test~test`, so no observation report exists for them and the owner's
-// requirements read as check-not-observed even though nothing regressed.
+// go/framework/api and proven by openapi, proto and grpc), and a project that
+// names one of the owner's features as its feature authority (the CLI's install
+// and smoke script tests, split out so that only the scripts key them). Under a
+// narrowed selection (`--impacted`, `--projects`) the planner schedules none of
+// these `test~test` jobs, so no observation report exists for them and the
+// owner's requirements read as check-not-observed even though nothing
+// regressed.
 //
 // The fix does NOT widen the plan and does NOT add a second authored
 // declaration of who attests what. It reads the observation the attesting
@@ -45,8 +48,9 @@ import (
 // LAYERING. This package stays the policy half: it decides WHEN to ask (only
 // after an ordinary in-session join left something unresolved — a fully green
 // run pays nothing), WHICH projects may be asked (the owner's transitive
-// dependency closure plus its DIRECT dependents — see candidates for why those
-// two radii differ), and what the answer means. HOW to turn a project into
+// dependency closure, its DIRECT dependents, and the projects whose feature
+// authority is one of its features — see candidates for why), and what the
+// answer means. HOW to turn a project into
 // cache bytes — plan, key, look the entry up — belongs to the engine, which
 // already owns the run's planner, its command params and its one memoized cache
 // manager.
@@ -167,22 +171,23 @@ func newEvidenceSource(ws *workspace.Workspace, planned []*jobs.ScheduledJob, re
 }
 
 // forProject returns the recovered evidence for one spec-owning project,
-// computing it on first use. Two specs of the same project share one lookup.
-func (source *evidenceSource) forProject(projectID string) *recoveredEvidence {
+// computing it on first use. Two specs of the same project share one lookup, so
+// owned is the set of every feature the project's projection declares.
+func (source *evidenceSource) forProject(projectID string, owned map[string]bool) *recoveredEvidence {
 	if source == nil {
 		return nil
 	}
 	if cached, found := source.resolved[projectID]; found {
 		return cached
 	}
-	evidence := source.resolve(projectID)
+	evidence := source.resolve(projectID, owned)
 	source.resolved[projectID] = evidence
 	return evidence
 }
 
-func (source *evidenceSource) resolve(projectID string) *recoveredEvidence {
+func (source *evidenceSource) resolve(projectID string, owned map[string]bool) *recoveredEvidence {
 	evidence := &recoveredEvidence{reportsByFeature: map[string][]features.VerificationReportRef{}}
-	candidates := source.candidates(projectID)
+	candidates := source.candidates(projectID, owned)
 	evidence.candidates = len(candidates)
 	if len(candidates) == 0 {
 		return evidence
@@ -242,12 +247,14 @@ func (source *evidenceSource) resolve(projectID string) *recoveredEvidence {
 }
 
 // candidates is the closed set of projects that may be asked for a spec-owning
-// project's missing evidence: its TRANSITIVE dependency closure plus its DIRECT
-// dependents, minus every project whose report producer this session already
+// project's missing evidence: its TRANSITIVE dependency closure, its DIRECT
+// dependents, and every project whose featureAuthority.owner names a feature in
+// owned, minus every project whose report producer this session already
 // planned (see jobs.ProducesVerificationReport).
 //
-// The asymmetry is the whole rule, and it is not a compromise between two
-// arbitrary radii — the two directions attest for two different reasons.
+// The asymmetry between the first two is the whole graph rule, and it is not a
+// compromise between two arbitrary radii — the two directions attest for two
+// different reasons.
 //
 // A DEPENDENCY can attest because the owner's own tests exercise it: a
 // `spectest.Proves` call can only observe code that runs, and the code a
@@ -271,7 +278,15 @@ func (source *evidenceSource) resolve(projectID string) *recoveredEvidence {
 // widest framework library). Keying a bounded set on a path that only runs when
 // the gate is already unresolved is affordable; keying the workspace is the cost
 // `--impacted` exists to avoid.
-func (source *evidenceSource) candidates(projectID string) []*workspace.Project {
+//
+// A FEATURE-AUTHORITY project can attest because it declared, in its own
+// manifest, that its user-facing feature is one the owner declares. That is the
+// shape of a test-only project split out of the owner so that its key holds
+// only the files its tests read: it shares no dependency edge with the owner on
+// purpose, because an edge would fold the owner's sources into its key. The set
+// is bounded by the declarations, and a declaration naming a feature the owner
+// does not declare admits nothing.
+func (source *evidenceSource) candidates(projectID string, owned map[string]bool) []*workspace.Project {
 	if source.ws.Graph == nil {
 		return nil
 	}
@@ -293,6 +308,15 @@ func (source *evidenceSource) candidates(projectID string) []*workspace.Project 
 	// project declares the dependency more than once; add dedupes.
 	for _, id := range source.ws.Graph.DependentsOf(projectID) {
 		add(id)
+	}
+	for _, project := range source.ws.Projects {
+		if project == nil || project.ID == projectID || project.Config == nil ||
+			project.Config.FeatureAuthority == nil {
+			continue
+		}
+		if owned[project.Config.FeatureAuthority.Owner] {
+			add(project.ID)
+		}
 	}
 	// The engine's lookup order — and therefore its diagnostics and the report
 	// references it produces — must not depend on graph insertion order.

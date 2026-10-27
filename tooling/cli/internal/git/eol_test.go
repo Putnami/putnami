@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -124,5 +125,21 @@ func TestHasLFPolicy_ReadsTheAttributesGitApplies(t *testing.T) {
 	}
 	if ok, err := HasLFPolicy(dir, "README.md"); err != nil || !ok {
 		t.Fatalf("with the LF policy: ok=%v err=%v, want true", ok, err)
+	}
+}
+
+// TestReleaseSmokeRequiresTheLFPolicy pins the Windows release smoke to the
+// line-ending policy the CLI writes: smoke-check-release.ps1 requires
+// LFPolicyAttributes in a fresh workspace's .gitattributes. The script's own
+// tests live in @putnami/install-scripts, which does not depend on the CLI, so
+// this test is the one that sees both sides.
+func TestReleaseSmokeRequiresTheLFPolicy(t *testing.T) {
+	script, err := os.ReadFile(filepath.Join("..", "..", "scripts", "smoke-check-release.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "@('.gitattributes', '" + LFPolicyAttributes + "')"
+	if !strings.Contains(string(script), want) {
+		t.Fatalf("smoke-check-release.ps1 does not require %q in .gitattributes; update it with LFPolicyAttributes", LFPolicyAttributes)
 	}
 }

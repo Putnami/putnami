@@ -73,7 +73,7 @@ func smokeScriptPath(t *testing.T) string {
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	script := filepath.Join(filepath.Dir(thisFile), "..", "..", "scripts", "smoke-check-release.sh")
+	script := filepath.Join(filepath.Dir(thisFile), "..", "cli", "scripts", "smoke-check-release.sh")
 	if _, err := os.Stat(script); err != nil {
 		t.Fatalf("smoke-check-release.sh not found: %v", err)
 	}
@@ -82,10 +82,10 @@ func smokeScriptPath(t *testing.T) string {
 
 // stubCLIVersionOnly answers --version and refuses everything else, so the smoke
 // stops at its first real CLI command instead of waiting out the serve deadline.
-func stubCLIVersionOnly(version string) []byte {
+func stubCLIVersionOnly() []byte {
 	return []byte("#!/bin/sh\n" +
 		"if [ \"$1\" = \"--version\" ]; then\n" +
-		"  echo \"Putnami   " + version + "\"\n" +
+		"  echo \"Putnami   " + stubVersion + "\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
 		"echo \"stub cli: $* is not implemented\" >&2\n" +
@@ -95,7 +95,7 @@ func stubCLIVersionOnly(version string) []byte {
 func stubCLIWithNoisyInitFailure(version string) []byte {
 	return []byte("#!/bin/sh\n" +
 		"if [ \"$1\" = \"--version\" ]; then\n" +
-		"  echo \"Putnami   " + version + "\"\n" +
+		"  echo \"Putnami   " + stubVersion + "\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
 		"i=0\n" +
@@ -497,7 +497,7 @@ func TestSmokeRejectsGeneratedPackageRegistryCredentials(t *testing.T) {
 
 func TestSmokeInstallsThroughTheInstallerAndDiscoversTheCommand(t *testing.T) {
 	requireBash(t)
-	body := stubCLIVersionOnly(stubVersion)
+	body := stubCLIVersionOnly()
 	server := newRegistry(t, registryOptions{
 		body:      body,
 		integrity: "sha256:" + sha256Hex(body),
@@ -756,7 +756,7 @@ func TestSmokeCapturesOnlyBoundedOptInFailureDiagnostics(t *testing.T) {
 
 func TestSmokeKeepsRelativeDiagnosticsOutsideTheRemovedWorkdir(t *testing.T) {
 	requireBash(t)
-	body := stubCLIVersionOnly(stubVersion)
+	body := stubCLIVersionOnly()
 	server := newRegistry(t, registryOptions{
 		body:      body,
 		integrity: "sha256:" + sha256Hex(body),
@@ -776,7 +776,7 @@ func TestSmokeKeepsRelativeDiagnosticsOutsideTheRemovedWorkdir(t *testing.T) {
 
 func TestSmokeFailsTheReleaseWhenNoDigestIsAdvertised(t *testing.T) {
 	requireBash(t)
-	body := stubCLIVersionOnly(stubVersion)
+	body := stubCLIVersionOnly()
 	server := newRegistry(t, registryOptions{body: body, resolved: stubVersion})
 
 	res := runSmoke(t, server.URL)
@@ -790,7 +790,7 @@ func TestSmokeFailsTheReleaseWhenNoDigestIsAdvertised(t *testing.T) {
 
 func TestSmokeFailsTheReleaseWhenTheAdvertisedDigestDoesNotMatch(t *testing.T) {
 	requireBash(t)
-	body := stubCLIVersionOnly(stubVersion)
+	body := stubCLIVersionOnly()
 	server := newRegistry(t, registryOptions{
 		body:      body,
 		integrity: "sha256:" + strings.Repeat("c", 64),
@@ -810,7 +810,7 @@ func TestSmokeFailsTheReleaseWhenTheAdvertisedDigestDoesNotMatch(t *testing.T) {
 // channel resolved a version, but the installed binary reported an older one.
 func TestSmokeFailsTheReleaseOnAStaleStamp(t *testing.T) {
 	requireBash(t)
-	body := stubCLIVersionOnly(stubVersion)
+	body := stubCLIVersionOnly()
 	server := newRegistry(t, registryOptions{
 		body:      body,
 		integrity: "sha256:" + sha256Hex(body),
@@ -837,7 +837,7 @@ func TestSmokeFailsTheReleaseOnAStaleStamp(t *testing.T) {
 // release that behaved.
 func TestSmokeFailsTheReleaseWhenTheInstallerEscalates(t *testing.T) {
 	requireBash(t)
-	body := stubCLIVersionOnly(stubVersion)
+	body := stubCLIVersionOnly()
 	server := newRegistry(t, registryOptions{
 		body:      body,
 		integrity: "sha256:" + sha256Hex(body),

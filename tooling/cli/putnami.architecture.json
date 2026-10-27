@@ -7,6 +7,7 @@
     "/tooling/cli",
     "/tooling/cli-documents",
     "/tooling/cli-model",
+    "/tooling/install-scripts",
     "/tooling/windows-vet"
   ],
   "owns": [
@@ -67,6 +68,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
           "producerProject": "/tooling/extension-sdk"
         }
       ],
@@ -384,6 +390,96 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/workspace"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
           "producerProject": "/protocols/workspace"
         },
         {

@@ -103,6 +103,7 @@ use (
 	./tooling/dev
 	./tooling/extension-sdk
 	./tooling/github-collaboration
+	./tooling/install-scripts
 	./tooling/local-collaboration
 	./tooling/memory-store
 	./tooling/scaffold

@@ -117,7 +117,7 @@ func firstUseScriptPath(t *testing.T) string {
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	script := filepath.Join(filepath.Dir(thisFile), "..", "..", "scripts", "smoke-first-use.sh")
+	script := filepath.Join(filepath.Dir(thisFile), "..", "cli", "scripts", "smoke-first-use.sh")
 	if _, err := os.Stat(script); err != nil {
 		t.Fatalf("smoke-first-use.sh not found: %v", err)
 	}

@@ -119,7 +119,7 @@
     },
     {
       "id": "spec-gate-evidence-scope",
-      "text": "A selected project's requirements resolve from observations its transitive dependencies and its DIRECT dependents already published: an attester the run did not plan is answered from its report producer's cache entry, provenance still contained in the reporting project. Transitive dependents stay out of scope. A consulted source that did not support a check still blocks under enforce, as does an exhausted scope; a check no reachable source could report is recorded unobserved and warned, never blocked."
+      "text": "A selected project's requirements resolve from observations its transitive dependencies, its DIRECT dependents and the projects whose featureAuthority.owner is one of its features already published: an unplanned attester answers from its report producer's cache entry, provenance contained in the reporting project. Other projects stay out of scope. A consulted source that did not support a check, or an exhausted scope, still blocks under enforce; a check no reachable source could report is warned."
     },
     {
       "id": "declared-verification-producers",

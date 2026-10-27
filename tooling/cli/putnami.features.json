@@ -1068,6 +1068,8 @@
             "checks": [
               "an-unplanned-attester-resolves-from-its-cache-entry",
               "a-direct-dependent-attester-resolves-from-its-cache-entry",
+              "a-feature-authority-attester-resolves-from-its-cache-entry",
+              "a-feature-authority-of-another-feature-stays-out-of-the-candidate-set",
               "transitive-dependents-stay-out-of-the-candidate-set",
               "a-consulted-source-that-did-not-support-the-check-still-blocks",
               "an-exhausted-evidence-scope-blocks-and-says-so",
@@ -3301,7 +3303,8 @@
               "the-installer-follows-the-switch-contract",
               "a-running-cli-is-replaced-by-a-rename-aside",
               "a-failed-move-in-restores-the-old-binary",
-              "a-failed-restore-names-the-kept-binary"
+              "a-failed-restore-names-the-kept-binary",
+              "the-installer-keeps-the-old-binary-when-a-restore-fails"
             ]
           }
         },

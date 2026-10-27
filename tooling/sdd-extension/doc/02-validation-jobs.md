@@ -303,14 +303,15 @@ it is unchanged.
 
 **An attester's cache entry, only when the session left something unresolved.**
 A `spectest.Proves` call lives where the code it protects lives, which is
-routinely not the project that owns the spec. Two shapes occur:
+routinely not the project that owns the spec. Three shapes occur:
 
 | Shape | Example in this repository |
 |---|---|
 | a library the owner **depends on** | a workload's requirement proven by its core library |
 | a **direct dependent** that implements the owner's contract | `architecture/executable-contracts` (owned by `protocols/architecture`) proven by `@putnami/sdd`; `go/api-contracts` (owned by `go/framework/api`) proven by `openapi`, `proto`, `grpc` |
+| a project whose **`featureAuthority.owner`** names a feature the owner declares | the CLI's install and smoke script tests (`@putnami/install-scripts`), which prove `cli/first-use-path` and three other CLI features |
 
-A narrowed run (`--impacted`, `--projects`) plans neither shape's `test~test`, so
+A narrowed run (`--impacted`, `--projects`) plans none of these `test~test` jobs, so
 the requirement used to read `check-not-observed` on a run that had
 regressed nothing.
 
@@ -327,8 +328,9 @@ The invariant closes on the cache key, not on trust: an attester that changed is
 already selected by `--impacted` and runs, and one that did not change keeps its
 key, so the entry it published is the entry for exactly these inputs.
 
-Candidates are the spec-owning project's **transitive dependency closure plus its
-direct dependents**, and the lookup is **lazy**: a fully verified run performs no
+Candidates are the spec-owning project's **transitive dependency closure, its
+direct dependents, and the projects whose feature authority is one of its
+features**, and the lookup is **lazy**: a fully verified run performs no
 extra planning, no extra keying, and never touches the store. A project leaves
 the set only when the run planned the job that writes its report. A
 `test~generate` planned as a prerequisite does not count.
@@ -342,6 +344,13 @@ already a candidate, so transitive dependents stay out of scope. The direct set
 is bounded by fan-in: 31 projects for the widest spec owner in this workspace of
 147. See [ADR 0026](../../cli/doc/adr/0026-spec-gate-evidence-scope.md) for the
 measurements.
+
+A feature-authority project can attest because its own manifest declares that its
+user-facing feature is one the owner declares. It is a test-only project split out
+of the owner so that only the files its tests read key it, so it shares no
+dependency edge with the owner on purpose. A declaration that names another
+feature admits nothing. See
+[ADR 0081](../../cli/doc/adr/0081-a-feature-authority-project-attests-for-the-spec-owner.md).
 
 ## When nothing could be consulted
 

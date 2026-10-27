@@ -317,7 +317,7 @@ Job Object of ADR 0052 is the guarantee, and the command-line check is a sanity
 check. An answer on the freed port does not fail the leg, because an unrelated
 listener can take the port. Any failing leg prints bounded diagnostics;
 an automated run sets `SMOKE_DIAGNOSTICS_DIR` to retain the artifact bundle.
-The legs themselves are covered by `tooling/cli/internal/installscript`, which
+The legs themselves are covered by `tooling/install-scripts`, which
 points both served URLs at local test servers — see
 [Installing the CLI](22-installing-the-cli.md#the-release-smoke).
 
