@@ -10,6 +10,10 @@
   within a time bound, and fetches it into the local store only.
 - **Amended**: 2026-10-23, §5: a narrowed run with no cache to read warns on
   every unresolved check, and this repository's contributor CI is such a run.
+- **Amended**: 2026-10-27, §2, by
+  [ADR 0081](0081-a-feature-authority-project-attests-for-the-spec-owner.md): a
+  project whose `featureAuthority.owner` names a feature the owner declares is
+  also a candidate.
 - **Scope**: `@putnami/cli` spec gate (`internal/specgate`, the observation
   recovery in `internal/engine`) and the verification record of
   `protocols/features`

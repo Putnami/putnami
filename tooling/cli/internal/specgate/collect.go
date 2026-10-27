@@ -106,9 +106,13 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 			record.Groups = append(record.Groups, group)
 			continue
 		}
+		owned := make(map[string]bool, len(projection.Groups))
+		for _, criteria := range projection.Groups {
+			owned[criteria.Feature] = true
+		}
 		for _, criteria := range projection.Groups {
 			record.Groups = append(record.Groups, evaluateGroup(projectID, criteria, mode, source,
-				observations, reportsByFeature, at, evidence))
+				observations, reportsByFeature, at, evidence, owned))
 		}
 	}
 	// Nothing was projected and nothing was diagnosed. The record is empty when
@@ -125,11 +129,13 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 
 // evaluateGroup joins one spec's criteria with the session's observations, and
 // — only when that join leaves something unresolved — with the observations a
-// dependency's cache entry can still supply (recover.go).
+// dependency's cache entry can still supply (recover.go). owned is the set of
+// features the project's projection declares, which decides the projects that
+// name one of them as their feature authority.
 func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode features.VerificationMode,
 	source features.VerificationModeSource, observations []features.VerificationObservation,
 	reportsByFeature map[string][]features.VerificationReportRef, at time.Time,
-	evidence *evidenceSource) features.SpecVerificationGroup {
+	evidence *evidenceSource, owned map[string]bool) features.SpecVerificationGroup {
 	group := features.SpecVerificationGroup{
 		Project:    projectID,
 		Feature:    criteria.Feature,
@@ -156,7 +162,7 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 	// in-session join could not close, which is what keeps a fully green run
 	// free of any extra planning, keying or hashing.
 	if evidence != nil && unresolvedInSession(verdicts) {
-		recovered := evidence.forProject(projectID)
+		recovered := evidence.forProject(projectID, owned)
 		group.Diagnostics = append(group.Diagnostics, recovered.diagnostics...)
 		group.Unconsulted = unconsultedCandidates(recovered.unconsulted)
 		if len(recovered.observations) > 0 {

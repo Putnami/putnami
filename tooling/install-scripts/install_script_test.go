@@ -40,7 +40,7 @@ func installScriptPath(t *testing.T) string {
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	script := filepath.Join(filepath.Dir(thisFile), "..", "..", "scripts", "install.sh")
+	script := filepath.Join(filepath.Dir(thisFile), "..", "cli", "scripts", "install.sh")
 	if _, err := os.Stat(script); err != nil {
 		t.Fatalf("install.sh not found: %v", err)
 	}
@@ -197,19 +197,19 @@ func (e *env) set(key, value string) *env {
 	return e
 }
 
-func (e *env) prependPath(dir string) *env {
+func (e *env) prependPath(dir string) {
 	e.pathDirs = append([]string{dir}, e.pathDirs...)
-	return e
 }
 
 func (e *env) materialize() []string {
-	out := []string{
-		"PATH=" + strings.Join(e.pathDirs, string(os.PathListSeparator)),
-		"HOME=" + e.home,
+	out := make([]string, 0, 3+len(e.vars))
+	out = append(out,
+		"PATH="+strings.Join(e.pathDirs, string(os.PathListSeparator)),
+		"HOME="+e.home,
 		// An unknown shell keeps completion generation and profile edits out of
 		// the way of the behavior under test.
 		"SHELL=/bin/sh",
-	}
+	)
 	for k, v := range e.vars {
 		out = append(out, k+"="+v)
 	}
@@ -1037,7 +1037,7 @@ func TestReleaseSmokeGrepsStringsTheInstallerPrints(t *testing.T) {
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	smoke, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "..", "..", "scripts", "smoke-check-release.sh"))
+	smoke, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "..", "cli", "scripts", "smoke-check-release.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}

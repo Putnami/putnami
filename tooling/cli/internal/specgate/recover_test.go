@@ -312,6 +312,56 @@ func TestTransitiveDependentsStayOutOfScope(t *testing.T) {
 	}
 }
 
+// TestRecoveredObservationResolvesAFeatureAuthorityAttester covers a project
+// that shares no edge with the spec owner and names one of the owner's features
+// as its feature authority: a test-only project split out of the owner so that
+// only its own inputs key it.
+func TestRecoveredObservationResolvesAFeatureAuthorityAttester(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "spec-gate-evidence-scope",
+		"a-feature-authority-attester-resolves-from-its-cache-entry")
+	fixture := newAttestedFixture(t)
+	fixture.ws.Projects[1].Dependencies = nil
+	fixture.ws.Projects[0].Config.FeatureAuthority = &wsproto.ProjectFeatureAuthority{Owner: "billing/invoicing"}
+	fixture.rebuildGraph()
+
+	report := fixture.writeCachedReport(t, attestingReport("passed", "ledger_test.go"))
+	stub := &stubRecovery{answer: Recovery{Reports: []RecoveredReport{report}}}
+	group := soleGroup(t, fixture.collect(t, stub))
+
+	if len(stub.asked) != 1 || len(stub.asked[0]) != 1 || stub.asked[0][0] != "/ledger" {
+		t.Fatalf("candidates asked = %v, want the feature-authority project [/ledger]", stub.asked)
+	}
+	if got := requirementState(t, group, "issue"); got != features.RequirementVerified {
+		t.Fatalf("issue = %s, want verified from the feature-authority project's cached observation", got)
+	}
+	if group.Blocked {
+		t.Error("a requirement verified from a feature-authority project's cache still blocked")
+	}
+}
+
+// TestAFeatureAuthorityOfAnotherFeatureStaysOutOfScope pins that a declaration
+// admits a project only for an owner that declares the named feature.
+func TestAFeatureAuthorityOfAnotherFeatureStaysOutOfScope(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "spec-gate-evidence-scope",
+		"a-feature-authority-of-another-feature-stays-out-of-the-candidate-set")
+	fixture := newAttestedFixture(t)
+	fixture.ws.Projects[1].Dependencies = nil
+	fixture.ws.Projects[0].Config.FeatureAuthority = &wsproto.ProjectFeatureAuthority{Owner: "billing/refunds"}
+	fixture.rebuildGraph()
+
+	stub := &stubRecovery{}
+	fixture.collect(t, stub)
+	for _, asked := range stub.asked {
+		for _, id := range asked {
+			if id == "/ledger" {
+				t.Fatalf("a project naming another feature entered the candidate set: %v", asked)
+			}
+		}
+	}
+}
+
 // TestExhaustedScopeNamesItselfAndStillBlocks is review point 5: when every
 // project that could attest a check WAS in the run and none reported it, the
 // requirement is a genuine gap. It keeps blocking, and the reader is told the

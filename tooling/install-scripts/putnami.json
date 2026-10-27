@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/install-scripts",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "lint": {
+      "fix": false
+    },
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0,
+      "filePatterns": [
+        "../cli/scripts/**",
+        "../cli/doc/14-version-management.md",
+        "../cli/doc/22-installing-the-cli.md",
+        "../cli/internal/commands/versioncmd/version_switch.go",
+        "../extension-sdk/filelock/filelock_windows.go"
+      ]
+    }
+  },
+  "featureAuthority": {
+    "owner": "cli/first-use-path"
+  }
+}

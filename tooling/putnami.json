@@ -9,6 +9,7 @@
     "dev",
     "extension-sdk",
     "github-collaboration",
+    "install-scripts",
     "local-collaboration",
     "memory-store",
     "scaffold",

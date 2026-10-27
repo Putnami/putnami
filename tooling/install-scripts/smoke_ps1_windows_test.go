@@ -30,8 +30,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows/registry"
-
-	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 const smokeHelperEnv = "GO_WANT_SMOKE_CLI_HELPER"
@@ -98,7 +96,7 @@ func runSmokeStubPutnami(args []string) int {
 		return 0
 	case "init\x00--project\x00webapp\x00--extension\x00ts":
 		files := goldenPathFixture()
-		files[".gitattributes"] = git.LFPolicyAttributes
+		files[".gitattributes"] = lfPolicyAttributes
 		if err := writeFixture(files); err != nil {
 			fmt.Fprintln(os.Stderr, "smoke stub: "+err.Error())
 			return 4

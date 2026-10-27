@@ -963,7 +963,7 @@ func checkPS1SwitchKeepsTheOldBinary(src string) error {
 // the user can move it back before a later switch deletes it. Each mutation
 // below breaks one part of that, and each must be caught.
 func TestInstallPS1KeepsTheOldBinaryWhenARestoreFails(t *testing.T) {
-	spectest.Proves(t, "cli/windows-consumers", "one-binary-switch-on-windows", "a-failed-restore-names-the-kept-binary")
+	spectest.Proves(t, "cli/windows-consumers", "one-binary-switch-on-windows", "the-installer-keeps-the-old-binary-when-a-restore-fails")
 	src := readInstallPS1(t)
 	if err := checkPS1SwitchKeepsTheOldBinary(src); err != nil {
 		t.Fatalf("install.ps1 can lose the binary it moved aside: %v", err)
@@ -988,8 +988,11 @@ func TestInstallPS1KeepsTheOldBinaryWhenARestoreFails(t *testing.T) {
 			}
 		})
 	}
+}
 
-	// The same failure, run: the move-in and the restore both fail.
+// TestInstallPS1KeepsTheOldBinaryWhenARestoreFailsInARun runs the same failure
+// through PowerShell: the move-in and the restore both fail.
+func TestInstallPS1KeepsTheOldBinaryWhenARestoreFailsInARun(t *testing.T) {
 	requirePwsh(t)
 	registry, _, binary := defaultPS1Registry(t)
 	e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
@@ -1371,19 +1374,20 @@ func (e *psEnv) set(key, value string) *psEnv {
 func (e *psEnv) binDir() string { return filepath.Join(e.home, ".putnami", "bin") }
 
 func (e *psEnv) environ() []string {
-	out := []string{
-		"PATH=" + strings.Join(e.pathDirs, string(os.PathListSeparator)),
-		"HOME=" + e.home,
-		"USERPROFILE=" + e.home,
-		"TMPDIR=" + e.tmp,
-		"PUTNAMI_HARNESS_SCRIPT=" + e.script,
-		"PUTNAMI_HARNESS_STATE=" + e.state,
-		"PUTNAMI_TEST_STUB_LOG=" + e.stubLog,
+	out := make([]string, 0, 11+len(e.vars))
+	out = append(out,
+		"PATH="+strings.Join(e.pathDirs, string(os.PathListSeparator)),
+		"HOME="+e.home,
+		"USERPROFILE="+e.home,
+		"TMPDIR="+e.tmp,
+		"PUTNAMI_HARNESS_SCRIPT="+e.script,
+		"PUTNAMI_HARNESS_STATE="+e.state,
+		"PUTNAMI_TEST_STUB_LOG="+e.stubLog,
 		"POWERSHELL_TELEMETRY_OPTOUT=1",
 		"POWERSHELL_UPDATECHECK=Off",
 		"DOTNET_CLI_TELEMETRY_OPTOUT=1",
 		"DOTNET_EnableDiagnostics=0",
-	}
+	)
 	for k, v := range e.vars {
 		out = append(out, k+"="+v)
 	}

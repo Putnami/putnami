@@ -7,6 +7,7 @@
     "/tooling/cli",
     "/tooling/cli-documents",
     "/tooling/cli-model",
+    "/tooling/install-scripts",
     "/tooling/windows-vet"
   ],
   "owns": [
@@ -67,6 +68,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/tooling/extension-sdk"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
           "producerProject": "/tooling/extension-sdk"
         }
       ],
@@ -309,6 +315,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/cli-documents",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/install-scripts",
           "producerProject": "/protocols/features"
         },
         {

@@ -30,6 +30,7 @@ func authoredCLIDomain() *arch.Builder {
 			"/tooling/cli",
 			"/tooling/cli-documents",
 			"/tooling/cli-model",
+			"/tooling/install-scripts",
 			"/tooling/windows-vet",
 		).
 		Owns(
@@ -58,6 +59,7 @@ func authoredCLIDomain() *arch.Builder {
 				arch.Justification("The CLI and the extensions share one implementation of every contract both sides read or write, so the orchestrator and the extension that produced a document never disagree on it: release sets and package metadata (releaseset, pkgmeta), channel credentials (registrycred, privatebroker), recorded results, agent artifacts, context, profiles, architecture declarations, JSONL events, OCI and Docker publication, the source-v1 record of one worktree path (sourcebinding), and the fingerprint of a whole worktree (treefingerprint). A few packages are shared platform primitives instead: filelock, the one cross-process lock every Putnami process takes on the same files; scratch, the reclaimable scratch directory both sides create; proctree, which starts and stops a process tree the same way on every OS; dirlink, the directory link (a symbolic link on Unix, a junction on Windows); treearchive, which stages a tree and packs it into a reproducible .tar.gz without starting a process; envkeys, the environment-name rule (case-insensitive on Windows); and ownerperm, which restricts a private file to its owner (an access list on Windows). None of them carries an extension's behavior."),
 				arch.Bind("/tooling/cli", "/tooling/extension-sdk"),
 				arch.Bind("/tooling/cli-documents", "/tooling/extension-sdk"),
+				arch.Bind("/tooling/install-scripts", "/tooling/extension-sdk"),
 			),
 			arch.Reference("cli.protocol-contracts.v1", 1, arch.From("protocols", "protocols.wire-contracts.v1"),
 				arch.As("cli.protocol-contracts"),
@@ -109,6 +111,7 @@ func authoredCLIDomain() *arch.Builder {
 				arch.Bind("/tooling/cli-documents", "/protocols/events"),
 				arch.Bind("/tooling/cli-documents", "/protocols/extension"),
 				arch.Bind("/tooling/cli-documents", "/protocols/features"),
+				arch.Bind("/tooling/install-scripts", "/protocols/features"),
 				arch.Bind("/tooling/cli-documents", "/protocols/gomod"),
 				arch.Bind("/tooling/cli-documents", "/protocols/clientcontract"),
 				arch.Bind("/tooling/cli-documents", "/protocols/collaboration"),

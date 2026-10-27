@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 func smokePS1Path(t *testing.T) string {
@@ -406,8 +405,8 @@ func TestSmokePS1RequiresTheGeneratedWorkspaceOfTheShellSmoke(t *testing.T) {
 			t.Fatalf("smoke-check-release.ps1 does not require %s in %s", m[2], m[1])
 		}
 	}
-	if !strings.Contains(src, "@('.gitattributes', '"+git.LFPolicyAttributes+"')") {
-		t.Fatalf("smoke-check-release.ps1 does not require %q in .gitattributes", git.LFPolicyAttributes)
+	if !strings.Contains(src, "@('.gitattributes', '"+lfPolicyAttributes+"')") {
+		t.Fatalf("smoke-check-release.ps1 does not require %q in .gitattributes", lfPolicyAttributes)
 	}
 	files := regexp.MustCompile(`for path in \\\n\s+(putnami\.workspace\.json putnami\.lock\.json[^;]*); do\n\s+require_generated_file`).FindStringSubmatch(sh)
 	if files == nil {

@@ -131,7 +131,7 @@ describe('putnami.dev', () => {
      * is what `curl -fsSL https://putnami.dev/install.sh | bash` executes on a
      * machine with no way to audit it first. The behavior is specified in
      * tooling/cli/doc/22-installing-the-cli.md and decided in ADR 0012, and it
-     * is pinned by tooling/cli/internal/installscript — but that suite reads the
+     * is pinned by tooling/install-scripts — but that suite reads the
      * repository copy. These assertions cover the publishing seam: a
      * `generate.assets` change that shipped a stale or unverifying installer
      * would pass every CLI test and fail here.
@@ -196,7 +196,7 @@ describe('putnami.dev', () => {
     /**
      * `curl -fsSL "https://putnami.dev/install.sh?run=<command>" | bash`: the
      * same script with the command set in its one placeholder line. The
-     * installer side is pinned by tooling/cli/internal/installscript.
+     * installer side is pinned by tooling/install-scripts.
      */
     describe('install.sh?run=<command>', () => {
       const repositoryScript = () =>
@@ -303,7 +303,7 @@ describe('putnami.dev', () => {
 
     /**
      * The Windows counterpart of install.sh, what `irm https://putnami.dev/install.ps1 | iex`
-     * executes. tooling/cli/internal/installscript pins its behavior on the
+     * executes. tooling/install-scripts pins its behavior on the
      * repository copy; these assertions cover the publishing seam.
      */
     it('should serve an install.ps1 that still verifies what it downloads', async () => {
@@ -357,7 +357,7 @@ describe('putnami.dev', () => {
      * `irm "https://putnami.dev/install.ps1?run=<command>" | iex`: the Windows
      * installer with the command set in its one placeholder line, served like
      * the static script. The installer side is pinned by
-     * tooling/cli/internal/installscript.
+     * tooling/install-scripts.
      */
     describe('install.ps1?run=<command>', () => {
       const repositoryScript = () =>

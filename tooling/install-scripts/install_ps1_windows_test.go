@@ -29,7 +29,7 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 
-	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/sdk/extension/filelock"
 )
 
 const windowsE2EEnv = "PUTNAMI_INSTALLSCRIPT_WINDOWS_E2E"
@@ -449,7 +449,7 @@ func TestWindowsInstallPS1WaitsForTheSwitchLock(t *testing.T) {
 	if err := os.MkdirAll(h.binDir(), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	lock, err := flock.Acquire(filepath.Join(h.binDir(), ".putnami-switch.lock"), true, false)
+	lock, err := filelock.Acquire(filepath.Join(h.binDir(), ".putnami-switch.lock"), true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
