@@ -176,7 +176,8 @@ the other.
   against the schema rather than asserted in prose (`TestDrift_EventTypes`,
   `TestDrift_LogLevels`, `TestDrift_ResultStatuses`,
   `TestDrift_DiagnosticSeverities`, `TestDrift_PhaseActions`,
-  `TestDriftV2_EventTypes`, `TestDriftV2_ReadyVocabularies`), and
+  `TestDrift_CoverageGranularities`, `TestDriftV2_EventTypes`,
+  `TestDriftV2_ReadyVocabularies`), and
   `TestDriftV2_V1SchemaFrozen` pins that v1's schema still fixes `v` to 1 and
   still excludes the v2-only `ready` type — so v2 cannot widen v1. The
   corpus is 6 v1 streams and 14 v2 streams, with
@@ -188,16 +189,15 @@ the other.
 
 ## Specs and durable decisions
 
-There is deliberately **no user-facing feature or spec for this module**. This
-contract is the byte format two processes exchange; a user never chooses it,
-sees it, or asks for it. Minting a product feature per technical wire contract
-would create a promise with no user on the other end and a second authority
-beside the schemas.
-
-The user-facing surfaces that own the outcome are the CLI commands whose output
-these events become — `putnami build`, `putnami test`, `putnami serve` and the
-machine projections `--output=json` / `--output=jsonl`. A spec belongs with the
-change those surfaces are made for; this module records the wire decisions.
+The module owns the feature of its contract, `runtime/event-stream`, specified
+in [`specs/event-stream.json`](specs/event-stream.json). The tests here prove
+its requirements, and so do three implementations: the extension SDK's emitter
+(`tooling/extension-sdk/jsonl`), the TypeScript emitter and parser of
+`@putnami/runtime`, and the CLI's serve watcher. The emitter's wire
+conformance moved here from the SDK's own feature, `tooling/extension-authoring`,
+which keeps log forwarding and the rest of the authoring library. The CLI
+commands whose output these events become keep the features of what they
+deliver.
 
 Durable decisions recorded here:
 

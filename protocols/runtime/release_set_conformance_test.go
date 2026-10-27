@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestReleaseSetPublishOutcomeConformance(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-release-set-outcome-is-one-opaque-payload", "one-outcome-on-success-and-none-otherwise")
 	t.Run("success", func(t *testing.T) {
 		events := readReleaseSetFixture(t, "success.jsonl")
 		outcome, diagnostics := RequireReleaseSetPublishOutcome(events)
@@ -69,6 +71,7 @@ func TestReleaseSetPublishOutcomeConformance(t *testing.T) {
 }
 
 func TestReleaseSetPublishOutcomeRejectsInvalidResultLocations(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-release-set-outcome-is-one-opaque-payload", "one-outcome-on-success-and-none-otherwise")
 	failed := decodeReleaseSetStream(t, strings.Replace(
 		string(readReleaseSetFixtureBytes(t, "success.jsonl")), `"status":"OK"`, `"status":"FAILED"`, 1))
 	_, diagnostics := ReleaseSetPublishOutcome(failed)
@@ -84,6 +87,7 @@ func TestReleaseSetPublishOutcomeRejectsInvalidResultLocations(t *testing.T) {
 }
 
 func TestReleaseSetPublishOutcomeKeepsDistributionPayloadOpaque(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-release-set-outcome-is-one-opaque-payload", "the-outcome-stays-owned-by-distribution")
 	if outcome, diagnostics := ExtractReleaseSetPublishOutcome(nil); outcome != nil || len(diagnostics) != 0 {
 		t.Fatalf("nil result data = %#v, %v", outcome, diagnostics)
 	}
@@ -112,6 +116,7 @@ func TestReleaseSetPublishOutcomeKeepsDistributionPayloadOpaque(t *testing.T) {
 }
 
 func TestReleaseSetSchemaReferencesDistributionAuthority(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "a-release-set-outcome-is-one-opaque-payload", "the-outcome-stays-owned-by-distribution")
 	const authority = "https://putnami.dev/schemas/distribution-release-set-publish-outcome-v2.json"
 	for _, name := range []string{"event.json", "event-v2.json", "payloads.json"} {
 		data, err := os.ReadFile(filepath.Join("schemas", name))
