@@ -2,11 +2,9 @@ module go.putnami.dev/protocol/cli
 
 go 1.25.7
 
-require (
-	// features is TEST-ONLY: spectest binds the conformance tests to the
-	// requirements of cli/machine-contract.
-	go.putnami.dev/protocol/features v0.0.0
-)
+// features is TEST-ONLY: spectest binds the conformance tests to the
+// requirements of cli/machine-contract.
+require go.putnami.dev/protocol/features v0.0.0
 
 replace go.putnami.dev/protocol/capabilities => ../capabilities
 
