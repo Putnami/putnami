@@ -3,6 +3,7 @@
   "name": "putnami.dev",
   "tags": ["web", "ts"],
   "extensions": ["@putnami/typescript", "/tooling/sdd-extension"],
+  "dependencies": ["/protocols/sitecontent"],
   "options": {
     "@putnami/cloud:publish-migration": { "namespace": "putnami" },
     "@putnami/cloud:publish-config": { "namespace": "putnami" },

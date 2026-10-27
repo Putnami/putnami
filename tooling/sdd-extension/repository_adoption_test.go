@@ -156,6 +156,7 @@ var expectedEvidenceRows = []evidenceRow{
 	{Project: "/sites/putnami.dev", Import: "public-docs.application-runtime.v1", Mode: "reference"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.go-framework-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.method-documentation.v1", Mode: "snapshot"},
+	{Project: "/sites/putnami.dev", Import: "public-docs.protocol-contracts.v1", Mode: "reference"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.python-surface-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.typescript-framework-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.workspace-documentation.v1", Mode: "snapshot"},

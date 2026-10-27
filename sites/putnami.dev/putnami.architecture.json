@@ -126,6 +126,28 @@
       "justification": "The site publishes the spec-driven development method at public/docs/07-spec-driven-development by copying the /tooling/sdd-extension/doc tree verbatim at build time. The sdd domain owns the method's wording; the site owns only its placement in the published information architecture."
     },
     {
+      "id": "public-docs.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "public-docs.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/putnami.dev",
+          "producerProject": "/protocols/sitecontent"
+        }
+      ],
+      "justification": "putnami.dev implements the site-content-bundle/v1 contract that /protocols/sitecontent owns: it verifies and mounts content bundles by that contract's rules, and its tests prove the protocol's requirements. The protocols domain owns what the contract means; the site holds a reference to it and owns none of its meaning."
+    },
+    {
       "id": "public-docs.python-surface-documentation.v1",
       "version": 1,
       "from": {
