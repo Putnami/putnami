@@ -1,0 +1,117 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "oci",
+  "features": [
+    {
+      "id": "oci/registry-fast-path-contract",
+      "type": "feature",
+      "name": "OCI registry fast path and registry host contract",
+      "outcome": "A client tags every ref of a release in one call when a Putnami-managed registry advertises the fast path and falls back to the standard distribution API elsewhere, and every component derives the same registry host and scheme from an image repository",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-and-endpoints-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-1",
+              "the-endpoints-and-the-capability-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "the-fast-path-is-taken-only-when-advertised",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-capability-gate-needs-tag-digest-v1",
+              "the-extension-sdk-reads-anything-else-as-no-fast-path",
+              "the-extension-sdk-falls-back-to-the-standard-api"
+            ]
+          }
+        },
+        {
+          "id": "one-call-tags-every-ref",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-extension-sdk-sends-the-repository-digest-and-tags",
+              "the-extension-sdk-tags-every-ref-in-one-call",
+              "the-extension-sdk-fails-on-a-server-error"
+            ]
+          }
+        },
+        {
+          "id": "the-error-codes-are-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-error-codes-are-the-five-canonical-ones"
+            ]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "the-registry-host-rules-are-one-table",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-registry-host-case-gets-its-verdict",
+              "a-host-is-lowercased-first",
+              "the-extension-sdk-matches-go-containerregistry"
+            ]
+          }
+        },
+        {
+          "id": "consumers-read-the-host-by-the-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-normalizes-the-declared-registry-host",
+              "the-cli-sends-an-image-only-to-the-declared-host",
+              "the-cloud-provider-sends-an-image-to-its-repository-host"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

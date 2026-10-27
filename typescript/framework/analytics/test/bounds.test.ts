@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { bounded, MAX_UTM_LEN, utf8Bytes as clientUtf8Bytes } from '../src/client/bounds';
 import { utf8Bytes } from '../src/server/sanitize/vocabulary';
+
+// Each binding proves a requirement of the analytics protocol's feature
+// under a check of this package's own.
+const UTF8_BYTES = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'lengths-are-utf-8-bytes',
+  check: 'the-typescript-measure-counts-utf-8-bytes',
+};
 
 const SAMPLES = ['', '/docs', 'я'.repeat(100), 'é', '😀', 'a😀b', '中文', 'ÿ'];
 
@@ -8,13 +17,13 @@ describe('utf8Bytes (browser copy)', () => {
   // The browser cannot use Buffer.byteLength. A copy that disagreed with the
   // server would let the tracker emit values the sanitizer rejects, and no
   // ASCII fixture could reveal it.
-  it('agrees with the server measurement on every sample', () => {
+  specTest('agrees with the server measurement on every sample', UTF8_BYTES, () => {
     for (const sample of SAMPLES) {
       expect(clientUtf8Bytes(sample)).toBe(utf8Bytes(sample));
     }
   });
 
-  it('counts bytes, not UTF-16 code units', () => {
+  specTest('counts bytes, not UTF-16 code units', UTF8_BYTES, () => {
     const campaign = 'я'.repeat(100);
 
     expect(campaign.length).toBe(100);

@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSubscriptionMarshalForms(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-subscribe-has-two-forms")
 	cases := []struct {
 		name string
 		sub  Subscription
@@ -32,6 +34,7 @@ func TestSubscriptionMarshalForms(t *testing.T) {
 }
 
 func TestSubscriptionUnmarshalForms(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-subscribe-has-two-forms")
 	cases := []struct {
 		name string
 		in   string
@@ -56,6 +59,7 @@ func TestSubscriptionUnmarshalForms(t *testing.T) {
 }
 
 func TestSubscriptionUnmarshalRejectsUnknownField(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-subscribe-has-two-forms")
 	var s Subscription
 	if err := json.Unmarshal([]byte(`{"topic":"a.b","foo":1}`), &s); err == nil {
 		t.Error("expected error for unknown field in subscription object")
@@ -63,6 +67,7 @@ func TestSubscriptionUnmarshalRejectsUnknownField(t *testing.T) {
 }
 
 func TestEventsSubscribesBackCompatBytes(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-subscribe-has-two-forms")
 	// All-pull subscribes must marshal byte-identically to the legacy string
 	// array so existing manifests and goldens do not churn.
 	ev := Events{Subscribes: []Subscription{{Topic: "a.b"}, {Topic: "c.d"}}}
@@ -77,6 +82,7 @@ func TestEventsSubscribesBackCompatBytes(t *testing.T) {
 }
 
 func TestMergeResolvesDeliveryByPrecedence(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-merged-subscribe-takes-the-strongest-delivery")
 	// Two projects subscribe the same topic with different deliveries; the
 	// aggregated entry takes the strongest, independent of contribution order.
 	push := ProjectContribution{
@@ -104,6 +110,7 @@ func TestMergeResolvesDeliveryByPrecedence(t *testing.T) {
 }
 
 func TestMergePullSubscribeOmitsDelivery(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-merged-subscribe-takes-the-strongest-delivery")
 	// A pull-only subscribe must leave delivery empty so the aggregated shape
 	// stays byte-identical to the pre-push manifest.
 	c := ProjectContribution{
@@ -118,6 +125,7 @@ func TestMergePullSubscribeOmitsDelivery(t *testing.T) {
 }
 
 func TestValidatePerProjectManifestDelivery(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-subscription-carries-its-delivery", "a-subscribe-has-two-forms")
 	valid := &PerProjectManifest{
 		ProtocolVersion: ProtocolVersion,
 		Events:          &Events{Subscribes: []Subscription{{Topic: "t", Delivery: DeliveryPush}}},

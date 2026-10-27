@@ -375,16 +375,31 @@ The command loads `<workload>/.gen/requirements.json` via `LoadAggregatedManifes
 - [`doc/adr/0003-deployers-own-runtime-cost-policy.md`](doc/adr/0003-deployers-own-runtime-cost-policy.md)
   — why minimum residency and billing posture left the workload contract.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is the deployability contract between framework producers, the build
-aggregator, and deployers; a developer experiences it as "my workload declares
-what it needs", which the framework packages own. Per the spec contract in
-[`protocols/features`](../features/README.md) a spec details an already-authored
-feature and never mints one, so the durable design intent lives in the ADRs
-above. A product feature that later owns deployment links to them rather than
-restating them.
+The module owns the feature of its contract,
+`infra/infrastructure-requirements-contract`, specified in
+[`specs/infrastructure-requirements-contract.json`](specs/infrastructure-requirements-contract.json).
+The tests here prove the version, the schemas, the strict readers, the merge
+and override rules, the committed form, the deployment bytes and the secret-free
+projections. Each implementer proves its part under checks named after it:
+
+- the Go `database`, `events`, `migration` and `storage` frameworks and the Go
+  extension's secrets producer (`the-go-…`), and the TypeScript `database`,
+  `events`, `migration`, `document`, `storage` and `runtime` packages
+  (`the-typescript-…`), that each emits its golden in
+  [`fixtures/equivalence/`](fixtures/equivalence);
+- the extension SDK aggregator (`the-extension-sdk-…`), that it applies the
+  overrides, the default runtime and the cost-policy refusal, and declares the
+  aggregate in canonical bytes;
+- the TypeScript extension (`the-typescript-extension-…`), that it syncs the
+  committed requirements, turns HTTP/2 off and declares the canonical aggregate;
+- the Cloud extension (`the-cloud-…`), that its plan prints the codes of an
+  invalid manifest and its publish stores the declaration byte for byte and
+  refuses any other spelling.
+
+What each producer declares, and how the aggregator walks the dependency closure,
+stays in the features of those projects. The design intent is in the ADRs above.
 
 ## Support
 

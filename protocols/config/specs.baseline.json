@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "config/configuration-contract#authored-member",
+    "config/configuration-contract#canonical-schema-hash",
+    "config/configuration-contract#closed-vocabulary",
+    "config/configuration-contract#extractors-map-onto-the-vocabulary",
+    "config/configuration-contract#fixture-corpus",
+    "config/configuration-contract#input-names",
+    "config/configuration-contract#json-schema-rendering",
+    "config/configuration-contract#permission-scopes",
+    "config/configuration-contract#resolution-layers",
+    "config/configuration-contract#sensitive-decides-the-store",
+    "config/configuration-contract#strict-manifest"
+  ]
+}

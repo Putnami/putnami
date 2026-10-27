@@ -9,6 +9,14 @@
       "settledBy": "fdumay",
       "adr": "doc/adr/0013-the-race-detector-runs-on-the-packages-a-change-touches.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-G2",
+      "statement": "with CI set, lint applies no fix and build runs go mod tidy -diff instead of go mod tidy; a failure names the command that fixes it",
+      "settled": "2026-10-27",
+      "settledBy": "fdumay",
+      "adr": "doc/adr/0014-a-check-run-in-ci-writes-no-source.md",
+      "reviewOnly": true
     }
   ]
 }

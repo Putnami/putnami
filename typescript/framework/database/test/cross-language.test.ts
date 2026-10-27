@@ -22,9 +22,9 @@ describe('cross-language equivalence', () => {
   specTest(
     'database producer matches the shared golden fixture',
     {
-      feature: 'typescript/relational-persistence',
-      requirement: 'declared-infrastructure',
-      check: 'the-producer-matches-the-shared-golden-fixture',
+      feature: 'infra/infrastructure-requirements-contract',
+      requirement: 'producers-emit-the-shared-goldens',
+      check: 'the-typescript-database-producer-emits-its-golden',
     },
     async () => {
       const id = { id: Key(Uuid) };

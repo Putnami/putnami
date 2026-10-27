@@ -181,10 +181,27 @@ outside this workspace stamps the wire yet.
   schema pinned to the constant by `version_test.go`. It is not `stable`: the
   node vocabulary is still gaining lowerings and nothing outside this workspace
   stamps the wire, so a compatibility promise would be untested.
-- **User-facing feature**: none. The IR is a build-time artifact; what a user
-  sees is the CLI's `contracts` commands and the typed clients, OpenAPI, and
-  documentation generated from it. Declaring a product feature per wire contract
-  would move product intent away from the surfaces users actually operate. The
-  durable decisions for this module live in [`doc/adr/`](doc/adr/), the form
-  [`protocols/features`](../features/README.md#specs-and-durable-decisions)
-  expects a spec to link to.
+
+## Feature, spec and durable decisions
+
+The module owns the feature of its contract, `contracts/contract-ir`, specified
+in [`specs/contract-ir.json`](specs/contract-ir.json). The tests here prove the
+fixture corpus, the strict parser and validator, the canonical bytes, the
+versioned paths, the Go and JSON Schema lowerings and the Markdown reference.
+
+The implementations prove the same contract under checks of their own:
+
+- the CLI's `contracts generate` and `contracts check` (`tooling/sdd-extension`),
+  under its `the-cli-…` checks: generation writes the committed lowerings, and
+  the check refuses drift and breaking changes;
+- the Go OpenAPI generator (`go/framework/openapi`), under its `the-go-…`
+  check: contract types become referenced components that the Go client reader
+  keeps;
+- `@putnami/application` (`typescript/framework/application`), under its
+  `the-typescript-…` checks: its emitter matches the goldens, its OpenAPI
+  generator projects contract types, and its validation refuses an invalid
+  union value.
+
+The durable decisions for this module live in [`doc/adr/`](doc/adr/):
+
+- [`doc/adr/0001-one-ir-many-lowerings.md`](doc/adr/0001-one-ir-many-lowerings.md)

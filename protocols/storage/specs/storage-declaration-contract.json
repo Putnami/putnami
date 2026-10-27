@@ -1,0 +1,39 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "storage/storage-declaration-contract",
+  "outcomes": [
+    "A manifest or a binding that the parser accepts is one every reader accepts, and an invalid one fails with a typed code",
+    "The deployer-facing projection of a bucket carries no isolation scope and no signer"
+  ],
+  "nonGoals": [
+    "The storage backends and their key layout, which the storage libraries own",
+    "Provisioning the buckets, which deployers own",
+    "The aggregated deployer requirement, which the infra protocol owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-schemas-match-the-go-types",
+      "text": "The manifest and the binding schemas pin protocolVersion to the version the parser accepts. The manifest, resource and binding schemas have the members of their Go types, no more and no fewer."
+    },
+    {
+      "id": "a-manifest-is-strict-and-closed",
+      "text": "A manifest at protocolVersion 1 round-trips its name, access, scope, signedUrls, public and retention. A reader refuses an unknown member as storage.unknown_field, bytes that are not JSON as storage.parse_error, another version as storage.invalid_protocol_version, a name off its pattern as storage.invalid_name, an access outside read, write and readwrite as storage.invalid_access, and a scope outside the closed set as storage.invalid_scope."
+    },
+    {
+      "id": "a-binding-is-strict",
+      "text": "A binding round-trips its name, backend, bucket, prefix, identity and signedUrls. One without a backend is storage.missing_backend, one without a bucket storage.missing_bucket, and an identity outside static and workload storage.invalid_identity. The Go storage framework refuses a bindings document with an unknown member, a trailing value, another version, no binding, a repeated name, an unsupported backend, a missing bucket or an invalid name, and fills a binding's omitted version."
+    },
+    {
+      "id": "the-fixture-corpus-is-the-contract",
+      "text": "Every manifest and every binding under fixtures/*/valid validates, and every one under fixtures/*/invalid fails with at least one error, so another reader of the contract can check itself against the same files."
+    },
+    {
+      "id": "the-projection-drops-scope-and-signer",
+      "text": "Project flattens a manifest into name, access, public and retention, sorted by name, and returns nothing for an absent or empty manifest. The isolation scope and the signedUrls grant never reach the projection."
+    }
+  ],
+  "decisions": [
+    "protocols/database/doc/adr/0001-one-database-contract-with-a-secret-free-projection.md"
+  ]
+}

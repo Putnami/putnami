@@ -355,6 +355,8 @@ func TestExtensionFlagHelpLine_ListsTheNegationOfAFlagOnByDefault(t *testing.T) 
 		{"race", extension.FlagDefinition{Type: "boolean", Default: false, Description: "Race detector"},
 			"  --race  Race detector (default: false)"},
 		{"port", extension.FlagDefinition{Type: "number", Default: 3000}, "  --port  port (default: 3000)"},
+		{"fix", extension.FlagDefinition{Type: "boolean", Default: true, CIDefault: false, Description: "Apply fixes"},
+			"  --fix, --no-fix  Apply fixes (default: true; false when CI is set)"},
 	} {
 		if got := extensionFlagHelpLine(tc.name, tc.flag); got != tc.want {
 			t.Errorf("extensionFlagHelpLine(%s) = %q, want %q", tc.name, got, tc.want)

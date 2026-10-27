@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestMerge_EmptyContributions(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	m, diags := Merge("w", nil)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -21,6 +23,7 @@ func TestMerge_EmptyContributions(t *testing.T) {
 }
 
 func TestMerge_DatabaseSchemaUnion(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -48,6 +51,7 @@ func TestMerge_DatabaseSchemaUnion(t *testing.T) {
 }
 
 func TestMerge_DatabaseDifferentEnginesSplit(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -65,6 +69,7 @@ func TestMerge_DatabaseDifferentEnginesSplit(t *testing.T) {
 }
 
 func TestMerge_StorageConflictingRetention(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -88,6 +93,7 @@ func TestMerge_StorageConflictingRetention(t *testing.T) {
 }
 
 func TestMerge_StorageFillEmptyRetention(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -108,6 +114,7 @@ func TestMerge_StorageFillEmptyRetention(t *testing.T) {
 }
 
 func TestMerge_StorageUnionsAccess(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	// Two projects share a bucket needing different access; the merged grant is
 	// the union (read ∪ write = readwrite) so neither consumer is under-granted.
 	// Unlike retention, differing access is not a conflict — it is additive.
@@ -134,6 +141,7 @@ func TestMerge_StorageUnionsAccess(t *testing.T) {
 }
 
 func TestMerge_StorageOrsPublic(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	// public is an additive capability: if any consumer needs public read access
 	// the merged bucket is public.
 	contribs := []ProjectContribution{
@@ -159,6 +167,7 @@ func TestMerge_StorageOrsPublic(t *testing.T) {
 }
 
 func TestMerge_ManualOverridesFrameworkRetention(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	// Same project contributes a framework-inferred retention and a
 	// developer-authored one. The manual value must win, and the override is
 	// reported as a non-fatal warning rather than an unresolved error.
@@ -191,6 +200,7 @@ func TestMerge_ManualOverridesFrameworkRetention(t *testing.T) {
 }
 
 func TestMerge_FrameworkDoesNotOverrideManualRetention(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	// Reverse order of inputs: the manual value is established first and a
 	// later framework value must not override it. (Sorting puts framework
 	// first, so this also exercises the lower-precedence-loses path.)
@@ -214,6 +224,7 @@ func TestMerge_FrameworkDoesNotOverrideManualRetention(t *testing.T) {
 }
 
 func TestMerge_ManualOverridesFrameworkSchedule(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: FrameworkContributor("go.putnami.dev/scheduler"), Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -237,6 +248,7 @@ func TestMerge_ManualOverridesFrameworkSchedule(t *testing.T) {
 }
 
 func TestMerge_EventsDedup(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -257,6 +269,7 @@ func TestMerge_EventsDedup(t *testing.T) {
 }
 
 func TestMerge_ScheduledJobConflictingSchedule(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -274,6 +287,7 @@ func TestMerge_ScheduledJobConflictingSchedule(t *testing.T) {
 }
 
 func TestMerge_ScheduledJobConflictingEntrypoint(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -291,6 +305,7 @@ func TestMerge_ScheduledJobConflictingEntrypoint(t *testing.T) {
 }
 
 func TestMerge_SecretsDedup(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-unions-each-kind-by-its-identity")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -311,6 +326,7 @@ func TestMerge_SecretsDedup(t *testing.T) {
 }
 
 func TestMerge_SameProjectMultipleContributors(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "sources-are-sorted-and-deduped")
 	contribs := []ProjectContribution{
 		{Project: "a", Contributor: ContributorManual, Manifest: PerProjectManifest{
 			ProtocolVersion: ProtocolVersion,
@@ -331,6 +347,7 @@ func TestMerge_SameProjectMultipleContributors(t *testing.T) {
 }
 
 func TestMerge_SourcesSortedAndDeduped(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "sources-are-sorted-and-deduped")
 	src := Source{Project: "p", Contributor: ContributorManual}
 	contribs := []ProjectContribution{
 		{Project: "p", Contributor: ContributorManual, Manifest: PerProjectManifest{

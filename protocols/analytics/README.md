@@ -73,10 +73,20 @@ Additive only. A new event name, a new enum member, or a new optional field is a
 - **Evidence**: the version, the 18 error codes, every bound, and every closed
   enum are pinned by `conformance_test.go`; the invalid corpus carries one file
   per code and is proven exhaustive against `ValidErrorCodes`; the golden batch
-  is validated rather than asserted. It is not `stable`: the only consumer,
-  `@putnami/analytics`, does not exist yet, so no cross-language parity has been
-  demonstrated and the corpus should still be able to change.
-- **User-facing feature**: none of its own. The user-visible behavior is the
-  analytics plugin that produces and consumes these documents; a wire contract is
-  not a product feature. The durable decisions for this module live in
-  [`doc/adr/`](doc/adr/).
+  is validated rather than asserted. It is not `stable`: its only consumer,
+  `@putnami/analytics`, lives in this repository, and the corpus should still be
+  able to change.
+
+## Feature and spec
+
+The module owns the feature of its contract,
+`analytics/collection-wire-contract`, specified in
+[`specs/collection-wire-contract.json`](specs/collection-wire-contract.json).
+The tests here prove the version, the codes, the bounds, the closed
+vocabulary, the strict decode and the fixture corpus. `@putnami/analytics`
+(`typescript/framework/analytics`) proves under its own `the-typescript-…`
+checks that its sanitizer, its classifiers, its bot list and its byte measure
+give the corpus the verdicts the contract states. The collection itself, with
+its ingest route, storage and visitor identity, stays the feature of
+`@putnami/analytics`. The design intent is
+[ADR 0001](doc/adr/0001-putnami-owned-wire-with-closed-vocabulary.md).

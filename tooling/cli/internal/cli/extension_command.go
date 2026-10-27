@@ -822,6 +822,7 @@ type helpFlagJSON struct {
 	Short       string   `json:"short,omitempty"`
 	Type        string   `json:"type,omitempty"`
 	Default     any      `json:"default,omitempty"`
+	CIDefault   any      `json:"ciDefault,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Required    bool     `json:"required,omitempty"`
 	Choices     []string `json:"choices,omitempty"`
@@ -881,6 +882,7 @@ func buildSubcommandHelpJSON(ext *extension.ExtensionDescription, group, sub str
 			Short:       f.Short,
 			Type:        f.Type,
 			Default:     f.Default,
+			CIDefault:   f.CIDefault,
 			Description: f.Description,
 			Required:    f.Required,
 			Choices:     f.Choices,

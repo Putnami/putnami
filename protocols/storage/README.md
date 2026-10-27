@@ -207,14 +207,18 @@ by `drift_test.go`, and the corpus under [`fixtures/`](fixtures)
 (`manifest/{valid,invalid}`, `binding/{valid,invalid}`) is the cross-language
 surface `conformance_test.go` drives.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is a declaration contract between a project, a deployer, and the storage
-libraries; what a developer experiences is `storage()` / bucket APIs in
-`go.putnami.dev/storage` and `@putnami/storage`. Per the spec contract in
-[`protocols/features`](../features/README.md) a spec details an already-authored
-feature and never mints one. This module records no ADR of its own: its one
+The module owns the feature of its contract,
+`storage/storage-declaration-contract`, specified in
+[`specs/storage-declaration-contract.json`](specs/storage-declaration-contract.json).
+The tests here prove the schemas, the strict manifest and binding readers, the
+fixture corpus and the projection. `go.putnami.dev/storage`
+(`go/framework/storage`) proves under its own `the-go-storage-…` check that it
+refuses a bindings document the contract refuses. The bucket APIs a developer
+calls stay the features of `go.putnami.dev/storage` and `@putnami/storage`. The
+deployer-facing projection of a bucket is proven again, from the infra side, by
+`infra/infrastructure-requirements-contract`. This module records no ADR of its own: its one
 structural decision — the rich contract stays here while infra carries a thin,
 secret-free projection — is the same rule recorded for the sibling database
 contract in

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // contractsSchemaPath is the JSON schema editors validate authored IR documents
@@ -18,6 +20,7 @@ const contractsSchemaPath = "schemas/contracts.json"
 // instead produces an ephemeral IR that is never committed or shipped in a
 // packaged workload. Mirrors protocols/capabilities' TestCanonicalFilenames.
 func TestCanonicalFilenames(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "versioned-paths", "the-schema-pins-the-version-and-the-paths")
 	if ManifestFilename != "contracts.json" {
 		t.Errorf("ManifestFilename = %q, want contracts.json", ManifestFilename)
 	}
@@ -35,6 +38,7 @@ func TestCanonicalFilenames(t *testing.T) {
 // the parser intentionally reads, and a schema that accepts more blesses an IR
 // the parser drops. Either gap is drift.
 func TestProtocolVersion_SchemasMatch(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "versioned-paths", "the-schema-pins-the-version-and-the-paths")
 	want := []int{ProtocolVersion}
 	for _, path := range []string{contractsSchemaPath} {
 		t.Run(filepath.Base(path), func(t *testing.T) {

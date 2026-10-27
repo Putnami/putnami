@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const (
@@ -104,18 +106,21 @@ func assertFieldParity(t *testing.T, typeName string, schemaFields, goFields []s
 }
 
 func TestDrift_Manifest(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-schemas-match-the-go-types", "each-schema-has-the-members-of-its-go-type")
 	assertFieldParity(t, "Manifest",
 		schemaRootProperties(t, manifestSchemaPath),
 		goTypeJSONFields(t, Manifest{}))
 }
 
 func TestDrift_Resource(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-schemas-match-the-go-types", "each-schema-has-the-members-of-its-go-type")
 	assertFieldParity(t, "Resource",
 		schemaDefProperties(t, manifestSchemaPath, "resource"),
 		goTypeJSONFields(t, Resource{}))
 }
 
 func TestDrift_Binding(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-schemas-match-the-go-types", "each-schema-has-the-members-of-its-go-type")
 	assertFieldParity(t, "Binding",
 		schemaRootProperties(t, bindingSchemaPath),
 		goTypeJSONFields(t, Binding{}))
@@ -125,6 +130,7 @@ func TestDrift_Binding(t *testing.T) {
 // protocolVersion to the current ProtocolVersion, so an editor validating an
 // authored manifest/binding agrees with the Go parser.
 func TestDrift_SchemaProtocolVersionPinned(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-schemas-match-the-go-types", "the-schemas-pin-the-version")
 	for _, path := range []string{manifestSchemaPath, bindingSchemaPath} {
 		t.Run(path, func(t *testing.T) {
 			var schema struct {

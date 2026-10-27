@@ -186,9 +186,16 @@ Evidence:
 Missing: the server lives in another repository, so no test here covers a
 real exchange.
 
-## Product feature and durable decisions
+## Feature and spec
 
-No user-facing feature is declared for this module: the outcome, publishing a
-release set, belongs to the publish command of `@putnami/cli`.
-
-- [ADR 0001 — Immutable write without a channel](doc/adr/0001-immutable-write-without-a-channel.md)
+The module owns the feature of its contract, `put/immutable-write-contract`,
+specified in [`specs/immutable-write-contract.json`](specs/immutable-write-contract.json).
+The tests here prove the version, the bounds and paths, the profile of each
+kind, the field names and the schema, the error codes, the fixture corpus,
+the canonical payload, the blob references, the archive platforms, the
+coordinate and version rules and the answers bound to their request. The SDK
+publisher (`tooling/extension-sdk/putpublish`) proves the rest in its own
+tests: it stores each kind at its payload digest, reuses only the same
+manifest, refuses a member before any request, sends its bearer, and checks
+each answer against its request. The design intent lives in
+[`doc/adr/0001-immutable-write-without-a-channel.md`](doc/adr/0001-immutable-write-without-a-channel.md).

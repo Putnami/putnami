@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // findCode reports whether diags contains a diagnostic with the given code.
@@ -18,6 +19,7 @@ func findCode(diags []diag.Diagnostic, code string) bool {
 }
 
 func TestEnumValid(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "access-scope-and-identity-are-closed")
 	for _, tc := range []struct {
 		name  string
 		valid bool
@@ -39,6 +41,7 @@ func TestEnumValid(t *testing.T) {
 }
 
 func TestParseManifest_UnknownField(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-reader-refuses-what-is-not-the-contract")
 	_, diags := ParseManifest([]byte(`{"protocolVersion": 1, "nope": true}`))
 	if !findCode(diags, ErrorCodeUnknownField) {
 		t.Errorf("want %s, got %v", ErrorCodeUnknownField, diags)
@@ -46,6 +49,7 @@ func TestParseManifest_UnknownField(t *testing.T) {
 }
 
 func TestParseManifest_InvalidJSON(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-reader-refuses-what-is-not-the-contract")
 	_, diags := ParseManifest([]byte("{not json"))
 	if !findCode(diags, ErrorCodeParseError) {
 		t.Errorf("want %s, got %v", ErrorCodeParseError, diags)
@@ -53,6 +57,7 @@ func TestParseManifest_InvalidJSON(t *testing.T) {
 }
 
 func TestParseAndValidateManifest_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-round-trips")
 	data := []byte(`{
 		"protocolVersion": 1,
 		"resources": [
@@ -73,6 +78,7 @@ func TestParseAndValidateManifest_RoundTrip(t *testing.T) {
 }
 
 func TestValidateManifest_InvalidName(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-reader-refuses-what-is-not-the-contract")
 	m := &Manifest{ProtocolVersion: 1, Resources: []Resource{{Name: "Bad!Name"}}}
 	if diags := ValidateManifest(m); !findCode(diags, ErrorCodeInvalidName) {
 		t.Errorf("want %s, got %v", ErrorCodeInvalidName, diags)
@@ -80,6 +86,7 @@ func TestValidateManifest_InvalidName(t *testing.T) {
 }
 
 func TestValidateManifest_InvalidAccess(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-reader-refuses-what-is-not-the-contract")
 	m := &Manifest{ProtocolVersion: 1, Resources: []Resource{{Name: "uploads", Access: "append"}}}
 	if diags := ValidateManifest(m); !findCode(diags, ErrorCodeInvalidAccess) {
 		t.Errorf("want %s, got %v", ErrorCodeInvalidAccess, diags)
@@ -87,6 +94,7 @@ func TestValidateManifest_InvalidAccess(t *testing.T) {
 }
 
 func TestValidateManifest_InvalidScope(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-reader-refuses-what-is-not-the-contract")
 	m := &Manifest{ProtocolVersion: 1, Resources: []Resource{{Name: "uploads", Scope: "tenant"}}}
 	if diags := ValidateManifest(m); !findCode(diags, ErrorCodeInvalidScope) {
 		t.Errorf("want %s, got %v", ErrorCodeInvalidScope, diags)
@@ -94,6 +102,7 @@ func TestValidateManifest_InvalidScope(t *testing.T) {
 }
 
 func TestValidateManifest_InvalidProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-manifest-is-strict-and-closed", "a-manifest-reader-refuses-what-is-not-the-contract")
 	m := &Manifest{ProtocolVersion: 99, Resources: []Resource{{Name: "uploads"}}}
 	if diags := ValidateManifest(m); !findCode(diags, ErrorCodeInvalidProtocolVersion) {
 		t.Errorf("want %s, got %v", ErrorCodeInvalidProtocolVersion, diags)
@@ -101,6 +110,7 @@ func TestValidateManifest_InvalidProtocolVersion(t *testing.T) {
 }
 
 func TestParseAndValidateBinding_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-binding-is-strict", "a-binding-round-trips")
 	data := []byte(`{
 		"protocolVersion": 1,
 		"name": "uploads",
@@ -121,6 +131,7 @@ func TestParseAndValidateBinding_RoundTrip(t *testing.T) {
 }
 
 func TestValidateBinding_MissingBackendAndBucket(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-binding-is-strict", "a-binding-reader-refuses-what-is-not-the-contract")
 	b := &Binding{ProtocolVersion: 1, Name: "uploads"}
 	diags := ValidateBinding(b)
 	if !findCode(diags, ErrorCodeMissingBackend) {
@@ -132,6 +143,7 @@ func TestValidateBinding_MissingBackendAndBucket(t *testing.T) {
 }
 
 func TestValidateBinding_InvalidIdentity(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "a-binding-is-strict", "a-binding-reader-refuses-what-is-not-the-contract")
 	b := &Binding{ProtocolVersion: 1, Name: "uploads", Backend: "gcs", Bucket: "b", Identity: "oauth"}
 	if diags := ValidateBinding(b); !findCode(diags, ErrorCodeInvalidIdentity) {
 		t.Errorf("want %s, got %v", ErrorCodeInvalidIdentity, diags)
@@ -139,6 +151,7 @@ func TestValidateBinding_InvalidIdentity(t *testing.T) {
 }
 
 func TestProject_FlattensSortedByName(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-projection-drops-scope-and-signer", "the-projection-is-sorted-by-name")
 	m := &Manifest{
 		ProtocolVersion: ProtocolVersion,
 		Resources: []Resource{
@@ -159,6 +172,7 @@ func TestProject_FlattensSortedByName(t *testing.T) {
 }
 
 func TestProject_NilAndEmpty(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-projection-drops-scope-and-signer", "the-projection-is-sorted-by-name")
 	if got := (*Manifest)(nil).Project(); got != nil {
 		t.Errorf("nil manifest: Project() = %#v, want nil", got)
 	}
@@ -174,6 +188,7 @@ func TestProject_NilAndEmpty(t *testing.T) {
 // from. ProjectedResource has no field for either, so the type itself enforces
 // the guarantee.
 func TestProject_DropsResolutionAndSignerFields(t *testing.T) {
+	spectest.Proves(t, "storage/storage-declaration-contract", "the-projection-drops-scope-and-signer", "the-projection-drops-scope-and-signer")
 	m := &Manifest{
 		ProtocolVersion: ProtocolVersion,
 		Resources:       []Resource{{Name: "uploads", Access: AccessReadWrite, Scope: ScopeRuntime, SignedUrls: true}},

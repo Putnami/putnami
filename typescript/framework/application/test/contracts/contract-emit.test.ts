@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { specTest } from '@putnami/runtime/spectest';
 import { type ContractManifest, emitTypeScript, serializeJSONSchema } from '../../src/contracts';
+
+// Each test proves a requirement of the contracts protocol's feature under a check of this package's own.
+const EMITTER_GOLDENS = {
+  feature: 'contracts/contract-ir',
+  requirement: 'one-ir-many-lowerings',
+  check: 'the-typescript-emitter-matches-the-goldens',
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The contract IR module owns the shared cross-language corpus. The equivalence
@@ -22,7 +30,7 @@ function loadManifest(): ContractManifest {
 }
 
 describe('contract emitters', () => {
-  it('reproduces the Go-emitted JSON Schema byte-for-byte', () => {
+  specTest('reproduces the Go-emitted JSON Schema byte-for-byte', EMITTER_GOLDENS, () => {
     // The schema golden is written by the Go emitter's TestEmitJSONSchema_Golden
     // (json.MarshalIndent + "\n"). The TS serializer must reproduce those exact
     // bytes — this is the cross-language byte-parity guarantee.
@@ -31,7 +39,7 @@ describe('contract emitters', () => {
     expect(got).toBe(want);
   });
 
-  it('serializes the JSON Schema deterministically', () => {
+  specTest('serializes the JSON Schema deterministically', EMITTER_GOLDENS, () => {
     const manifest = loadManifest();
     const first = serializeJSONSchema(manifest);
     for (let i = 0; i < 20; i++) {
@@ -39,7 +47,7 @@ describe('contract emitters', () => {
     }
   });
 
-  it('emits deterministic TypeScript types matching the golden', () => {
+  specTest('emits deterministic TypeScript types matching the golden', EMITTER_GOLDENS, () => {
     const got = emitTypeScript(loadManifest());
     if (update) {
       if (!existsSync(testdataDir)) mkdirSync(testdataDir, { recursive: true });

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "put/immutable-write-contract#a-publish-stores-the-payload-at-its-digest",
+    "put/immutable-write-contract#an-answer-matches-its-request",
+    "put/immutable-write-contract#an-archive-lists-its-platforms",
+    "put/immutable-write-contract#blob-references-are-three-members",
+    "put/immutable-write-contract#coordinates-and-versions-are-validated",
+    "put/immutable-write-contract#each-kind-has-one-profile",
+    "put/immutable-write-contract#the-error-codes-are-closed",
+    "put/immutable-write-contract#the-fixture-corpus-is-the-contract",
+    "put/immutable-write-contract#the-payload-is-canonical",
+    "put/immutable-write-contract#the-publisher-sends-its-bearer",
+    "put/immutable-write-contract#the-version-bounds-and-paths-are-pinned",
+    "put/immutable-write-contract#the-wire-is-closed"
+  ]
+}

@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestRenderJSONSchema_NestedFixtureConformance is the Go side of the
@@ -13,6 +15,7 @@ import (
 // .jsonschema.json companion. The TS extractor's test renders the same
 // manifest and compares against the same companion file.
 func TestRenderJSONSchema_NestedFixtureConformance(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	manifestData, err := os.ReadFile("fixtures/valid/nested-hash.json")
 	if err != nil {
 		t.Fatal(err)
@@ -55,6 +58,7 @@ func TestRenderJSONSchema_NestedFixtureConformance(t *testing.T) {
 // int→integer, float→number) rather than a transport string. The TS extractor's
 // test renders the same manifest and compares against the same companion file.
 func TestRenderJSONSchema_TypedDefaultsFixtureConformance(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	manifestData, err := os.ReadFile("fixtures/valid/typed-defaults.json")
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +96,7 @@ func TestRenderJSONSchema_TypedDefaultsFixtureConformance(t *testing.T) {
 // validate against that schema (a boolean default under type:boolean, an
 // integer default under type:integer, a number default under type:number).
 func TestRenderJSONSchema_TypedDefaultDeclaredTypeParity(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	m := &SchemaManifest{
 		AppName: "app",
 		Configs: []Block{{
@@ -132,6 +137,7 @@ func TestRenderJSONSchema_TypedDefaultDeclaredTypeParity(t *testing.T) {
 // transport layer (Default is serialized with omitempty), so the emitter omits
 // `default`. This previously diverged — TS emitted "" while Go dropped it.
 func TestRenderJSONSchema_EmptyStringDefaultOmitted(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	got := renderField(FieldSchema{Name: "label", Type: FieldTypeString, Default: ""})
 	if _, present := got["default"]; present {
 		t.Errorf("empty-string default must be omitted, got default=%v", got["default"])
@@ -143,6 +149,7 @@ func TestRenderJSONSchema_EmptyStringDefaultOmitted(t *testing.T) {
 // range), float→JSON number (finite JSON-number tokens), duration/string
 // unchanged, and any parse failure keeps the raw string.
 func TestCoerceDefault(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	tests := []struct {
 		name      string
 		fieldType string
@@ -188,6 +195,7 @@ func TestCoerceDefault(t *testing.T) {
 // extension when set, and is omitted otherwise — mirroring the x-sensitive path
 // and the TS twin (config-schema-json.ts).
 func TestRenderJSONSchema_ProductionUnsafeMarker(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	marked := renderField(FieldSchema{Name: "driver", Type: FieldTypeString, ProductionUnsafeDefault: true})
 	if marked["x-production-unsafe-default"] != true {
 		t.Errorf("marked field must render x-production-unsafe-default=true, got %v", marked["x-production-unsafe-default"])
@@ -206,6 +214,7 @@ func TestRenderJSONSchema_NilManifest(t *testing.T) {
 }
 
 func TestRenderJSONSchema_RequiredOnlyOptIn(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	m := &SchemaManifest{
 		AppName: "app",
 		Configs: []Block{{
@@ -225,6 +234,7 @@ func TestRenderJSONSchema_RequiredOnlyOptIn(t *testing.T) {
 }
 
 func TestRenderJSONSchema_MapKeyConstraints(t *testing.T) {
+	spectest.Proves(t, "config/configuration-contract", "json-schema-rendering", "the-renderer-matches-the-goldens")
 	tests := []struct {
 		key  string
 		want map[string]any

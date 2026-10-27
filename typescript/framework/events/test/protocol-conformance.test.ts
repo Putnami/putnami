@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   PUTNAMI_EVENTS_PROTOCOL,
   isManagedPublishFrame,
@@ -8,6 +9,28 @@ import {
   isPutnamiEventsFrame,
   type ManagedPublishOutcomeFixture,
 } from '../src/protocol';
+
+// Each test proves a requirement of the events protocol's feature under a check of this package's own.
+const VALID_FIXTURES = {
+  feature: 'events/event-server-contract',
+  requirement: 'envelope-and-gateway-corpus',
+  check: 'the-typescript-guards-accept-every-valid-fixture',
+};
+const PROTOCOL_DEFECTS = {
+  feature: 'events/event-server-contract',
+  requirement: 'envelope-and-gateway-corpus',
+  check: 'the-typescript-guards-refuse-a-missing-or-other-protocol',
+};
+const MANAGED_VERDICTS = {
+  feature: 'events/event-server-contract',
+  requirement: 'managed-publish-requests',
+  check: 'the-typescript-guard-gives-each-managed-request-its-verdict',
+};
+const OUTCOME_CLASSES = {
+  feature: 'events/event-server-contract',
+  requirement: 'one-outcome-corpus',
+  check: 'the-typescript-corpus-covers-every-class',
+};
 
 // The shared fixture corpus is the cross-language test surface declared canonical
 // in protocols/events (see its README and doc/10-protocol.md). The Go
@@ -44,13 +67,13 @@ describe('events protocol fixture conformance', () => {
   const validFixtures = loadFixtures('valid');
   const invalidFixtures = loadFixtures('invalid');
 
-  it('finds the shared fixture corpus', () => {
+  specTest('finds the shared fixture corpus', VALID_FIXTURES, () => {
     expect(validFixtures.length).toBeGreaterThan(0);
     expect(invalidFixtures.length).toBeGreaterThan(0);
   });
 
   for (const fixture of validFixtures) {
-    it(`accepts valid fixture ${fixture.name}`, () => {
+    specTest(`accepts valid fixture ${fixture.name}`, VALID_FIXTURES, () => {
       // Every canonical wire shape carries the protocol identifier.
       expect(fixture.data['protocol']).toBe(PUTNAMI_EVENTS_PROTOCOL);
 
@@ -78,13 +101,13 @@ describe('events protocol fixture conformance', () => {
   // The TypeScript guards assert protocol identity and structural shape; deep
   // field/enum validation is owned by the canonical JSON Schemas and the Go
   // strict parsers. These cases cover the invariants the guards do enforce.
-  it('rejects a frame fixture that omits the protocol identifier', () => {
+  specTest('rejects a frame fixture that omits the protocol identifier', PROTOCOL_DEFECTS, () => {
     const fixture = invalidFixtures.find((f) => f.name === 'gateway-missing-protocol.json');
     expect(fixture).toBeDefined();
     expect(isPutnamiEventsFrame(fixture?.data)).toBe(false);
   });
 
-  it('rejects capabilities advertising a different protocol version', () => {
+  specTest('rejects capabilities advertising a different protocol version', PROTOCOL_DEFECTS, () => {
     const fixture = invalidFixtures.find((f) => f.name === 'gateway-capabilities-bad-protocol.json');
     expect(fixture).toBeDefined();
     expect(isPutnamiEventServerCapabilities(fixture?.data)).toBe(false);
@@ -104,24 +127,24 @@ describe('managed publish v1 fixture conformance', () => {
   const validFixtures = loadManaged('valid');
   const invalidFixtures = loadManaged('invalid');
 
-  it('loads the canonical managed corpus without a TypeScript copy', () => {
+  specTest('loads the canonical managed corpus without a TypeScript copy', MANAGED_VERDICTS, () => {
     expect(validFixtures.length).toBeGreaterThanOrEqual(4);
     expect(invalidFixtures.length).toBeGreaterThanOrEqual(18);
   });
 
   for (const fixture of validFixtures) {
-    it(`accepts managed valid fixture ${fixture.name}`, () => {
+    specTest(`accepts managed valid fixture ${fixture.name}`, MANAGED_VERDICTS, () => {
       expect(isManagedPublishFrame(fixture.data)).toBe(true);
     });
   }
 
   for (const fixture of invalidFixtures) {
-    it(`rejects managed invalid fixture ${fixture.name}`, () => {
+    specTest(`rejects managed invalid fixture ${fixture.name}`, MANAGED_VERDICTS, () => {
       expect(isManagedPublishFrame(fixture.data)).toBe(false);
     });
   }
 
-  it('rejects payloads that cannot be represented as JSON', () => {
+  specTest('rejects payloads that cannot be represented as JSON', MANAGED_VERDICTS, () => {
     const frame = (payload: unknown) => ({
       protocol: PUTNAMI_EVENTS_PROTOCOL,
       type: 'publish',
@@ -146,7 +169,7 @@ describe('managed publish v1 fixture conformance', () => {
     expect(retry.equals(first)).toBe(true);
   });
 
-  it('covers accepted, permanent, retryable, and ambiguous outcomes', () => {
+  specTest('covers accepted, permanent, retryable, and ambiguous outcomes', OUTCOME_CLASSES, () => {
     const outcomes = readdirSync(join(MANAGED_PUBLISH_V1_DIR, 'outcomes'))
       .filter((name) => name.endsWith('.json'))
       .sort()

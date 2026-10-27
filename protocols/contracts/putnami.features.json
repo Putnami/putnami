@@ -1,0 +1,126 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "contracts",
+  "features": [
+    {
+      "id": "contracts/contract-ir",
+      "type": "feature",
+      "name": "Contract IR",
+      "outcome": "A project describes its enums, tagged unions, DTOs, configuration fields and authorization vocabulary once, in a versioned and strict IR committed at schema/contracts.json, and every artifact built from it — Go types, TypeScript types, JSON Schema, reference Markdown and OpenAPI components — is a deterministic lowering, with the JSON Schema byte-identical in Go and TypeScript.",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "fixture-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "strict-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-parser-refuses-unknown-fields-and-invalid-json",
+              "validation-names-each-defect"
+            ]
+          }
+        },
+        {
+          "id": "canonical-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-serialization-is-canonical"
+            ]
+          }
+        },
+        {
+          "id": "versioned-paths",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-pins-the-version-and-the-paths"
+            ]
+          }
+        },
+        {
+          "id": "one-ir-many-lowerings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-emitters-match-the-goldens",
+              "the-typescript-emitter-matches-the-goldens"
+            ]
+          }
+        },
+        {
+          "id": "markdown-reference",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reference-follows-the-contract"
+            ]
+          }
+        },
+        {
+          "id": "committed-lowerings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-generates-the-committed-lowerings",
+              "the-cli-check-refuses-drift-and-breaking-changes"
+            ]
+          }
+        },
+        {
+          "id": "contract-types-become-components",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-openapi-generator-projects-contract-types",
+              "the-typescript-openapi-generator-projects-contract-types",
+              "the-typescript-runtime-validates-contract-unions"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

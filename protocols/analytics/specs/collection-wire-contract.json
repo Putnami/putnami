@@ -1,0 +1,49 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "analytics/collection-wire-contract",
+  "outcomes": [
+    "A batch the Go validator accepts, the TypeScript sanitizer accepts, and a batch one refuses the other drops for the same reason",
+    "Every value a visitor sends is a member of a closed vocabulary or within a pinned byte bound",
+    "A bot or a request without a User-Agent is recognised the same way on both sides"
+  ],
+  "nonGoals": [
+    "A read API to query or visualize the collected data",
+    "An OTLP mapping, which the telemetry protocol owns",
+    "Shipping the data from the application's own database to anywhere else",
+    "The ingest handler, the storage schema and the visitor identity, which @putnami/analytics owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-codes-and-bounds-are-pinned",
+      "text": "A batch carries protocolVersion 1, which a test pins, so a bump is a reviewed change. The 18 error codes carry the analytics. prefix and are the whole closed set. The bounds are pinned constants: 50 events, a 65536-byte body, seq up to 1000000, engagementMs up to 86400000, 512 for a path, 256 for a route, 512 for a referrer, 128 for a UTM value, 64 for an action name, and 20 property keys of at most 32 with string values of at most 256."
+    },
+    {
+      "id": "the-vocabulary-is-closed",
+      "text": "Ten closed enums have a pinned member count with no repeat and a predicate that accepts each member and refuses any other value and the empty string: 5 viewport classes, 5 referrer types, 4 device types, 7 browsers, 7 operating systems, 2 sources, 2 visitor kinds, 3 outcomes, 5 UTM keys and 15 dimensions. page_view and action are wire events, and form_submit is not. The TypeScript classifier of @putnami/analytics emits only browser, OS and device members."
+    },
+    {
+      "id": "a-batch-is-decoded-strictly-and-validated",
+      "text": "A batch needs protocolVersion 1, a sentAt with milliseconds and 1 to 50 events. A body that does not decode is analytics.parse_error, a JSON type mismatch is analytics.attribute_kind, and an undeclared member is analytics.unknown_attribute naming it. A decode failure is one diagnostic and returns no batch, and a body that is not JSON never reaches validation. A diagnostic of an event names its index, as events[1].eventId."
+    },
+    {
+      "id": "lengths-are-utf-8-bytes",
+      "text": "A length bound counts UTF-8 bytes: a path of 2-byte characters is accepted at 512 bytes and is analytics.invalid_path past them, and a UTM value past 128 bytes is analytics.invalid_utm, though each stays within its bound in characters. The browser measure of @putnami/analytics counts bytes, not UTF-16 code units, and agrees with its server measure."
+    },
+    {
+      "id": "the-fixture-corpus-is-the-contract",
+      "text": "The corpus holds 4 valid batches and 17 invalid ones, one per error code but parse_error, each named after its code. Every valid batch validates, and every invalid one yields its code and only codes of the closed set. The golden batch, embedded as GoldenBatchJSON and equal to its file, validates as a page view with UTM then an action with 3 properties. The sanitizer of @putnami/analytics accepts every event of the valid and golden batches, and drops each invalid one citing its code."
+    },
+    {
+      "id": "bots-are-one-shared-list",
+      "text": "The bot list holds at least 30 unique lowercase tokens, matched case-insensitively within a User-Agent. An empty or blank User-Agent is a bot, and a plain desktop browser is not. @putnami/analytics carries the same tokens in the same order and counts an absent or blank User-Agent as a bot."
+    },
+    {
+      "id": "classification-follows-the-shared-corpus",
+      "text": "The corpus holds at least 25 unique user agents, 4 or more of them bots by the shared list, whose expected browser, OS and device are enum members, and at least 12 referrers covering every referrer type, each stored without query or fragment within the bound, one of them truncated. The classifiers of @putnami/analytics give each of the 25 user agents and 12 referrers its expected values, and classify a tablet before a mobile."
+    }
+  ],
+  "decisions": [
+    "protocols/analytics/doc/adr/0001-putnami-owned-wire-with-closed-vocabulary.md"
+  ]
+}

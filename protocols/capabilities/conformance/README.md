@@ -7,7 +7,7 @@ bytes on every run and in every runtime, or a downstream cannot content-address
 or diff it.
 
 It reuses the byte-stability machinery pinned by
-[`../determinism_test.go`](../determinism_test.go): re-emit the manifest in the
+[`../proof/determinism_test.go`](../proof/determinism_test.go): re-emit the manifest in the
 canonical `json.MarshalIndent` form (two-space indent + trailing newline) and
 **byte-compare** it to the committed file. The comparison is deliberately exact,
 not semantic — the canonical form is the cross-language contract (the Go emitter

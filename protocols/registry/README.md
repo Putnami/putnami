@@ -464,18 +464,23 @@ Per the [support protocol](../support/README.md), `preview` means public and
 usable, but subject to change before it becomes stable. It is not a statement
 about reliability of the consumers, which fall back safely by construction.
 
-## Product feature and durable decisions
+## Feature and spec
 
-**No user-facing feature is declared for this module, deliberately.** A feature
-in [`protocols/features`](../features/README.md) is authored product intent with
-an owner and a maturity target; this module is a machine-to-machine boundary
-with no user-visible surface of its own. The outcome a user actually has —
-"publishing works against a private registry without me configuring
-credentials" — is owned by the publishing commands of `@putnami/cli` and the
-language extensions, and declaring a second feature here would mint an
-artificial product identity for a technical seam. Because a spec details exactly
-one already-authored feature and can never mint one, this module has no spec
-either.
+The module owns the feature of its contract, `registry/credential-seam-contract`,
+specified in [`specs/credential-seam-contract.json`](specs/credential-seam-contract.json).
+The tests here prove the seam and provider tokens, the strict wire, the schema,
+the credential and host rules, the redaction of every secret, the capability
+negotiation, the line bounds, the plan digest, the distribution documents, the
+plan, ancestry and evidence rules, and the upload rules. Each implementer proves
+the rest in its own tests, under checks named after it:
+
+- The extension SDK (`tooling/extension-sdk/registrycred`) runs the host-keyed
+  seam and reads its answer.
+- The CLI (`tooling/cli`) asks once per purpose, serves a bearer only to its
+  hosts, holds a refusal, retries after the backoff, and drives open and release.
+- The Cloud provider (`cloud/extension`) ends its session at shutdown or EOF,
+  refuses requests outside the protocol, echoes publication-v1 and uploader-v1
+  only when it can serve them, and refuses an upload before any registry request.
 
 Durable decisions:
 

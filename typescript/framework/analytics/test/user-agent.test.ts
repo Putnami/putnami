@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import { classifyUserAgent, MAX_USER_AGENT_LEN } from '../src/server/enrich/user-agent';
 import { BROWSERS, DEVICE_TYPES, OPERATING_SYSTEMS } from '../src/server/sanitize/vocabulary';
+
+// Each binding proves a requirement of the analytics protocol's feature
+// under a check of this package's own.
+const USER_AGENT_CORPUS = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'classification-follows-the-shared-corpus',
+  check: 'the-typescript-classifier-matches-every-user-agent-case',
+};
+const ENUM_MEMBERS = {
+  feature: 'analytics/collection-wire-contract',
+  requirement: 'the-vocabulary-is-closed',
+  check: 'the-typescript-classifier-emits-only-enum-members',
+};
 
 // The classifier lives here, but its expectations are the shared corpus of
 // protocols/analytics: the Go side proves every expected value is a closed-enum
@@ -21,12 +35,12 @@ interface UserAgentFixture {
 const FIXTURES = JSON.parse(readFileSync(join(FIXTURES_DIR, 'user-agents.json'), 'utf8')) as UserAgentFixture[];
 
 describe('classifyUserAgent', () => {
-  it('reads the whole shared corpus', () => {
+  specTest('reads the whole shared corpus', USER_AGENT_CORPUS, () => {
     expect(FIXTURES).toHaveLength(25);
   });
 
   for (const fixture of FIXTURES) {
-    it(`classifies ${fixture.ua.slice(0, 60) || '(empty)'}`, () => {
+    specTest(`classifies ${fixture.ua.slice(0, 60) || '(empty)'}`, USER_AGENT_CORPUS, () => {
       expect(classifyUserAgent(fixture.ua)).toEqual({
         browser: fixture.browser,
         browserMajor: fixture.browserMajor,
@@ -36,7 +50,7 @@ describe('classifyUserAgent', () => {
     });
   }
 
-  it('only ever emits protocol enum members', () => {
+  specTest('only ever emits protocol enum members', ENUM_MEMBERS, () => {
     for (const fixture of FIXTURES) {
       const info = classifyUserAgent(fixture.ua);
       expect(BROWSERS).toContain(info.browser);
@@ -55,7 +69,7 @@ describe('classifyUserAgent', () => {
 
   // Ordering rule of protocols/analytics/README.md: an iPad sends `Mobile/15E148`,
   // so testing `Mobi` first would make the tablet branch unreachable.
-  it('lets tablet win over mobile', () => {
+  specTest('lets tablet win over mobile', USER_AGENT_CORPUS, () => {
     const ipad =
       'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
     const androidTablet =

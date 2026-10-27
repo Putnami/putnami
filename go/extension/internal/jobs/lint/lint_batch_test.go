@@ -167,9 +167,11 @@ func TestRunGolangciBatchSplitsByConfigAndAttributes(t *testing.T) {
 		t.Fatalf("cli run leaked a framework module: %v", cliRun.args)
 	}
 
-	// Attribution + workspace-relative path equivalence.
+	// Attribution + workspace-relative path equivalence. The read-only run
+	// adds one info diagnostic, the fix hint, after each failed project's
+	// findings.
 	api := resultByID(t, results, "/go/framework/api")
-	if api.Status != "FAILED" || len(api.Diagnostics) != 1 {
+	if api.Status != "FAILED" || len(api.Diagnostics) != 2 || api.Diagnostics[1].Severity != "info" {
 		t.Fatalf("api result = %+v", api)
 	}
 	if api.Diagnostics[0].File != "go/framework/api/handler.go" ||
@@ -182,7 +184,7 @@ func TestRunGolangciBatchSplitsByConfigAndAttributes(t *testing.T) {
 	}
 
 	errs := resultByID(t, results, "/go/framework/errors")
-	if errs.Status != "FAILED" || len(errs.Diagnostics) != 1 ||
+	if errs.Status != "FAILED" || len(errs.Diagnostics) != 2 ||
 		errs.Diagnostics[0].File != "go/framework/errors/wrap.go" {
 		t.Fatalf("errors result mis-attributed: %+v", errs)
 	}
@@ -555,5 +557,55 @@ func TestManifestStaticcheckBatchKeepsPerProjectCacheIdentity(t *testing.T) {
 	workspaceModules := task.Inputs["workspaceModules"].Files
 	if len(workspaceModules) != 2 || workspaceModules[0] != "go.work" || workspaceModules[1] != "go.work.sum" {
 		t.Fatalf("lint-staticcheck workspaceModules = %v, want [go.work go.work.sum]", workspaceModules)
+	}
+}
+
+// A read-only run, the default when CI is set, names the command that applies
+// the fixes it reports, on the projects with findings only.
+func TestExecuteGolangciGroupReadOnlyFailureNamesTheFixCommand(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "a-check-run-writes-no-source",
+		"a-read-only-lint-failure-names-the-command-that-applies-the-fixes")
+	group, root := newGroup(t, "a", "b")
+	invocations := stubGolangci(t, func(recordedInvocation) ([]byte, error) {
+		return []byte(filepath.Join(root, "a", "x.go") + ":3:1: File is not properly formatted (gofmt)\n"), fmt.Errorf("exit status 1")
+	})
+	results := executeGolangciGroup("golangci-lint", lintOptions{tool: "golangci-lint"}, group, filepath.Dir(root))
+
+	for _, inv := range *invocations {
+		if invocationKind(inv) == "fmt" || slices.Contains(inv.args, "--fix") {
+			t.Fatalf("a read-only run invoked a writer: %v", inv.args)
+		}
+	}
+	a := resultByID(t, results, "/a")
+	if a.Status != "FAILED" {
+		t.Fatalf("project a has a finding and should FAIL: %+v", a)
+	}
+	var hint bool
+	for _, diag := range a.Diagnostics {
+		if diag.Severity == "info" && strings.Contains(diag.Description, "putnami lint --fix --projects a") {
+			hint = true
+		}
+	}
+	if !hint {
+		t.Fatalf("project a carries no hint naming `putnami lint --fix --projects a`: %+v", a.Diagnostics)
+	}
+	if b := resultByID(t, results, "/b"); b.Status != "OK" || len(b.Diagnostics) != 0 {
+		t.Fatalf("project b has no finding and should carry no hint: %+v", b)
+	}
+}
+
+func TestExecuteGolangciGroupFixingFailureCarriesNoHint(t *testing.T) {
+	group, root := newGroup(t, "a")
+	stubGolangci(t, func(inv recordedInvocation) ([]byte, error) {
+		if invocationKind(inv) == "fmt" {
+			return nil, nil
+		}
+		return []byte(filepath.Join(root, "a", "x.go") + ":3:1: ineffectual assignment (ineffassign)\n"), fmt.Errorf("exit status 1")
+	})
+	results := executeGolangciGroup("golangci-lint", lintOptions{tool: "golangci-lint", fix: true}, group, filepath.Dir(root))
+	for _, diag := range resultByID(t, results, "/a").Diagnostics {
+		if diag.Severity == "info" {
+			t.Fatalf("a fixing run already applied the fixes, so it names no fix command: %+v", diag)
+		}
 	}
 }

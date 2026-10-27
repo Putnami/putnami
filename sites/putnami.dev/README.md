@@ -107,7 +107,12 @@ TypeScript framework runtime the site is built on. Nothing is copied, so the onl
 promise is minimization: the import names one fact, and asking for another throws
 `DarcError('fact-not-imported')`.
 
-`src/main.ts` registers all six through `DarcPlugin`, which contributes one
+The seventh contract, `public-docs.protocol-contracts.v1`, is a `reference` on the
+`site-content-bundle/v1` contract that `/protocols/sitecontent` owns. The site
+implements that contract in `src/lib/content/`, and its tests prove the
+protocol's requirements. It names one fact, `wire_contract_definitions`.
+
+`src/main.ts` registers all seven through `DarcPlugin`, which contributes one
 `domainAccess` row per contract to the capability manifest.
 `putnami architecture validate` joins those rows to the declarations. A row is
 evidence, never authority — emitting one cannot create a cross-domain permission.

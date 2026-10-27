@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestProtocolVersion_SchemasMatch asserts each JSON schema accepts exactly
@@ -17,6 +19,7 @@ import (
 // manifest the parser intentionally reads, and a schema that accepts more
 // blesses a manifest the parser drops. Either gap is drift.
 func TestProtocolVersion_SchemasMatch(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-protocol-version-is-2")
 	want := []int{ProtocolVersion}
 	for _, path := range []string{perProjectSchemaPath, aggregatedSchemaPath} {
 		t.Run(filepath.Base(path), func(t *testing.T) {
@@ -59,9 +62,10 @@ var tsProtocolVersionPattern = regexp.MustCompile(`(?m)\bconst\s+(?:INFRA_)?PROT
 // Go producers are not scanned: they reference infra.ProtocolVersion directly
 // and so cannot drift from it (their own infra_test.go files assert this).
 func TestProtocolVersion_TSProducersSupported(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "every-typescript-producer-stamps-the-version")
 	root := repoRoot(t)
 	if root == "" {
-		t.Skip("workspace root (putnami.workspace.json) not found; skipping cross-language producer scan")
+		t.Fatalf("the cross-language producer scan needs the workspace root (putnami.workspace.json), which no parent of the working directory holds")
 	}
 	for _, rel := range tsProducers {
 		t.Run(rel, func(t *testing.T) {

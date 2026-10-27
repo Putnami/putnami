@@ -14,6 +14,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
@@ -56,6 +57,7 @@ func fixtureRelease(t *testing.T) *ReleaseParams {
 
 func TestPublicationOpsAreRefusedWithoutTheCapability(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "publication-v1-is-negotiated", "the-capability-is-negotiated")
 	for _, name := range []string{"request-resolve.json", "request-open.json", "request-open-empty-plan.json", "request-release.json", "request-release-without-evidence.json"} {
 		line := readFixture(t, "valid", name)
 		if _, err := ParseNegotiatedCredentialRequest(line, everyCapability); err != nil {
@@ -124,6 +126,7 @@ func padLine(line []byte, size int) []byte {
 
 func TestPublicationLineBoundIsPerOp(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "each-op-has-its-line-bound", "each-op-has-its-line-bound")
 	credential := []byte(`{"protocolVersion":1,"id":4,"op":"credential","payload":{"purpose":"publish"}}`)
 	for _, negotiated := range [][]string{nil, everyCapability} {
 		if _, err := ParseNegotiatedCredentialRequest(padLine(credential, MaxCredentialLineBytes), negotiated); err != nil {
@@ -206,6 +209,7 @@ func evidenceMembers(count int, suffix string) []PublicationMemberEvidence {
 
 func TestReleasePayloadReusesTheDistributionRequest(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "resolve-and-release-carry-distribution-documents", "the-release-is-a-distribution-request")
 	payload := fixturePayload(t, "request-release.json")
 	params, err := ParseReleaseParams(payload)
 	if err != nil {
@@ -301,6 +305,7 @@ type releasePlanContract struct {
 
 func TestOpenPlanDigestMatchesTheReleasePlanContract(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-plan-digest-is-the-release-plan-contract", "the-plan-digest-is-pinned")
 	source := strings.Repeat("a", 40)
 	digestFor := func(char string) string { return "sha256:" + strings.Repeat(char, 64) }
 	plan := PublicationPlan{ProtocolVersion: 1, Namespace: "putnami", SourceRevision: source, Channels: []string{"canary", "v1.2.3"}, ImmutableChannel: "v1.2.3", Members: []PublicationPlanMember{
@@ -369,6 +374,7 @@ func TestOpenPlanDigestMatchesTheReleasePlanContract(t *testing.T) {
 // evidence.
 func TestPublicationCarriesPutRegistryMembers(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "the-plan-digest-is-the-release-plan-contract", "put-registry-members-are-planned-and-evidenced")
 	open, err := ParseOpenParams(fixturePayload(t, "request-open-put-members.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -423,6 +429,7 @@ func TestPublicationCarriesPutRegistryMembers(t *testing.T) {
 
 func TestPublicationLinesNeverFormatTheirPayload(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "secrets-are-never-formatted", "a-publication-line-never-formats-its-payload")
 	for _, name := range []string{"request-open.json", "request-release.json"} {
 		request, err := ParseNegotiatedCredentialRequest(readFixture(t, "valid", name), everyCapability)
 		if err != nil {
@@ -453,6 +460,7 @@ func TestPublicationLinesNeverFormatTheirPayload(t *testing.T) {
 
 func TestPublicationPlanValidation(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "plans-ancestry-and-evidence-are-validated", "a-plan-is-validated")
 	for name, mutate := range map[string]func(*PublicationPlan){
 		"version 2":  func(p *PublicationPlan) { p.ProtocolVersion = 2 },
 		"no channel": func(p *PublicationPlan) { p.Channels, p.ImmutableChannel = nil, "" },
@@ -489,6 +497,7 @@ func TestPublicationPlanValidation(t *testing.T) {
 
 func TestPublicationAncestryValidation(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "plans-ancestry-and-evidence-are-validated", "an-ancestry-is-validated")
 	valid := fixtureOpen(t).Ancestry
 	if err := ValidatePublicationAncestry(valid); err != nil {
 		t.Fatal(err)
@@ -527,6 +536,7 @@ func TestPublicationAncestryValidation(t *testing.T) {
 
 func TestPublicationEvidenceValidation(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "plans-ancestry-and-evidence-are-validated", "evidence-is-validated")
 	if err := ValidatePublicationEvidence(PublicationEvidence{Images: []runtimeproto.ReleaseSetPublishedImage{}, Members: []PublicationMemberEvidence{}}); err != nil {
 		t.Errorf("empty evidence: %v", err)
 	}
@@ -579,6 +589,7 @@ func TestPublicationEvidenceValidation(t *testing.T) {
 
 func TestPublicationPayloadParsersRefuseMalformedInput(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "plans-ancestry-and-evidence-are-validated", "the-publication-parsers-refuse-malformed-input")
 	parsers := map[string]func(json.RawMessage) error{
 		"resolve params": func(p json.RawMessage) error { _, err := ParseResolveParams(p); return err },
 		"resolve result": func(p json.RawMessage) error { _, err := ParseResolveResult(p); return err },
@@ -617,6 +628,7 @@ func TestPublicationPayloadParsersRefuseMalformedInput(t *testing.T) {
 
 func TestStrictScanDefersNullOnlyInsideDelegatedMembers(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "resolve-and-release-carry-distribution-documents", "null-is-deferred-only-inside-delegated-members")
 	delegated := [][]string{{"payload", "request"}}
 	for document, want := range map[string]string{
 		`{"payload":{"request":{"expected":null}}}`:                      "deferred",

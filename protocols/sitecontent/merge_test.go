@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestPrefixesConflict_SegmentBoundary(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "mounts-partition-the-url-space", "prefixes-conflict-at-segment-boundaries")
 	tests := []struct {
 		a, b string
 		want bool
@@ -26,6 +28,7 @@ func TestPrefixesConflict_SegmentBoundary(t *testing.T) {
 }
 
 func TestMountForPath(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "mounts-partition-the-url-space", "a-path-matches-only-its-mount")
 	mounts := []Mount{{URLPrefix: "/docs/cloud"}}
 	if _, ok := MountForPath(mounts, "docs/cloud/index.html"); !ok {
 		t.Fatal("expected docs/cloud/index.html to be under /docs/cloud")
@@ -36,6 +39,7 @@ func TestMountForPath(t *testing.T) {
 }
 
 func TestValidateMergePlan_BundleVsSiteCollision(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "mounts-partition-the-url-space", "a-merge-plan-refuses-colliding-mounts")
 	bundles := []Manifest{{
 		Name:   "cloud-docs",
 		Mounts: []Mount{{URLPrefix: "/docs/cloud"}},
@@ -47,6 +51,7 @@ func TestValidateMergePlan_BundleVsSiteCollision(t *testing.T) {
 }
 
 func TestValidateMergePlan_BundleVsBundleCollision(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "mounts-partition-the-url-space", "a-merge-plan-refuses-colliding-mounts")
 	bundles := []Manifest{
 		{Name: "cloud-docs", Mounts: []Mount{{URLPrefix: "/docs/cloud"}}},
 		{Name: "cloud-api", Mounts: []Mount{{URLPrefix: "/docs/cloud/api"}}},
@@ -58,6 +63,7 @@ func TestValidateMergePlan_BundleVsBundleCollision(t *testing.T) {
 }
 
 func TestValidateMergePlan_CollisionHiddenByInterveningSibling(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "mounts-partition-the-url-space", "a-merge-plan-refuses-colliding-mounts")
 	// A non-conflicting sibling ("/docs-cloud") sorts lexicographically between
 	// an ancestor ("/docs") and its descendant ("/docs/cloud") because '-'
 	// (0x2d) sorts before '/' (0x2f). The overlap between /docs and /docs/cloud
@@ -74,6 +80,7 @@ func TestValidateMergePlan_CollisionHiddenByInterveningSibling(t *testing.T) {
 }
 
 func TestValidateMergePlan_Disjoint(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "mounts-partition-the-url-space", "a-merge-plan-accepts-disjoint-mounts")
 	bundles := []Manifest{
 		{Name: "cloud-docs", Mounts: []Mount{{URLPrefix: "/docs/cloud"}}},
 		{Name: "cli-docs", Mounts: []Mount{{URLPrefix: "/docs/cli"}}},

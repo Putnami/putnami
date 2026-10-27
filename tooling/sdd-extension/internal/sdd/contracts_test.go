@@ -9,6 +9,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	contracts "go.putnami.dev/protocol/contracts"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // baseManifest is a valid contract manifest exercising every vocabulary the
@@ -114,6 +115,7 @@ func staticPrior(src string) PriorLoader {
 // byte-stable across repeated generations: no map-iteration order or other
 // nondeterminism leaks into a committed artifact.
 func TestContractsGenerate_Deterministic(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-generates-the-committed-lowerings")
 	m := parseManifest(t, baseManifest)
 	first, err := generateArtifacts(m)
 	if err != nil {
@@ -142,6 +144,7 @@ func TestContractsGenerate_Deterministic(t *testing.T) {
 // IR, Go twin, JSON Schema, and Markdown reference into both the staged
 // .gen/schema/ tree and the committed schema/ tree, byte-identically.
 func TestContractsGenerate_WritesArtifacts(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-generates-the-committed-lowerings")
 	dir := writeProject(t)
 	report, err := ContractsGenerate(dir, testLabel)
 	if err != nil {
@@ -179,6 +182,7 @@ func TestContractsGenerate_WritesArtifacts(t *testing.T) {
 // generation (an invalid manifest) never overwrites a previously good committed
 // artifact — the atomicity invariant.
 func TestContractsGenerate_FailureLeavesArtifactsUntouched(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-generates-the-committed-lowerings")
 	dir := writeProject(t)
 	if _, err := ContractsGenerate(dir, testLabel); err != nil {
 		t.Fatalf("initial ContractsGenerate: %v", err)
@@ -209,6 +213,7 @@ func TestContractsGenerate_FailureLeavesArtifactsUntouched(t *testing.T) {
 // TestContractsCheck_Clean asserts a freshly generated project with an
 // unchanged prior reports clean and exits 0.
 func TestContractsCheck_Clean(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-check-refuses-drift-and-breaking-changes")
 	dir := writeProject(t)
 	if _, err := ContractsGenerate(dir, testLabel); err != nil {
 		t.Fatalf("ContractsGenerate: %v", err)
@@ -229,6 +234,7 @@ func TestContractsCheck_Clean(t *testing.T) {
 // TestContractsCheck_Drift asserts hand-edited generated documentation reports
 // drift and exits 2, with the report carried on the error for the failure envelope.
 func TestContractsCheck_Drift(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-check-refuses-drift-and-breaking-changes")
 	dir := writeProject(t)
 	if _, err := ContractsGenerate(dir, testLabel); err != nil {
 		t.Fatalf("ContractsGenerate: %v", err)
@@ -257,6 +263,7 @@ func TestContractsCheck_Drift(t *testing.T) {
 // TestContractsCheck_Breaking asserts a prior with removed enum values, scopes,
 // claims, and grants is classified as a breaking change and exits 2.
 func TestContractsCheck_Breaking(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-check-refuses-drift-and-breaking-changes")
 	dir := writeProject(t)
 	if _, err := ContractsGenerate(dir, testLabel); err != nil {
 		t.Fatalf("ContractsGenerate: %v", err)
@@ -280,6 +287,7 @@ func TestContractsCheck_Breaking(t *testing.T) {
 // TestCompareManifests_RenamedEnumWire asserts an enum value whose wire value
 // changes under the same constant name is classified as a rename (breaking).
 func TestCompareManifests_RenamedEnumWire(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-check-refuses-drift-and-breaking-changes")
 	prior := parseManifest(t, baseManifest)
 	renamed := `{
   "protocolVersion": 1,
@@ -322,6 +330,7 @@ func TestCompareManifests_RenamedEnumWire(t *testing.T) {
 // TestCompareManifests_AdditionsAreCompatible asserts that adding an enum value,
 // scope, claim, or grant is not a breaking change.
 func TestCompareManifests_AdditionsAreCompatible(t *testing.T) {
+	spectest.Proves(t, "contracts/contract-ir", "committed-lowerings", "the-cli-check-refuses-drift-and-breaking-changes")
 	prior := parseManifest(t, baseManifest)
 	current := parseManifest(t, priorManifest) // priorManifest is a superset of base
 	if changes := CompareManifests(prior, current); len(changes) != 0 {

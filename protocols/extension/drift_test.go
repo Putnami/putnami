@@ -117,6 +117,11 @@ func TestDrift_Manifest(t *testing.T) {
 	assertFieldParity(t, "Manifest", schemaRootProperties(t), goTypeJSONFields(t, Manifest{}))
 }
 
+func TestDrift_FlagDefinition(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
+	assertFieldParity(t, "FlagDefinition", schemaDefProperties(t, "manifestFlagDefinition"), goTypeJSONFields(t, FlagDefinition{}))
+}
+
 func TestDrift_RuntimeDefinition(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
 	schemaFields := schemaDefProperties(t, "runtimeDefinition")

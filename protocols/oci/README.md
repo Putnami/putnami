@@ -116,9 +116,17 @@ shape may still change before it carries a stable commitment.
   probe-gated, a client on an older or newer contract still publishes correctly
   through the standard distribution API.
 
-**Owning user feature** — none, deliberately. These extensions are an
-optimization of an operation a standard registry already performs; the
-user-visible outcome (a release's refs point at the pushed image) is identical
-with or without them, so a product feature would describe latency, not a
-capability. The durable decision lives in [`doc/adr/`](doc/adr/) instead of a
-spec, which by contract details exactly one authored feature.
+## Feature and spec
+
+The module owns the feature of its contract, `oci/registry-fast-path-contract`,
+specified in [`specs/registry-fast-path-contract.json`](specs/registry-fast-path-contract.json).
+The tests here prove the version, the endpoints, the capability gate, the
+error codes, the fixture corpus and the registry host table. Three
+implementations prove the rest in their own tests. The SDK pusher
+(`tooling/extension-sdk/oci`) proves the probe, the fallback to the standard
+distribution API, the one batched tag-digest call and the parity of the host
+rules with go-containerregistry. The CLI (`tooling/cli`) proves that it reads
+the declared OCI registry by these rules and sends an image only to that host.
+The Cloud credential provider (`cloud/extension`) proves that an image goes to
+its repository's host. The design intent lives in
+[`doc/adr/0001-optional-registry-fast-paths.md`](doc/adr/0001-optional-registry-fast-paths.md).

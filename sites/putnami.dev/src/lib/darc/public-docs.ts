@@ -23,7 +23,12 @@
  */
 import { type DarcComponent, type DarcRecord, Reference, Snapshot } from '@putnami/application';
 import { getWorkspaceRoot } from '@putnami/utils';
-import { APPLICATION_RUNTIME_FACT, APPLICATION_RUNTIME_IMPORT, DOCUMENTATION_SOURCES } from './documentation-contracts';
+import {
+  APPLICATION_RUNTIME_FACT,
+  APPLICATION_RUNTIME_IMPORT,
+  DOCUMENTATION_SOURCES,
+  PROTOCOL_CONTRACTS_IMPORT,
+} from './documentation-contracts';
 import { type DocumentationTree, type DocumentationTreeReader, readDocumentationTree } from './documentation-tree';
 
 /** Construction options. */
@@ -37,8 +42,8 @@ export interface PublicDocumentationAccessOptions {
 }
 
 /**
- * The `public-docs` domain's enforced contracts: five documentation snapshots
- * and one framework-runtime reference.
+ * The `public-docs` domain's enforced contracts: five documentation snapshots,
+ * one framework-runtime reference and one protocol-contract reference.
  */
 export class PublicDocumentationAccess {
   private readonly snapshots = new Map<string, Snapshot<DocumentationTree>>();
@@ -46,6 +51,8 @@ export class PublicDocumentationAccess {
   private readonly readTree: DocumentationTreeReader;
   /** The stable handle on the TypeScript framework runtime this site is built on. */
   readonly runtime: Reference;
+  /** The stable handle on the content-bundle protocol this site implements. */
+  readonly protocols: Reference;
 
   constructor(options: PublicDocumentationAccessOptions = {}) {
     const clock = options.clock;
@@ -59,11 +66,16 @@ export class PublicDocumentationAccess {
     this.readTree =
       options.readTree ?? ((root: string) => readDocumentationTree(options.workspaceRoot ?? getWorkspaceRoot(), root));
     this.runtime = new Reference(APPLICATION_RUNTIME_IMPORT);
+    this.protocols = new Reference(PROTOCOL_CONTRACTS_IMPORT);
   }
 
   /** Every component this domain enforces, snapshots first, in declaration order. */
   components(): DarcComponent[] {
-    return [...DOCUMENTATION_SOURCES.map((source) => this.snapshotFor(source.sourceRoot)), this.runtime];
+    return [
+      ...DOCUMENTATION_SOURCES.map((source) => this.snapshotFor(source.sourceRoot)),
+      this.runtime,
+      this.protocols,
+    ];
   }
 
   /** Whether a `generate.assets` source root is governed by a declared import. */

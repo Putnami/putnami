@@ -1,8 +1,13 @@
 package infra
 
-import "testing"
+import (
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+)
 
 func TestProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-version-and-the-schemas-are-pinned", "the-protocol-version-is-2")
 	if ProtocolVersion != 2 {
 		t.Errorf("ProtocolVersion = %d, want 2", ProtocolVersion)
 	}
@@ -24,6 +29,7 @@ func TestCanonicalFilenames(t *testing.T) {
 }
 
 func TestValidEngines(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-manifest-is-read-strictly", "the-version-and-the-engine-are-closed")
 	wanted := []Engine{EnginePostgres, EngineMySQL, EngineSQLite, EngineFirestore}
 	for _, e := range wanted {
 		if !ValidEngines[e] {
@@ -50,6 +56,7 @@ func TestContributorManual(t *testing.T) {
 }
 
 func TestContributorPrecedence(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "a-conflicting-value-resolves-by-precedence")
 	manual := ContributorPrecedence(ContributorManual)
 	framework := ContributorPrecedence(FrameworkContributor("database"))
 	if manual <= framework {
@@ -63,6 +70,7 @@ func TestContributorPrecedence(t *testing.T) {
 }
 
 func TestDefaultRuntime(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-default-runtime-is-pinned")
 	rt := DefaultRuntime()
 	if rt == nil || rt.Scaling == nil || rt.Ingress == nil {
 		t.Fatalf("DefaultRuntime returned an incomplete value: %+v", rt)

@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review. A bump is a breaking change for
 // every deployed browser tracker, which keeps sending the old number.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-version-codes-and-bounds-are-pinned", "the-protocol-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -23,6 +25,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // sanitizer counts drop reasons by these strings minus the prefix, so a rename
 // or an addition that lands here alone stops a deployed consumer from counting.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-version-codes-and-bounds-are-pinned", "the-18-error-codes-are-a-closed-set")
 	canonical := []string{
 		"analytics.parse_error",
 		"analytics.invalid_version",
@@ -61,6 +64,7 @@ func TestConformance_ErrorCodes(t *testing.T) {
 // the receiving side, so adding a member is a protocol change; each predicate is
 // the only way a consumer is meant to test membership.
 func TestConformance_ClosedEnums(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-vocabulary-is-closed", "each-closed-enum-has-its-members-and-its-predicate")
 	enums := []struct {
 		name      string
 		members   []string
@@ -111,6 +115,7 @@ func TestConformance_ClosedEnums(t *testing.T) {
 // event. form_submit is exported so consumers share one name for it, and is
 // rejected on the wire so a visitor cannot forge a server-recorded outcome.
 func TestConformance_EventNames(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-vocabulary-is-closed", "form-submit-is-refused-on-the-wire")
 	if !IsEventName(EventPageView) || !IsEventName(EventAction) {
 		t.Error("IsEventName must accept the two wire event names")
 	}
@@ -124,6 +129,7 @@ func TestConformance_EventNames(t *testing.T) {
 // runtime rejects, which is the exact asymmetry the shared corpus exists to
 // prevent.
 func TestConformance_Bounds(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-version-codes-and-bounds-are-pinned", "the-bounds-are-pinned")
 	bounds := map[string][2]int{
 		"MaxEvents":        {MaxEvents, 50},
 		"MaxBodyBytes":     {MaxBodyBytes, 65536},
@@ -150,6 +156,7 @@ func TestConformance_Bounds(t *testing.T) {
 // TypeScript sanitizer runs the same corpus, which is what makes it a parity
 // proof rather than two independent test suites.
 func TestConformance_Fixtures(t *testing.T) {
+	spectest.Proves(t, "analytics/collection-wire-contract", "the-fixture-corpus-is-the-contract", "every-valid-batch-validates-and-every-invalid-one-is-refused")
 	runFixtureDir(t, "valid", false)
 	runFixtureDir(t, "invalid", true)
 }

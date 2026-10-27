@@ -21,6 +21,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 	registry "go.putnami.dev/protocol/registry"
 )
 
@@ -755,6 +756,7 @@ func mustReleased(t *testing.T, response *registry.CredentialResponse, requestBy
 }
 
 func TestPublicationEchoNeedsAnOfferAHostedRunDeliveryAndOrigins(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "publication-v1-is-negotiated", "the-cloud-provider-echoes-publication-v1-only-when-it-can-serve-it")
 	cases := []struct {
 		name          string
 		runCredential string
@@ -913,6 +915,7 @@ func mustJSON(t *testing.T, value any) []byte {
 }
 
 func TestPublicationOpenIsIdempotentAndRefusesAnotherPlan(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "open-is-idempotent-and-release-final", "the-cloud-provider-opens-a-plan-once")
 	r := newPubRig(t, nil).start().opened()
 	mustOpened(t, r.open(pubOpenParams(t)), pubPlan(t).PlanDigest)
 	if _, publish := r.delivery.calls(); publish != 1 {
@@ -1335,6 +1338,7 @@ func TestPublicationReleaseRefusesARequestThatIsNotThePlan(t *testing.T) {
 }
 
 func TestPublicationReleaseIsFinalPerPlan(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "open-is-idempotent-and-release-final", "the-cloud-provider-releases-a-plan-once")
 	r := newPubRig(t, nil).start().opened()
 	wrong := r.defaultRelease()
 	wrong.request.ReleaseSet.Members[1].Version = "1.2.4"
@@ -1354,6 +1358,7 @@ func TestPublicationReleaseIsFinalPerPlan(t *testing.T) {
 }
 
 func TestPublicationReleaseBeforeOpenIsRefused(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "nothing-moves-before-an-open", "the-cloud-provider-refuses-a-release-before-open")
 	r := newPubRig(t, nil).start()
 	payload, _ := r.defaultRelease().payload(t)
 	mustRefusal(t, r.release(payload), registry.RefusalPlanNotOpen)
@@ -1718,6 +1723,7 @@ func TestPublicationShutdownAbandonsAReleaseInProgress(t *testing.T) {
 }
 
 func TestPublicationLineBoundFollowsTheNegotiation(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "each-op-has-its-line-bound", "the-cloud-provider-bounds-a-line-by-its-op")
 	clock := &pubClock{now: time.Now()}
 	delivery := newFakeDelivery(t, clock)
 	server := newTestCredentialServer(delivery.url, nil, nil)

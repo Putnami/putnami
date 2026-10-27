@@ -197,7 +197,7 @@ func refusalCode(err error) string {
 // absent and whose publication ops are never sent.
 func TestSessionOffersPublicationV1AndAcceptsAV1OnlyEcho(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "the-session-offers-publication-v1-and-the-echo-decides")
+	spectest.Proves(t, "registry/credential-seam-contract", "publication-v1-is-negotiated", "the-cli-offers-every-capability-and-follows-the-echo")
 	offered := []string{registry.CapabilityCredentialV1, registry.CapabilityPublicationV1, registry.CapabilityUploaderV1}
 
 	both := providertest.New(providertest.Config{})
@@ -237,7 +237,7 @@ func TestSessionOffersPublicationV1AndAcceptsAV1OnlyEcho(t *testing.T) {
 // an upload is served only once a plan is open.
 func TestSessionRefusesASecondDifferentPlan(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "a-second-plan-is-refused-in-one-session")
+	spectest.Proves(t, "registry/credential-seam-contract", "open-is-idempotent-and-release-final", "the-cli-surfaces-plan-already-open-for-a-second-plan")
 	ctx := context.Background()
 	reg, provider := npmRegistry(t, providertest.Config{})
 	first := testOpenParams(t, "0.3.0", []string{"canary"}, nil)
@@ -449,7 +449,7 @@ const lostAnswerTimeout = 5 * time.Second
 // the plan digest and the session ends.
 func TestReleaseAfterAnUncertainSubmitIsResolvedByPlanDigest(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "an-uncertain-release-is-resolved-by-plan-digest")
+	spectest.Proves(t, "registry/credential-seam-contract", "open-is-idempotent-and-release-final", "the-cli-sends-a-lost-release-once-more")
 	ctx := context.Background()
 
 	provider := providertest.New(providertest.Config{Unanswered: map[registry.CredentialOp]int{registry.CredentialOpRelease: 1}})
@@ -491,6 +491,7 @@ func TestReleaseAfterAnUncertainSubmitIsResolvedByPlanDigest(t *testing.T) {
 // ancestors is refused at open, before any member is uploaded.
 func TestSessionRefusesANotForwardOpen(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "nothing-moves-before-an-open", "the-cli-refuses-uploads-after-a-not-forward-open")
 	provider := providertest.New(providertest.Config{Bearer: publishFixture, Hosts: []string{publishHost}})
 	_, publication := publicationBroker(t, provider)
 	open := testOpenParams(t, "0.3.0", []string{"canary"}, map[string]string{"canary": planOtherCommit})

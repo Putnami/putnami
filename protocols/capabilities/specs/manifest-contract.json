@@ -1,0 +1,60 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "capabilities/manifest-contract",
+  "outcomes": [
+    "A manifest one reader accepts, every reader accepts, in Go and in TypeScript.",
+    "A committed manifest changes only when a contribution or its stable provenance changes, never because a dependency version or the dependency closure moved.",
+    "A manifest whose required capability has no provider in it is reported, and Go describe fails on it."
+  ],
+  "nonGoals": [
+    "What a domainAccess row's mode, status, transports and enforced members mean, which protocols/architecture owns.",
+    "Enumerating source files for a source binding, which the CLI's loaders own.",
+    "The manifest-determinism conformance pack a downstream project runs against its own manifest."
+  ],
+  "requirements": [
+    {
+      "id": "the-reader-is-strict-and-versioned",
+      "text": "The v1 reader refuses a member the manifest does not declare with capabilities.unknown_field and no manifest, and input that is not JSON with capabilities.parse_error. In Go and TypeScript, the document reader reads the version 1 and 2 and refuses with capabilities.invalid_protocol_version a missing, null, string, 1.5, 1.0, 2.0, 1e0, 2e0, nested or repeated version and the version 3. In Go it also refuses an undeclared v2 member."
+    },
+    {
+      "id": "every-fixture-gets-its-verdict",
+      "text": "Every fixture under fixtures/valid and every v1 equivalence golden parses and validates to a manifest, and every fixture under fixtures/invalid fails with an error. Every v2 valid fixture and v2 equivalence golden validates as a v2 document, each golden equals its canonical v2 serialization byte for byte, and every v2 invalid fixture fails with an error."
+    },
+    {
+      "id": "v1-bytes-are-canonical",
+      "text": "The canonical v1 serialization is JSON indented with two spaces and ended by a newline. A manifest with every v1 contribution kind serializes to fixtures/valid/full.json byte for byte, and to the same bytes over 100 serializations. A valid fixture parsed, serialized, parsed and serialized again gives the same bytes both times."
+    },
+    {
+      "id": "v2-emission-drops-volatile-state",
+      "text": "Canonical v2 bytes are the same over 100 serializations and a strict round trip, sort migrations by identity, keep packages, and hold no sourceBinding, version or packageVersions, which a valid input may carry. A resolved dependency version alone changes no byte. Go and TypeScript drop the same members, and Go describe emits a manifest that validates, equals its canonical bytes and holds no version, the same on each run."
+    },
+    {
+      "id": "packages-stay-on-the-capability-surface",
+      "text": "The capability surface holds the project and each package that declared one of its contributions, and no other package. Canonical v2 emission keeps only the package entries on the surface, in Go and TypeScript, so a package that only the dependency closure reaches changes no byte and the result reads back to the same bytes. Go describe, given a stamp with one more closure package, emits the same manifest, naming only the contributing packages."
+    },
+    {
+      "id": "a-required-capability-needs-a-provider-in-its-manifest",
+      "text": "A required capability kind that no contribution of the same manifest provides is reported as capabilities.missing_required_provider at its requires entry, naming the project. In v2, in Go and TypeScript, every kind maps to a provider, and a dependency-owned provider copied into the manifest counts while one outside it does not. Go describe fails with that code when no plugin provides a required kind."
+    },
+    {
+      "id": "a-provider-identity-is-unique",
+      "text": "Two v1 health contributors of one name and probe are reported as capabilities.duplicate_provider, and two config definitions of one path with different fields as capabilities.conflicting_provider. An infra provider's identity is its kind and name: two kinds may share a name, and one kind may not use it twice. Go describe fails with capabilities.duplicate_contribution when two plugins contribute one health check."
+    },
+    {
+      "id": "each-schema-accepts-exactly-its-version",
+      "text": "schemas/capabilities.json accepts exactly protocolVersion 1 and schemas/capabilities-v2.json exactly 2. The TypeScript application producer declares one protocol version constant, and its value is 2."
+    },
+    {
+      "id": "the-typescript-application-reproduces-the-go-golden",
+      "text": "The TypeScript application reads the shared v2 golden, which equals the Go serialization, as v2 and serializes it to the same bytes, and reads fixtures/valid/minimal.json as v1. Its producer emits a v2 manifest that equals its own canonical serialization and has the same bytes on each of five runs."
+    },
+    {
+      "id": "typescript-loaders-are-reconciled-into-the-manifest",
+      "text": "Reconciling generated loaders into a v1 or v2 manifest adds the react-loader route loader as a route schema and the sql-loader server loader as a source discoverer, leaves the client and config loaders out, writes a manifest that validates and holds no version in v2, and writes the same bytes when run again. A loader whose path or identity conflicts with an entry fails the reconciliation and leaves no manifest."
+    }
+  ],
+  "decisions": [
+    "protocols/capabilities/doc/adr/0001-committed-manifest-scope.md"
+  ]
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   DEFAULT_PBKDF2_ITERATIONS,
   type DigestAlgorithm,
@@ -52,8 +53,13 @@ const HASHING_TIMEOUT_MS = 60_000;
 
 describe('secret-digest cross-language vectors', () => {
   const vectors = loadSecretVectors();
+  const secretVectors = {
+    feature: 'keyring/signing-keyring-contract',
+    requirement: 'secret-vectors-reproduce-in-both-languages',
+    check: 'the-typescript-application-reproduces-the-secret-vectors',
+  };
 
-  it('covers both digest algorithms', () => {
+  specTest('covers both digest algorithms', secretVectors, () => {
     const families = new Set(vectors.map((v) => v.algorithm));
     expect(families.has('pbkdf2-sha256')).toBe(true);
     expect(families.has('hmac-sha256')).toBe(true);
@@ -61,14 +67,15 @@ describe('secret-digest cross-language vectors', () => {
 
   for (const v of vectors) {
     describe(v.id, () => {
-      it('pinned digest parses clean through the keyring grammar', () => {
+      specTest('pinned digest parses clean through the keyring grammar', secretVectors, () => {
         const parsed = parseDigest(v.digest);
         expect(parsed).toBeDefined();
         expect(parsed?.algorithm).toBe(v.algorithm);
       });
 
-      it(
+      specTest(
         'every valid secret verifies true with the pinned rehashRequired flag',
+        secretVectors,
         async () => {
           for (const secret of v.valid) {
             const res = await verifySecret(secret, v.digest);
@@ -79,8 +86,9 @@ describe('secret-digest cross-language vectors', () => {
         HASHING_TIMEOUT_MS,
       );
 
-      it(
+      specTest(
         'every invalid secret fails closed',
+        secretVectors,
         async () => {
           for (const secret of v.invalid) {
             const res = await verifySecret(secret, v.digest);
@@ -91,8 +99,9 @@ describe('secret-digest cross-language vectors', () => {
         HASHING_TIMEOUT_MS,
       );
 
-      it(
+      specTest(
         're-hashing the secret with the pinned salt reproduces the EXACT digest (byte-identical to Go)',
+        secretVectors,
         async () => {
           const salt = decodeSalt(v.salt);
           const opts =

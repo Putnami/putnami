@@ -1,0 +1,171 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "config",
+  "features": [
+    {
+      "id": "config/configuration-contract",
+      "type": "feature",
+      "name": "Configuration contract",
+      "outcome": "A Go or TypeScript application, the CLI that publishes its configuration and the config server exchange one schema manifest, one canonical schema hash, one JSON Schema rendering, one set of resolve and write shapes and one authored member format, held by one schema and one fixture corpus that both extractors read, so a drift fails at build time instead of at the config server.",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "fixture-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-gets-its-verdict",
+              "validation-is-deterministic"
+            ]
+          }
+        },
+        {
+          "id": "strict-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-strict-parser-refuses-unknown-and-server-owned-members",
+              "validation-names-each-manifest-defect"
+            ]
+          }
+        },
+        {
+          "id": "closed-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-enums-are-the-vocabulary",
+              "the-typescript-vocabulary-matches-the-schema"
+            ]
+          }
+        },
+        {
+          "id": "extractors-map-onto-the-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-maps-go-types-onto-the-vocabulary",
+              "the-go-framework-describes-the-same-vocabulary",
+              "the-typescript-extractor-maps-descriptors-onto-the-vocabulary"
+            ]
+          }
+        },
+        {
+          "id": "canonical-schema-hash",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-hash-is-canonical-and-pinned",
+              "the-typescript-hash-matches-the-go-anchors"
+            ]
+          }
+        },
+        {
+          "id": "json-schema-rendering",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-renderer-matches-the-goldens",
+              "the-typescript-renderer-matches-the-goldens"
+            ]
+          }
+        },
+        {
+          "id": "resolution-layers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-layers-and-the-merge-are-fixed"
+            ]
+          }
+        },
+        {
+          "id": "input-names",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-name-grammar-is-enforced",
+              "each-write-shape-is-validated"
+            ]
+          }
+        },
+        {
+          "id": "permission-scopes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-six-scopes-are-fixed"
+            ]
+          }
+        },
+        {
+          "id": "sensitive-decides-the-store",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-store-misuse-gets-its-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "authored-member",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-member-is-canonical-and-secret-free",
+              "each-member-defect-is-refused",
+              "the-v1-bytes-are-pinned",
+              "the-cloud-cli-member-passes-validate"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

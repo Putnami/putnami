@@ -247,7 +247,7 @@ describe('documentation sources are version-addressed snapshots', () => {
   );
 
   specTest(
-    'reports exactly the six contracts it enforces, deterministically',
+    'reports exactly the seven contracts it enforces, deterministically',
     {
       feature: 'putnami-dev/public-documentation',
       requirement: 'documentation-sources-are-version-addressed-snapshots',
@@ -261,19 +261,20 @@ describe('documentation sources are version-addressed snapshots', () => {
         ['public-docs.application-runtime.v1', 'reference'],
         ['public-docs.go-framework-documentation.v1', 'snapshot'],
         ['public-docs.method-documentation.v1', 'snapshot'],
+        ['public-docs.protocol-contracts.v1', 'reference'],
         ['public-docs.python-surface-documentation.v1', 'snapshot'],
         ['public-docs.typescript-framework-documentation.v1', 'snapshot'],
         ['public-docs.workspace-documentation.v1', 'snapshot'],
       ]);
 
-      // The domain opts into evidence with all six rows or none: a partial set
+      // The domain opts into evidence with all seven rows or none: a partial set
       // makes `architecture validate` report declared_without_evidence for the
       // rest of the domain.
       expect(rows).toHaveLength(PUBLIC_DOCS_CONTRACTS.length);
       for (const row of rows) expect(row.status).toBe('active');
 
       // Every snapshot row carries the declared carrier and consistency block
-      // verbatim; the reference row carries neither, because it enforces neither.
+      // verbatim; a reference row carries neither, because it enforces neither.
       for (const row of rows.filter((candidate) => candidate.mode === 'snapshot')) {
         expect(row.transports).toEqual([
           { role: 'transport', kind: 'file', contract: 'putnami.documentation-tree.v1', availability: 'active' },
@@ -286,9 +287,10 @@ describe('documentation sources are version-addressed snapshots', () => {
           lateEvents: 'ignore-older',
         });
       }
-      const reference = rows.find((row) => row.mode === 'reference');
-      expect(reference?.transports).toBeUndefined();
-      expect(reference?.enforced).toBeUndefined();
+      for (const reference of rows.filter((candidate) => candidate.mode === 'reference')) {
+        expect(reference.transports).toBeUndefined();
+        expect(reference.enforced).toBeUndefined();
+      }
 
       // Deterministic: the committed sidecar these rows land in must not move
       // between two runs of the producing job.
@@ -304,6 +306,15 @@ describe('the application-runtime reference minimizes', () => {
     expect(access.runtimeProvenance()).toBe('typescript-framework.application-runtime.v1');
     expect(() => access.runtime.fact('go_application_runtime_api')).toThrow(DarcError);
     expect(access.runtime.facts()).toEqual(['typescript_application_runtime_api']);
+  });
+});
+
+describe('the protocol-contracts reference minimizes', () => {
+  it('resolves the one fact it declares and refuses any other', () => {
+    const access = accessWith();
+    expect(access.protocols.fact('wire_contract_definitions')).toBe('protocols.wire-contracts.v1');
+    expect(() => access.protocols.fact('typescript_application_runtime_api')).toThrow(DarcError);
+    expect(access.protocols.facts()).toEqual(['wire_contract_definitions']);
   });
 });
 
@@ -340,6 +351,7 @@ describe('emitted domain-access evidence', () => {
     const rows = (manifest.document['domainAccess'] ?? []) as ManifestDomainAccess[];
     expect(rows.map((row) => [row.import, row.mode])).toEqual([
       ['public-docs.application-runtime.v1', 'reference'],
+      ['public-docs.protocol-contracts.v1', 'reference'],
       ['public-docs.go-framework-documentation.v1', 'snapshot'],
       ['public-docs.method-documentation.v1', 'snapshot'],
       ['public-docs.python-surface-documentation.v1', 'snapshot'],

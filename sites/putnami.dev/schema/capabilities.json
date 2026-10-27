@@ -450,6 +450,26 @@
       "identity": {
         "ownerProject": "putnami.dev",
         "kind": "domainAccess",
+        "subkind": "reference",
+        "key": "public-docs.protocol-contracts.v1"
+      },
+      "import": "public-docs.protocol-contracts.v1",
+      "mode": "reference",
+      "status": "active",
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "putnami.dev",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "putnami.dev",
+        "kind": "domainAccess",
         "subkind": "snapshot",
         "key": "public-docs.go-framework-documentation.v1"
       },

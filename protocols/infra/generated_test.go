@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSyncGeneratedRequirementsWritesCommittedManifest(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-sync-writes-the-committed-requirements")
 	dir := t.TempDir()
 	if err := WriteSidecar(dir, "storage", PerProjectManifest{
 		Storage: []StorageBucket{{Name: "uploads", Retention: "30d"}},
@@ -61,6 +63,7 @@ func TestSyncGeneratedRequirementsWritesCommittedManifest(t *testing.T) {
 }
 
 func TestSyncGeneratedRequirementsMigratesV1Sidecar(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "a-v1-fragment-is-moved-to-v2-and-stays-strict")
 	dir := t.TempDir()
 	sidecarDir := GeneratedSidecarDir(dir)
 	if err := os.MkdirAll(sidecarDir, 0o755); err != nil {
@@ -98,6 +101,7 @@ func TestSyncGeneratedRequirementsMigratesV1Sidecar(t *testing.T) {
 }
 
 func TestSyncGeneratedRequirementsKeepsV1MigrationStrict(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "a-v1-fragment-is-moved-to-v2-and-stays-strict")
 	dir := t.TempDir()
 	sidecarDir := GeneratedSidecarDir(dir)
 	if err := os.MkdirAll(sidecarDir, 0o755); err != nil {
@@ -125,6 +129,7 @@ func TestSyncGeneratedRequirementsKeepsV1MigrationStrict(t *testing.T) {
 }
 
 func TestSyncGeneratedRequirementsRemovesStaleCommittedManifest(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-sync-writes-the-committed-requirements")
 	dir := t.TempDir()
 	path := ProjectRequirementsPath(dir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -143,6 +148,7 @@ func TestSyncGeneratedRequirementsRemovesStaleCommittedManifest(t *testing.T) {
 }
 
 func TestClearGeneratedRequirementSidecars(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-sync-writes-the-committed-requirements")
 	dir := t.TempDir()
 	if err := WriteSidecar(dir, "events", PerProjectManifest{
 		Events: &Events{Publishes: []string{"workspace.deploy.completed"}},
@@ -158,6 +164,7 @@ func TestClearGeneratedRequirementSidecars(t *testing.T) {
 }
 
 func TestSyncGeneratedRequirementsReportsInvalidSidecar(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "a-v1-fragment-is-moved-to-v2-and-stays-strict")
 	dir := t.TempDir()
 	sidecarDir := GeneratedSidecarDir(dir)
 	if err := os.MkdirAll(sidecarDir, 0o755); err != nil {

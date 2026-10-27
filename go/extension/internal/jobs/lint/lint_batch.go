@@ -263,6 +263,15 @@ func executeGolangciGroup(
 		}
 		failGroup(tail)
 	}
+	// A read-only run names the command that applies the fixes it reports.
+	if !options.fix && attributed {
+		for _, project := range group.projects {
+			if failed[project.ref.ID] {
+				diagnostics[project.ref.ID] = append(diagnostics[project.ref.ID],
+					parse.ToolDiagnostic{Severity: "info", Description: fixHint(project.ref.Name)})
+			}
+		}
+	}
 
 	return buildGroupResults(group.projects, diagnostics, failed)
 }

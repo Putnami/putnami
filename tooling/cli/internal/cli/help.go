@@ -257,8 +257,13 @@ func extensionFlagHelpLine(name string, flag extension.FlagDefinition) string {
 		spelling += ", --no-" + name
 	}
 	def := ""
-	if flag.Default != nil {
+	switch {
+	case flag.Default != nil && flag.CIDefault != nil:
+		def = fmt.Sprintf(" (default: %v; %v when CI is set)", flag.Default, flag.CIDefault)
+	case flag.Default != nil:
 		def = fmt.Sprintf(" (default: %v)", flag.Default)
+	case flag.CIDefault != nil:
+		def = fmt.Sprintf(" (default when CI is set: %v)", flag.CIDefault)
 	}
 	desc := flag.Description
 	if desc == "" {

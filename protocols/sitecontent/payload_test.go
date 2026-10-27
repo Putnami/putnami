@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 type payloadFixture struct {
@@ -26,6 +27,7 @@ type payloadFixtureEntry struct {
 }
 
 func TestVerifyPayload_Fixtures(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-payload-matches-the-manifest", "the-payload-corpus-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/payload/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -63,6 +65,7 @@ func TestVerifyPayload_Fixtures(t *testing.T) {
 }
 
 func TestVerifyPayload_InvalidGzip(t *testing.T) {
+	spectest.Proves(t, "sitecontent/content-bundle-contract", "the-payload-matches-the-manifest", "a-payload-that-is-not-gzip-is-refused")
 	m := validPayloadManifest()
 	diags := VerifyPayload(&m, []byte("not gzip"))
 	if !hasCode(diags, ErrorCodeParseError) {

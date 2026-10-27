@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 
+	"go.putnami.dev/protocol/features/spectest"
 	ociproto "go.putnami.dev/protocol/oci"
 )
 
@@ -49,6 +50,7 @@ var registryHostParityHosts = []string{
 // upgrade of go-containerregistry changes how a repository or a host is read.
 func TestRegistryHostMatchesGoContainerRegistry(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-registry-host-rules-are-one-table", "the-extension-sdk-matches-go-containerregistry")
 	for _, input := range registryHostParityRepositories {
 		lowered := input
 		if host, path, found := strings.Cut(input, "/"); found {

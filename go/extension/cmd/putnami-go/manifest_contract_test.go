@@ -1541,6 +1541,7 @@ func TestTaskEffectTable(t *testing.T) {
 		"build-cross-compile":    {"network", "toolchain-cache"},
 		"build-describe":         {"network", "toolchain-cache"},
 		"build-tidy":             {"network", "toolchain-cache"},
+		"build-tidy-check":       {"network", "toolchain-cache"},
 		"deps-upgrade-exec":      {"network", "toolchain-cache", "workspace-files"},
 		"deps-edit-exec":         {"network", "toolchain-cache", "workspace-files"},
 		"project-setup-exec":     {"network", "toolchain-cache", "workspace-files"},
@@ -2890,5 +2891,68 @@ func TestRaceStepIsGatedBoundAndKeyedOnTheChangedFiles(t *testing.T) {
 	}
 	if m.CLIContract != proto.RequiredCLIContract(m) || m.CLIContract != protocolcli.ChangedFilesContract {
 		t.Errorf("cliContract = %d, want %d, the rung of the changed-files gate", m.CLIContract, protocolcli.ChangedFilesContract)
+	}
+}
+
+// With CI set, the flag defaults pick the read-only steps: lint runs no
+// golangci-lint --fix and build checks the module files instead of tidying
+// them. Without CI, both commands keep the step that fixes.
+func TestWithCISetLintAndBuildScheduleNoStepThatWritesSources(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "a-check-run-writes-no-source",
+		"with-ci-set-lint-and-build-schedule-no-step-that-writes-sources")
+	m := loadExtensionManifest(t)
+	// scheduled returns the tasks of the command's steps whose condition holds
+	// on the flag defaults, among the steps keep selects.
+	scheduled := func(command string, ci bool, keep func(proto.PipelineStep) bool) []string {
+		cmd := m.Commands[command]
+		params := proto.ParamMap{}
+		for name, flag := range cmd.Flags {
+			if value := flag.DefaultFor(ci); value != nil {
+				params[name] = value
+			}
+		}
+		var tasks []string
+		for _, step := range cmd.Run {
+			if !keep(step) {
+				continue
+			}
+			active, valid := proto.EvaluateExpressionChecked(step.If, &proto.WhenContext{Params: params})
+			if !valid {
+				t.Fatalf("%s step %s: condition %q does not resolve on the flag defaults", command, step.ID, step.If)
+			}
+			if active {
+				tasks = append(tasks, step.Task)
+			}
+		}
+		slices.Sort(tasks)
+		return tasks
+	}
+	all := func(proto.PipelineStep) bool { return true }
+	tidying := func(step proto.PipelineStep) bool { return strings.HasPrefix(step.Task, "build-tidy") }
+
+	for _, task := range scheduled("lint", true, all) {
+		if declares := m.Tasks[task].Declares; declares != nil && declares.MutatesSources {
+			t.Errorf("with CI set, lint schedules %s, which writes sources", task)
+		}
+	}
+	if got := scheduled("lint", true, all); !slices.Contains(got, "lint-golangci-readonly") {
+		t.Errorf("with CI set, lint schedules %v; want the read-only golangci-lint step", got)
+	}
+	if got := scheduled("lint", false, all); !slices.Contains(got, "lint-golangci-fix") {
+		t.Errorf("without CI, lint schedules %v; want the golangci-lint step that fixes", got)
+	}
+	if got := scheduled("build", true, tidying); !slices.Equal(got, []string{"build-tidy-check"}) {
+		t.Errorf("with CI set, build schedules %v; want build-tidy-check alone", got)
+	}
+	if got := scheduled("build", false, tidying); !slices.Equal(got, []string{"build-tidy"}) {
+		t.Errorf("without CI, build schedules %v; want build-tidy alone", got)
+	}
+
+	check := m.Tasks["build-tidy-check"]
+	if !slices.Equal(check.Args, []string{"build", "--phase", "tidy-check"}) {
+		t.Errorf("build-tidy-check args = %v, want the tidy-check phase", check.Args)
+	}
+	if len(check.Writes) != 0 || (check.Declares != nil && check.Declares.MutatesSources) {
+		t.Errorf("build-tidy-check declares writes %v; a check writes nothing", check.Writes)
 	}
 }

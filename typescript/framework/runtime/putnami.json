@@ -5,10 +5,10 @@
   "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/protocols/runtime"],
+  "dependencies": ["/protocols/infra", "/protocols/runtime"],
   "options": {
     "test": {
-      "filePatterns": ["../../../protocols/runtime/fixtures/**"]
+      "filePatterns": ["../../../protocols/infra/fixtures/equivalence/**", "../../../protocols/runtime/fixtures/**"]
     },
     "package": {
       "npm": true

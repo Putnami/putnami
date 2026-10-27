@@ -8,12 +8,14 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	protoevents "go.putnami.dev/protocol/events"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestManagedPublishConformance_SharedCorpus is the Go framework counterpart
 // to @putnami/events' protocol-conformance test. Both consume the canonical
 // protocol corpus instead of maintaining language-owned fixture copies.
 func TestManagedPublishConformance_SharedCorpus(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "managed-publish-requests", "the-go-framework-gives-each-managed-request-its-verdict")
 	fixtures := protoevents.ManagedPublishV1Fixtures()
 
 	for _, test := range []struct {
@@ -70,6 +72,7 @@ func TestManagedPublishConformance_ByteStableRetry(t *testing.T) {
 }
 
 func TestManagedPublishConformance_OutcomeClasses(t *testing.T) {
+	spectest.Proves(t, "events/event-server-contract", "one-outcome-corpus", "the-go-framework-finds-every-outcome-class")
 	fixtures := protoevents.ManagedPublishV1Fixtures()
 	entries, err := fs.ReadDir(fixtures, "outcomes")
 	if err != nil {

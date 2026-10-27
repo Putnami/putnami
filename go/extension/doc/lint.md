@@ -15,7 +15,9 @@ pre-bake the same toolchain before the lint gate runs.
   binaries cannot mask the expected tool
 - Installs the pinned tool via `go install` only when no compatible binary is
   available; pre-install with `putnami deps install --tag go` for offline CI
-- `golangci-lint` supports auto-fix (`--fix` enabled by default)
+- `golangci-lint` supports auto-fix (`--fix` enabled by default, disabled when
+  the `CI` environment variable is set). A read-only run that fails names
+  `putnami lint --fix --projects <project>`, which applies the fixes
 - Config resolution walks up from project root to workspace root, falling back to the bundled default config
 - Retries up to 3 times on `ETXTBSY` (a transient OS-level error on Linux)
 

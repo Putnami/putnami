@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // canonical returns the canonical serialization of v: json.MarshalIndent with
@@ -46,6 +47,7 @@ func sampleProjection(t *testing.T) JWKS {
 // cross-language contract — a future TypeScript projector must produce this same
 // file byte-for-byte.
 func TestPublicJWKS_CanonicalByteForm(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-projection-has-one-byte-form", "the-projection-matches-the-golden-bytes")
 	want, err := os.ReadFile(filepath.Join("fixtures", "equivalence", "keyring.golden.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +62,7 @@ func TestPublicJWKS_CanonicalByteForm(t *testing.T) {
 // projection is byte-identical across 100 marshals — no nondeterminism (e.g. map
 // ordering) leaks into the wire form.
 func TestPublicJWKS_Stable100(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-projection-has-one-byte-form", "the-projection-serializes-the-same-way-every-time")
 	jwks := sampleProjection(t)
 	first := canonical(t, jwks)
 	for i := range 100 {
@@ -73,6 +76,7 @@ func TestPublicJWKS_Stable100(t *testing.T) {
 // for every valid fixture, parse → String reproduces the original string, and a
 // second parse → String is byte-identical.
 func TestDigest_RoundTripStable(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-digest-grammar-is-strict", "a-digest-round-trips-to-the-same-string")
 	var c digestCorpus
 	loadFixture(t, "fixtures/digests.json", &c)
 	for _, v := range c.Valid {
@@ -100,6 +104,7 @@ func TestDigest_RoundTripStable(t *testing.T) {
 // stable and sorted across repeated calls, even though the underlying table is a
 // Go map (whose iteration order is not stable).
 func TestAllowedTransitions_Deterministic(t *testing.T) {
+	spectest.Proves(t, "keyring/signing-keyring-contract", "the-key-state-machine-is-closed", "allowed-transitions-are-sorted-and-stable")
 	for _, s := range AllKeyStates() {
 		first := s.AllowedTransitions()
 		for i := 0; i < 100; i++ {

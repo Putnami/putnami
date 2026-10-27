@@ -3,11 +3,14 @@ package infra
 import (
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestMerge_Deterministic verifies Merge produces byte-deterministic
 // output regardless of contribution input order or Go map iteration.
 func TestMerge_Deterministic(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-is-deterministic")
 	makeContribs := func() []ProjectContribution {
 		return []ProjectContribution{
 			{
@@ -59,6 +62,7 @@ func TestMerge_Deterministic(t *testing.T) {
 // TestMerge_OrderIndependent verifies Merge produces identical output
 // regardless of contribution caller order.
 func TestMerge_OrderIndependent(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-is-deterministic")
 	a := ProjectContribution{
 		Project: "a", Contributor: ContributorManual,
 		Manifest: PerProjectManifest{
@@ -100,6 +104,7 @@ func TestMerge_OrderIndependent(t *testing.T) {
 // TestValidatePerProjectManifest_Deterministic verifies validation
 // diagnostics appear in a stable order.
 func TestValidatePerProjectManifest_Deterministic(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "merging-follows-the-identity-rules", "the-merge-is-deterministic")
 	m := &PerProjectManifest{
 		ProtocolVersion: ProtocolVersion,
 		Databases: []Database{

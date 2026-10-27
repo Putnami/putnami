@@ -1,0 +1,80 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "distribution/release-set-contract",
+  "outcomes": [
+    "Two implementations derive the same rs_ reference from the same release set, because both encode the same canonical bytes",
+    "A provider and its caller exchange only the four operations, through one request file and one strict answer, and refuse an answer that does not bind to the request",
+    "A conflict on any channel of a release advances none of them, and the answer says which head moved"
+  ],
+  "nonGoals": [
+    "Cloud hosts, credentials, HTTP, authentication, authorization, storage, channel implementation and registry projection, which the provider owns",
+    "Coordinate and version shapes of an ecosystem, which the extension that owns the ecosystem profile and the registry validate",
+    "Which members a publication republishes and which channels it advances, which cli/job-planning-execution owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-protocol-identity-is-pinned",
+      "text": "The protocol is distribution/release-set/v2 at protocolVersion 2. The provider command name is cloud-release-set; its operations are resolve, release, channel-set and channel-status, each with --request-file. The ecosystem grammar is ^[a-z][a-z0-9-]{0,31}$, the channel grammar ^[a-z0-9][a-z0-9._-]{0,63}$, and at most 16 channels and 16 registry kinds are named. The schemas pin the same version, the ecosystem pattern, the required member fields in order, the kind vocabulary and the three outcomes."
+    },
+    {
+      "id": "a-release-set-is-closed-over-its-members",
+      "text": "A release set names one namespace and at least one member, keyed by ecosystem and coordinate. Each defect gets its code at its field: a malformed ecosystem, coordinate, version, digest, source revision, selection fingerprint, kind, source tree, project or platform, an oversized value, a duplicate member or dependency, a dependency the set does not hold at exactly its version, and a version other than 2. An ecosystem the protocol never heard of, and two members of one project in one ecosystem, are accepted."
+    },
+    {
+      "id": "the-canonical-bytes-are-the-identity",
+      "text": "Normalization returns a deep copy sorted by ecosystem and coordinate, never aliases or mutates its input, and drops an empty platforms map. The canonical bytes encode that copy in struct order and equal the embedded golden. The ref id is rs_ plus the SHA-256 hex of those bytes and its digest is sha256: plus the same hex; a ref whose id and digest differ is refused. The canonical parser accepts those exact bytes and refuses any other spelling of the same set."
+    },
+    {
+      "id": "optional-provenance-is-part-of-identity",
+      "text": "A member's project, kind and sourceTree are optional. A set without them derives the same ref as before they existed, and an explicitly empty value decodes as absence. A present value is part of the canonical bytes, so two sets that differ only in it have different refs, and it survives normalization and strict decoding. The kinds are image, config, migration, doc, library, archive and deployment, in that order; any other token is refused. A member project is the project id without its leading slash."
+    },
+    {
+      "id": "parsing-is-strict-and-bounded",
+      "text": "Every parser refuses unknown, duplicate, missing and unexpectedly null fields, trailing JSON and values of the wrong type, in the release set and in each provider shape, with the code at its field. An input above 4 MiB is refused before decoding. Validation returns at most 128 diagnostics and ends with distribution.diagnostics_truncated when it stops. Every validator fails closed on a nil value, and an empty release set fails validation."
+    },
+    {
+      "id": "channels-are-portable-and-visibility-only-widens",
+      "text": "A git tag becomes the channel of a tagged publish by replacing each / with -, so ts/v0.3.0 becomes ts-v0.3.0; a tag that cannot become a portable channel is refused, and a slash is never portable. Visibility has three ordered levels, internal, private and public. An unknown level is invalid, and MaxVisibility returns the wider of two levels, so a resolved level never narrows."
+    },
+    {
+      "id": "a-resolve-answers-exactly-what-it-asked",
+      "text": "A resolve names either 1 to 16 unique portable channels or one release id, never both. Its answer names exactly the requested channels in the requested namespace, and null means the channel has no head. A present head carries its snapshot, a generation of at least 1 and a ref that recomputes from that snapshot. A release-id request is answered with that release at generation 0, never with heads. The extension SDK resolves an immutable release this way."
+    },
+    {
+      "id": "a-release-is-one-compare-and-swap",
+      "text": "A release names its set, each channel with its expected head or null, and a visibility chain whose member rules name members of the set. The answer reports pointers only, for exactly the requested channels. Released and already-current report the set on each channel at generation 1 or more; a set already expected everywhere is already-current. A conflict names a head other than the expected one. The CLI expects null for an empty channel and, on a conflict, advances nothing and names the moved head."
+    },
+    {
+      "id": "a-channel-set-moves-one-channel",
+      "text": "A channel-set request moves one channel from exactly one source, a channel or a release id, with its expected head. Its answer is a release response keyed by that one channel: released must change the head, conflict must report a head other than the expected one, and a successful move from a release id must report that exact set. An already-current answer stays valid for a retry whose expectation is stale. The extension SDK refuses an answer about another channel or another release."
+    },
+    {
+      "id": "a-channel-status-reports-desired-and-observed",
+      "text": "A channel-status answer carries the desired head, null for an empty channel or a head of generation 1 or more, and maps each registry kind, an ecosystem identifier, to the generation it has applied, for at most 16 kinds. A channel name that is not portable is refused."
+    },
+    {
+      "id": "the-publish-outcome-names-one-set",
+      "text": "A publish outcome names its namespace, the ref of its set and at least one portable channel. Every channel head names that same set at generation 1 or more. A null ref or head, another set on a channel, a version other than 2 and a malformed namespace are refused."
+    },
+    {
+      "id": "mirror-intent-never-changes-the-set",
+      "text": "A release may carry mirror targets, one per registry kind and at most 16. A release without them omits the field, and carrying them never changes the set's ref. A target of more than 2048 bytes is refused, as is one that is empty, uses http, or carries userinfo, a query, a fragment or whitespace, and the refusal never echoes the secret. A null, duplicate, mistyped or unknown mirror field is refused. The extension SDK passes mirror intent to the provider unchanged."
+    },
+    {
+      "id": "the-embedded-corpus-is-the-conformance-suite",
+      "text": "The module embeds its valid, invalid, non-canonical and equivalence fixtures and the golden canonical bytes and ref. RunEmbeddedConformance passes every fixture: a valid set canonicalizes and round-trips, an invalid or non-canonical one yields its exact code, and each equivalent spelling normalizes to the golden bytes and ref. Each call returns fresh copies, so one caller cannot change another's fixtures."
+    },
+    {
+      "id": "the-provider-seam-is-one-request-file-and-one-answer",
+      "text": "A caller invokes the provider with one operation and --request-file naming an absolute, private file it removes afterwards, and refuses a malformed answer or one with extra output. The provider accepts only the four operations in that exact shape, refuses a relative, shared, linked, oversized or unknown-field request file before any network call, prints exactly one answer line per outcome, prints nothing when it fails, and refuses an answer that is invalid or does not bind to its request."
+    }
+  ],
+  "decisions": [
+    "protocols/distribution/doc/adr/0001-immutable-release-sets-and-channel-cas.md",
+    "protocols/distribution/doc/adr/0004-mirror-intent-in-the-release-transaction.md",
+    "protocols/distribution/doc/adr/0005-member-attribution-project-and-kind.md",
+    "protocols/distribution/doc/adr/0006-a-publication-measures-against-a-channel-it-does-not-advance.md",
+    "protocols/distribution/doc/adr/0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md"
+  ]
+}

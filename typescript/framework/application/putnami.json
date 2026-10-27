@@ -5,9 +5,13 @@
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "dependencies": [
+    "/protocols/capabilities",
+    "/protocols/config",
+    "/protocols/contracts",
     "/protocols/features",
     "/protocols/http-routes",
     "/protocols/identity",
+    "/protocols/keyring",
     "/protocols/platform",
     "/protocols/telemetry"
   ],
@@ -17,10 +21,15 @@
         "../../../protocols/capabilities/fixtures/v2/equivalence/**",
         "../../../protocols/clientcontract/fixtures/**",
         "../../../protocols/clientcontract/schemas/**",
+        "../../../protocols/config/fixtures/**",
+        "../../../protocols/config/schemas/**",
+        "../../../protocols/contracts/fixtures/**",
+        "../../../protocols/contracts/testdata/**",
         "../../../protocols/features/fixtures/**",
         "../../../protocols/http-routes/fixtures/**",
         "../../../protocols/identity/schema/contracts.gen.ts",
         "../../../protocols/identity/schema/contracts.json",
+        "../../../protocols/keyring/fixtures/**",
         "../../../protocols/platform/fixtures/envelope/**"
       ]
     },

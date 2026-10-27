@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/config",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -11,9 +11,11 @@
   "options": {
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "Typed configuration is delivered by the framework packages; this module only fixes the wire shape they exchange."
   }
 }

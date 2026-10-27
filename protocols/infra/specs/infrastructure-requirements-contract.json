@@ -1,0 +1,68 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "infra/infrastructure-requirements-contract",
+  "outcomes": [
+    "A Go and a TypeScript producer write the same bytes for the same needs",
+    "A workload's aggregated manifest merges its dependency closure by identity, with provenance, overrides and a runtime block",
+    "A deployer reads a deployment declaration in one canonical byte form and refuses any other"
+  ],
+  "nonGoals": [
+    "Deployer adapters that provision the declared resources",
+    "Payload schemas attached to event topics",
+    "Minimum residency and billing posture, which deployers own",
+    "The rich, secret-bearing database and storage shapes, which their own protocols own"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-and-the-schemas-are-pinned",
+      "text": "A manifest carries protocolVersion 2, and the per-project and aggregated schemas accept exactly that version. Each schema definition of the per-project, aggregated and overrides shapes has the members of its Go type, no more and no fewer. The runtime subtree exposes none of the retired cost-policy fields min, billing, requestBased, cpuIdle and cpuAlwaysAllocated. Each of the six TypeScript producers of the framework stamps version 2 in its one version constant."
+    },
+    {
+      "id": "a-manifest-is-read-strictly",
+      "text": "Every valid fixture validates and every invalid one is refused. A reader refuses an unknown member as infra.unknown_field, naming the migration for a retired cost-policy field; a runtime block in a per-project manifest as infra.runtime_in_library; bytes that are not JSON as infra.parse_error; another version, 1 included, as infra.invalid_protocol_version; and an engine but postgres, mysql, sqlite and firestore as infra.invalid_engine. The cloud infra plan prints the codes of a manifest that fails."
+    },
+    {
+      "id": "names-schedules-provenance-and-scaling-are-validated",
+      "text": "A resource name is lowercase and a secret name a config key, or it is infra.invalid_name. A schedule is a 5-field cron: an empty or blank one is infra.empty_schedule, and a malformed one or a macro infra.invalid_schedule. An aggregated manifest without a workload is infra.missing_workload, an entry without sources infra.missing_sources, and a contributor but manual or framework:<name>, or a source without a project, infra.invalid_contributor. A negative scaling is infra.invalid_scaling, and 0 is valid."
+    },
+    {
+      "id": "merging-follows-the-identity-rules",
+      "text": "Merge keys a database by name and engine and unions its schemas, keeps two engines apart, and dedups topics and secrets by name. A bucket unions its access and its public flag and fills an empty retention. Two different retentions, or two schedules or entrypoints of one job, are infra.conflicting_value, which a manual contributor wins over a framework one; between equals the first source wins. Sources are sorted and deduped. The same contributions, in any order, give the same bytes."
+    },
+    {
+      "id": "a-subscription-carries-its-delivery",
+      "text": "A subscribe is a bare topic for pull delivery or an object with its topic and a stream or push delivery, so an all-pull events block keeps the bytes of a string array. The object form refuses an unknown member, and a delivery outside pull, stream and push is refused. When two projects subscribe one topic, the merged subscribe takes the strongest delivery whatever their order, and a pull one carries no delivery."
+    },
+    {
+      "id": "overrides-drop-entries-by-identity",
+      "text": "An overrides file drops from a merged manifest each entry an ignore rule names, a database by name and engine and any other entry by name, a secret by its config key, and leaves its input unchanged; an events block left empty becomes absent. A rule that matches nothing is a warning, infra.unused_override. The overrides reader refuses an unknown member, a bad engine and a bad name. The extension SDK aggregator drops a database a library declares when the workload ignores it, and keeps the rest."
+    },
+    {
+      "id": "a-workload-always-has-a-runtime",
+      "text": "DefaultRuntime returns, at each call, a fresh runtime with the default scaling max, concurrency and ingress visibility.The extension SDK aggregator gives a workload without infra/runtime.json those defaults, in its manifest and in .gen/infra/runtime.json; an authored runtime.json wins and removes that sidecar; one with scaling.min is infra.unknown_field naming the cost policy and the migration, and drops the whole runtime block. The TypeScript extension sets runtime.protocols.http2 to false in both files."
+    },
+    {
+      "id": "committed-requirements-are-synced-from-the-fragments",
+      "text": "Sync folds every fragment of .gen/infra but runtime.json into infra/requirements.json, sorted and deduped, in the formatter's form: a scalar array fits one line within 120 columns, a trailing comma counted, or expands. It moves a v1 fragment to v2 with a warning, refuses an unknown member naming its fragment, and removes a stale file. A producer owns one fragment, which WriteSidecar stamps with $schema and the version and removes when empty. The TypeScript extension's generate step syncs the file."
+    },
+    {
+      "id": "producers-emit-the-shared-goldens",
+      "text": "For the inputs its golden in fixtures/equivalence documents, each producer emits that golden byte for byte: the Go database, events, migration and storage frameworks and the secrets producer of the Go extension, and the TypeScript database, events, migration, document, storage and runtime config producers. A Go and a TypeScript producer of one kind therefore write the same bytes."
+    },
+    {
+      "id": "the-deployment-declaration-is-canonical",
+      "text": "MarshalDeployment writes a manifest that validates as compact bytes in member order, without $schema or a final newline, the same at each call, and nothing for one that does not. ParseDeployment refuses indented, reordered, newline-ended, repeated-member, $schema or unescaped bytes as infra.non_canonical. The extension SDK and the TypeScript extension declare the build aggregate in those bytes. The cloud publish stores them as they are and refuses a missing, non-canonical or other workload's declaration."
+    },
+    {
+      "id": "projections-carry-no-secret",
+      "text": "The database entries are the engine-mapped image of the database protocol's projection, sorted by name, and the storage entries the access-mapped image of the storage protocol's; an unmapped engine is infra.invalid_engine and an unmapped access infra.invalid_access, each dropping its entry, and none invents a schema or an access. The encoded database entries carry no connection, DSN, host, user, password or SSL member, and the storage entries no backend, bucket, prefix, identity, scope or signer."
+    }
+  ],
+  "decisions": [
+    "protocols/infra/doc/adr/0001-committed-requirements-are-a-formatter-fixed-point.md",
+    "protocols/infra/doc/adr/0002-human-intent-survives-every-generation.md",
+    "protocols/infra/doc/adr/0003-deployers-own-runtime-cost-policy.md",
+    "protocols/infra/doc/adr/0004-a-secret-is-named-by-its-config-key.md"
+  ]
+}

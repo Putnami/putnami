@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "grpc-services/service-inventory-contract",
+  "outcomes": [
+    "A consumer reads which services a build serves from one strictly parsed document and refuses the whole document when any part of it is invalid",
+    "The same services give the same bytes and the same digest whatever their registration order",
+    "A Connect service is found in the HTTP route inventory of the same build through the route its source kind names"
+  ],
+  "nonGoals": [
+    "Message types, request and response schemas or protobuf descriptors",
+    "Listener addresses, ports, TLS settings or any environment value",
+    "Reachability and visibility, which the HTTP route inventory owns",
+    "Which surfaces a framework composes and when it describes them, which the producer's own feature owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-identifiers-are-pinned",
+      "text": "The protocol identifier is putnami.grpc-services.v1 and the schema URL is https://putnami.dev/schemas/putnami-grpc-services-v1.json. The published schema carries that $id and pins that $schema and that protocol. Its members match the Go types of the manifest, a service, a method and a provenance, and its transport and sourceKind enums match the Go values."
+    },
+    {
+      "id": "an-inventory-fails-closed",
+      "text": "An inventory parses strictly and fails as a whole: an invalid one returns no manifest. Each of the 29 invalid fixtures fails with its expected code, among them an unknown member, trailing JSON, a missing services, methodsKnown or streaming flag, another protocol or schema and a wrong digest. Both valid fixtures validate, and every expected code is registered. The Go extension checks an inventory its describe wrote or staged with this parser, refuses a malformed one with its code and passes a canonical one."
+    },
+    {
+      "id": "a-service-is-identified-by-name-transport-and-base-path",
+      "text": "A service name is dot-joined identifier segments, one segment included; an empty name or a leading dot is invalid. A Connect basePath ends in /<name>/ behind a mount prefix with no empty, dot or percent-escaped segment. A connect-gateway source on grpc is a mismatch. Name, transport and basePath identify a service: one name on two transports or base paths is valid, and a repeated triple is a duplicate even when byte-identical. The Go gRPC plugins collapse an identical registration and fail on a conflict."
+    },
+    {
+      "id": "the-serialization-is-canonical",
+      "text": "Canonicalization gives one byte form and one digest: the full fixture yields the committed golden and its pinned digest, also with its services and methods reversed, on each of 100 runs, and leaves the input unchanged. A nil or empty inventory yields the minimal fixture and its pinned digest, a service without methods serializes an empty methods list and round-trips, and a nil manifest or a manifest of another protocol is refused."
+    },
+    {
+      "id": "each-source-kind-joins-the-route-inventory-its-own-way",
+      "text": "A grpc-server service has no basePath and lists every registered method with its streaming flags, as the Go gRPC server does for health and enabled reflection. A connect-gateway service lists no method and joins one prefix route at its basePath that admits POST, under the route inventory's project, as the Go gateway does with and without a path prefix. An api-bridge service lists its methods, each joined by one exact POST route at basePath plus its name, as the Go API bridge does."
+    }
+  ],
+  "decisions": [
+    "protocols/grpc-services/doc/adr/0001-grpc-services-is-its-own-protocol.md"
+  ]
+}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	protocfg "go.putnami.dev/protocol/config"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
 )
 
@@ -28,6 +29,7 @@ const equivalenceFixturePath = "../../../../../protocols/infra/fixtures/equivale
 // against the same golden file. A change to either implementation that breaks
 // byte-equivalence fails both tests.
 func TestCrossLanguageEquivalence_Secrets(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "producers-emit-the-shared-goldens", "the-go-extension-secrets-producer-emits-its-golden")
 	blocks := []protocfg.Block{
 		{Path: "database", Fields: []protocfg.FieldSchema{
 			{Name: "password", Type: protocfg.FieldTypeString, Sensitive: true},

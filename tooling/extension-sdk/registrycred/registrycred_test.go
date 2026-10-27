@@ -8,10 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	registryproto "go.putnami.dev/protocol/registry"
 )
 
 func TestResolveTokenWithCLI_BootstrapsWithoutChangingTheParentOrConsultingPATH(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-extension-sdk-passes-only-the-host")
 	args := filepath.Join(t.TempDir(), "argv")
 	executable := fakeCLIExecutable(t, fakeCLI{
 		RequireEnv: map[string]string{"PUTNAMI_NO_RELAUNCH": "1"},
@@ -69,6 +71,7 @@ func TestResolveTokenCLI_FallbackRetainsLauncherPolicy(t *testing.T) {
 // publisher and the installer make the SAME call; a package, an action, or an
 // owning workspace on this command line is a cross-repo break.
 func TestResolveTokenCLI_PassesTheHostAndNothingElse(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-extension-sdk-passes-only-the-host")
 	recorded := filepath.Join(t.TempDir(), "argv")
 	fakeCloudCLI(t, fakeCLI{WordsFile: recorded, Stdout: "pkt_host_only\n"})
 
@@ -87,6 +90,7 @@ func TestResolveTokenCLI_PassesTheHostAndNothingElse(t *testing.T) {
 }
 
 func TestResolveTokenCLI_FailureReturnsHint(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "a-seam-token-is-a-bare-bearer", "the-extension-sdk-relays-the-stderr-of-a-failure")
 	recordedCloudCLI(t, recordedExchange(t, "not-authenticated"))
 	tok, hint := resolveTokenCLI("oci.putnami.dev")
 	if tok != "" {
@@ -100,6 +104,7 @@ func TestResolveTokenCLI_FailureReturnsHint(t *testing.T) {
 // The settled answer is one production-sized bearer on stdout: a 1011-byte
 // RS256 JWT, returned without its trailing newline.
 func TestResolveTokenCLI_SettledAnswerIsTheWholeBearer(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "a-seam-token-is-a-bare-bearer", "the-extension-sdk-returns-the-whole-bearer")
 	settled := recordedExchange(t, "settled")
 	recordedCloudCLI(t, settled)
 	tok, hint := resolveTokenCLI("put.putnami.dev")
@@ -109,6 +114,7 @@ func TestResolveTokenCLI_SettledAnswerIsTheWholeBearer(t *testing.T) {
 }
 
 func TestResolveTokenCLI_MissingBinaryIsSilent(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "a-seam-token-is-a-bare-bearer", "the-extension-sdk-is-silent-without-an-answer")
 	t.Setenv(registryproto.CLIExecutableEnv, "")
 	prev := cloudCLIName
 	t.Cleanup(func() { cloudCLIName = prev })
@@ -120,6 +126,7 @@ func TestResolveTokenCLI_MissingBinaryIsSilent(t *testing.T) {
 }
 
 func TestResolveTokenCLI_UsesAdvertisedCLIExecutableWithoutWorkspacePinRelaunch(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-extension-sdk-uses-the-advertised-cli")
 	// Without PUTNAMI_NO_RELAUNCH=1 the advertised CLI would relaunch through
 	// the workspace pin.
 	cliPath := fakeCLIExecutable(t, fakeCLI{
@@ -140,6 +147,7 @@ func TestResolveTokenCLI_UsesAdvertisedCLIExecutableWithoutWorkspacePinRelaunch(
 }
 
 func TestResolveTokenCLI_EmptyHost(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "the-seam-is-pinned", "the-extension-sdk-answers-nothing-for-an-empty-host")
 	// No host → no resolution attempt at all (the binary is never invoked).
 	t.Setenv(registryproto.CLIExecutableEnv, "")
 	prev := cloudCLIName
@@ -151,6 +159,7 @@ func TestResolveTokenCLI_EmptyHost(t *testing.T) {
 }
 
 func TestResolveTokenCLI_WhitespaceRejected(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "a-seam-token-is-a-bare-bearer", "the-extension-sdk-reads-a-status-line-as-no-token")
 	// Human status lines ahead of the bearer (not a bare bearer) must not become
 	// a token. The recording is the stdout the incident captured.
 	recordedCloudCLI(t, recordedExchange(t, "lock-changed"))
@@ -164,6 +173,7 @@ func TestResolveTokenCLI_WhitespaceRejected(t *testing.T) {
 }
 
 func TestResolveTokenCLI_EmptyStdoutIsSilent(t *testing.T) {
+	spectest.Proves(t, "registry/credential-seam-contract", "a-seam-token-is-a-bare-bearer", "the-extension-sdk-is-silent-without-an-answer")
 	fakeCloudCLI(t, fakeCLI{})
 	tok, hint := resolveTokenCLI("oci.putnami.dev")
 	if tok != "" || hint != "" {

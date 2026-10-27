@@ -21,15 +21,23 @@ import {
   Uuid,
   type SchemaDescriptor,
 } from '@putnami/application';
+import { specTest } from '@putnami/runtime/spectest';
 import { contractStruct, type ContractManifest } from '../../src/contracts';
 import { generateOpenApiSpec } from '../../src/openapi/openapi';
+
+// This test proves a requirement of the contracts protocol's feature under a check of this package's own.
+const CONTRACT_COMPONENTS = {
+  feature: 'contracts/contract-ir',
+  requirement: 'contract-types-become-components',
+  check: 'the-typescript-openapi-generator-projects-contract-types',
+};
 
 describe('generateOpenApiSpec', () => {
   const defaultOptions = {
     info: { title: 'Test API', version: '1.0.0' },
   };
 
-  it('projects canonical contract enums, unions, and DTOs as referenced components', () => {
+  specTest('projects canonical contract enums, unions, and DTOs as referenced components', CONTRACT_COMPONENTS, () => {
     const manifest: ContractManifest = {
       protocolVersion: 1,
       name: 'example/projection',

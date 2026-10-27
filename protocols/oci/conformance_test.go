@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
 // is intentional and surfaces in code review.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-version-and-endpoints-are-pinned", "the-protocol-version-is-1")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
@@ -22,6 +24,7 @@ func TestConformance_ProtocolVersion(t *testing.T) {
 // TestConformance_Endpoints pins the capability/endpoint contract the cloud OCI
 // registry implements. Changing any of these is a protocol change.
 func TestConformance_Endpoints(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-version-and-endpoints-are-pinned", "the-endpoints-and-the-capability-are-pinned")
 	if CapabilitiesPath != "/v2/_putnami/capabilities" {
 		t.Errorf("CapabilitiesPath = %q, want /v2/_putnami/capabilities", CapabilitiesPath)
 	}
@@ -35,6 +38,7 @@ func TestConformance_Endpoints(t *testing.T) {
 
 // TestConformance_SupportsTagDigest pins the capability-gate semantics.
 func TestConformance_SupportsTagDigest(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-fast-path-is-taken-only-when-advertised", "the-capability-gate-needs-tag-digest-v1")
 	if !(CapabilitiesResponse{APIs: []string{"tag-digest/v1"}}).SupportsTagDigest() {
 		t.Error("SupportsTagDigest must be true when apis contains tag-digest/v1")
 	}
@@ -49,6 +53,7 @@ func TestConformance_SupportsTagDigest(t *testing.T) {
 // TestConformance_ErrorCodes validates that every protocol error code uses the
 // oci.* prefix and that the canonical set is complete.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-error-codes-are-closed", "the-error-codes-are-the-five-canonical-ones")
 	canonical := []string{
 		"oci.invalid_capabilities",
 		"oci.invalid_tag_digest",
@@ -75,6 +80,7 @@ type parseFunc func([]byte) []diag.Diagnostic
 // valid/ must produce no errors, those in invalid/ must produce at least one. A
 // cloud registry in another language validates its bodies against the same corpus.
 func TestConformance_Fixtures(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-fixture-corpus-is-the-contract", "every-fixture-gets-its-verdict")
 	messages := map[string]parseFunc{
 		"capabilities-response": func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateCapabilitiesResponse(b); return d },
 		"tag-digest-request":    func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateTagDigestRequest(b); return d },
@@ -135,6 +141,7 @@ type registryHostCases struct {
 // repository and host yields its registry host and scheme, every refused one
 // is refused, and no error repeats what it refuses.
 func TestConformance_RegistryHost(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-registry-host-rules-are-one-table", "every-registry-host-case-gets-its-verdict")
 	data, err := os.ReadFile(filepath.Join("fixtures", "registry-host", "cases.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +191,7 @@ func TestConformance_RegistryHost(t *testing.T) {
 // go-containerregistry: a host is lowercased before any other rule applies,
 // and only its ASCII letters change.
 func TestRegistryHostIsCaseInsensitive(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "the-registry-host-rules-are-one-table", "a-host-is-lowercased-first")
 	for _, test := range []struct{ host, want string }{
 		{"Docker.Io", "index.docker.io"},
 		{"REGISTRY.LOCALHOST:5000", "registry.localhost:5000"},

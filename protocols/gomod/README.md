@@ -160,17 +160,15 @@ Evidence still missing for `stable`:
 - there is exactly one consumer, so the contract has never been proven against a
   second, independently written client.
 
-## Product feature and durable decisions
+## Feature and spec
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcome is "publish a private Go module to a channel", and that outcome is owned
-by the publish command surface of `@putnami/cli` and the Go extension, not by a
-wire contract. Declaring a feature per protocol module would mint one artificial
-product identity per technical boundary, which the
-[feature protocol's authoring boundary](../features/README.md) explicitly warns
-against. With no feature to detail, there is no spec: a spec details exactly one
-already-authored feature and never mints one.
-
-Durable decisions:
-
-- [ADR 0001 — Bespoke authenticated write, standard proxy read](doc/adr/0001-bespoke-write-standard-read.md)
+The module owns the feature of its contract, `gomod/module-write-contract`,
+specified in [`specs/module-write-contract.json`](specs/module-write-contract.json).
+The tests here prove the version, the paths and content types, the field
+names, the error codes, the fixture corpus and the release acknowledgement.
+Two implementations prove the rest in their own tests. The SDK publisher
+(`tooling/extension-sdk`, `gomodpublish`) proves that a version is bound to the
+zip the registry stored and that a 409 is a reuse only when the caller allows
+it. The Go extension's publish job (`go/extension`) proves that a publish sets
+no channel and calls no release. The design intent lives in
+[`doc/adr/0001-bespoke-write-standard-read.md`](doc/adr/0001-bespoke-write-standard-read.md).

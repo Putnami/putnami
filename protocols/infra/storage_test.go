@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	pstorage "go.putnami.dev/protocol/storage"
 )
 
@@ -15,6 +16,7 @@ import (
 // access-mapped image of Manifest.Project(), sorted by resource name, carrying
 // name/access/public/retention.
 func TestStoragesFromManifest_DerivesProjection(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-storage-projection-follows-the-storage-protocol")
 	m := &pstorage.Manifest{
 		ProtocolVersion: pstorage.ProtocolVersion,
 		Resources: []pstorage.Resource{
@@ -63,6 +65,7 @@ func TestStoragesFromManifest_DerivesProjection(t *testing.T) {
 
 // TestStoragesFromManifest_NilAndEmpty covers the no-op inputs.
 func TestStoragesFromManifest_NilAndEmpty(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-storage-projection-follows-the-storage-protocol")
 	if got, diags := StoragesFromManifest(nil); got != nil || diags != nil {
 		t.Errorf("nil manifest: got %v, diags %v; want nil, nil", got, diags)
 	}
@@ -75,6 +78,7 @@ func TestStoragesFromManifest_NilAndEmpty(t *testing.T) {
 // TestStoragesFromManifest_NoAccess maps a resource that declares no access to
 // an entry with no access — a valid "no grant declared" state, never invented.
 func TestStoragesFromManifest_NoAccess(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-storage-projection-follows-the-storage-protocol")
 	m := &pstorage.Manifest{
 		ProtocolVersion: pstorage.ProtocolVersion,
 		Resources:       []pstorage.Resource{{Name: "scratch"}},
@@ -93,6 +97,7 @@ func TestStoragesFromManifest_NoAccess(t *testing.T) {
 // protocol cannot represent instead of coercing them, and drops the offending
 // entry.
 func TestStoragesFromManifest_UnknownAccess(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-storage-projection-follows-the-storage-protocol")
 	m := &pstorage.Manifest{
 		ProtocolVersion: pstorage.ProtocolVersion,
 		Resources: []pstorage.Resource{
@@ -121,6 +126,7 @@ func TestStoragesFromManifest_UnknownAccess(t *testing.T) {
 // additionally drops the isolation scope and the signed-URL signer. The derived
 // infra entries serialize to none of those.
 func TestStoragesFromManifest_CannotLeakBindingCoordinates(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "a-projection-carries-no-secret")
 	m := &pstorage.Manifest{
 		ProtocolVersion: pstorage.ProtocolVersion,
 		Resources: []pstorage.Resource{
