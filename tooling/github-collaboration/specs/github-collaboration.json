@@ -17,10 +17,6 @@
   ],
   "requirements": [
     {
-      "id": "contract-scenarios",
-      "text": "The shared tasks and proposals scenarios of go.putnami.dev/protocol/collaboration/providertest pass against GitHub's API: empty and paginated finds, idempotent creation and review, stale revisions, one open proposal per exact identity, and not-found foreign references."
-    },
-    {
       "id": "configurable-state-mapping",
       "text": "States map to configured issue labels. Transitions remove all state labels and apply the target's first label, even when another label or no label supplies the current state. done and canceled close as completed and not planned; empty resulting label lists are encoded as arrays, never null. Unmapped states needing labels are unsupported. Create applies state labels only for states that need one; create and update refuse state labels."
     },
@@ -46,7 +42,7 @@
     },
     {
       "id": "truthful-manifest",
-      "text": "The manifest passes the extension protocol's strict validation and the collaboration offer check, declares preconditions checked where GitHub cannot compare and write in one step, and marks every tool as reaching outside the machine. Its link tool states that a task's parent is outside the revision, which link does not move."
+      "text": "The manifest passes the extension protocol's strict validation, declares preconditions checked where GitHub cannot compare and write in one step, and marks every tool as reaching outside the machine. Its link tool states that a task's parent is outside the revision, which link does not move."
     }
   ],
   "decisions": [

@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestCatalog_RequiredOperationsAreTheContract pins what every provider of
 // each version must implement. Moving an operation between required and
 // optional changes the contract, so it is a new version, never an edit.
 func TestCatalog_RequiredOperationsAreTheContract(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-closed-catalog", "every-version-names-its-required-and-optional-operations")
 	want := map[string][]string{
 		ContractMemory:    {OperationCheckpoint, OperationContext, OperationMission},
 		ContractMissions:  {OperationAsk, OperationReply, OperationSync},
@@ -53,6 +55,7 @@ func TestCatalog_RequiredOperationsAreTheContract(t *testing.T) {
 // TestCatalog_OperationsAreWellFormed checks the invariants every entry must
 // hold for the orchestrator's rules to be sound.
 func TestCatalog_OperationsAreWellFormed(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "well-formed-operations", "every-operation-is-well-formed")
 	catalog := Catalog()
 	if !slices.IsSortedFunc(catalog, func(a, b ContractSpec) int {
 		if a.Name != b.Name {
@@ -98,6 +101,7 @@ func TestCatalog_OperationsAreWellFormed(t *testing.T) {
 // every mutation that adds an item carries the key that lets a provider
 // recognize a retry instead of adding a second one.
 func TestCatalog_MutationsThatCreateCarryIdempotencyKeys(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-closed-catalog", "every-creating-mutation-carries-an-idempotency-key")
 	for _, key := range []OperationKey{
 		{ContractTasks, 1, OperationCreate},
 		{ContractProposals, 1, OperationReview},
@@ -117,6 +121,7 @@ func TestCatalog_MutationsThatCreateCarryIdempotencyKeys(t *testing.T) {
 // missions.sync alone. A host-only operation is a mutation, because a read has
 // no reason to hide from an agent.
 func TestCatalog_HostOnlyOperations(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-closed-catalog", "only-missions-sync-is-host-only")
 	var hostOnly []string
 	for _, spec := range Catalog() {
 		for _, op := range spec.Operations {
@@ -147,6 +152,7 @@ func goMembersOf(value any) []string {
 }
 
 func TestLookupRejectsUnknownOperationsAndVersions(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "strict-documents", "an-unknown-contract-version-or-operation-is-refused")
 	cases := []struct {
 		contract  string
 		version   int
@@ -166,6 +172,7 @@ func TestLookupRejectsUnknownOperationsAndVersions(t *testing.T) {
 }
 
 func TestInputSchemaIsSelfContainedForEveryOperation(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "schemas-track-the-go-types", "every-input-schema-is-self-contained")
 	for _, spec := range Catalog() {
 		for _, name := range append([]string{OperationCapabilities}, operationNames(spec)...) {
 			schema, err := InputSchema(spec.Name, spec.Version, name)
@@ -205,6 +212,7 @@ func operationNames(spec ContractSpec) []string {
 }
 
 func TestStrictDecodeRefusals(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "strict-documents", "a-malformed-document-is-refused")
 	cases := []struct {
 		name string
 		data string
@@ -229,6 +237,7 @@ func TestStrictDecodeRefusals(t *testing.T) {
 }
 
 func TestValidationBoundsAndTimestamps(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "strict-documents", "bounds-and-timestamps-are-validated")
 	record := MemoryRecord{
 		Ref: Ref{Source: "local:x", ID: "m1"}, Revision: "r1", Kind: MemoryKindMission,
 		Identity:   MemoryIdentity{Mission: "m1"},
@@ -267,6 +276,7 @@ func TestValidationBoundsAndTimestamps(t *testing.T) {
 // TestReconcileOperationFindsTheNamedOperation: a hint is prose for a person,
 // and names the operation automation runs first.
 func TestReconcileOperationFindsTheNamedOperation(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-outcome-per-envelope", "a-reconcile-hint-names-a-catalog-operation")
 	cases := []struct {
 		contract, hint, want string
 	}{
@@ -290,6 +300,7 @@ func TestReconcileOperationFindsTheNamedOperation(t *testing.T) {
 }
 
 func TestEnvelopeValidationCoversCapabilitiesAndVersions(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "one-outcome-per-envelope", "an-envelope-carries-one-outcome")
 	ok := json.RawMessage(`{"task":{"ref":{"source":"local:x","id":"T-1"},"revision":"r1","title":"t","state":"open"}}`)
 	cases := []struct {
 		name     string

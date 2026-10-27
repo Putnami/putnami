@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "provider-neutral-publication",
-      "text": "putnami change finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry. With no open proposal, a merged or closed proposal of the branch stops the run before any write."
+      "text": "putnami change finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. With no open proposal, a merged or closed proposal of the branch stops the run before any write."
     },
     {
       "id": "repository-policy",

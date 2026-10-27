@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "samples/go-first-party-client-matrix#a-call-is-observable-and-ends-with-its-application",
+    "samples/go-first-party-client-matrix#a-declared-continuation-survives-an-instance-change",
+    "samples/go-first-party-client-matrix#a-result-is-what-the-contract-declared",
+    "samples/go-first-party-client-matrix#generation-is-deterministic-and-a-break-is-detected",
+    "samples/go-first-party-client-matrix#identity-is-declared-and-never-downgraded",
+    "samples/go-first-party-client-matrix#the-declared-request-policy-is-the-one-applied",
+    "samples/go-first-party-client-matrix#the-matrix-index-is-checkable"
+  ]
+}

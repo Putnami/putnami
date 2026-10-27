@@ -528,7 +528,7 @@
       "family": "observability",
       "auth": "api-key",
       "policy": "safe",
-      "test": "test/client.test.ts:should refuse every call through a retained client once its application stopped",
+      "test": "test/client.test.ts:should refuse a call through a retained client once its application stopped",
       "result": "pass"
     },
     {
