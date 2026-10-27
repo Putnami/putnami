@@ -8,6 +8,7 @@ import (
 
 	pdb "go.putnami.dev/protocol/database"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestDatabasesFromManifest_DerivesProjection proves the infra database entries
@@ -15,6 +16,7 @@ import (
 // engine-mapped image of RequirementManifest.Project(), sorted by datasource
 // name, one schema per datasource.
 func TestDatabasesFromManifest_DerivesProjection(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-database-projection-follows-the-database-protocol")
 	m := &pdb.RequirementManifest{
 		ProtocolVersion: pdb.ProtocolVersion,
 		Databases: map[string]pdb.Requirement{
@@ -66,6 +68,7 @@ func TestDatabasesFromManifest_DerivesProjection(t *testing.T) {
 
 // TestDatabasesFromManifest_NilAndEmpty covers the no-op inputs.
 func TestDatabasesFromManifest_NilAndEmpty(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-database-projection-follows-the-database-protocol")
 	if got, diags := DatabasesFromManifest(nil); got != nil || diags != nil {
 		t.Errorf("nil manifest: got %v, diags %v; want nil, nil", got, diags)
 	}
@@ -78,6 +81,7 @@ func TestDatabasesFromManifest_NilAndEmpty(t *testing.T) {
 // TestDatabasesFromManifest_NoSchema maps a datasource that declares no schema
 // to an entry with no schemas, never inventing one from the name.
 func TestDatabasesFromManifest_NoSchema(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-database-projection-follows-the-database-protocol")
 	m := &pdb.RequirementManifest{
 		ProtocolVersion: pdb.ProtocolVersion,
 		Databases:       map[string]pdb.Requirement{"cache": {Engine: pdb.EnginePostgres}},
@@ -95,6 +99,7 @@ func TestDatabasesFromManifest_NoSchema(t *testing.T) {
 // TestDatabasesFromManifest_UnknownEngine reports engines the infra protocol
 // cannot represent instead of coercing them, and drops the offending entry.
 func TestDatabasesFromManifest_UnknownEngine(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "the-database-projection-follows-the-database-protocol")
 	m := &pdb.RequirementManifest{
 		ProtocolVersion: pdb.ProtocolVersion,
 		Databases: map[string]pdb.Requirement{
@@ -124,6 +129,7 @@ func TestDatabasesFromManifest_UnknownEngine(t *testing.T) {
 //  2. The derived infra entries serialize to nothing but name/engine/schemas;
 //     no connection, dsn, host, user, password, ssl, or param survives.
 func TestDatabasesFromManifest_CannotLeakSecrets(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "projections-carry-no-secret", "a-projection-carries-no-secret")
 	withConnection := []byte(`{
 		"$schema": "https://putnami.dev/schemas/putnami-database.json",
 		"protocolVersion": 1,

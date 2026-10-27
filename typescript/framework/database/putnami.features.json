@@ -79,8 +79,7 @@
             "kind": "acceptance",
             "checks": [
               "tables-derive-the-infra-requirements-sidecar",
-              "pool-schemas-union-deduped-and-sorted",
-              "the-producer-matches-the-shared-golden-fixture"
+              "pool-schemas-union-deduped-and-sorted"
             ]
           }
         }

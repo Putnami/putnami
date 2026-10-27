@@ -49,7 +49,7 @@
     },
     {
       "id": "infra-publication",
-      "text": "Build-time infrastructure discovery groups Firestore collections by sorted named store, omits memory stores, de-duplicates collection names, and matches the shared document requirement fixture byte-for-byte."
+      "text": "Build-time infrastructure discovery groups Firestore collections by sorted named store, omits memory stores, and de-duplicates collection names."
     },
     {
       "id": "operation-observability",

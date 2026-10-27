@@ -106,6 +106,7 @@ const dbManifest = `{"protocolVersion":2,"databases":[{"name":"primary","engine"
 // --- Aggregate ------------------------------------------------------------
 
 func TestAggregate_EmptyWorkloadEmitsRuntimeDefaults(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-extension-sdk-gives-a-workload-the-default-runtime")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application", "lib")
 
@@ -480,6 +481,7 @@ func TestAggregate_RuntimeEventsGatewaySurvivesAggregation(t *testing.T) {
 }
 
 func TestAggregate_RuntimeDefaultsWrittenAsSidecar(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-extension-sdk-gives-a-workload-the-default-runtime")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application")
 
@@ -512,6 +514,7 @@ func TestAggregate_RuntimeDefaultsWrittenAsSidecar(t *testing.T) {
 }
 
 func TestAggregate_DeveloperRuntimeRemovesDefaultsSidecar(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-extension-sdk-lets-an-authored-runtime-win")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application")
 
@@ -559,6 +562,7 @@ func TestAggregate_RuntimeNegativeScalingDiag(t *testing.T) {
 // message keeps the author's only signal from decaying back into
 // encoding/json's bare "unknown field".
 func TestAggregate_RuntimeScalingMinIsRejectedAndCostsTheWholeBlock(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "a-workload-always-has-a-runtime", "the-extension-sdk-refuses-scaling-min")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application")
 
@@ -688,6 +692,7 @@ func TestAggregate_RuntimeDefaultsReplaceStale(t *testing.T) {
 }
 
 func TestAggregate_OverridesSuppressRequirement(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "overrides-drop-entries-by-identity", "the-extension-sdk-applies-the-workload-overrides")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application", "lib")
 	writeProjectFile(t, root, "lib", "infra/requirements.json",

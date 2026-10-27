@@ -120,6 +120,7 @@ func TestAggregate_OutputIsPinnedByteForByte(t *testing.T) {
 // canonical bytes the infra protocol and the Put registry both accept, the
 // same bytes on every run.
 func TestDeployment_WritesTheCanonicalAggregate(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-extension-sdk-declares-the-aggregate-in-canonical-bytes")
 	spectest.Proves(t, "tooling/extension-authoring", "infra-aggregation-neutrality", "a-deployment-declaration-is-the-canonical-aggregate")
 	root := t.TempDir()
 	ctx := closureContext(root, "app", "app", "application", "lib")

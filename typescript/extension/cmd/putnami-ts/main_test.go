@@ -1943,6 +1943,7 @@ func TestDoGenerate_WithMode(t *testing.T) {
 }
 
 func TestDoGenerate_SyncsCommittedInfraRequirements(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "committed-requirements-are-synced-from-the-fragments", "the-typescript-extension-syncs-the-committed-requirements")
 	mockBunResolution(t)
 
 	ctx, dir := makeTestCtx(t)

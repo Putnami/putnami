@@ -72,8 +72,7 @@
             "checks": [
               "a-failed-delivery-emits-the-corpus-terminal-record",
               "a-handled-delivery-emits-the-corpus-terminal-record",
-              "an-exhausted-delivery-emits-the-corpus-retry-and-dead-letter-records",
-              "the-producer-output-matches-the-shared-golden-fixture"
+              "an-exhausted-delivery-emits-the-corpus-retry-and-dead-letter-records"
             ]
           }
         },

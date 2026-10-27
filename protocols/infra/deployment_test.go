@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // deploymentGolden is the canonical deployment declaration of
@@ -38,6 +39,7 @@ func mergedFixtureManifest(t *testing.T) *AggregatedManifest {
 // manifest always encodes to the same bytes, the bytes parse back, and the
 // parsed manifest encodes to the same bytes again.
 func TestMarshalDeploymentWritesTheGoldenBytes(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-deployment-golden-is-pinned")
 	m := mergedFixtureManifest(t)
 	if m.Schema == "" {
 		t.Fatal("the fixture must carry a $schema for this test to prove it is dropped")
@@ -67,6 +69,7 @@ func TestMarshalDeploymentWritesTheGoldenBytes(t *testing.T) {
 // TestMarshalDeploymentRefusesAManifestThatDoesNotValidate pins that no bytes
 // leave the encoder for a manifest a reader would refuse.
 func TestMarshalDeploymentRefusesAManifestThatDoesNotValidate(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "an-invalid-manifest-encodes-to-nothing")
 	if data, diagnostics := MarshalDeployment(nil); data != nil || !findCode(diagnostics, ErrorCodeParseError) {
 		t.Fatalf("MarshalDeployment(nil) = %s %v", data, diagnostics)
 	}
@@ -85,6 +88,7 @@ func TestMarshalDeploymentRefusesAManifestThatDoesNotValidate(t *testing.T) {
 // TestParseDeploymentRefusesEveryOtherSpelling pins the reader: only the
 // canonical bytes of a valid manifest are a deployment declaration.
 func TestParseDeploymentRefusesEveryOtherSpelling(t *testing.T) {
+	spectest.Proves(t, "infra/infrastructure-requirements-contract", "the-deployment-declaration-is-canonical", "the-reader-refuses-every-other-spelling")
 	var indented bytes.Buffer
 	if err := json.Indent(&indented, []byte(deploymentGolden), "", "  "); err != nil {
 		t.Fatal(err)

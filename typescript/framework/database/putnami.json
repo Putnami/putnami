@@ -5,12 +5,13 @@
   "type": "library",
   "tags": ["ts"],
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
-  "dependencies": ["/protocols/database", "/protocols/transaction"],
+  "dependencies": ["/protocols/database", "/protocols/infra", "/protocols/transaction"],
   "options": {
     "test": {
       "filePatterns": [
         "../../../protocols/database/conformance/**",
         "../../../protocols/database/fixtures/**",
+        "../../../protocols/infra/fixtures/equivalence/**",
         "../../../protocols/transaction/conformance/**"
       ],
       "coverage-threshold": 40
