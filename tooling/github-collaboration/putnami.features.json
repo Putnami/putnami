@@ -12,20 +12,6 @@
       "target": "modeled",
       "requirements": [
         {
-          "id": "contract-scenarios",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-shared-proposal-scenarios-pass",
-              "the-shared-task-scenarios-pass"
-            ]
-          }
-        },
-        {
           "id": "configurable-state-mapping",
           "stage": "coded",
           "evidenceKinds": [

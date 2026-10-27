@@ -4,9 +4,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseBindings_KeepsEveryContractIndependent(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "independent-bindings", "each-contract-is-bound-on-its-own")
 	bindings, diags := ParseBindings([]byte(`{
 		"tasks": {"provider": "@acme/github", "version": 1},
 		"proposals": {"provider": "@putnami/local-collaboration", "version": 1, "settings": {"repository": "local"}}
@@ -28,6 +31,7 @@ func TestParseBindings_KeepsEveryContractIndependent(t *testing.T) {
 // TestParseBindings_ReportsTheValidSubset: one malformed contract binding does
 // not unbind the others, and the error names the contract.
 func TestParseBindings_ReportsTheValidSubset(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "independent-bindings", "an-invalid-binding-drops-only-its-contract")
 	bindings, diags := ParseBindings([]byte(`{
 		"tasks": {"provider": "@acme/github", "version": 1},
 		"memory": {"provider": "@acme/memory", "version": 9}
@@ -47,6 +51,8 @@ func TestParseBindings_ReportsTheValidSubset(t *testing.T) {
 }
 
 func TestParseBindings_Refusals(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-a-binding", "a-credential-named-setting-is-refused")
+	spectest.Proves(t, "collaboration/provider-contract", "independent-bindings", "a-malformed-binding-is-refused")
 	cases := []struct {
 		name string
 		data string
@@ -78,6 +84,7 @@ func TestParseBindings_Refusals(t *testing.T) {
 // sits; a URL naming an SSH account, a scp-like remote or a path is not a
 // credential.
 func TestParseBindings_RefusesCredentialsInURLValues(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-a-binding", "a-url-carrying-a-credential-is-refused")
 	binding := func(settings string) string {
 		return `{"memory": {"provider": "@acme/memory", "version": 1, "settings": ` + settings + `}}`
 	}
@@ -113,6 +120,7 @@ func TestParseBindings_RefusesCredentialsInURLValues(t *testing.T) {
 }
 
 func TestCredentialNamesAreRecognizedAcrossSpellings(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "no-credential-in-a-binding", "credential-names-are-recognized-across-spellings")
 	for _, name := range []string{"token", "apiToken", "API_KEY", "api-key", "clientSecret", "Password", "privateKey", "Authorization", "bearer", "sessionCookie"} {
 		if !IsCredentialName(name) {
 			t.Errorf("%q is not recognized as a credential", name)

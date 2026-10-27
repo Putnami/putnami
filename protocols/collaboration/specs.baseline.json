@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "collaboration/provider-contract#absent-is-not-empty",
+    "collaboration/provider-contract#bounded-documents",
+    "collaboration/provider-contract#bounded-pages",
+    "collaboration/provider-contract#callers-never-repeat-an-unresolved-write",
+    "collaboration/provider-contract#exact-identity",
+    "collaboration/provider-contract#independent-bindings",
+    "collaboration/provider-contract#invalid-answers-are-refused",
+    "collaboration/provider-contract#memory-scenarios",
+    "collaboration/provider-contract#missions-identity-and-reconciliation",
+    "collaboration/provider-contract#missions-provider-semantics",
+    "collaboration/provider-contract#no-credential-in-a-binding",
+    "collaboration/provider-contract#no-credential-in-an-envelope",
+    "collaboration/provider-contract#one-closed-catalog",
+    "collaboration/provider-contract#one-fixture-corpus",
+    "collaboration/provider-contract#one-outcome-per-envelope",
+    "collaboration/provider-contract#proposal-scenarios",
+    "collaboration/provider-contract#refused-before-the-provider",
+    "collaboration/provider-contract#scenarios-normalize-requests",
+    "collaboration/provider-contract#schemas-track-the-go-types",
+    "collaboration/provider-contract#serve-validates-both-sides",
+    "collaboration/provider-contract#strict-documents",
+    "collaboration/provider-contract#task-scenarios",
+    "collaboration/provider-contract#truthful-provider-declarations",
+    "collaboration/provider-contract#uncertain-writes-are-unresolved",
+    "collaboration/provider-contract#well-formed-operations"
+  ]
+}

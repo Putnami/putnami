@@ -5,6 +5,8 @@ import (
 	"os"
 	"sort"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // v2Schema is the decoded shape of schemas/event-v2.json the drift tests read.
@@ -38,6 +40,7 @@ func loadV2Schema(t *testing.T) v2Schema {
 }
 
 func TestDriftV2_ProtocolVersionConst(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-versions-are-pinned", "the-version-constants-stay-1-and-2")
 	schema := loadV2Schema(t)
 	v, ok := schema.Properties["v"]
 	if !ok || v.Const == nil {
@@ -63,6 +66,7 @@ func TestDriftV2_ProtocolVersionConst(t *testing.T) {
 }
 
 func TestDriftV2_EventTypes(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	schema := loadV2Schema(t)
 	def, ok := schema.Defs["EventType"]
 	if !ok {
@@ -81,6 +85,7 @@ func TestDriftV2_EventTypes(t *testing.T) {
 }
 
 func TestDriftV2_ReadyVocabularies(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "every-vocabulary-matches-its-schema")
 	schema := loadV2Schema(t)
 
 	readyData, ok := schema.Defs["ReadyData"]
@@ -120,6 +125,7 @@ func TestDriftV2_ReadyVocabularies(t *testing.T) {
 // vocabulary in authoring order would make their output depend on this file's
 // line order.
 func TestDriftV2_ExportedVocabulariesAreCanonical(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-schemas-and-the-go-types-agree", "exported-vocabularies-are-sorted")
 	for name, values := range map[string][]string{
 		"ValidReadyTargets":         ValidReadyTargets,
 		"ValidReadyEndpointSchemes": ValidReadyEndpointSchemes,
@@ -139,6 +145,7 @@ func TestDriftV2_ExportedVocabulariesAreCanonical(t *testing.T) {
 // TestDriftV2_V1SchemaFrozen is the additivity guard on the schema corpus: the
 // v1 schema keeps pinning v = 1 and must never learn the v2-only event type.
 func TestDriftV2_V1SchemaFrozen(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-versions-are-pinned", "the-version-1-schema-stays-frozen")
 	data, err := os.ReadFile("schemas/event.json")
 	if err != nil {
 		t.Fatalf("read v1 schema: %v", err)

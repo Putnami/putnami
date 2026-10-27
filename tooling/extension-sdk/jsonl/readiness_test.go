@@ -74,7 +74,7 @@ func decodeLines(t *testing.T, output string) []*runtime.Event {
 // workload's listening log becomes BOTH the log line the console shows and a
 // typed readiness event, in that order.
 func TestForwardLine_EmitsTypedReadinessAtV2(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "a-typed-readiness-marker-is-emitted-at-the-negotiated-version")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "a-typed-readiness-marker-is-emitted-at-the-negotiated-version")
 	e := NewForVersion(runtime.ProtocolVersion2)
 	line := listeningLine(t, 3000)
 	output := captureStdout(t, func() { ForwardLine(e, line, "info") })
@@ -144,7 +144,7 @@ func TestForwardLine_ReadinessMarkerStrippedFromContext(t *testing.T) {
 // advertised v2 acceptance receives the byte-identical v1 stream it always did,
 // with no `ready` line it would reject the whole stream for.
 func TestForwardLine_NoReadinessLeakAtV1(t *testing.T) {
-	spectest.Proves(t, "tooling/extension-authoring", "event-stream-conformance", "no-readiness-marker-leaks-at-a-version-that-lacks-it")
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "no-readiness-marker-leaks-at-a-version-that-lacks-it")
 	e := New() // no advertisement in the test environment ⇒ v1
 	if e.SupportsReady() {
 		t.Fatal("an un-negotiated emitter must not claim readiness support")
@@ -164,6 +164,7 @@ func TestForwardLine_NoReadinessLeakAtV1(t *testing.T) {
 // marker loses its typed readiness, but its log line — and the rest of the
 // stream — stays valid.
 func TestForwardLine_MalformedMarkerFailsClosed(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-sdk-never-writes-an-invalid-line")
 	e := NewForVersion(runtime.ProtocolVersion2)
 	line := `{"severity":"INFO","message":"listening http://localhost:3000","putnami.ready":{"target":"server"}}`
 	output := captureStdout(t, func() { ForwardLine(e, line, "info") })
@@ -184,6 +185,7 @@ func TestForwardLine_MalformedMarkerFailsClosed(t *testing.T) {
 // re-announce itself once per iteration. Nothing in the forwarder is allowed to
 // remember that it already saw a readiness marker.
 func TestForwardPipe_ReemitsReadinessOnEveryRestart(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-sdk-announces-readiness-on-every-restart")
 	e := NewForVersion(runtime.ProtocolVersion2)
 	line := listeningLine(t, 8080)
 
@@ -220,6 +222,7 @@ func TestForwardPipe_ReemitsReadinessOnEveryRestart(t *testing.T) {
 // TestEmitter_ReadyReportsRefusalAtV1 pins the SDK wrapper's contract: it never
 // writes an invalid line, and it tells the caller when it wrote nothing.
 func TestEmitter_ReadyReportsRefusalAtV1(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-sdk-never-writes-an-invalid-line")
 	data := runtime.ReadyData{
 		Target:    runtime.ReadyTargetServer,
 		Endpoints: []runtime.ReadyEndpoint{{Scheme: runtime.ReadySchemeHTTP, Host: "localhost", Port: 3000}},
@@ -249,6 +252,7 @@ func TestEmitter_ReadyReportsRefusalAtV1(t *testing.T) {
 // seam: the emitter's version comes from the CLI's advertisement, resolved by
 // the protocol package's shared helper so writer and reader cannot disagree.
 func TestNew_ReadsNegotiationFromEnvironment(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-sdk-emits-at-the-negotiated-version")
 	cases := []struct {
 		advertised string
 		want       int
@@ -269,6 +273,7 @@ func TestNew_ReadsNegotiationFromEnvironment(t *testing.T) {
 // TestNewForVersion_UnknownVersionFailsClosed keeps an out-of-range version
 // from producing a stream nobody can parse.
 func TestNewForVersion_UnknownVersionFailsClosed(t *testing.T) {
+	spectest.Proves(t, "runtime/event-stream", "the-extension-sdk-emits-a-conforming-stream", "the-sdk-emits-at-the-negotiated-version")
 	for _, version := range []int{0, -1, 42} {
 		if got := NewForVersion(version).Version(); got != runtime.ProtocolVersion {
 			t.Errorf("NewForVersion(%d).Version() = %d, want %d", version, got, runtime.ProtocolVersion)
