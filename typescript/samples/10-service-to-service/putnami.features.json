@@ -60,7 +60,7 @@
             "kind": "acceptance",
             "checks": [
               "a-generated-call-continues-the-inbound-trace-and-is-measured-once",
-              "a-retained-client-refuses-every-call-after-its-application-stopped",
+              "a-retained-client-refuses-a-call-after-its-application-stopped",
               "a-generated-stream-is-one-traced-call-measured-at-its-terminal",
               "a-raw-octet-call-is-traced-and-measured-without-its-octets"
             ]
@@ -86,8 +86,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-cursor-stream-continues-on-another-instance-after-the-last-delivered-change",
-              "a-position-the-provider-never-issued-is-its-typed-refusal"
+              "the-go-consumer-continues-after-the-last-delivered-change-on-another-instance",
+              "the-go-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal",
+              "the-typescript-consumer-continues-after-the-last-delivered-change-on-another-instance",
+              "the-typescript-consumer-reads-a-position-the-provider-never-issued-as-its-typed-refusal"
             ]
           }
         },

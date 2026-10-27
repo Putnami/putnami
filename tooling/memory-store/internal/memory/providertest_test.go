@@ -15,6 +15,7 @@ import (
 // store; its second provider instance shares nothing with the first but that
 // store.
 func TestTheSharedMemoryScenariosPassOnEveryBackend(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "memory-scenarios", "the-memory-store-passes-the-memory-scenarios-on-every-backend")
 	spectest.Proves(t, feature, "one-contract-every-backend", "read-checkpoint-resume")
 	spectest.Proves(t, feature, "compare-and-set-checkpoints", "concurrent-checkpoints-at-one-revision-land-once")
 	for _, b := range backends() {

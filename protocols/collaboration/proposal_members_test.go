@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestProposalMembersKeepAbsentApartFromEmpty: an answer without labels or
@@ -11,6 +13,7 @@ import (
 // the proposal has none. The difference survives a parse and a re-encoding,
 // which is what the orchestrator does to every result it forwards.
 func TestProposalMembersKeepAbsentApartFromEmpty(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "absent-is-not-empty", "absent-and-empty-members-survive-a-re-encoding")
 	const proposal = `"ref":{"source":"local:x","id":"P-1"},"revision":"r1","change":{"repository":"r","base":"main","head":"topic"},"title":"t","state":"open"`
 	for name, tc := range map[string]struct {
 		members string
