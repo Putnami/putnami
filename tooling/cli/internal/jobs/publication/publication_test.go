@@ -965,6 +965,7 @@ func TestMemberRegistryEndpointComparesTheNormalizedRegistry(t *testing.T) {
 // before any upload is sent.
 func TestOCIUploadReadsTheDeclaredHostInEitherForm(t *testing.T) {
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "each-packed-member-goes-to-the-session")
+	spectest.Proves(t, "oci/registry-fast-path-contract", "consumers-read-the-host-by-the-rules", "the-cli-sends-an-image-only-to-the-declared-host")
 	for name, tc := range map[string]struct {
 		declared func(host string) string
 		refusal  string
@@ -1005,6 +1006,7 @@ func TestOCIUploadReadsTheDeclaredHostInEitherForm(t *testing.T) {
 // image repository's host, and refuses an entry naming no host without
 // printing it.
 func TestDeclaredOCIRegistryHost(t *testing.T) {
+	spectest.Proves(t, "oci/registry-fast-path-contract", "consumers-read-the-host-by-the-rules", "the-cli-normalizes-the-declared-registry-host")
 	for declared, want := range map[string]string{
 		"":                           "",
 		"ghcr.io":                    "ghcr.io",
@@ -1207,7 +1209,7 @@ func TestPackedMembersAreCheckedAgainstThePlan(t *testing.T) {
 // ancestor, and the provider refuses the open: nothing is uploaded and no
 // channel moves.
 func TestNotForwardHeadIsRefusedAtOpen(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "a-head-that-is-not-forward-is-refused-at-open")
+	spectest.Proves(t, "registry/credential-seam-contract", "nothing-moves-before-an-open", "the-cli-moves-no-channel-on-a-not-forward-open")
 	const elsewhere = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 	npm := newNPMRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})

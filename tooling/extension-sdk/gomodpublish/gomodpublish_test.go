@@ -119,6 +119,7 @@ func testModuleVersion(zip string) Module {
 
 func TestGoModuleUploadReusesAnExistingVersionAtTheSameDigest(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "an-upload-reuses-a-version-at-the-same-digest")
+	spectest.Proves(t, "gomod/module-write-contract", "the-version-is-bound-to-the-stored-zip", "the-extension-sdk-publishes-and-reuses-the-same-bytes")
 	registry := newFakeRegistry(t)
 	client := testClient(t)
 	ctx := context.Background()
@@ -154,6 +155,7 @@ func TestGoModuleUploadReusesAnExistingVersionAtTheSameDigest(t *testing.T) {
 }
 
 func TestPublishVersionRefusesAConflictUnlessAllowed(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-version-is-bound-to-the-stored-zip", "the-extension-sdk-reuses-a-conflict-only-when-allowed")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 	}))
@@ -169,6 +171,7 @@ func TestPublishVersionRefusesAConflictUnlessAllowed(t *testing.T) {
 }
 
 func TestUploadZipRefusesRegistryDigestMismatch(t *testing.T) {
+	spectest.Proves(t, "gomod/module-write-contract", "the-version-is-bound-to-the-stored-zip", "the-extension-sdk-refuses-another-upload-digest")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = fmt.Fprintf(w, `{"digest":"sha256:%s"}`, strings.Repeat("f", 64))

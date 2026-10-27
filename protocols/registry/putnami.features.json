@@ -1,0 +1,399 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "registry",
+  "features": [
+    {
+      "id": "registry/credential-seam-contract",
+      "type": "feature",
+      "name": "Registry credential seam and provider session contract",
+      "outcome": "An engine, a credential provider and an extension exchange registry credentials, publication ops and uploads through one versioned, strictly parsed contract pinned with its schema and fixtures, so a bearer reaches only its hosts, is never printed, and no publish credential crosses a repository process",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-seam-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-seam-version-is-1",
+              "the-seam-invocation-is-pinned",
+              "the-publish-provider-name-is-reserved",
+              "the-extension-sdk-passes-only-the-host",
+              "the-extension-sdk-uses-the-advertised-cli",
+              "the-extension-sdk-answers-nothing-for-an-empty-host"
+            ]
+          }
+        },
+        {
+          "id": "a-seam-token-is-a-bare-bearer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bearer-is-non-empty-without-whitespace",
+              "the-extension-sdk-returns-the-whole-bearer",
+              "the-extension-sdk-reads-a-status-line-as-no-token",
+              "the-extension-sdk-relays-the-stderr-of-a-failure",
+              "the-extension-sdk-is-silent-without-an-answer"
+            ]
+          }
+        },
+        {
+          "id": "the-provider-tokens-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-credential-provider-tokens-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "the-session-ends-at-shutdown-or-eof",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cloud-provider-acknowledges-shutdown-and-exits",
+              "the-cloud-provider-exits-at-eof"
+            ]
+          }
+        },
+        {
+          "id": "the-wire-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-fixture-line-gets-its-verdict",
+              "the-credential-parsers-refuse-malformed-input",
+              "the-cloud-provider-refuses-requests-outside-the-protocol",
+              "the-cloud-provider-ends-the-session-on-an-oversized-line"
+            ]
+          }
+        },
+        {
+          "id": "the-schema-tracks-the-go-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schema-tracks-the-go-types",
+              "the-upload-schema-tracks-the-go-types",
+              "every-fixture-is-judged-by-the-schema",
+              "the-run-credential-grammar-matches-the-go-rule"
+            ]
+          }
+        },
+        {
+          "id": "a-credential-serves-only-its-hosts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-credential-is-validated",
+              "the-host-rule-is-exact",
+              "the-cli-sends-the-bearer-only-to-a-matching-host"
+            ]
+          }
+        },
+        {
+          "id": "secrets-are-never-formatted",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bearer-is-never-formatted",
+              "a-run-credential-is-never-formatted",
+              "a-publication-line-never-formats-its-payload"
+            ]
+          }
+        },
+        {
+          "id": "a-run-credential-is-a-bounded-bearer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-run-credential-is-validated"
+            ]
+          }
+        },
+        {
+          "id": "one-declaring-extension-is-the-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-fails-the-first-request-when-two-extensions-declare"
+            ]
+          }
+        },
+        {
+          "id": "one-call-per-purpose-while-valid",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-asks-once-per-purpose",
+              "the-cli-renews-before-expiry",
+              "the-cloud-provider-shares-one-call-per-purpose"
+            ]
+          }
+        },
+        {
+          "id": "refusal-and-absence-hold-for-the-process",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-holds-a-refusal-and-an-absence-for-the-process",
+              "the-cloud-provider-answers-publish-with-absence"
+            ]
+          }
+        },
+        {
+          "id": "a-failure-answers-for-30-seconds",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-fails-the-request-on-a-provider-failure",
+              "the-cli-starts-the-provider-again-after-the-backoff"
+            ]
+          }
+        },
+        {
+          "id": "publication-v1-is-negotiated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-capability-is-negotiated",
+              "the-cli-offers-every-capability-and-follows-the-echo",
+              "the-cloud-provider-echoes-publication-v1-only-when-it-can-serve-it"
+            ]
+          }
+        },
+        {
+          "id": "the-publication-tokens-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-publication-tokens-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "each-op-has-its-line-bound",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-op-has-its-line-bound",
+              "the-cloud-provider-bounds-a-line-by-its-op"
+            ]
+          }
+        },
+        {
+          "id": "the-plan-digest-is-the-release-plan-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-plan-digest-is-pinned",
+              "put-registry-members-are-planned-and-evidenced"
+            ]
+          }
+        },
+        {
+          "id": "resolve-and-release-carry-distribution-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-release-is-a-distribution-request",
+              "null-is-deferred-only-inside-delegated-members"
+            ]
+          }
+        },
+        {
+          "id": "plans-ancestry-and-evidence-are-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-plan-is-validated",
+              "an-ancestry-is-validated",
+              "evidence-is-validated",
+              "the-publication-parsers-refuse-malformed-input"
+            ]
+          }
+        },
+        {
+          "id": "open-is-idempotent-and-release-final",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-surfaces-plan-already-open-for-a-second-plan",
+              "the-cli-sends-a-lost-release-once-more",
+              "the-cloud-provider-opens-a-plan-once",
+              "the-cloud-provider-releases-a-plan-once"
+            ]
+          }
+        },
+        {
+          "id": "nothing-moves-before-an-open",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-refuses-uploads-after-a-not-forward-open",
+              "the-cli-moves-no-channel-on-a-not-forward-open",
+              "the-cloud-provider-refuses-a-release-before-open"
+            ]
+          }
+        },
+        {
+          "id": "uploader-v1-needs-publication-v1",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "upload-needs-both-capabilities",
+              "uploader-v1-names-publication-v1",
+              "the-cloud-provider-echoes-uploader-v1-only-beside-publication-v1"
+            ]
+          }
+        },
+        {
+          "id": "the-uploader-tokens-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-uploader-tokens-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "an-upload-carries-no-credential",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-upload-wire-holds-no-credential",
+              "the-cloud-provider-answers-no-bearer"
+            ]
+          }
+        },
+        {
+          "id": "an-upload-is-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "upload-params-are-validated",
+              "upload-results-are-validated",
+              "an-upload-line-has-the-publication-bounds",
+              "each-invalid-upload-fixture-fails-for-its-rule"
+            ]
+          }
+        },
+        {
+          "id": "an-upload-is-refused-before-any-registry-request",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cloud-provider-refuses-an-upload-before-any-registry-request",
+              "the-cloud-provider-maps-a-failed-upload-to-its-refusal"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

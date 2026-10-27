@@ -1,0 +1,13 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "oci/registry-fast-path-contract#consumers-read-the-host-by-the-rules",
+    "oci/registry-fast-path-contract#one-call-tags-every-ref",
+    "oci/registry-fast-path-contract#the-error-codes-are-closed",
+    "oci/registry-fast-path-contract#the-fast-path-is-taken-only-when-advertised",
+    "oci/registry-fast-path-contract#the-fixture-corpus-is-the-contract",
+    "oci/registry-fast-path-contract#the-registry-host-rules-are-one-table",
+    "oci/registry-fast-path-contract#the-version-and-endpoints-are-pinned"
+  ]
+}

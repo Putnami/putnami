@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "oci/registry-fast-path-contract",
+  "outcomes": [
+    "A client takes the tag-digest fast path of a Putnami-managed registry when the registry advertises it, and tags through the standard distribution API anywhere else",
+    "Every component that reads a registry host from an image repository derives the same host and scheme, whether it imports go-containerregistry or not"
+  ],
+  "nonGoals": [
+    "The standard OCI distribution API, which is owned upstream and never redefined here",
+    "A JSON Schema: the Go types, the strict parsers and the shared fixtures are the contract",
+    "How a pusher builds, assembles and uploads image content, which the extension SDK owns",
+    "How a registry stores tags, which the server owns"
+  ],
+  "requirements": [
+    {
+      "id": "the-version-and-endpoints-are-pinned",
+      "text": "The protocol version is 1. The capabilities endpoint is /v2/_putnami/capabilities, the tag-digest endpoint is /v2/_putnami/tag-digest, and the capability that advertises it is tag-digest/v1. A test pins each value, so a change is a reviewed bump."
+    },
+    {
+      "id": "the-fast-path-is-taken-only-when-advertised",
+      "text": "A capabilities response supports tag-digest only when its apis list holds tag-digest/v1; an empty list or other entries do not. The SDK pusher (tooling/extension-sdk) reads a list without tag-digest/v1, a 404 or a malformed body as no fast path. When it does not take the fast path, it tags each ref through the standard distribution API."
+    },
+    {
+      "id": "one-call-tags-every-ref",
+      "text": "The SDK pusher sends a tag-digest request with the repository without its host, the digest and every tag. It tags every ref of a session in one batched call, after which each tag names the digest. A server error fails the call and names its status."
+    },
+    {
+      "id": "the-error-codes-are-closed",
+      "text": "The error codes are exactly oci.invalid_capabilities, oci.invalid_tag_digest, oci.invalid_digest, oci.invalid_repository and oci.invalid_tag."
+    },
+    {
+      "id": "the-fixture-corpus-is-the-contract",
+      "text": "Every valid fixture of the capabilities response and the tag-digest request parses with no error. Every invalid fixture fails: an unknown field, a malformed digest, a malformed tag, an empty tag list and a missing repository."
+    },
+    {
+      "id": "the-registry-host-rules-are-one-table",
+      "text": "RegistryHost, NormalizeRegistryHost and RegistryScheme give every repository and host of fixtures/registry-host/cases.json its host and scheme, or refuse it, and no error repeats a refused input of more than 3 bytes. A host is lowercased first, and only its ASCII letters change. A test in tooling/extension-sdk shows that, once the host is lowercased, the rules derive the host and scheme go-containerregistry derives under strict validation."
+    },
+    {
+      "id": "consumers-read-the-host-by-the-rules",
+      "text": "The CLI (tooling/cli) reads the declared OCI registry, a repository prefix or a URL, as a host normalized by these rules, so docker.io reads as index.docker.io, and refuses an entry with a credential or no host without printing it. It sends an image's upload only when the image's host is the declared one. The Cloud credential provider (cloud/extension) refuses registry_not_served for an image whose repository host is outside its origins, whatever registry the request names."
+    }
+  ],
+  "decisions": [
+    "protocols/oci/doc/adr/0001-optional-registry-fast-paths.md"
+  ]
+}

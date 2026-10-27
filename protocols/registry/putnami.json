@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/registry",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -14,9 +14,11 @@
     },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "Registry credential seams are plumbing behind install and publish; the outcome belongs to the CLI: its cli/credential-provider feature and the commands that download and publish."
   }
 }
