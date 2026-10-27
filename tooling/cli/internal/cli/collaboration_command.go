@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -300,7 +301,15 @@ func printCollaborationHelp(w io.Writer, contract string, capabilities collab.Ca
 	iox.Fprintf(w, "Usage: putnami %s <operation> [--input <json> | --input-file <path|->]\n\n", contract)
 	iox.Fprintf(w, "The %s collaboration contract, routed to the provider options.collaboration.%s binds in putnami.workspace.json.\n",
 		contract, contract)
-	iox.Fprintf(w, "The same operations are MCP tools named %s.<operation>. Every call prints one envelope.\n\n", contract)
+	hostOnly := hostOnlyOperations(contract)
+	if len(hostOnly) > 0 {
+		iox.Fprintf(w, "The same operations are MCP tools named %s.<operation>, except the host-only %s: the host that runs an agent calls it here, and the agent never sees it as a tool.\n",
+			contract, strings.Join(hostOnly, ", "))
+		iox.Fprintln(w, "Every call prints one envelope.")
+		iox.Fprintln(w)
+	} else {
+		iox.Fprintf(w, "The same operations are MCP tools named %s.<operation>. Every call prints one envelope.\n\n", contract)
+	}
 	switch {
 	case capabilities.Provider != nil && capabilities.Binding != nil:
 		iox.Fprintf(w, "Binding: %s, version %d (%s)\n", capabilities.Provider.Name, capabilities.Binding.Version, capabilities.Status)
@@ -323,6 +332,24 @@ func printCollaborationHelp(w io.Writer, contract string, capabilities collab.Ca
 		if op.Required {
 			kind = "required"
 		}
+		if slices.Contains(hostOnly, op.Name) {
+			kind += ", host-only"
+		}
 		iox.Fprintf(w, "  %-12s %-9s %s, %s\n", op.Name, op.Access, kind, support)
 	}
+}
+
+// hostOnlyOperations names the operations of contract that the catalog marks
+// host-only in any version this CLI supports.
+func hostOnlyOperations(contract string) []string {
+	var names []string
+	for _, version := range collab.SupportedVersions(contract) {
+		spec, _ := collab.Lookup(contract, version)
+		for _, op := range spec.Operations {
+			if op.HostOnly && !slices.Contains(names, op.Name) {
+				names = append(names, op.Name)
+			}
+		}
+	}
+	return names
 }

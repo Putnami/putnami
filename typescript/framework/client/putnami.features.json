@@ -562,6 +562,18 @@
               "the-emitted-typescript-client-carries-binding-headers-beside-forwarded-users"
             ]
           }
+        },
+        {
+          "id": "client-project-document",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-new-client-gets-a-putnami-json-declaring-feature-authority-none",
+              "an-existing-putnami-json-is-kept-byte-for-byte"
+            ]
+          }
         }
       ]
     }

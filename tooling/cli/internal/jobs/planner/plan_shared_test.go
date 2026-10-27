@@ -127,7 +127,7 @@ func planSharedProbeWithExtension(
 	t.Helper()
 	ws := sharedProbeWorkspace(root)
 	planned, err := Plan(ws, []string{"build", "test"}, ws.Projects,
-		[]*extension.ExtensionDescription{ext}, nil, nil, nil)
+		[]*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestSharedExecutions_RequireDeclaredWritesAndDeterminism(t *testing.T) {
 			ext.Tasks["probe-describe"] = task
 
 			planned, err := Plan(ws, []string{"build", "test"}, ws.Projects,
-				[]*extension.ExtensionDescription{ext}, nil, nil, nil)
+				[]*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("Plan: %v", err)
 			}
@@ -361,7 +361,7 @@ func TestSharedExecutions_SeparateDifferentProjects(t *testing.T) {
 	ws.Name = "probe-ws"
 
 	planned, err := Plan(ws, []string{"build", "test"}, ws.Projects,
-		[]*extension.ExtensionDescription{sharedProbeExtension()}, nil, nil, nil)
+		[]*extension.ExtensionDescription{sharedProbeExtension()}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

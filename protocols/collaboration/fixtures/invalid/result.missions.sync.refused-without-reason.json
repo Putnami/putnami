@@ -1,0 +1,9 @@
+{
+  "session": { "state": "working" },
+  "mission": { "key": "issue-596", "title": "", "plan": { "steps": [] }, "openDecisions": [] },
+  "inbox": [],
+  "decisions": [],
+  "replies": [{ "message": "msg_09", "state": "refused" }],
+  "minIntervalMs": 15000,
+  "now": "2026-10-26T09:30:01Z"
+}

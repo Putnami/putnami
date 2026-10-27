@@ -184,10 +184,14 @@ still contain a breaking change; the [release policy](../../../RELEASE.md) requi
 release notes and migration documentation rather than strict compatibility between
 every pre-1.0 minor.
 
-The [service telemetry specification](specs/service-telemetry.json) defines the
-contract, backed by two durable decisions: [push OTLP/JSON without an exporter
-SDK](doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md) and [the middleware
-owns the span](doc/adr/0002-the-middleware-owns-the-span.md).
+The [service telemetry specification](specs/service-telemetry.json) defines what
+the framework adds, backed by two durable decisions: [push OTLP/JSON without an
+exporter SDK](doc/adr/0001-push-otlp-json-without-an-exporter-sdk.md) and [the
+middleware owns the span](doc/adr/0002-the-middleware-owns-the-span.md). The
+export defaults, the final flush and the dropped collector error belong to the
+feature of the [telemetry protocol](../../../protocols/telemetry/README.md),
+`telemetry/otlp-push-contract`; the exporter, log sink and mapping tests here
+prove its checks.
 
 Regression evidence covers [tracing, metrics, HTTP middleware, sampling, and the
 error bridge](telemetry_test.go), [plugin lifecycle purity and bounded

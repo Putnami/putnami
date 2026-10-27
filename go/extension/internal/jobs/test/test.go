@@ -178,14 +178,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 		testArgs = append(testArgs, "-race")
 	}
 
-	if timeout != "" {
-		// Convert plain numeric to milliseconds
-		if isNumeric(timeout) {
-			testArgs = append(testArgs, "-timeout", timeout+"ms")
-		} else {
-			testArgs = append(testArgs, "-timeout", timeout)
-		}
-	}
+	testArgs = appendTimeoutArg(testArgs, timeout)
 
 	if runPattern != "" {
 		testArgs = append(testArgs, "-run", runPattern)
@@ -241,10 +234,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	var testCounts parse.TestCounts
 	if useJSON {
 		testCounts = parse.TestJSON(outputStr)
-		emit.Metric("tests-total", testCounts.Total(), "count")
-		emit.Metric("tests-passed", testCounts.Passed, "count")
-		emit.Metric("tests-failed", testCounts.Failed, "count")
-		emit.Metric("tests-skipped", testCounts.Skipped, "count")
+		emitTestCounts(emit, testCounts)
 	}
 	// One locator resolves the test files that both the test cases and the
 	// failure diagnostics name.
@@ -346,16 +336,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	// used to leave a failed run with no diagnostic at all. The failure path
 	// always emits at least one diagnostic, falling back to the raw output.
 	if testFailed {
-		for _, diagnostic := range failureDiagnostics {
-			emit.DiagnosticWithCode(
-				diagnostic.Severity,
-				diagnostic.Description,
-				diagnostic.File,
-				diagnostic.Line,
-				diagnostic.Column,
-				diagnostic.Category,
-			)
-		}
+		emitFailureDiagnostics(emit, failureDiagnostics)
 		// A test binary past its -timeout failed on host load, not on its
 		// inputs: the mark keeps the CLI from replaying the failure.
 		if parse.TestTimedOut(outputStr) {
@@ -370,6 +351,41 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	}
 
 	return "OK", resultData, nil
+}
+
+// appendTimeoutArg passes the timeout to `go test`, reading a plain number as
+// milliseconds.
+func appendTimeoutArg(args []string, timeout string) []string {
+	if timeout == "" {
+		return args
+	}
+	if isNumeric(timeout) {
+		return append(args, "-timeout", timeout+"ms")
+	}
+	return append(args, "-timeout", timeout)
+}
+
+// emitTestCounts reports the counts parsed from a `go test -json` transcript
+// as the job's test metrics.
+func emitTestCounts(emit *jsonl.Emitter, counts parse.TestCounts) {
+	emit.Metric("tests-total", counts.Total(), "count")
+	emit.Metric("tests-passed", counts.Passed, "count")
+	emit.Metric("tests-failed", counts.Failed, "count")
+	emit.Metric("tests-skipped", counts.Skipped, "count")
+}
+
+// emitFailureDiagnostics reports the diagnostics of a failed `go test` run.
+func emitFailureDiagnostics(emit *jsonl.Emitter, diagnostics []parse.ToolDiagnostic) {
+	for _, diagnostic := range diagnostics {
+		emit.DiagnosticWithCode(
+			diagnostic.Severity,
+			diagnostic.Description,
+			diagnostic.File,
+			diagnostic.Line,
+			diagnostic.Column,
+			diagnostic.Category,
+		)
+	}
 }
 
 // appendParallelArgs keeps Go's package build/test width (-p) separate from

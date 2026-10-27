@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	proto "go.putnami.dev/protocol/extension"
 	runtime "go.putnami.dev/protocol/runtime"
 )
 
@@ -27,6 +28,8 @@ type Emitter struct {
 	version int
 	// timedOut is set by MarkTimedOut and read by Result.
 	timedOut atomic.Bool
+	// hostUnsupported is set by MarkHostUnsupported and read by Result.
+	hostUnsupported atomic.Bool
 	// observer, when set, sees the message of every log and diagnostic event.
 	observer atomic.Pointer[func(message string)]
 }
@@ -229,11 +232,21 @@ func (e *Emitter) SummaryWithData(message string, data map[string]any) {
 // SKIP result. It is safe to call from any goroutine.
 func (e *Emitter) MarkTimedOut() { e.timedOut.Store(true) }
 
+// MarkHostUnsupported records that this host cannot run the job at all, such
+// as a race detector run without the C compiler it needs. A FAILED result
+// emitted afterwards carries error.code proto.HostUnsupportedFailureCode, and
+// the CLI never records that failure for replay. It never changes an OK or
+// SKIP result. It is safe to call from any goroutine.
+func (e *Emitter) MarkHostUnsupported() { e.hostUnsupported.Store(true) }
+
 // Result emits a result event. Status: OK, FAILED, SKIP.
 func (e *Emitter) Result(status string, data map[string]any) {
 	var jobErr *runtime.JobError
-	if runtime.ResultStatus(status) == runtime.ResultFailed && e.timedOut.Load() {
-		jobErr = &runtime.JobError{TimedOut: true}
+	if runtime.ResultStatus(status) == runtime.ResultFailed && (e.timedOut.Load() || e.hostUnsupported.Load()) {
+		jobErr = &runtime.JobError{TimedOut: e.timedOut.Load()}
+		if e.hostUnsupported.Load() {
+			jobErr.Code = proto.HostUnsupportedFailureCode
+		}
 	}
 	_ = e.rt().Result(runtime.ResultStatus(status), data, jobErr)
 }

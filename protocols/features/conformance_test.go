@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/conformance"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestConformanceRunners(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "conformance-corpus", "the-conformance-runners-reproduce-every-equivalence-golden")
 	conformance.RunManifestFile(t, filepath.Join("fixtures", "equivalence", "go-typescript-features.golden.json"))
 	conformance.RunEvidenceFile(t, filepath.Join("fixtures", "equivalence", "go-typescript-evidence.golden.json"))
 	conformance.RunEvidenceFile(t, filepath.Join("fixtures", "equivalence", "generated-evidence.golden.json"))
@@ -23,6 +25,7 @@ func TestConformanceRunners(t *testing.T) {
 }
 
 func TestConformancePackAndVectors(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "conformance-corpus", "the-conformance-pack-names-its-corpus-and-every-vector-exists")
 	packData, err := os.ReadFile(filepath.Join("conformance", "pack.json"))
 	if err != nil {
 		t.Fatal(err)

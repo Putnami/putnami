@@ -159,7 +159,7 @@
     },
     {
       "id": "failure-replay-cache",
-      "text": "A failed task is recorded locally at the cache key its success would use; a later run with unchanged inputs replays it without running, with the same status, exit code, diagnostics and logs plus age and attempt count. Canceled, skipped, bailed-out and leak results are never recorded, nor is a timeout the CLI or an extension reports; one run counts one observation per key. A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record reaches a remote cache."
+      "text": "A failed task is recorded locally at the key its success would use; a later run with unchanged inputs replays it without running, with its status, exit code, diagnostics and logs plus age and attempts. Canceled, skipped, bailed-out, leak and host-unsupported results are never recorded, nor is a timeout the CLI or an extension reports; one run counts one observation per key. A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record is shared remotely."
     },
     {
       "id": "extension-implementation-cache-key",
@@ -258,6 +258,10 @@
       "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Such a manifest declares CLI contract 15; older readers refuse it."
     },
     {
+      "id": "a-step-reads-the-changed-files",
+      "text": "A step can gate on the run's changed files (activation.changedFiles) and bind them (from: context, path selection.changedFiles). It is planned only for a project whose own directory holds a matching changed file, and binds the files its gate selects, project-relative and sorted, into its parameters and cache key; other steps' keys ignore the change. A run without a diff plans it nowhere; a portable request plans from the submitter's paths. A finalizer waits for planned consumers. It needs CLI contract 16."
+    },
+    {
       "id": "an-interactive-command-stops-on-its-own-terms",
       "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit, then kills it; the CLI's shutdown bound covers that budget from before the child starts. A second signal kills the child at once, or as soon as it started. A child that exits by itself after the signal keeps its exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
     },
@@ -308,6 +312,7 @@
     "tooling/cli/doc/adr/0075-an-interactive-command-knows-the-directory-it-was-typed-in.md",
     "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
     "tooling/cli/doc/adr/0078-the-core-asks-extensions-to-expand-their-input-selectors.md",
-    "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md"
+    "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
+    "protocols/extension/doc/adr/0015-a-step-reads-the-changed-files-from-contract-16.md"
   ]
 }

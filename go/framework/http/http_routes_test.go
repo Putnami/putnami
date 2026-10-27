@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"go.putnami.dev/app"
+	"go.putnami.dev/protocol/features/spectest"
 	httproutes "go.putnami.dev/protocol/http-routes"
 )
 
 func TestDescribeHTTPRoutesFromConfiguredRegistry(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-go-server-describes-a-valid-inventory")
 	server := NewServerPlugin(ServerConfig{})
 	server.GET("/healthz", func(*Context) *Response { return Text("ok") })
 	server.Handle("GET", "/users/{userID}", func(*Context) *Response { return JSON(map[string]bool{"ok": true}) })
@@ -71,6 +73,7 @@ func TestDescribeHTTPRoutesFromConfiguredRegistry(t *testing.T) {
 }
 
 func TestDescribeHTTPRoutesFromPrefixMount(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-go-server-describes-a-valid-inventory")
 	server := NewServerPlugin(ServerConfig{})
 	server.RouteMount("POST", "/pkg.Service/", func(*Context) *Response { return Text("ok") })
 
@@ -130,6 +133,7 @@ func TestDescribeHTTPRoutesFromPrefixMount(t *testing.T) {
 // catch-all '{name...}', which is exactly the protocol spelling, so the six
 // runtime routes flow through the emitter as template routes unchanged.
 func TestDescribeHTTPRoutesFromGomodCatchAll(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-go-server-describes-a-valid-inventory")
 	ok := func(*Context) *Response { return Text("ok") }
 	server := NewServerPlugin(ServerConfig{})
 	server.GET("/{module...}", ok)
@@ -188,6 +192,7 @@ func TestDescribeHTTPRoutesFromGomodCatchAll(t *testing.T) {
 // if a legacy fact bypasses public registration, which now rejects anonymous
 // wildcards before they reach Describe.
 func TestDescribeHTTPRoutesRejectsWildcard(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-go-server-refuses-a-wildcard")
 	server := NewServerPlugin(ServerConfig{})
 	server.httpRouteFacts = append(server.httpRouteFacts, httpRouteFact{
 		method: "GET", path: "/files/*", source: routeSourceManual,
@@ -208,6 +213,7 @@ func TestDescribeHTTPRoutesRejectsWildcard(t *testing.T) {
 // companion, sourceKind typed-api, publicEdge true. A templated stream path
 // must still derive MatchTemplate.
 func TestDescribeHTTPRoutesIncludesStreamRoutes(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "producers-emit-valid-inventories", "the-go-server-describes-a-valid-inventory")
 	server := NewServerPlugin(ServerConfig{})
 	server.Handle("POST", "/v1/messages", func(*Context) *Response { return JSON(map[string]bool{"ok": true}) })
 	server.HandleStream("/v1/events", StreamHandler{

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "doctor/readiness-report-contract#a-finding-is-complete",
+    "doctor/readiness-report-contract#a-waiver-is-reviewed-and-unique",
+    "doctor/readiness-report-contract#check-codes-are-frozen",
+    "doctor/readiness-report-contract#expiry-is-data-in-the-contract",
+    "doctor/readiness-report-contract#putnami-doctor-applies-waivers-by-the-contract",
+    "doctor/readiness-report-contract#the-corpus-is-the-contract",
+    "doctor/readiness-report-contract#the-parsers-are-strict",
+    "doctor/readiness-report-contract#the-serialization-is-canonical",
+    "doctor/readiness-report-contract#the-summary-agrees",
+    "doctor/readiness-report-contract#the-version-is-pinned"
+  ]
+}

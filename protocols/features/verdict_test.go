@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func sampleVerificationRecord() *SpecVerificationRecord {
@@ -187,6 +188,7 @@ func verdictOfEveryState() []SpecRequirementVerdict {
 // has to accept it, or the gate would write a document its own audit surface
 // refuses.
 func TestUnobservedIsTheOneNonVerifiedStateThatDoesNotBlock(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "only-enforce-blocks", "an-unobserved-requirement-is-reported-and-never-blocks")
 	mixed := []SpecRequirementVerdict{{State: RequirementVerified}, {State: RequirementUnobserved}}
 	if GroupBlocks(VerificationModeEnforce, mixed, nil) {
 		t.Error("enforce sanctioned a requirement no source could observe")
@@ -253,6 +255,7 @@ func TestRecordRejectsAStateNobodyDeclared(t *testing.T) {
 // and an error finding over the group's own inputs blocks it too — a gate
 // whose inputs were unreadable must not read as green.
 func TestGroupBlocksIsTheOneBlockingRule(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "only-enforce-blocks", "enforce-blocks-on-every-unresolved-state-and-on-an-error-finding")
 	verified := []SpecRequirementVerdict{{State: RequirementVerified}}
 	for _, state := range []RequirementVerificationState{
 		RequirementUnmapped, RequirementUnexecutable, RequirementMissing, RequirementStale, RequirementContradicted,

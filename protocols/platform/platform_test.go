@@ -3,11 +3,14 @@ package platform
 import (
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // --- ValidateProbeName ---
 
 func TestValidateProbeName_AcceptsCanonical(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "a-probe-name-is-canonical")
 	for _, name := range []string{
 		"database",
 		"db-pool",
@@ -24,6 +27,7 @@ func TestValidateProbeName_AcceptsCanonical(t *testing.T) {
 }
 
 func TestValidateProbeName_RejectsInvalid(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "a-probe-name-is-canonical")
 	cases := []string{
 		"",                      // empty
 		"-leading-dash",         // must start with [a-z0-9]
@@ -43,6 +47,7 @@ func TestValidateProbeName_RejectsInvalid(t *testing.T) {
 // --- ValidateStatus ---
 
 func TestValidateStatus(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "the-status-is-one-of-three")
 	for _, s := range []Status{StatusOK, StatusUnavailable, StatusDegraded} {
 		if diags := ValidateStatus(s); len(diags) > 0 {
 			t.Errorf("ValidateStatus(%q): unexpected diags %v", s, diags)
@@ -56,6 +61,7 @@ func TestValidateStatus(t *testing.T) {
 // --- ValidateEnvelope ---
 
 func TestValidateEnvelope_OkWithChecks(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "each-status-constrains-its-checks")
 	e := Envelope{
 		Status: StatusOK,
 		Checks: map[string]CheckEntry{"database": "ok", "cache": "ok"},
@@ -66,6 +72,7 @@ func TestValidateEnvelope_OkWithChecks(t *testing.T) {
 }
 
 func TestValidateEnvelope_OkRejectsFailingProbe(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "each-status-constrains-its-checks")
 	// "ok" envelope with a failing probe is a contract violation —
 	// the runtime should have set status to "degraded".
 	e := Envelope{
@@ -79,6 +86,7 @@ func TestValidateEnvelope_OkRejectsFailingProbe(t *testing.T) {
 }
 
 func TestValidateEnvelope_DegradedRequiresFailure(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "each-status-constrains-its-checks")
 	// "degraded" with all-ok checks is a contract violation.
 	e := Envelope{
 		Status: StatusDegraded,
@@ -91,6 +99,7 @@ func TestValidateEnvelope_DegradedRequiresFailure(t *testing.T) {
 }
 
 func TestValidateEnvelope_DegradedAccepted(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "each-status-constrains-its-checks")
 	e := Envelope{
 		Status: StatusDegraded,
 		Checks: map[string]CheckEntry{"database": "conn refused", "cache": "ok"},
@@ -101,6 +110,7 @@ func TestValidateEnvelope_DegradedAccepted(t *testing.T) {
 }
 
 func TestValidateEnvelope_UnavailableForbidsChecks(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-envelope-states-one-status", "each-status-constrains-its-checks")
 	// Before Start / after Stop the runtime short-circuits before
 	// running probes; emitting check entries is a contract violation.
 	e := Envelope{
@@ -116,6 +126,7 @@ func TestValidateEnvelope_UnavailableForbidsChecks(t *testing.T) {
 // --- NormalizePrefix ---
 
 func TestNormalizePrefix_Canonical(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "prefixes-normalize-to-one-form", "a-prefix-normalizes")
 	cases := []struct{ in, want string }{
 		{"", ""},
 		{" ", ""},
@@ -150,6 +161,7 @@ func TestNormalizePrefix_Canonical(t *testing.T) {
 // --- EndpointByKind ---
 
 func TestEndpointByKind(t *testing.T) {
+	spectest.Proves(t, "platform/operational-endpoints", "the-endpoint-set-is-canonical", "the-canonical-paths-are-fixed")
 	if e, ok := EndpointByKind(EndpointHealth); !ok || e.Path != PathHealthz {
 		t.Errorf("EndpointByKind(health) = %v ok=%v", e, ok)
 	}

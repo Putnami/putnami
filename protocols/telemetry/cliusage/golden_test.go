@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	telemetry "go.putnami.dev/protocol/telemetry"
 )
 
@@ -11,6 +12,7 @@ import (
 // a structurally valid OTLP logs request and a conforming CLI usage payload, so
 // the CLI encoder and the receiver share one trustworthy reference.
 func TestGoldenLogsConformsToVocabulary(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-golden-conforms")
 	req, diags := telemetry.ParseAndValidateLogs(GoldenLogsJSON)
 	if diag.HasErrors(diags) {
 		t.Fatalf("golden fixture failed structural OTLP validation: %v", diags)

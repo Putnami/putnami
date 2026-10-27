@@ -18,7 +18,7 @@ import (
 func TestTypedIdentity_KeyIsTheDerivedView(t *testing.T) {
 	t.Parallel()
 	ws, ext := makeIntegrationWorkspace(t)
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestTypedIdentity_KeyIsTheDerivedView(t *testing.T) {
 func TestTypedIdentity_StampedEqualsDerived(t *testing.T) {
 	t.Parallel()
 	ws, ext := makeIntegrationWorkspace(t)
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestPlan_DeterministicIdentitySnapshot(t *testing.T) {
 	t.Parallel()
 	ws, ext := makeIntegrationWorkspace(t)
 	snapshot := func() string {
-		planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}

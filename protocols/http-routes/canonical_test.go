@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const goldenDigest = "sha256:b9b1df83b351439e30d8aff5c6d2ec7de61de8a9bab1444738c4c27984c1f77e"
 
 func TestCanonicalJSON_MatchesCrossLanguageGolden(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "the-serialization-is-canonical", "the-golden-pins-the-bytes-and-the-digest")
 	data, err := os.ReadFile("fixtures/valid/full.json")
 	if err != nil {
 		t.Fatal(err)
@@ -37,6 +39,7 @@ func TestCanonicalJSON_MatchesCrossLanguageGolden(t *testing.T) {
 }
 
 func TestCanonicalize_OrderAndMethodCaseIndependent(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "the-serialization-is-canonical", "input-order-and-method-case-do-not-matter")
 	data, err := os.ReadFile("fixtures/valid/full.json")
 	if err != nil {
 		t.Fatal(err)
@@ -87,6 +90,7 @@ func TestCanonicalize_OrderAndMethodCaseIndependent(t *testing.T) {
 }
 
 func TestValidateRoutes_OverlapPolicy(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "visibility-never-widens", "overlaps-follow-the-policy")
 	base := Provenance{Project: "example/app", SourceKind: SourceManual}
 	tests := []struct {
 		name     string
@@ -159,6 +163,7 @@ func TestValidateRoutes_OverlapPolicy(t *testing.T) {
 }
 
 func TestValidateRoutes_CatchAllOverlapPolicy(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "visibility-never-widens", "a-catch-all-overlaps-conservatively")
 	base := Provenance{Project: "example/app", SourceKind: SourceManual}
 	pub := func(match MatchKind, p string) Route {
 		return Route{Match: match, Path: p, Methods: []string{"GET"}, PublicEdge: true, Provenance: base}
@@ -204,6 +209,7 @@ func TestValidateRoutes_CatchAllOverlapPolicy(t *testing.T) {
 // TestCatchAllOverlapMethodDisjoint pins that a public catch-all over a private
 // route with disjoint methods is not a visibility overlap.
 func TestCatchAllOverlapMethodDisjoint(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "visibility-never-widens", "a-catch-all-overlaps-conservatively")
 	base := Provenance{Project: "example/app", SourceKind: SourceManual}
 	routes := []Route{
 		{Match: MatchTemplate, Path: "/{m...}", Methods: []string{"GET"}, PublicEdge: true, Provenance: base},

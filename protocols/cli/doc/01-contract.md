@@ -253,6 +253,26 @@ same name. A reader below 15 answers "unknown subcommand" for that word, so it
 refuses the stamp. The floor binds a manifest wherever it loads from. Only a
 manifest whose group default declares positionals is stamped 15; positionals
 on another subcommand keep the base stamp.
+Contract `16` (`ChangedFilesContract`) is additive for the run's changed
+files as a step fact. A step may gate on them (`activation.changedFiles`: the
+step is planned only when a changed file the target project owns matches one
+of the globs) and bind them (`with: {"from": "context", "path":
+"selection.changedFiles"}`: the project-relative changed files the project
+owns, on a gated step only those its globs select, bound into the step's
+parameters and so into its cache key). A run that
+measured no diff (`--all`, `--projects`) plans no gated step and binds no
+value. A reader below 16 ignores the gate and resolves no context binding, so
+it would plan the step on every run and key it without the files; it refuses
+the stamp. The floor binds a manifest wherever it loads from. Only a manifest
+with a step that declares either form is stamped 16.
+Contract `17` (`HostHooksContract`) is additive for the `hostHooks` member:
+the hooks an extension asks the agent hosts to run. From 17 on, an explicit
+`putnami install`, `init` or `upgrade` writes them into `.claude/settings.json`
+and `.codex/hooks.json` for a workspace that opts into the extension's agent
+content and binds the collaboration contract the hooks require. A reader below
+17 would install the extension without its hooks, so it refuses the stamp. The
+floor binds a manifest wherever it loads from. Only a manifest that declares
+the member is stamped 17.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

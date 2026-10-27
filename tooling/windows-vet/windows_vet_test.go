@@ -1,4 +1,4 @@
-package documents
+package windowsvet
 
 import (
 	"errors"
@@ -19,9 +19,9 @@ import (
 //
 // It names the modules through the go command's `work` pattern, which matches
 // every package of every go.work module. One root `./...` would stop at each
-// nested go.mod. The project's test inputs are the whole tracked tree
-// (options.test.filePatterns ["git:**"]), so every change selects this gate and
-// changes its cache key.
+// nested go.mod. The project's test inputs are the tracked Go sources, go.mod
+// and go.sum files of the repository and go.work, so a change to any of them
+// selects this gate and changes its cache key.
 
 // windowsVetPlatform is the platform the gate compiles for: the only Windows
 // target Putnami supports (D-W1).
@@ -95,4 +95,24 @@ func goOutputLines(t *testing.T, root string, env []string, args ...string) []st
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+// repositoryRoot walks up from the test's working directory, the project root,
+// to the directory holding putnami.workspace.json.
+func repositoryRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "putnami.workspace.json")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("no putnami.workspace.json above the test working directory")
+		}
+		dir = parent
+	}
 }

@@ -1,0 +1,12 @@
+{
+  "mission": { "repository": "putnami/putnami", "key": "issue-596", "title": "Agent sessions report to their mission" },
+  "question": "Which bound does the inbox use?",
+  "context": "The inbox holds at most 50 messages.\nIts texts must also fit one result.",
+  "options": [
+    { "id": "bytes", "label": "64 KiB of text in total", "consequences": "A provider counts bytes." },
+    { "id": "count.only", "label": "50 messages only" }
+  ],
+  "recommendation": { "option": "bytes", "reason": "It bounds the document size." },
+  "blocks": "The sync result validator.",
+  "idempotencyKey": "issue-596/ask/inbox-bound"
+}

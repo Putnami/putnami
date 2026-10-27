@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "telemetry/otlp-push-contract#cli-usage-vocabulary-is-closed",
+    "telemetry/otlp-push-contract#equivalent-input-serializes-to-the-same-bytes",
+    "telemetry/otlp-push-contract#released-command-names-stay",
+    "telemetry/otlp-push-contract#the-cli-and-the-receiver-share-one-record-shape",
+    "telemetry/otlp-push-contract#the-error-codes-are-a-closed-set",
+    "telemetry/otlp-push-contract#the-exporter-never-hurts-the-workload",
+    "telemetry/otlp-push-contract#the-parser-is-strict",
+    "telemetry/otlp-push-contract#the-resource-names-the-service",
+    "telemetry/otlp-push-contract#the-version-is-pinned",
+    "telemetry/otlp-push-contract#three-signals-on-fixed-paths",
+    "telemetry/otlp-push-contract#values-map-to-otlp-numbers"
+  ]
+}

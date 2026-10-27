@@ -2,9 +2,11 @@ package extension
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	proto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // StepSeparator is used in step job names: build~transpile.
@@ -78,6 +80,14 @@ type PipelineExpansionOptions struct {
 	// dependencies so ordering and data-flow are preserved. A nil predicate
 	// leaves every step active (no project-aware pruning).
 	StepActive func(PipelineStep) bool
+
+	// ChangedFiles are the run's changed files the target project owns,
+	// project-relative, sorted and unique: the value of the context path
+	// proto.ContextPathChangedFiles. A `from: context` binding of that path
+	// joins the step's BoundParams beside its literals, so the task receives
+	// the files and its cache key holds them. Nil binds nothing: the project
+	// owns no changed file, or the run measured no diff.
+	ChangedFiles []string
 }
 
 // ExpandPipeline expands a command's pipeline steps into individual job definitions.
@@ -218,7 +228,7 @@ func ExpandPipelineWithOptions(
 			CommandDependsOn:     commandDef.CommandDependsOn,
 			SessionPrerequisites: commandDef.SessionPrerequisites,
 			AlsoRuns:             commandDef.AlsoRuns,
-			BoundParams:          literalBindingParams(step.With),
+			BoundParams:          stepBindingParams(step.With, stepChangedFiles(step, opts.ChangedFiles)),
 			FilePatterns:         filePatterns,
 			Writes:               task.Writes,
 			Reads:                task.Reads,
@@ -245,23 +255,54 @@ func ExpandPipelineWithOptions(
 	return expanded, nil
 }
 
-// literalBindingParams materializes the literal members of a step's `with`
-// map into a fresh, step-local parameter bag. HasValue, rather than Value !=
-// nil, is the discriminator because JSON null is a valid explicit binding.
-// Context and producer bindings remain wiring declarations; they are resolved
-// by their own planner/runtime paths and must not be mistaken for literals.
-func literalBindingParams(bindings map[string]InputBinding) map[string]any {
+// stepBindingParams materializes the literal and context members of a step's
+// `with` map into a fresh, step-local parameter bag. HasValue, rather than
+// Value != nil, is the discriminator for a literal because JSON null is a valid
+// explicit binding. A context binding of the changed files takes a copy of
+// changedFiles and binds nothing when there are none. Producer bindings remain
+// wiring declarations; they are resolved by their own runtime path and must
+// not be mistaken for parameters.
+func stepBindingParams(bindings map[string]InputBinding, changedFiles []string) map[string]any {
 	var params map[string]any
 	for name, binding := range bindings {
-		if !binding.HasValue {
+		var value any
+		switch {
+		case binding.HasValue:
+			value = binding.Value
+		case binding.From == proto.InputBindingFromContext && binding.Path == proto.ContextPathChangedFiles &&
+			len(changedFiles) > 0:
+			value = slices.Clone(changedFiles)
+		default:
 			continue
 		}
 		if params == nil {
 			params = make(map[string]any)
 		}
-		params[name] = binding.Value
+		params[name] = value
 	}
 	return params
+}
+
+// stepChangedFiles narrows the project's changed files to those the step's
+// activation.changedFiles globs select, so a change gate and the binding it
+// guards read the same files: an edit the gate ignores neither reaches the
+// task nor keys the step. A step without a change gate binds them all.
+func stepChangedFiles(step PipelineStep, changedFiles []string) []string {
+	if step.Activation == nil || len(step.Activation.ChangedFiles) == 0 {
+		return changedFiles
+	}
+	return slices.DeleteFunc(slices.Clone(changedFiles), func(file string) bool {
+		return !wsproto.SelectsPath(file, step.Activation.ChangedFiles)
+	})
+}
+
+// SelectsChangedFile reports whether one of changedFiles, project-relative,
+// matches one of the globs of a changedFiles activation gate. The globs read
+// with the workspace file-pattern grammar, negation included.
+func SelectsChangedFile(changedFiles, globs []string) bool {
+	return slices.ContainsFunc(changedFiles, func(file string) bool {
+		return wsproto.SelectsPath(file, globs)
+	})
 }
 
 // computeExcludedSteps determines which steps should be excluded:

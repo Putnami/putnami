@@ -13,6 +13,11 @@
   and their locked dependencies only, no content is read from `node_modules`,
   a name declared in both places is no longer refused, and `install` and
   `upgrade` run the agent phase in its one place.
+- **Amended**: 2026-10-26, by
+  [ADR 0081](0081-the-core-writes-declared-host-hooks.md): the
+  `extension:<name>` opt-in also turns on the host hooks the extension
+  declares, when the workspace binds the contract they need. They are read
+  from the same verified manifest as the content.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`, `internal/extension`,
   `internal/commands/lifecycle`), the `agentArtifacts` workspace declaration,
   the built-in starters

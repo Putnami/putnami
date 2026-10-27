@@ -86,6 +86,7 @@ func commandHandlers() map[string]cli.JobFunc {
 		"test-env-up":    dbtestenv.UpJob(),
 		"test-env-down":  dbtestenv.DownJob(),
 		"test":           test.Run,
+		"test-race":      test.RunRace,
 		"lint":           lint.Run,
 		"validate-api":   apicheck.Run,
 		"serve":          serve.Run,
