@@ -595,7 +595,7 @@ because both used to surprise:
   planned produces no replay line to read.
 
 **What is never recorded.** A verdict is recorded only when the cache key
-explains it, so these six are always re-executed:
+explains it, so these seven are always re-executed:
 
 - a **timeout** — a deadline depends on host load, not on the key (the result
   carries a structural `TimedOut` marker; the message is never matched). The
@@ -605,6 +605,11 @@ explains it, so these six are always re-executed:
 - a **sensitive leak** — the guard matches an invocation-scoped artifact's path
   and bytes and the process capabilities a run provisions, none of which the key
   describes;
+- a **host-unsupported** failure — the extension reports that this host cannot
+  run the task at all, such as a race detector run without a C compiler, with
+  `error.code` `host-unsupported` on its result event. The host is not in the
+  key, so the next run executes the task again and passes once the host gains
+  what it lacked;
 - a **canceled** task — the session was cut short;
 - a **skipped** task — it has its own caching rule above;
 - a **wrapper bail-out** that never reached the job's own logic (no `meta`

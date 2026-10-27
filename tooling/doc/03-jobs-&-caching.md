@@ -178,16 +178,35 @@ Steps can pass data to tasks via `with`:
   "task": "build-transpile",
   "with": {
     "target": { "value": "production" },
-    "config": { "from": "command", "path": "flags.target" },
     "schemas": { "fromStep": "generate", "output": "schemas" }
   }
 }
 ```
 
+A step that reads the run's changed files gates on them and binds them from
+the planner's context. This needs CLI contract 16:
+
+```json
+{
+  "id": "test-race",
+  "task": "test-race-exec",
+  "dependsOn": ["test"],
+  "activation": { "changedFiles": ["**/*.go", "!**/.gen/**"] },
+  "with": { "changed-files": { "from": "context", "path": "selection.changedFiles" } }
+}
+```
+
+The step is planned only for a project that owns a changed file its globs
+select. The binding holds those files, project-relative and sorted, and they
+key the step. A run that measured no diff (`--all`, `--projects`) plans the
+step nowhere. `context` is the only `from` source and `selection.changedFiles`
+its only path: packaging refuses any other, and so does loading a manifest
+stamped 16.
+
 ### Conditional execution
 
 - `if` — evaluated at plan-time. Removes the step entirely from the DAG: `"if": "params.compile"`
-- `runOn` — evaluated at execution time. `success` (the default) runs only after successful dependencies. `finally` marks the containing step as the finalizer; `finalizes.producer` start arms it once and cleanup waits for every downstream step in `finalizes.consumers` to become terminal. A finalizer uses no ordinary `dependsOn` and exports no result
+- `runOn` — evaluated at execution time. `success` (the default) runs only after successful dependencies. `finally` marks the containing step as the finalizer; `finalizes.producer` start arms it once and cleanup waits for each step in `finalizes.consumers` that the plan holds to become terminal; a consumer an `if` or an activation gate removed never runs and is not waited for. A finalizer uses no ordinary `dependsOn` and exports no result
 
 ```json
 {

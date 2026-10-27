@@ -16,10 +16,6 @@
   ],
   "requirements": [
     {
-      "id": "endpoint-set",
-      "text": "The plugin mounts liveness, health, readiness, and version paths under the configured prefix, and mounts profiling handlers only when the workload enables them explicitly."
-    },
-    {
       "id": "self-mounting",
       "text": "A platform plugin added to an application mounts its endpoints on the application's single server when the application configures, in any plugin order, and mounts them once however often the application configures. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin mounted through RegisterOn registers nothing more."
     },
@@ -33,15 +29,11 @@
     },
     {
       "id": "deferred-discovery",
-      "text": "Probe discovery walks the module tree on the first aggregate request rather than during configure, so a probe contributed by a plugin configured later is still found, and an explicitly registered probe is never overwritten by a discovered one of the same name."
+      "text": "Probe discovery walks the module tree on the first aggregate request rather than during configure, so a probe contributed by a plugin configured later is still found."
     },
     {
       "id": "probe-names",
       "text": "Probe names are validated against the cross-language probe-name pattern when registered explicitly, and a discovered or required name that violates it fails application start rather than emitting an envelope the protocol's own validator would reject."
-    },
-    {
-      "id": "bounded-probes",
-      "text": "Probes run in parallel, each under its own timeout, and the aggregate answers after a bounded grace period even when a probe ignores cancellation."
     },
     {
       "id": "required-probes",

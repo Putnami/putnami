@@ -156,7 +156,7 @@ func TestRunEntrypointDispatchesCompleteCommandSet(t *testing.T) {
 		t.Fatalf("runEntrypoint(build): %v", err)
 	}
 	for _, name := range []string{
-		"build", "build-generate", "build-describe", "test", "lint", "serve",
+		"build", "build-generate", "build-describe", "test", "test-race", "lint", "serve",
 		"run", "package", "publish", "config-extract", "config-merge",
 		"workspace-sync", "workspace-fetch", "workspace-install", "deps-upgrade",
 		"project-setup", "deps-edit", "validate-api",

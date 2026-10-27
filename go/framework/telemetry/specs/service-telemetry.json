@@ -25,11 +25,7 @@
     },
     {
       "id": "never-fails-the-workload",
-      "text": "Collector errors are dropped rather than propagated, and the log sink batches records onto a background flush, so neither export failures nor collector latency reach the request path."
-    },
-    {
-      "id": "final-flush",
-      "text": "The metric reader flushes periodically and once more during provider shutdown, so a short-lived container does not drop its last batch."
+      "text": "The log sink batches records onto a background flush, so collector latency never reaches the request path."
     },
     {
       "id": "bounded-shutdown",

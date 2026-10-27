@@ -612,5 +612,12 @@ func selectFrozenProjects(req *Request, ws *workspace.Workspace) ([]*workspace.P
 			req.selectionEvidence.taskScopes[id] = append([]string{}, extensions...)
 		}
 	}
+	// So are the changed paths: a step that gates on or binds the changed
+	// files planned and keyed from the submitter's diff, and this side reads
+	// that diff rather than measuring one of its own.
+	req.selectionEvidence.changedPaths = nil
+	if len(frozen.ChangedPaths) > 0 {
+		req.selectionEvidence.changedPaths = append([]string{}, frozen.ChangedPaths...)
+	}
 	return selected, ExitSuccess
 }

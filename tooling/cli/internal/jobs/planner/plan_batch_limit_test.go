@@ -26,7 +26,7 @@ func TestPlanRefusesAnInvalidBatchProjectCap(t *testing.T) {
 		if options != nil {
 			ws.Config.Options = map[string]extension.ParamMap{"test": options}
 		}
-		_, err := Plan(ws, []string{"test"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		_, err := Plan(ws, []string{"test"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 		return err
 	}
 

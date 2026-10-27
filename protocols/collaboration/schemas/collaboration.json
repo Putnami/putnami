@@ -20,7 +20,7 @@
   "$defs": {
     "contract": {
       "type": "string",
-      "enum": ["memory", "proposals", "tasks"]
+      "enum": ["memory", "missions", "proposals", "tasks"]
     },
     "outcome": {
       "type": "string",
@@ -33,7 +33,7 @@
       "required": ["message", "retryable"],
       "properties": {
         "message": { "type": "string", "minLength": 1 },
-        "reason": { "type": "string", "description": "Stable machine-readable code: binding.*, operation.*, precondition.*, request.*, provider.*, idempotency.*, revision.*, record.*, claim.*, or a provider-chosen dotted code." },
+        "reason": { "type": "string", "description": "Stable machine-readable code: binding.*, operation.*, precondition.*, request.*, provider.*, idempotency.*, revision.*, record.*, claim.*, message.*, or a provider-chosen dotted code." },
         "retryable": { "type": "boolean", "description": "Whether repeating the identical request can succeed. Never true for unresolved." },
         "current": { "$ref": "#/$defs/token", "description": "The current revision, on a conflict." },
         "reconcile": { "type": "string", "description": "The read, or the idempotent repeat, that establishes whether an unresolved mutation happened: prose that names the operation as <contract>.<operation> of the same contract, for example \"run proposals.find for the same change\"." }
@@ -140,6 +140,7 @@
       "additionalProperties": false,
       "properties": {
         "memory": { "$ref": "#/$defs/binding" },
+        "missions": { "$ref": "#/$defs/binding" },
         "proposals": { "$ref": "#/$defs/binding" },
         "tasks": { "$ref": "#/$defs/binding" }
       }
@@ -197,7 +198,8 @@
         "supported": { "type": "boolean", "description": "Whether the bound provider offers this operation." },
         "preconditions": { "$ref": "#/$defs/preconditions" },
         "openWorld": { "type": "boolean", "description": "Whether the operation reaches a system outside this machine." },
-        "description": { "type": "string", "description": "The provider tool's own description of provider-specific behavior and limits." }
+        "description": { "type": "string", "description": "The provider tool's own description of provider-specific behavior and limits." },
+        "hostOnly": { "type": "boolean", "description": "True when only the host that runs an agent calls the operation: the agent has no tool for it. Absent otherwise." }
       }
     },
     "capabilityIssue": {

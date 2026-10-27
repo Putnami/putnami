@@ -321,7 +321,7 @@ would have produced:
 |-----------|-----|
 | Same project, extension, manifest task and task-contract digest | The identity of the work itself. |
 | Same recursive functional-producer identity, ordering producers left out | Downstream nodes are not unified when any direct or transitive producer has different declared work or literal task params. |
-| No `with:` binding on the candidate step | Literal values are live task params; context/result bindings are not reducible to one plan-time value, so input-bound candidates stay separate. TypeScript's `test` binds `mode: "test"` on its `generate`, so that pair stays separate. |
+| No `with:` binding on the candidate step | Literal values are live task params; a step-result binding has no plan-time value and a context binding carries a per-run fact, so input-bound candidates stay separate. TypeScript's `test` binds `mode: "test"` on its `generate`, so that pair stays separate. |
 | Task declares `cache.deterministic` | The manifest's own statement that identical inputs give identical outputs. |
 | Task declares a complete `inputs` contract | "The same declared inputs" is only a complete statement when the task declares them; contract-declared params and explicit step literals are compared. |
 | Task declares at least one `writes` resource | A shared run's side effects must be ones the planner can serialize. |

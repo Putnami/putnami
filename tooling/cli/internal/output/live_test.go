@@ -1142,6 +1142,51 @@ func TestStartReplaysCoverageOnTheCommandThatRecordedIt(t *testing.T) {
 	}
 }
 
+// A command whose test step reports the counts keeps them when a later or
+// earlier step of the same command reports none, as the Go race step does:
+// the live cell and the Tasks line read the test step's counts in either
+// completion order.
+func TestAStepWithoutTestCountsKeepsTheTestStepCounts(t *testing.T) {
+	testResult := func() *jobs.JobResult {
+		return &jobs.JobResult{
+			Status: "success",
+			Events: []jobs.RawJobEvent{
+				metricEvent("tests-total", 40, "count"),
+				metricEvent("tests-passed", 40, "count"),
+				{Type: jobs.EventTypeSummary, Data: map[string]any{"message": "40/40 passed"}},
+			},
+			Data: map[string]any{"testSummary": map[string]any{"total": 40, "passed": 40, "failed": 0, "skipped": 0}},
+		}
+	}
+	raceResult := func() *jobs.JobResult {
+		return &jobs.JobResult{Status: "success", Events: []jobs.RawJobEvent{
+			logEvent("info", "Race detector on 2 package(s): 3/3 passed"),
+		}}
+	}
+	for name, order := range map[string][]string{
+		"race after test":  {"test~test", "test~test-race"},
+		"race before test": {"test~test-race", "test~test"},
+	} {
+		test := makeLiveTestJob("app", "test~test")
+		race := makeLiveTestJob("app", "test~test-race")
+		jobsByName := map[string]*jobs.ScheduledJob{"test~test": test, "test~test-race": race}
+		resultFor := map[string]func() *jobs.JobResult{"test~test": testResult, "test~test-race": raceResult}
+		r, errOut := newTestRenderer(t, 120, test, race)
+		for _, step := range order {
+			r.JobStart(jobsByName[step])
+			r.JobComplete(jobsByName[step], resultFor[step]())
+		}
+		cmd := r.rowByID["app"].commands["test"]
+		if cmd.summary != "40/40 passed" || cmd.testSummary == nil || cmd.testSummary.Total != 40 {
+			t.Errorf("%s: command summary %q, test summary %+v; want the test step's", name, cmd.summary, cmd.testSummary)
+		}
+		r.Finish(map[string]*jobs.JobResult{test.Key(): {Status: "success"}, race.Key(): {Status: "success"}}, jobs.SessionOutcome{})
+		if out := errOut.String(); !strings.Contains(out, "40 tests") || strings.Contains(out, "43 tests") {
+			t.Errorf("%s: the Tasks line does not report the test step's 40 tests alone:\n%s", name, out)
+		}
+	}
+}
+
 func TestFinalSummaryBlocks(t *testing.T) {
 	// app: lint+test+build all pass with metrics. lib: test fails.
 	appLint := makeLiveTestJob("app", "lint")

@@ -262,6 +262,14 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 		if !shared.IsImplicitInstall(ctx) && agentctx.RegisterMCPServer(wsRoot, os.Stderr) {
 			recordAction(LifecycleAction{Kind: "assistant-context", Name: ".mcp.json", Description: "Putnami MCP server registered in .mcp.json"})
 		}
+		// Write the host hooks the opted-in extensions declare, and remove the
+		// ones that no longer apply (ADR 0081). Only an explicit install does:
+		// the bootstrap must not change a committed file either.
+		if !shared.IsImplicitInstall(ctx) {
+			for _, change := range agentctx.RegisterHostHooks(wsRoot, updatedCfg, os.Stderr) {
+				recordAction(LifecycleAction{Kind: "assistant-context", Name: change.File, Description: change.Description()})
+			}
+		}
 	}
 
 	if len(cfg.Templates) > 0 {

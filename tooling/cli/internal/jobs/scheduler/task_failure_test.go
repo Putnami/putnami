@@ -322,6 +322,11 @@ func TestFailureCacheRefusesVerdictsItsKeyCannotExplain(t *testing.T) {
 			cacheEnabled: true, hash: captureHashA,
 		},
 		{
+			name:         "a host that cannot run the task says nothing about its inputs",
+			result:       resultFromWire(t, `{"status":"FAILED","error":{"code":"host-unsupported","message":"no C compiler"}}`),
+			cacheEnabled: true, hash: captureHashA,
+		},
+		{
 			name:         "a wrapper bail-out never reached the job's own logic",
 			result:       &JobResult{Status: "failed"},
 			cacheEnabled: true, hash: captureHashA,
@@ -626,9 +631,9 @@ func resultProbeFixture(t *testing.T, logPath, resultData string) (*workspace.Wo
 
 // TestFailureReplay_AnExtensionReportedTimeoutRunsAgain is the timeout carve-out
 // end to end through the real subprocess, parse and store: a failed result
-// event whose error.timedOut is set is never recorded, so the next run at the
-// same key executes again. The control, the same failure without the mark, is
-// replayed.
+// event whose error.timedOut is set, or whose error.code says the host cannot
+// run the task, is never recorded, so the next run at the same key executes
+// again. The control, the same failure without either mark, is replayed.
 func TestFailureReplay_AnExtensionReportedTimeoutRunsAgain(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "failure-replay-cache",
@@ -641,6 +646,7 @@ func TestFailureReplay_AnExtensionReportedTimeoutRunsAgain(t *testing.T) {
 		wantRuns   int
 	}{
 		{name: "timed out", resultData: `{"status":"FAILED","error":{"timedOut":true}}`, wantRuns: 2},
+		{name: "host unsupported", resultData: `{"status":"FAILED","error":{"code":"host-unsupported"}}`, wantRuns: 2},
 		{name: "control", resultData: `{"status":"FAILED","error":{"message":"assertion failed"}}`, wantRuns: 1},
 	}
 	for _, tc := range cases {

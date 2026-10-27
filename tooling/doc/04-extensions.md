@@ -278,7 +278,7 @@ side-effecting jobs are skipped unless `--continue-on-error` is set.
 **Conditional execution:**
 
 - `if` (plan-time): evaluated before the pipeline runs, removes the step entirely from the graph
-- `runOn` (execution): `success` (default) runs only after successful dependencies; `finally` marks the containing step as the finalizer and requires `finalizes.producer` plus the complete downstream `finalizes.consumers` frontier
+- `runOn` (execution): `success` (default) runs only after successful dependencies; `finally` marks the containing step as the finalizer and requires `finalizes.producer` plus `finalizes.consumers`, every downstream step that uses the resource
 
 ```json
 { "id": "types", "task": "build-types", "if": "params.emitTypes == true" }
@@ -291,7 +291,7 @@ side-effecting jobs are skipped unless `--continue-on-error` is set.
 ```
 
 Producer start arms the finalizer exactly once; cleanup waits until every listed
-consumer is terminal. The producer task must declare an invocation-scoped
+consumer the plan holds is terminal. The producer task must declare an invocation-scoped
 output, and the finalizer has no ordinary `dependsOn` or result exports.
 
 **Input bindings** via `with`:
@@ -302,11 +302,30 @@ output, and the finalizer has no ordinary `dependsOn` or result exports.
   "task": "build-transpile",
   "with": {
     "target": { "value": "production" },
-    "config": { "from": "command", "path": "flags.target" },
     "schemas": { "fromStep": "generate", "output": "schemas" }
   }
 }
 ```
+
+A step that reads the run's changed files gates on them and binds them from
+the planner's context. This needs CLI contract 16:
+
+```json
+{
+  "id": "test-race",
+  "task": "test-race-exec",
+  "dependsOn": ["test"],
+  "activation": { "changedFiles": ["**/*.go", "!**/.gen/**"] },
+  "with": { "changed-files": { "from": "context", "path": "selection.changedFiles" } }
+}
+```
+
+The step is planned only for a project that owns a changed file its globs
+select. The binding holds those files, project-relative and sorted, and they
+key the step. A run that measured no diff (`--all`, `--projects`) plans the
+step nowhere. `context` is the only `from` source and `selection.changedFiles`
+its only path: packaging refuses any other, and so does loading a manifest
+stamped 16.
 
 ## The JSONL event protocol
 

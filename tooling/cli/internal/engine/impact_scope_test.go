@@ -428,7 +428,7 @@ func planFixtureLanguage(t *testing.T, manifest string) (*workspace.Workspace, f
 	ws.Graph = workspace.BuildGraph(ws.Projects)
 	return ws, func() []*scheduler.ScheduledJob {
 		t.Helper()
-		planned, err := planner.Plan(ws, []string{"build", "test", "lint"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		planned, err := planner.Plan(ws, []string{"build", "test", "lint"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("plan: %v", err)
 		}
@@ -759,7 +759,7 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib", Extensions: []string{"@fixture/release"}, Config: &wsproto.ProjectConfig{}}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "scope"}, []*workspace.Project{lib})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
-	planned, err := planner.Plan(ws, []string{"build", "ship", "publish", "deploy", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"build", "ship", "publish", "deploy", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}

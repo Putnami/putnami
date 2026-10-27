@@ -1,4 +1,4 @@
-// Package provider implements the tasks and proposals contracts of
+// Package provider implements the tasks, proposals and missions contracts of
 // go.putnami.dev/protocol/collaboration over the local file store.
 //
 // It is the reference provider: every operation reads or writes one store
@@ -6,6 +6,9 @@
 // cannot do it says. It records proposals and reviews but runs no hosted
 // checks (proposals.status always reports checks unsupported) and offers no
 // merge; tasks.assign, tasks.link and tasks.claim are not offered either.
+// Its missions have one owner, the person who works in the workspace, who
+// answers decisions and writes messages as files of the store directory
+// (missions.go).
 package provider
 
 import (
@@ -68,6 +71,9 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		key(collab.ContractProposals, collab.OperationUpsert): p.upsertProposal,
 		key(collab.ContractProposals, collab.OperationStatus): p.proposalStatus,
 		key(collab.ContractProposals, collab.OperationReview): p.reviewProposal,
+		key(collab.ContractMissions, collab.OperationSync):    p.syncMission,
+		key(collab.ContractMissions, collab.OperationAsk):     p.askDecision,
+		key(collab.ContractMissions, collab.OperationReply):   p.replyToMessage,
 	}
 }
 
@@ -133,6 +139,12 @@ func readState(s *store.Store) (*store.State, *collab.Failure) {
 // returned keeps its outcome.
 func update(s *store.Store, change func(*store.State) error) *collab.Failure {
 	_, err := s.Update(change)
+	return writeFailure(err)
+}
+
+// writeFailure maps the error of a store write to its contract failure, as
+// update describes. A nil error is no failure.
+func writeFailure(err error) *collab.Failure {
 	if err == nil || errors.Is(err, errNothingToWrite) {
 		return nil
 	}

@@ -241,6 +241,63 @@ func LocateAgentContent(wsRoot string, cfg *wsproto.Config, name string) (*Agent
 }
 
 func locateLocalAgentContent(declared DeclaredExtension) (*AgentContentSource, error) {
+	verified, err := readLocalManifest(declared)
+	if err != nil {
+		return nil, err
+	}
+	contribution, err := validatedContribution(declared.Name, verified.Manifest)
+	if err != nil {
+		return nil, err
+	}
+	return &AgentContentSource{
+		Name:         declared.Name,
+		Version:      verified.Version,
+		Root:         verified.Root,
+		Local:        true,
+		ManifestHash: verified.ManifestHash,
+		Contribution: contribution,
+	}, nil
+}
+
+func locateInstalledAgentContent(wsRoot, name string) (*AgentContentSource, error) {
+	verified, err := readPinnedManifest(wsRoot, name, "agent content")
+	if err != nil {
+		return nil, err
+	}
+	contribution, err := validatedContribution(name, verified.Manifest)
+	if err != nil {
+		return nil, err
+	}
+	if !contribution.Packaged() {
+		return nil, fmt.Errorf("installed extension %s@%s ships its agent content as source only; a published extension carries the built tree bound by agentContent.manifestSha256, so it must be re-packaged",
+			name, verified.Version)
+	}
+	return &AgentContentSource{
+		Name:         name,
+		Version:      verified.Version,
+		Root:         verified.Root,
+		ManifestHash: verified.ManifestHash,
+		Contribution: contribution,
+	}, nil
+}
+
+// verifiedManifest is a declared extension's manifest, read from where
+// discovery loads the extension and negotiated by the protocol's loader.
+type verifiedManifest struct {
+	Manifest *extproto.Manifest
+	// Version is the lock pin of an installed extension, or the manifest's own
+	// version for a local one.
+	Version string
+	// Root is the directory the manifest came from.
+	Root string
+	// ManifestHash is the SHA-256 of the manifest bytes. For an installed
+	// extension it equals the digest its lock pin records.
+	ManifestHash string
+}
+
+// readLocalManifest reads a local extension's manifest from its declared
+// directory.
+func readLocalManifest(declared DeclaredExtension) (*verifiedManifest, error) {
 	manifestPath := filepath.Join(declared.Dir, ManifestFilename)
 	data, err := readRegularManifest(manifestPath)
 	if err != nil {
@@ -250,21 +307,15 @@ func locateLocalAgentContent(declared DeclaredExtension) (*AgentContentSource, e
 	if err != nil {
 		return nil, err
 	}
-	contribution, err := validatedContribution(declared.Name, m)
-	if err != nil {
-		return nil, err
-	}
-	return &AgentContentSource{
-		Name:         declared.Name,
-		Version:      strings.TrimSpace(m.Version),
-		Root:         declared.Dir,
-		Local:        true,
-		ManifestHash: lockfile.HashBytes(data),
-		Contribution: contribution,
-	}, nil
+	return &verifiedManifest{Manifest: m, Version: strings.TrimSpace(m.Version), Root: declared.Dir, ManifestHash: lockfile.HashBytes(data)}, nil
 }
 
-func locateInstalledAgentContent(wsRoot, name string) (*AgentContentSource, error) {
+// readPinnedManifest reads an installed extension's manifest only through its
+// lock pin: the lock must pin the extension with a manifest digest, and the
+// manifest discovery loads must hash to exactly that digest and declare the
+// pinned version. purpose names what the caller verifies, for the error that
+// says the pin has no digest.
+func readPinnedManifest(wsRoot, name, purpose string) (*verifiedManifest, error) {
 	lock, err := lockfile.ReadLockFile(wsRoot)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", lockfile.LockFilename, err)
@@ -277,8 +328,8 @@ func locateInstalledAgentContent(wsRoot, name string) (*AgentContentSource, erro
 		return nil, fmt.Errorf("%s pins no extension %s: run `putnami install` to install it", lockfile.LockFilename, name)
 	}
 	if !isBareSHA256(entry.ManifestHash) {
-		return nil, fmt.Errorf("%s pins extension %s@%s without a manifest digest, so its agent content cannot be verified: run `putnami extensions update %s`",
-			lockfile.LockFilename, name, entry.Version, name)
+		return nil, fmt.Errorf("%s pins extension %s@%s without a manifest digest, so its %s cannot be verified: run `putnami extensions update %s`",
+			lockfile.LockFilename, name, entry.Version, purpose, name)
 	}
 	root, display, data, err := readInstalledManifest(wsRoot, name, entry.Version)
 	if err != nil {
@@ -295,21 +346,7 @@ func locateInstalledAgentContent(wsRoot, name string) (*AgentContentSource, erro
 	if m.Version != "" && m.Version != entry.Version {
 		return nil, fmt.Errorf("installed extension %s declares version %s, but %s pins %s", name, m.Version, lockfile.LockFilename, entry.Version)
 	}
-	contribution, err := validatedContribution(name, m)
-	if err != nil {
-		return nil, err
-	}
-	if !contribution.Packaged() {
-		return nil, fmt.Errorf("installed extension %s@%s ships its agent content as source only; a published extension carries the built tree bound by agentContent.manifestSha256, so it must be re-packaged",
-			name, entry.Version)
-	}
-	return &AgentContentSource{
-		Name:         name,
-		Version:      entry.Version,
-		Root:         root,
-		ManifestHash: entry.ManifestHash,
-		Contribution: contribution,
-	}, nil
+	return &verifiedManifest{Manifest: m, Version: entry.Version, Root: root, ManifestHash: entry.ManifestHash}, nil
 }
 
 // readInstalledManifest reads a pinned extension's manifest from where

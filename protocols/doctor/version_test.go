@@ -5,6 +5,8 @@ import (
 	"os"
 	"sort"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // doctorSchemaPath is the JSON schema editors validate authored reports and
@@ -17,6 +19,7 @@ const doctorSchemaPath = "schemas/doctor.json"
 // fewer versions rejects a document the parser reads, and a schema that accepts
 // more blesses one the parser drops. Either gap is drift.
 func TestProtocolVersion_SchemaMatches(t *testing.T) {
+	spectest.Proves(t, "doctor/readiness-report-contract", "the-version-is-pinned", "the-schema-pins-the-version")
 	want := []int{ProtocolVersion}
 	for _, def := range []string{"report", "waiverFile"} {
 		t.Run(def, func(t *testing.T) {

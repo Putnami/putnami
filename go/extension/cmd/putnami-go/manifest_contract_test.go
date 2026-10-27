@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/go/extension/internal/codegen"
 	"go.putnami.dev/go/extension/internal/jobs/configmerge"
 	"go.putnami.dev/go/extension/internal/toolchain"
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -253,7 +254,7 @@ func TestModuleAwareCachedTasksKeyWorkspaceGraphFiles(t *testing.T) {
 	m := loadExtensionManifest(t)
 	wantFiles := []string{"go.work", "go.work.sum"}
 	for _, taskName := range []string{
-		"test-exec", "build-tidy", "build-generate", "build-describe",
+		"test-exec", "test-race-exec", "build-tidy", "build-generate", "build-describe",
 		"build-compile", "build-cross-compile", "lint-golangci-fix",
 		"lint-golangci-readonly", "lint-staticcheck", "config-extract-exec",
 	} {
@@ -1557,6 +1558,7 @@ func TestTaskEffectTable(t *testing.T) {
 		"run-exec":         {"network", "process", "toolchain-cache"},
 		"serve-run":        {"network", "process", "toolchain-cache"},
 		"test-exec":        {"network", "toolchain-cache"},
+		"test-race-exec":   {"network", "toolchain-cache"},
 		// The database test environment runs a container (process) and may pull
 		// its pinned image (network). Both are external effects a cache hit
 		// could not reproduce, which is also why the pair is uncacheable — and
@@ -2407,6 +2409,9 @@ func TestHeavyStepsSurfaceTheAuditedDeadlines(t *testing.T) {
 		"package/cross-compile -> build-cross-compile = 900000ms",
 		"test/describe -> build-describe = 900000ms",
 		"test/test -> test-exec = 600000ms",
+		// The race step builds and runs the touched packages' tests under
+		// the detector after test, so it is heavy and carries test's ceiling.
+		"test/test-race -> test-race-exec = 600000ms",
 	}
 
 	var got []string
@@ -2797,5 +2802,92 @@ func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
 		case *cmd.Traits != want:
 			t.Errorf("command %q declares traits %+v, want %+v", name, *cmd.Traits, want)
 		}
+	}
+}
+
+// The race step runs after test, never instead of it, and the test
+// environment's teardown waits for both. It is planned only where the project
+// owns a changed Go or testdata file outside .gen, and binds those files as the
+// changed-files input, which keys it. It carries no plan-time `if`: it reads
+// race-changed and --race at run time, so no flag excludes it, and test, the
+// prerequisite only it depends on, stays planned. It writes no file, so a hit
+// restores no sibling's output; it reads every file test-exec reads, so a hit
+// answers the same tree; and it declares the rung its gate and binding need.
+// Its declared inputs leave out the coverage and benchmark parameters, which
+// it never reads; every flag of the test command still keys it, as it keys
+// every step of the command.
+func TestRaceStepIsGatedBoundAndKeyedOnTheChangedFiles(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "race-on-touched-packages",
+		"the-race-step-is-gated-bound-and-keyed-on-the-changed-files")
+	m := loadExtensionManifest(t)
+	test := m.Commands["test"]
+
+	flag, ok := test.Flags["race-changed"]
+	if !ok || flag.Type != "boolean" || flag.Default != true || strings.TrimSpace(flag.Description) == "" {
+		t.Errorf("race-changed flag = %+v, present=%t; want a described boolean defaulting to true", flag, ok)
+	}
+
+	var race, teardown *proto.PipelineStep
+	for i := range test.Run {
+		switch test.Run[i].ID {
+		case "test-race":
+			race = &test.Run[i]
+		case "test-env-teardown":
+			teardown = &test.Run[i]
+		}
+	}
+	if race == nil || teardown == nil {
+		t.Fatalf("test pipeline lost its race step (%v) or its teardown (%v)", race, teardown)
+	}
+	if race.Task != "test-race-exec" || race.Heavy == nil || !*race.Heavy {
+		t.Errorf("race step runs %q, heavy=%v; want the heavy test-race-exec", race.Task, race.Heavy)
+	}
+	if !slices.Equal(race.DependsOn, []string{"test"}) {
+		t.Errorf("race step dependsOn = %v, want test alone", race.DependsOn)
+	}
+	if race.If != "" {
+		t.Errorf("race step if = %q; an excluded race step would exclude test, the prerequisite only it depends on", race.If)
+	}
+	if race.Activation == nil || !slices.Equal(race.Activation.ChangedFiles, []string{"**/*.go", "**/testdata/**", "!**/.gen/**"}) {
+		t.Errorf("race step activation = %+v, want the changed Go and testdata files outside .gen", race.Activation)
+	}
+	want := proto.InputBinding{From: proto.InputBindingFromContext, Path: proto.ContextPathChangedFiles}
+	if got := race.With["changed-files"]; !reflect.DeepEqual(got, want) || len(race.With) != 1 {
+		t.Errorf("race step with = %+v, want changed-files bound to %+v alone", race.With, want)
+	}
+	if !slices.Contains(teardown.Finalizes.Consumers, "test-race") || !slices.Contains(teardown.Finalizes.Consumers, "test") {
+		t.Errorf("teardown consumers = %v, want test and test-race", teardown.Finalizes.Consumers)
+	}
+
+	task := m.Tasks["test-race-exec"]
+	if !slices.Equal(task.Args, []string{"test-race"}) {
+		t.Errorf("test-race-exec args = %v, want the test-race job", task.Args)
+	}
+	if port, ok := task.Inputs["changed-files"]; !ok || port.From != proto.TaskInputFromParams {
+		t.Errorf("test-race-exec changed-files input = %+v, present=%t; the bound files must key the task", port, ok)
+	}
+	for _, name := range []string{"coverage", "enforce-coverage", "coverage-threshold", "coverprofile", "bench", "timeout"} {
+		if _, ok := task.Inputs[name]; ok {
+			t.Errorf("test-race-exec declares the input %q, which the race run never reads", name)
+		}
+	}
+	for _, name := range []string{"race", "race-changed"} {
+		if port, ok := task.Inputs[name]; !ok || port.From != proto.TaskInputFromParams {
+			t.Errorf("test-race-exec input %q = %+v, present=%t; the run reads it to skip itself", name, port, ok)
+		}
+	}
+	reads, raced := proto.DeriveTaskCacheKey(m.Tasks["test-exec"].Inputs), proto.DeriveTaskCacheKey(task.Inputs)
+	if !reflect.DeepEqual(reads.Files, raced.Files) || !reflect.DeepEqual(reads.WorkspaceFiles, raced.WorkspaceFiles) {
+		t.Errorf("test-race-exec key files = %v %v, want test-exec's %v %v",
+			raced.Files, raced.WorkspaceFiles, reads.Files, reads.WorkspaceFiles)
+	}
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+		t.Errorf("test-race-exec cache = %+v, want enabled with noOutput: it shares test's output directory", task.Cache)
+	}
+	if task.Declares == nil || len(task.Declares.Outputs) > 0 || task.Batchable != nil {
+		t.Errorf("test-race-exec declares %+v, batchable %+v; want no output and no batch", task.Declares, task.Batchable)
+	}
+	if m.CLIContract != proto.RequiredCLIContract(m) || m.CLIContract != protocolcli.ChangedFilesContract {
+		t.Errorf("cliContract = %d, want %d, the rung of the changed-files gate", m.CLIContract, protocolcli.ChangedFilesContract)
 	}
 }

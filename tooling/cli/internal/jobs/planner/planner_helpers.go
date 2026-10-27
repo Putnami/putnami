@@ -46,6 +46,13 @@ type planCache struct {
 	// project's dependency closure, so a closureFiles gate walks the graph once
 	// per project instead of once per (project, command, step).
 	closureRoots map[string][]string
+
+	// ownedChangedFiles is keyed by project ID and holds the run's changed files
+	// each project owns, project-relative (workspace.OwnedChangedFiles). A
+	// changedFiles gate and a context binding read it; it is nil when the run
+	// measured no diff, so a gated step plans nowhere and a binding binds
+	// nothing.
+	ownedChangedFiles map[string][]string
 }
 
 // newPlanCache returns an empty cache; callers do not need to know its shape.

@@ -224,7 +224,7 @@ func (l *treeKeyedLane) keys(
 	buildTime string,
 ) ([]*ScheduledJob, map[string]string) {
 	t.Helper()
-	planned, err := planner.Plan(l.ws, commands, l.ws.Projects, exts, params, nil, nil)
+	planned, err := planner.Plan(l.ws, commands, l.ws.Projects, exts, params, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan %v: %v", commands, err)
 	}

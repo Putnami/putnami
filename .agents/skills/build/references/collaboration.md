@@ -1,7 +1,7 @@
-# Tasks, proposals and memory
+# Collaboration contracts
 
 Every workflow reaches work items, change proposals and shared memory through
-the three collaboration contracts, never through a backend's own client. The
+the collaboration contracts, never through a backend's own client. The
 workspace binds each contract to a provider extension in the
 `options.collaboration` block of `putnami.workspace.json`; the provider owns
 the backend, its credentials, its identifiers and its label or state mapping.
@@ -21,6 +21,12 @@ fi
 The MCP server offers the same operations as `<contract>.<operation>` tools
 (`tasks.get`, `proposals.upsert`, `memory.checkpoint`, ...) with the same
 request and envelope. Use whichever entry path the host exposes.
+
+When the workspace binds `missions`, the host hooks publish the session to its
+mission and print the mission sheet at session start: ask the owner with
+`missions.ask` and the repository and key the sheet names, and reply to an
+owner's message with `missions.reply` or an `[ack <message id>] <reply>` line
+in the final message of the turn.
 
 ## Read the envelope
 
