@@ -11,8 +11,6 @@ require (
 
 replace go.putnami.dev/protocol/capabilities => ../capabilities
 
-replace go.putnami.dev/protocol/capabilities => ../capabilities
-
 replace go.putnami.dev/protocol/cli => ../cli
 
 replace go.putnami.dev/protocol/diagnostic => ../diagnostic
