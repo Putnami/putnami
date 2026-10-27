@@ -7,9 +7,12 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSchemaFieldParity(t *testing.T) {
+	spectest.Proves(t, "http-routes/route-inventory-contract", "the-identifiers-are-pinned", "the-schema-members-match-the-go-types")
 	data, err := os.ReadFile("schemas/http-routes.json")
 	if err != nil {
 		t.Fatal(err)

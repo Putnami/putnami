@@ -14,6 +14,7 @@ import (
 	"time"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const evaluationInstant = "2026-08-18T10:00:00Z"
@@ -88,6 +89,7 @@ func measuredObservation(requirement, check string, measurement ObservationMeasu
 }
 
 func TestManifestVersionDispatchRefusesTheForwardField(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "strict-versioned-documents", "a-version-1-manifest-refuses-the-verification-field")
 	criterion := `"verification":{"kind":"acceptance","checks":["lifecycle-flush"]}`
 	requirement := `{"id":"lifecycle","stage":"coded","evidenceKinds":["attestation"],` + criterion + `}`
 	feature := `{"id":"logging/structured-logging","type":"feature","name":"L","outcome":"L","owner":"p","target":"coded","requirements":[` + requirement + `]}`
@@ -225,6 +227,15 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		// which its own tests, the first-party extensions and the CLI observe,
 		// in the verification block.
 		filepath.Join("protocols", "workspace", ManifestFilename): true,
+
+		// The doctor, features, http-routes, platform and telemetry protocols
+		// name the acceptance checks of their contracts, which their own tests
+		// and their implementers observe, in the verification block.
+		filepath.Join("protocols", "doctor", ManifestFilename):      true,
+		filepath.Join("protocols", "features", ManifestFilename):    true,
+		filepath.Join("protocols", "http-routes", ManifestFilename): true,
+		filepath.Join("protocols", "platform", ManifestFilename):    true,
+		filepath.Join("protocols", "telemetry", ManifestFilename):   true,
 	}
 	// Gitignored roots are skipped too. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized
@@ -517,6 +528,7 @@ func TestMeasuredObservationBoundaries(t *testing.T) {
 }
 
 func TestVerificationCanonicalizationIsDeterministicAndNonMutating(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "canonical-bytes-across-languages", "go-reproduces-the-verification-report-golden")
 	data, err := os.ReadFile(filepath.Join("fixtures", "equivalence", "go-typescript-verification.golden.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -650,6 +662,7 @@ func assertSameNames(t *testing.T, properties map[string]json.RawMessage, want [
 }
 
 func TestEvaluationJoinsOnRequirementIdentity(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "acceptance-verdicts", "evaluation-joins-spec-and-manifest-on-requirement-identity")
 	requirements := []Requirement{
 		acceptanceRequirement("flush-visits-every-sink"),
 		{ID: "sink-wiring", Stage: MaturityWired, EvidenceKinds: []EvidenceKind{EvidenceKindCapability}},
@@ -692,6 +705,7 @@ func TestEvaluationJoinsOnRequirementIdentity(t *testing.T) {
 }
 
 func TestAcceptanceEvaluationRequiresEveryDeclaredCheck(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "acceptance-verdicts", "an-acceptance-requirement-needs-every-declared-check-to-pass")
 	requirement := acceptanceRequirement("close-visits-every-sink", "flush-visits-every-sink")
 	for _, test := range []struct {
 		name         string
@@ -787,6 +801,7 @@ func TestAcceptanceEvaluationRequiresEveryDeclaredCheck(t *testing.T) {
 }
 
 func TestThresholdEvaluationRecomputesTheAuthoredObjective(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "objective-verdicts", "a-threshold-is-recomputed-from-the-measured-value")
 	requirement := invocationThresholdRequirement()
 	window := ObservedWindow{Start: "2026-08-18T09:59:00Z", End: evaluationInstant}
 	measured := func(value float64) []VerificationObservation {
@@ -858,6 +873,7 @@ func TestThresholdEvaluationRecomputesTheAuthoredObjective(t *testing.T) {
 }
 
 func TestRollingEvaluationEnforcesWindowEnvironmentAndFreshness(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "objective-verdicts", "a-rolling-objective-needs-a-current-window-in-the-declared-environment")
 	requirement := rollingThresholdRequirement()
 	measurement := ObservationMeasurement{Name: "logging.delivery.success", Aggregation: AggregationRatio, Value: 0.9994, Unit: "ratio"}
 	observe := func(start, end, environment string) []VerificationObservation {
@@ -927,6 +943,7 @@ func TestRollingEvaluationEnforcesWindowEnvironmentAndFreshness(t *testing.T) {
 }
 
 func TestAnUnauthoredObjectiveNeverProducesAVerdict(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "objective-verdicts", "an-unauthored-objective-never-produces-a-verdict")
 	// Manifest validation refuses a threshold without a target. A caller that
 	// builds one directly must still get nothing rather than a verdict against
 	// an objective nobody authored.

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	proto "go.putnami.dev/protocol/extension"
 	runtime "go.putnami.dev/protocol/runtime"
 )
 
@@ -225,6 +226,55 @@ func TestEmitter_MarkTimedOut(t *testing.T) {
 		}
 		if i > 0 && stripTime(t, line) != stripTime(t, marked[i]) {
 			t.Errorf("result %d differs with and without the mark:\n%s\n%s", i, line, marked[i])
+		}
+	}
+}
+
+// TestEmitter_MarkHostUnsupported pins the host-unsupported result on the
+// wire: a FAILED result after MarkHostUnsupported carries error.code
+// host-unsupported, beside error.timedOut when both marks are set, and parses
+// as a valid runtime protocol event; OK and SKIP carry no error. The
+// TypeScript emitter writes the same member through result's error argument.
+func TestEmitter_MarkHostUnsupported(t *testing.T) {
+	for name, tc := range map[string]struct {
+		timedOut bool
+		want     runtime.JobError
+	}{
+		"host unsupported": {want: runtime.JobError{Code: proto.HostUnsupportedFailureCode}},
+		"and timed out":    {timedOut: true, want: runtime.JobError{Code: proto.HostUnsupportedFailureCode, TimedOut: true}},
+	} {
+		out := captureStdout(t, func() {
+			e := NewForVersion(runtime.ProtocolVersion)
+			e.MarkHostUnsupported()
+			if tc.timedOut {
+				e.MarkTimedOut()
+			}
+			e.Result("FAILED", nil)
+			e.Result("OK", nil)
+			e.Result("SKIP", nil)
+		})
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if len(lines) != 3 {
+			t.Fatalf("%s: emitted %d lines, want 3:\n%s", name, len(lines), out)
+		}
+		evt, err := runtime.ParseEvent([]byte(lines[0]))
+		if err != nil {
+			t.Fatalf("%s: result does not parse: %v\n%s", name, err, lines[0])
+		}
+		if diags := runtime.ValidateEvent(evt); diag.HasErrors(diags) {
+			t.Fatalf("%s: result violates the runtime protocol: %v\n%s", name, diags, lines[0])
+		}
+		var data runtime.ResultData
+		if err := json.Unmarshal(evt.Data, &data); err != nil {
+			t.Fatal(err)
+		}
+		if data.Status != runtime.ResultFailed || data.Error == nil || *data.Error != tc.want {
+			t.Errorf("%s: result = %+v (error %+v), want FAILED with %+v", name, data, data.Error, tc.want)
+		}
+		for _, line := range lines[1:] {
+			if strings.Contains(line, `"error"`) {
+				t.Errorf("%s: an OK or SKIP result carries an error: %s", name, line)
+			}
 		}
 	}
 }

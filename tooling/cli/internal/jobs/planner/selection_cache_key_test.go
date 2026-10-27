@@ -82,7 +82,7 @@ func TestCacheKeyIsTheSameUnderEverySelectionThatPlansTheTask(t *testing.T) {
 
 	keysFor := func(name string, selected ...*workspace.Project) map[string]string {
 		t.Helper()
-		planned, err := Plan(ws, []string{"build"}, selected, exts, nil, nil, nil)
+		planned, err := Plan(ws, []string{"build"}, selected, exts, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("%s: plan: %v", name, err)
 		}

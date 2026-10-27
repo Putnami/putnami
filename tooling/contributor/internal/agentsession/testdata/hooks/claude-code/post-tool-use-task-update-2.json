@@ -1,0 +1,29 @@
+{
+  "session_id": "ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8",
+  "transcript_path": "/home/agent/.claude/projects/-work-repo/ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8.jsonl",
+  "cwd": "/work/repo",
+  "prompt_id": "50054e58-1cf4-49cf-a268-3df3069ab5e6",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "TaskUpdate",
+  "tool_input": {
+    "taskId": "2",
+    "status": "completed"
+  },
+  "tool_response": {
+    "success": true,
+    "taskId": "2",
+    "updatedFields": [
+      "status"
+    ],
+    "statusChange": {
+      "from": "pending",
+      "to": "completed"
+    }
+  },
+  "tool_use_id": "toolu_01WScnuUXhQeTzFDshTdb45r",
+  "duration_ms": 223
+}

@@ -129,7 +129,7 @@ func planPipelineProbe(
 ) []*jobmodel.ScheduledJob {
 	t.Helper()
 	ws := testWorkspace(t.TempDir(), projects...)
-	planned, err := Plan(ws, commands, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, commands, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan %v: %v", commands, err)
 	}
@@ -363,7 +363,7 @@ func TestSharedExecutions_KeysMatchEachCommandAlone(t *testing.T) {
 			ws := testWorkspace(root, projects...)
 			cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
 			plan := func(commands ...string) ([]*jobmodel.ScheduledJob, map[string]string) {
-				planned, err := Plan(ws, commands, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+				planned, err := Plan(ws, commands, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 				if err != nil {
 					t.Fatalf("Plan %v: %v", commands, err)
 				}
@@ -526,7 +526,7 @@ func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T
 	for _, commands := range [][]string{{"clientgen", "test", "build"}, {"lint", "test", "build", "validate"}} {
 		ws, selected := dependentsWorkspace(t)
 		plan := func(clientgen *extension.ExtensionDescription) []*jobmodel.ScheduledJob {
-			planned, err := Plan(ws, commands, selected, []*extension.ExtensionDescription{goExtension, clientgen}, nil, nil, nil)
+			planned, err := Plan(ws, commands, selected, []*extension.ExtensionDescription{goExtension, clientgen}, nil, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("plan %v: %v", commands, err)
 			}
@@ -604,7 +604,7 @@ func TestSharedExecutions_DroppedWhenTheirPlanCannotBeScheduled(t *testing.T) {
 	ext, projects := pipelineProbeWithInfra()
 	plan := func() ([]*jobmodel.ScheduledJob, *workspace.Workspace) {
 		ws := testWorkspace(t.TempDir(), projects...)
-		planned, err := Plan(ws, []string{"build", "test"}, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		planned, err := Plan(ws, []string{"build", "test"}, projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
@@ -668,7 +668,7 @@ func planRealGoProjects(t *testing.T, commands []string, params ...extension.Par
 	if len(params) > 0 {
 		commandParams = params[0]
 	}
-	planned, err := Plan(ws, commands, projects, []*extension.ExtensionDescription{goExtension}, commandParams, nil, nil)
+	planned, err := Plan(ws, commands, projects, []*extension.ExtensionDescription{goExtension}, commandParams, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan %v: %v", commands, err)
 	}
@@ -766,7 +766,7 @@ func planRealGoApplication(t *testing.T, commands []string, params extension.Par
 		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "subject")),
 	}
 	planned, err := Plan(testWorkspace(root, project), commands, []*workspace.Project{project},
-		[]*extension.ExtensionDescription{goExtension}, params, nil, nil)
+		[]*extension.ExtensionDescription{goExtension}, params, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan %v: %v", commands, err)
 	}

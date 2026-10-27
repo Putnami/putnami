@@ -4,6 +4,12 @@
 - **Amended**: 2026-10-21, with [ADR 0047](0047-extension-owned-agent-content.md):
   an installed npm package is no longer a source of agent content, so the
   session-start pass reconciles only the extensions the committed lock pins.
+- **Amended**: 2026-10-26, by
+  [ADR 0081](0081-the-core-writes-declared-host-hooks.md): `init`, `install`
+  and `upgrade` also write the hook handlers an opted-in extension declares
+  into `.claude/settings.json` and `.codex/hooks.json`. Every other byte of
+  those files stays hand-authored, and the session-start pass still writes no
+  host file.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`,
   `internal/commands/lifecycle`, `internal/cli`), the extension SDK
   agent-content builder, public onboarding docs

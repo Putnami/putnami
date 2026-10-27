@@ -114,6 +114,7 @@ func TestSanitizeGoldenRoundTrip(t *testing.T) {
 }
 
 func TestSanitizeValidStartPassesThrough(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-receiver-keeps-a-conforming-record")
 	clean := sanitizeLogs(logsReq(cliResource(), validStartRecord()))
 	if got := cliusage.ValidateLogs(clean); diag.HasErrors(got) {
 		t.Fatalf("valid session:start rejected: %v", got)
@@ -412,6 +413,7 @@ func TestSanitizeDropsNonConforming(t *testing.T) {
 // TestSanitizeRebuildsIntFormatting proves values are rebuilt from their typed
 // scalar, not passed through: a non-canonical integer string is re-formatted.
 func TestSanitizeRebuildsIntFormatting(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-receiver-keeps-a-conforming-record")
 	rec := validStartRecord()
 	weird := "007"
 	rec.Attributes[6] = telemetry.Attr(cliusage.AttrProjects, telemetry.AnyValue{IntValue: &weird})

@@ -6,7 +6,8 @@
   "projects": [
     "/tooling/cli",
     "/tooling/cli-documents",
-    "/tooling/cli-model"
+    "/tooling/cli-model",
+    "/tooling/windows-vet"
   ],
   "owns": [
     {

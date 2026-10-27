@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -195,6 +196,35 @@ func fakeCollabHandlers(mode string) map[collab.OperationKey]collab.Handler {
 		key("memory", "checkpoint"): func(context.Context, collab.Call) (any, *collab.Failure) {
 			return nil, collab.Fail(collab.OutcomeConflict, collab.ReasonRevisionConflict, "the mission moved")
 		},
+		key("missions", "sync"): func(_ context.Context, call collab.Call) (any, *collab.Failure) {
+			input := call.Input.(*collab.MissionsSyncInput)
+			result := &collab.MissionsSyncResult{
+				Session:       collab.SessionStatus{State: input.State},
+				Mission:       collab.MissionView{Key: input.Mission.Key, Title: input.Mission.Title},
+				MinIntervalMs: collab.MinSyncIntervalMs, Now: "2026-10-26T09:00:00Z",
+			}
+			for _, reply := range input.Replies {
+				result.Replies = append(result.Replies, collab.ReplyStatus{Message: reply.Message, State: collab.ReplyStateReplied})
+			}
+			if mode == "wrong-identity" {
+				result.Mission.Key = "another-mission"
+			}
+			return result, nil
+		},
+		key("missions", "ask"): func(context.Context, collab.Call) (any, *collab.Failure) {
+			decision := collab.MissionDecision{ID: "D-1", State: collab.DecisionStateOpen}
+			if mode == "wrong-identity" {
+				decision.State, decision.Answer = collab.DecisionStateAnswered, "yes"
+			}
+			return &collab.MissionsAskResult{Decision: decision}, nil
+		},
+		key("missions", "reply"): func(_ context.Context, call collab.Call) (any, *collab.Failure) {
+			message := call.Input.(*collab.MissionsReplyInput).Message
+			if mode == "wrong-identity" {
+				message = "M-999"
+			}
+			return &collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: message, State: collab.ReplyStateReplied}}, nil
+		},
 	}
 }
 
@@ -225,7 +255,7 @@ type collabFixture struct {
 
 // newCollabFixture writes a workspace whose options.collaboration block is
 // bindings, and a provider extension implementing every required operation of
-// the three contracts plus tasks.assign (with no precondition support). mutate
+// every contract plus tasks.assign (with no precondition support). mutate
 // edits the provider's tools before the manifest is written.
 func newCollabFixture(t *testing.T, mode, bindings string, mutate func(map[string]proto.ToolDefinition)) collabFixture {
 	t.Helper()
@@ -282,7 +312,8 @@ func newCollabFixture(t *testing.T, mode, bindings string, mutate func(map[strin
 
 const bindAll = `{"tasks":{"provider":"@test/collab","version":1},` +
 	`"proposals":{"provider":"@test/collab","version":1,"settings":{"repository":"local"}},` +
-	`"memory":{"provider":"@test/collab","version":1,"settings":{"root":"memory"}}}`
+	`"memory":{"provider":"@test/collab","version":1,"settings":{"root":"memory"}},` +
+	`"missions":{"provider":"@test/collab","version":1}}`
 
 func (f collabFixture) server(t *testing.T) *Server {
 	t.Helper()
@@ -364,7 +395,7 @@ func TestCollaboration_BoundContractsExposeTruthfulRoutedTools(t *testing.T) {
 		}
 		for _, op := range spec.Operations {
 			tool, registered := tools[contract+"."+op.Name]
-			offered := op.Required || op.Name == collab.OperationAssign
+			offered := (op.Required || op.Name == collab.OperationAssign) && !op.HostOnly
 			if registered != offered {
 				t.Errorf("%s.%s registered=%v, offered=%v", contract, op.Name, registered, offered)
 				continue
@@ -388,6 +419,58 @@ func TestCollaboration_BoundContractsExposeTruthfulRoutedTools(t *testing.T) {
 				t.Errorf("%s input schema is not self-contained", tool.Name)
 			}
 		}
+	}
+}
+
+// TestCollaboration_AHostOnlyOperationHasNoTool: the agent never sees
+// missions.sync as a tool, while the operations it calls itself stay listed.
+// The command line and the host channel still route the operation; the cli
+// package proves that end to end.
+func TestCollaboration_AHostOnlyOperationHasNoTool(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "a-host-only-operation-has-no-mcp-tool")
+	fixture := newCollabFixture(t, "ok", bindAll, nil)
+	srv := fixture.server(t)
+	tools := toolNames(t, srv)
+	if _, listed := tools["missions.sync"]; listed {
+		t.Error("the host-only missions.sync is listed as an MCP tool")
+	}
+	for _, name := range []string{"missions.capabilities", "missions.ask", "missions.reply"} {
+		if _, listed := tools[name]; !listed {
+			t.Errorf("%s is not listed", name)
+		}
+	}
+	if _, found, _ := srv.lookupTool("missions.sync"); found {
+		t.Error("a tools/call of the host-only missions.sync finds a tool")
+	}
+	envelope := CallProviderOperation(context.Background(), ProviderEnvironment{WorkspaceRoot: fixture.root, Extensions: discovered(t, fixture.root)},
+		collab.ContractMissions, collab.OperationSync,
+		json.RawMessage(`{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"putnami/putnami","key":"issue-596"},"event":"stop","state":"handed_back","observedAt":"2026-10-26T09:00:00Z"}`))
+	expectOutcome(t, envelope, collab.OutcomeOK, "")
+}
+
+// TestCollaboration_CapabilitiesMarkAHostOnlyOperation: missions.capabilities
+// lists sync, as it lists every operation, and says that only the host calls
+// it, so an agent that reads it does not look for a tool.
+func TestCollaboration_CapabilitiesMarkAHostOnlyOperation(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "capabilities-mark-a-host-only-operation")
+	fixture := newCollabFixture(t, "ok", bindAll, nil)
+	envelope := callCollab(t, fixture.server(t), "missions.capabilities", "")
+	var capabilities collab.Capabilities
+	if err := json.Unmarshal(envelope.Result, &capabilities); err != nil {
+		t.Fatal(err)
+	}
+	hostOnly := map[string]bool{}
+	for _, op := range capabilities.Operations {
+		hostOnly[op.Name] = op.HostOnly
+	}
+	if want := map[string]bool{collab.OperationAsk: false, collab.OperationReply: false, collab.OperationSync: true}; !maps.Equal(hostOnly, want) {
+		t.Errorf("missions.capabilities marks host-only %v, want %v", hostOnly, want)
+	}
+	envelope = callCollab(t, fixture.server(t), "tasks.capabilities", "")
+	if strings.Contains(string(envelope.Result), "hostOnly") {
+		t.Errorf("tasks.capabilities names hostOnly: %s", envelope.Result)
 	}
 }
 

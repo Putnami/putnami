@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	otlp "go.putnami.dev/protocol/telemetry"
 	"go.putnami.dev/protocol/telemetry/cliusage"
 	"go.putnami.dev/tooling/cli/internal/hometest"
@@ -21,6 +22,7 @@ import (
 const otlpLogsGoldenDigest = "317c957b3218a63f8cfdb5adf5c21f91fad14ce7b9dc5b490955022a31d5e7fa"
 
 func TestEncodeLogsGolden(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-cli-and-the-receiver-share-one-record-shape", "the-cli-encodes-the-golden-bytes")
 	request := encodeLogs([]Event{{
 		Name:      cliusage.EventSessionEnd,
 		Timestamp: "2026-01-02T03:04:05Z",

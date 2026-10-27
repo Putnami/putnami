@@ -193,6 +193,7 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 					diags = append(diags, diag.Warningf("unresolved-task", field+".task", "task %q is not defined in this manifest", step.Task))
 				}
 			}
+			diags = append(diags, validateBindingSources(field, step)...)
 			if step.RunOn != "" && !IsValidStepRunOn(step.RunOn) {
 				diags = append(diags, diag.Errorf("invalid-enum", field+".runOn",
 					"invalid step run condition %q; must be one of: %s",
@@ -367,6 +368,10 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	// The agent-content section (agent_content.go). Inert for a manifest that
 	// declares none.
 	diags = append(diags, ValidateAgentContent(m)...)
+
+	// The host hooks (host_hooks.go). Inert for a manifest that declares
+	// none.
+	diags = append(diags, ValidateHostHooks(m)...)
 
 	// The verb vocabulary (verb_vocabulary.go). Inert for a manifest that
 	// declares none.

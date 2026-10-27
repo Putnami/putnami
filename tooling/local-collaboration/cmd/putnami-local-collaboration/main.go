@@ -1,7 +1,7 @@
 // Command putnami-local-collaboration is the runtime of the
-// @putnami/local-collaboration extension: the reference provider of the tasks
-// and proposals collaboration contracts, backed by a store directory inside
-// the workspace.
+// @putnami/local-collaboration extension: the reference provider of the tasks,
+// proposals and missions collaboration contracts, backed by a store directory
+// inside the workspace.
 //
 // Usage:
 //
@@ -9,8 +9,9 @@
 //	putnami-local-collaboration provider-tool            (one routed ToolCallRequest on stdin, one ToolCallResult on stdout)
 //
 // It is never called directly: the workspace binds it in options.collaboration
-// and Putnami routes `putnami tasks|proposals <operation>` and the MCP tools
-// `tasks.*` and `proposals.*` to it.
+// and Putnami routes `putnami tasks|proposals|missions <operation>` and the MCP
+// tools `tasks.*`, `proposals.*`, `missions.ask` and `missions.reply` to it;
+// missions.sync is host-only and has no MCP tool.
 package main
 
 import (

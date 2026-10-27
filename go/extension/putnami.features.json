@@ -555,6 +555,22 @@
           }
         },
         {
+          "id": "race-on-touched-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-race-step-runs-on-the-packages-the-change-touched",
+              "the-race-run-measures-no-coverage",
+              "a-host-that-cannot-run-the-race-detector-fails-naming-the-opt-out",
+              "the-race-step-is-gated-bound-and-keyed-on-the-changed-files"
+            ]
+          }
+        },
+        {
           "id": "shared-build-cache",
           "stage": "coded",
           "evidenceKinds": [

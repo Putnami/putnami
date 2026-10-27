@@ -152,6 +152,10 @@
     {
       "id": "binding-headers",
       "text": "Static non-secret binding headers, programmatic or from clients.services.<id>.headers, are snapshotted and canonicalized at construction. Invalid names, values outside visible ASCII or with surrounding whitespace, case aliases, reserved and declared credential headers fail with client.config, as the Go runtime decides for the shared corpus. Operation headers win; a static idempotency key fails before dispatch. Cache keys, retries and every stream carrier see the effective values; credentials are unchanged."
+    },
+    {
+      "id": "client-project-document",
+      "text": "When the client's output directory has no putnami.json, generation writes one, rendered with the provider's Biome configuration, that names the package, marks it a library, tags it ts and generated-client, selects @putnami/typescript and declares featureAuthority.none. An existing putnami.json is kept byte for byte. Neither the generated manifest nor the files the result reports list it."
     }
   ],
   "decisions": [
@@ -170,6 +174,7 @@
     "go/framework/client/doc/adr/0007-static-binding-headers-are-non-credential-defaults.md",
     "typescript/framework/client/doc/adr/0007-a-call-delivers-its-success-body-through-a-caller-owned-sink.md",
     "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md",
-    "protocols/clientcontract/doc/adr/0014-a-client-drops-a-response-property-it-does-not-declare.md"
+    "protocols/clientcontract/doc/adr/0014-a-client-drops-a-response-property-it-does-not-declare.md",
+    "protocols/extension/doc/adr/0005-a-declared-directory-output-may-preserve-workspace-files.md"
   ]
 }

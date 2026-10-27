@@ -1,0 +1,175 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "telemetry",
+  "features": [
+    {
+      "id": "telemetry/otlp-push-contract",
+      "type": "feature",
+      "name": "OTLP push contract",
+      "outcome": "Every Putnami runtime and the CLI push metrics, traces and logs as the same OTLP/JSON bytes over HTTP, so one standard collector ingests all of them and a serverless instance never needs to be scraped",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-version-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-is-1"
+            ]
+          }
+        },
+        {
+          "id": "three-signals-on-fixed-paths",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-signal-paths-are-fixed",
+              "the-content-type-is-json",
+              "the-go-log-sink-posts-a-valid-logs-request"
+            ]
+          }
+        },
+        {
+          "id": "the-resource-names-the-service",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-resource-keys-are-fixed"
+            ]
+          }
+        },
+        {
+          "id": "the-exporter-never-hurts-the-workload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-export-defaults-are-pinned",
+              "the-go-metric-reader-flushes-once-more-on-shutdown",
+              "the-go-exporter-swallows-a-collector-error"
+            ]
+          }
+        },
+        {
+          "id": "the-parser-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-signal-fixture-gets-its-verdict",
+              "every-data-point-reject-branch-has-a-fixture"
+            ]
+          }
+        },
+        {
+          "id": "the-error-codes-are-a-closed-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-codes-are-fixed"
+            ]
+          }
+        },
+        {
+          "id": "equivalent-input-serializes-to-the-same-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-signal-matches-its-golden",
+              "the-typescript-renderer-reproduces-each-digest"
+            ]
+          }
+        },
+        {
+          "id": "values-map-to-otlp-numbers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-level-maps-to-its-severity-number",
+              "a-value-sets-one-kind",
+              "the-go-runtime-maps-to-otlp-numbers"
+            ]
+          }
+        },
+        {
+          "id": "cli-usage-vocabulary-is-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-conforming-record-validates",
+              "a-record-outside-the-vocabulary-is-refused",
+              "a-foreign-service-is-refused",
+              "every-required-attribute-is-allowed"
+            ]
+          }
+        },
+        {
+          "id": "released-command-names-stay",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "released-names-stay-in-the-vocabulary",
+              "names-are-unique-tokens"
+            ]
+          }
+        },
+        {
+          "id": "the-cli-and-the-receiver-share-one-record-shape",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-golden-conforms",
+              "the-cli-encodes-the-golden-bytes",
+              "the-cli-records-only-vocabulary-events",
+              "the-receiver-keeps-a-conforming-record"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

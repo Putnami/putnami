@@ -240,7 +240,7 @@ func TestPlan_DoesNotEmitUpstreamCommandJobByDisplayName(t *testing.T) {
 	}
 
 	planned, err := Plan(ws, []string{"build"}, []*workspace.Project{app},
-		[]*extension.ExtensionDescription{flat, pipeline}, nil, nil, nil)
+		[]*extension.ExtensionDescription{flat, pipeline}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestPlan_EmitsUpstreamStepForExactReference(t *testing.T) {
 		},
 	}
 	planned, err := Plan(ws, []string{"build"}, []*workspace.Project{app},
-		[]*extension.ExtensionDescription{ext}, nil, nil, nil)
+		[]*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -342,7 +342,7 @@ func legacyMatchingKeys(idx *plannedIndex, projectID, cmdName, stepID string) []
 func TestResolveExternalDeps_ExactManifestsResolveIdenticallyToLegacy(t *testing.T) {
 	t.Parallel()
 	ws, ext := makeIntegrationWorkspace(t)
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -410,7 +410,7 @@ func TestPlan_CommandDependencyEmissionIsDeterministic(t *testing.T) {
 	}
 
 	snapshot := func() string {
-		planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+		planned, err := Plan(ws, []string{"publish"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Plan: %v", err)
 		}
