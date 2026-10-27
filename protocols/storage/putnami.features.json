@@ -1,0 +1,88 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "storage",
+  "features": [
+    {
+      "id": "storage/storage-declaration-contract",
+      "type": "feature",
+      "name": "Object storage declaration contract",
+      "outcome": "A project declares the buckets it needs and a deployer hands back the binding a workload builds its backend from, in one provider-neutral, versioned and strict form that the storage libraries and the infra protocol share",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-schemas-match-the-go-types",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-schemas-pin-the-version",
+              "each-schema-has-the-members-of-its-go-type"
+            ]
+          }
+        },
+        {
+          "id": "a-manifest-is-strict-and-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manifest-round-trips",
+              "a-manifest-reader-refuses-what-is-not-the-contract",
+              "access-scope-and-identity-are-closed"
+            ]
+          }
+        },
+        {
+          "id": "a-binding-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-binding-round-trips",
+              "a-binding-reader-refuses-what-is-not-the-contract",
+              "the-go-storage-framework-refuses-an-invalid-bindings-document"
+            ]
+          }
+        },
+        {
+          "id": "the-fixture-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates-and-every-invalid-one-fails"
+            ]
+          }
+        },
+        {
+          "id": "the-projection-drops-scope-and-signer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-projection-is-sorted-by-name",
+              "the-projection-drops-scope-and-signer"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
