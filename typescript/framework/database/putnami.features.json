@@ -77,10 +77,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "tables-derive-the-infra-requirements-sidecar",
-              "pool-schemas-union-deduped-and-sorted"
-            ]
+            "checks": ["tables-derive-the-infra-requirements-sidecar", "pool-schemas-union-deduped-and-sorted"]
           }
         }
       ]
