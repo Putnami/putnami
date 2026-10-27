@@ -19,7 +19,7 @@
     },
     {
       "id": "immutable-source",
-      "text": "Private source capture preserves tracked and non-ignored new worktree bytes, including unstaged/binary contents, deletions, executable modes and safe relative symlinks. Full scans and Git/index checks reject observed races. Materialization validates the bounded canonical manifest and every blob before returning an isolated directory. Source identity excludes HEAD and does not replace the tree fingerprint. Unsupported submodules, sparse and unmerged indexes fail explicitly."
+      "text": "Private source capture preserves tracked and non-ignored new worktree bytes, including unstaged/binary contents, deletions, executable modes and safe relative symlinks. Full scans and Git/index checks reject observed races. Materialization validates the bounded canonical manifest and every blob before returning an isolated directory. Source identity does not replace the tree fingerprint. Unsupported submodules, sparse and unmerged indexes fail explicitly."
     },
     {
       "id": "portable-request",
@@ -27,7 +27,7 @@
     },
     {
       "id": "commit-request",
-      "text": "A version 2 bound request names a commit and a requested selection, never a snapshot or expected plan; no command it names makes it malformed. The engine refuses it unless HEAD is that commit with no modified tracked file, then plans the checkout: impacted against source.base, the projects selectors, or all. It stamps versions from Git, never resolves placement, refuses a workload or source-rewriting command, a task whose cwd leaves the checkout or an unauthorized publication, and records no provenance."
+      "text": "The engine refuses a version 2 bound request unless HEAD is its commit with no modified tracked file, then plans the checkout: impacted against source.base, the projects selectors, or all. It stamps versions from Git, never resolves placement, refuses a workload or source-rewriting command, a task whose cwd leaves the checkout or an unauthorized publication, and records no provenance."
     },
     {
       "id": "durable-lifecycle",
@@ -39,7 +39,7 @@
     },
     {
       "id": "isolated-execution",
-      "text": "With a compatible provider, the captured bytes execute in an isolated directory through the snapshot's pinned entrypoint; later edits never reach execution. Output is forwarded unchanged; the session bundle is validated and imported atomically with nested sessions and parent links, a repeat import is safe and a different record under the same id is refused. The local exit code follows the remote gate, a failing task keeps its message, and a completed attempt without a session never reads as success."
+      "text": "With a compatible provider, the captured bytes execute in an isolated directory through the snapshot's pinned entrypoint; later edits never reach execution. Output is forwarded unchanged; the session bundle is imported with nested sessions and parent links. The local exit code follows the remote gate, a failing task keeps its message, and a completed attempt without a session never reads as success."
     }
   ],
   "decisions": [

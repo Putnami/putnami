@@ -16,7 +16,8 @@ import (
 // authored facts, so the loader settles them before any job is planned.
 
 func TestNearestAncestorLineWins(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "version-lines-are-scopes", "nearest-ancestor-line-wins")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "version-lines-are-scopes", "the-loader-maps-each-line-to-its-tag-pattern")
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "the-cli-loader-puts-each-project-on-its-nearest-ancestor-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename),
 		`{"name":"ws","includes":["typescript","standalone"]}`)
@@ -62,7 +63,8 @@ func TestNearestAncestorLineWins(t *testing.T) {
 }
 
 func TestWorkspaceWithoutLineBlockIsOneLine(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "version-lines-are-scopes", "nearest-ancestor-line-wins")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "version-lines-are-scopes", "the-loader-maps-each-line-to-its-tag-pattern")
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "the-cli-loader-makes-a-workspace-without-a-line-one-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{"name":"ws","includes":["app"]}`)
 	writeFile(t, filepath.Join(root, "app", wsproto.ConfigFilename), `{"name":"app"}`)
@@ -81,7 +83,7 @@ func TestWorkspaceWithoutLineBlockIsOneLine(t *testing.T) {
 }
 
 func TestNestedLineIsRefused(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "version-lines-are-scopes", "nested-line-is-refused")
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "the-cli-loader-refuses-a-nested-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{"name":"ws","includes":["go"]}`)
 	writeFile(t, filepath.Join(root, "go", wsproto.ConfigFilename),
@@ -96,7 +98,8 @@ func TestNestedLineIsRefused(t *testing.T) {
 }
 
 func TestProjectRegistriesOverrideReplacesTheEntry(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "registries-keyed-by-ecosystem", "project-override-replaces-the-entry")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "registries-keyed-by-ecosystem", "each-project-reads-the-entry-of-its-ecosystem")
+	spectest.Proves(t, "workspace/workspace-contract", "registries-are-keyed-by-ecosystem", "the-cli-loader-replaces-an-overridden-registry-entry-whole")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{
 		"name": "ws",

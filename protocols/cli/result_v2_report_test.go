@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The report document's BOUNDS (doc/03-report.md).
@@ -74,6 +76,7 @@ func marshalReport(t *testing.T, report ReportFile) []byte {
 // TestReportFileRoundTrip pins the whole document through the wire: every
 // member the Go producer writes survives, and the result conforms.
 func TestReportFileRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-round-trips-and-absent-is-not-zero")
 	want := reportFileFixture()
 	fix := false
 	want.Fix = &fix
@@ -102,6 +105,7 @@ func TestReportFileRoundTrip(t *testing.T) {
 // optional blocks are absent from the WIRE when the run could not measure them,
 // never present with zeros a consumer would read as measurements.
 func TestReportAbsentIsNotZero(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-round-trips-and-absent-is-not-zero")
 	report := reportFileFixture()
 	report.Git = nil
 	data := marshalReport(t, report)
@@ -116,6 +120,7 @@ func TestReportAbsentIsNotZero(t *testing.T) {
 }
 
 func TestReportTestsFailureDetailAccountingIsOptionalAndNonNegative(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-round-trips-and-absent-is-not-zero")
 	report := reportFileFixture()
 	report.Commands[0].Tests = &ReportTests{Total: 1, Passed: 0, Failed: 1, Skipped: 0}
 	if violations := ValidateDocument(DocumentReportFile, marshalReport(t, report)); len(violations) != 0 {
@@ -159,6 +164,7 @@ func reportWithJobs(count, elided int) ReportFile {
 // honest: the list plus the elided count accounts for every selected task, and
 // nothing is elided until the list is full.
 func TestReportJobBudget(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-is-bounded-and-counts-what-it-drops")
 	cases := []struct {
 		name  string
 		count int
@@ -200,6 +206,7 @@ func TestReportJobBudget(t *testing.T) {
 // report still states the run's whole task total, so a small run and a
 // truncated one are never confusable.
 func TestReportElidedJobsAccountForTheRun(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-is-bounded-and-counts-what-it-drops")
 	report := reportWithJobs(ReportMaxJobs, 681)
 	report.ElidedJobs = 680 // one task accounted for by neither the list nor the count
 	data := marshalReport(t, report)
@@ -214,6 +221,7 @@ func TestReportElidedJobsAccountForTheRun(t *testing.T) {
 // rejected — the budget is spent in bytes, and the schema's maxLength (which
 // counts code points) is deliberately the weaker of the two checks.
 func TestReportMessageBoundIsBytes(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-is-bounded-and-counts-what-it-drops")
 	// "é" is two UTF-8 bytes, so half the cap in runes is exactly the cap in
 	// bytes and one rune more is over it.
 	atCap := strings.Repeat("é", ReportMaxMessageBytes/2)
@@ -234,6 +242,7 @@ func TestReportMessageBoundIsBytes(t *testing.T) {
 // truncation clause. Typed producer omissions may accompany a short list; any
 // additional report-side omission requires the list to be full.
 func TestReportDiagnosticsBudget(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-report-is-a-bounded-projection", "the-report-is-bounded-and-counts-what-it-drops")
 	diagnostics := func(count int) []Diagnostic {
 		out := make([]Diagnostic, 0, count)
 		for i := range count {

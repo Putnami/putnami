@@ -119,6 +119,7 @@ func readyProvider() fakeProvider {
 }
 
 func TestSessionNegotiatesAndDrivesEveryOp(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "a-client-submits-only-to-a-compatible-provider", "the-cli-drives-every-op")
 	t.Parallel()
 	ctx := context.Background()
 	session := connectFake(t, readyProvider())
@@ -159,6 +160,7 @@ func TestSessionNegotiatesAndDrivesEveryOp(t *testing.T) {
 }
 
 func TestSessionInitializeFailsClosedOnIncompatibleProviders(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "a-client-submits-only-to-a-compatible-provider", "the-cli-refuses-an-incompatible-provider")
 	t.Parallel()
 	ctx := context.Background()
 	cases := map[string]struct {
@@ -188,6 +190,7 @@ func TestSessionInitializeFailsClosedOnIncompatibleProviders(t *testing.T) {
 }
 
 func TestClientOffersInvocationProvidersOnlyForARequestThatCarriesThem(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "a-client-submits-only-to-a-compatible-provider", "the-cli-offers-invocation-providers-only-with-providers")
 	t.Parallel()
 	base := []string{runner.CapabilityExecutionRequestV1, runner.CapabilitySessionBundleV1}
 	if got := requestCapabilities(runner.ExecutionRequest{}); !slices.Equal(got, base) {
@@ -315,6 +318,7 @@ func observingClient(t *testing.T, provider fakeProvider, cursor int64) (*client
 // An attempt state this protocol version does not define is a protocol
 // error: observe returns it instead of waiting on it forever.
 func TestObserveRefusesAnUnknownAttemptState(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "follow-replays-without-duplicates", "the-cli-refuses-an-unknown-attempt-state")
 	t.Parallel()
 	provider := readyProvider()
 	provider.followState = "hibernating"
@@ -332,6 +336,7 @@ func TestObserveRefusesAnUnknownAttemptState(t *testing.T) {
 // dropped, so a line is never printed twice, while a provider that answers
 // out of order within one answer is refused.
 func TestObserveDropsReplayedRecordsAndRefusesDisorder(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "follow-replays-without-duplicates", "the-cli-drops-replayed-records-and-refuses-disorder")
 	t.Parallel()
 	provider := readyProvider()
 	provider.followRecords = []runner.OutputRecord{

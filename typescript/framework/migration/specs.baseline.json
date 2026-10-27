@@ -3,8 +3,6 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "typescript/migration-orchestration#backend-free",
-    "typescript/migration-orchestration#compatible-marker-parity",
-    "typescript/migration-orchestration#cross-language-bundle",
     "typescript/migration-orchestration#defensive-reads",
     "typescript/migration-orchestration#deterministic-kind-order",
     "typescript/migration-orchestration#infra-aggregation",

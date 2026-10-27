@@ -117,6 +117,7 @@ func TestSourceCaptureUsesWorktreeBytesAndSurvivesLaterEdits(t *testing.T) {
 }
 
 func TestSourceDigestIsIndependentOfHeadAndIndex(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "source-identity-is-the-content", "the-cli-source-digest-ignores-head-and-index")
 	repo, store := sourceFixture(t)
 	writeSource(t, repo, "tracked", []byte("changed"), 0o644)
 	dirty := captureSource(t, store, repo)
@@ -397,7 +398,7 @@ func TestSourceCaptureBindsIgnoredInputsExplicitly(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("../ignored", filepath.Join(repo, "conf", "ignored-link")); err != nil {
-		t.Fatal(err)
+		t.Fatalf("create the bound symbolic link: %v (on Windows, enable Developer Mode or run as administrator)", err)
 	}
 	writeSource(t, repo, ".gitignore", []byte("ignored\nignored-link\n"), 0o644)
 	gitCmd(t, repo, "add", ".gitignore")
@@ -420,10 +421,22 @@ func TestSourceCaptureBindsIgnoredInputsExplicitly(t *testing.T) {
 	if len(bound) != 2 || bound["ignored"].Kind != "file" || bound["ignored"].Size != int64(len("private ambient input")) || bound["conf/ignored-link"].Kind != "symlink" || bound["conf/ignored-link"].Target != "../ignored" {
 		t.Fatalf("bound entries = %+v", bound)
 	}
-	if runtime.GOOS == "windows" {
-		t.Skip("a runner on Windows refuses a symbolic link by design (TestMaterializeRefusesSymlinkOnWindows)")
+	// The same tree with the same bound set has the same identity: binding is
+	// deterministic, not a per-capture observation.
+	again, err := store.Capture(context.Background(), repo, []string{"conf/ignored-link", "ignored"})
+	if err != nil || again.Digest != snapshot.Digest {
+		t.Fatalf("bound capture is not deterministic: %s vs %s (%v)", again.Digest, snapshot.Digest, err)
 	}
 	dir, err := store.Materialize(t.TempDir(), snapshot.Manifest)
+	if runtime.GOOS == "windows" {
+		// A runner on Windows refuses a symbolic link by design
+		// (TestMaterializeRefusesSymlinkOnWindows): the bound link is refused,
+		// never dropped.
+		if err == nil || !strings.Contains(err.Error(), "source entry conf/ignored-link is a symbolic link") {
+			t.Fatalf("Materialize on Windows = %v, want the refusal of the bound link", err)
+		}
+		return
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,12 +445,6 @@ func TestSourceCaptureBindsIgnoredInputsExplicitly(t *testing.T) {
 	}
 	if got, err := os.ReadFile(filepath.Join(dir, "conf", "ignored-link")); err != nil || string(got) != "private ambient input" {
 		t.Fatalf("bound symlink did not resolve to the bound file: %q (%v)", got, err)
-	}
-	// The same tree with the same bound set has the same identity: binding is
-	// deterministic, not a per-capture observation.
-	again, err := store.Capture(context.Background(), repo, []string{"conf/ignored-link", "ignored"})
-	if err != nil || again.Digest != snapshot.Digest {
-		t.Fatalf("bound capture is not deterministic: %s vs %s (%v)", again.Digest, snapshot.Digest, err)
 	}
 }
 

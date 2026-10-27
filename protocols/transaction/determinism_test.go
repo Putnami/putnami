@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // sampleResult builds the representative Result behind the
@@ -40,6 +42,7 @@ func canonical(t *testing.T, v any) []byte {
 // result is byte-identical across 100 marshals — no nondeterminism leaks into
 // the wire form.
 func TestSerialization_Stable100(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-serialization-is-canonical", "the-bytes-are-stable")
 	r := sampleResult()
 	first := canonical(t, r)
 	for i := range 100 {
@@ -54,6 +57,7 @@ func TestSerialization_Stable100(t *testing.T) {
 // serialization of sampleResult(). This is the cross-language contract — a
 // future TypeScript adapter must produce this same file byte-for-byte.
 func TestSerialization_CanonicalByteForm(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-serialization-is-canonical", "the-golden-pins-the-bytes")
 	want, err := os.ReadFile(filepath.Join("fixtures", "equivalence", "transaction.golden.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +96,7 @@ func parseAny(t *testing.T, data []byte) any {
 // byte-stable for every valid fixture: re-serializing a parsed document yields
 // the same bytes the second time, so the wire form is a fixed point.
 func TestRoundTrip_Idempotent(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-serialization-is-canonical", "a-parsed-fixture-reserializes-to-itself")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func adapterManifest(adapter WorkspaceAdapter, tasks ...string) *Manifest {
@@ -19,6 +20,7 @@ func adapterManifest(adapter WorkspaceAdapter, tasks ...string) *Manifest {
 }
 
 func TestValidateWorkspaceAdapter_AcceptedShapes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "the-workspace-adapter-validates")
 	cases := map[string]*Manifest{
 		"markers are inputs": adapterManifest(WorkspaceAdapter{
 			Markers: []string{"package.json"},
@@ -66,6 +68,7 @@ func TestValidateWorkspaceAdapter_AcceptedShapes(t *testing.T) {
 // TestValidateWorkspaceAdapter_Rules pins one diagnostic code per rule so
 // slices C3a/C3b key on the code rather than on message text.
 func TestValidateWorkspaceAdapter_Rules(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "lifecycles-validate-and-fail-in-closed-vocabularies", "the-workspace-adapter-validates")
 	cases := []struct {
 		name     string
 		manifest *Manifest
@@ -431,6 +434,7 @@ func TestWorkspaceAdapterDeclarationsNeedNoContractRung(t *testing.T) {
 // TestWorkspaceSectionMakesAManifestV3 pins that the adapter vocabulary is
 // self-identifying, exactly as the runtime section and the task contract are.
 func TestWorkspaceSectionMakesAManifestV3(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-protocol-version-is-pinned", "a-manifest-reports-the-version-it-uses")
 	m := &Manifest{
 		Tasks: map[string]TaskDefinition{"build": {Kind: "command", Command: "echo"}},
 		Workspace: &WorkspaceAdapter{

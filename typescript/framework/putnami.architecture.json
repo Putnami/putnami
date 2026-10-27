@@ -103,6 +103,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/application",
+          "producerProject": "/protocols/identity"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/application",
           "producerProject": "/protocols/platform"
         },
         {
@@ -113,7 +118,27 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/typescript/framework/cli-protocol",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/cli-protocol",
           "producerProject": "/protocols/qualify"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/database",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/database",
+          "producerProject": "/protocols/transaction"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/typescript/framework/migration",
+          "producerProject": "/protocols/migration"
         },
         {
           "kind": "project-dependency",

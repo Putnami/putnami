@@ -77,7 +77,7 @@ func TestCopyHookFiles_StagedOutputLoadsUnderTheCurrentLoader(t *testing.T) {
 func TestCopyHookFiles_RatchetsAStaleLowerClaim(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "a-stale-lower-claim-is-ratcheted-to-the-earned-one")
 	if protocolcli.CurrentContract < 2 {
-		t.Skip("no lower contract to ratchet from")
+		t.Fatalf("the ratchet needs a contract below the current one, and CurrentContract is %d", protocolcli.CurrentContract)
 	}
 	stale := strings.Replace(conformingCLIManifest,
 		`"name": "@putnami/testext",`,
@@ -103,7 +103,7 @@ func TestCopyHookFiles_RatchetsAStaleLowerClaim(t *testing.T) {
 // higher claim fails the package job instead of being quietly downgraded into a
 // stamp the loader would then believe.
 func TestCopyHookFiles_RejectsFutureContractClaim(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "a-contract-claim-newer-than-the-packager-is-rejected")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
 	future := strings.Replace(conformingCLIManifest,
 		`"name": "@putnami/testext",`,
 		fmt.Sprintf(`"name": "@putnami/testext",
@@ -133,7 +133,7 @@ func TestCopyHookFiles_RejectsFutureContractClaim(t *testing.T) {
 // about what the CONTRACT governs, not about whether the file is usable, and
 // this is the framework-package path where hook-only manifests actually ship.
 func TestCopyHookFiles_RejectsUnloadableHookOnlyManifest(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "packaged-loadability", "an-unloadable-hook-only-manifest-fails-packaging")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
 	for name, manifest := range map[string]string{
 		"hooks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "hooks": []}`,
 		"tasks of the wrong type": `{"name": "@putnami/testext", "commands": {}, "tasks": []}`,

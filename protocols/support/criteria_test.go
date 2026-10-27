@@ -3,11 +3,14 @@ package support
 import (
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const catalogLinkExample = "[`putnami.support.json`](../../putnami.support.json)"
 
 func TestReadStatusDeclarationFindsTheSectionsOwnStatus(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "a-documented-status-is-read-from-the-support-section", "the-support-section-is-found-outside-fenced-examples")
 	tests := []struct {
 		name      string
 		document  string
@@ -106,6 +109,7 @@ func TestReadStatusDeclarationFindsTheSectionsOwnStatus(t *testing.T) {
 }
 
 func TestStatusDeclarationExplainsEveryDisagreement(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "a-documented-status-is-read-from-the-support-section", "every-disagreement-with-the-reviewed-status-is-explained")
 	tests := []struct {
 		name     string
 		document string
@@ -149,6 +153,7 @@ func TestStatusDeclarationExplainsEveryDisagreement(t *testing.T) {
 }
 
 func TestStatusDeclarationAgreesWithTheReviewedStatus(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "a-documented-status-is-read-from-the-support-section", "a-matching-documented-status-reports-no-reason")
 	document := "## Support\n\n- **Status:** `stable`, recorded in " + catalogLinkExample + ".\n"
 	if reason := readStatusDeclaration(document).explain(StatusStable); reason != "" {
 		t.Fatalf("explain(stable) = %q, want empty", reason)

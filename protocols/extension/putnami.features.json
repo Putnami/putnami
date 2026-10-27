@@ -1,0 +1,295 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "extension",
+  "features": [
+    {
+      "id": "extension/manifest-contract",
+      "type": "feature",
+      "name": "Extension manifest contract",
+      "outcome": "An extension in any language declares its commands, tasks, pipelines, cache inputs, lifecycles, ecosystems and agent tools as data in one manifest, and the CLI, the package-time gate and the SDK's authoring gate validate it with one implementation, so adding a language never edits the CLI",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-protocol-version-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-protocol-version-stays-3",
+              "a-manifest-reports-the-version-it-uses",
+              "every-fixture-reports-its-version"
+            ]
+          }
+        },
+        {
+          "id": "strict-manifests-and-a-fixture-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-strict-parser-refuses-unknown-fields-and-invalid-json",
+              "every-valid-fixture-validates",
+              "every-invalid-fixture-is-refused",
+              "each-counter-example-reports-its-exact-codes",
+              "the-harness-and-the-strict-path-agree"
+            ]
+          }
+        },
+        {
+          "id": "a-contract-matches-or-the-manifest-does-not-load",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-compatibility-matrix-holds",
+              "every-surface-kind-is-governed",
+              "a-released-manifest-below-the-contract-stays-refused",
+              "no-adaptation-function-returns"
+            ]
+          }
+        },
+        {
+          "id": "an-additive-vocabulary-raises-the-contract-floor",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-additive-vocabulary-requires-its-contract",
+              "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary",
+              "a-manifest-below-its-rung-does-not-load"
+            ]
+          }
+        },
+        {
+          "id": "a-registry-extension-dependency-requires-rung-8",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "extension-dependencies-require-rung-8",
+              "the-go-extension-stamps-a-dependent-at-rung-8",
+              "the-cli-requires-rung-8-of-a-dependent",
+              "the-cli-refuses-a-stamp-above-its-latest-contract"
+            ]
+          }
+        },
+        {
+          "id": "the-schema-and-the-go-types-agree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-wire-struct-matches-the-schema",
+              "the-outbox-schema-matches-its-go-types"
+            ]
+          }
+        },
+        {
+          "id": "task-contracts-are-exact-owned-and-additive",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "declaration-rules-refuse-their-counter-examples",
+              "one-owner-per-output",
+              "every-declaration-feature-has-a-fixture",
+              "the-version-3-vocabulary-is-additive"
+            ]
+          }
+        },
+        {
+          "id": "output-readers-and-publish-channels-follow-their-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-read-output-is-durable-and-under-the-project-root",
+              "a-channel-list-is-non-empty-once-each-and-needs-the-registry-effect",
+              "a-channel-list-normalizes-to-sorted-order"
+            ]
+          }
+        },
+        {
+          "id": "task-digests-move-only-with-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-digest-is-deterministic",
+              "only-contract-members-move-the-digest",
+              "the-fixture-digests-match-the-golden",
+              "cache-keys-and-validation-are-deterministic"
+            ]
+          }
+        },
+        {
+          "id": "declared-paths-follow-one-rule",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "paths-refuse-absolutes-escapes-and-templates",
+              "the-path-rules-agree"
+            ]
+          }
+        },
+        {
+          "id": "lifecycles-validate-and-fail-in-closed-vocabularies",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-runtime-section-validates",
+              "the-workspace-adapter-validates",
+              "lifecycle-codes-are-closed-and-documented"
+            ]
+          }
+        },
+        {
+          "id": "one-owner-per-ecosystem-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-second-owner-or-an-unknown-use-is-refused",
+              "a-built-in-owner-satisfies-a-use",
+              "a-profile-validates-alone",
+              "each-ecosystem-fixture-reports-its-code"
+            ]
+          }
+        },
+        {
+          "id": "publication-events-are-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-published-member-is-strict",
+              "a-member-probe-is-strict",
+              "the-payload-drops-the-envelope"
+            ]
+          }
+        },
+        {
+          "id": "the-publication-outbox-is-strict-and-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-outbox-refuses-unknown-duplicate-and-null-members",
+              "the-outbox-refuses-escaping-paths-and-symbolic-links",
+              "the-outbox-refuses-invalid-artifacts-identities-and-registries",
+              "the-outbox-accepts-every-ecosystem",
+              "the-outbox-is-bounded",
+              "every-outbox-fixture-is-held"
+            ]
+          }
+        },
+        {
+          "id": "every-first-party-manifest-conforms",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "first-party-manifests-load-under-the-current-contract",
+              "first-party-manifests-pass-the-publish-gate",
+              "first-party-task-declarations-conform",
+              "the-go-extension-manifest-passes-full-validation",
+              "the-typescript-extension-manifest-passes-full-validation",
+              "the-python-extension-manifest-passes-full-validation"
+            ]
+          }
+        },
+        {
+          "id": "first-party-packagers-stamp-and-gate-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-stamps-the-rung-its-vocabulary-requires",
+              "the-go-extension-refuses-what-the-protocol-refuses",
+              "the-typescript-extension-stamps-the-rung-its-vocabulary-requires",
+              "the-typescript-extension-refuses-what-the-protocol-refuses",
+              "the-extension-sdk-stamps-the-rung-its-vocabulary-requires",
+              "the-extension-sdk-authoring-gate-runs-the-full-validator"
+            ]
+          }
+        },
+        {
+          "id": "first-party-publishers-emit-what-the-protocol-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-emits-a-published-member-the-protocol-validates",
+              "the-go-extension-probes-pass-the-strict-reader",
+              "the-go-extension-packs-an-outbox-the-strict-reader-accepts",
+              "the-typescript-extension-emits-a-published-member-the-protocol-parses",
+              "the-typescript-extension-probes-pass-the-strict-reader",
+              "the-typescript-extension-packs-an-outbox-the-strict-reader-accepts",
+              "the-extension-sdk-probes-pass-the-strict-reader",
+              "the-extension-sdk-reader-refuses-what-the-protocol-refuses-in-a-probe",
+              "the-extension-sdk-outbox-reads-back-what-it-writes",
+              "the-extension-sdk-outbox-reader-refuses-an-invalid-descriptor",
+              "the-cloud-extension-emits-a-published-member-the-protocol-validates",
+              "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "migration",
+  "features": [
+    {
+      "id": "migration/migration-contract",
+      "type": "feature",
+      "name": "Migration contract",
+      "outcome": "Every Putnami framework applies schema changes under one execution contract and packages them as one content-addressed bundle, so a release's migrations run the same way from any language, locally or remotely",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-state-store-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-state-table-and-its-columns-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "a-migration-is-identified-by-datasource-and-name",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-canonical-id-is-datasource-scoped",
+              "normalization-fills-defaults-and-sorts-the-same-way"
+            ]
+          }
+        },
+        {
+          "id": "definitions-are-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-definition-is-valid-or-refused",
+              "a-duplicate-definition-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "startup-and-reliability-are-contract-defaults",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-default-contract-holds-every-guarantee"
+            ]
+          }
+        },
+        {
+          "id": "the-error-codes-are-a-closed-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-error-taxonomy-is-complete-and-closed"
+            ]
+          }
+        },
+        {
+          "id": "a-bundle-manifest-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-validator-refuses-each-broken-manifest",
+              "every-bundle-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "the-digest-addresses-the-migration-content",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "provenance-and-order-leave-the-digest-unchanged",
+              "the-payload-hash-and-the-digest-follow-the-content",
+              "a-wrong-digest-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "the-digest-is-identical-across-languages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-golden-digests-are-pinned",
+              "the-typescript-runner-reproduces-the-golden-digests"
+            ]
+          }
+        },
+        {
+          "id": "a-rollback-needs-reversible-or-compatible",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "normalization-infers-only-reversible",
+              "compatible-is-part-of-the-content",
+              "a-rollback-is-allowed-only-when-every-operation-allows-it"
+            ]
+          }
+        },
+        {
+          "id": "writing-and-loading-verify-every-payload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "writing-accepts-a-matching-payload-and-refuses-a-mismatch",
+              "loading-reads-back-a-written-bundle-and-refuses-a-missing-or-tampered-one"
+            ]
+          }
+        },
+        {
+          "id": "a-bundle-packs-to-one-tar",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "packing-is-deterministic-and-round-trips-files-and-directories",
+              "unpacking-refuses-an-unsafe-entry",
+              "a-filesystem-error-surfaces",
+              "a-name-holds-one-registry-segment",
+              "the-transport-imports-only-the-standard-library"
+            ]
+          }
+        },
+        {
+          "id": "a-publication-packs-exactly-the-stored-bytes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-same-input-packs-the-same-bytes",
+              "the-publication-scope-is-enforced"
+            ]
+          }
+        },
+        {
+          "id": "the-go-sql-runner-emits-and-loads-bundles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-runner-contributes-a-valid-bundle",
+              "a-written-bundle-loads-back-exactly"
+            ]
+          }
+        },
+        {
+          "id": "the-typescript-runner-builds-bundles-by-the-same-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-normalization-fills-the-same-defaults",
+              "the-typescript-digest-ignores-provenance-and-order",
+              "the-typescript-writer-writes-the-digest-and-the-payload-bytes",
+              "the-typescript-writer-refuses-a-payload-path-that-escapes-the-bundle",
+              "the-typescript-writer-refuses-bytes-that-do-not-match-their-hash"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

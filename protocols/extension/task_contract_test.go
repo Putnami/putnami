@@ -12,6 +12,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const v3FixturePath = "fixtures/valid/task-contract-v3.json"
@@ -92,6 +93,7 @@ func TestNormalizeOutputPath(t *testing.T) {
 }
 
 func TestOutputsOverlap(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "one-owner-per-output")
 	ref := func(root, path string) OutputRef { return OutputRef{Root: root, Path: path} }
 	port := func(root, name string) OutputRef { return OutputRef{Root: root, FromPort: name} }
 	cedes := func(root, path string, excludes ...string) OutputRef {
@@ -176,6 +178,7 @@ func TestOutputsOverlap(t *testing.T) {
 // that lands inside a project is caught once both refs are resolved, which is
 // the cross-root case the static check deliberately leaves open.
 func TestOutputsOverlap_ResolvedRefs(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "one-owner-per-output")
 	base := "/ws/packages/api"
 	fromProject := OutputRef{Root: base, Path: "dist"}
 	fromWorkspace := OutputRef{Root: base, Path: "dist/esm"}
@@ -329,6 +332,7 @@ func TestTaskEffectVocabulary(t *testing.T) {
 // TestManifestProtocolVersion pins how a loader recognizes v3: the vocabulary
 // is self-identifying, and a manifest without it is a v2 manifest.
 func TestManifestProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-protocol-version-is-pinned", "a-manifest-reports-the-version-it-uses")
 	if got := ManifestProtocolVersion(nil); got != ProtocolVersionV2 {
 		t.Errorf("ManifestProtocolVersion(nil) = %d, want %d", got, ProtocolVersionV2)
 	}
@@ -383,6 +387,7 @@ func TestValidateManifest_V3FixtureIsClean(t *testing.T) {
 // consumer (the conformance harness in B3a, the planner in B2b) can rely on the
 // code rather than message text.
 func TestValidateTaskDeclaration_Rules(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "declaration-rules-refuse-their-counter-examples")
 	cases := []struct {
 		name string
 		task TaskDefinition
@@ -640,6 +645,7 @@ func TestValidateTaskDeclaration_Rules(t *testing.T) {
 // TestValidateTaskDeclaration_AcceptedShapes pins that the rules above do not
 // fire on the declarations they must allow.
 func TestValidateTaskDeclaration_AcceptedShapes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "declaration-rules-refuse-their-counter-examples")
 	cases := map[string]TaskDefinition{
 		"v2 task has no declaration": {Kind: "command", Command: "echo"},
 		"external effect with caching disabled": {
@@ -765,6 +771,7 @@ func TestSourcesWriteScope(t *testing.T) {
 func boolPtr(v bool) *bool { return &v }
 
 func TestValidateOutputOwnership(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "one-owner-per-output")
 	dir := func(root, path string) DeclaredOutput {
 		return DeclaredOutput{Kind: OutputKindDirectory, Root: root, Path: path}
 	}
@@ -1021,6 +1028,7 @@ func TestV3FixtureRoundTrip(t *testing.T) {
 // (TestConformance_TaskContracts_InvalidFixtures) proves the same codes come
 // from the task contract rather than from an unrelated phase.
 func TestV3InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "each-counter-example-reports-its-exact-codes")
 	for name, codes := range v3InvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {
 			m := loadFixtureManifest(t, filepath.Join("fixtures/invalid", name))
@@ -1159,6 +1167,7 @@ func TestLoadManifest_TolerantOfInvalidV3(t *testing.T) {
 // was before carve-outs existed. The cross-task control keeps the rule from
 // being a blanket rejection.
 func TestValidateOutputOwnership_CarveOutDoesNotDivideOneTask(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-contracts-are-exact-owned-and-additive", "one-owner-per-output")
 	gen := DeclaredOutput{
 		Kind: OutputKindDirectory, Root: OutputRootProject,
 		Path: ".gen", Excludes: []string{".gen/migration-bundle"},
@@ -1289,6 +1298,7 @@ func TestValidateOutputEmptied(t *testing.T) {
 // and each is refused at the readByDependents field. An unset flag states
 // nothing.
 func TestValidateOutputReadByDependents(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "output-readers-and-publish-channels-follow-their-rules", "a-read-output-is-durable-and-under-the-project-root")
 	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"clientOutput": {}}}
 	const code = "invalid-output-read-by-dependents"
 	cases := []struct {

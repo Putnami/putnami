@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func validTestKey() string    { return strings.Repeat("a", KeyLength) }
@@ -17,6 +18,7 @@ func validTestDigest() string { return DigestAlgorithm + digestSep + strings.Rep
 
 // TestProviderOp_Valid pins the recognized op set.
 func TestProviderOp_Valid(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "the-op-set-is-closed")
 	for _, op := range []ProviderOp{
 		OpInitialize, OpAuthenticate, OpPrefetch, OpRestore, OpUpload,
 		OpMarkerLookup, OpMarkerWrite, OpObjectGet, OpObjectPut,
@@ -38,6 +40,7 @@ func TestProviderOp_Valid(t *testing.T) {
 // a task shut the provider down, publish a run marker, or restore a task entry
 // it never declared.
 func TestProviderOp_ValidOnObjectCacheSocket(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "only-object-ops-are-valid-on-the-socket")
 	for _, op := range []ProviderOp{OpObjectGet, OpObjectPut} {
 		if !op.ValidOnObjectCacheSocket() {
 			t.Errorf("op %q should be valid on the object-cache socket", op)
@@ -58,6 +61,7 @@ func TestProviderOp_ValidOnObjectCacheSocket(t *testing.T) {
 // provider extension and the language extension that calls the socket), so a
 // rename here is a wire break, not a refactor.
 func TestObjectCacheContract(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-object-cache-tokens-are-pinned")
 	for _, tc := range []struct{ got, want string }{
 		{CapabilityObjectCache, "object-cache"},
 		{string(OpObjectGet), "object-get"},
@@ -74,6 +78,7 @@ func TestObjectCacheContract(t *testing.T) {
 // TestRunCredentialContract pins the run-credential tokens a provider in
 // another repository reads, and the bound it shares with protocol/registry.
 func TestRunCredentialContract(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-run-credential-rule-is-pinned")
 	for _, tc := range []struct{ got, want string }{
 		{CapabilityRunCredential, "run-credential"},
 		{string(OpAuthenticate), "authenticate"},
@@ -109,6 +114,7 @@ func TestRunCredentialContract(t *testing.T) {
 // is absent when unset, so a request without them is byte-identical to the
 // one a provider without the capability already parses strictly.
 func TestRestoreResultOnlyContract(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "the-result-only-wire-is-pinned")
 	if CapabilityRestoreResultOnly != "restore-result-only" {
 		t.Errorf("wire token = %q, want %q", CapabilityRestoreResultOnly, "restore-result-only")
 	}
@@ -153,6 +159,7 @@ func TestRestoreResultOnlyContract(t *testing.T) {
 // strict parser that predates the field accepts), and the two refusals of
 // strict validation: a mode without the echo, and an unknown mode.
 func TestProviderConfigurationContract(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-resolves-the-mode", "the-provider-configuration-wire-is-pinned")
 	if CapabilityProviderConfiguration != "provider-configuration" {
 		t.Errorf("wire token = %q, want %q", CapabilityProviderConfiguration, "provider-configuration")
 	}
@@ -202,6 +209,7 @@ func TestProviderConfigurationContract(t *testing.T) {
 // TestPrefetchParams_ResultOnlyKeysValidation pins the subset rule: every
 // result-only key is well-formed, listed once, and also listed in Keys.
 func TestPrefetchParams_ResultOnlyKeysValidation(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated", "result-only-keys-are-a-subset-of-keys")
 	key := validTestKey()
 	other := strings.Repeat("b", KeyLength)
 	for _, tc := range []struct {
@@ -239,6 +247,7 @@ func TestPrefetchParams_ResultOnlyKeysValidation(t *testing.T) {
 // TestAuthenticateNeverFormatsTheCredential keeps the run credential out of
 // every formatted value and diagnostic, while the wire still carries it.
 func TestAuthenticateNeverFormatsTheCredential(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-run-credential-is-authenticated-once", "the-credential-is-never-formatted")
 	const secret = "prc_secret_run_credential"
 	params := AuthenticateParams{Credential: secret}
 	payload, err := MarshalPayload(params)
@@ -269,6 +278,7 @@ func TestAuthenticateNeverFormatsTheCredential(t *testing.T) {
 // on: the object cache ships WITHOUT a provider protocol bump, so a v1/v2
 // provider that ignores the capability keeps working unchanged.
 func TestObjectCacheIsAdditiveToV2(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "the-object-cache-is-additive-to-version-2")
 	if ProviderProtocolVersion != 2 {
 		t.Fatalf("ProviderProtocolVersion = %d, want 2 — the object cache is additive to v2", ProviderProtocolVersion)
 	}
@@ -288,6 +298,7 @@ func TestObjectCacheIsAdditiveToV2(t *testing.T) {
 // typed params, wrap in the SAME envelope stdin/stdout uses, strict-parse, and
 // decode the payload back.
 func TestObjectGetParams_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "object-messages-are-validated")
 	params := &ObjectGetParams{
 		Namespace:      "go-build",
 		IDs:            []string{validTestKey(), strings.Repeat("c", 32)},
@@ -323,6 +334,7 @@ func TestObjectGetParams_RoundTrip(t *testing.T) {
 // on to use a namespace and an id as storage path segments, and the channel
 // filter's closed enum.
 func TestObjectGetParams_Validation(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "object-messages-are-validated")
 	id := validTestKey()
 	for _, tc := range []struct {
 		name string
@@ -362,6 +374,7 @@ func TestObjectGetParams_Validation(t *testing.T) {
 // channel-less hit stays valid — it is the legacy signal, treated as an
 // untrusted hint by an authoritative policy.
 func TestObjectGetResult_Validation(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "object-messages-are-validated")
 	digest := validTestDigest()
 	id := validTestKey()
 	valid := []byte(`{"objects":[{"id":"` + id + `","digest":"` + digest + `","size":12,"meta":"out","producer":"ci","channel":"trusted"}]}`)
@@ -399,6 +412,7 @@ func TestObjectGetResult_Validation(t *testing.T) {
 // TestObjectPut_RoundTrip covers the write path, including the fire-and-forget
 // acknowledgement shape.
 func TestObjectPut_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "object-messages-are-validated")
 	params := &ObjectPutParams{
 		Namespace: "go-build",
 		Objects: []ObjectPut{
@@ -434,6 +448,7 @@ func TestObjectPut_RoundTrip(t *testing.T) {
 // process cannot even claim one. The provider derives trust from its own
 // credential, exactly as it overwrites UploadParams provenance.
 func TestObjectPutParams_CarriesNoTrustAssertion(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "a-put-asserts-no-channel")
 	claimed := []byte(`{"namespace":"go-build","objects":[{"id":"` + validTestKey() +
 		`","digest":"` + validTestDigest() + `","size":1,"channel":"trusted"}]}`)
 	if got, diags := ParseAndValidateObjectPutParams(claimed); got != nil || !diag.HasErrors(diags) {
@@ -444,6 +459,7 @@ func TestObjectPutParams_CarriesNoTrustAssertion(t *testing.T) {
 // TestNormalizeObjectGetParams_Deterministic verifies normalization makes one
 // lookup's canonical form stable whatever order the caller batched it in.
 func TestNormalizeObjectGetParams_Deterministic(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-object-cache-is-a-negotiated-socket", "object-messages-are-validated")
 	p := &ObjectGetParams{
 		Namespace:      " go-build ",
 		IDs:            []string{"bb", "aa"},
@@ -464,6 +480,7 @@ func TestNormalizeObjectGetParams_Deterministic(t *testing.T) {
 // TestRestoreStatus_Valid pins the restore status set, including the distinct
 // error (restore-failure) signal.
 func TestRestoreStatus_Valid(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "a-restore-is-a-hit-a-miss-or-an-error")
 	for _, s := range []RestoreStatus{RestoreHit, RestoreMiss, RestoreError} {
 		if !s.Valid() {
 			t.Errorf("status %q should be valid", s)
@@ -478,6 +495,7 @@ func TestRestoreStatus_Valid(t *testing.T) {
 // uses: marshal a typed payload, wrap in a request, encode, strict-parse, then
 // decode the payload back.
 func TestProviderRequest_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "an-envelope-round-trips-with-its-payload")
 	params := &RestoreParams{Key: validTestKey()}
 	raw, err := MarshalPayload(params)
 	if err != nil {
@@ -509,6 +527,7 @@ func TestProviderRequest_RoundTrip(t *testing.T) {
 // TestProviderResponse_RoundTrip round-trips a hit response carrying a restore
 // result payload.
 func TestProviderResponse_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "an-envelope-round-trips-with-its-payload")
 	result := &RestoreResult{
 		Status:   RestoreHit,
 		Result:   &ActionResult{Status: "success"},
@@ -541,6 +560,7 @@ func TestProviderResponse_RoundTrip(t *testing.T) {
 // version is rejected against ProviderProtocolVersion, not the HTTP
 // ProtocolVersion.
 func TestProviderRequest_VersionMismatch(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "the-provider-rpc-versions-are-pinned")
 	b := []byte(`{"protocolVersion": 999, "id": 1, "op": "restore"}`)
 	got, diags := ParseAndValidateProviderRequest(b)
 	if got != nil || !diag.HasErrors(diags) {
@@ -551,6 +571,7 @@ func TestProviderRequest_VersionMismatch(t *testing.T) {
 // TestProviderProtocolVersion pins the v2 provenance migration and its v1
 // compatibility floor so a future bump requires an explicit migration story.
 func TestProviderProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "the-provider-rpc-versions-are-pinned")
 	if ProviderProtocolVersion != 2 {
 		t.Fatalf("ProviderProtocolVersion = %d, want 2 — bumping requires a migration story", ProviderProtocolVersion)
 	}
@@ -569,6 +590,7 @@ func TestProviderProtocolVersion(t *testing.T) {
 // window: v1 envelopes remain valid for channel-less providers while v2 carries
 // the provenance extension. Versions outside that window are rejected.
 func TestProviderProtocolVersion_ToleratesLegacy(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "the-provider-rpc-versions-are-pinned")
 	for _, version := range []int{ProviderProtocolMinVersion, ProviderProtocolVersion} {
 		data := []byte(`{"protocolVersion": ` + strconv.Itoa(version) + `, "id": 1, "op": "restore"}`)
 		got, diags := ParseAndValidateProviderRequest(data)
@@ -596,6 +618,7 @@ func TestProviderProtocolVersion_ToleratesLegacy(t *testing.T) {
 // TestEntryProvenance_Validation covers both the compatibility case (all fields
 // omitted by a v1/channel-less provider) and the complete, closed v2 triple.
 func TestEntryProvenance_Validation(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "provenance-is-derived-by-the-provider", "the-triple-is-closed-and-whole")
 	key := validTestKey()
 	digest := validTestDigest()
 
@@ -644,6 +667,7 @@ func TestEntryProvenance_Validation(t *testing.T) {
 // TestProviderResponse_FailedNeedsCode verifies a failed response without an
 // error code is rejected (the harness relies on a populated error).
 func TestProviderResponse_FailedNeedsCode(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "a-failed-response-carries-a-code")
 	b := []byte(`{"protocolVersion": 1, "id": 1, "ok": false}`)
 	_, diags := ParseAndValidateProviderResponse(b)
 	if !diag.HasErrors(diags) {
@@ -653,6 +677,7 @@ func TestProviderResponse_FailedNeedsCode(t *testing.T) {
 
 // TestBlobExchangePath checks the shared blob-exchange layout helper both repos use.
 func TestBlobExchangePath(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "blobs-cross-through-the-exchange-directory", "the-exchange-path-is-content-addressed")
 	digest := validTestDigest()
 	hex := strings.TrimPrefix(digest, DigestAlgorithm+digestSep)
 	want := filepath.Join("/exchange", hex[:2], hex)
@@ -669,6 +694,7 @@ func TestBlobExchangePath(t *testing.T) {
 // digest/capability sets so the canonical form is stable, and leaves an absent
 // mode absent, so a provider can tell core's intent apart from none.
 func TestNormalizeInitializeParams_Deterministic(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-resolves-the-mode", "the-provider-configuration-wire-is-pinned")
 	d1 := DigestAlgorithm + digestSep + strings.Repeat("c", KeyLength)
 	d2 := DigestAlgorithm + digestSep + strings.Repeat("a", KeyLength)
 	p := &InitializeParams{
@@ -691,6 +717,7 @@ func TestNormalizeInitializeParams_Deterministic(t *testing.T) {
 
 // TestMarshalPayload_Nil confirms a nil body yields an absent payload.
 func TestMarshalPayload_Nil(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "an-envelope-round-trips-with-its-payload")
 	raw, err := MarshalPayload(nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

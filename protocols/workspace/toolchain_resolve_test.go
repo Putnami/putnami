@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func validToolchainResolveRequest() ToolchainResolveRequest {
@@ -55,6 +56,7 @@ func assertDiagnostic(t *testing.T, diags []diag.Diagnostic, code, field string)
 }
 
 func TestValidateToolchainResolveRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-toolchain-answer-pins-only-what-was-asked", "a-toolchain-request-and-result-are-validated")
 	tooMany := make([]string, maxToolchainResolveIdentities+1)
 	for i := range tooMany {
 		tooMany[i] = fmt.Sprintf("tool%d", i)
@@ -97,6 +99,7 @@ func TestValidateToolchainResolveRequest(t *testing.T) {
 }
 
 func TestValidateToolchainResolveResult(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-toolchain-answer-pins-only-what-was-asked", "a-toolchain-request-and-result-are-validated")
 	cases := []struct {
 		name  string
 		edit  func(*ToolchainResolveResult)
@@ -151,6 +154,7 @@ func TestValidateToolchainResolveResult(t *testing.T) {
 }
 
 func TestValidateToolchainResolveAnswer(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-toolchain-answer-pins-only-what-was-asked", "a-toolchain-answer-matches-its-request")
 	cases := []struct {
 		name  string
 		edit  func(*ToolchainResolveRequest, *ToolchainResolveResult)
@@ -194,6 +198,7 @@ func TestValidateToolchainResolveAnswer(t *testing.T) {
 }
 
 func TestToolchainResolveDiagnosticsAreDeterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-toolchain-answer-pins-only-what-was-asked", "a-toolchain-request-and-result-are-validated")
 	request := validToolchainResolveRequest()
 	request.Locked = map[string]LockToolchainEntry{"z": {}, "b": {}, "m": {}}
 	result := validToolchainResolveResult()
@@ -218,6 +223,7 @@ func TestToolchainResolveDiagnosticsAreDeterministic(t *testing.T) {
 }
 
 func TestParseToolchainResolveRejectsTrailingDocument(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-toolchain-answer-pins-only-what-was-asked", "a-toolchain-request-and-result-are-validated")
 	if _, diags := ParseToolchainResolveRequest([]byte(`{"version":1,"extension":"x","identities":["go"],"platform":"linux/amd64"} {}`)); !hasDiagnosticCode(diags, "parse-error") {
 		t.Fatalf("trailing request document was accepted: %v", diags)
 	}
@@ -227,6 +233,7 @@ func TestParseToolchainResolveRejectsTrailingDocument(t *testing.T) {
 }
 
 func TestConformance_ToolchainResolveRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "toolchain-resolve-request", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateToolchainResolveRequest(b)
 		return d
@@ -234,6 +241,7 @@ func TestConformance_ToolchainResolveRequestFixtures(t *testing.T) {
 }
 
 func TestConformance_ToolchainResolveResultFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "toolchain-resolve-result", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateToolchainResolveResult(b)
 		return d
@@ -243,6 +251,7 @@ func TestConformance_ToolchainResolveResultFixtures(t *testing.T) {
 // Each valid result fixture is an answer to the full request fixture, so the
 // corpus also exercises the relation between the two documents.
 func TestConformance_ToolchainResolveResultFixturesAnswerTheFullRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "each-valid-result-fixture-answers-its-request")
 	data, err := os.ReadFile("fixtures/toolchain-resolve-request/valid/full.json")
 	if err != nil {
 		t.Fatal(err)
@@ -273,24 +282,28 @@ func TestConformance_ToolchainResolveResultFixturesAnswerTheFullRequest(t *testi
 }
 
 func TestDrift_ToolchainResolveResult(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ToolchainResolveResult",
 		jsonSchemaProperties(t, "schemas/toolchain-resolve.json"),
 		goTypeJSONFields(t, ToolchainResolveResult{}))
 }
 
 func TestDrift_ToolchainResolveRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ToolchainResolveRequest",
 		jsonSchemaDefinitionProperties(t, "schemas/toolchain-resolve.json", "toolchainResolveRequest"),
 		goTypeJSONFields(t, ToolchainResolveRequest{}))
 }
 
 func TestDrift_ToolchainResolution(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ToolchainResolution",
 		jsonSchemaDefinitionProperties(t, "schemas/toolchain-resolve.json", "toolchainResolution"),
 		goTypeJSONFields(t, ToolchainResolution{}))
 }
 
 func TestDrift_ToolchainProblem(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "ToolchainProblem",
 		jsonSchemaDefinitionProperties(t, "schemas/toolchain-resolve.json", "toolchainProblem"),
 		goTypeJSONFields(t, ToolchainProblem{}))
@@ -299,6 +312,7 @@ func TestDrift_ToolchainProblem(t *testing.T) {
 // A locked entry is any committed toolchain entry, so its schema carries every
 // member of the Go type, the version 3 and 4 source included.
 func TestDrift_ToolchainResolveLockedEntry(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "LockToolchainEntry (locked)",
 		jsonSchemaDefinitionProperties(t, "schemas/toolchain-resolve.json", "lockedToolchainEntry"),
 		goTypeJSONFields(t, LockToolchainEntry{}))
@@ -308,6 +322,7 @@ func TestDrift_ToolchainResolveLockedEntry(t *testing.T) {
 // the validator applies, and takes the pin's shape from schemas/lock.json so
 // an answer's pin and a lock entry cannot diverge.
 func TestToolchainResolveSchemaAgreesWithTheValidator(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "schema-rules-agree-with-the-validator")
 	type rule struct {
 		Pattern   string `json:"pattern"`
 		MaxLength int    `json:"maxLength"`

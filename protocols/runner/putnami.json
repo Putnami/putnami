@@ -3,14 +3,12 @@
   "name": "go.putnami.dev/protocol/runner",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": { "jobs": ["serve"] },
   "options": {
     "test": { "filePatterns": ["fixtures/**", "schemas/**"] },
-    "publish": { "archives": false }
-  },
-  "featureAuthority": {
-    "none": "The runner source contract supports execution selected by the CLI; it grants no execution or source-access authority."
+    "publish": { "archives": false },
+    "sdd": { "verification": { "specs": "enforce" } }
   }
 }

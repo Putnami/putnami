@@ -15,6 +15,7 @@ func boolPtr(b bool) *bool { return &b }
 // libpq DSN with the physical database name and maps the ssl flag to sslmode,
 // and carries the owning schema as the search_path.
 func TestPoolConfigFromBinding_TCP(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-builds-a-pool-from-each-transport")
 	b := &pdb.Binding{
 		ProtocolVersion: pdb.ProtocolVersion,
 		Databases: map[string]pdb.Database{
@@ -97,6 +98,7 @@ func TestPoolConfigFromBinding_ExplicitSSLModeWins(t *testing.T) {
 // TestPoolConfigFromBinding_DSN passes a self-contained DSN through untouched
 // while still applying the schema as search_path.
 func TestPoolConfigFromBinding_DSN(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-builds-a-pool-from-each-transport")
 	const dsn = "postgres://app:s3cret@10.0.0.5:5432/analytics?sslmode=require"
 	b := &pdb.Binding{
 		ProtocolVersion: pdb.ProtocolVersion,
@@ -123,6 +125,7 @@ func TestPoolConfigFromBinding_DSN(t *testing.T) {
 // TestPoolConfigFromBinding_Instance resolves a Cloud SQL instance into the
 // /cloudsql Unix-socket DSN, decoupled from the logical datasource name.
 func TestPoolConfigFromBinding_Instance(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-builds-a-pool-from-each-transport")
 	b := &pdb.Binding{
 		ProtocolVersion: pdb.ProtocolVersion,
 		Databases: map[string]pdb.Database{
@@ -230,6 +233,7 @@ func TestPoolConfigFromBinding_Errors(t *testing.T) {
 // TestParseBinding_RejectsInvalid surfaces protocol validation errors and
 // rejects a connection that smuggles multiple transport strategies.
 func TestParseBinding_RejectsInvalid(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-refuses-what-the-protocol-refuses")
 	raw := []byte(`{
 		"$schema": "https://putnami.dev/schemas/putnami-database-binding.json",
 		"protocolVersion": 1,
@@ -244,6 +248,7 @@ func TestParseBinding_RejectsInvalid(t *testing.T) {
 // TestParseBinding_RoundTrip parses a valid multi-datasource binding and
 // resolves one of its datasources.
 func TestParseBinding_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-builds-a-pool-from-each-transport")
 	raw := []byte(`{
 		"$schema": "https://putnami.dev/schemas/putnami-database-binding.json",
 		"protocolVersion": 1,
@@ -272,6 +277,7 @@ func TestParseBinding_RoundTrip(t *testing.T) {
 // TestResolveBinding_EnvUnset returns ok=false so a caller can fall back to an
 // explicit connection.
 func TestResolveBinding_EnvUnset(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-resolves-the-injected-binding")
 	t.Setenv(EnvBinding, "")
 	cfg, ok, err := resolveBinding("auth")
 	if err != nil {
@@ -288,6 +294,7 @@ func TestResolveBinding_EnvUnset(t *testing.T) {
 // TestResolveBinding_FromEnv reads the injected binding and resolves a named
 // datasource end to end.
 func TestResolveBinding_FromEnv(t *testing.T) {
+	spectest.Proves(t, "database/datasource-contract", "the-go-adapter-reads-the-binding", "the-adapter-resolves-the-injected-binding")
 	t.Setenv(EnvBinding, `{
 		"protocolVersion": 1,
 		"databases": { "auth": { "engine": "postgres", "schema": "iam",

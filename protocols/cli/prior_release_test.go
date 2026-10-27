@@ -29,6 +29,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 var priorReleaseResultDir = filepath.Join("testdata", "prior-releases")
@@ -72,6 +74,7 @@ func loadPriorReleaseResults(t *testing.T) priorReleaseResultCorpus {
 // matching it, the cheap fix would be to edit the fixture and the correct one is
 // to decide whether a recorded document just stopped decoding.
 func TestPriorReleaseResultArtifactsAreImmutable(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "released-artifacts-stay-unchanged")
 	corpus := loadPriorReleaseResults(t)
 	recorded := make(map[string]bool, len(corpus.Fixtures))
 
@@ -124,6 +127,7 @@ func TestPriorReleaseResultArtifactsAreImmutable(t *testing.T) {
 // in every other test, because nothing in this repository writes against it any
 // more.
 func TestRetainedV1SchemaHasNotDriftedSinceItsLastRelease(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "released-artifacts-stay-unchanged")
 	corpus := loadPriorReleaseResults(t)
 	compared := 0
 
@@ -160,6 +164,7 @@ func TestRetainedV1SchemaHasNotDriftedSinceItsLastRelease(t *testing.T) {
 // requires must be one the retained Go type carries. Without this, the two
 // halves of the v1 read path could drift apart while each stayed self-consistent.
 func TestRecordedV1DocumentsStillDecodeAgainstTheReleasedSchema(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "version-1-documents-stay-readable")
 	released := releasedV1Schema(t)
 	envelope := schemaProperties(t, released, "properties")
 	if len(envelope) == 0 {
@@ -216,6 +221,7 @@ func TestRecordedV1DocumentsStillDecodeAgainstTheReleasedSchema(t *testing.T) {
 // together: what this build writes is stamped, and the stamp is the version the
 // budget names.
 func TestEmittedDocumentsCarryTheCurrentProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "emitted-documents-carry-version-2")
 	var buffer bytes.Buffer
 	if _, err := WriteResultV2(&buffer, OutputJSON, NewResultV2("build", map[string]any{"ok": true}, nil)); err != nil {
 		t.Fatalf("WriteResultV2: %v", err)

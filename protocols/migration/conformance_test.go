@@ -3,11 +3,14 @@ package migration
 import (
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_StateStoreSchema validates that the canonical state store
 // specification matches the protocol README contract exactly.
 func TestConformance_StateStoreSchema(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-state-store-is-canonical", "the-state-table-and-its-columns-are-pinned")
 	c := DefaultContract()
 
 	if c.StateStore.Schema != "migration" {
@@ -55,6 +58,7 @@ func TestConformance_StateStoreSchema(t *testing.T) {
 
 // TestConformance_CanonicalID validates the datasource-scoped identity format.
 func TestConformance_CanonicalID(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-migration-is-identified-by-datasource-and-name", "the-canonical-id-is-datasource-scoped")
 	tests := []struct {
 		datasource string
 		name       string
@@ -82,6 +86,7 @@ func TestConformance_CanonicalID(t *testing.T) {
 // TestConformance_ErrorCodes validates that all protocol error codes use the
 // migration.* prefix and that the full canonical set is present.
 func TestConformance_ErrorCodes(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-error-codes-are-a-closed-set", "the-error-taxonomy-is-complete-and-closed")
 	canonical := []string{
 		"migration.invalid_definition",
 		"migration.duplicate_definition",
@@ -116,6 +121,7 @@ func TestConformance_ErrorCodes(t *testing.T) {
 // TestConformance_StartupContract validates that the default startup contract
 // enforces blocking migration execution before readiness.
 func TestConformance_StartupContract(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "startup-and-reliability-are-contract-defaults", "the-default-contract-holds-every-guarantee")
 	c := DefaultContract()
 
 	if !c.Startup.RunBeforeReady {
@@ -132,6 +138,7 @@ func TestConformance_StartupContract(t *testing.T) {
 // TestConformance_ReliabilityContract validates that the default reliability
 // contract requires the full set of protocol guarantees.
 func TestConformance_ReliabilityContract(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "startup-and-reliability-are-contract-defaults", "the-default-contract-holds-every-guarantee")
 	c := DefaultContract()
 
 	if !c.Reliability.DedicatedStateSchema {
@@ -163,6 +170,7 @@ func TestConformance_ReliabilityContract(t *testing.T) {
 // TestConformance_QualifiedTableName validates the fully qualified state table
 // matches schema.table exactly.
 func TestConformance_QualifiedTableName(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-state-store-is-canonical", "the-state-table-and-its-columns-are-pinned")
 	want := "migration.migrations"
 	got := QualifiedStateTable()
 	if got != want {
@@ -173,6 +181,7 @@ func TestConformance_QualifiedTableName(t *testing.T) {
 // TestConformance_DefinitionNormalization validates that protocol normalization
 // fills canonical defaults without altering explicit values.
 func TestConformance_DefinitionNormalization(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-migration-is-identified-by-datasource-and-name", "normalization-fills-defaults-and-sorts-the-same-way")
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	downHash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
@@ -219,6 +228,7 @@ func TestConformance_DefinitionNormalization(t *testing.T) {
 // TestConformance_DuplicateDetection validates that per-datasource duplicate
 // detection uses canonical IDs.
 func TestConformance_DuplicateDetection(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "definitions-are-validated", "a-duplicate-definition-is-refused")
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 	// Same name in DIFFERENT datasources must NOT be a duplicate.

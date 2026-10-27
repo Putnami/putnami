@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestLineTagPatternDefaults(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-tag-pattern-defaults-renders-and-validates")
 	cases := []struct {
 		name      string
 		scopePath string
@@ -33,6 +35,7 @@ func TestLineTagPatternDefaults(t *testing.T) {
 }
 
 func TestRenderLineTag(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-tag-pattern-defaults-renders-and-validates")
 	cases := []struct {
 		pattern string
 		want    string
@@ -49,6 +52,7 @@ func TestRenderLineTag(t *testing.T) {
 }
 
 func TestScopeLineIsNotInherited(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-project-belongs-to-one-line")
 	root := t.TempDir()
 	project := filepath.Join(root, "typescript", "framework", "web")
 
@@ -79,6 +83,7 @@ func TestScopeLineIsNotInherited(t *testing.T) {
 }
 
 func TestScanAllScopesCollectsLines(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-project-belongs-to-one-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "typescript", ConfigFilename), `{"line": {"tag": "ts/v{version}"}}`)
 	writeFile(t, filepath.Join(root, "go", ConfigFilename), `{"line": {}}`)
@@ -99,6 +104,7 @@ func TestScanAllScopesCollectsLines(t *testing.T) {
 }
 
 func TestScanAllScopesWithoutLinesIsOneLine(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-project-belongs-to-one-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "typescript", ConfigFilename), `{"tags": ["ts"]}`)
 
@@ -112,6 +118,7 @@ func TestScanAllScopesWithoutLinesIsOneLine(t *testing.T) {
 }
 
 func TestNestedLineIsAnError(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-project-belongs-to-one-line")
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go", ConfigFilename), `{"line": {}}`)
 	writeFile(t, filepath.Join(root, "go", "framework", ConfigFilename), `{"line": {}}`)
@@ -131,6 +138,7 @@ func TestNestedLineIsAnError(t *testing.T) {
 }
 
 func TestValidateScopeLine(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-line-is-a-scope-that-is-not-inherited", "a-tag-pattern-defaults-renders-and-validates")
 	cases := []struct {
 		name string
 		doc  string
@@ -160,6 +168,7 @@ func TestValidateScopeLine(t *testing.T) {
 }
 
 func TestRegistriesEntryPerEcosystem(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "registries-are-keyed-by-ecosystem", "the-outer-map-is-validated-and-entries-stay-raw")
 	cfg, diags := ParseAndValidateWorkspaceConfig([]byte(`{
 		"name": "ws",
 		"registries": {
@@ -213,6 +222,7 @@ func TestRegistriesEntryPerEcosystem(t *testing.T) {
 }
 
 func TestMergeWorkspaceConfigReplacesRegistryEntryWhole(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "configuration-loads-in-a-fixed-precedence", "a-later-layer-overlays-what-it-authors")
 	target := &Config{Registries: map[string]json.RawMessage{
 		"npm": json.RawMessage(`{"publish":"https://npm.putnami.dev","scopes":{"@putnami":"https://npm.putnami.dev"}}`),
 		"go":  json.RawMessage(`{"origin":"https://go.putnami.dev"}`),

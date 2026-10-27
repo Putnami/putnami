@@ -147,9 +147,7 @@
             "kind": "acceptance",
             "checks": [
               "a-staged-package-loads-under-the-claimed-contract",
-              "a-contract-claim-newer-than-the-packager-is-rejected",
-              "a-stale-lower-claim-is-ratcheted-to-the-earned-one",
-              "an-unloadable-hook-only-manifest-fails-packaging"
+              "a-stale-lower-claim-is-ratcheted-to-the-earned-one"
             ]
           }
         },
@@ -633,26 +631,10 @@
               "a-breaking-marker-since-the-tag-allows-the-change",
               "an-addition-is-compatible",
               "a-changed-signature-warns-and-passes-and-a-renamed-parameter-is-silent",
-              "a-preview-or-experimental-project-is-not-checked",
-              "an-unlisted-project-is-not-checked-when-a-catalog-exists",
-              "a-workspace-without-a-catalog-checks-every-project",
               "a-line-without-a-reachable-tag-passes",
               "a-package-absent-at-the-tag-passes",
               "a-removed-manifest-or-entry-point-is-incompatible",
               "an-unreadable-release-warns-instead-of-failing"
-            ]
-          }
-        },
-        {
-          "id": "command-kinds-and-traits",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-npm-packager-stamps-command-kinds"
             ]
           }
         },
@@ -665,21 +647,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-typescript-extension-declares-its-publish-channels",
-              "the-npm-packager-stamps-publish-channels"
-            ]
-          }
-        },
-        {
-          "id": "vocabulary-default-traits",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-npm-packager-validates-and-stamps-a-vocabulary"
+              "the-typescript-extension-declares-its-publish-channels"
             ]
           }
         },

@@ -118,7 +118,7 @@ func TestBuildImpactKeepsThePlannedCommandOrder(t *testing.T) {
 // ValidateImpactPlan: a command list the planner did not name, or names twice,
 // is refused rather than emitted.
 func TestBuildImpactRefusesWhatTheProtocolRefuses(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "one-projection", "an-invalid-plan-is-never-emitted")
+	spectest.Proves(t, "ci/ci-contract", "producers-reproduce-the-corpus", "the-cli-never-emits-a-plan-the-protocol-refuses")
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "apps/app"}
 	for _, commands := range [][]string{nil, {"lint", "lint"}, {"lint,test"}} {
 		in := changePlanInput(app, app, []string{"apps/app/main.go"}, ciproto.ChangePlanCache{Status: "disabled"})

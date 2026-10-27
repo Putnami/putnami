@@ -5,11 +5,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // --- bin: parsing both wire forms -------------------------------------------
 
 func TestProjectConfig_BinString(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	c, diags := ParseProjectConfig([]byte(`{"name":"p","bin":"./cli.js"}`))
 	if diag.HasErrors(diags) {
 		t.Fatalf("unexpected errors: %v", diags)
@@ -20,6 +22,7 @@ func TestProjectConfig_BinString(t *testing.T) {
 }
 
 func TestProjectConfig_BinObject(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	c, diags := ParseProjectConfig([]byte(`{"name":"p","bin":{"cli":"./cli.js","tool":"./tool.js"}}`))
 	if diag.HasErrors(diags) {
 		t.Fatalf("unexpected errors: %v", diags)
@@ -35,6 +38,7 @@ func TestProjectConfig_BinObject(t *testing.T) {
 // --- bin: strict decoding must bite -----------------------------------------
 
 func TestProjectConfig_BinWrongType_Rejected(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	// A number is neither a string nor an object of strings.
 	_, diags := ParseProjectConfig([]byte(`{"name":"p","bin":42}`))
 	if !diag.HasErrors(diags) {
@@ -43,6 +47,7 @@ func TestProjectConfig_BinWrongType_Rejected(t *testing.T) {
 }
 
 func TestProjectConfig_BinNonStringValue_Rejected(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	// Object with a non-string value is invalid per the schema.
 	_, diags := ParseProjectConfig([]byte(`{"name":"p","bin":{"cli":{"nested":"x"}}}`))
 	if !diag.HasErrors(diags) {
@@ -53,6 +58,7 @@ func TestProjectConfig_BinNonStringValue_Rejected(t *testing.T) {
 // --- exports: parsing both wire forms ---------------------------------------
 
 func TestProjectConfig_ExportsString(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	c, diags := ParseProjectConfig([]byte(`{"name":"p","exports":"./index.js"}`))
 	if diag.HasErrors(diags) {
 		t.Fatalf("unexpected errors: %v", diags)
@@ -63,6 +69,7 @@ func TestProjectConfig_ExportsString(t *testing.T) {
 }
 
 func TestProjectConfig_ExportsObjectStringEntry(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	c, diags := ParseProjectConfig([]byte(`{"name":"p","exports":{".":"./index.js"}}`))
 	if diag.HasErrors(diags) {
 		t.Fatalf("unexpected errors: %v", diags)
@@ -74,6 +81,7 @@ func TestProjectConfig_ExportsObjectStringEntry(t *testing.T) {
 }
 
 func TestProjectConfig_ExportsConditionalEntry(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	input := `{"name":"p","exports":{".":{"types":"./index.d.ts","import":"./index.js","require":"./index.cjs","default":"./index.js"}}}`
 	c, diags := ParseProjectConfig([]byte(input))
 	if diag.HasErrors(diags) {
@@ -92,6 +100,7 @@ func TestProjectConfig_ExportsConditionalEntry(t *testing.T) {
 // --- exports: strict decoding must bite -------------------------------------
 
 func TestProjectConfig_ExportsUnknownCondition_Rejected(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	// "browser" is not one of the closed condition keys — additionalProperties:false.
 	// Previously this whole subtree escaped strict decoding as `any`.
 	input := `{"name":"p","exports":{".":{"import":"./index.js","browser":"./browser.js"}}}`
@@ -102,6 +111,7 @@ func TestProjectConfig_ExportsUnknownCondition_Rejected(t *testing.T) {
 }
 
 func TestProjectConfig_ExportsWrongType_Rejected(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	// A number is neither a string nor an object.
 	_, diags := ParseProjectConfig([]byte(`{"name":"p","exports":7}`))
 	if !diag.HasErrors(diags) {
@@ -110,6 +120,7 @@ func TestProjectConfig_ExportsWrongType_Rejected(t *testing.T) {
 }
 
 func TestProjectConfig_ExportsEntryWrongType_Rejected(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "bin-and-exports-accept-their-spellings-and-refuse-the-rest")
 	// An array entry is neither a string nor a conditional object.
 	_, diags := ParseProjectConfig([]byte(`{"name":"p","exports":{".":[1,2,3]}}`))
 	if !diag.HasErrors(diags) {
@@ -120,6 +131,7 @@ func TestProjectConfig_ExportsEntryWrongType_Rejected(t *testing.T) {
 // --- round-trip determinism -------------------------------------------------
 
 func TestProjectConfig_BinExportsRoundtrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "a-rewrite-keeps-the-authored-form-and-bytes")
 	cases := map[string]string{
 		"bin string":            `{"bin":"./cli.js","name":"p"}`,
 		"bin object":            `{"bin":{"a":"./a.js","b":"./b.js"},"name":"p"}`,
@@ -161,6 +173,7 @@ func TestProjectConfig_BinExportsRoundtrip(t *testing.T) {
 // TestProjectConfig_BinExportsMarshalDeterministic verifies re-serialization is
 // byte-identical across many iterations (map-key ordering is stable).
 func TestProjectConfig_BinExportsMarshalDeterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "a-rewrite-keeps-the-authored-form-and-bytes")
 	input := `{"bin":{"z":"./z.js","a":"./a.js","m":"./m.js"},"exports":{"./z":"./z.js","./a":{"import":"./a.js","types":"./a.d.ts"}},"name":"p"}`
 	var c ProjectConfig
 	if err := json.Unmarshal([]byte(input), &c); err != nil {
@@ -184,6 +197,7 @@ func TestProjectConfig_BinExportsMarshalDeterministic(t *testing.T) {
 // TestProjectConfig_BinExportsFormPreserved verifies the string form stays a
 // string and the object form stays an object after a round-trip (no coercion).
 func TestProjectConfig_BinExportsFormPreserved(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-authored-form-survives-a-rewrite", "a-rewrite-keeps-the-authored-form-and-bytes")
 	var c ProjectConfig
 	if err := json.Unmarshal([]byte(`{"name":"p","bin":"./cli.js","exports":"./index.js"}`), &c); err != nil {
 		t.Fatal(err)

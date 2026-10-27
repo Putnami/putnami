@@ -6,9 +6,12 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestIsProbeInvocationMatchesOnlyTheReservedCall(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	cases := []struct {
 		name string
 		args []string
@@ -30,6 +33,7 @@ func TestIsProbeInvocationMatchesOnlyTheReservedCall(t *testing.T) {
 }
 
 func TestProbeControlArgsIsTheSpawnShape(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	args := ProbeControlArgs()
 	if !IsProbeInvocation(args) {
 		t.Fatalf("ProbeControlArgs() = %q, which IsProbeInvocation rejects", args)
@@ -42,6 +46,7 @@ func TestProbeControlArgsIsTheSpawnShape(t *testing.T) {
 }
 
 func TestServeProbeRoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	var request bytes.Buffer
 	if err := EncodeProbeRequest(&request, ProbeRequest{
 		Extension: "@putnami/typescript",
@@ -89,6 +94,7 @@ func TestServeProbeRoundTrip(t *testing.T) {
 }
 
 func TestServeProbeDeclinesOrdinarySubcommands(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "only-the-reserved-call-is-claimed")
 	var stdout bytes.Buffer
 	handled, err := ServeProbe([]string{"build"}, strings.NewReader("{}"), &stdout, func(ProbeRequest) (ProbeResult, error) {
 		t.Fatal("answer must not run for an ordinary subcommand")
@@ -103,6 +109,7 @@ func TestServeProbeDeclinesOrdinarySubcommands(t *testing.T) {
 }
 
 func TestServeProbeRejectsAnUnreadableRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	// A request with a member this provider's protocol version does not know is
 	// a question it cannot fully read; answering it anyway would answer a
 	// different question than the one core asked.
@@ -125,6 +132,7 @@ func TestServeProbeRejectsAnUnreadableRequest(t *testing.T) {
 }
 
 func TestServeProbeWritesNothingWhenTheProviderFails(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var request bytes.Buffer
 	if err := EncodeProbeRequest(&request, ProbeRequest{Extension: "x"}); err != nil {
 		t.Fatalf("EncodeProbeRequest: %v", err)
@@ -143,6 +151,7 @@ func TestServeProbeWritesNothingWhenTheProviderFails(t *testing.T) {
 }
 
 func TestServeProbeRejectsAnAnswerTheContractRejects(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "nothing-is-written-on-failure")
 	var request bytes.Buffer
 	if err := EncodeProbeRequest(&request, ProbeRequest{Extension: "x"}); err != nil {
 		t.Fatalf("EncodeProbeRequest: %v", err)
@@ -161,6 +170,7 @@ func TestServeProbeRejectsAnAnswerTheContractRejects(t *testing.T) {
 }
 
 func TestDecodeProbeDocumentRejectsTrailingData(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	// A provider that logs to stdout produces exactly this shape.
 	_, err := DecodeProbeDocument(strings.NewReader(`{"version":1,"extension":"x"}` + "\ninfo: done\n"))
 	if err == nil {
@@ -172,6 +182,7 @@ func TestDecodeProbeDocumentRejectsTrailingData(t *testing.T) {
 }
 
 func TestDecodeProbeDocumentRejectsEmptyAndOversized(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "one-bounded-document-each-way")
 	if _, err := DecodeProbeDocument(strings.NewReader("   \n")); err == nil {
 		t.Fatal("expected an empty document to be rejected")
 	}
@@ -183,6 +194,7 @@ func TestDecodeProbeDocumentRejectsEmptyAndOversized(t *testing.T) {
 }
 
 func TestEncodeProbeRequestAlwaysStampsTheProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	var buf bytes.Buffer
 	if err := EncodeProbeRequest(&buf, ProbeRequest{Version: 99, Extension: "x"}); err != nil {
 		t.Fatalf("EncodeProbeRequest: %v", err)
@@ -199,6 +211,7 @@ func TestEncodeProbeRequestAlwaysStampsTheProtocolVersion(t *testing.T) {
 // The exchange must be byte-stable: the same facts, however authored, must
 // produce the same document, because that document's digest keys the snapshot.
 func TestServeProbeIsByteStableAcrossAuthoringOrder(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-reserved-call-exchanges-one-bounded-document", "the-request-is-stamped-and-the-answer-byte-stable")
 	answers := []ProbeResult{
 		{Projects: []ProbeProject{
 			{Path: "b", Tags: []string{"z", "a"}},
@@ -233,6 +246,7 @@ func TestServeProbeIsByteStableAcrossAuthoringOrder(t *testing.T) {
 // from every answer to a request that did not set the request member — the
 // provider does not have to know which core it is talking to.
 func TestServeProbe_AnswersDependencySourcesOnlyWhenAsked(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "dependency-sources-are-answered-only-when-asked")
 	answer := func(ProbeRequest) (ProbeResult, error) {
 		return ProbeResult{Projects: []ProbeProject{{
 			Path:              "apps/web",
@@ -282,6 +296,7 @@ func TestServeProbe_AnswersDependencySourcesOnlyWhenAsked(t *testing.T) {
 // project and found no imported edge — and it stays distinct from an absent
 // member through the wire, the parse, normalization and the merge.
 func TestServeProbe_AnEmptyDependencySourcesMapSurvivesAsAnAnswer(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "dependency-sources-attribute-each-edge", "dependency-sources-are-answered-only-when-asked")
 	answer := func(ProbeRequest) (ProbeResult, error) {
 		return ProbeResult{Projects: []ProbeProject{
 			{Path: "apps/web", SourceName: "@acme/web", DependencySources: map[string]DependencySource{}},

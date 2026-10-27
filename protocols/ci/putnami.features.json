@@ -1,0 +1,370 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "ci",
+  "features": [
+    {
+      "id": "ci/ci-contract",
+      "type": "feature",
+      "name": "CI document, plan and verdict contract",
+      "outcome": "A workspace declares its CI intent in a strict, versioned putnami.ci.json, and the commands that serve it, the CLI's impact plan and a CI plane's verdict each share one schema, one canonical form and one fixture corpus.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-document-is-version-3-and-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-document-fixture-gets-its-verdict",
+              "duplicate-keys-and-trailing-values-are-refused",
+              "the-schema-is-closed-and-pinned-to-version-3"
+            ]
+          }
+        },
+        {
+          "id": "commands-run-in-order-with-their-flags",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-workspace-fixture-carries-every-member",
+              "authoring-shorthands-round-trip",
+              "bad-references-and-bounds-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "the-runner-object-is-opaque",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-runner-is-kept-without-its-key-order"
+            ]
+          }
+        },
+        {
+          "id": "rules-are-first-match",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-rule-has-exactly-one-trigger",
+              "explain-takes-the-first-match",
+              "a-tag-publishes-by-convention",
+              "the-cloud-explain-names-the-rule-and-what-it-publishes"
+            ]
+          }
+        },
+        {
+          "id": "branch-globs-are-slash-aware",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-glob-dialect-is-pinned"
+            ]
+          }
+        },
+        {
+          "id": "distribution-is-a-closed-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "distribution-vocabulary-is-closed",
+              "mirror-destinations-are-credential-free"
+            ]
+          }
+        },
+        {
+          "id": "environments-follow-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "environments-are-validated",
+              "explain-lists-environments-per-channel"
+            ]
+          }
+        },
+        {
+          "id": "retain-declares-a-channel-lifetime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "retain-is-intent",
+              "retain-spelling-and-placement-are-validated",
+              "explain-reports-the-lifetime"
+            ]
+          }
+        },
+        {
+          "id": "baseline-names-a-channel-the-rule-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "baseline-is-intent",
+              "baseline-placement-and-spelling-are-validated",
+              "explain-reports-the-baseline"
+            ]
+          }
+        },
+        {
+          "id": "one-canonical-form-and-digest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "canonical-digest-and-format-are-stable",
+              "the-cloud-fmt-writes-or-checks-the-canonical-form"
+            ]
+          }
+        },
+        {
+          "id": "review-is-guidance-without-authority",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "review-refuses-authority-and-malformed-input",
+              "review-bounds-are-field-addressable",
+              "review-guidance-enters-the-digest",
+              "an-absent-review-keeps-the-canonical-bytes"
+            ]
+          }
+        },
+        {
+          "id": "validating-commands-resolve-the-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "provider-sections-are-distribution-and-envs",
+              "task-references-resolve-against-the-graph",
+              "the-cloud-validate-resolves-jobs-and-provider-sections"
+            ]
+          }
+        },
+        {
+          "id": "a-deploy-binds-the-published-release-set",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-deploy-binds-the-published-ref",
+              "deployment-binding-fails-closed",
+              "authored-intent-carries-no-release-set"
+            ]
+          }
+        },
+        {
+          "id": "the-change-plan-v1-is-frozen",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-change-plan-v1-identity-is-pinned",
+              "every-valid-change-plan-has-its-digest"
+            ]
+          }
+        },
+        {
+          "id": "a-change-plan-is-admitted-only-when-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-invalid-change-plan-is-refused",
+              "each-change-plan-defect-is-refused-alone",
+              "transitive-dependents-keep-closure-order"
+            ]
+          }
+        },
+        {
+          "id": "an-impact-plan-is-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-impact-plan-fixture-gets-its-verdict",
+              "each-impact-plan-defect-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "the-projection-is-one-change-plan",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-valid-corpus-projects-onto-the-change-plan-corpus",
+              "the-projection-refuses-what-the-change-plan-refuses",
+              "the-projection-is-one-output-per-plan"
+            ]
+          }
+        },
+        {
+          "id": "producers-reproduce-the-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-reproduces-the-impact-plan-corpus",
+              "the-cli-projects-onto-the-change-plan-corpus",
+              "the-cli-never-emits-a-plan-the-protocol-refuses"
+            ]
+          }
+        },
+        {
+          "id": "the-verdict-corpus-is-the-conformance-case",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-verdict-fixture-gets-its-verdict",
+              "the-verdict-corpus-covers-the-vocabulary",
+              "a-verdict-round-trips"
+            ]
+          }
+        },
+        {
+          "id": "the-answer-and-the-mark-are-folds",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "answers-fold-to-the-most-severe",
+              "advisory-checks-never-change-the-answer",
+              "the-mark-follows-the-answer-and-the-gaps"
+            ]
+          }
+        },
+        {
+          "id": "gaps-name-what-is-missing-or-unknown",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-unapproved-declaration-is-a-gap",
+              "unknown-evidence-keeps-a-passed-verdict-checked",
+              "a-project-without-counts-is-unknown",
+              "the-root-project-is-named"
+            ]
+          }
+        },
+        {
+          "id": "a-verdict-is-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-verdict-defect-is-refused",
+              "the-verdict-bounds-are-admitted"
+            ]
+          }
+        },
+        {
+          "id": "verdict-identities-are-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "project-ids-are-workspace-paths",
+              "the-repository-is-a-credential-free-url",
+              "the-reference-is-a-full-git-reference"
+            ]
+          }
+        },
+        {
+          "id": "verdicts-parse-strictly-against-one-schema",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "parse-verdict-is-strict-and-bounded",
+              "the-verdict-schema-is-closed",
+              "the-verdict-schema-tracks-the-go-types"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

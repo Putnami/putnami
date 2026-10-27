@@ -1,0 +1,268 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "features": [
+    {
+      "id": "cli/machine-contract",
+      "type": "feature",
+      "name": "CLI machine contract",
+      "outcome": "Every Putnami CLI surface, in any language, gives an exit code, an output mode, a machine document and a reserved flag one meaning, so a script or an agent reads every binary the same way",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "exit-codes-and-error-classification",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-exit-code-values-stay-fixed",
+              "errors-classify-to-exit-codes",
+              "the-innermost-suggested-next-wins",
+              "the-cli-maps-each-error-class-to-its-exit-code",
+              "the-cli-reports-an-interrupt-as-aborted-with-exit-130"
+            ]
+          }
+        },
+        {
+          "id": "output-modes-and-the-result-envelope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "output-modes-resolve-one-way",
+              "the-envelope-maps-every-outcome"
+            ]
+          }
+        },
+        {
+          "id": "version-2-is-the-only-machine-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "emitted-documents-carry-version-2",
+              "version-1-documents-stay-readable",
+              "released-artifacts-stay-unchanged",
+              "the-typescript-version-2-token-matches-the-schema-const"
+            ]
+          }
+        },
+        {
+          "id": "the-schemas-and-the-types-agree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-2-schema-matches-the-go-types",
+              "bounds-come-from-the-schema",
+              "the-version-1-schema-matches-its-go-type",
+              "the-typescript-member-sets-match-the-schema",
+              "the-typescript-every-schema-def-has-a-pinned-member-list",
+              "the-typescript-report-bounds-come-from-the-schema",
+              "the-typescript-machine-output-budgets-come-from-the-schema",
+              "the-typescript-test-case-bounds-come-from-the-schema"
+            ]
+          }
+        },
+        {
+          "id": "one-validator-and-a-shared-corpus",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-validator-refuses-malformed-documents",
+              "violations-are-sorted-with-index-paths",
+              "every-corpus-case-meets-its-expectation",
+              "the-corpus-is-complete-and-unique",
+              "the-typescript-twin-meets-every-corpus-expectation",
+              "the-typescript-corpus-covers-every-kind-and-code",
+              "the-typescript-validator-sorts-violations-by-path-then-code"
+            ]
+          }
+        },
+        {
+          "id": "one-run-verdict-on-every-surface",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-verdict-is-strict-and-abort-wins",
+              "every-surface-shares-one-run-summary",
+              "a-task-identity-derives-its-key",
+              "the-typescript-strict-verdict-gates-run-success",
+              "the-typescript-aborted-run-keeps-failures-visible",
+              "the-cli-session-exit-code-follows-the-run-verdict"
+            ]
+          }
+        },
+        {
+          "id": "session-members-are-additive",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "executions-round-trip-and-resolve",
+              "environment-facts-are-exact-or-absent",
+              "placement-is-complete-or-absent",
+              "preparation-is-a-closed-histogram",
+              "the-tree-member-is-optional-and-strict",
+              "the-typescript-placement-is-optional-and-preserves-fallback"
+            ]
+          }
+        },
+        {
+          "id": "the-report-is-a-bounded-projection",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-report-round-trips-and-absent-is-not-zero",
+              "the-report-is-bounded-and-counts-what-it-drops"
+            ]
+          }
+        },
+        {
+          "id": "the-bounded-stream-keeps-its-promises",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "budgets-are-fixed-by-mode",
+              "selection-keeps-partitions-and-order",
+              "classifiers-are-closed-and-agree",
+              "output-is-sanitized-and-valid-utf-8",
+              "the-typescript-stream-mode-policy-is-enforced",
+              "the-typescript-two-mode-budgets-are-fixed",
+              "the-typescript-failure-priority-is-classified",
+              "the-typescript-controls-strip-and-member-names-remain",
+              "the-typescript-every-credential-family-is-redacted",
+              "the-cli-stream-suppresses-debug-detail-in-normal-mode-and-admits-it-in-verbose",
+              "the-cli-stream-keeps-failure-capacity-after-the-ordinary-budget-is-spent"
+            ]
+          }
+        },
+        {
+          "id": "test-cases-are-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "cases-keep-their-priority-within-the-cap",
+              "text-is-cut-on-code-points",
+              "truncation-stays-bounded-and-redacts",
+              "byte-budgets-hold-per-task-and-batch",
+              "bounded-cases-validate-as-records"
+            ]
+          }
+        },
+        {
+          "id": "reserved-flags-and-the-extension-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-registry-is-duplicate-free-and-copied",
+              "lookups-and-shadow-checks-agree",
+              "the-extension-contract-only-moves-forward"
+            ]
+          }
+        },
+        {
+          "id": "the-command-surface-names-breaking-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-command-surface-corpus-and-schema-hold",
+              "writing-is-canonical-and-reading-is-bounded",
+              "incompatible-changes-are-named-once"
+            ]
+          }
+        },
+        {
+          "id": "a-commit-is-read-one-way",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "subjects-and-footers-are-read",
+              "the-departures-from-the-specification-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "the-reporting-wire",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-reporting-wire-passes-its-corpus",
+              "an-ack-binds-identity-and-the-credential-stays-in-authenticate",
+              "subscriber-evidence-passes-its-corpus",
+              "the-typescript-reporter-corpus-and-identity"
+            ]
+          }
+        },
+        {
+          "id": "the-cli-emits-conforming-documents",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-machine-surfaces-validate-and-match-their-goldens",
+              "version-2-is-the-only-contract-the-cli-writes",
+              "the-goldens-encode-the-strict-verdict-and-abort-precedence"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

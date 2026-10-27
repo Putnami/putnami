@@ -42,15 +42,7 @@
     },
     {
       "id": "infra-aggregation",
-      "text": "The registry walks every contributed source's infrastructure contribution and merges them into databases keyed by name and engine, so one project emits one requirement per database with the union of its schemas."
-    },
-    {
-      "id": "cross-language-bundle",
-      "text": "The bundle payload hash and digest are computed over a canonical form, so the same migration inputs produce the same bundle identity in TypeScript and in Go."
-    },
-    {
-      "id": "compatible-marker-parity",
-      "text": "The TypeScript canonical form of a migration bundle carries the compatible capability exactly as Go does, so both languages compute one digest for a bundle that sets it."
+      "text": "The registry walks every contributed source's infrastructure contribution and merges them into databases keyed by name and engine, so one project emits one requirement per database with the union of its schemas. For the shared equivalence inputs, its output equals protocols/infra/fixtures/equivalence/migration.golden.json byte for byte."
     },
     {
       "id": "defensive-reads",

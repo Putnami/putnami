@@ -9,11 +9,15 @@ require (
 	go.putnami.dev/protocol/storage v0.0.0
 )
 
+replace go.putnami.dev/protocol/capabilities => ../capabilities
+
 replace go.putnami.dev/protocol/database => ../database
 
 replace go.putnami.dev/protocol/diagnostic => ../diagnostic
 
 replace go.putnami.dev/protocol/events => ../events
+
+replace go.putnami.dev/protocol/features => ../features
 
 replace go.putnami.dev/protocol/storage => ../storage
 

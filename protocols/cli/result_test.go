@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The version-1 envelope is a READ shape now that this module has deleted its
@@ -31,6 +33,7 @@ const v1FailureDocument = `{
 }`
 
 func TestResultV1_DecodesRecordedSuccessDocument(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "version-1-documents-stay-readable")
 	var r Result
 	if err := json.Unmarshal([]byte(v1SuccessDocument), &r); err != nil {
 		t.Fatalf("decode v1 success document: %v", err)
@@ -50,6 +53,7 @@ func TestResultV1_DecodesRecordedSuccessDocument(t *testing.T) {
 }
 
 func TestResultV1_DecodesRecordedFailureDocument(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "version-1-documents-stay-readable")
 	var r Result
 	if err := json.Unmarshal([]byte(v1FailureDocument), &r); err != nil {
 		t.Fatalf("decode v1 failure document: %v", err)
@@ -73,6 +77,7 @@ func TestResultV1_DecodesRecordedFailureDocument(t *testing.T) {
 // struct that grew one would make version detection ambiguous for every
 // consumer that must open both shapes.
 func TestResultV1_HasNoProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "version-2-is-the-only-machine-contract", "version-1-documents-stay-readable")
 	data, err := json.Marshal(Result{Command: "build", Status: StatusSuccess})
 	if err != nil {
 		t.Fatal(err)

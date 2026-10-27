@@ -78,6 +78,7 @@ func TestHandleToolchainResolve_ServesTheReservedInvocation(t *testing.T) {
 }
 
 func TestHandleToolchainResolve_DeclinesOtherInvocations(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-typescript-extension-leaves-other-calls-to-their-owner")
 	for _, args := range [][]string{{"build"}, wsproto.ProbeControlArgs()} {
 		handled, err := handleToolchainResolve(args)
 		if handled || err != nil {

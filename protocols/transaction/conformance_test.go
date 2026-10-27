@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // parseFixture routes a fixture to the right strict parser by its declared
@@ -35,6 +36,7 @@ func parseFixture(data []byte) []diag.Diagnostic {
 // fixtures/invalid must produce at least one diagnostic. This is the
 // cross-language surface a future TypeScript adapter validates against too.
 func TestConformance(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-shapes-parse-strictly", "every-wire-fixture-gets-its-verdict")
 	valid, err := filepath.Glob(filepath.Join("fixtures", "valid", "*.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +79,7 @@ func TestConformance(t *testing.T) {
 // TestErrorCodesRegistered asserts every error code the validators can emit is
 // registered in ValidErrorCodes, so the taxonomy stays complete.
 func TestErrorCodesRegistered(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "the-shapes-parse-strictly", "every-validator-code-is-registered")
 	codes := []string{
 		ErrorCodeParseError,
 		ErrorCodeUnknownField,
@@ -102,6 +105,7 @@ func TestErrorCodesRegistered(t *testing.T) {
 // TestRetryableTaxonomy pins the Outcome.Retryable() invariant that the
 // validator enforces: exactly one outcome is retryable.
 func TestRetryableTaxonomy(t *testing.T) {
+	spectest.Proves(t, "transaction/unit-of-work-contract", "exactly-one-outcome-is-retryable", "only-a-serialization-failure-is-retryable")
 	retryable := map[Outcome]bool{
 		OutcomeApplied:                       false,
 		OutcomeAlreadyConsumedConflict:       false,

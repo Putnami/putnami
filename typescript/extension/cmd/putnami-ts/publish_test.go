@@ -465,6 +465,7 @@ func TestRunPublishNpm_ManagedAlreadyPublishedRetryVerifiesWithoutUpload(t *test
 // on the reused path alike: the set is assembled from what EXISTS in the
 // registry under a verified digest, not from what this session uploaded.
 func TestRunPublishNpm_ManagedEmitsAPublishedMemberOnBothPaths(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-typescript-extension-emits-a-published-member-the-protocol-parses")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "member-event-per-publication", "reuse-reports-the-existing-digest")
 
 	for _, alreadyPublished := range []bool{false, true} {

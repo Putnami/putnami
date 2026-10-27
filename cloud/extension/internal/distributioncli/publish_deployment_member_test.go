@@ -13,6 +13,7 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -138,6 +139,7 @@ func TestPublishDeploymentMemberRefusesAnInvalidIdentityBeforeCredentials(t *tes
 // and so the same artifact digest. The engine admits the packed member as
 // the planned deployment member and its upload check accepts it.
 func TestPackDeploymentMemberPacksTheBytesPublishDeploymentMemberPublishes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-packs-outbox-descriptors-the-protocol-accepts")
 	publication := DeploymentMemberPublication{Namespace: "cloud", Package: "shop-workloads-api-deployment", Version: "rs-1", Payload: deploymentMemberPayload}
 	direct, srv := newRecordingPutServer(t)
 	published, err := PublishDeploymentMember(map[string]any{"registry-put-url": srv.URL}, t.TempDir(), nativePutCredentialEnv(t, srv.URL), clicore.IO{Client: srv.Client()}, publication)

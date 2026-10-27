@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // digestTask is a fully-populated v3 task used as the mutation base: every
@@ -50,6 +52,7 @@ func digestTask() TaskDefinition {
 }
 
 func TestTaskContractDigest_DeterministicAcrossParses(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "the-digest-is-deterministic")
 	// The same task authored with members in two different orders must digest
 	// identically — canonical form cannot depend on authoring order or on map
 	// iteration.
@@ -88,6 +91,7 @@ func TestTaskContractDigest_DeterministicAcrossParses(t *testing.T) {
 }
 
 func TestTaskContractDigest_SelfNormalizing(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "the-digest-is-deterministic")
 	// An un-normalized task (unsorted effects, uncleaned path, cache policy
 	// left for derivation) must digest identically to its normalized form:
 	// the CLI's negotiating load path does not run NormalizeManifest.
@@ -122,6 +126,7 @@ func TestTaskContractDigest_SelfNormalizing(t *testing.T) {
 }
 
 func TestTaskContractDigest_PresentationalMembersDoNotMove(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "only-contract-members-move-the-digest")
 	base := TaskContractDigest(digestTask())
 
 	edited := digestTask()
@@ -140,6 +145,7 @@ func TestTaskContractDigest_PresentationalMembersDoNotMove(t *testing.T) {
 }
 
 func TestTaskContractDigest_ContractMembersMove(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "only-contract-members-move-the-digest")
 	// Every contract member must move the digest. Each case is a compiling
 	// mutation; the presentational test above is the negative control.
 	cases := map[string]func(*TaskDefinition){
@@ -212,6 +218,7 @@ func TestTaskContractDigest_ContractMembersMove(t *testing.T) {
 // an empty record, so the flag changes the tree a hit leaves and moves the
 // digest on its own.
 func TestTaskContractDigest_EmptiedMoves(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "only-contract-members-move-the-digest")
 	optional := func(emptied bool) TaskDefinition {
 		task := digestTask()
 		task.Declares.Outputs["report"] = DeclaredOutput{
@@ -227,6 +234,7 @@ func TestTaskContractDigest_EmptiedMoves(t *testing.T) {
 // The planner orders a dependent project's jobs after a task whose output they
 // read, so the flag is task contract and moves the digest on its own.
 func TestTaskContractDigest_ReadByDependentsMoves(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "only-contract-members-move-the-digest")
 	read := func(readByDependents bool) TaskDefinition {
 		task := digestTask()
 		task.Declares.Outputs["report"] = DeclaredOutput{
@@ -240,6 +248,7 @@ func TestTaskContractDigest_ReadByDependentsMoves(t *testing.T) {
 }
 
 func TestTaskContractDigest_DoesNotMutateItsArgument(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "the-digest-is-deterministic")
 	task := digestTask()
 	task.Declares.Effects = []string{"network", "locks"} // deliberately unsorted
 	task.Cache = nil                                     // deliberately underivable
@@ -264,6 +273,7 @@ func TestTaskContractDigest_DoesNotMutateItsArgument(t *testing.T) {
 // every v5 cache entry at once — and must be a reviewed, deliberate event.
 // Regenerate with UPDATE_DIGEST_GOLDENS=1.
 func TestTaskContractDigest_FixtureCorpus(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "task-digests-move-only-with-the-contract", "the-fixture-digests-match-the-golden")
 	files, err := filepath.Glob(filepath.Join("fixtures", "valid", "*.json"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no valid fixtures found: %v", err)
@@ -304,7 +314,6 @@ func TestTaskContractDigest_FixtureCorpus(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("wrote %d digests to %s", len(got), goldenPath)
-		return
 	}
 
 	data, err := os.ReadFile(goldenPath)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The run-marker RESPONSE strict parsers/validators are wire-contract parsers
@@ -12,6 +13,7 @@ import (
 // Only the request side was covered; these tests exercise the response side.
 
 func TestRunMarkerResponse_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-response-is-strict")
 	// A hit carries a marker.
 	hit := RunMarkerResponse{ProtocolVersion: ProtocolVersion, Marker: &RunMarker{SHA: "abc123", UpdatedAt: "2026-07-03T00:00:00Z"}}
 	data, err := json.Marshal(hit)
@@ -37,6 +39,7 @@ func TestRunMarkerResponse_RoundTrip(t *testing.T) {
 }
 
 func TestRunMarkerResponse_VersionMismatch(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "an-http-message-of-another-version-is-refused")
 	_, diags := ParseAndValidateRunMarkerResponse([]byte(`{"protocolVersion":2,"marker":{"sha":"abc"}}`))
 	if !codeSet(diags)[CodeVersionMismatch] {
 		t.Fatalf("expected version-mismatch diagnostic, got %v", diags)
@@ -44,18 +47,21 @@ func TestRunMarkerResponse_VersionMismatch(t *testing.T) {
 }
 
 func TestRunMarkerResponse_MarkerSHARequired(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-response-is-strict")
 	if diags := ValidateRunMarkerResponse(&RunMarkerResponse{ProtocolVersion: ProtocolVersion, Marker: &RunMarker{}}); !codeSet(diags)[CodeRequiredField] {
 		t.Fatalf("expected required-field diagnostic for empty marker sha, got %v", diags)
 	}
 }
 
 func TestRunMarkerResponse_UnknownFieldRejected(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-response-is-strict")
 	if _, diags := ParseRunMarkerResponseStrict([]byte(`{"protocolVersion":1,"nope":true}`)); !codeSet(diags)[CodeParseError] {
 		t.Fatalf("expected parse-error on unknown field, got %v", diags)
 	}
 }
 
 func TestPublishRunMarkerResponse_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-response-is-strict")
 	resp := PublishRunMarkerResponse{ProtocolVersion: ProtocolVersion, Published: true, Marker: &RunMarker{SHA: "def456"}}
 	data, err := json.Marshal(resp)
 	if err != nil {
@@ -80,6 +86,7 @@ func TestPublishRunMarkerResponse_RoundTrip(t *testing.T) {
 }
 
 func TestPublishRunMarkerResponse_VersionMismatch(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "an-http-message-of-another-version-is-refused")
 	_, diags := ParseAndValidatePublishRunMarkerResponse([]byte(`{"protocolVersion":99,"published":true}`))
 	if !codeSet(diags)[CodeVersionMismatch] {
 		t.Fatalf("expected version-mismatch diagnostic, got %v", diags)
@@ -87,6 +94,7 @@ func TestPublishRunMarkerResponse_VersionMismatch(t *testing.T) {
 }
 
 func TestPublishRunMarkerResponse_MarkerSHARequired(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-response-is-strict")
 	if diags := ValidatePublishRunMarkerResponse(&PublishRunMarkerResponse{ProtocolVersion: ProtocolVersion, Published: true, Marker: &RunMarker{}}); !codeSet(diags)[CodeRequiredField] {
 		t.Fatalf("expected required-field diagnostic for empty marker sha, got %v", diags)
 	}

@@ -220,7 +220,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "provider-configuration-echo-and-mode"
+              "the-session-mode-is-the-intent-else-the-configured-mode-else-full"
             ]
           }
         }

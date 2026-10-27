@@ -10,6 +10,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // First-party conformance for the exact-match contract loader.
@@ -97,6 +98,7 @@ var firstPartyExtensionManifests = []string{
 // is an extension that vanishes: `putnami build` in a consumer workspace loses
 // the commands it provides, with a skip record most users never look at.
 func TestFirstPartyManifestsLoadUnderTheCurrentContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "first-party-manifests-load-under-the-current-contract")
 	repoRoot := findRepoRoot(t)
 	manifests := discoverFirstPartyManifests(t, repoRoot)
 
@@ -151,6 +153,7 @@ func TestFirstPartyManifestsLoadUnderTheCurrentContract(t *testing.T) {
 // The gate itself lives in the packagers (they are the ones that write the
 // stamp); what is asserted here is the input they will be given.
 func TestFirstPartyManifestsPassThePublishGate(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "first-party-manifests-pass-the-publish-gate")
 	repoRoot := findRepoRoot(t)
 
 	for _, rel := range firstPartyExtensionManifests {
@@ -179,6 +182,7 @@ func TestFirstPartyManifestsPassThePublishGate(t *testing.T) {
 // exact paths, one owner per output, honest effects. A first-party violation
 // would surface in a consumer's plan, far from the extension that caused it.
 func TestFirstPartyDeclaredTasksConform(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "first-party-task-declarations-conform")
 	repoRoot := findRepoRoot(t)
 
 	declaring := 0
@@ -231,7 +235,7 @@ func findRepoRoot(t *testing.T) string {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Skipf("could not find Putnami repo root from %s", start)
+			t.Fatalf("could not find the Putnami repo root from %s: the first-party manifests are read from their real paths", start)
 		}
 		dir = parent
 	}

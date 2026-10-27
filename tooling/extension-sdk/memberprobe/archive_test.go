@@ -43,6 +43,7 @@ func heldArchive(digest, resolvedVersion string) http.Handler {
 // member, the registry and the version in every verdict, and asks with HEAD
 // only. Every refusal is a response the production registry sent.
 func TestProbeArchiveReportsWhatTheRegistryHolds(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-probes-pass-the-strict-reader")
 	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "put-archive-probe-is-read-only")
 	const version = "1.4.0"
 	cases := []struct {
@@ -166,6 +167,7 @@ func TestProbeArchiveReportsWhatTheRegistryHolds(t *testing.T) {
 // A dry run with no network access must not pass in silence: a registry that
 // cannot be reached is an unverified verdict whose reason says so.
 func TestProbeArchiveReportsAnUnreachableRegistry(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-probes-pass-the-strict-reader")
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,375 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "workspace",
+  "features": [
+    {
+      "id": "workspace/workspace-contract",
+      "type": "feature",
+      "name": "Workspace contract",
+      "outcome": "The CLI, every language extension and automation read one contract for a workspace: which configuration wins, how a project is identified and scoped, what the lock pins, and how an extension answers project discovery, toolchain pins and input selectors, so one tree means the same thing to each of them",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "configuration-loads-in-a-fixed-precedence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "load-merges-two-layers-and-never-the-current-project",
+              "command-defaults-merge-in-a-fixed-order",
+              "a-later-layer-overlays-what-it-authors"
+            ]
+          }
+        },
+        {
+          "id": "configuration-parsing-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-field-or-invalid-json-is-refused",
+              "validation-requires-a-name-and-normalization-fills-empty-maps",
+              "a-feature-authority-states-exactly-one-thing",
+              "a-declared-jobs-block-is-reported-not-rejected",
+              "task-tuning-is-strict-and-the-rest-lenient",
+              "diagnostics-and-names-come-in-one-order"
+            ]
+          }
+        },
+        {
+          "id": "an-authored-form-survives-a-rewrite",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bin-and-exports-accept-their-spellings-and-refuse-the-rest",
+              "a-rewrite-keeps-the-authored-form-and-bytes",
+              "extensions-accept-the-array-and-the-map",
+              "an-absent-member-stays-distinct-from-a-zero"
+            ]
+          }
+        },
+        {
+          "id": "scopes-resolve-through-one-chain",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-deepest-scope-wins",
+              "a-scope-is-recognized-from-both-sides",
+              "two-scopes-cannot-claim-one-alias-or-group"
+            ]
+          }
+        },
+        {
+          "id": "a-line-is-a-scope-that-is-not-inherited",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tag-pattern-defaults-renders-and-validates",
+              "a-project-belongs-to-one-line",
+              "the-cli-loader-puts-each-project-on-its-nearest-ancestor-line",
+              "the-cli-loader-makes-a-workspace-without-a-line-one-line",
+              "the-cli-loader-refuses-a-nested-line"
+            ]
+          }
+        },
+        {
+          "id": "registries-are-keyed-by-ecosystem",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-outer-map-is-validated-and-entries-stay-raw",
+              "the-cli-loader-replaces-an-overridden-registry-entry-whole"
+            ]
+          }
+        },
+        {
+          "id": "visibility-and-distribution-fail-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-boundary-closes-on-anything-but-public",
+              "a-distribution-level-fails-closed",
+              "the-cli-refuses-a-declared-distribution-level-that-is-unknown-or-missing"
+            ]
+          }
+        },
+        {
+          "id": "one-selection-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "file-patterns-follow-one-grammar",
+              "a-selector-has-four-kinds-and-round-trips"
+            ]
+          }
+        },
+        {
+          "id": "the-agent-artifact-manifest-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "unsafe-or-ambiguous-files-are-refused",
+              "canonical-bytes-are-deterministic-and-non-mutating",
+              "an-older-reader-fails-closed-on-the-opt-in"
+            ]
+          }
+        },
+        {
+          "id": "a-lock-is-read-at-its-recorded-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-window-is-2-to-5",
+              "a-lock-writes-only-its-version-vocabulary",
+              "migration-is-explicit-and-refuses-pins-without-archives"
+            ]
+          }
+        },
+        {
+          "id": "a-lock-entry-binds-what-it-pins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-agent-artifact-entry-binds-its-archive-and-manifest",
+              "a-version-5-toolchain-entry-names-its-archives",
+              "the-cli-entry-has-two-exclusive-shapes",
+              "the-cli-lockfile-keeps-the-source-sentinel-byte-for-byte",
+              "archives-are-written-before-integrities"
+            ]
+          }
+        },
+        {
+          "id": "a-probe-digest-is-a-function-of-the-facts",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-probe-path-is-normalized",
+              "the-digest-ignores-authoring-and-diagnostics",
+              "the-digest-moves-with-every-contract-member"
+            ]
+          }
+        },
+        {
+          "id": "probe-version-1-is-frozen-and-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-probe-version-is-pinned-and-its-result-frozen",
+              "probe-validation-names-each-rule",
+              "a-probe-failure-is-typed-and-causal"
+            ]
+          }
+        },
+        {
+          "id": "probe-results-merge-by-fixed-rules",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "explicit-values-win-and-lists-union",
+              "conflicting-provider-scalars-fail",
+              "names-and-tags-follow-one-precedence"
+            ]
+          }
+        },
+        {
+          "id": "dependency-sources-attribute-each-edge",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-edge-is-attributed-to-its-manifest-family",
+              "a-merge-prefers-the-import-in-any-order",
+              "dependency-sources-are-answered-only-when-asked"
+            ]
+          }
+        },
+        {
+          "id": "a-reserved-call-exchanges-one-bounded-document",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-the-reserved-call-is-claimed",
+              "one-bounded-document-each-way",
+              "nothing-is-written-on-failure",
+              "the-request-is-stamped-and-the-answer-byte-stable"
+            ]
+          }
+        },
+        {
+          "id": "a-toolchain-answer-pins-only-what-was-asked",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-toolchain-request-and-result-are-validated",
+              "a-toolchain-answer-matches-its-request"
+            ]
+          }
+        },
+        {
+          "id": "an-input-answer-lists-files-and-their-basis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-input-selector-grammar",
+              "an-input-request-and-result-are-validated",
+              "an-input-answer-matches-its-request"
+            ]
+          }
+        },
+        {
+          "id": "the-input-basis-digest-is-host-independent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-digest-binds-what-the-basis-selects",
+              "the-digest-is-deterministic-and-unambiguous",
+              "what-cannot-be-digested-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "the-schemas-and-the-go-types-agree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-schema-matches-its-go-type",
+              "schema-rules-agree-with-the-validator"
+            ]
+          }
+        },
+        {
+          "id": "a-fixture-corpus-holds-every-shape",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-workspace-protocol-version-is-pinned",
+              "every-fixture-gets-its-verdict",
+              "each-valid-result-fixture-answers-its-request",
+              "every-guarded-reject-branch-has-a-fixture",
+              "fixture-providers-replay-the-corpus"
+            ]
+          }
+        },
+        {
+          "id": "first-party-extensions-answer-the-reserved-calls",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-extension-answers-the-probe",
+              "the-go-extension-refuses-a-misrouted-request",
+              "the-go-extension-claims-only-the-reserved-calls",
+              "the-typescript-extension-answers-the-probe",
+              "the-typescript-extension-leaves-other-calls-to-their-owner",
+              "the-cloud-extension-answers-the-probe",
+              "the-cloud-extension-claims-only-the-reserved-call",
+              "the-python-extension-answers-the-probe",
+              "the-python-extension-claims-only-the-reserved-call",
+              "the-python-extension-writes-nothing-it-cannot-answer"
+            ]
+          }
+        },
+        {
+          "id": "the-cli-reads-answers-through-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-reads-each-answer",
+              "the-cli-refuses-an-answer-the-contract-refuses"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

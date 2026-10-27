@@ -1,0 +1,123 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "ci/ci-contract",
+  "outcomes": [
+    "A reviewer reads in Git what a run executes, publishes and deploys, and a command explains it locally.",
+    "An extension reads the impacted plan of a change and admits it as one ChangePlan with one digest.",
+    "A run's verdict names the tree it tested and what its producer does not know."
+  ],
+  "nonGoals": [
+    "Granting trust, resources, publication or deploy authority, which the execution plane owns.",
+    "Signing a verdict or verifying a signature.",
+    "Impact planning in the CLI and the behavior of the Cloud ci commands beyond the contract.",
+    "Reading putnami.ci.json versions 1 and 2."
+  ],
+  "requirements": [
+    {
+      "id": "the-document-is-version-3-and-strict",
+      "text": "putnami.ci.json is version 3 and names its schema. Each of the six valid fixtures parses without a finding and is already canonical, and each invalid fixture is refused with its stable code. A duplicate key and a trailing value are refused. The embedded schema is closed, pins version 3 and declares commands, flags, runner, distribution, rules and envs, and none of env, runners, jobs, gate or branches."
+    },
+    {
+      "id": "commands-run-in-order-with-their-flags",
+      "text": "commands lists in order the commands a run executes. An entry blocks unless failOnError is false, and a duplicate, a malformed name, too many entries and an empty list are refused. flags are kept as authored, and a flag that is not a long option is refused. A bare command name, glob or selector decodes like its array or object form and is written back bare, an explicit failOnError true is the default, and publish false is the only boolean publish."
+    },
+    {
+      "id": "the-runner-object-is-opaque",
+      "text": "runner is an object the document keeps as authored for the runner, and its key order does not change the digest. A runner that is not an object is refused."
+    },
+    {
+      "id": "rules-are-first-match",
+      "text": "A rule has exactly one trigger: branches, tags or pullRequests. The first matching rule decides, and explain reports the commands and flags. A push that no rule matches publishes nothing, a pull request matches a pullRequests rule with {number} rendered, and a tag publishes by convention unless a tags rule matches it, where publish false opts it out. An unknown event and a tag event without a tag are refused. A command that explains an event names the rule it matched and the channels it publishes."
+    },
+    {
+      "id": "branch-globs-are-slash-aware",
+      "text": "A branch glob matches a branch name without a refs/ prefix: * stays inside one segment, ** spans segments, and a literal matches only itself. An empty glob, a refs/ prefix, a leading, trailing or doubled slash, a bracket, a question mark and ** inside a segment are refused, and so is matching a refs/ name."
+    },
+    {
+      "id": "distribution-is-a-closed-vocabulary",
+      "text": "Every distribution member is validated against a closed vocabulary: the namespace, the visibility levels, channel names, member selectors and registry ecosystems. A mirror target is an HTTPS URL or a registry destination within the distribution protocol's size bound, with no credential, query, fragment or control character, and a diagnostic never echoes a target that carries a secret."
+    },
+    {
+      "id": "environments-follow-channels",
+      "text": "An environment's approval constraint other than manual, a malformed rollout, a non-portable channel in a workload rule, a workload rule without a selector and too many workload rules are refused, and a manual, progressive environment is admitted. For each channel a rule advances, explain lists the environments that follow it, directly or through a workload rule."
+    },
+    {
+      "id": "retain-declares-a-channel-lifetime",
+      "text": "retain is authored intent: it survives canonicalization and changes the digest. It is while-open on a pull-request rule whose channels all carry {number}, or 1d to 365d on a rule that publishes. A Go duration, a bare number, 0d, 366d, while-open on another trigger or a shared channel, and retain on a rule that publishes nothing are refused with ci.invalid_retain at rules[i].retain, naming a wrong trigger alone and the shared channels in order. Explain reports the lifetime, or none."
+    },
+    {
+      "id": "baseline-names-a-channel-the-rule-reads",
+      "text": "baseline is authored intent: it survives canonicalization and changes the digest. It names a portable channel the rule reads and never advances, a protected one included. A channel the same rule publishes, a {number} placeholder, a non-portable name and a baseline on a rule that publishes nothing are refused with ci.invalid_baseline at rules[i].baseline. Explain reports the baseline of the matched rule, or none."
+    },
+    {
+      "id": "one-canonical-form-and-digest",
+      "text": "The same document always has the same digest, and the order of commands and of rules is semantic and changes it. The canonical form pins the $schema URL and ends with a newline. A formatter writes that form, its check mode fails on a document that is not in it, and it refuses an invalid document."
+    },
+    {
+      "id": "review-is-guidance-without-authority",
+      "text": "review is an optional closed profile that requires enabled, a known fallbackEngine, one or more distinct known focus areas and instructions. A credential, image, command, mcp, provider or approval member, a null, a case variant and a duplicate key are refused. Too many instructions, or one too long, padded or holding a control character, are refused at their field. The guidance enters the digest, enabled false is kept, and an absent review leaves a document's canonical bytes unchanged."
+    },
+    {
+      "id": "validating-commands-resolve-the-graph",
+      "text": "A document that declares distribution or envs has provider sections, and a document with commands only has none. A validating command resolves every command against the workspace's graph jobs and refuses one it does not find, with ci.unknown_task at its field. It refuses a document with provider sections in a workspace without a release-set provider."
+    },
+    {
+      "id": "a-deploy-binds-the-published-release-set",
+      "text": "A deploy binds the exact release-set ref of the successful publish outcome, and validation refuses any other ref, such as the head a channel moved to after the publish. Binding fails closed: without an outcome, without a deploy ref, or with an invalid outcome ref, nothing is bound. An authored document cannot carry a release-set ref."
+    },
+    {
+      "id": "the-change-plan-v1-is-frozen",
+      "text": "ChangePlan version 1 has the digest domain putnami/change-plan/v1, and the golden fixture keeps its pinned digest. Every valid change-plan fixture is the exact indented encoding of its plan, validates and has the digest expectations.json lists, and the golden plan has its exact canonical bytes. The cache summary is outside the digest. The fixtures on disk are exactly those expectations.json lists."
+    },
+    {
+      "id": "a-change-plan-is-admitted-only-when-canonical",
+      "text": "Every invalid change-plan fixture is refused with its expected reason. With the digest re-stamped, validation and the digest each refuse a single defect: an incomplete generator, a repository without a remote or with credentials, a revision that is not full lowercase hex, an unsorted list, partial transitive dependents, a non-canonical task or an inconsistent cache summary. A malformed digest is refused. Derived transitive dependents keep closure order and are never null."
+    },
+    {
+      "id": "an-impact-plan-is-validated",
+      "text": "Every invalid impact-plan fixture is refused with its expected reason, and the fixtures on disk are exactly those expectations.json lists. Validation refuses an incomplete generator, a command list that is empty or holds an empty name or whitespace, an uppercase revision, an unsorted or duplicated list, a non-canonical task and an inconsistent cache summary, and keeps the requested command order."
+    },
+    {
+      "id": "the-projection-is-one-change-plan",
+      "text": "ChangePlanFromImpactPlan projects every valid impact-plan fixture, with the repository of the change plan it names, onto that change plan byte for byte, digest included. It refuses an unknown version or a repeated command as the impact plan's defect and every other defect as the change plan's, derives the transitive dependents from the closure, projects a nil list like an empty one, and shares no list with its input."
+    },
+    {
+      "id": "producers-reproduce-the-corpus",
+      "text": "A producer of impact plans rebuilds every valid impact-plan fixture byte for byte from its scrambled planner data, and the projection of what it builds from the planner data of each valid change-plan fixture is that fixture, digest included. It never emits a plan the protocol refuses: for the planner data of an invalid fixture, it refuses with the protocol's reason or emits a different, valid plan."
+    },
+    {
+      "id": "the-verdict-corpus-is-the-conformance-case",
+      "text": "Every valid verdict fixture is the exact indented encoding of its verdict, round-trips through its compact encoding and has the answer and mark expectations.json lists. ParseVerdict refuses every invalid fixture with its expected reason, and the fixtures on disk are exactly those listed. The valid fixtures cover every answer, the verified, checked and absent marks, every gap kind and both tested checkouts."
+    },
+    {
+      "id": "the-answer-and-the-mark-are-folds",
+      "text": "An answer fold keeps the most severe of failed, infrastructure, canceled, unanswered and passed, in either order. unsupported is the fold of no answer and the mildest of all, and an unknown answer folds as unsupported. The verdict answer folds the required checks only, so an advisory check never changes it. A passed verdict is verified without a gap and checked with one, and any other answer has no mark."
+    },
+    {
+      "id": "gaps-name-what-is-missing-or-unknown",
+      "text": "A declaration change without an approval is a gap whether it weakens the declaration or not. A producer that does not know the impact or the declarations records an unknown-impact or unknown-declarations gap, and a passed verdict is then checked, never verified. A project without counts adds only to projectsUnknown and carries an unknown-requirements gap, not a no-requirement gap. The root project is /, listed first, named by its gaps and reaching the others."
+    },
+    {
+      "id": "a-verdict-is-validated",
+      "text": "ValidateVerdict refuses each defect with its own reason: a statement or predicate type other than in-toto v1 and verdict v1, a null list, a subject that is not the repository at its head, a revision that is not a full lowercase object id, an unknown tested checkout, a merge without a base, a malformed run, a list that is unsorted, duplicated, malformed or over its bound, sums or gaps that do not match, a mark that does not follow, a bad computedAt and a revision below 1. It admits a verdict at its bounds."
+    },
+    {
+      "id": "verdict-identities-are-canonical",
+      "text": "A project id of at most 512 bytes is /, or a slash and a workspace path with no empty, . or .. segment, backslash, padding or control character. The repository is a credential-free https, http or ssh URL with a path and no user, query, fragment, trailing slash or space. The reference is a full Git reference under refs/ that Git's ref spelling admits."
+    },
+    {
+      "id": "verdicts-parse-strictly-against-one-schema",
+      "text": "ParseVerdict reads one strict JSON verdict of at most MaxVerdictBytes and refuses a larger one, a trailing value, truncated data, a wrong type and a non-object. The embedded verdict schema has its $id, closes all sixteen object schemas and is returned as a copy. It lists the members of each Go type, required exactly when Go always writes them, and states the vocabularies, bounds and patterns of the Go code."
+    }
+  ],
+  "decisions": [
+    "protocols/ci/doc/adr/0001-commands-rules-environments-distribution.md",
+    "protocols/ci/doc/adr/0002-target-revision-review-profile.md",
+    "protocols/ci/doc/adr/0003-published-channel-lifetime.md",
+    "protocols/ci/doc/adr/0004-a-rule-names-its-baseline-channel.md",
+    "protocols/ci/doc/adr/0005-a-change-plan-projects-an-impact-plan.md",
+    "protocols/ci/doc/adr/0006-a-run-carries-one-verdict.md",
+    "protocols/ci/doc/adr/0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md"
+  ]
+}

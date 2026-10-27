@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func validCommitRequest() CommitRequest {
@@ -28,6 +30,7 @@ func validCommitRequest() CommitRequest {
 }
 
 func TestCommitRequestRoundTripsCanonically(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v2-request-names-a-commit", "the-v2-request-round-trips-canonically")
 	t.Parallel()
 	for name, request := range map[string]CommitRequest{
 		"impacted": validCommitRequest(),
@@ -71,6 +74,7 @@ func TestCommitRequestRoundTripsCanonically(t *testing.T) {
 }
 
 func TestCommitInputDigestExcludesControlAndCapabilities(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "input-digests-name-the-applicable-inputs", "the-v2-input-digest-excludes-control")
 	t.Parallel()
 	base := validCommitRequest()
 	digest, err := CommitInputDigest(base)
@@ -132,6 +136,7 @@ func TestCommitInputDigestExcludesControlAndCapabilities(t *testing.T) {
 }
 
 func TestCommitRequestRejectsSemanticViolations(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v2-request-names-a-commit", "the-v2-request-refuses-semantic-violations")
 	t.Parallel()
 	cases := map[string]func(*CommitRequest){
 		"version":               func(r *CommitRequest) { r.Version = 1 },
@@ -214,6 +219,7 @@ func TestCommitRequestRejectsSemanticViolations(t *testing.T) {
 // manifests it loads declare, so a command an extension adds needs no change
 // here. The schema carries no command list either.
 func TestCommitRequestRefusesNoCommandByName(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v2-request-names-a-commit", "no-command-is-refused-by-name")
 	t.Parallel()
 	for _, commands := range [][]string{{"compose"}, {"build", "qualify"}, {"compose-up", "qualify-run"}, {"serve"}} {
 		request := validCommitRequest()
@@ -242,6 +248,7 @@ func TestCommitRequestRefusesNoCommandByName(t *testing.T) {
 // member one version carries and the other does not, so a caller learns which
 // version it mixed in rather than meeting a bare unknown field.
 func TestBoundRequestRefusesEveryVersionMix(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "versions-never-mix", "every-version-mix-is-refused-by-name")
 	t.Parallel()
 	commit := func(edit func(map[string]any)) []byte {
 		return editedRequest(t, mustCanonicalCommit(t, validCommitRequest()), edit)
@@ -313,6 +320,7 @@ func TestBoundRequestRefusesEveryVersionMix(t *testing.T) {
 }
 
 func TestCommitRequestSchemaTracksWireShape(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-v2-request-names-a-commit", "the-v2-schema-tracks-the-wire")
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("schemas", "execution-request-v2.json"))
 	if err != nil {

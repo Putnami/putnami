@@ -13,7 +13,7 @@ import (
 
 func TestExitCodeForError(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "errors-map-to-stable-exit-codes")
+	spectest.Proves(t, "cli/machine-contract", "exit-codes-and-error-classification", "the-cli-maps-each-error-class-to-its-exit-code")
 	tests := []struct {
 		name string
 		err  error

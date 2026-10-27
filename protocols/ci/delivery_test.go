@@ -7,9 +7,11 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestBindDeploymentToPublishedReleaseSet(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-deploy-binds-the-published-release-set", "a-deploy-binds-the-published-ref")
 	published := releaseSetPublishOutcome("7")
 	bound, diagnostics := BindDeploymentToPublishedReleaseSet(published)
 	if diag.HasErrors(diagnostics) {
@@ -33,6 +35,7 @@ func TestBindDeploymentToPublishedReleaseSet(t *testing.T) {
 }
 
 func TestDeploymentBindingFailsClosed(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-deploy-binds-the-published-release-set", "deployment-binding-fails-closed")
 	if bound, diagnostics := BindDeploymentToPublishedReleaseSet(nil); bound != nil {
 		t.Fatalf("nil publish outcome produced binding %#v", bound)
 	} else {
@@ -54,6 +57,7 @@ func TestDeploymentBindingFailsClosed(t *testing.T) {
 // intent. Version 3 has no deploy clause at all, so the closed rule object is
 // what keeps a completed, content-addressed fact from becoming author input.
 func TestAuthoredCIIntentCannotCarryRuntimeReleaseSetRef(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-deploy-binds-the-published-release-set", "authored-intent-carries-no-release-set")
 	ref := releaseSetRef("7").ID
 	authored := []byte(`{"version":3,"commands":["test"],"rules":[` +
 		`{"branches":"main","publish":["canary"],"releaseSet":{"id":"` + ref + `"}}]}`)

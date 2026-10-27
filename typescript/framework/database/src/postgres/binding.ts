@@ -79,80 +79,243 @@ export interface ResolvedDatabaseBinding {
   connectionParams?: Record<string, string>;
 }
 
-function fail(message: string): never {
-  throw new Error(`${ENV_DATABASE_BINDINGS}: ${message}`);
+/**
+ * The error codes of the database protocol (`go.putnami.dev/protocol/database`,
+ * `ValidErrorCodes`). A refusal names the code the Go parser gives the same
+ * document, so both adapters report one taxonomy.
+ */
+const CODE_PARSE_ERROR = 'database.parse_error';
+const CODE_UNKNOWN_FIELD = 'database.unknown_field';
+const CODE_INVALID_PROTOCOL_VERSION = 'database.invalid_protocol_version';
+const CODE_INVALID_NAME = 'database.invalid_name';
+const CODE_MISSING_ENGINE = 'database.missing_engine';
+const CODE_INVALID_ENGINE = 'database.invalid_engine';
+const CODE_MISSING_SCHEMA = 'database.missing_schema';
+const CODE_INVALID_SCHEMA = 'database.invalid_schema';
+const CODE_MISSING_CONNECTION = 'database.missing_connection';
+const CODE_INVALID_CONNECTION = 'database.invalid_connection';
+const CODE_INVALID_MODE = 'database.invalid_mode';
+const CODE_INVALID_ISOLATION = 'database.invalid_isolation';
+const CODE_INVALID_REUSE = 'database.invalid_reuse';
+
+/** The members of the Go `Binding`, `TestBinding`, `Database` and `Connection` types. */
+const BINDING_MEMBERS: ReadonlySet<string> = new Set(['$schema', 'protocolVersion', 'databases']);
+const TEST_BINDING_MEMBERS: ReadonlySet<string> = new Set([
+  ...BINDING_MEMBERS,
+  'mode',
+  'isolation',
+  'reuse',
+  'applyMigrations',
+  'keepDatabases',
+]);
+const ENTRY_MEMBERS: ReadonlySet<string> = new Set(['engine', 'schema', 'connection']);
+const CONNECTION_MEMBERS: ReadonlySet<string> = new Set([
+  'dsn',
+  'host',
+  'port',
+  'database',
+  'user',
+  'password',
+  'ssl',
+  'params',
+  'instance',
+]);
+
+/** An unquoted SQL identifier: the shape of a schema the Go parser accepts. */
+const SCHEMA_PATTERN = /^[A-Za-z_][A-Za-z0-9_$]*$/;
+
+function fail(message: string, code?: string): never {
+  throw new Error(`${ENV_DATABASE_BINDINGS}: ${code ? `${code}: ` : ''}${message}`);
 }
 
-/**
- * parseDatabaseBinding strictly parses and validates a canonical database
- * binding, with the same invariants the Go protocol enforces: a supported
- * protocol version, canonical datasource names, the postgres engine, a present
- * schema, and a connection declaring exactly one transport strategy. It throws
- * a descriptive error on any violation so a deploy-time misconfiguration fails
- * loudly rather than producing an opaque connection failure later.
- */
-export function parseDatabaseBinding(raw: string): DatabaseBinding {
-  let doc: DatabaseBinding;
-  try {
-    doc = JSON.parse(raw) as DatabaseBinding;
-  } catch (err) {
-    fail(`invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (typeof doc !== 'object' || doc === null) {
-    fail('binding must be a JSON object');
-  }
-  if (doc.protocolVersion !== DATABASE_PROTOCOL_VERSION) {
-    fail(`unsupported protocolVersion ${String(doc.protocolVersion)} (supported: ${DATABASE_PROTOCOL_VERSION})`);
-  }
-  const databases = doc.databases ?? {};
-  for (const [name, entry] of Object.entries(databases)) {
-    if (!DATASOURCE_NAME_PATTERN.test(name)) {
-      fail(`datasource name ${JSON.stringify(name)} is not a canonical identifier`);
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** An absent member: missing, or JSON null (which the Go decoder leaves at its zero value). */
+function isAbsent(value: unknown): boolean {
+  return value === undefined || value === null;
+}
+
+/** failUnknownMember refuses a member the protocol types do not carry, as the Go decoder does. */
+function failUnknownMember(where: string, value: Record<string, unknown>, allowed: ReadonlySet<string>): void {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      fail(`${where} has unknown member ${JSON.stringify(key)}`, CODE_UNKNOWN_FIELD);
     }
-    validateEntry(name, entry);
+  }
+}
+
+function failWrongType(where: string, member: string, expected: string): never {
+  fail(`${where} member ${JSON.stringify(member)} must be ${expected}`, CODE_PARSE_ERROR);
+}
+
+/** expectKind refuses a present member whose JSON type is not the one the Go type decodes. */
+function expectKind(where: string, member: string, value: unknown, kind: 'string' | 'boolean' | 'integer'): void {
+  if (isAbsent(value)) {
+    return;
+  }
+  const ok = kind === 'integer' ? Number.isInteger(value) : typeof value === kind;
+  if (!ok) {
+    failWrongType(where, member, kind === 'integer' ? 'an integer' : `a ${kind}`);
+  }
+}
+
+/** parseDocument decodes a binding document and checks the members the three shapes share. */
+function parseDocument(raw: string, what: string, allowed: ReadonlySet<string>): Record<string, unknown> {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(raw);
+  } catch (err) {
+    fail(`invalid JSON: ${err instanceof Error ? err.message : String(err)}`, CODE_PARSE_ERROR);
+  }
+  if (!isObject(doc)) {
+    fail(`${what} must be a JSON object`, CODE_PARSE_ERROR);
+  }
+  failUnknownMember(what, doc, allowed);
+  expectKind(what, '$schema', doc['$schema'], 'string');
+  if (doc['protocolVersion'] !== DATABASE_PROTOCOL_VERSION) {
+    fail(
+      `unsupported protocolVersion ${String(doc['protocolVersion'])} (supported: ${DATABASE_PROTOCOL_VERSION})`,
+      CODE_INVALID_PROTOCOL_VERSION,
+    );
   }
   return doc;
 }
 
+/** validateDatabases checks every datasource of a `databases` map: its name and its entry. */
+function validateDatabases(databases: unknown): void {
+  if (isAbsent(databases)) {
+    return;
+  }
+  if (!isObject(databases)) {
+    fail('"databases" must be an object keyed by datasource name', CODE_PARSE_ERROR);
+  }
+  for (const [name, entry] of Object.entries(databases)) {
+    if (!DATASOURCE_NAME_PATTERN.test(name)) {
+      fail(`datasource name ${JSON.stringify(name)} is not a canonical identifier`, CODE_INVALID_NAME);
+    }
+    validateEntry(name, entry as DatabaseBindingEntry);
+  }
+}
+
+/**
+ * parseDatabaseBinding strictly parses and validates a canonical database
+ * binding, giving it the verdict `ParseAndValidateBinding` of the Go protocol
+ * gives: a member the protocol types do not carry, a member of the wrong JSON
+ * type, an unsupported protocol version, a non-canonical datasource name, a
+ * missing or non-postgres engine, a missing or malformed schema, and a
+ * connection that does not declare exactly one transport are all refused. It
+ * throws an error naming the protocol's `database.*` code on any violation, so
+ * a deploy-time misconfiguration fails loudly rather than producing an opaque
+ * connection failure later.
+ */
+export function parseDatabaseBinding(raw: string): DatabaseBinding {
+  const doc = parseDocument(raw, 'binding', BINDING_MEMBERS);
+  validateDatabases(doc['databases']);
+  return doc as unknown as DatabaseBinding;
+}
+
 function validateEntry(name: string, entry: DatabaseBindingEntry): void {
-  if (!entry || typeof entry !== 'object') {
-    fail(`datasource ${JSON.stringify(name)} has no entry`);
+  const where = `datasource ${JSON.stringify(name)}`;
+  if (!isObject(entry)) {
+    fail(`${where} has no entry`, CODE_PARSE_ERROR);
+  }
+  failUnknownMember(where, entry, ENTRY_MEMBERS);
+  expectKind(where, 'engine', entry.engine, 'string');
+  expectKind(where, 'schema', entry.schema, 'string');
+  if (isAbsent(entry.engine) || entry.engine === '') {
+    fail(`${where} requires an engine (postgres)`, CODE_MISSING_ENGINE);
   }
   if (entry.engine !== 'postgres') {
-    fail(`datasource ${JSON.stringify(name)} uses unsupported engine ${JSON.stringify(entry.engine)} (only postgres)`);
+    fail(`${where} uses unsupported engine ${JSON.stringify(entry.engine)} (only postgres)`, CODE_INVALID_ENGINE);
   }
-  if (!entry.schema || entry.schema.trim() === '') {
-    fail(`datasource ${JSON.stringify(name)} requires a schema`);
+  if (isAbsent(entry.schema) || entry.schema?.trim() === '') {
+    fail(`${where} requires a schema`, CODE_MISSING_SCHEMA);
   }
-  if (!entry.connection) {
-    fail(`datasource ${JSON.stringify(name)} has no connection`);
+  if (!SCHEMA_PATTERN.test(entry.schema as string)) {
+    fail(
+      `${where} schema ${JSON.stringify(entry.schema)} does not match the identifier pattern ${SCHEMA_PATTERN.source}`,
+      CODE_INVALID_SCHEMA,
+    );
   }
-  validateConnection(name, entry.connection);
+  if (isAbsent(entry.connection)) {
+    fail(`${where} has no connection`, CODE_MISSING_CONNECTION);
+  }
+  validateConnection(name, entry.connection as DatabaseConnectionSpec);
+}
+
+/** checkConnectionTypes refuses a connection member whose JSON type is not the one the Go type decodes. */
+function checkConnectionTypes(where: string, conn: DatabaseConnectionSpec): void {
+  for (const member of ['dsn', 'host', 'database', 'user', 'password', 'instance'] as const) {
+    expectKind(where, member, conn[member], 'string');
+  }
+  expectKind(where, 'port', conn.port, 'integer');
+  expectKind(where, 'ssl', conn.ssl, 'boolean');
+  if (isAbsent(conn.params)) {
+    return;
+  }
+  if (!isObject(conn.params)) {
+    failWrongType(where, 'params', 'an object of strings');
+  }
+  for (const [key, value] of Object.entries(conn.params)) {
+    if (typeof value !== 'string') {
+      failWrongType(where, `params.${key}`, 'a string');
+    }
+  }
+}
+
+/** transportsOf lists the transports a connection declares, as the Go validator does: a non-blank dsn, host or instance. */
+function transportsOf(conn: DatabaseConnectionSpec): string[] {
+  const declared: string[] = [];
+  for (const transport of ['dsn', 'host', 'instance'] as const) {
+    if (conn[transport]?.trim()) {
+      declared.push(transport);
+    }
+  }
+  return declared;
+}
+
+/** extrasOf lists the members a self-contained dsn, or a cloud socket instance, does not use. */
+function extrasOf(conn: DatabaseConnectionSpec, transport: string): string[] {
+  const extras: string[] = [];
+  if (conn.port) {
+    extras.push('port');
+  }
+  if (!isAbsent(conn.ssl)) {
+    extras.push('ssl');
+  }
+  if (transport === 'dsn') {
+    for (const member of ['database', 'user', 'password'] as const) {
+      if (conn[member]?.trim()) {
+        extras.push(member);
+      }
+    }
+    if (conn.params && Object.keys(conn.params).length > 0) {
+      extras.push('params');
+    }
+  }
+  return extras.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 function validateConnection(name: string, conn: DatabaseConnectionSpec): void {
-  const hasDSN = !!conn.dsn?.trim();
-  const hasHost = !!conn.host?.trim();
-  const hasInstance = !!conn.instance?.trim();
-  const strategies = [hasDSN, hasHost, hasInstance].filter(Boolean).length;
-  if (strategies !== 1) {
-    fail(`datasource ${JSON.stringify(name)} connection must declare exactly one of dsn, host, or instance`);
+  const where = `datasource ${JSON.stringify(name)} connection`;
+  if (!isObject(conn)) {
+    fail(`${where} must be an object`, CODE_PARSE_ERROR);
   }
-  if (
-    hasDSN &&
-    (hasHost ||
-      hasInstance ||
-      conn.port ||
-      conn.database ||
-      conn.user ||
-      conn.password ||
-      conn.ssl !== undefined ||
-      conn.params)
-  ) {
-    fail(`datasource ${JSON.stringify(name)} dsn connection must not carry other connection fields`);
+  failUnknownMember(where, conn, CONNECTION_MEMBERS);
+  checkConnectionTypes(where, conn);
+  const transports = transportsOf(conn);
+  if (transports.length === 0) {
+    fail(`${where} must declare exactly one transport: dsn, host, or instance`, CODE_INVALID_CONNECTION);
   }
-  if (hasInstance && (conn.port || conn.ssl !== undefined)) {
-    fail(`datasource ${JSON.stringify(name)} instance connection must not carry port or ssl`);
+  if (transports.length > 1) {
+    fail(`${where} must declare exactly one transport but found ${transports.join(', ')}`, CODE_INVALID_CONNECTION);
+  }
+  const transport = transports[0] as string;
+  const extras = transport === 'host' ? [] : extrasOf(conn, transport);
+  if (extras.length > 0) {
+    fail(`${where} with a ${transport} transport must not carry ${extras.join(', ')}`, CODE_INVALID_CONNECTION);
   }
 }
 
@@ -469,32 +632,18 @@ const TEST_REUSES: ReadonlySet<string> = new Set<TestReuse>(['none', 'bundle-tem
  * descriptive error on any violation.
  */
 export function parseTestBinding(raw: string): DatabaseTestBinding {
-  let doc: DatabaseTestBinding;
-  try {
-    doc = JSON.parse(raw) as DatabaseTestBinding;
-  } catch (err) {
-    fail(`invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
+  const doc = parseDocument(raw, 'test binding', TEST_BINDING_MEMBERS);
+  if (!isAbsent(doc['mode']) && !TEST_MODES.has(doc['mode'] as string)) {
+    fail(`invalid mode ${JSON.stringify(doc['mode'])} (expected skip | require | auto)`, CODE_INVALID_MODE);
   }
-  if (typeof doc !== 'object' || doc === null) {
-    fail('test binding must be a JSON object');
+  if (!isAbsent(doc['isolation']) && !TEST_ISOLATIONS.has(doc['isolation'] as string)) {
+    fail(`invalid isolation ${JSON.stringify(doc['isolation'])} (expected database | schema)`, CODE_INVALID_ISOLATION);
   }
-  if (doc.protocolVersion !== DATABASE_PROTOCOL_VERSION) {
-    fail(`unsupported protocolVersion ${String(doc.protocolVersion)} (supported: ${DATABASE_PROTOCOL_VERSION})`);
+  if (!isAbsent(doc['reuse']) && !TEST_REUSES.has(doc['reuse'] as string)) {
+    fail(`invalid reuse ${JSON.stringify(doc['reuse'])} (expected none | bundle-template)`, CODE_INVALID_REUSE);
   }
-  if (doc.mode !== undefined && !TEST_MODES.has(doc.mode)) {
-    fail(`invalid mode ${JSON.stringify(doc.mode)} (expected skip | require | auto)`);
-  }
-  if (doc.isolation !== undefined && !TEST_ISOLATIONS.has(doc.isolation)) {
-    fail(`invalid isolation ${JSON.stringify(doc.isolation)} (expected database | schema)`);
-  }
-  if (doc.reuse !== undefined && !TEST_REUSES.has(doc.reuse)) {
-    fail(`invalid reuse ${JSON.stringify(doc.reuse)} (expected none | bundle-template)`);
-  }
-  for (const [name, entry] of Object.entries(doc.databases ?? {})) {
-    if (!DATASOURCE_NAME_PATTERN.test(name)) {
-      fail(`datasource name ${JSON.stringify(name)} is not a canonical identifier`);
-    }
-    validateEntry(name, entry);
-  }
-  return doc;
+  expectKind('test binding', 'applyMigrations', doc['applyMigrations'], 'boolean');
+  expectKind('test binding', 'keepDatabases', doc['keepDatabases'], 'boolean');
+  validateDatabases(doc['databases']);
+  return doc as unknown as DatabaseTestBinding;
 }

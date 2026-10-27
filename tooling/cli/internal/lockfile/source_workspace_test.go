@@ -64,6 +64,7 @@ func TestWorkspaceSourceSentinelIsDistinguishableFromAPin(t *testing.T) {
 // tracked-worktree mutation guard on CI — the exact class of failure the pin
 // was introduced to fix.
 func TestWorkspaceSourceSentinelRoundTripsByteForByte(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-lock-entry-binds-what-it-pins", "the-cli-lockfile-keeps-the-source-sentinel-byte-for-byte")
 	lf, err := ParseLockFile([]byte(sentinelLock))
 	if err != nil {
 		t.Fatalf("ParseLockFile: %v", err)
@@ -86,8 +87,6 @@ func TestWorkspaceSourceSentinelRoundTripsByteForByte(t *testing.T) {
 	if strings.Contains(string(data), `"version": ""`) {
 		t.Error(`the writer must not add an empty "version" to a source-workspace entry`)
 	}
-	spectest.Proves(t, "cli/engine-provenance", "source-workspace-declaration",
-		"the-source-sentinel-round-trips-and-a-metadata-refresh-leaves-it-intact")
 }
 
 // A real workspace lock also survives the write path that install uses.

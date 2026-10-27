@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The promotion process is a public commitment, so it is pinned against the
@@ -21,6 +23,7 @@ const (
 )
 
 func TestPromotionDocumentationCoversEveryStatus(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "promotion-ladder-is-documented", "the-promotion-table-has-one-row-per-status")
 	section := promotionSection(t)
 	rows := statusTableRows(section)
 	if len(rows) == 0 {
@@ -42,6 +45,7 @@ func TestPromotionDocumentationCoversEveryStatus(t *testing.T) {
 }
 
 func TestPromotionDocumentationStatesTheLadderAndItsRecord(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "promotion-ladder-is-documented", "the-promotion-section-states-the-ladder-and-its-record")
 	section := promotionSection(t)
 	for _, required := range []struct{ phrase, why string }{
 		{promotionLadder, "the promotion order, one step at a time"},

@@ -11,6 +11,7 @@ import (
 	cliproto "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	ext "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The v2 corpus lives in fixtures/v2 rather than joining fixtures/{valid,
@@ -30,6 +31,7 @@ func readFixture(t *testing.T, parts ...string) []byte {
 // TestConformance_ProtocolVersion2 pins the v2 constant the same way
 // TestConformance_ProtocolVersion pins v1.
 func TestConformance_ProtocolVersion2(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-version-is-read-from-the-document", "the-version-constants-stay-1-and-2")
 	if ProtocolVersion2 != 2 {
 		t.Fatalf("ProtocolVersion2 = %d, want 2 — bumping requires a migration story", ProtocolVersion2)
 	}
@@ -39,6 +41,7 @@ func TestConformance_ProtocolVersion2(t *testing.T) {
 }
 
 func TestConformance_V2ValidFixtures(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "strict-producers-lenient-consumers", "every-valid-fixture-passes-both-parsers")
 	files, err := filepath.Glob("fixtures/v2/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -72,6 +75,7 @@ func TestConformance_V2ValidFixtures(t *testing.T) {
 }
 
 func TestConformance_V2InvalidFixtures(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "strict-producers-lenient-consumers", "every-invalid-fixture-fails-the-strict-parser")
 	files, err := filepath.Glob("fixtures/v2/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +96,7 @@ func TestConformance_V2InvalidFixtures(t *testing.T) {
 // every version-scoped reject branch must be triggered by a fixture, so
 // relaxing one of them turns a red fixture green and fails here.
 func TestV2InvalidFixtureCoverage(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "every-reject-branch-has-a-fixture", "every-version-2-reject-branch-has-a-fixture")
 	files, err := filepath.Glob("fixtures/v2/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -176,6 +181,7 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 // TestV1FixturesStayV1 is the additivity guard: every v1 fixture must still
 // validate exactly as before and must still be read as version 1.
 func TestV1FixturesStayV1(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "version-1-stays-frozen", "every-version-1-fixture-stays-version-1")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -402,6 +408,7 @@ func TestValidate_V2LifecycleMembers(t *testing.T) {
 // v1 consumer would ignore exactly the members a v2 consumer would trust, so a
 // v1 document may not carry them at all.
 func TestValidate_V1RejectsLifecycleMembers(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "version-1-stays-frozen", "a-version-1-document-refuses-the-version-2-members")
 	cases := []struct {
 		field string
 		mutas func(*Context)
@@ -781,30 +788,41 @@ func TestStrictPresencePreservesEmptyAndNullLifecycleMembers(t *testing.T) {
 	}
 }
 
-// TestV1DocumentBytesUnchanged pins that a v1 context still serializes to the
-// v1 wire: protocolVersion, identity and staging are all omitted, so a producer
-// that has not migrated emits byte-identical documents.
+// TestV1DocumentBytesUnchanged pins that every version 1 fixture still
+// serializes to the version 1 wire: protocolVersion, identity and staging are
+// all omitted, so a producer that has not migrated writes no version 2 member.
 func TestV1DocumentBytesUnchanged(t *testing.T) {
-	ctx, err := Parse(readFixture(t, "fixtures", "valid", "minimal.json"))
+	spectest.Proves(t, "job/execution-context", "version-1-stays-frozen", "a-version-1-document-serializes-without-version-2-members")
+	paths, err := filepath.Glob(filepath.Join("fixtures", "valid", "*.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, err := json.Marshal(ctx)
-	if err != nil {
-		t.Fatal(err)
+	if len(paths) == 0 {
+		t.Fatal("no version 1 fixture under fixtures/valid")
 	}
-	var members map[string]json.RawMessage
-	if err := json.Unmarshal(encoded, &members); err != nil {
-		t.Fatal(err)
-	}
-	for _, member := range []string{"protocolVersion", "identity", "staging"} {
-		if _, ok := members[member]; ok {
-			t.Errorf("a v1 document must not serialize %q", member)
+	for _, path := range paths {
+		ctx, err := Parse(readFixture(t, path))
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		encoded, err := json.Marshal(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(encoded, &members); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		for _, member := range []string{"protocolVersion", "identity", "staging"} {
+			if _, ok := members[member]; ok {
+				t.Errorf("%s: a version 1 document must not serialize %q", path, member)
+			}
 		}
 	}
 }
 
 func TestContextVersion(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-version-is-read-from-the-document", "an-absent-version-reads-as-version-1")
 	var nilCtx *Context
 	if got := nilCtx.ContextVersion(); got != 0 {
 		t.Errorf("nil context version = %d, want 0", got)
@@ -1334,6 +1352,7 @@ func TestValidate_V2Staging(t *testing.T) {
 // side: a document that does not declare v2 may not carry v2 members, because a
 // v1 consumer would ignore exactly the members a v2 consumer would trust.
 func TestValidate_V1RejectsV2Members(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "version-1-stays-frozen", "a-version-1-document-refuses-the-version-2-members")
 	ctx := validV2Context()
 	ctx.ProtocolVersion = 0 // v1
 	ctx.Staging = &Staging{Root: "/s", Project: "/s/p", Workspace: "/s/w", CommandOutput: "/s/c"}
@@ -1349,6 +1368,7 @@ func TestValidate_V1RejectsV2Members(t *testing.T) {
 }
 
 func TestValidate_UnknownVersion(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-version-is-read-from-the-document", "validation-refuses-an-unknown-or-negative-version")
 	ctx := validV2Context()
 	ctx.ProtocolVersion = 3
 	diags := Validate(ctx)
@@ -1370,6 +1390,7 @@ func TestValidate_UnknownVersion(t *testing.T) {
 }
 
 func TestValidate_NegativeVersion(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-version-is-read-from-the-document", "validation-refuses-an-unknown-or-negative-version")
 	ctx := validV2Context()
 	ctx.ProtocolVersion = -1
 	assertDiagnostic(t, Validate(ctx), ErrorCodeInvalidVersion, "protocolVersion")

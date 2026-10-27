@@ -110,16 +110,19 @@ the conformance surface — drift is detected by regenerating and comparing byte
   artifact is generated and committed, and why no issuer-side vocabulary lives
   here.
 
-## Product feature linkage
+## Feature and spec
 
-No user-facing product feature owns this module, and none should be minted for
-it. It is an internal vocabulary contract consumed by the two frameworks' auth
-code; what a developer experiences is authentication and authorization in the
-framework packages, not this manifest. Per the spec contract in
-[`protocols/features`](../features/README.md) a spec details an already-authored
-feature and never mints one, so the durable design intent lives in
-[`doc/adr/`](doc/adr) instead. A product feature that later owns authentication
-end to end links to that record rather than restating it.
+The module owns the feature of its contract, `identity/consumer-side-vocabulary`,
+specified in
+[`specs/consumer-side-vocabulary.json`](specs/consumer-side-vocabulary.json).
+The Go tests here prove the manifest, its vocabulary and the freshness of its
+generated twins. `go/framework/security` and `typescript/framework/application`
+prove `adopted-constants-mirror-the-enums` in their own tests. Authentication
+and authorization stay features of the framework packages. The durable
+decisions behind this module live in [`doc/adr/`](doc/adr/), linked from the
+spec the way
+[`protocols/features`](../features/README.md#specs-and-durable-decisions)
+defines.
 
 ## Support
 

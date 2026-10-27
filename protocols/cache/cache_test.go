@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 )
 
 func TestValidKey(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "keys-and-digests-are-content-addresses", "a-key-is-64-lowercase-hex")
 	cases := map[string]bool{
 		keyA:                           true,
 		strings.Repeat("a", 63):        false, // too short
@@ -34,6 +36,7 @@ func TestValidKey(t *testing.T) {
 }
 
 func TestDigestRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "keys-and-digests-are-content-addresses", "a-digest-is-the-sha256-of-its-bytes")
 	d := DigestOf([]byte("hello world"))
 	if !ValidDigest(d) {
 		t.Fatalf("DigestOf produced an invalid digest: %q", d)
@@ -52,12 +55,14 @@ func TestDigestRoundTrip(t *testing.T) {
 }
 
 func TestValidDigest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "keys-and-digests-are-content-addresses", "a-digest-is-the-sha256-of-its-bytes")
 	cases := map[string]bool{
 		digX:                             true,
 		strings.Repeat("d", 64):          false, // no prefix
 		"md5:" + strings.Repeat("d", 64): false, // wrong algorithm
 		"sha256:xyz":                     false, // not hex / wrong length
-		"":                               false,
+		DigestAlgorithm + ":" + strings.Repeat("D", 64): false, // uppercase rejected
+		"": false,
 	}
 	for in, want := range cases {
 		if got := ValidDigest(in); got != want {
@@ -67,6 +72,7 @@ func TestValidDigest(t *testing.T) {
 }
 
 func TestBearerToken(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "keys-and-digests-are-content-addresses", "a-token-travels-as-a-bearer-value")
 	tok, ok := BearerToken(AuthorizationValue("secret-123"))
 	if !ok || tok != "secret-123" {
 		t.Errorf("round-trip = (%q, %v), want (secret-123, true)", tok, ok)
@@ -80,6 +86,7 @@ func TestBearerToken(t *testing.T) {
 }
 
 func TestModeValid(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "the-mode-is-one-of-three")
 	for _, m := range []Mode{ModeMinimal, ModeToplevel, ModeFull} {
 		if !m.Valid() {
 			t.Errorf("Mode %q should be valid", m)
@@ -91,6 +98,7 @@ func TestModeValid(t *testing.T) {
 }
 
 func TestValidateRequest_Errors(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "a-negotiate-request-is-validated")
 	r := &NegotiateRequest{
 		ProtocolVersion: 99,
 		Mode:            Mode("eager"),
@@ -111,6 +119,7 @@ func TestValidateRequest_Errors(t *testing.T) {
 }
 
 func TestValidateRequest_DuplicateKeyWarns(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "a-negotiate-request-is-validated")
 	r := &NegotiateRequest{
 		ProtocolVersion: ProtocolVersion,
 		Keys:            []KeyRequest{{Key: keyA}, {Key: keyA}},
@@ -125,6 +134,7 @@ func TestValidateRequest_DuplicateKeyWarns(t *testing.T) {
 }
 
 func TestValidateResponse_HitRequiresResult(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "a-negotiate-response-is-validated")
 	resp := &NegotiateResponse{
 		ProtocolVersion: ProtocolVersion,
 		Results:         []KeyResult{{Key: keyA, Hit: true}},
@@ -135,6 +145,7 @@ func TestValidateResponse_HitRequiresResult(t *testing.T) {
 }
 
 func TestValidateResponse_TransferMethodChecked(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "a-negotiate-response-is-validated")
 	resp := &NegotiateResponse{
 		ProtocolVersion: ProtocolVersion,
 		Results: []KeyResult{{
@@ -150,14 +161,15 @@ func TestValidateResponse_TransferMethodChecked(t *testing.T) {
 }
 
 func TestNormalizeRequest_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "negotiate-normalizes-to-one-form")
 	r := NormalizeRequest(&NegotiateRequest{
 		Keys: []KeyRequest{{Key: keyC}, {Key: keyA}, {Key: keyB}},
 	})
 	if r.ProtocolVersion != ProtocolVersion {
 		t.Errorf("ProtocolVersion default = %d, want %d", r.ProtocolVersion, ProtocolVersion)
 	}
-	if r.Mode != DefaultMode {
-		t.Errorf("Mode default = %q, want %q", r.Mode, DefaultMode)
+	if r.Mode != ModeMinimal {
+		t.Errorf("Mode default = %q, want %q", r.Mode, ModeMinimal)
 	}
 	if r.Keys[0].Key != keyA || r.Keys[1].Key != keyB || r.Keys[2].Key != keyC {
 		t.Errorf("keys not sorted: %v", r.Keys)
@@ -165,6 +177,7 @@ func TestNormalizeRequest_DefaultsAndOrder(t *testing.T) {
 }
 
 func TestNormalizeRequest_Deterministic(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "negotiate-normalizes-to-one-form")
 	build := func() *NegotiateRequest {
 		return &NegotiateRequest{
 			Keys: []KeyRequest{{Key: keyC}, {Key: keyA}, {Key: keyB}},
@@ -179,6 +192,7 @@ func TestNormalizeRequest_Deterministic(t *testing.T) {
 }
 
 func TestNormalizeResponse_Deterministic(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "negotiate-normalizes-to-one-form")
 	build := func() *NegotiateResponse {
 		return &NegotiateResponse{
 			Results: []KeyResult{
@@ -210,6 +224,7 @@ func TestNormalizeResponse_Deterministic(t *testing.T) {
 }
 
 func TestRunMarkerRequest_NormalizeAndValidate(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-request-is-validated")
 	req := NormalizeRunMarkerRequest(&RunMarkerRequest{
 		ProtocolVersion: ProtocolVersion,
 		Workspace:       "  repo:abc  ",
@@ -229,6 +244,7 @@ func TestRunMarkerRequest_NormalizeAndValidate(t *testing.T) {
 }
 
 func TestRunMarkerRequest_SelectionRequired(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-request-is-validated")
 	req := &RunMarkerRequest{
 		ProtocolVersion: ProtocolVersion,
 		Workspace:       "repo:abc",
@@ -242,6 +258,7 @@ func TestRunMarkerRequest_SelectionRequired(t *testing.T) {
 }
 
 func TestPublishRunMarkerRequest_SHARequired(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "run-markers-are-strict", "a-run-marker-request-is-validated")
 	req := &PublishRunMarkerRequest{
 		ProtocolVersion: ProtocolVersion,
 		Workspace:       "repo:abc",
@@ -255,6 +272,7 @@ func TestPublishRunMarkerRequest_SHARequired(t *testing.T) {
 }
 
 func TestValidateStoreRequest_Errors(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-store-is-validated")
 	r := &StoreRequest{
 		ProtocolVersion: 99,
 		Key:             "not-a-key",
@@ -269,6 +287,7 @@ func TestValidateStoreRequest_Errors(t *testing.T) {
 }
 
 func TestValidateStoreRequest_ManifestRequired(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-store-is-validated")
 	r := &StoreRequest{ProtocolVersion: ProtocolVersion, Key: keyA}
 	if !codeSet(ValidateStoreRequest(r))[CodeRequiredField] {
 		t.Error("a store request without a manifest should be a required-field error")
@@ -276,6 +295,7 @@ func TestValidateStoreRequest_ManifestRequired(t *testing.T) {
 }
 
 func TestValidateStoreRequest_Valid(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-store-is-validated")
 	r := &StoreRequest{
 		ProtocolVersion: ProtocolVersion,
 		Key:             keyA,
@@ -287,6 +307,7 @@ func TestValidateStoreRequest_Valid(t *testing.T) {
 }
 
 func TestValidateStoreResponse_TransferMethodChecked(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-store-is-validated")
 	resp := &StoreResponse{
 		ProtocolVersion: ProtocolVersion,
 		Key:             keyA,
@@ -298,6 +319,7 @@ func TestValidateStoreResponse_TransferMethodChecked(t *testing.T) {
 }
 
 func TestValidateStoreResponse_EmptyUploadsValid(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-store-is-validated")
 	resp := &StoreResponse{ProtocolVersion: ProtocolVersion, Key: keyA}
 	if diag.HasErrors(ValidateStoreResponse(resp)) {
 		t.Error("an empty upload set (full dedup) should be valid")
@@ -305,6 +327,7 @@ func TestValidateStoreResponse_EmptyUploadsValid(t *testing.T) {
 }
 
 func TestValidateCommitRequest_RequiresResult(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-commit-carries-the-whole-entry")
 	r := &CommitRequest{
 		ProtocolVersion: ProtocolVersion,
 		Key:             keyA,
@@ -315,7 +338,20 @@ func TestValidateCommitRequest_RequiresResult(t *testing.T) {
 	}
 }
 
+func TestValidateCommitRequest_RequiresManifest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-commit-carries-the-whole-entry")
+	r := &CommitRequest{
+		ProtocolVersion: ProtocolVersion,
+		Key:             keyA,
+		Result:          &ActionResult{Status: "success"},
+	}
+	if !codeSet(ValidateCommitRequest(r))[CodeRequiredField] {
+		t.Error("a commit without a manifest should be a required-field error")
+	}
+}
+
 func TestValidateActionResult_AllowsCachedEvents(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-cached-event-has-a-type")
 	r := &CommitRequest{
 		ProtocolVersion: ProtocolVersion,
 		Key:             keyA,
@@ -342,6 +378,7 @@ func TestValidateActionResult_AllowsCachedEvents(t *testing.T) {
 }
 
 func TestValidateActionResult_RejectsCachedEventWithoutType(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-cached-event-has-a-type")
 	r := &CommitRequest{
 		ProtocolVersion: ProtocolVersion,
 		Key:             keyA,
@@ -354,6 +391,7 @@ func TestValidateActionResult_RejectsCachedEventWithoutType(t *testing.T) {
 }
 
 func TestValidateCommitResponse_Errors(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-versions-are-pinned", "an-http-message-of-another-version-is-refused")
 	resp := &CommitResponse{ProtocolVersion: 99, Key: "bad"}
 	codes := codeSet(ValidateCommitResponse(resp))
 	for _, want := range []string{CodeVersionMismatch, CodeInvalidKey} {
@@ -364,6 +402,7 @@ func TestValidateCommitResponse_Errors(t *testing.T) {
 }
 
 func TestNormalizeStoreRequest_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-write-path-normalizes-to-one-form")
 	r := NormalizeStoreRequest(&StoreRequest{
 		Key: keyA,
 		Manifest: &Manifest{Files: []FileEntry{
@@ -379,6 +418,7 @@ func TestNormalizeStoreRequest_DefaultsAndOrder(t *testing.T) {
 }
 
 func TestNormalizeStoreResponse_Deterministic(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "the-write-path-normalizes-to-one-form")
 	build := func() *StoreResponse {
 		return &StoreResponse{
 			Key: keyA,
@@ -403,6 +443,7 @@ func TestNormalizeStoreResponse_Deterministic(t *testing.T) {
 }
 
 func TestParseAndValidate_StoreCommit_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-write-path-is-store-then-commit", "a-commit-carries-the-whole-entry")
 	storeReq := &StoreRequest{
 		ProtocolVersion: ProtocolVersion,
 		Key:             keyA,
@@ -432,6 +473,7 @@ func TestParseAndValidate_StoreCommit_RoundTrip(t *testing.T) {
 }
 
 func TestValidateFindMissingRequest_TooManyBlobs(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "find-missing-is-bounded")
 	blobs := make([]BlobRef, MaxKeysPerRequest+1)
 	for i := range blobs {
 		blobs[i] = BlobRef{Digest: digX}
@@ -443,6 +485,7 @@ func TestValidateFindMissingRequest_TooManyBlobs(t *testing.T) {
 }
 
 func TestValidateFindMissingResponse_TransferMethodChecked(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "find-missing-is-bounded")
 	resp := &FindMissingResponse{
 		ProtocolVersion: ProtocolVersion,
 		Uploads:         []BlobTransfer{{Digest: digX, URL: "https://cas/x", Method: TransferGet}},
@@ -453,6 +496,7 @@ func TestValidateFindMissingResponse_TransferMethodChecked(t *testing.T) {
 }
 
 func TestNormalizeFindMissingRequest_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "find-missing-is-bounded")
 	r := &FindMissingRequest{Blobs: []BlobRef{{Digest: digY}, {Digest: digX}}}
 	NormalizeFindMissingRequest(r)
 	if r.ProtocolVersion != ProtocolVersion {
@@ -463,7 +507,23 @@ func TestNormalizeFindMissingRequest_DefaultsAndOrder(t *testing.T) {
 	}
 }
 
+func TestNormalizeFindMissingResponse_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "find-missing-is-bounded")
+	resp := &FindMissingResponse{Uploads: []BlobTransfer{
+		{Digest: digY, URL: "https://cas/y", Method: TransferPut},
+		{Digest: digX, URL: "https://cas/x", Method: TransferPut},
+	}}
+	NormalizeFindMissingResponse(resp)
+	if resp.ProtocolVersion != ProtocolVersion {
+		t.Errorf("ProtocolVersion = %d, want %d", resp.ProtocolVersion, ProtocolVersion)
+	}
+	if resp.Uploads[0].Digest != digX || resp.Uploads[1].Digest != digY {
+		t.Errorf("uploads not sorted by digest: %+v", resp.Uploads)
+	}
+}
+
 func TestValidateCommitBatchRequest_DuplicateKeyWarns(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "commit-batch-entries-are-self-contained")
 	r := &CommitBatchRequest{
 		ProtocolVersion: ProtocolVersion,
 		Entries: []CommitEntry{
@@ -481,6 +541,7 @@ func TestValidateCommitBatchRequest_DuplicateKeyWarns(t *testing.T) {
 }
 
 func TestValidateCommitBatchRequest_EntryRequiresResultAndManifest(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "commit-batch-entries-are-self-contained")
 	r := &CommitBatchRequest{
 		ProtocolVersion: ProtocolVersion,
 		Entries:         []CommitEntry{{Key: keyA}},
@@ -491,6 +552,7 @@ func TestValidateCommitBatchRequest_EntryRequiresResultAndManifest(t *testing.T)
 }
 
 func TestNormalizeCommitBatchRequest_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "commit-batch-entries-are-self-contained")
 	r := &CommitBatchRequest{
 		Entries: []CommitEntry{
 			{Key: keyB, Result: &ActionResult{Status: "success"}, Manifest: &Manifest{Files: []FileEntry{
@@ -511,8 +573,24 @@ func TestNormalizeCommitBatchRequest_DefaultsAndOrder(t *testing.T) {
 	}
 }
 
+func TestNormalizeCommitBatchResponse_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "commit-batch-entries-are-self-contained")
+	resp := &CommitBatchResponse{Results: []CommitResult{
+		{Key: keyB, Committed: true},
+		{Key: keyA, Committed: true},
+	}}
+	NormalizeCommitBatchResponse(resp)
+	if resp.ProtocolVersion != ProtocolVersion {
+		t.Errorf("ProtocolVersion = %d, want %d", resp.ProtocolVersion, ProtocolVersion)
+	}
+	if resp.Results[0].Key != keyA || resp.Results[1].Key != keyB {
+		t.Errorf("results not sorted by key: %+v", resp.Results)
+	}
+}
+
 func TestNormalizeCapabilitiesResponse_SortsCapabilities(t *testing.T) {
-	resp := &CapabilitiesResponse{Capabilities: []string{CapabilityCommitBatch, CapabilityFindMissing}}
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "capabilities-are-sorted")
+	resp := &CapabilitiesResponse{Capabilities: []string{CapabilityFindMissing, CapabilityCommitBatch}}
 	NormalizeCapabilitiesResponse(resp)
 	if resp.ProtocolVersion != ProtocolVersion {
 		t.Errorf("ProtocolVersion = %d, want %d", resp.ProtocolVersion, ProtocolVersion)
@@ -523,6 +601,7 @@ func TestNormalizeCapabilitiesResponse_SortsCapabilities(t *testing.T) {
 }
 
 func TestParseAndValidate_BatchWritePath_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-batched-write-path-adds-routes-not-fields", "the-batched-messages-round-trip")
 	roundTrip := func(name string, v any, parse func([]byte) (any, []diag.Diagnostic)) {
 		b, err := json.Marshal(v)
 		if err != nil {
@@ -547,6 +626,7 @@ func TestParseAndValidate_BatchWritePath_RoundTrip(t *testing.T) {
 }
 
 func TestNormalizeUploadGrant_DefaultsMethodAndVersion(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-grant-is-a-put-template")
 	g := &UploadGrant{URLTemplate: "https://cas.example/blob/" + DigestPlaceholder}
 	NormalizeUploadGrant(g)
 	if g.ProtocolVersion != ProtocolVersion {
@@ -561,6 +641,7 @@ func TestNormalizeUploadGrant_DefaultsMethodAndVersion(t *testing.T) {
 }
 
 func TestValidateUploadGrant_RequiresPlaceholder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-grant-is-a-put-template")
 	g := &UploadGrant{ProtocolVersion: ProtocolVersion, URLTemplate: "https://cas.example/blob/fixed", Method: TransferPut}
 	if !codeSet(ValidateUploadGrant(g))[CodeRequiredField] {
 		t.Error("a template without the digest placeholder should be flagged")
@@ -568,6 +649,7 @@ func TestValidateUploadGrant_RequiresPlaceholder(t *testing.T) {
 }
 
 func TestValidateUploadGrant_MethodChecked(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-grant-is-a-put-template")
 	g := &UploadGrant{ProtocolVersion: ProtocolVersion, URLTemplate: "x/" + DigestPlaceholder, Method: TransferGet}
 	if !codeSet(ValidateUploadGrant(g))[CodeInvalidMethod] {
 		t.Error("a non-PUT grant method should be flagged")
@@ -575,6 +657,7 @@ func TestValidateUploadGrant_MethodChecked(t *testing.T) {
 }
 
 func TestParseAndValidateUploadGrant_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-grant-is-a-put-template")
 	g := &UploadGrant{
 		ProtocolVersion:         ProtocolVersion,
 		URLTemplate:             "https://cas.example/blob/" + DigestPlaceholder,
@@ -596,6 +679,7 @@ func TestParseAndValidateUploadGrant_RoundTrip(t *testing.T) {
 }
 
 func TestValidateUploadBatchRequest_RejectsOversizeBlob(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-batch-is-bounded")
 	r := &UploadBatchRequest{
 		ProtocolVersion: ProtocolVersion,
 		Blobs: []InlineBlob{
@@ -608,6 +692,7 @@ func TestValidateUploadBatchRequest_RejectsOversizeBlob(t *testing.T) {
 }
 
 func TestValidateUploadBatchRequest_DuplicateDigestWarns(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-batch-is-bounded")
 	r := &UploadBatchRequest{
 		ProtocolVersion: ProtocolVersion,
 		Blobs:           []InlineBlob{{Digest: digX, Data: []byte("a")}, {Digest: digX, Data: []byte("a")}},
@@ -622,6 +707,7 @@ func TestValidateUploadBatchRequest_DuplicateDigestWarns(t *testing.T) {
 }
 
 func TestValidateUploadBatchResponse_DigestChecked(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-batch-is-bounded")
 	resp := &UploadBatchResponse{ProtocolVersion: ProtocolVersion, Stored: []string{"not-a-digest"}}
 	if !codeSet(ValidateUploadBatchResponse(resp))[CodeInvalidDigest] {
 		t.Error("a malformed stored digest should be flagged")
@@ -629,6 +715,7 @@ func TestValidateUploadBatchResponse_DigestChecked(t *testing.T) {
 }
 
 func TestNormalizeUploadBatch_DefaultsAndOrder(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-batch-is-bounded")
 	req := &UploadBatchRequest{Blobs: []InlineBlob{{Digest: digY, Data: []byte("y")}, {Digest: digX, Data: []byte("x")}}}
 	NormalizeUploadBatchRequest(req)
 	if req.ProtocolVersion != ProtocolVersion {
@@ -646,6 +733,7 @@ func TestNormalizeUploadBatch_DefaultsAndOrder(t *testing.T) {
 }
 
 func TestParseAndValidate_UploadBatch_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "accelerators-are-optional", "an-upload-batch-is-bounded")
 	req := &UploadBatchRequest{
 		ProtocolVersion: ProtocolVersion,
 		Blobs:           []InlineBlob{{Digest: digX, Data: []byte("compiled")}},

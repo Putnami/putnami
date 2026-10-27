@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // A reader that does not know the releaseBaseline runtime input would key the
 // task without it, so a manifest that declares it needs the contract that
 // names it, whatever other additive vocabulary it also uses.
 func TestReleaseBaselineInputRequiresAdditiveCLIContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	manifest := []byte(`{"name":"@test/go","cliContract":6,"commands":{"validate":{"run":[{"id":"api","task":"api"}]}},"tasks":{"api":{"kind":"command","command":"echo","inputs":{"sources":{"from":"project","files":["**/*.go"]},"releaseBaseline":{"from":"runtime"}}}}}`)
 	if _, err := NegotiateManifest("go.json", manifest); err == nil || !strings.Contains(err.Error(), "requires 7") {
 		t.Fatalf("contract-6 stamp accepted the releaseBaseline input: %v", err)
@@ -34,6 +36,7 @@ func TestReleaseBaselineInputRequiresAdditiveCLIContract(t *testing.T) {
 // declares one on a task needs rung 7, so the older reader refuses it instead
 // of replaying a verdict across a chmod.
 func TestAGitInputRequiresTheContractThatKeysTheMode(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	manifest := []byte(`{"name":"@test/sdd","cliContract":6,"commands":{"validate":{"run":[{"id":"features","task":"features"}]}},"tasks":{"features":{"kind":"command","command":"echo","inputs":{"repository":{"from":"workspace","files":["git:**"]}}}}}`)
 	if _, err := NegotiateManifest("sdd.json", manifest); err == nil || !strings.Contains(err.Error(), "requires 7") {
 		t.Fatalf("contract-6 stamp accepted a git: input: %v", err)
@@ -71,6 +74,7 @@ func TestAGitInputRequiresTheContractThatKeysTheMode(t *testing.T) {
 // Every task counts: a task that needs no rung, or a lower one, met first,
 // cannot mask a task that needs a higher rung.
 func TestRequiredCLIContractTakesTheHighestRungAcrossTasks(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "the-floor-rises-only-for-a-manifest-that-uses-the-vocabulary")
 	selector := TaskDefinition{Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
 		"sources": {From: TaskInputFromProject, Files: []string{"sel:build"}},
 	}}

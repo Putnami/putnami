@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestStatusAndKindVocabulariesAreClosed(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "closed-vocabularies-and-exact-version", "the-status-and-kind-vocabularies-are-closed")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1; changing it requires a migration story", ProtocolVersion)
 	}
@@ -28,6 +30,7 @@ func TestStatusAndKindVocabulariesAreClosed(t *testing.T) {
 }
 
 func TestStrictParserRejectsNonCanonicalJSON(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "strict-canonical-catalog", "the-strict-reader-rejects-a-catalog-that-is-not-strict-json")
 	tests := []struct {
 		name string
 		data string
@@ -57,6 +60,7 @@ func TestStrictParserRejectsNonCanonicalJSON(t *testing.T) {
 }
 
 func TestValidateCatalogReportsIndependentFindings(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "validation-reports-independent-findings", "independent-findings-are-all-reported")
 	defaultOn := true
 	catalog := &Catalog{ProtocolVersion: 2, Entries: []Entry{
 		{ID: "Bad ID", Kind: "surface", Status: "beta", Default: &defaultOn, Parity: "partial"},
@@ -89,6 +93,7 @@ func TestValidateCatalogReportsIndependentFindings(t *testing.T) {
 }
 
 func TestValidateCatalogRejectsNilAndEmpty(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "validation-reports-independent-findings", "a-nil-or-empty-catalog-is-an-error")
 	emptyCatalog := &Catalog{ProtocolVersion: ProtocolVersion}
 	for _, test := range []struct {
 		name    string
@@ -106,6 +111,7 @@ func TestValidateCatalogRejectsNilAndEmpty(t *testing.T) {
 }
 
 func TestValidateCatalogRejectsNonCanonicalSubjectIDs(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "validation-reports-independent-findings", "a-non-canonical-subject-id-is-invalid")
 	for _, id := range []string{
 		"go.putnami.dev/protocol/support/../cli",
 		"go.putnami.dev/protocol/./cli",
@@ -127,6 +133,7 @@ func TestValidateCatalogRejectsNonCanonicalSubjectIDs(t *testing.T) {
 }
 
 func TestCanonicalCatalogSortsACopyAndRoundTrips(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "strict-canonical-catalog", "canonical-writing-sorts-a-copy-and-round-trips")
 	defaultOff := false
 	input := &Catalog{Schema: CatalogSchemaURL, ProtocolVersion: ProtocolVersion, Entries: []Entry{
 		{ID: "zeta", Kind: SubjectKindProtocol, Status: StatusStable},
@@ -140,6 +147,14 @@ func TestCanonicalCatalogSortsACopyAndRoundTrips(t *testing.T) {
 	}
 	if !reflect.DeepEqual(input.Entries, original) {
 		t.Fatal("MarshalCatalog mutated caller entry order")
+	}
+	canonical := CanonicalCatalog(input).Entries
+	order := make([]string, 0, len(canonical))
+	for _, entry := range canonical {
+		order = append(order, entry.ID)
+	}
+	if want := []string{"alpha", "@putnami/python", "zeta"}; !reflect.DeepEqual(order, want) {
+		t.Fatalf("canonical entry order = %v, want %v: by kind, then by ID", order, want)
 	}
 	parsed, diagnostics := ParseAndValidateCatalog(first)
 	if parsed == nil || diag.HasErrors(diagnostics) {
@@ -158,6 +173,7 @@ func TestCanonicalCatalogSortsACopyAndRoundTrips(t *testing.T) {
 }
 
 func TestExperimentalCannotBeDefault(t *testing.T) {
+	spectest.Proves(t, "support/support-catalog", "validation-reports-independent-findings", "an-experimental-entry-cannot-be-the-default")
 	defaultOn := true
 	diagnostics := ValidateCatalog(&Catalog{ProtocolVersion: 1, Entries: []Entry{{
 		ID: "@putnami/python", Kind: SubjectKindPackage, Status: StatusExperimental, Default: &defaultOn,

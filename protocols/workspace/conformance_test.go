@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ProtocolVersion pins the current protocol version so any bump
@@ -14,12 +15,14 @@ import (
 // semver, not this constant), so this is the only anchor — bumping requires a
 // migration story.
 func TestConformance_ProtocolVersion(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "the-workspace-protocol-version-is-pinned")
 	if ProtocolVersion != 1 {
 		t.Fatalf("ProtocolVersion = %d, want 1 — bumping requires a migration story", ProtocolVersion)
 	}
 }
 
 func TestConformance_ValidWorkspaceFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -47,6 +50,7 @@ func TestConformance_ValidWorkspaceFixtures(t *testing.T) {
 }
 
 func TestConformance_InvalidWorkspaceFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	files, err := filepath.Glob("fixtures/invalid/*.json")
 	if err != nil {
 		t.Fatal(err)

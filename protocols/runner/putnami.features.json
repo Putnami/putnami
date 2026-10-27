@@ -1,0 +1,231 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "runner",
+  "features": [
+    {
+      "id": "runner/runner-contract",
+      "type": "feature",
+      "name": "Runner execution contract",
+      "outcome": "The CLI and a runner provider exchange a source snapshot, an execution request, provider RPC and a session bundle through one versioned, strictly parsed wire and one fixture corpus, so a provider runs a submission without source access or verdict authority.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-source-manifest-is-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-source-manifest-fixture-gets-its-verdict",
+              "the-source-manifest-schema-tracks-the-wire"
+            ]
+          }
+        },
+        {
+          "id": "source-identity-is-the-content",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-content-property-changes-the-identity",
+              "the-cli-source-digest-ignores-head-and-index"
+            ]
+          }
+        },
+        {
+          "id": "source-paths-are-portable-and-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "unsafe-paths-and-sizes-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "symlinks-resolve-inside-the-snapshot",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "symlink-resolution-stays-inside-the-snapshot"
+            ]
+          }
+        },
+        {
+          "id": "decoders-are-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "manifests-and-git-contexts-decode-strictly"
+            ]
+          }
+        },
+        {
+          "id": "the-v1-request-is-strict-and-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-v1-request-round-trips-canonically",
+              "parameters-keep-their-go-types",
+              "the-v1-request-refuses-semantic-violations",
+              "the-v1-schema-tracks-the-wire"
+            ]
+          }
+        },
+        {
+          "id": "input-digests-name-the-applicable-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-v1-input-digest-excludes-plan-and-control",
+              "the-v2-input-digest-excludes-control"
+            ]
+          }
+        },
+        {
+          "id": "providers-and-publication-are-additive",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "absent-invocation-members-stay-off-the-wire",
+              "publication-waits-for-the-barrier"
+            ]
+          }
+        },
+        {
+          "id": "the-v2-request-names-a-commit",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-v2-request-round-trips-canonically",
+              "the-v2-request-refuses-semantic-violations",
+              "no-command-is-refused-by-name",
+              "the-v2-schema-tracks-the-wire"
+            ]
+          }
+        },
+        {
+          "id": "versions-never-mix",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-version-mix-is-refused-by-name",
+              "every-execution-request-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "the-provider-envelope-is-strict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "envelopes-and-ops-are-strict",
+              "the-envelope-has-its-own-depth-budget",
+              "lifecycle-payloads-round-trip"
+            ]
+          }
+        },
+        {
+          "id": "a-client-submits-only-to-a-compatible-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-drives-every-op",
+              "the-cli-refuses-an-incompatible-provider",
+              "the-cli-offers-invocation-providers-only-with-providers"
+            ]
+          }
+        },
+        {
+          "id": "follow-replays-without-duplicates",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "terminal-states-are-pinned",
+              "the-cli-drops-replayed-records-and-refuses-disorder",
+              "the-cli-refuses-an-unknown-attempt-state"
+            ]
+          }
+        },
+        {
+          "id": "the-session-bundle-is-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-session-bundle-fixture-gets-its-verdict",
+              "session-ids-exchange-paths-and-file-names-are-pinned"
+            ]
+          }
+        },
+        {
+          "id": "importers-verify-and-are-idempotent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-importer-verifies-before-it-writes",
+              "the-cli-importer-repeats-safely-and-refuses-a-different-record"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

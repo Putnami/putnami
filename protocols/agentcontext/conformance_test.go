@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestConformance_ValidDocuments parses + validates every JSON file under
 // fixtures/valid. Each must strict-parse and validate clean.
 func TestConformance_ValidDocuments(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "conformance-corpus", "every-valid-document-fixture-validates-clean")
 	forEachFixture(t, "fixtures/valid/*.json", func(t *testing.T, path string, data []byte) {
 		d, diags := ParseAndValidateDocument(data)
 		if diag.HasErrors(diags) {
@@ -26,6 +28,7 @@ func TestConformance_ValidDocuments(t *testing.T) {
 // fixtures/invalid produces at least one coded error diagnostic drawn from the
 // agent-context taxonomy.
 func TestConformance_InvalidDocuments(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "conformance-corpus", "every-invalid-document-fixture-fails-with-a-taxonomy-code")
 	forEachFixture(t, "fixtures/invalid/*.json", func(t *testing.T, path string, data []byte) {
 		_, diags := ParseAndValidateDocument(data)
 		assertCodedError(t, path, diags)
@@ -35,6 +38,7 @@ func TestConformance_InvalidDocuments(t *testing.T) {
 // TestConformance_ValidOverrides parses + validates every JSON file under
 // fixtures/overrides/valid. Each must strict-parse and validate clean.
 func TestConformance_ValidOverrides(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "conformance-corpus", "every-valid-overrides-fixture-validates-clean")
 	forEachFixture(t, "fixtures/overrides/valid/*.json", func(t *testing.T, path string, data []byte) {
 		o, diags := ParseAndValidateOverrides(data)
 		if diag.HasErrors(diags) {
@@ -49,6 +53,7 @@ func TestConformance_ValidOverrides(t *testing.T) {
 // TestConformance_InvalidOverrides asserts every JSON file under
 // fixtures/overrides/invalid produces at least one coded error diagnostic.
 func TestConformance_InvalidOverrides(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "conformance-corpus", "every-invalid-overrides-fixture-fails-with-a-taxonomy-code")
 	forEachFixture(t, "fixtures/overrides/invalid/*.json", func(t *testing.T, path string, data []byte) {
 		_, diags := ParseAndValidateOverrides(data)
 		assertCodedError(t, path, diags)

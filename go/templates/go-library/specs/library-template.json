@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/library-template",
+  "outcomes": [
+    "A new Go library starts from an exported function and a test beside it, and putnami build, putnami test and putnami lint report nothing to fix before the user edits a line",
+    "A change to the template or to the framework it uses that breaks this promise fails the template proof, before a user creates a project from it"
+  ],
+  "nonGoals": [
+    "Packaging the template, its archive contents and the render rules, which tooling/project-scaffolding owns",
+    "Adding the created project to go.work, pinning its framework modules and tidying it, which go/project-setup owns",
+    "Resolving modules from a proxy: the proof wires a go.work to this repository's framework sources, so a rendered project is proven against the framework it is released with (ADR 0006)"
+  ],
+  "requirements": [
+    {
+      "id": "a-rendered-project-builds",
+      "text": "A project rendered from go-library passes go vet and go build without downloading a module."
+    },
+    {
+      "id": "a-rendered-project-passes-its-tests",
+      "text": "A project rendered from go-library ships TestHello, and go test runs it to a pass without downloading a module."
+    },
+    {
+      "id": "a-rendered-project-passes-lint",
+      "text": "A project rendered from go-library passes the linters putnami lint runs: golangci-lint with the Go extension's config/.golangci.yml, then staticcheck, at the versions go/extension/tools/versions.json pins. Neither reports a finding."
+    }
+  ],
+  "decisions": [
+    "tooling/scaffold/doc/adr/0003-what-a-default-template-promises.md",
+    "tooling/scaffold/doc/adr/0006-templates-run-against-the-workspace-framework.md"
+  ]
+}

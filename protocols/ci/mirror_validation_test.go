@@ -6,9 +6,11 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	distributionproto "go.putnami.dev/protocol/distribution"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestValidateMirrorDestinations(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "distribution-is-a-closed-vocabulary", "mirror-destinations-are-credential-free")
 	for _, target := range []string{
 		"http://registry.example", "https://user:secret@registry.example",
 		"user:secret@registry.example", "https://registry.example?token=secret",

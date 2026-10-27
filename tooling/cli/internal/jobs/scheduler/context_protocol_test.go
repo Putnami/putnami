@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -18,6 +19,7 @@ import (
 // test fails if BuildJobContext emits a shape the contract does not
 // define.
 func TestBuildJobContext_ConformsToProtocol(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-cli-produces-a-conforming-context", "the-cli-context-passes-the-strict-reader-as-version-2")
 	t.Parallel()
 	ws := &workspace.Workspace{
 		Name: "test-workspace",

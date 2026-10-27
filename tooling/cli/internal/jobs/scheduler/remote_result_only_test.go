@@ -403,7 +403,7 @@ func TestAFailedFullRestoreNeverFallsBackToTheResultOnlyEntry(t *testing.T) {
 // provider that does not echo the capability receives neither new field, and
 // a minimal run restores every hit with its files exactly as before.
 func TestProviderWithoutTheEchoKeepsTheFullRestore(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "result-only-remote-restore",
+	spectest.Proves(t, "cache/remote-cache-contract", "result-only-restore-is-negotiated",
 		"a-provider-without-the-capability-sees-no-new-field")
 	server := newFakeCacheServer()
 	hash, want := publishMatrixEntry(t, server)

@@ -15,7 +15,8 @@ import (
 // vocabulary-only package is validated and stamped 9, and a defective one
 // fails the package job unstamped, the same verdicts as the Go packager.
 func TestCopyHookFiles_GatesAndStampsAVocabulary(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "vocabulary-default-traits", "the-npm-packager-validates-and-stamps-a-vocabulary")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	projDir := stageSourceManifest(t, `{
 	"name": "@putnami/testverbs",
 	"verbs": [{"name": "build", "description": "Compile the project.", "aliases": ["b"]}]

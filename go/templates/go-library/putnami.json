@@ -3,15 +3,20 @@
   "name": "go-library",
   "type": "template",
   "extensions": [
-    "@putnami/scaffold"
+    "@putnami/scaffold",
+    "/tooling/sdd-extension"
   ],
-  "featureAuthority": {"owner": "go/project-setup"},
   "publish": [
     "template-archives"
   ],
   "options": {
     "publish": {
       "archives": true
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
   }
 }

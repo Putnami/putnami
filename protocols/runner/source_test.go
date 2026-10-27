@@ -9,9 +9,12 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSourceManifestFixtures(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-source-manifest-is-canonical", "every-source-manifest-fixture-gets-its-verdict")
 	data, err := os.ReadFile(filepath.Join("fixtures", "source-manifest", "digests.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -62,6 +65,7 @@ func TestSourceManifestFixtures(t *testing.T) {
 }
 
 func TestSchemaTracksWireShapesAndBounds(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "the-source-manifest-is-canonical", "the-source-manifest-schema-tracks-the-wire")
 	data, err := os.ReadFile(filepath.Join("schemas", "source-manifest-v1.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -125,6 +129,7 @@ func sourceManifest(entries ...SourceEntry) SourceManifest {
 }
 
 func TestSourceIdentityBindsEveryContentProperty(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "source-identity-is-the-content", "every-content-property-changes-the-identity")
 	original := sourceFile("file")
 	originalDigest, err := SourceDigest(sourceManifest(original))
 	if err != nil {
@@ -169,6 +174,7 @@ func TestSourceIdentityBindsEveryContentProperty(t *testing.T) {
 }
 
 func TestSourceManifestBoundsAndPortablePaths(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "source-paths-are-portable-and-bounded", "unsafe-paths-and-sizes-are-refused")
 	for _, name := range []string{"", ".", "..", "a//b", "a/./b", "a/../b", "C:/file", "a\x00b", "a\nb", "file.", "file ", "NUL.txt", "COM1", "LPT0.txt", "a/.GIT/config", strings.Repeat("a", 256), strings.Repeat("a/", 64) + "a", strings.Repeat("a/", 513), string([]byte{0xff})} {
 		t.Run(fmt.Sprintf("path_%q", name), func(t *testing.T) {
 			if err := ValidateSourcePath(name); err == nil {
@@ -244,6 +250,7 @@ func FuzzParseSourceManifest(f *testing.F) {
 }
 
 func TestSymlinkResolution(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "symlinks-resolve-inside-the-snapshot", "symlink-resolution-stays-inside-the-snapshot")
 	cases := []struct {
 		name    string
 		entries []SourceEntry
@@ -270,6 +277,7 @@ func TestSymlinkResolution(t *testing.T) {
 }
 
 func TestStrictJSONAndGitContext(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "decoders-are-strict", "manifests-and-git-contexts-decode-strictly")
 	for _, raw := range []string{"", "[]", "null", "{", `{"version":"1","entries":[]}`, `{"version":1,"entries":{}}`, `{"version":1,"entries":[false]}`, `{"version":1,"entries":[]} trailing`, strings.Repeat("[", 10) + "0" + strings.Repeat("]", 10), string([]byte{0xff})} {
 		if _, err := ParseSourceManifest([]byte(raw)); err == nil {
 			t.Fatalf("malformed JSON accepted: %s", raw)

@@ -316,7 +316,7 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *job
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 			return
 		}
-		out, err := sess.Upload(ctx, &cache.UploadParams{Key: in.Key, Result: in.Result, Manifest: in.Manifest})
+		out, err := sess.Upload(ctx, &cache.UploadParams{Key: in.Key, Result: r.providerResult(in.Result), Manifest: in.Manifest})
 		if err != nil || out == nil || !out.Accepted {
 			r.stats.RecordUploadFailure()
 			slog.Warn("remote cache: provider upload failed",
@@ -328,8 +328,10 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *job
 // prepareTaskUpload turns a published task-owned entry into the input to share
 // with the provider, applying the same eligibility rule as the legacy write
 // path: every entry is shared whatever its build duration or size, except the
-// entry of a job with external effects (jobmodel.HasExternalEffects). It
-// returns ok=false when the entry should not be uploaded.
+// entry of a job with external effects (jobmodel.HasExternalEffects). The
+// input keeps the cached events, which the upload drops when the provider did
+// not advertise action-events (providerResult). It returns ok=false when the
+// entry should not be uploaded.
 func (r *RemoteCache) PrepareTaskUpload(hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) (TaskUploadInput, bool) {
 	entry, err := cm.LookupTaskEntry(hash)
 	if err != nil || entry == nil || entry.Result == nil {
@@ -355,7 +357,7 @@ func (r *RemoteCache) PrepareTaskUpload(hash string, job *jobmodel.ScheduledJob,
 	return TaskUploadInput{
 		uploadInput: uploadInput{
 			Key:      transfer.Key,
-			Result:   cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, r.actionEvents),
+			Result:   cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, true),
 			Manifest: transfer.Manifest,
 		},
 		Payload:          transfer.Payload,

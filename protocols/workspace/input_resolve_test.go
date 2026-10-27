@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func validInputResolveRequest() InputResolveRequest {
@@ -52,6 +53,7 @@ func validInputResolveResult() InputResolveResult {
 }
 
 func TestIsInputSelectorName(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "the-input-selector-grammar")
 	cases := map[string]bool{
 		"go-embed:build":                true,
 		"go-embed:test":                 true,
@@ -84,6 +86,7 @@ func TestIsInputSelectorName(t *testing.T) {
 }
 
 func TestValidateInputResolveRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "an-input-request-and-result-are-validated")
 	cases := []struct {
 		name  string
 		edit  func(*InputResolveRequest)
@@ -131,6 +134,7 @@ func TestValidateInputResolveRequest(t *testing.T) {
 }
 
 func TestValidateInputResolveResult(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "an-input-request-and-result-are-validated")
 	cases := []struct {
 		name  string
 		edit  func(*InputResolveResult)
@@ -221,6 +225,7 @@ func TestValidateInputResolveResult(t *testing.T) {
 }
 
 func TestValidateInputResolveAnswer(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "an-input-answer-matches-its-request")
 	cases := []struct {
 		name  string
 		edit  func(*InputResolveRequest, *InputResolveResult)
@@ -261,6 +266,7 @@ func TestValidateInputResolveAnswer(t *testing.T) {
 }
 
 func TestInputResolveDiagnosticsAreDeterministic(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "an-input-request-and-result-are-validated")
 	request := validInputResolveRequest()
 	request.Inputs = append(request.Inputs, request.Inputs[0], InputResolveQuery{Project: "/x", Selector: "git:x"})
 	result := validInputResolveResult()
@@ -285,6 +291,7 @@ func TestInputResolveDiagnosticsAreDeterministic(t *testing.T) {
 }
 
 func TestParseInputResolveRejectsTrailingDocument(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "an-input-request-and-result-are-validated")
 	if _, diags := ParseInputResolveRequest([]byte(`{"version":1,"extension":"x","inputs":[{"project":".","selector":"go-embed:build"}]} {}`)); !hasDiagnosticCode(diags, "parse-error") {
 		t.Fatalf("trailing request document was accepted: %v", diags)
 	}
@@ -296,6 +303,7 @@ func TestParseInputResolveRejectsTrailingDocument(t *testing.T) {
 // An error answer omits its basis on the wire, and an answer without an
 // error omits the error member.
 func TestInputResolveAnswerWireForm(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "an-input-answer-lists-files-and-their-basis", "an-input-request-and-result-are-validated")
 	data, err := json.Marshal(validInputResolveResult())
 	if err != nil {
 		t.Fatal(err)
@@ -311,6 +319,7 @@ func TestInputResolveAnswerWireForm(t *testing.T) {
 }
 
 func TestConformance_InputResolveRequestFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "input-resolve-request", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateInputResolveRequest(b)
 		return d
@@ -318,6 +327,7 @@ func TestConformance_InputResolveRequestFixtures(t *testing.T) {
 }
 
 func TestConformance_InputResolveResultFixtures(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-fixture-gets-its-verdict")
 	runShapeConformance(t, "input-resolve-result", func(b []byte) []diag.Diagnostic {
 		_, d := ParseAndValidateInputResolveResult(b)
 		return d
@@ -327,6 +337,7 @@ func TestConformance_InputResolveResultFixtures(t *testing.T) {
 // Each valid result fixture answers the valid request fixture of the same
 // name, so the corpus also exercises the relation between the two documents.
 func TestConformance_InputResolveResultFixturesAnswerTheirRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "each-valid-result-fixture-answers-its-request")
 	files, err := filepath.Glob("fixtures/input-resolve-result/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
@@ -359,30 +370,35 @@ func TestConformance_InputResolveResultFixturesAnswerTheirRequest(t *testing.T) 
 }
 
 func TestDrift_InputResolveResult(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "InputResolveResult",
 		jsonSchemaProperties(t, "schemas/input-resolve.json"),
 		goTypeJSONFields(t, InputResolveResult{}))
 }
 
 func TestDrift_InputResolveRequest(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "InputResolveRequest",
 		jsonSchemaDefinitionProperties(t, "schemas/input-resolve.json", "inputResolveRequest"),
 		goTypeJSONFields(t, InputResolveRequest{}))
 }
 
 func TestDrift_InputResolveQuery(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "InputResolveQuery",
 		jsonSchemaDefinitionProperties(t, "schemas/input-resolve.json", "inputResolveQuery"),
 		goTypeJSONFields(t, InputResolveQuery{}))
 }
 
 func TestDrift_InputResolveAnswer(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "InputResolveAnswer",
 		jsonSchemaDefinitionProperties(t, "schemas/input-resolve.json", "inputResolveAnswer"),
 		goTypeJSONFields(t, InputResolveAnswer{}))
 }
 
 func TestDrift_InputBasis(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
 	assertFieldParity(t, "InputBasis",
 		jsonSchemaDefinitionProperties(t, "schemas/input-resolve.json", "inputBasis"),
 		goTypeJSONFields(t, InputBasis{}))
@@ -391,6 +407,7 @@ func TestDrift_InputBasis(t *testing.T) {
 // schemas/input-resolve.json states the selector, path and pattern grammars
 // and the bounds the validator applies.
 func TestInputResolveSchemaAgreesWithTheValidator(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "schema-rules-agree-with-the-validator")
 	type rule struct {
 		Pattern   string `json:"pattern"`
 		MaxLength int    `json:"maxLength"`
@@ -447,6 +464,7 @@ func TestInputResolveSchemaAgreesWithTheValidator(t *testing.T) {
 // Each invalid fixture breaks one rule, so the coverage test's code names the
 // reason it fails.
 func TestInputResolveInvalidFixturesFailForOneReason(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-fixture-corpus-holds-every-shape", "every-guarded-reject-branch-has-a-fixture")
 	for shape, parse := range map[string]func([]byte) []diag.Diagnostic{
 		"input-resolve-request": func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateInputResolveRequest(b); return d },
 		"input-resolve-result":  func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateInputResolveResult(b); return d },

@@ -144,6 +144,8 @@ type RemoteCache struct {
 
 	// actionEvents is set when the provider reports it accepts ActionResult.Events
 	// in upload payloads, so uploads carry them only when the provider supports it.
+	// ensureProvider writes it under the provider lock: read it only after
+	// ensureProvider returns (see providerResult).
 	actionEvents bool
 
 	// stats accumulates this run's cache activity (hits, bytes, time saved vs
@@ -863,13 +865,27 @@ func (r *RemoteCache) Upload(ctx context.Context, hash string, job *jobmodel.Sch
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 			return
 		}
-		out, err := sess.Upload(ctx, &cache.UploadParams{Key: in.Key, Result: in.Result, Manifest: in.Manifest})
+		out, err := sess.Upload(ctx, &cache.UploadParams{Key: in.Key, Result: r.providerResult(in.Result), Manifest: in.Manifest})
 		if err != nil || out == nil || !out.Accepted {
 			r.stats.RecordUploadFailure()
 			slog.Warn("remote cache: provider upload failed",
 				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		}
 	})
+}
+
+// providerResult returns the result an upload sends to the started provider:
+// the cached events ride along only when the provider advertised
+// action-events. The upload calls it after ensureProvider, which records that
+// answer, so the first upload of a run, which may start the provider, already
+// knows it. The prepared result is not modified.
+func (r *RemoteCache) providerResult(result *cache.ActionResult) *cache.ActionResult {
+	if r.actionEvents || result == nil || result.Events == nil {
+		return result
+	}
+	withoutEvents := *result
+	withoutEvents.Events = nil
+	return &withoutEvents
 }
 
 // DrainUploads waits for the background uploads to finish, then asks the provider
@@ -901,6 +917,8 @@ type uploadInput struct {
 // prepareUpload turns a freshly built local entry into the input to share with
 // the provider. Every entry is shared whatever its build duration or size,
 // except the entry of a job with external effects (jobmodel.HasExternalEffects).
+// The input keeps the cached events: the provider may not have answered
+// initialize yet, so the upload drops them later (providerResult).
 // It returns ok=false when the entry should not be uploaded.
 func (r *RemoteCache) prepareUpload(hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) (uploadInput, bool) {
 	entry, err := cm.Lookup(hash)
@@ -932,7 +950,7 @@ func (r *RemoteCache) prepareUpload(hash string, job *jobmodel.ScheduledJob, cm 
 	in := uploadInput{
 		Key:      hash,
 		Manifest: manifest,
-		Result:   cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, r.actionEvents),
+		Result:   cachekey.ActionResultFromEntryResult(entry.Result, durationMs, sizeBytes, true),
 	}
 	return in, true
 }

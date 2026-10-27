@@ -3,9 +3,12 @@ package migration
 import (
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestNormalizeDefinitions_Deterministic(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "a-migration-is-identified-by-datasource-and-name", "normalization-fills-defaults-and-sorts-the-same-way")
 	hashA := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	hashB := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	hashC := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"

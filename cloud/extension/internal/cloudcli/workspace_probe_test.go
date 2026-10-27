@@ -15,6 +15,7 @@ import (
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	workspaceproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
@@ -230,6 +231,7 @@ func TestArchiveIntentFollowsCommandOptionPrecedence(t *testing.T) {
 }
 
 func TestCloudWorkspaceProbeTransportIsReservedStrictAndBounded(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-cloud-extension-answers-the-probe")
 	root := t.TempDir()
 	writeArchiveProbeProject(t, root, ".", "@putnami/cloud")
 	request := workspaceproto.ProbeRequest{
@@ -257,7 +259,10 @@ func TestCloudWorkspaceProbeTransportIsReservedStrictAndBounded(t *testing.T) {
 	if len(diagnostics) != 0 || parsed.Extension != cloudRuntimeIdentity || len(parsed.Projects) != 1 {
 		t.Fatalf("transport result = %+v diagnostics=%+v", parsed, diagnostics)
 	}
+}
 
+func TestCloudWorkspaceProbeDeclinesAnOrdinaryCommand(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "first-party-extensions-answer-the-reserved-calls", "the-cloud-extension-claims-only-the-reserved-call")
 	var ordinary bytes.Buffer
 	if handled, err := HandleWorkspaceProbe([]string{"packages", "publish"}, strings.NewReader("{}"), &ordinary); handled || err != nil || ordinary.Len() != 0 {
 		t.Fatalf("ordinary command handled=%v err=%v stdout=%q", handled, err, ordinary.String())
@@ -615,6 +620,7 @@ func TestCloudWorkspaceProbeUsesFrameworkOptionPrecedenceAndRejectsInvalidOverri
 }
 
 func TestPublishedArchiveUsesTheNativeRuntimeArtifactEnvelope(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-emits-a-published-member-the-protocol-validates")
 	digest := "sha256:" + strings.Repeat("a", 64)
 	platformDigest := "sha256:" + strings.Repeat("b", 64)
 	var output []string

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "ci/ci-contract#a-change-plan-is-admitted-only-when-canonical",
+    "ci/ci-contract#a-deploy-binds-the-published-release-set",
+    "ci/ci-contract#a-verdict-is-validated",
+    "ci/ci-contract#an-impact-plan-is-validated",
+    "ci/ci-contract#baseline-names-a-channel-the-rule-reads",
+    "ci/ci-contract#branch-globs-are-slash-aware",
+    "ci/ci-contract#commands-run-in-order-with-their-flags",
+    "ci/ci-contract#distribution-is-a-closed-vocabulary",
+    "ci/ci-contract#environments-follow-channels",
+    "ci/ci-contract#gaps-name-what-is-missing-or-unknown",
+    "ci/ci-contract#one-canonical-form-and-digest",
+    "ci/ci-contract#producers-reproduce-the-corpus",
+    "ci/ci-contract#retain-declares-a-channel-lifetime",
+    "ci/ci-contract#review-is-guidance-without-authority",
+    "ci/ci-contract#rules-are-first-match",
+    "ci/ci-contract#the-answer-and-the-mark-are-folds",
+    "ci/ci-contract#the-change-plan-v1-is-frozen",
+    "ci/ci-contract#the-document-is-version-3-and-strict",
+    "ci/ci-contract#the-projection-is-one-change-plan",
+    "ci/ci-contract#the-runner-object-is-opaque",
+    "ci/ci-contract#the-verdict-corpus-is-the-conformance-case",
+    "ci/ci-contract#validating-commands-resolve-the-graph",
+    "ci/ci-contract#verdict-identities-are-canonical",
+    "ci/ci-contract#verdicts-parse-strictly-against-one-schema"
+  ]
+}

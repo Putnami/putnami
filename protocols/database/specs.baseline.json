@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "database/datasource-contract#a-binding-resolves-each-datasource",
+    "database/datasource-contract#a-connection-declares-exactly-one-transport",
+    "database/datasource-contract#a-requirement-carries-no-secret",
+    "database/datasource-contract#a-test-binding-adds-a-closed-policy",
+    "database/datasource-contract#the-go-adapter-reads-the-binding",
+    "database/datasource-contract#the-go-test-provider-reads-the-test-binding",
+    "database/datasource-contract#the-projection-is-secret-free-and-sorted",
+    "database/datasource-contract#the-schemas-and-the-go-types-agree",
+    "database/datasource-contract#the-shapes-parse-strictly",
+    "database/datasource-contract#the-typescript-adapter-reads-the-binding",
+    "database/datasource-contract#the-typescript-test-provider-reads-the-test-binding"
+  ]
+}

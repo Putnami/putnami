@@ -26,6 +26,7 @@ import (
 // client upload/request/response-validation path and exact published-member
 // bytes; backend persistence and projection need their own composed proof.
 func TestPublishArchivesEmitsMemberOnlyAfterAcceptedPutResponse(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-cloud-extension-emits-a-published-member-the-protocol-validates")
 	spectest.Proves(t, "cloud/cli-archive-publication", "member-only-after-accepted-put-response", "archive-publication-member-contract")
 	workspaceRoot := archiveMemberWorkspace(t)
 	bearer := jwt(map[string]any{"aud": "distribution", "scope": "put", "sub": "fixture-publisher"})

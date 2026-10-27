@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"go.putnami.dev/migration"
+	"go.putnami.dev/protocol/features/spectest"
 	protocolmigration "go.putnami.dev/protocol/migration"
 )
 
 func TestSQLRunner_MigrationBundleOperations(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-go-sql-runner-emits-and-loads-bundles", "the-runner-contributes-a-valid-bundle")
 	reg := migration.NewRegistry()
 	src := NewSQLSource("iam", Datasource{}, nil,
 		Definition{Name: "0001_create_users", SQL: "CREATE TABLE iam.users (id uuid primary key);", Down: "DROP TABLE iam.users;"},
@@ -65,6 +67,7 @@ func TestSQLRunner_MigrationBundleOperations(t *testing.T) {
 }
 
 func TestSQLRunner_MigrationBundleOperations_EmptyRegistry(t *testing.T) {
+	spectest.Proves(t, "migration/migration-contract", "the-go-sql-runner-emits-and-loads-bundles", "the-runner-contributes-a-valid-bundle")
 	runner := newSQLRunner(SQLRunnerOptions{Registry: migration.NewRegistry()})
 	ops, payloads, err := runner.MigrationBundleOperations()
 	if err != nil {

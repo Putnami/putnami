@@ -3,6 +3,8 @@ package extension
 import (
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // unsafePaths are the three classes every contract surface must reject,
@@ -24,6 +26,7 @@ var unsafePaths = []string{
 }
 
 func TestNormalizeRelativePath(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "declared-paths-follow-one-rule", "paths-refuse-absolutes-escapes-and-templates")
 	valid := map[string]string{
 		".gen":                  ".gen",
 		"bin/":                  "bin",
@@ -56,6 +59,7 @@ func TestNormalizeRelativePath(t *testing.T) {
 }
 
 func TestNormalizeInputPattern(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "declared-paths-follow-one-rule", "paths-refuse-absolutes-escapes-and-templates")
 	valid := map[string]string{
 		"cmd/**":          "cmd/**",
 		"./cmd/**":        "cmd/**",
@@ -90,6 +94,7 @@ func TestNormalizeInputPattern(t *testing.T) {
 // dimension — globbing — so a surface cannot accidentally relax an escape or an
 // absolute-path rule by choosing the other normalizer.
 func TestPathRulesAgree(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "declared-paths-follow-one-rule", "the-path-rules-agree")
 	for _, unsafe := range unsafePaths {
 		_, concreteErr := NormalizeRelativePath(unsafe)
 		_, patternErr := NormalizeInputPattern(unsafe)
@@ -116,6 +121,7 @@ func TestPathRulesAgree(t *testing.T) {
 }
 
 func TestNormalizePatternList(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "declared-paths-follow-one-rule", "paths-refuse-absolutes-escapes-and-templates")
 	if got := normalizePatternList(nil); got != nil {
 		t.Errorf("normalizePatternList(nil) = %v, want nil", got)
 	}

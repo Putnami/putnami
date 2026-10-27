@@ -51,9 +51,9 @@ describe('bounded machine-output helpers', () => {
   specTest(
     'returns only the two fixed mode budgets',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'bounded-stream-policy',
-      check: 'the-two-mode-budgets-are-fixed',
+      feature: 'cli/machine-contract',
+      requirement: 'the-bounded-stream-keeps-its-promises',
+      check: 'the-typescript-two-mode-budgets-are-fixed',
     },
     () => {
       expect(MACHINE_OUTPUT_BUDGETS[MACHINE_OUTPUT_MODE.normal]).toEqual({
@@ -78,9 +78,9 @@ describe('bounded machine-output helpers', () => {
   specTest(
     'sanitizes controls and values while retaining member names',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'sanitization',
-      check: 'controls-strip-and-member-names-remain',
+      feature: 'cli/machine-contract',
+      requirement: 'the-bounded-stream-keeps-its-promises',
+      check: 'the-typescript-controls-strip-and-member-names-remain',
     },
     () => {
       expect(
@@ -104,9 +104,9 @@ describe('bounded machine-output helpers', () => {
   specTest(
     'redacts every high-confidence credential family',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'sanitization',
-      check: 'every-credential-family-is-redacted',
+      feature: 'cli/machine-contract',
+      requirement: 'the-bounded-stream-keeps-its-promises',
+      check: 'the-typescript-every-credential-family-is-redacted',
     },
     () => {
       const syntheticValues = [
@@ -128,9 +128,9 @@ describe('bounded machine-output helpers', () => {
   specTest(
     'classifies the closed failure-priority vocabulary',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'bounded-stream-policy',
-      check: 'failure-priority-is-classified',
+      feature: 'cli/machine-contract',
+      requirement: 'the-bounded-stream-keeps-its-promises',
+      check: 'the-typescript-failure-priority-is-classified',
     },
     () => {
       const eventRecord = (event: Record<string, unknown>): SessionStreamRecord => ({
@@ -497,9 +497,9 @@ describe('session execution placement', () => {
   specTest(
     'records requested and actual placement without changing the session tree',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'execution-placement',
-      check: 'placement-is-optional-and-preserves-fallback',
+      feature: 'cli/machine-contract',
+      requirement: 'session-members-are-additive',
+      check: 'the-typescript-placement-is-optional-and-preserves-fallback',
     },
     () => {
       const session: SessionFile = {
@@ -894,9 +894,9 @@ describe('validateDocument determinism', () => {
   specTest(
     'sorts violations by path, then code',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'deterministic-violations',
-      check: 'violations-sort-by-path-then-code',
+      feature: 'cli/machine-contract',
+      requirement: 'one-validator-and-a-shared-corpus',
+      check: 'the-typescript-validator-sorts-violations-by-path-then-code',
     },
     () => {
       expect(validateDocument(DOCUMENT_KIND.sessionPlanFile, '{"zzz":1,"protocolVersion":1,"aaa":2}')).toEqual([
@@ -914,7 +914,7 @@ describe('validateDocument determinism', () => {
     'orders paths by code unit, never by locale',
     {
       feature: 'typescript/cli-machine-output',
-      requirement: 'deterministic-violations',
+      requirement: 'violations-order-by-code-unit',
       check: 'paths-compare-by-code-unit',
     },
     () => {
@@ -934,17 +934,18 @@ describe('validateDocument determinism', () => {
   );
 
   specTest(
-    'indexes array elements above nine',
+    'orders array indices above nine by code unit',
     {
       feature: 'typescript/cli-machine-output',
-      requirement: 'deterministic-violations',
-      check: 'array-indices-order-numerically',
+      requirement: 'violations-order-by-code-unit',
+      check: 'array-indices-order-by-code-unit',
     },
     () => {
-      const commands = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', ''];
+      const commands = ['a', 'b', '', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', ''];
       const document = JSON.stringify({ protocolVersion: 2, sessionId: 's', commands, tasks: [] });
       expect(validateDocument(DOCUMENT_KIND.sessionPlanFile, document)).toEqual([
         { code: VIOLATION_CODE.invalidValue, path: 'commands[11]' },
+        { code: VIOLATION_CODE.invalidValue, path: 'commands[2]' },
       ]);
     },
   );
@@ -958,9 +959,9 @@ describe('v2 derivations', () => {
   specTest(
     'reports the strict unified verdict',
     {
-      feature: 'typescript/cli-machine-output',
-      requirement: 'strict-verdict',
-      check: 'the-strict-verdict-gates-run-success',
+      feature: 'cli/machine-contract',
+      requirement: 'one-run-verdict-on-every-surface',
+      check: 'the-typescript-strict-verdict-gates-run-success',
     },
     () => {
       const summary: RunSummary = {

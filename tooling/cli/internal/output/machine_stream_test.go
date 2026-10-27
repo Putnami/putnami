@@ -117,7 +117,7 @@ func TestMachineStreamIsBoundedFailureFirstSanitizedAndCompletelyRecorded(t *tes
 }
 
 func TestMachineStreamVerboseChangesCapacityNotVerdict(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "normal-suppresses-and-verbose-admits-debug-detail")
+	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "the-output-mode-never-changes-the-run-verdict")
 	run := func(mode string) ([]byte, protocolcli.BoundedSessionEndRecord) {
 		t.Helper()
 		var out bytes.Buffer
@@ -154,7 +154,7 @@ func TestMachineStreamVerboseChangesCapacityNotVerdict(t *testing.T) {
 }
 
 func TestMachineStreamNormalSuppressesDebugTranscriptAndVerboseRetainsIt(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "normal-suppresses-and-verbose-admits-debug-detail")
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "the-cli-stream-suppresses-debug-detail-in-normal-mode-and-admits-it-in-verbose")
 	type stream struct {
 		live     []byte
 		artifact []byte
@@ -232,7 +232,7 @@ func TestMachineStreamNormalSuppressesDebugTranscriptAndVerboseRetainsIt(t *test
 }
 
 func TestMachineStreamReservesNormalizedFailedResultAfterOrdinaryExhaustion(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "failure-capacity-is-reserved-after-exhaustion")
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "the-cli-stream-keeps-failure-capacity-after-the-ordinary-budget-is-spent")
 	var live bytes.Buffer
 	session, err := workspace_state.NewSession(t.TempDir())
 	if err != nil {
@@ -278,7 +278,7 @@ func TestMachineStreamReservesNormalizedFailedResultAfterOrdinaryExhaustion(t *t
 // (scheduler.canonicalTaskEvents). The live stream classifies a record by its event's
 // type, so a record written without it was elided like ordinary detail.
 func TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "failure-capacity-is-reserved-after-exhaustion")
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "the-cli-stream-keeps-failure-capacity-after-the-ordinary-budget-is-spent")
 	var live bytes.Buffer
 	session, err := workspace_state.NewSession(t.TempDir())
 	if err != nil {

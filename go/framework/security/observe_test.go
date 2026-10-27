@@ -180,6 +180,7 @@ func TestRecordDecision_AnonymousSubjectDoesNotPanic(t *testing.T) {
 // change fails here (and in the contract twin drift tests) rather than silently
 // diverging from the TypeScript framework's adopted constants.
 func TestDecisionConstants_AliasGeneratedVocabulary(t *testing.T) {
+	spectest.Proves(t, "identity/consumer-side-vocabulary", "adopted-constants-mirror-the-enums", "go-security-decision-labels-alias-the-generated-constants")
 	cases := []struct {
 		got  decision
 		want identity.AuthDecision

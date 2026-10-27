@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestProbe_ProtocolVersionPinned(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-version-1-is-frozen-and-validated", "the-probe-version-is-pinned-and-its-result-frozen")
 	if ProbeProtocolVersion != 1 {
 		t.Fatalf("ProbeProtocolVersion = %d, want 1 — bumping requires a migration story on both "+
 			"core and every out-of-tree provider", ProbeProtocolVersion)
@@ -26,6 +28,7 @@ func TestProbe_ProtocolVersionPinned(t *testing.T) {
 // (dependencySources is the one such member; see
 // TestServeProbe_AnswersDependencySourcesOnlyWhenAsked).
 func TestProbeV1ResultWireShapeStaysStrictConsumerCompatible(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-version-1-is-frozen-and-validated", "the-probe-version-is-pinned-and-its-result-frozen")
 	assertJSONFields := func(name string, value any, want []string) {
 		t.Helper()
 		typ := reflect.TypeOf(value)
@@ -60,6 +63,7 @@ func TestProbeV1ResultWireShapeStaysStrictConsumerCompatible(t *testing.T) {
 }
 
 func TestNormalizeProbePath(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "a-probe-path-is-normalized")
 	cases := []struct {
 		in    string
 		want  string
@@ -90,6 +94,7 @@ func TestNormalizeProbePath(t *testing.T) {
 // identically — otherwise a provider's internal map iteration would oscillate
 // every cache key that observes it.
 func TestProbeResultDigest_IndependentOfAuthoringOrder(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "the-digest-ignores-authoring-and-diagnostics")
 	a := ProbeResult{
 		Version:   ProbeProtocolVersion,
 		Extension: "@putnami/go",
@@ -131,6 +136,7 @@ func TestProbeResultDigest_IndependentOfAuthoringOrder(t *testing.T) {
 }
 
 func TestProbeResultDigest_ExcludesDiagnostics(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "the-digest-ignores-authoring-and-diagnostics")
 	base := ProbeResult{Version: ProbeProtocolVersion, Extension: "@putnami/go",
 		Projects: []ProbeProject{{Path: "go/framework/http"}}}
 	noisy := base
@@ -142,6 +148,7 @@ func TestProbeResultDigest_ExcludesDiagnostics(t *testing.T) {
 }
 
 func TestProbeResultDigest_MovesWithEveryContractMember(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "the-digest-moves-with-every-contract-member")
 	base := ProbeResult{Version: ProbeProtocolVersion, Extension: "@putnami/go",
 		Projects: []ProbeProject{{Path: "go/framework/http"}}}
 	baseDigest := ProbeResultDigest(base)
@@ -180,6 +187,7 @@ func TestProbeResultDigest_MovesWithEveryContractMember(t *testing.T) {
 }
 
 func TestProbeWorkspaceDigest_IndependentOfProviderOrder(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "the-digest-ignores-authoring-and-diagnostics")
 	goResult := ProbeResult{Version: ProbeProtocolVersion, Extension: "@putnami/go",
 		Projects: []ProbeProject{{Path: "go/framework/http"}}}
 	tsResult := ProbeResult{Version: ProbeProtocolVersion, Extension: "@putnami/typescript",
@@ -199,6 +207,7 @@ func TestProbeWorkspaceDigest_IndependentOfProviderOrder(t *testing.T) {
 }
 
 func TestCanonicalMetadata(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "the-digest-ignores-authoring-and-diagnostics")
 	canonical, ok := CanonicalMetadata(json.RawMessage(`{"b":2,"a":{"d":4,"c":3}}`))
 	if !ok {
 		t.Fatal("object metadata rejected")
@@ -221,6 +230,7 @@ func TestCanonicalMetadata(t *testing.T) {
 }
 
 func TestNormalizeProbeResult_Idempotent(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-probe-digest-is-a-function-of-the-facts", "the-digest-ignores-authoring-and-diagnostics")
 	r := ProbeResult{
 		Version:   ProbeProtocolVersion,
 		Extension: "  @putnami/go  ",
@@ -254,6 +264,7 @@ func TestNormalizeProbeResult_Idempotent(t *testing.T) {
 // --- validation -------------------------------------------------------------
 
 func TestValidateProbeResult_Codes(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-version-1-is-frozen-and-validated", "probe-validation-names-each-rule")
 	cases := []struct {
 		name   string
 		result ProbeResult
@@ -293,6 +304,7 @@ func TestValidateProbeResult_Codes(t *testing.T) {
 }
 
 func TestValidateProbeRequest_Codes(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-version-1-is-frozen-and-validated", "probe-validation-names-each-rule")
 	cases := []struct {
 		name    string
 		request ProbeRequest
@@ -323,6 +335,7 @@ func TestValidateProbeRequest_Codes(t *testing.T) {
 }
 
 func TestParseAndValidateProbe_RoundTrip(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-version-1-is-frozen-and-validated", "probe-validation-names-each-rule")
 	result, diags := ParseAndValidateProbeResult([]byte(`{"version":1,"extension":"@putnami/go",
 		"projects":[{"path":"a","metadata":{"k":"v"}}]}`))
 	if diag.HasErrors(diags) {
@@ -351,6 +364,7 @@ func TestParseAndValidateProbe_RoundTrip(t *testing.T) {
 // --- merge rules ------------------------------------------------------------
 
 func TestMergeProbeResults_UnionsListsAndBucketsMetadata(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "explicit-values-win-and-lists-union")
 	goResult := ProbeResult{Version: 1, Extension: "@putnami/go", Projects: []ProbeProject{{
 		Path:         "svc",
 		SourceName:   "go.putnami.dev/svc",
@@ -398,6 +412,7 @@ func TestMergeProbeResults_UnionsListsAndBucketsMetadata(t *testing.T) {
 }
 
 func TestMergeProbeResults_ConflictingScalarsAreHardErrors(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "conflicting-provider-scalars-fail")
 	a := ProbeResult{Version: 1, Extension: "@putnami/go",
 		Projects: []ProbeProject{{Path: "svc", Type: "library"}}}
 	b := ProbeResult{Version: 1, Extension: "@putnami/typescript",
@@ -435,6 +450,7 @@ func TestMergeProbeResults_ConflictingScalarsAreHardErrors(t *testing.T) {
 // authors a sourceFile and the conflict diagnostic's advertised escape hatch
 // ("set it explicitly in putnami.json") does not exist for this field.
 func TestMergeProbeResults_ProvenanceFollowsTheResolvedName(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "conflicting-provider-scalars-fail")
 	goResult := ProbeResult{Version: 1, Extension: "@putnami/go", Projects: []ProbeProject{
 		{Path: "svc", SourceName: "example.com/svc", SourceFile: "svc/go.mod"},
 	}}
@@ -488,6 +504,7 @@ func TestMergeProbeResults_ProvenanceFollowsTheResolvedName(t *testing.T) {
 }
 
 func TestMergeProbeResults_AgreeingProvidersAreNotAConflict(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "conflicting-provider-scalars-fail")
 	a := ProbeResult{Version: 1, Extension: "@putnami/go",
 		Projects: []ProbeProject{{Path: "svc", Type: "library"}}}
 	b := ProbeResult{Version: 1, Extension: "@putnami/scaffold",
@@ -503,6 +520,7 @@ func TestMergeProbeResults_AgreeingProvidersAreNotAConflict(t *testing.T) {
 }
 
 func TestMergeProbeResults_ExplicitOnlyProjectSurvives(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "explicit-values-win-and-lists-union")
 	merged, diags := MergeProbeResults(nil, map[string]ExplicitProject{
 		"svc": {Name: "svc", Type: "application", Tags: []string{"go"}},
 	})
@@ -519,6 +537,7 @@ func TestMergeProbeResults_ExplicitOnlyProjectSurvives(t *testing.T) {
 }
 
 func TestMergeProbeResults_DoesNotMutateInput(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "explicit-values-win-and-lists-union")
 	input := []ProbeResult{{Version: 1, Extension: "@putnami/go", Projects: []ProbeProject{
 		{Path: "./b/", Tags: []string{"z", "a"}},
 		{Path: "a"},
@@ -530,6 +549,7 @@ func TestMergeProbeResults_DoesNotMutateInput(t *testing.T) {
 }
 
 func TestExplicitFromProjectConfig(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "explicit-values-win-and-lists-union")
 	if got := ExplicitFromProjectConfig(nil); got.Name != "" || got.Tags != nil {
 		t.Errorf("nil config = %+v, want zero value", got)
 	}
@@ -545,6 +565,7 @@ func TestExplicitFromProjectConfig(t *testing.T) {
 }
 
 func TestResolveProjectName_Precedence(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "names-and-tags-follow-one-precedence")
 	cases := []struct {
 		explicit, probe, pattern, basename, want string
 	}{
@@ -564,6 +585,7 @@ func TestResolveProjectName_Precedence(t *testing.T) {
 }
 
 func TestFillScopeTags_FillsButNeverOverwrites(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-results-merge-by-fixed-rules", "names-and-tags-follow-one-precedence")
 	if got := FillScopeTags([]string{"go"}, []string{"protocol"}); len(got) != 1 || got[0] != "go" {
 		t.Errorf("FillScopeTags = %v, want the project's own tags untouched", got)
 	}
@@ -578,6 +600,7 @@ func TestFillScopeTags_FillsButNeverOverwrites(t *testing.T) {
 // --- typed failures ---------------------------------------------------------
 
 func TestProbeFailure_TypedAndCausal(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "probe-version-1-is-frozen-and-validated", "a-probe-failure-is-typed-and-causal")
 	failure := NewProbeFailure(ProbeFailureTimeout, "@putnami/go", "no answer after %ds", 30)
 	if failure.Error() != "timeout: @putnami/go: no answer after 30s" {
 		t.Errorf("Error() = %q", failure.Error())

@@ -3,7 +3,7 @@
   "name": "go.putnami.dev/protocol/ci",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
@@ -14,9 +14,11 @@
     },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "The user outcome is owned by the commands that write, validate and explain the document, which a CI extension serves, and the plane that executes its requests."
   }
 }

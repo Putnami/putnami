@@ -240,8 +240,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "nearest-ancestor-line-wins",
-              "nested-line-is-refused"
+              "the-loader-maps-each-line-to-its-tag-pattern"
             ]
           }
         },
@@ -254,7 +253,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "project-override-replaces-the-entry"
+              "each-project-reads-the-entry-of-its-ecosystem"
             ]
           }
         },
@@ -1313,8 +1312,7 @@
             "checks": [
               "a-hit-no-job-waits-for-moves-no-bytes",
               "a-hit-a-planned-job-waits-for-keeps-its-files",
-              "a-run-that-reads-the-files-restores-them-or-executes",
-              "a-provider-without-the-capability-sees-no-new-field"
+              "a-run-that-reads-the-files-restores-them-or-executes"
             ]
           }
         },
@@ -1751,7 +1749,6 @@
             "kind": "acceptance",
             "checks": [
               "core-reads-no-cache-configuration",
-              "core-materializes-in-the-mode-the-provider-returns",
               "a-provider-that-is-not-ready-stops-silently",
               "one-provider-per-run"
             ]
@@ -1900,9 +1897,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "errors-map-to-stable-exit-codes",
-              "session-exit-derives-from-the-canonical-reduction",
-              "an-interrupt-is-a-distinct-aborted-status",
               "an-interactive-run-that-passes-its-deadline-exits-one-and-names-it",
               "an-interactive-child-that-ends-from-a-signal-exits-one-and-names-it",
               "an-interactive-child-that-ends-from-sigint-is-an-interrupted-run"
@@ -1919,8 +1913,7 @@
             "kind": "acceptance",
             "checks": [
               "the-stream-is-bounded-failure-first-sanitized-and-recorded",
-              "normal-suppresses-and-verbose-admits-debug-detail",
-              "failure-capacity-is-reserved-after-exhaustion"
+              "the-output-mode-never-changes-the-run-verdict"
             ]
           }
         },
@@ -2695,7 +2688,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "putnami-json-declares-the-member-level"
+              "putnami-json-declares-the-member-level",
+              "publish-refuses-a-members-rule-that-disagrees"
             ]
           }
         },
@@ -3003,7 +2997,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-source-sentinel-round-trips-and-a-metadata-refresh-leaves-it-intact"
+              "pin-shows-a-lock-with-the-reserved-literal-as-built-from-this-workspace",
+              "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it",
+              "pin-remove-clears-the-source-sentinel",
+              "pin-replaces-the-source-sentinel"
             ]
           }
         },
@@ -4003,9 +4000,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-projection-is-canonical",
-              "the-corpus-is-reproduced",
-              "an-invalid-plan-is-never-emitted"
+              "the-projection-is-canonical"
             ]
           }
         },
@@ -4261,7 +4256,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-dependent-manifest-requires-contract-8"
+              "a-dependent-stamped-below-rung-8-is-skipped"
             ]
           }
         }

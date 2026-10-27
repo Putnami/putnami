@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // shortExchangeDir returns an exchange directory whose path is short enough for
@@ -48,6 +49,7 @@ func dial(t *testing.T, server *Server) *Client {
 // miss, a put whose bytes travel through the blob-exchange directory, then a hit
 // whose bytes are back in that directory at their content address.
 func TestObjectRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-stores-only-verified-bytes")
 	dir := shortExchangeDir(t)
 	server := startServer(t, dir)
 	client := dial(t, server)
@@ -115,6 +117,7 @@ func TestObjectRoundTrip(t *testing.T) {
 // rests on: under an authoritative policy a hint object is a MISS, and is
 // indistinguishable from an absent one.
 func TestChannelFilterHidesUntrustedObjects(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-hides-a-filtered-channel")
 	dir := shortExchangeDir(t)
 	id := strings.Repeat("b", 64)
 	server := startServer(t, dir,
@@ -152,6 +155,7 @@ func TestChannelFilterHidesUntrustedObjects(t *testing.T) {
 
 // TestNamespacesAreDisjoint pins that ids never collide across namespaces.
 func TestNamespacesAreDisjoint(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-keeps-namespaces-apart")
 	dir := shortExchangeDir(t)
 	id := strings.Repeat("c", 64)
 	server := startServer(t, dir, WithSeed("go-build", id, []byte("go object"), ""))
@@ -169,6 +173,7 @@ func TestNamespacesAreDisjoint(t *testing.T) {
 // TestSessionOpsAreRefusedOnTheSocket pins the socket's op boundary: a job
 // process cannot drive the session through the socket it was handed.
 func TestSessionOpsAreRefusedOnTheSocket(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-refuses-session-ops")
 	server := startServer(t, shortExchangeDir(t))
 	client := dial(t, server)
 
@@ -193,6 +198,7 @@ func TestSessionOpsAreRefusedOnTheSocket(t *testing.T) {
 // TestConcurrentConnections pins the contract's "many concurrent connections"
 // clause with real parallel clients sharing one store.
 func TestConcurrentConnections(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-serves-concurrent-connections")
 	server := startServer(t, shortExchangeDir(t))
 
 	const clients = 8
@@ -237,8 +243,28 @@ func TestConcurrentConnections(t *testing.T) {
 	for err := range errs {
 		t.Fatalf("concurrent client: %v", err)
 	}
-	if gets, puts := server.Stats(); gets != clients || puts != clients {
-		t.Fatalf("stats = %d gets / %d puts, want %d each", gets, puts, clients)
+
+	// One more client reads every object the others stored: a store per
+	// connection would hold none of them.
+	reader, err := Dial(server.Path())
+	if err != nil {
+		t.Fatalf("dial reader: %v", err)
+	}
+	defer func() { _ = reader.Close() }()
+	ids := make([]string, clients)
+	for i := range ids {
+		ids[i] = strings.Repeat("d", 60) + string(rune('0'+i))
+	}
+	shared, err := reader.Get(&cache.ObjectGetParams{Namespace: "go-build", IDs: ids})
+	if err != nil {
+		t.Fatalf("reader get: %v", err)
+	}
+	if len(shared.Objects) != clients {
+		t.Fatalf("reader saw %d objects stored by the other clients, want %d", len(shared.Objects), clients)
+	}
+
+	if gets, puts := server.Stats(); gets != clients+1 || puts != clients {
+		t.Fatalf("stats = %d gets / %d puts, want %d / %d", gets, puts, clients+1, clients)
 	}
 }
 
@@ -246,6 +272,7 @@ func TestConcurrentConnections(t *testing.T) {
 // follows, and TestLongExchangeDirFallsBackToAShortPath covers the escape hatch
 // that keeps a deep temporary directory from making a socket unbindable.
 func TestSocketLivesUnderTheExchangeDir(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-socket-lives-in-the-exchange-directory")
 	dir := shortExchangeDir(t)
 	server := startServer(t, dir)
 	if got := filepath.Dir(server.Path()); got != dir {
@@ -261,6 +288,7 @@ func TestSocketLivesUnderTheExchangeDir(t *testing.T) {
 }
 
 func TestLongExchangeDirFallsBackToAShortPath(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-socket-lives-in-the-exchange-directory")
 	base := shortExchangeDir(t)
 	deep := filepath.Join(base, strings.Repeat("deep-directory-name/", 8))
 	if err := os.MkdirAll(deep, 0o755); err != nil {
@@ -295,6 +323,7 @@ func TestLongExchangeDirFallsBackToAShortPath(t *testing.T) {
 // server stores only bytes it could read AND verify, so a caller cannot make an
 // id resolve to content that does not hash to the digest it announced.
 func TestPutRejectsUnstagedOrMismatchedBytes(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-stores-only-verified-bytes")
 	server := startServer(t, shortExchangeDir(t))
 	client := dial(t, server)
 
@@ -343,6 +372,7 @@ func TestPutRejectsUnstagedOrMismatchedBytes(t *testing.T) {
 // TestCloseIsIdempotent keeps the handle safe for a deferred cleanup that a
 // test may also call explicitly.
 func TestCloseIsIdempotent(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-handle-is-safe")
 	server := startServer(t, shortExchangeDir(t))
 	if err := server.Close(); err != nil {
 		t.Fatalf("close: %v", err)
@@ -354,6 +384,7 @@ func TestCloseIsIdempotent(t *testing.T) {
 
 // TestStartRequiresAnExchangeDir keeps the handle from starting half-configured.
 func TestStartRequiresAnExchangeDir(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-reference-socket-server", "the-reference-server-handle-is-safe")
 	if _, err := Start(""); err == nil {
 		t.Fatal("Start(\"\") should fail")
 	}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	runner "go.putnami.dev/protocol/runner"
 )
 
@@ -84,6 +85,7 @@ func removeString(values []string, target string) []string {
 }
 
 func TestImportBundleIsAtomicIdempotentAndCollisionSafe(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "importers-verify-and-are-idempotent", "the-cli-importer-repeats-safely-and-refuses-a-different-record")
 	t.Parallel()
 	root, exchange := t.TempDir(), t.TempDir()
 	bundle := stageBundle(t, exchange, map[string]map[string][]byte{
@@ -122,6 +124,7 @@ func TestImportBundleIsAtomicIdempotentAndCollisionSafe(t *testing.T) {
 }
 
 func TestImportBundleRefusesInvalidEvidence(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "importers-verify-and-are-idempotent", "the-cli-importer-verifies-before-it-writes")
 	t.Parallel()
 	cases := map[string]func(map[string]map[string][]byte) (gate string){
 		"session id mismatch": func(s map[string]map[string][]byte) string {
@@ -174,6 +177,7 @@ func TestImportBundleRefusesInvalidEvidence(t *testing.T) {
 }
 
 func TestImportBundleVerifiesDigestsBeforeWriting(t *testing.T) {
+	spectest.Proves(t, "runner/runner-contract", "importers-verify-and-are-idempotent", "the-cli-importer-verifies-before-it-writes")
 	t.Parallel()
 	root, exchange := t.TempDir(), t.TempDir()
 	bundle := stageBundle(t, exchange, map[string]map[string][]byte{gateID: {runner.BundleSessionFile: sessionDocument(gateID, "", 0)}}, gateID)

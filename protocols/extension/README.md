@@ -387,16 +387,27 @@ Evidence behind `stable`:
 
 ## Product feature and durable decisions
 
-**No user-facing feature is declared for this module, deliberately.** The user
-outcomes it enables — "my language works in Putnami", "my extension's tasks are
-cached correctly" — belong to the extensions and CLI commands that deliver them.
-A feature per protocol module would create one artificial product identity per
-technical boundary, which the [feature protocol's authoring
-boundary](../features/README.md) rules out. With no feature to detail there is
-no spec, since a spec details exactly one already-authored feature and never
-mints one.
+The module owns the feature of its contract, `extension/manifest-contract`,
+specified in [`specs/manifest-contract.json`](specs/manifest-contract.json). The
+conformance, drift, matrix, digest, ecosystem and outbox tests here prove its
+requirements, and so do the implementations, each under checks of its own:
 
-Durable decisions (both scope `protocols/extension` explicitly):
+| Implementation | Where | What its tests prove |
+| --- | --- | --- |
+| CLI | `tooling/cli/internal/extension` | Every manifest in the repository loads at the contract its vocabulary requires; the first-party list passes the strict parser and `FullValidateManifest`; a manifest with a registry dependency requires rung 8 and a stamp above the latest contract is refused. |
+| Go extension | `go/extension` | The packager stamps the rung a manifest's vocabulary requires, stamps a dependent at rung 8 and refuses what the protocol refuses; the publisher emits a valid published member, probes the strict reader accepts and an outbox it reads; its own manifest passes `FullValidateManifest`. |
+| TypeScript extension | `typescript/extension` | The npm packager stamps and refuses the same way; the publisher emits a valid published member, probes and an outbox the strict reader accepts; its own manifest passes `FullValidateManifest`. |
+| Python extension | `python/extension` | Its own manifest passes `FullValidateManifest`. |
+| Extension SDK | `tooling/extension-sdk` | The builder and the content packager stamp the rung; the authoring gate runs `FullValidateManifest`; the probe builders and reader agree with `ParseMemberProbe`; the outbox writer and reader agree with `ParsePublicationOutbox`. |
+| Cloud extension | `cloud/extension` | The publishers emit valid published members and pack outbox descriptors the strict parser accepts. |
+
+The other first-party extensions author manifests that the CLI loads in its
+first-party tests. They are not implementations of this contract and keep their
+own features, as do the CLI commands that deliver "my language works in
+Putnami".
+
+The spec lists every ADR under [`doc/adr`](doc/adr). Two more decisions scope
+`protocols/extension` explicitly:
 
 - [ADR 0001 — CLI foundation boundaries: catalog, result, engine](../../tooling/cli/doc/adr/0001-cli-foundation-boundaries.md)
 - [ADR 0002 — CLI vNext: one contract with four surfaces, and the ratchets that hold it](../../tooling/cli/doc/adr/0002-cli-vnext-contracts.md)

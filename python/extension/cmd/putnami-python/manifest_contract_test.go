@@ -60,6 +60,7 @@ func formatDiagnostics(diags []diag.Diagnostic) string {
 // diagnostics under the comprehensive protocol entry point, which includes the
 // v3 task-contract harness (exactness, one owner per output, honest effects).
 func TestExtensionManifestPassesFullValidation(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "every-first-party-manifest-conforms", "the-python-extension-manifest-passes-full-validation")
 	spectest.Proves(t, "python/experimental-workspace-integration", "explicit-opt-in", "the-extension-manifest-passes-the-protocol-validation-the-cli-applies")
 	m := loadExtensionManifest(t)
 	if diags := proto.FullValidateManifest(m); len(diags) > 0 {

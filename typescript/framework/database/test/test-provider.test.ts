@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { specTest } from '@putnami/spectest';
 import type { DatabaseConnectionSpec, DatabaseTestBinding } from '../src/postgres/binding';
 import { parseTestBinding } from '../src/postgres/binding';
 import { SQLSource } from '../src/migrations/sql-source';
@@ -327,15 +328,33 @@ describe('bundleDigest', () => {
 });
 
 describe('provision (no live database)', () => {
-  it('throws TestProviderSkip when mode=skip and no datasources', async () => {
-    await expect(provision({ binding: { protocolVersion: 1, mode: 'skip' } })).rejects.toBeInstanceOf(TestProviderSkip);
-  });
+  specTest(
+    'throws TestProviderSkip when mode=skip and no datasources',
+    {
+      feature: 'database/datasource-contract',
+      requirement: 'the-typescript-test-provider-reads-the-test-binding',
+      check: 'the-typescript-provider-honors-the-mode',
+    },
+    async () => {
+      await expect(provision({ binding: { protocolVersion: 1, mode: 'skip' } })).rejects.toBeInstanceOf(
+        TestProviderSkip,
+      );
+    },
+  );
 
-  it('fails loudly when mode=require and no datasources', async () => {
-    await expect(provision({ binding: { protocolVersion: 1, mode: 'require' } })).rejects.toThrow(
-      /DATABASE_TEST_BINDINGS/,
-    );
-  });
+  specTest(
+    'fails loudly when mode=require and no datasources',
+    {
+      feature: 'database/datasource-contract',
+      requirement: 'the-typescript-test-provider-reads-the-test-binding',
+      check: 'the-typescript-provider-honors-the-mode',
+    },
+    async () => {
+      await expect(provision({ binding: { protocolVersion: 1, mode: 'require' } })).rejects.toThrow(
+        /DATABASE_TEST_BINDINGS/,
+      );
+    },
+  );
 });
 
 // The datasource-selection corpus both test providers run. Its Go twin is
@@ -360,28 +379,36 @@ describe('datasource selection corpus', () => {
   });
 
   for (const c of corpus.cases) {
-    it(c.id, async () => {
-      const binding = parseTestBinding(JSON.stringify(corpus.binding));
-      if (c.mode) {
-        binding.mode = c.mode;
-      }
+    specTest(
+      c.id,
+      {
+        feature: 'database/datasource-contract',
+        requirement: 'the-typescript-test-provider-reads-the-test-binding',
+        check: 'the-typescript-provider-passes-the-selection-corpus',
+      },
+      async () => {
+        const binding = parseTestBinding(JSON.stringify(corpus.binding));
+        if (c.mode) {
+          binding.mode = c.mode;
+        }
 
-      if (c.expect.error) {
-        const err = await provision({ binding, datasources: c.datasources }).then(
-          () => undefined,
-          (e: unknown) => e as Error,
-        );
-        expect(err).toBeInstanceOf(Error);
-        expect(err instanceof TestProviderSkip).toBe(c.expect.error === 'skip');
-        const list = (c.expect.names ?? []).map((n) => JSON.stringify(n)).join(', ');
-        expect(err?.message).toContain(`has no datasource ${list}`);
-        return;
-      }
+        if (c.expect.error) {
+          const err = await provision({ binding, datasources: c.datasources }).then(
+            () => undefined,
+            (e: unknown) => e as Error,
+          );
+          expect(err).toBeInstanceOf(Error);
+          expect(err instanceof TestProviderSkip).toBe(c.expect.error === 'skip');
+          const list = (c.expect.names ?? []).map((n) => JSON.stringify(n)).join(', ');
+          expect(err?.message).toContain(`has no datasource ${list}`);
+          return;
+        }
 
-      const plans = planDatabases(selectDatasources(binding, c.datasources), fixedSuffix('s'));
-      expect(plans.map((p) => p.name)).toEqual(c.expect.datasources ?? []);
-      expect(Object.keys(runtimeBinding(plans).databases ?? {}).sort()).toEqual(c.expect.datasources ?? []);
-    });
+        const plans = planDatabases(selectDatasources(binding, c.datasources), fixedSuffix('s'));
+        expect(plans.map((p) => p.name)).toEqual(c.expect.datasources ?? []);
+        expect(Object.keys(runtimeBinding(plans).databases ?? {}).sort()).toEqual(c.expect.datasources ?? []);
+      },
+    );
   }
 });
 

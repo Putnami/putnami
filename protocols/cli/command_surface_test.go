@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The command-surface document has two representations that must move
@@ -25,6 +27,7 @@ var commandSurfaceSchema []byte
 var commandSurfaceCorpus []byte
 
 func TestCommandSurfaceCorpus(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "the-command-surface-corpus-and-schema-hold")
 	t.Parallel()
 	var corpus []struct {
 		Name  string `json:"name"`
@@ -89,6 +92,7 @@ func TestCommandSurfaceCorpus(t *testing.T) {
 // from a malformed document, so a consumer can skip a document it cannot read
 // yet instead of failing on it.
 func TestAReaderReadsEveryVersionUpToItsOwn(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "writing-is-canonical-and-reading-is-bounded")
 	t.Parallel()
 	document := func(version int) []byte {
 		return fmt.Appendf(nil, `{"protocolVersion":%d,"globalFlags":[],"commands":[]}`, version)
@@ -114,6 +118,7 @@ func TestAReaderReadsEveryVersionUpToItsOwn(t *testing.T) {
 }
 
 func TestCommandSurfaceSchemaDrift(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "the-command-surface-corpus-and-schema-hold")
 	t.Parallel()
 	var schema struct {
 		ID   string `json:"$id"`
@@ -252,6 +257,7 @@ func sameJSON(t *testing.T, a, b []byte) bool {
 }
 
 func TestNewCommandSurfaceIsCanonical(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "writing-is-canonical-and-reading-is-bounded")
 	t.Parallel()
 	values := []string{"tag", "push"}
 	commands := []CommandSurfaceCommand{
@@ -311,6 +317,7 @@ func TestNewCommandSurfaceIsCanonical(t *testing.T) {
 }
 
 func TestNewCommandSurfaceRefusesADuplicate(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "writing-is-canonical-and-reading-is-bounded")
 	t.Parallel()
 	for name, commands := range map[string][]CommandSurfaceCommand{
 		"command": {{Path: "build"}, {Path: "build"}},
@@ -330,6 +337,7 @@ func TestNewCommandSurfaceRefusesADuplicate(t *testing.T) {
 }
 
 func TestParseCommandSurfaceRefusesAnOversizedDocument(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "writing-is-canonical-and-reading-is-bounded")
 	t.Parallel()
 	document := []byte(`{"protocolVersion":1,"globalFlags":[],"commands":[]}`)
 	padded := append(bytes.Repeat([]byte(" "), CommandSurfaceMaxBytes), document...)
@@ -339,6 +347,7 @@ func TestParseCommandSurfaceRefusesAnOversizedDocument(t *testing.T) {
 }
 
 func TestParseCommandSurfaceNamesTheSameNullMemberEveryTime(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "writing-is-canonical-and-reading-is-bounded")
 	t.Parallel()
 	document := []byte(`{"protocolVersion":1,"globalFlags":[],"commands":[{"path":null,"positionals":null,"flags":null}]}`)
 	for range 50 {
@@ -391,6 +400,7 @@ func surfaceFlag(flags []CommandSurfaceFlag, long string) *CommandSurfaceFlag {
 }
 
 func TestIncompatibleCommandChanges(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "incompatible-changes-are-named-once")
 	t.Parallel()
 	for _, testCase := range []struct {
 		name   string
@@ -528,6 +538,7 @@ func TestIncompatibleCommandChanges(t *testing.T) {
 // Changes come back in one order whatever order the edits were made in, and a
 // removed command or flag is one change, not one per member it held.
 func TestIncompatibleCommandChangesAreSortedAndNotRepeated(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-command-surface-names-breaking-changes", "incompatible-changes-are-named-once")
 	t.Parallel()
 	previous := surfaceFixture(t)
 	current := surfaceFixture(t)

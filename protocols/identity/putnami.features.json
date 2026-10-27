@@ -1,0 +1,71 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "identity",
+  "features": [
+    {
+      "id": "identity/consumer-side-vocabulary",
+      "type": "feature",
+      "name": "Consumer-side identity vocabulary",
+      "outcome": "The frameworks read claims, produce principal kinds and report authorization decisions from one reviewed vocabulary compiled from a single manifest, so no runtime hand-writes the keys that dashboards and logs share",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "one-manifest-identity-and-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-parses-validates-and-names-the-identity-contract"
+            ]
+          }
+        },
+        {
+          "id": "reviewed-claim-and-principal-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-pins-claims-principal-kinds-and-enum-values"
+            ]
+          }
+        },
+        {
+          "id": "committed-twins-are-fresh",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-committed-artifacts-match-a-fresh-generation",
+              "typescript-application-twin-matches-a-fresh-emission"
+            ]
+          }
+        },
+        {
+          "id": "adopted-constants-mirror-the-enums",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "go-security-decision-labels-alias-the-generated-constants",
+              "typescript-application-constants-equal-the-manifest-enums"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

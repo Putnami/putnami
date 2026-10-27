@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The dependency-preparation stage's ownership attribution.
@@ -46,6 +48,7 @@ func sessionFileWithPreparation() SessionFile {
 
 // TestSessionPreparationRoundTrip pins the whole block through the wire.
 func TestSessionPreparationRoundTrip(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "preparation-is-a-closed-histogram")
 	want := sessionFileWithPreparation()
 	data, err := json.Marshal(want)
 	if err != nil {
@@ -67,6 +70,7 @@ func TestSessionPreparationRoundTrip(t *testing.T) {
 // no preparation block is exactly the document an earlier producer wrote, and it still
 // validates.
 func TestSessionPreparationIsAdditive(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "preparation-is-a-closed-histogram")
 	file := sessionFileWithPreparation()
 	file.Preparation = nil
 	data, err := json.Marshal(file)
@@ -91,6 +95,7 @@ func TestSessionPreparationIsAdditive(t *testing.T) {
 // non-overlapping work inside 4.2 seconds of wall, which no measurement can
 // produce — so exactly there, the validator rejects it.
 func TestSessionPreparationOverlapIsOnlyAllowedUnderParallelism(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "preparation-is-a-closed-histogram")
 	overlapping := sessionFileWithPreparation()
 	data, err := json.Marshal(overlapping)
 	if err != nil {
@@ -129,6 +134,7 @@ func TestSessionPreparationOverlapIsOnlyAllowedUnderParallelism(t *testing.T) {
 // rows would otherwise publish a plausible-looking list from which every ratio
 // a reader computes is wrong, with nothing else in the document to reveal it.
 func TestSessionPreparationPhasesAreAHistogram(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "preparation-is-a-closed-histogram")
 	file := sessionFileWithPreparation()
 	file.Preparation.Phases = append(file.Preparation.Phases,
 		PreparationPhaseRecord{Phase: PreparationPhaseGeneration, WallMs: 10, Steps: 1})
@@ -147,6 +153,7 @@ func TestSessionPreparationPhasesAreAHistogram(t *testing.T) {
 // can act on, so a sixth phase name is a producer bug rather than a forward
 // extension.
 func TestPreparationPhaseVocabularyIsClosed(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "preparation-is-a-closed-histogram")
 	file := sessionFileWithPreparation()
 	file.Preparation.Phases = []PreparationPhaseRecord{{Phase: "other", WallMs: 10, Steps: 1}}
 	data, err := json.Marshal(file)
@@ -164,6 +171,7 @@ func TestPreparationPhaseVocabularyIsClosed(t *testing.T) {
 // block follows — a zero here would read as "this class was entered and cost
 // nothing", which is a different statement from "never entered".
 func TestPreparationPhaseStepsAreAtLeastOne(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "session-members-are-additive", "preparation-is-a-closed-histogram")
 	file := sessionFileWithPreparation()
 	file.Preparation.Phases = []PreparationPhaseRecord{{Phase: PreparationPhaseNetwork, WallMs: 0, Steps: 0}}
 	data, err := json.Marshal(file)

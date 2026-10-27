@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The non-job envelope constructor. Every case asserts the
@@ -14,6 +16,7 @@ import (
 // assertion.
 
 func TestNewResultV2_SuccessCarriesNoError(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "the-envelope-maps-every-outcome")
 	r := NewResultV2("contracts check", map[string]any{"outcome": "clean"}, nil)
 	if r.ProtocolVersion != ResultProtocolVersion {
 		t.Errorf("protocolVersion = %d, want %d", r.ProtocolVersion, ResultProtocolVersion)
@@ -35,6 +38,7 @@ func TestNewResultV2_SuccessCarriesNoError(t *testing.T) {
 // functions the process exit path uses, so a class whose code disagreed with
 // its verdict would fail the validator here rather than on a consumer's wire.
 func TestNewResultV2_FailureClassesMapToTheContract(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "the-envelope-maps-every-outcome")
 	for name, tc := range map[string]struct {
 		err      error
 		status   string
@@ -79,6 +83,7 @@ func TestNewResultV2_FailureClassesMapToTheContract(t *testing.T) {
 // TestNewResultV2_CarriesTheSuggestedNext keeps the recovery hint on the machine
 // surface: an agent reads error.next instead of the human "Try:" line.
 func TestNewResultV2_CarriesTheSuggestedNext(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "the-envelope-maps-every-outcome")
 	err := WithNext(Classify(errors.New("lock needs migration"), ErrInvalidConfig),
 		"putnami migrate vnext --apply")
 	r := NewResultV2("migrate vnext", nil, err)
@@ -89,6 +94,7 @@ func TestNewResultV2_CarriesTheSuggestedNext(t *testing.T) {
 }
 
 func TestWriteResultV2_Modes(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "output-modes-and-the-result-envelope", "the-envelope-maps-every-outcome")
 	r := NewResultV2("doctor", map[string]any{"verdict": "pass"}, nil)
 
 	t.Run("json is indented", func(t *testing.T) {

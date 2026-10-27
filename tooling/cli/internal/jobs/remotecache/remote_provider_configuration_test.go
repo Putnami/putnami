@@ -48,7 +48,7 @@ func readLines(t *testing.T, path string) []string {
 // The core sends no mode and lists provider-configuration. It materializes in
 // the mode a provider returns with the echo, and in full without the echo.
 func TestProviderMode_TheProviderResolvesIt(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-cache-provider-owns-its-configuration", "core-materializes-in-the-mode-the-provider-returns")
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-resolves-the-mode", "core-materializes-in-the-mode-the-provider-returns")
 	useInProcessFakeProvider(t)
 	for _, tc := range []struct {
 		name     string

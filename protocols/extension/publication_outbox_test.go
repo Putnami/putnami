@@ -7,12 +7,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const outboxFixtures = "fixtures/publication-outbox"
@@ -36,6 +36,7 @@ func readOutboxFixture(t *testing.T, kind, name string) []byte {
 }
 
 func TestOutboxDescriptorRefusesUnknownDuplicateAndNullMembers(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-refuses-unknown-duplicate-and-null-members")
 	for name, want := range map[string]string{
 		"unknown-root-member.json":     `unknown member "registry"`,
 		"unknown-artifact-member.json": `unknown member "url"`,
@@ -62,6 +63,7 @@ func TestOutboxDescriptorRefusesUnknownDuplicateAndNullMembers(t *testing.T) {
 }
 
 func TestOutboxDescriptorRefusesEscapingPathsAndSymlinks(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-refuses-escaping-paths-and-symbolic-links")
 	for name, want := range map[string]string{
 		"parent-path.json":        "escapes the outbox root",
 		"nested-parent-path.json": "is not clean",
@@ -113,17 +115,12 @@ func TestOutboxDescriptorRefusesEscapingPathsAndSymlinks(t *testing.T) {
 		t.Fatalf("ResolveOutboxPath(file root) error = %v, want a refusal", err)
 	}
 
-	if runtime.GOOS == "windows" {
-		t.Skip("creating a symbolic link needs a privilege a Windows test host lacks")
-	}
 	for link, target := range map[string]string{
 		"leaf.tgz":       filepath.Join(outside, "secret"),
 		"linked-dir":     outside,
 		"oci/app/blobs2": filepath.Join(root, "npm"),
 	} {
-		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(link))); err != nil {
-			t.Fatal(err)
-		}
+		mustSymlink(t, target, filepath.Join(root, filepath.FromSlash(link)))
 	}
 	for _, rel := range []string{"leaf.tgz", "linked-dir/secret", "linked-dir", "oci/app/blobs2/web.tgz"} {
 		if _, err := ResolveOutboxPath(root, rel); err == nil || !strings.Contains(err.Error(), "symbolic link") {
@@ -131,15 +128,24 @@ func TestOutboxDescriptorRefusesEscapingPathsAndSymlinks(t *testing.T) {
 		}
 	}
 	linkedRoot := filepath.Join(t.TempDir(), "outbox")
-	if err := os.Symlink(root, linkedRoot); err != nil {
-		t.Fatal(err)
-	}
+	mustSymlink(t, root, linkedRoot)
 	if _, err := ResolveOutboxPath(linkedRoot, "npm/web.tgz"); err == nil || !strings.Contains(err.Error(), "not a directory") {
 		t.Fatalf("ResolveOutboxPath(linked root) error = %v, want a refusal", err)
 	}
 }
 
+// mustSymlink creates the link or fails the test: the symbolic-link refusals
+// are part of the requirement, so a host that cannot create a link does not
+// get to skip them.
+func mustSymlink(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatalf("cannot create the symbolic link %s -> %s: %v; on Windows, enable Developer Mode or run the tests with administrator rights", link, target, err)
+	}
+}
+
 func TestOutboxDescriptorRefusesInvalidArtifactsAndIdentities(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-refuses-invalid-artifacts-identities-and-registries")
 	for name, want := range map[string]string{
 		"two-blocks.json":         "2 ecosystem blocks",
 		"wrong-block.json":        "a go member requires the go block",
@@ -171,6 +177,7 @@ func TestOutboxDescriptorRefusesInvalidArtifactsAndIdentities(t *testing.T) {
 // absolute https URL, or http to a loopback host, with no userinfo, query or
 // fragment. A refusal never repeats the registry.
 func TestOutboxDescriptorRefusesAnNPMRegistryTheManagedRulesRefuse(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-refuses-invalid-artifacts-identities-and-registries")
 	for name, want := range map[string]string{
 		"npm-registry-missing.json":   "registry is required",
 		"npm-registry-cleartext.json": "HTTP is allowed only for loopback",
@@ -199,6 +206,7 @@ func TestOutboxDescriptorRefusesAnNPMRegistryTheManagedRulesRefuse(t *testing.T)
 }
 
 func TestManagedNPMRegistryNormalizesWhatItAccepts(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-refuses-invalid-artifacts-identities-and-registries")
 	for _, accepted := range []struct{ raw, want string }{
 		{"https://registry.npmjs.org", "https://registry.npmjs.org"},
 		{"\tHTTPS://npm.example.test/scoped/\n", "https://npm.example.test/scoped"},
@@ -244,6 +252,7 @@ func TestManagedNPMRegistryNormalizesWhatItAccepts(t *testing.T) {
 // Every fixture in the corpus is asserted by a test above: a new
 // counter-example cannot be added without a stated reason for refusal.
 func TestOutboxFixtureCorpusIsCovered(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "every-outbox-fixture-is-held")
 	files, err := filepath.Glob(filepath.Join(outboxFixtures, "invalid", "*.json"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no invalid outbox fixtures: %v", err)
@@ -267,6 +276,7 @@ func TestOutboxFixtureCorpusIsCovered(t *testing.T) {
 }
 
 func TestOutboxDescriptorAcceptsEveryEcosystem(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-accepts-every-ecosystem")
 	outbox, diags := ParsePublicationOutbox(readOutboxFixture(t, "valid", "every-ecosystem.json"))
 	if outbox == nil {
 		t.Fatalf("valid descriptor refused: %s", outboxRefusal(diags))
@@ -294,6 +304,7 @@ func TestOutboxDescriptorAcceptsEveryEcosystem(t *testing.T) {
 // A put or archive member carries one put block: the manifest payload, its
 // media type, and the blobs it references, each a regular outbox file.
 func TestOutboxDescriptorAcceptsPutAndArchiveMembers(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-accepts-every-ecosystem")
 	outbox, diags := ParsePublicationOutbox(readOutboxFixture(t, "valid", "put-members.json"))
 	if outbox == nil {
 		t.Fatalf("valid descriptor refused: %s", outboxRefusal(diags))
@@ -355,6 +366,7 @@ func TestOutboxDescriptorAcceptsPutAndArchiveMembers(t *testing.T) {
 }
 
 func TestOutboxDescriptorIsBounded(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-publication-outbox-is-strict-and-bounded", "the-outbox-is-bounded")
 	oversized := `{"protocolVersion":1,"members":[],"pad":"` + strings.Repeat("x", MaxPublicationOutboxBytes) + `"}`
 	if _, diags := ParsePublicationOutbox([]byte(oversized)); !strings.Contains(outboxRefusal(diags), "exceeds") {
 		t.Fatalf("oversized descriptor refusal = %q", outboxRefusal(diags))
@@ -403,6 +415,7 @@ func TestOutboxDescriptorIsBounded(t *testing.T) {
 
 // The schema states the same member set as the Go types, at every level.
 func TestOutboxSchemaTracksTheGoTypes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "the-outbox-schema-matches-its-go-types")
 	data, err := os.ReadFile("schemas/publication-outbox.json")
 	if err != nil {
 		t.Fatal(err)

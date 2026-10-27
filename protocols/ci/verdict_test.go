@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // verdictExpectations is fixtures/verdict/expectations.json, the corpus index:
@@ -76,6 +78,7 @@ func cloneVerdict(t *testing.T, verdict Verdict) Verdict {
 }
 
 func TestVerdictCorpusMatchesExpectations(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-verdict-corpus-is-the-conformance-case", "every-verdict-fixture-gets-its-verdict")
 	index := readVerdictExpectations(t)
 	for kind, names := range map[string][]string{"valid": sortedMapKeys(index.Valid), "invalid": sortedMapKeys(index.Invalid)} {
 		entries, err := os.ReadDir(filepath.Join("fixtures", "verdict", kind))
@@ -93,6 +96,7 @@ func TestVerdictCorpusMatchesExpectations(t *testing.T) {
 }
 
 func TestVerdictValidCorpusCoversEveryAnswerAndMark(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-verdict-corpus-is-the-conformance-case", "the-verdict-corpus-covers-the-vocabulary")
 	answers := map[string]bool{}
 	marks := map[string]bool{}
 	for _, outcome := range readVerdictExpectations(t).Valid {
@@ -112,6 +116,7 @@ func TestVerdictValidCorpusCoversEveryAnswerAndMark(t *testing.T) {
 }
 
 func TestVerdictValidCorpusCoversEveryGapKindAndTestedCheckout(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-verdict-corpus-is-the-conformance-case", "the-verdict-corpus-covers-the-vocabulary")
 	kinds := map[string]bool{}
 	checkouts := map[string]bool{}
 	for name := range readVerdictExpectations(t).Valid {
@@ -135,6 +140,7 @@ func TestVerdictValidCorpusCoversEveryGapKindAndTestedCheckout(t *testing.T) {
 }
 
 func TestVerdictValidCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-verdict-corpus-is-the-conformance-case", "every-verdict-fixture-gets-its-verdict")
 	for name, want := range readVerdictExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
 			verdict := readVerdictFixture(t, name)
@@ -147,6 +153,7 @@ func TestVerdictValidCorpus(t *testing.T) {
 }
 
 func TestVerdictInvalidCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-verdict-corpus-is-the-conformance-case", "every-verdict-fixture-gets-its-verdict")
 	for name, refusal := range readVerdictExpectations(t).Invalid {
 		t.Run(name, func(t *testing.T) {
 			_, err := ParseVerdict(readFixture(t, filepath.Join("verdict", "invalid"), name))
@@ -158,6 +165,7 @@ func TestVerdictInvalidCorpus(t *testing.T) {
 }
 
 func TestVerdictJSONRoundTrip(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-verdict-corpus-is-the-conformance-case", "a-verdict-round-trips")
 	for name := range readVerdictExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
 			verdict := readVerdictFixture(t, name)
@@ -177,6 +185,7 @@ func TestVerdictJSONRoundTrip(t *testing.T) {
 }
 
 func TestFoldVerdictAnswersKeepsTheMostSevere(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-answer-and-the-mark-are-folds", "answers-fold-to-the-most-severe")
 	for _, tc := range []struct {
 		answers []string
 		want    string
@@ -206,6 +215,7 @@ func TestFoldVerdictAnswersKeepsTheMostSevere(t *testing.T) {
 }
 
 func TestFoldRequiredChecksIgnoresAdvisoryChecks(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-answer-and-the-mark-are-folds", "advisory-checks-never-change-the-answer")
 	required := func(answer string) VerdictCheck {
 		return VerdictCheck{Check: "test", Answer: answer, Level: LevelRequired}
 	}
@@ -230,6 +240,7 @@ func TestFoldRequiredChecksIgnoresAdvisoryChecks(t *testing.T) {
 }
 
 func TestVerdictMarkFollowsTheAnswerAndTheGaps(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "the-answer-and-the-mark-are-folds", "the-mark-follows-the-answer-and-the-gaps")
 	gaps := []VerdictGap{{Kind: GapNoRequirement, Project: "/shop"}}
 	for _, tc := range []struct {
 		answer string
@@ -255,6 +266,7 @@ func TestVerdictMarkFollowsTheAnswerAndTheGaps(t *testing.T) {
 // A declaration change needs its approval whether it weakens the declaration
 // or not: without one, the verdict records a gap and stays checked.
 func TestEveryUnapprovedDeclarationIsAGap(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "gaps-name-what-is-missing-or-unknown", "every-unapproved-declaration-is-a-gap")
 	verdict := readVerdictFixture(t, "passed-verified.json")
 	declaration := &verdict.Predicate.Declarations[1]
 	if declaration.Weakening {
@@ -271,6 +283,7 @@ func TestEveryUnapprovedDeclarationIsAGap(t *testing.T) {
 // A producer that does not know the impact or the declarations says so with a
 // gap, so a passed verdict cannot read verified on evidence nobody recorded.
 func TestUnknownEvidenceKeepsAPassedVerdictChecked(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "gaps-name-what-is-missing-or-unknown", "unknown-evidence-keeps-a-passed-verdict-checked")
 	verdict := readVerdictFixture(t, "passed-verified.json")
 	p := &verdict.Predicate
 	p.Impact.Projects = []VerdictProject{}
@@ -300,6 +313,7 @@ func TestUnknownEvidenceKeepsAPassedVerdictChecked(t *testing.T) {
 // exactly one gap, which is not the gap of a project that states no
 // requirement.
 func TestAProjectWithoutCountsIsUnknownNotEmpty(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "gaps-name-what-is-missing-or-unknown", "a-project-without-counts-is-unknown")
 	verdict := readVerdictFixture(t, "passed-checked.json")
 	p := &verdict.Predicate
 	p.Impact.Projects[1].Requirements = nil
@@ -321,6 +335,7 @@ func TestAProjectWithoutCountsIsUnknownNotEmpty(t *testing.T) {
 // A project is named after its directories, so its ID is the workspace root
 // or any workspace path behind a slash.
 func TestVerdictProjectID(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdict-identities-are-canonical", "project-ids-are-workspace-paths")
 	accepted := []string{
 		"/", "/tooling/cli", "/packages/@acme/ui", "/libs/c++", "/.github/actions/setup",
 		"/_internal", "/-legacy", "/docs/release notes", "/services/café",
@@ -346,6 +361,7 @@ func TestVerdictProjectID(t *testing.T) {
 // A workspace with one project at its root gets a verdict like any other: the
 // root project is listed, counted and named by its gaps.
 func TestVerdictNamesTheRootProject(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "gaps-name-what-is-missing-or-unknown", "the-root-project-is-named")
 	verdict := readVerdictFixture(t, "passed-root-project.json")
 	projects := verdict.Predicate.Impact.Projects
 	if len(projects) == 0 || projects[0].Project != "/" {
@@ -370,6 +386,7 @@ type verdictCase struct {
 }
 
 func TestValidateVerdictRefusals(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-verdict-is-validated", "each-verdict-defect-is-refused")
 	const (
 		lists        = "verdict omits a list or writes it as null"
 		subject      = "verdict subject is not the change's repository at its head commit"
@@ -676,6 +693,7 @@ func passedChannels(count int) []VerdictChannel {
 }
 
 func TestValidateVerdictAcceptsItsBounds(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "a-verdict-is-validated", "the-verdict-bounds-are-admitted")
 	verdict := readVerdictFixture(t, "passed-verified.json")
 	verdict.Predicate.Checks = passingChecks(MaxVerdictChecks)
 	verdict.Predicate.Deploy.Channels = passedChannels(MaxVerdictChannels)
@@ -703,6 +721,7 @@ func TestValidateVerdictAcceptsItsBounds(t *testing.T) {
 }
 
 func TestVerdictRepositoryIsACredentialFreeURL(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdict-identities-are-canonical", "the-repository-is-a-credential-free-url")
 	base := readVerdictFixture(t, "passed-verified.json")
 	withRepository := func(repository string) Verdict {
 		verdict := cloneVerdict(t, base)
@@ -749,6 +768,7 @@ func TestVerdictRepositoryIsACredentialFreeURL(t *testing.T) {
 }
 
 func TestVerdictReferenceIsAFullGitReference(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdict-identities-are-canonical", "the-reference-is-a-full-git-reference")
 	base := readVerdictFixture(t, "passed-verified.json")
 	withReference := func(reference string) Verdict {
 		verdict := cloneVerdict(t, base)
@@ -777,6 +797,7 @@ func TestVerdictReferenceIsAFullGitReference(t *testing.T) {
 }
 
 func TestParseVerdictIsStrictAndBounded(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdicts-parse-strictly-against-one-schema", "parse-verdict-is-strict-and-bounded")
 	valid := readFixture(t, filepath.Join("verdict", "valid"), "passed-verified.json")
 	padded := append(append([]byte(nil), valid...), bytes.Repeat([]byte(" "), MaxVerdictBytes-len(valid))...)
 	if _, err := ParseVerdict(padded); err != nil {
@@ -800,6 +821,7 @@ func TestParseVerdictIsStrictAndBounded(t *testing.T) {
 }
 
 func TestVerdictSchemaIsEmbeddedAndClosed(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdicts-parse-strictly-against-one-schema", "the-verdict-schema-is-closed")
 	schema := verdictSchema(t)
 	if schema["$id"] != VerdictSchemaURL {
 		t.Fatalf("schema $id = %v, want %s", schema["$id"], VerdictSchemaURL)
@@ -840,6 +862,7 @@ func TestVerdictSchemaIsEmbeddedAndClosed(t *testing.T) {
 // describes: the same members, and required exactly when Go always writes
 // them.
 func TestVerdictSchemaNamesTheGoMembers(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdicts-parse-strictly-against-one-schema", "the-verdict-schema-tracks-the-go-types")
 	schema := verdictSchema(t)
 	for path, value := range map[string]any{
 		"":                                Verdict{},
@@ -877,6 +900,7 @@ func TestVerdictSchemaNamesTheGoMembers(t *testing.T) {
 }
 
 func TestVerdictSchemaMatchesTheGoVocabulary(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "verdicts-parse-strictly-against-one-schema", "the-verdict-schema-tracks-the-go-types")
 	schema := verdictSchema(t)
 	if !strings.HasSuffix(VerdictPredicateType, fmt.Sprintf("/v%d", VerdictVersion)) {
 		t.Fatalf("predicate type %s does not carry version %d", VerdictPredicateType, VerdictVersion)

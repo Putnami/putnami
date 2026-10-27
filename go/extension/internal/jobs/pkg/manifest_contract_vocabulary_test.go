@@ -23,7 +23,7 @@ const vocabularyOnlyManifest = `{
 // A verb vocabulary is contract surface: the packager validates it strictly
 // and stamps contract 9, in both package forms, so the artifact loads.
 func TestGateStampsAVocabularyOnlyManifest(t *testing.T) {
-	spectest.Proves(t, "go/go-project-toolchain", "vocabulary-default-traits", "the-go-packager-stamps-a-vocabulary-only-manifest")
+	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
 	for name, form := range map[string]packageForm{"put archive": putArchive, "npm package": npmPackage} {
 		dir := stageManifest(t, vocabularyOnlyManifest)
 		if err := gateAndStampManifestContract(dir, form); err != nil {

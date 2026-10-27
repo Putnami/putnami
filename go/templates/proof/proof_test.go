@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"debug/buildinfo"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/version"
+	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +17,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+	templateproto "go.putnami.dev/protocol/template"
 )
 
 // goExtension is the extension every Go template names.
@@ -51,78 +58,57 @@ const golangciConfig = "go/extension/config/.golangci.yml"
 // workspace root. The go.putnami.dev/go/extension/tools package embeds it.
 const toolVersionsFile = "go/extension/tools/versions.json"
 
-// TestGoTemplatesBuildTestAndLint renders each Go template beside this
-// project into a throwaway workspace whose go.work is this repository's, and
-// runs `go vet`, `go build`, `go test` and the linters `putnami lint` runs
-// there with the network off. A template that no longer compiles against the
-// framework, whose own tests fail, or that the linters reject, fails here. The
-// third-party modules the rendered project compiles come from the module
-// cache, which a fresh machine does not have: a first step downloads exactly
-// those, checked against go.sum, before the network goes.
-func TestGoTemplatesBuildTestAndLint(t *testing.T) {
-	proofDir := workingDirectory(t)
-	root := workspaceRoot(t, proofDir)
-	templates := discoverTemplates(t, filepath.Dir(proofDir))
-	patterns := declaredPatterns(t, proofDir)
-	fetchEnv := fetchGoEnv(t)
-	env := offlineGoEnv(t)
-	config := filepath.Join(root, filepath.FromSlash(golangciConfig))
-	// A missing linter fails each template's lint step, after its vet, build
-	// and test results are known.
-	linters, lintErr := resolveLinters(t, root, env)
-	if lintErr == nil {
-		checkLintControl(t, env, linters.golangci, config)
-	}
+// provenTemplates maps each Go template beside this project to the feature it
+// declares. Each bound test below renders one template into a throwaway
+// workspace whose go.work is this repository's, and runs one step there
+// without downloading a module: go vet and go build, go test, or the linters
+// `putnami lint` runs. A template that no longer compiles against the
+// framework, whose own tests fail, or that the linters reject, fails here. A
+// binding names its feature, requirement and check literally, as the first
+// statement of a top-level test, so a template added beside this project fails
+// TestEveryGoTemplateDeclaresTheChecksThisProofObserves until provenTemplates
+// lists it and it declares the three checks.
+var provenTemplates = map[string]string{
+	"go-library": "go/library-template",
+	"go-server":  "go/server-template",
+}
 
-	for _, tpl := range templates {
-		t.Run(tpl.name, func(t *testing.T) {
-			// The real path: go matches the working directory it reads against
-			// the go.work entries, and a temporary directory can sit behind a
-			// symbolic link (/var on macOS).
-			workspace, err := filepath.EvalSymlinks(t.TempDir())
-			if err != nil {
-				t.Fatal(err)
-			}
-			vars := testVars(tpl)
-			project := filepath.Join(workspace, vars.projectPath)
-			renderTemplate(t, tpl.dir, project, vars)
-			workFile := writeWorkFile(t, root, workspace, project)
-			projectEnv := append(slices.Clone(env), "GOWORK="+workFile)
+// provenSteps are the requirement and check of each step a bound test runs,
+// the same for every template.
+var provenSteps = []struct{ requirement, check string }{
+	{"a-rendered-project-builds", "go-vet-and-go-build-pass"},
+	{"a-rendered-project-passes-its-tests", "go-test-passes"},
+	{"a-rendered-project-passes-lint", "the-linters-putnami-lint-runs-report-nothing"},
+}
 
-			runGo(t, project, append(slices.Clone(fetchEnv), "GOWORK="+workFile), "list", "-deps", "-test", "./...")
-			runGo(t, project, projectEnv, "vet", "./...")
-			runGo(t, project, projectEnv, "build", "./...")
-			runGo(t, project, projectEnv, "test", "-count=1", "./...")
+func TestGoLibraryTemplateBuilds(t *testing.T) {
+	spectest.Proves(t, "go/library-template", "a-rendered-project-builds", "go-vet-and-go-build-pass")
+	vetAndBuild(t, renderProject(t, "go-library"))
+}
 
-			// Every workspace module the rendered project compiles is a declared
-			// input of this project, whole, so a change to it reruns this test.
-			for _, dir := range strings.Fields(runGo(t, project, projectEnv,
-				"list", "-deps", "-test", "-f", "{{with .Module}}{{.Dir}}{{end}}", "./...")) {
-				rel, err := filepath.Rel(root, dir)
-				if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-					continue
-				}
-				fromProof, err := filepath.Rel(proofDir, dir)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if pattern := filepath.ToSlash(fromProof) + "/**"; !patterns[pattern] {
-					t.Errorf("the rendered %s compiles module %s, which is not a declared input: add %q to options.test.filePatterns in putnami.json",
-						tpl.name, filepath.ToSlash(rel), pattern)
-				}
-			}
+func TestGoLibraryTemplatePassesItsTests(t *testing.T) {
+	spectest.Proves(t, "go/library-template", "a-rendered-project-passes-its-tests", "go-test-passes")
+	goTest(t, renderProject(t, "go-library"), "TestHello")
+}
 
-			// The read-only pass of the lint job
-			// (go/extension/internal/jobs/lint/lint.go): golangci-lint with the
-			// extension's configuration, then staticcheck.
-			if lintErr != nil {
-				t.Fatal(lintErr)
-			}
-			runCommand(t, project, projectEnv, linters.golangci,
-				"run", "--allow-parallel-runners", "--config", config, "./...")
-			runCommand(t, project, projectEnv, linters.staticcheck, "./...")
-		})
-	}
+func TestGoLibraryTemplatePassesLint(t *testing.T) {
+	spectest.Proves(t, "go/library-template", "a-rendered-project-passes-lint", "the-linters-putnami-lint-runs-report-nothing")
+	lint(t, renderProject(t, "go-library"))
+}
+
+func TestGoServerTemplateBuilds(t *testing.T) {
+	spectest.Proves(t, "go/server-template", "a-rendered-project-builds", "go-vet-and-go-build-pass")
+	vetAndBuild(t, renderProject(t, "go-server"))
+}
+
+func TestGoServerTemplatePassesItsTests(t *testing.T) {
+	spectest.Proves(t, "go/server-template", "a-rendered-project-passes-its-tests", "go-test-passes")
+	goTest(t, renderProject(t, "go-server"), "TestHealthEndpoint")
+}
+
+func TestGoServerTemplatePassesLint(t *testing.T) {
+	spectest.Proves(t, "go/server-template", "a-rendered-project-passes-lint", "the-linters-putnami-lint-runs-report-nothing")
+	lint(t, renderProject(t, "go-server"))
 }
 
 // TestEveryGoTemplateIsADeclaredInput pins the other half of the cache key:
@@ -150,6 +136,321 @@ func TestEveryGoTemplateIsADeclaredInput(t *testing.T) {
 			t.Errorf("options.test.filePatterns lacks %q, so a change to the %s template would not rerun this proof", pattern, tpl.name)
 		}
 	}
+}
+
+// TestEveryModuleARenderedProjectCompilesIsADeclaredInput pins the cache key
+// from the rendered side: every workspace module a rendered template compiles
+// is a declared input of this project, whole, so a change to it reruns the
+// proof.
+func TestEveryModuleARenderedProjectCompilesIsADeclaredInput(t *testing.T) {
+	proofDir := workingDirectory(t)
+	patterns := declaredPatterns(t, proofDir)
+	for _, tpl := range discoverTemplates(t, filepath.Dir(proofDir)) {
+		p := renderProject(t, tpl.name)
+		for _, dir := range strings.Fields(runGo(t, p.dir, p.env,
+			"list", "-deps", "-test", "-f", "{{with .Module}}{{.Dir}}{{end}}", "./...")) {
+			rel, err := filepath.Rel(p.root, dir)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue
+			}
+			fromProof, err := filepath.Rel(proofDir, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pattern := filepath.ToSlash(fromProof) + "/**"; !patterns[pattern] {
+				t.Errorf("the rendered %s compiles module %s, which is not a declared input: add %q to options.test.filePatterns in putnami.json",
+					tpl.name, filepath.ToSlash(rel), pattern)
+			}
+		}
+	}
+}
+
+// TestEveryGoTemplateDeclaresOneFeatureUnderProjectScaffolding pins ADR 0003 of
+// tooling/scaffold: each template declares one feature of its own, whose
+// parent is tooling/project-scaffolding.
+func TestEveryGoTemplateDeclaresOneFeatureUnderProjectScaffolding(t *testing.T) {
+	for _, tpl := range discoverTemplates(t, filepath.Dir(workingDirectory(t))) {
+		features := templateFeatures(t, tpl)
+		if len(features) != 1 {
+			t.Errorf("%s declares %d features, want 1", tpl.name, len(features))
+			continue
+		}
+		feature := features[0]
+		if want := provenTemplates[tpl.name]; feature.ID != want {
+			t.Errorf("%s declares the feature %q, want %q", tpl.name, feature.ID, want)
+		}
+		relations := feature.Relations
+		if len(relations) != 1 || relations[0].Kind != "parent" || relations[0].Target != "tooling/project-scaffolding" {
+			t.Errorf("%s: the feature %s has the relations %+v, want one parent relation to tooling/project-scaffolding",
+				tpl.name, feature.ID, relations)
+		}
+	}
+}
+
+// TestEveryGoTemplateEnforcesItsSpec pins the setting that makes a check no
+// test observes fail the template's spec gate: in report mode, the default,
+// the gate reports check-not-observed without failing.
+func TestEveryGoTemplateEnforcesItsSpec(t *testing.T) {
+	for _, tpl := range discoverTemplates(t, filepath.Dir(workingDirectory(t))) {
+		data, err := os.ReadFile(filepath.Join(tpl.dir, "putnami.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var config struct {
+			Extensions []string `json:"extensions"`
+			Options    struct {
+				SDD struct {
+					Verification struct {
+						Specs string `json:"specs"`
+					} `json:"verification"`
+				} `json:"sdd"`
+			} `json:"options"`
+		}
+		if err := json.Unmarshal(data, &config); err != nil {
+			t.Fatalf("%s/putnami.json: %v", tpl.name, err)
+		}
+		if !slices.Contains(config.Extensions, "/tooling/sdd-extension") {
+			t.Errorf("%s/putnami.json does not list /tooling/sdd-extension in extensions, so no spec gate runs on it", tpl.name)
+		}
+		if got := config.Options.SDD.Verification.Specs; got != "enforce" {
+			t.Errorf("%s/putnami.json sets options.sdd.verification.specs to %q, want \"enforce\"", tpl.name, got)
+		}
+	}
+}
+
+// TestEveryGoTemplateIsADependencyOfThisProof pins the edge the spec gate
+// follows: a session that validates a template without running this proof
+// reads the template's checks from this proof's last test result only when
+// the proof depends on the template.
+func TestEveryGoTemplateIsADependencyOfThisProof(t *testing.T) {
+	proofDir := workingDirectory(t)
+	root := workspaceRoot(t, proofDir)
+	data, err := os.ReadFile(filepath.Join(proofDir, "putnami.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Dependencies []string `json:"dependencies"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatal(err)
+	}
+	for _, tpl := range discoverTemplates(t, filepath.Dir(proofDir)) {
+		rel, err := filepath.Rel(root, tpl.dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if project := "/" + filepath.ToSlash(rel); !slices.Contains(config.Dependencies, project) {
+			t.Errorf("putnami.json does not list %s in dependencies, so the spec gate of %s cannot read this proof's result", project, tpl.name)
+		}
+	}
+}
+
+// TestEveryGoTemplateDeclaresTheChecksThisProofObserves keeps each template's
+// declared checks equal to provenSteps: each template beside this project is
+// listed in provenTemplates and declares the check of each step, and only
+// those.
+func TestEveryGoTemplateDeclaresTheChecksThisProofObserves(t *testing.T) {
+	want := make([]string, 0, len(provenSteps))
+	for _, step := range provenSteps {
+		want = append(want, step.requirement+"#"+step.check)
+	}
+	slices.Sort(want)
+	discovered := map[string]bool{}
+	for _, tpl := range discoverTemplates(t, filepath.Dir(workingDirectory(t))) {
+		discovered[tpl.name] = true
+		feature, bound := provenTemplates[tpl.name]
+		if !bound {
+			t.Errorf("no test of this proof observes the template %s: give it a feature and a spec, add it to provenTemplates, and add one bound test per step, as the go-library tests do", tpl.name)
+			continue
+		}
+		var declared []string
+		for _, f := range templateFeatures(t, tpl) {
+			for _, requirement := range f.Requirements {
+				for _, check := range requirement.Verification.Checks {
+					declared = append(declared, requirement.ID+"#"+check)
+				}
+			}
+		}
+		slices.Sort(declared)
+		if !slices.Equal(declared, want) {
+			t.Errorf("%s declares the checks %v under %s, want %v: the bound tests of this proof observe exactly those", tpl.name, declared, feature, want)
+		}
+	}
+	for name := range provenTemplates {
+		if !discovered[name] {
+			t.Errorf("provenTemplates names %s, which is no Go template beside this project", name)
+		}
+	}
+}
+
+// TestARenderLeavesOutWhatTheArchiveLeavesOut pins the render rule that keeps a
+// template's own declarations out of the project created from it: the rendered
+// project holds no putnami.features.json, specs/ or specs.baseline.json, and
+// its putnami.json is the one putnami.json.template renders.
+func TestARenderLeavesOutWhatTheArchiveLeavesOut(t *testing.T) {
+	for _, tpl := range discoverTemplates(t, filepath.Dir(workingDirectory(t))) {
+		vars := testVars(tpl)
+		project := filepath.Join(t.TempDir(), vars.projectPath)
+		renderTemplate(t, tpl.dir, project, vars)
+		for _, name := range []string{"putnami.features.json", "specs", "specs.baseline.json"} {
+			if _, err := os.Stat(filepath.Join(project, name)); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("the rendered %s holds %s, which the archive leaves out (%v)", tpl.name, name, err)
+			}
+		}
+		data, err := os.ReadFile(filepath.Join(project, "putnami.json"))
+		if err != nil {
+			t.Fatalf("the rendered %s has no putnami.json: %v", tpl.name, err)
+		}
+		var config struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(data, &config); err != nil {
+			t.Fatalf("the rendered %s/putnami.json: %v", tpl.name, err)
+		}
+		if config.Name != vars.projectName {
+			t.Errorf("the rendered %s/putnami.json names %q, want %q from putnami.json.template", tpl.name, config.Name, vars.projectName)
+		}
+	}
+}
+
+// renderedProject is a template rendered into a throwaway workspace whose
+// go.work is this repository's, with the third-party modules it compiles in
+// the module cache.
+type renderedProject struct {
+	root    string   // this repository
+	dir     string   // the rendered project
+	offline []string // the environment of the offline steps
+	env     []string // offline, with GOWORK naming the rendered workspace's go.work
+}
+
+// renderProject renders the Go template called name, beside this project, into
+// a throwaway workspace. The third-party modules the rendered project compiles
+// come from the module cache, which a fresh machine does not have: this step
+// downloads exactly those, checked against go.sum, before the network goes.
+func renderProject(t *testing.T, name string) renderedProject {
+	t.Helper()
+	proofDir := workingDirectory(t)
+	root := workspaceRoot(t, proofDir)
+	tpl := templateNamed(t, filepath.Dir(proofDir), name)
+	// The real path: go matches the working directory it reads against the
+	// go.work entries, and a temporary directory can sit behind a symbolic link
+	// (/var on macOS).
+	workspace, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars := testVars(tpl)
+	project := filepath.Join(workspace, vars.projectPath)
+	renderTemplate(t, tpl.dir, project, vars)
+	workFile := writeWorkFile(t, root, workspace, project)
+	runGo(t, project, append(fetchGoEnv(t), "GOWORK="+workFile), "list", "-deps", "-test", "./...")
+	offline := offlineGoEnv(t)
+	return renderedProject{
+		root:    root,
+		dir:     project,
+		offline: offline,
+		env:     append(slices.Clone(offline), "GOWORK="+workFile),
+	}
+}
+
+// templateNamed returns the Go template called name in dir.
+func templateNamed(t *testing.T, dir, name string) committedTemplate {
+	t.Helper()
+	for _, tpl := range discoverTemplates(t, dir) {
+		if tpl.name == name {
+			return tpl
+		}
+	}
+	t.Fatalf("no Go template named %s beside this project", name)
+	return committedTemplate{}
+}
+
+// templateFeature is a feature a template declares, with what this proof
+// reads of it.
+type templateFeature struct {
+	ID        string `json:"id"`
+	Relations []struct {
+		Kind   string `json:"kind"`
+		Target string `json:"target"`
+	} `json:"relations"`
+	Requirements []struct {
+		ID           string `json:"id"`
+		Verification struct {
+			Checks []string `json:"checks"`
+		} `json:"verification"`
+	} `json:"requirements"`
+}
+
+// templateFeatures reads the features tpl declares in its putnami.features.json.
+func templateFeatures(t *testing.T, tpl committedTemplate) []templateFeature {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(tpl.dir, "putnami.features.json"))
+	if err != nil {
+		t.Fatalf("%s declares no feature: %v", tpl.name, err)
+	}
+	var manifest struct {
+		Features []templateFeature `json:"features"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("%s/putnami.features.json: %v", tpl.name, err)
+	}
+	return manifest.Features
+}
+
+// vetAndBuild runs go vet, then go build, in p.
+func vetAndBuild(t *testing.T, p renderedProject) {
+	t.Helper()
+	runGo(t, p.dir, p.env, "vet", "./...")
+	runGo(t, p.dir, p.env, "build", "./...")
+}
+
+// goTest runs the tests p ships and fails unless the test named want reports a
+// pass: go test also exits 0 on a package without test files.
+func goTest(t *testing.T, p renderedProject, want string) {
+	t.Helper()
+	passed := map[string]bool{}
+	dec := json.NewDecoder(strings.NewReader(runGo(t, p.dir, p.env, "test", "-count=1", "-json", "./...")))
+	for {
+		var event struct{ Action, Test string }
+		if err := dec.Decode(&event); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			t.Fatalf("go test -json: %v", err)
+		}
+		if event.Action == "pass" && event.Test != "" {
+			passed[event.Test] = true
+		}
+	}
+	if !passed[want] {
+		t.Errorf("go test reported no pass for %s", want)
+	}
+}
+
+// lintControl holds the verdict of checkLintControl. It runs once per test
+// process: every lint step depends on it, and it lints a planted module.
+var lintControl struct {
+	once sync.Once
+	err  error
+}
+
+// lint runs the read-only pass of the lint job
+// (go/extension/internal/jobs/lint/lint.go) in p: golangci-lint with the
+// extension's configuration, then staticcheck. A linter the proof cannot run,
+// or a control showing that the configuration hides a finding, fails the step.
+func lint(t *testing.T, p renderedProject) {
+	t.Helper()
+	config := filepath.Join(p.root, filepath.FromSlash(golangciConfig))
+	tools, err := resolveLinters(t, p.root, p.offline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lintControl.once.Do(func() { lintControl.err = checkLintControl(t, p.offline, tools.golangci, config) })
+	if lintControl.err != nil {
+		t.Fatal(lintControl.err)
+	}
+	runCommand(t, p.dir, p.env, tools.golangci, "run", "--allow-parallel-runners", "--config", config, "./...")
+	runCommand(t, p.dir, p.env, tools.staticcheck, "./...")
 }
 
 func workingDirectory(t *testing.T) string {
@@ -255,10 +556,11 @@ var leftPlaceholder = regexp.MustCompile(`<%=[^%]*%>`)
 // renderTemplate replays template.RenderDir
 // (tooling/cli/internal/template/render.go), whose rules
 // protocols/template/doc/02-variables.md documents: the walk is depth-first in
-// byte order, the root manifest is skipped, `__module__` in a path becomes
-// projectModule, and a `.template` file gets `<%= name %>` substitution and
-// loses its suffix. Unlike the CLI, a placeholder left after rendering fails
-// here: it would reach the user as literal text.
+// byte order, the root manifest and every root entry the archive leaves out
+// (template.IsTemplateRootPackagingExclusion) are skipped, `__module__` in a
+// path becomes projectModule, and a `.template` file gets `<%= name %>`
+// substitution and loses its suffix. Unlike the CLI, a placeholder left after
+// rendering fails here: it would reach the user as literal text.
 func renderTemplate(t *testing.T, src, dst string, vars renderVars) {
 	t.Helper()
 	replacer := placeholderReplacer(vars)
@@ -270,7 +572,13 @@ func renderTemplate(t *testing.T, src, dst string, vars renderVars) {
 		if err != nil {
 			return err
 		}
-		if rel == "putnami.template.json" {
+		if rel == templateproto.ManifestFilename {
+			return nil
+		}
+		if rel != "." && filepath.Dir(rel) == "." && templateproto.IsTemplateRootPackagingExclusion(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		target := filepath.Join(dst, strings.ReplaceAll(rel, "__module__", vars.projectModule))
@@ -560,13 +868,19 @@ func pinnedTool(t *testing.T, root string, env []string, tool string, local loca
 // vendor directory: golangci-lint resolves the symlink in its working directory
 // but not in the file paths, so each reported path climbs out of the module and
 // crosses that vendor directory. The configuration matches its patterns against
-// paths below the working directory only. The proof fails unless each run
-// reports every finding.
-func checkLintControl(t *testing.T, env []string, golangci, config string) {
+// paths below the working directory only. It returns an error unless each run
+// reports every finding. It runs once for every lint step, so it reports its
+// verdict instead of failing the test that runs it first.
+func checkLintControl(t *testing.T, env []string, golangci, config string) error {
 	t.Helper()
-	workspace, err := filepath.EvalSymlinks(t.TempDir())
+	tmp, err := os.MkdirTemp("", "lint-control-")
 	if err != nil {
-		t.Fatal(err)
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	workspace, err := filepath.EvalSymlinks(tmp)
+	if err != nil {
+		return err
 	}
 	project := filepath.Join(workspace, ".putnami", "vendor", "node_modules", "dist", "build", "bin", "test-project")
 	planted := []string{"internal/build/control.go", "bin/control.go"}
@@ -578,16 +892,16 @@ func checkLintControl(t *testing.T, env []string, golangci, config string) {
 	for name, content := range files {
 		path := filepath.Join(project, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+			return err
 		}
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
+			return err
 		}
 	}
 	dirs := []string{project}
 	link := filepath.Join(workspace, "vendor", "linked-project")
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
-		t.Fatal(err)
+		return err
 	}
 	switch err := os.Symlink(project, link); {
 	case err == nil:
@@ -596,20 +910,26 @@ func checkLintControl(t *testing.T, env []string, golangci, config string) {
 		// Creating a symlink needs a privilege Windows does not grant by default.
 		t.Logf("lint control skips the symlinked run: %v", err)
 	default:
-		t.Fatal(err)
+		return err
 	}
 	for _, dir := range dirs {
 		cmd := exec.Command(golangci, "run", "--allow-parallel-runners", "--config", config, "./...")
 		cmd.Dir = dir
 		cmd.Env = append(slices.Clone(env), "GOWORK=off", "PWD="+dir)
 		out, err := cmd.CombinedOutput()
+		const causes = "so it would not report a template's findings either. Either a directory of that path matches an exclusions.paths entry of %s, errcheck is no longer enabled there, or the control module did not load:\n%s"
+		if err == nil {
+			return fmt.Errorf("golangci-lint run from %s exited cleanly without reporting the unchecked errors planted in %s, "+causes,
+				dir, strings.Join(planted, ", "), config, out)
+		}
 		for _, name := range planted {
-			if err == nil || !strings.Contains(string(out), filepath.FromSlash(name)) || !strings.Contains(string(out), "errcheck") {
-				t.Fatalf("golangci-lint run from %s did not report the unchecked error planted in %s (%v), so it would not report a template's findings either. Either a directory of that path matches an exclusions.paths entry of %s, errcheck is no longer enabled there, or the control module did not load:\n%s",
+			if !strings.Contains(string(out), filepath.FromSlash(name)) || !strings.Contains(string(out), "errcheck") {
+				return fmt.Errorf("golangci-lint run from %s did not report the unchecked error planted in %s (%w), "+causes,
 					dir, name, err, config, out)
 			}
 		}
 	}
+	return nil
 }
 
 // pinnedVersion reads the version toolVersionsFile pins for tool.

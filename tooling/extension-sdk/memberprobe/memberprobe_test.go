@@ -40,6 +40,7 @@ func ociSubject() Subject {
 // kind: equal digests are a reuse, anything the dry run cannot prove equal is
 // not.
 func TestHeldVersionVerdict(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-probes-pass-the-strict-reader")
 	for name, tc := range map[string]struct {
 		local, registry string
 		wantState       string
@@ -86,6 +87,7 @@ func TestHeldWithStatesThePublishersReason(t *testing.T) {
 // registry where the real publish moves the tag. Without a local artifact it is
 // still a tag move, to the image the publish builds.
 func TestHeldTagVerdict(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-probes-pass-the-strict-reader")
 	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "held-tag-is-a-tag-move")
 	for name, tc := range map[string]struct {
 		local, registry string
@@ -118,6 +120,7 @@ func TestHeldTagVerdict(t *testing.T) {
 // names the artifact, because that artifact may predate the source. Only the
 // identical verdict carries the note: a conflict keeps the publisher's reason.
 func TestIdenticalNamesAStagedArtifact(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-probes-pass-the-strict-reader")
 	spectest.Proves(t, "tooling/extension-authoring", "dry-run-member-probe", "identical-names-a-staged-artifact")
 	const wantZip = "compared with the module zip the last `package` staged; re-run `package` if the source changed since"
 	staged := testSubject()
@@ -256,6 +259,7 @@ func captureEvents(t *testing.T, fn func()) []map[string]any {
 // exactly what the orchestrator reads back through the strict parser, on both
 // stream versions, and the registry never leaves with a credential.
 func TestEmitRoundTripsThroughTheStrictReader(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-probes-pass-the-strict-reader")
 	subject := testSubject()
 	subject.Registry = "https://user:hunter2@registry.example.test/npm/?token=hunter2"
 	subject.Platform = "linux/arm64"
@@ -308,6 +312,7 @@ func TestEmitRoundTripsThroughTheStrictReader(t *testing.T) {
 // A field or a state this build does not know is refused: reading it leniently
 // would drop a verdict the publisher stated.
 func TestDecodeRefusesWhatTheProtocolDoesNotKnow(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-extension-sdk-reader-refuses-what-the-protocol-refuses-in-a-probe")
 	valid := func() map[string]any {
 		return map[string]any{
 			"type": "artifact", "kind": extproto.MemberProbeEventKind, "id": "npm", "name": "@acme/widget", "path": "",

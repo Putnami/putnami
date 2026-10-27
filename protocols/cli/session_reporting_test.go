@@ -10,9 +10,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestSessionReportingSharedCorpus(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "the-reporting-wire-passes-its-corpus")
 	data, err := os.ReadFile("conformance/session-reporting.json")
 	if err != nil {
 		t.Fatal(err)
@@ -71,6 +74,7 @@ func TestSessionReportingSharedCorpus(t *testing.T) {
 // TestReporterCapabilityNames pins the discovery names and the artifacts each
 // reporter capability receives. The TypeScript twin pins the same literals.
 func TestReporterCapabilityNames(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "the-reporting-wire-passes-its-corpus")
 	names := [][2]string{
 		{SessionReporterCommand, "session-reporter"}, {SessionReporterEnv, "PUTNAMI_SESSION_REPORTER"}, {SessionReporterTokenEnv, "PUTNAMI_SESSION_REPORTER_TOKEN"},
 		{LogReporterCommand, "log-reporter"}, {LogReporterEnv, "PUTNAMI_LOG_REPORTER"}, {LogReporterTokenEnv, "PUTNAMI_LOG_REPORTER_TOKEN"},
@@ -97,6 +101,7 @@ func TestReporterCapabilityNames(t *testing.T) {
 }
 
 func TestSessionReportingSchemaAndBounds(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "the-reporting-wire-passes-its-corpus")
 	data, err := os.ReadFile("schemas/session-reporting.json")
 	if err != nil {
 		t.Fatal(err)
@@ -140,6 +145,7 @@ func TestSessionReportingSchemaAndBounds(t *testing.T) {
 // acknowledgement obeys the same offset bound. events.jsonl and session.json
 // have no such bound. The schema states the same numbers.
 func TestSessionReportingArtifactBounds(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "the-reporting-wire-passes-its-corpus")
 	if SessionReportingPlanBytes != 16<<20 {
 		t.Fatalf("SessionReportingPlanBytes = %d, want 16 MiB", SessionReportingPlanBytes)
 	}
@@ -235,6 +241,7 @@ func TestSessionReportingArtifactBounds(t *testing.T) {
 }
 
 func TestSessionReportingAckBindsEveryIdentityField(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "an-ack-binds-identity-and-the-credential-stays-in-authenticate")
 	chunk := NewSessionReportingChunk("session", "events.jsonl", 12, 3, []byte("abc"), false)
 	ack := chunk.Ack()
 	if !ack.Matches(chunk) {
@@ -265,6 +272,7 @@ func TestSessionReportingAckBindsEveryIdentityField(t *testing.T) {
 // authenticate carries the credential within its bound, every format verb
 // redacts it, and a result answers only the line of its own operation.
 func TestSessionReportingHandshakeHandsTheCredentialOnlyInAuthenticate(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-reporting-wire", "an-ack-binds-identity-and-the-credential-stays-in-authenticate")
 	const credential = "hosted-run-credential-7c1e"
 	initialize := NewSessionReportingInitialize()
 	wire, err := json.Marshal(initialize)

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "workspace/workspace-contract#a-fixture-corpus-holds-every-shape",
+    "workspace/workspace-contract#a-line-is-a-scope-that-is-not-inherited",
+    "workspace/workspace-contract#a-lock-entry-binds-what-it-pins",
+    "workspace/workspace-contract#a-lock-is-read-at-its-recorded-version",
+    "workspace/workspace-contract#a-probe-digest-is-a-function-of-the-facts",
+    "workspace/workspace-contract#a-reserved-call-exchanges-one-bounded-document",
+    "workspace/workspace-contract#a-toolchain-answer-pins-only-what-was-asked",
+    "workspace/workspace-contract#an-authored-form-survives-a-rewrite",
+    "workspace/workspace-contract#an-input-answer-lists-files-and-their-basis",
+    "workspace/workspace-contract#configuration-loads-in-a-fixed-precedence",
+    "workspace/workspace-contract#configuration-parsing-is-strict",
+    "workspace/workspace-contract#dependency-sources-attribute-each-edge",
+    "workspace/workspace-contract#first-party-extensions-answer-the-reserved-calls",
+    "workspace/workspace-contract#one-selection-vocabulary",
+    "workspace/workspace-contract#probe-results-merge-by-fixed-rules",
+    "workspace/workspace-contract#probe-version-1-is-frozen-and-validated",
+    "workspace/workspace-contract#registries-are-keyed-by-ecosystem",
+    "workspace/workspace-contract#scopes-resolve-through-one-chain",
+    "workspace/workspace-contract#the-agent-artifact-manifest-is-strict",
+    "workspace/workspace-contract#the-cli-reads-answers-through-the-contract",
+    "workspace/workspace-contract#the-input-basis-digest-is-host-independent",
+    "workspace/workspace-contract#the-schemas-and-the-go-types-agree",
+    "workspace/workspace-contract#visibility-and-distribution-fail-closed"
+  ]
+}

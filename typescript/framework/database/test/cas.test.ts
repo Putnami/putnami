@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { runInContext } from '@putnami/runtime';
+import { specTest } from '@putnami/spectest';
 import {
   Column,
   Key,
@@ -122,47 +123,103 @@ afterAll(() => {
 describe('Outcome enum — cross-language byte parity', () => {
   // These string values MUST match the Go enum (transaction.Outcome*) and the
   // schema at protocols/transaction/schemas/transaction-result.json byte-for-byte.
-  it('mirrors the four Go Outcome literals exactly', () => {
-    expect(Outcome.Applied).toBe('applied');
-    expect(Outcome.AlreadyConsumedConflict).toBe('already-consumed-conflict');
-    expect(Outcome.NotFound).toBe('not-found');
-    expect(Outcome.RetryableSerializationFailure).toBe('retryable-serialization-failure');
-  });
+  specTest(
+    'mirrors the four Go Outcome literals exactly',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'exactly-one-outcome-is-retryable',
+      check: 'the-typescript-outcomes-are-the-same-closed-set',
+    },
+    () => {
+      expect(Outcome.Applied).toBe('applied');
+      expect(Outcome.AlreadyConsumedConflict).toBe('already-consumed-conflict');
+      expect(Outcome.NotFound).toBe('not-found');
+      expect(Outcome.RetryableSerializationFailure).toBe('retryable-serialization-failure');
+    },
+  );
 
-  it('exposes exactly the closed set of outcome values', () => {
-    expect([...Object.values(Outcome)].sort()).toEqual(
-      ['already-consumed-conflict', 'applied', 'not-found', 'retryable-serialization-failure'].sort(),
-    );
-  });
+  specTest(
+    'exposes exactly the closed set of outcome values',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'exactly-one-outcome-is-retryable',
+      check: 'the-typescript-outcomes-are-the-same-closed-set',
+    },
+    () => {
+      expect([...Object.values(Outcome)].sort()).toEqual(
+        ['already-consumed-conflict', 'applied', 'not-found', 'retryable-serialization-failure'].sort(),
+      );
+    },
+  );
 
-  it('marks only the serialization failure retryable', () => {
-    expect(outcomeRetryable(Outcome.RetryableSerializationFailure)).toBe(true);
-    expect(outcomeRetryable(Outcome.Applied)).toBe(false);
-    expect(outcomeRetryable(Outcome.AlreadyConsumedConflict)).toBe(false);
-    expect(outcomeRetryable(Outcome.NotFound)).toBe(false);
-  });
+  specTest(
+    'marks only the serialization failure retryable',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'exactly-one-outcome-is-retryable',
+      check: 'the-typescript-adapter-retries-only-the-serialization-failure',
+    },
+    () => {
+      expect(outcomeRetryable(Outcome.RetryableSerializationFailure)).toBe(true);
+      expect(outcomeRetryable(Outcome.Applied)).toBe(false);
+      expect(outcomeRetryable(Outcome.AlreadyConsumedConflict)).toBe(false);
+      expect(outcomeRetryable(Outcome.NotFound)).toBe(false);
+    },
+  );
 });
 
 describe('classifyOutcome — SQLSTATE → Outcome', () => {
-  it('maps 40001 and 40P01 to retryable-serialization-failure', () => {
-    expect(classifyOutcome(pgError('40001'))).toBe(Outcome.RetryableSerializationFailure);
-    expect(classifyOutcome(pgError('40P01'))).toBe(Outcome.RetryableSerializationFailure);
-  });
+  specTest(
+    'maps 40001 and 40P01 to retryable-serialization-failure',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'the-typescript-adapter-classifies-postgres-errors',
+      check: 'the-typescript-classifier-maps-postgres-errors-to-outcomes',
+    },
+    () => {
+      expect(classifyOutcome(pgError('40001'))).toBe(Outcome.RetryableSerializationFailure);
+      expect(classifyOutcome(pgError('40P01'))).toBe(Outcome.RetryableSerializationFailure);
+    },
+  );
 
-  it('maps 23505 to already-consumed-conflict', () => {
-    expect(classifyOutcome(pgError('23505'))).toBe(Outcome.AlreadyConsumedConflict);
-  });
+  specTest(
+    'maps 23505 to already-consumed-conflict',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'the-typescript-adapter-classifies-postgres-errors',
+      check: 'the-typescript-classifier-maps-postgres-errors-to-outcomes',
+    },
+    () => {
+      expect(classifyOutcome(pgError('23505'))).toBe(Outcome.AlreadyConsumedConflict);
+    },
+  );
 
-  it('passes an unrelated SQLSTATE through as undefined (raw error)', () => {
-    expect(classifyOutcome(pgError('08006'))).toBeUndefined();
-    expect(classifyOutcome(pgError('23503'))).toBeUndefined();
-  });
+  specTest(
+    'passes an unrelated SQLSTATE through as undefined (raw error)',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'the-typescript-adapter-classifies-postgres-errors',
+      check: 'the-typescript-classifier-maps-postgres-errors-to-outcomes',
+    },
+    () => {
+      expect(classifyOutcome(pgError('08006'))).toBeUndefined();
+      expect(classifyOutcome(pgError('23503'))).toBeUndefined();
+    },
+  );
 
-  it('returns undefined for a non-postgres error and for nullish input', () => {
-    expect(classifyOutcome(new Error('boom'))).toBeUndefined();
-    expect(classifyOutcome(undefined)).toBeUndefined();
-    expect(classifyOutcome(null)).toBeUndefined();
-  });
+  specTest(
+    'returns undefined for a non-postgres error and for nullish input',
+    {
+      feature: 'transaction/unit-of-work-contract',
+      requirement: 'the-typescript-adapter-classifies-postgres-errors',
+      check: 'the-typescript-classifier-maps-postgres-errors-to-outcomes',
+    },
+    () => {
+      expect(classifyOutcome(new Error('boom'))).toBeUndefined();
+      expect(classifyOutcome(undefined)).toBeUndefined();
+      expect(classifyOutcome(null)).toBeUndefined();
+    },
+  );
 });
 
 describe('compareAndSet', () => {

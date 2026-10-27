@@ -49,7 +49,7 @@
     },
     {
       "id": "packaged-loadability",
-      "text": "A staged npm package loads under the loader rules of the CLI contract it claims: a manifest claiming a contract newer than the packager's is rejected, a stale lower claim is ratcheted to the earned one, and an unloadable hook-only manifest fails packaging."
+      "text": "A staged npm package loads under the loader rules of the CLI contract it claims, and a stale lower claim is ratcheted to the earned one."
     },
     {
       "id": "npm-agent-content",
@@ -173,19 +173,11 @@
     },
     {
       "id": "api-compatibility-marker",
-      "text": "Validate holds the breaking-change marker for every TypeScript package the root support catalog lists as stable, or every package when there is no catalog: an entry point, an export or a member removed, a changed kind or reduced visibility since the last release of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it breaking. A change of written type warns and passes. Additions pass. A release the check cannot read warns."
-    },
-    {
-      "id": "command-kinds-and-traits",
-      "text": "The npm packager stamps CLI contract 11 on a package whose manifest declares a command kind, a workload, or the kind and phase of a batchable task, keeps the fields, and fails packaging of a kind outside the vocabulary."
+      "text": "Validate holds the breaking-change marker for a TypeScript package the support catalog selects for a stable-only consumer: an entry point, an export or a member removed, a changed kind or reduced visibility since the last release of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it breaking. A change of written type warns and passes. Additions pass. A release the check cannot read warns."
     },
     {
       "id": "publish-tasks-declare-their-channels",
-      "text": "The TypeScript extension's publish-docker task declares the docker channel and publish-npm the npm channel, and no other task declares one. The npm packager stamps CLI contract 12 on a manifest whose task lists publishChannels and fails packaging of a list on a task without the registry effect."
-    },
-    {
-      "id": "vocabulary-default-traits",
-      "text": "The npm packager validates a verb vocabulary and stamps CLI contract 9, and fails packaging of a defective one."
+      "text": "The TypeScript extension's publish-docker task declares the docker channel and publish-npm the npm channel, and no other task declares one."
     },
     {
       "id": "the-packager-refuses-a-nameless-manifest",

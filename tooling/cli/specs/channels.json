@@ -33,7 +33,7 @@
     },
     {
       "id": "project-declares-its-distribution-visibility",
-      "text": "A project states the member level of every artifact it publishes with distribution.visibility in its own putnami.json, or inherits it from the deepest scope that declares one. That level wins over the putnami.ci.json distribution.members[] rules, publish refuses a rule that disagrees with it, and an unknown or missing level fails closed."
+      "text": "A project states the member level of every artifact it publishes with distribution.visibility in its own putnami.json. That level wins over the putnami.ci.json distribution.members[] rules, and publish refuses a rule that disagrees with it."
     },
     {
       "id": "mirror-intent-follows-the-release",

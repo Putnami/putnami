@@ -68,7 +68,7 @@ func (f graphFixture) install(t *testing.T, name, manifest string) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(stored, link); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
+		t.Fatalf("cannot create the symbolic link %s -> %s: %v; on Windows, enable Developer Mode or run the tests with administrator rights", link, stored, err)
 	}
 }
 
@@ -426,12 +426,12 @@ func TestADependencyLosesReservedProviderCommands(t *testing.T) {
 	}
 }
 
-// A manifest that names a registry dependency requires contract 8: the stamp
-// is rung 8, so a CLI below it refuses the manifest as written for a newer
-// putnami, and this CLI refuses such a manifest stamped below rung 8 from the
-// artifact store or a declared path, without following its dependencies.
-func TestADependentManifestRequiresContract8(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "an-older-cli-refuses-a-dependent", "a-dependent-manifest-requires-contract-8")
+// This CLI reads a manifest that names a registry dependency as requiring
+// contract 8, and reads a stamp above its latest rung as written for a newer
+// putnami.
+func TestTheCLIReadsTheDependencyRung(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "the-cli-requires-rung-8-of-a-dependent")
+	spectest.Proves(t, "extension/manifest-contract", "a-registry-extension-dependency-requires-rung-8", "the-cli-refuses-a-stamp-above-its-latest-contract")
 	dependent := &Manifest{
 		Commands:      map[string]CommandDefinition{"build": {}},
 		ExtensionDeps: Dependencies{List: map[string]string{"@acme/dev": ""}},
@@ -444,7 +444,13 @@ func TestADependentManifestRequiresContract8(t *testing.T) {
 	if _, err := LoadManifest(filepath.Join(newer, ManifestFilename)); err == nil || !strings.Contains(err.Error(), "requires a newer putnami") {
 		t.Fatalf("a stamp above this CLI's latest rung = %v, want requires a newer putnami", err)
 	}
+}
 
+// This CLI refuses a manifest that names a registry dependency and is stamped
+// below rung 8, from the artifact store or a declared path, and follows none of
+// its dependencies.
+func TestADependentManifestRequiresContract8(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "an-older-cli-refuses-a-dependent", "a-dependent-stamped-below-rung-8-is-skipped")
 	f := newGraphFixture(t)
 	f.install(t, "@acme/app", graphManifest("@acme/app", 7, `{"@acme/dev": ""}`))
 	f.install(t, "@acme/dev", graphManifest("@acme/dev", 8, ""))

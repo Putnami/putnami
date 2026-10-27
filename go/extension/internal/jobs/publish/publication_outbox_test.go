@@ -125,6 +125,7 @@ func assertNoGoPublicationEvents(t *testing.T, output string) {
 // the descriptor names its zip, go.mod and .info, and the job asks for no
 // credential, sends no request and runs no `go mod download`.
 func TestGoModulePublishWritesTheOutboxAndUploadsNothing(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "first-party-publishers-emit-what-the-protocol-reads", "the-go-extension-packs-an-outbox-the-strict-reader-accepts")
 	spectest.Proves(t, "go/go-project-toolchain", "managed-publication-packs-only", "the-managed-route-packs-into-the-outbox-and-uploads-nothing")
 	module := newGoOutboxModule(t)
 	outboxRoot := filepath.Join(t.TempDir(), "outbox")

@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // updateGolden regenerates the canonical fixtures pinned by
@@ -131,6 +133,7 @@ func canonical(t *testing.T, v any) []byte {
 // document and overrides file is byte-identical across 100 marshals — no map
 // iteration or other nondeterminism leaks into the wire form.
 func TestSerialization_Stable100(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "canonical-deterministic-bytes", "the-canonical-form-is-identical-across-100-marshals")
 	cases := map[string]any{
 		"document":  sampleDocument(),
 		"overrides": sampleOverrides(),
@@ -152,6 +155,7 @@ func TestSerialization_Stable100(t *testing.T) {
 // This is the contract every producer of an agent-context document or overrides
 // file must reproduce byte-for-byte.
 func TestSerialization_CanonicalByteForm(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "canonical-deterministic-bytes", "the-canonical-bytes-equal-the-committed-full-fixtures")
 	cases := []struct {
 		path string
 		v    any
@@ -183,6 +187,7 @@ func TestSerialization_CanonicalByteForm(t *testing.T) {
 // byte-stable for every valid fixture: re-serializing a parsed document yields
 // the same bytes the second time, so the wire form is a fixed point.
 func TestRoundTrip_Idempotent(t *testing.T) {
+	spectest.Proves(t, "agent-context/aggregated-agent-context", "canonical-deterministic-bytes", "a-parsed-valid-fixture-reserializes-to-a-fixed-point")
 	docFiles, err := filepath.Glob("fixtures/valid/*.json")
 	if err != nil {
 		t.Fatal(err)
