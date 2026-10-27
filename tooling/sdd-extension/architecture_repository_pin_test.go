@@ -425,6 +425,7 @@ func authoredTypeScriptFrameworkDomain() *arch.Builder {
 				arch.Bind("/typescript/framework/application", "/protocols/features"),
 				arch.Bind("/typescript/framework/application", "/protocols/http-routes"),
 				arch.Bind("/typescript/framework/application", "/protocols/identity"),
+				arch.Bind("/typescript/framework/application", "/protocols/keyring"),
 				arch.Bind("/typescript/framework/application", "/protocols/platform"),
 				arch.Bind("/typescript/framework/application", "/protocols/telemetry"),
 				arch.Bind("/typescript/framework/cli-protocol", "/protocols/cli"),

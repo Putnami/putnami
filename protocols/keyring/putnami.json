@@ -3,17 +3,22 @@
   "name": "go.putnami.dev/protocol/keyring",
   "visibility": "public",
   "tags": ["go", "protocol"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
   },
   "options": {
+    "test": {
+      "filePatterns": ["fixtures/**", "schemas/**"]
+    },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     }
-  },
-  "featureAuthority": {
-    "none": "The key state machine backs `go.putnami.dev/keyringstore`, which owns the signing-key-rotation outcome."
   }
 }
