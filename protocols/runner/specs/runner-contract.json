@@ -1,0 +1,84 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "runner/runner-contract",
+  "outcomes": [
+    "A provider written against the contract runs a submission of the CLI, and the CLI imports what it returns.",
+    "Identical source content has one identity whatever its Git history.",
+    "An execution request names exactly the inputs that decide whether a previous execution applies."
+  ],
+  "nonGoals": [
+    "Source capture, planning, placement and session recording in the CLI, which cli/portable-runner owns.",
+    "How a provider allocates machines and stores attempts.",
+    "A TypeScript reader of the contract.",
+    "Cloud execution and trusted cache reuse."
+  ],
+  "requirements": [
+    {
+      "id": "the-source-manifest-is-canonical",
+      "text": "A source manifest is version 1 with entries sorted by path: a file has path, kind, digest, size and mode 0644 or 0755, a symlink has path, kind and target, and either may add bound. Every valid fixture parses, encodes back to its compact bytes and has the source digest digests.json pins, and every invalid fixture is refused. The closed JSON schema pins the version, both entry shapes, the entry and file-size limits and the two modes."
+    },
+    {
+      "id": "source-identity-is-the-content",
+      "text": "The source digest changes with an entry's path, blob digest, size, mode, kind, symlink target and bound flag, and never with the Git context. A producer captures one source digest for the same bytes whether they are modified, staged or committed, while its index digest moves with the index and its Git context with HEAD."
+    },
+    {
+      "id": "source-paths-are-portable-and-bounded",
+      "text": "A path is refused, before capture and in a manifest, when it is empty, has an empty, . or .. component, a drive letter, a control character, a trailing dot or space, a Windows device name, a .git component in any case, a component over 255 bytes, more than 64 components or invalid UTF-8. A negative size, a file over the per-file limit, files over the aggregate limit, too many entries and a manifest over the byte limit are refused, and an invalid manifest or entry is never encoded."
+    },
+    {
+      "id": "symlinks-resolve-inside-the-snapshot",
+      "text": "A symlink resolves inside the snapshot. A dangling link to a safe internal path and a chain through a parent component are admitted. An absolute target, an empty target component, a regular-file ancestor, a case alias of a path or of an implicit directory, file members on a link and an unknown kind are refused."
+    },
+    {
+      "id": "decoders-are-strict",
+      "text": "A source manifest decoder refuses empty or truncated input, a root that is not an object, a member of the wrong type, a trailing value, nesting over the document budget and invalid UTF-8. A Git context has only head, branch and dirty, and admits an empty head and an empty branch. An unknown or mistyped member, a head that is not a full object id, and a branch that breaks Git ref spelling or exceeds 1,024 bytes are refused."
+    },
+    {
+      "id": "the-v1-request-is-strict-and-canonical",
+      "text": "A version 1 execution request carries protocol, source, invocation, selection, plan, environment and control, and its closed schema pins them in that order with the version, the parameter types, the providers and the publication block. Its canonical bytes parse back to the same request and encode to the same bytes. A parameter decodes to its Go type; a fractional or string int, a non-string list, a map and an unsigned value are refused. Validation refuses each malformed member."
+    },
+    {
+      "id": "input-digests-name-the-applicable-inputs",
+      "text": "The version 1 input digest changes with every source, invocation, selection and environment member, and not with the plan, the control block, the negotiated capabilities or the selection diagnostics. The version 2 input digest changes with the commit, the base, the invocation and the selection, and not with the control block or the negotiated capabilities. The two versions have different digest domains, so their digests differ."
+    },
+    {
+      "id": "providers-and-publication-are-additive",
+      "text": "A request that enables no invocation provider and plans no publication encodes neither member. Providers are sorted and unique, from install and publish, and an empty list is absent. Under invocation.publication, every publication task waits through dependsOn for every task of each barrier command, and no barrier task is a publication task. A publication task without the block is refused, and the block over a plan without one is accepted."
+    },
+    {
+      "id": "the-v2-request-names-a-commit",
+      "text": "A version 2 request carries protocol, source, invocation, selection and control. Source names a full lowercase commit and, exactly for an impacted selection, a base of the same length. Selection is all, impacted, or projects with sorted unique selectors that hold no comma, mode spelling or padding. The caller is cli or ci. The request round-trips canonically through the bound-request parser and refuses no command by name, and its closed schema shares the version 1 protocol and invocation blocks."
+    },
+    {
+      "id": "versions-never-mix",
+      "text": "The bound-request parser reads the root version and refuses another, a missing or non-integer one, and a document over the size bound. It names each mix it refuses: a version 2 document with a plan, an environment, a version 1 source member or a frozen selection member, and a version 1 document with source.commit, source.base or caller ci. Each version's parser refuses the other version. Every execution-request fixture gets its verdict, its canonical bytes and its pinned digest."
+    },
+    {
+      "id": "the-provider-envelope-is-strict",
+      "text": "A provider request has protocolVersion 1, a positive id, an op among initialize, prepare, submit, lookup, follow, cancel, fetch and shutdown, and a payload that is never null. An unknown op or member, another version, a duplicate member and a trailing value are refused, and a failed response carries an error. An envelope has a deeper nesting budget than a bare document, so a submit whose task declares resources parses. A lookup miss carries no member, and a cancel answers the state it observed."
+    },
+    {
+      "id": "a-client-submits-only-to-a-compatible-provider",
+      "text": "A client initializes a provider, then drives prepare, submit, follow, fetch, lookup and cancel through it, and runs no op after close. Initialize fails when the provider reports another protocol version, lacks execution-request-v1 or session-bundle-v1, is not ready, fails or answers malformed. A client offers invocation-providers-v1 only for a request that carries invocation.providers."
+    },
+    {
+      "id": "follow-replays-without-duplicates",
+      "text": "An attempt is queued, preparing or running, then completed, failed or canceled, and only those last three are terminal. A client that follows an attempt again drops every record at or below the cursor it persisted, refuses records out of cursor order and an answer over the record bound, and refuses a state the protocol does not define after it forwards the records before it."
+    },
+    {
+      "id": "the-session-bundle-is-closed",
+      "text": "Every session-bundle fixture is strict JSON and gets its verdict: a bundle names its attempt, the gate session is listed first, or empty when the engine refused before recording one, a parent is in the bundle, and each session lists session.json among admitted files with a valid digest and size. A session id is a date, a time and six lowercase hex digits, a file outside the allowlist is refused, and a blob sits in the exchange directory at <hex[0:2]>/<hex> of its digest, with a traversal refused."
+    },
+    {
+      "id": "importers-verify-and-are-idempotent",
+      "text": "An importer verifies every file's digest and size, validates session.json against the protocols/cli session contract, and requires each document to name its session and its parent; it writes nothing when a check fails. It imports nested sessions with their gate session and leaves no staging behind. Repeating an identical import reuses every session, and a different record under an existing id is refused."
+    }
+  ],
+  "decisions": [
+    "protocols/runner/doc/adr/0001-source-content-identity.md",
+    "protocols/runner/doc/adr/0002-execution-request-and-provider-rpc.md",
+    "protocols/runner/doc/adr/0005-invocation-providers-and-publication-barrier.md",
+    "protocols/runner/doc/adr/0006-commit-addressed-engine-planned-request.md"
+  ]
+}

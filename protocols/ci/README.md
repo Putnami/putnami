@@ -545,25 +545,21 @@ only implementation; there is no TypeScript or Python parser of
 - **`default` and `parity`**: no claim is recorded on either axis. Omission is
   not a denial — see the support vocabulary.
 
-## Specs and durable decisions
+## Feature and spec
 
-There is deliberately **no user-facing feature or spec for this module**. The
-user-visible outcome is "my workspace's CI intent is reviewed in git and a
-command tells me what it will do" — and that outcome is owned by the
-`putnami cloud ci` command surface (`init`, `validate`, `fmt`, `explain`)
-together with the execution plane, not by the document's byte layout. The
-`tooling/cli` feature `cli/ci-document` carries the part the core CLI owns: the
-generated agent guidance names the document's blocking commands as the gate.
-Minting a second product feature per technical wire contract would create a
-promise with no user behind it and a second authority beside the schema.
-
-A spec for a CI change therefore belongs with the command surface that serves
-the document or with the plane that executes the requests, and would link back
-to this contract.
-
-The ImpactPlan's outcome, an extension that reads the impacted plan of a
-change without importing the CLI, is carried by the `tooling/cli` feature
-`cli/impact-plan`.
+The module owns the feature of its contract, `ci/ci-contract`, specified in
+[`specs/ci-contract.json`](specs/ci-contract.json). The tests here prove the
+document, its validation, canonical form and explanation, the deploy binding,
+the ChangePlan, the ImpactPlan and its projection, and the Verdict, with their
+fixture corpora. Two implementations prove the rest in their own tests. The
+CLI (`tooling/cli`) proves that `putnami impact-plan` reproduces the ImpactPlan
+corpus, projects onto the ChangePlan corpus and never emits a plan the
+protocol refuses; two of those checks moved here from the CLI's
+`cli/impact-plan`, which keeps the command and its output. The Cloud extension
+(`cloud/extension`) proves that `putnami cloud ci validate`, `fmt` and
+`explain` resolve the commands and the provider, write the canonical form and
+name the matched rule. The CLI's `cli/ci-document` keeps how the generated
+agent guidance and cache verify read the document's commands.
 
 This module records its shape in
 [ADR 0001](doc/adr/0001-commands-rules-environments-distribution.md), which

@@ -271,6 +271,20 @@ claiming cross-runtime conformance.
 
 Run `./putnamiw test --projects go.putnami.dev/protocol/runner --enforce-coverage`.
 
+## Feature and spec
+
+The module owns the feature of its contract, `runner/runner-contract`,
+specified in [`specs/runner-contract.json`](specs/runner-contract.json). The
+tests here prove the source manifest and its identity, the version 1 and
+version 2 execution requests, the provider envelope and the session bundle,
+with their fixture corpora. The CLI (`tooling/cli`), the one implementation,
+proves the rest in its own tests: its source digest ignores HEAD and the index,
+its provider client drives every op, refuses an incompatible provider and
+follows without duplicates, and its importer verifies before it writes and
+repeats safely. The CLI's `cli/portable-runner` keeps what the CLI adds:
+capture, planning, placement and the session it records. The design intent
+lives in the ADRs under [`doc/adr/`](doc/adr).
+
 ## Support
 
 `preview`, as recorded in the [reviewed support catalog](../../putnami.support.json).

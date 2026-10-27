@@ -69,6 +69,7 @@ func encodePlan(t *testing.T, plan ciproto.ChangePlan) []byte {
 // result for the fixture's repository must be the committed bytes and digest,
 // so the CLI canonicalizes every member a ChangePlan shares with an ImpactPlan.
 func TestBuildImpactProjectsOntoTheChangePlanCorpus(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "producers-reproduce-the-corpus", "the-cli-projects-onto-the-change-plan-corpus")
 	t.Parallel()
 	for name, digest := range readCorpusExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
@@ -147,7 +148,7 @@ func encodeImpactPlan(t *testing.T, plan ciproto.ImpactPlan) []byte {
 // plan back through BuildImpact, the path every emitted impact plan takes,
 // from scrambled planner data, which must emit the committed bytes.
 func TestBuildImpactReproducesTheValidCorpus(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "one-projection", "the-corpus-is-reproduced")
+	spectest.Proves(t, "ci/ci-contract", "producers-reproduce-the-corpus", "the-cli-reproduces-the-impact-plan-corpus")
 	t.Parallel()
 	for name := range readImpactCorpusExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
@@ -169,7 +170,7 @@ func TestBuildImpactReproducesTheValidCorpus(t *testing.T) {
 // expected reason, and BuildImpact given the same planner data either refuses
 // it for that reason or emits a different, valid plan.
 func TestBuildImpactNeverEmitsAnInvalidCorpusPlan(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "one-projection", "an-invalid-plan-is-never-emitted")
+	spectest.Proves(t, "ci/ci-contract", "producers-reproduce-the-corpus", "the-cli-never-emits-a-plan-the-protocol-refuses")
 	t.Parallel()
 	for name, refusal := range readImpactCorpusExpectations(t).Invalid {
 		t.Run(name, func(t *testing.T) {

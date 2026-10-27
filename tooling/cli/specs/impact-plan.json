@@ -13,7 +13,7 @@
   "requirements": [
     {
       "id": "one-projection",
-      "text": "The ImpactPlan impact-plan emits is the one projection of the planner's output: every list deduplicated and sorted, the transitive dependents derived, and the command list in its planned order. Every plan the CLI emits reproduces the protocol corpus byte for byte, and the CLI never emits a plan the protocol refuses."
+      "text": "The ImpactPlan impact-plan emits is the one projection of the planner's output: every list deduplicated and sorted, the transitive dependents derived, and the command list in its planned order."
     },
     {
       "id": "pinned-revisions",

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const validReview = `{"enabled":true,"fallbackEngine":"codex","focus":["security"],"instructions":[]}`
@@ -17,6 +18,7 @@ func reviewDocument(profile string) []byte {
 }
 
 func TestReviewRejectsAuthorityAndMalformedInput(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "review-is-guidance-without-authority", "review-refuses-authority-and-malformed-input")
 	cases := map[string]string{
 		"null":              "null",
 		"missing-enabled":   `{"fallbackEngine":"codex","focus":["security"],"instructions":[]}`,
@@ -43,6 +45,7 @@ func TestReviewRejectsAuthorityAndMalformedInput(t *testing.T) {
 }
 
 func TestReviewBoundsAreFieldAddressable(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "review-is-guidance-without-authority", "review-bounds-are-field-addressable")
 	profile := ReviewProfile{Enabled: true, FallbackEngine: "codex", Focus: []string{"security"}, Instructions: []string{}}
 	cases := []struct {
 		name, field string
@@ -73,6 +76,7 @@ func TestReviewBoundsAreFieldAddressable(t *testing.T) {
 }
 
 func TestReviewCanonicalizationPreservesGuidanceAndIsolation(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "review-is-guidance-without-authority", "review-guidance-enters-the-digest")
 	document := mustParse(t, readFixture(t, "valid", "review.json"))
 	before, _ := CanonicalBytes(document)
 	normalized := Normalize(document)
@@ -105,6 +109,7 @@ func TestReviewCanonicalizationPreservesGuidanceAndIsolation(t *testing.T) {
 }
 
 func TestReviewAbsentPreservesExistingCanonicalBytes(t *testing.T) {
+	spectest.Proves(t, "ci/ci-contract", "review-is-guidance-without-authority", "an-absent-review-keeps-the-canonical-bytes")
 	data := []byte(`{"version":3,"commands":["test"]}`)
 	document := mustParse(t, data)
 	got, _ := CanonicalBytes(document)

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "runner/runner-contract#a-client-submits-only-to-a-compatible-provider",
+    "runner/runner-contract#decoders-are-strict",
+    "runner/runner-contract#follow-replays-without-duplicates",
+    "runner/runner-contract#importers-verify-and-are-idempotent",
+    "runner/runner-contract#input-digests-name-the-applicable-inputs",
+    "runner/runner-contract#providers-and-publication-are-additive",
+    "runner/runner-contract#source-identity-is-the-content",
+    "runner/runner-contract#source-paths-are-portable-and-bounded",
+    "runner/runner-contract#symlinks-resolve-inside-the-snapshot",
+    "runner/runner-contract#the-provider-envelope-is-strict",
+    "runner/runner-contract#the-session-bundle-is-closed",
+    "runner/runner-contract#the-source-manifest-is-canonical",
+    "runner/runner-contract#the-v1-request-is-strict-and-canonical",
+    "runner/runner-contract#the-v2-request-names-a-commit",
+    "runner/runner-contract#versions-never-mix"
+  ]
+}
