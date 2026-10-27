@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -216,11 +217,14 @@ func readCheckedInSupportCatalog(t *testing.T, root string) *supportproto.Catalo
 // --- the predicate ---------------------------------------------------------
 
 // protocolPathPrefix is used ONLY to find the projects the tag convention
-// applies to, never to classify one. Classification reads the tag.
+// applies to, never to classify one. Classification reads the tag. A protocol
+// is a direct child of the prefix: a project nested under one, such as
+// protocols/capabilities/proof, proves the protocol and is not one.
 const protocolPathPrefix = "protocols/"
 
 func isProtocolPath(path string) bool {
-	return len(path) > len(protocolPathPrefix) && path[:len(protocolPathPrefix)] == protocolPathPrefix
+	name, ok := strings.CutPrefix(path, protocolPathPrefix)
+	return ok && name != "" && !strings.Contains(name, "/")
 }
 
 func requiredSupportSubject(project *Project) supportSubject {

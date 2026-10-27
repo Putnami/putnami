@@ -71,10 +71,10 @@
     }
   ],
   "decisions": [
-    "doc/adr/0001-immutable-release-sets-and-channel-cas.md",
-    "doc/adr/0004-mirror-intent-in-the-release-transaction.md",
-    "doc/adr/0005-member-attribution-project-and-kind.md",
-    "doc/adr/0006-a-publication-measures-against-a-channel-it-does-not-advance.md",
-    "doc/adr/0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md"
+    "protocols/distribution/doc/adr/0001-immutable-release-sets-and-channel-cas.md",
+    "protocols/distribution/doc/adr/0004-mirror-intent-in-the-release-transaction.md",
+    "protocols/distribution/doc/adr/0005-member-attribution-project-and-kind.md",
+    "protocols/distribution/doc/adr/0006-a-publication-measures-against-a-channel-it-does-not-advance.md",
+    "protocols/distribution/doc/adr/0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md"
   ]
 }

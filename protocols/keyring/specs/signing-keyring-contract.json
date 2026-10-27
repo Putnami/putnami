@@ -52,7 +52,7 @@
     }
   ],
   "decisions": [
-    "doc/adr/0001-closed-key-state-machine-and-fail-closed-publication.md",
-    "doc/adr/0002-phc-style-versioned-digest-grammar.md"
+    "protocols/keyring/doc/adr/0001-closed-key-state-machine-and-fail-closed-publication.md",
+    "protocols/keyring/doc/adr/0002-phc-style-versioned-digest-grammar.md"
   ]
 }
