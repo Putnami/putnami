@@ -258,6 +258,10 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	hasCoverage := false
 	var coverageUnreadable error
 	if coverageEnabled && coverFile != "" {
+		// `go test` repeats each block once per test binary; the profile the
+		// task leaves lists it once. A profile the merge cannot read or write
+		// stays as written, and the parse below reports what it reads.
+		_ = parse.MergeCoverageProfile(coverFile)
 		result, coverErr := parse.CoverageDetails(coverFile)
 		if errors.Is(coverErr, parse.ErrCoverageProfileUnreadable) {
 			coverageUnreadable = coverErr
