@@ -9,6 +9,7 @@ import (
 
 	capabilities "go.putnami.dev/protocol/capabilities"
 	diagnostic "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func writeLoaderModule(t *testing.T, projectPath, relative string) string {
@@ -24,6 +25,7 @@ func writeLoaderModule(t *testing.T, projectPath, relative string) string {
 }
 
 func TestReconcileCapabilityManifest_AddsLateHookLoadersCanonicallyAndIdempotently(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "typescript-loaders-are-reconciled-into-the-manifest", "the-typescript-extension-reconciles-v1-loaders-canonically")
 	dir := t.TempDir()
 	apiPath := writeLoaderModule(t, dir, ".gen/src/api.ts")
 	reactPath := writeLoaderModule(t, dir, ".gen/src/react.ts")
@@ -116,6 +118,7 @@ func TestReadValidatedCapabilityManifest_NormalizesV2Activation(t *testing.T) {
 }
 
 func TestReconcileCapabilityManifestV2_AddsLateHookLoadersCanonicallyAndIdempotently(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "typescript-loaders-are-reconciled-into-the-manifest", "the-typescript-extension-reconciles-v2-loaders-canonically")
 	dir := t.TempDir()
 	apiPath := writeLoaderModule(t, dir, ".gen/src/api.ts")
 	reactPath := writeLoaderModule(t, dir, ".gen/src/react.ts")
@@ -179,6 +182,7 @@ func TestReconcileCapabilityManifestV2_AddsLateHookLoadersCanonicallyAndIdempote
 }
 
 func TestReconcileCapabilityManifest_FailsClosedOnLoaderConflicts(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "typescript-loaders-are-reconciled-into-the-manifest", "the-typescript-extension-refuses-a-conflicting-loader")
 	tests := []struct {
 		name     string
 		manifest string

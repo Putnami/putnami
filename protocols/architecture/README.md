@@ -197,8 +197,8 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **96 of its 152 projects to 10 domains** and
-excludes the other 56 with a reason and an owner each. There is no workspace-root
+The Putnami repository maps **96 of its 154 projects to 10 domains** and
+excludes the other 58 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
 
@@ -228,9 +228,10 @@ its declarations complete, so there has never been debt to record.
 | `observability` | observability | 1 | Anonymous CLI-usage aggregates |
 | `public-docs` | public-docs | 1 | What the public documentation site publishes |
 
-The excluded 55 are the 28 samples, 7 templates, 2 template proofs, the
-standalone area detector, the 2 Cloud runtime
-destinations, and the Cloud CLI extension with its 14 generated clients. Samples and templates prove or
+The excluded 58 are the 28 samples, 7 templates, 2 template proofs, 2 protocol
+proofs, the standalone area detector, the 2 Cloud runtime
+destinations, the Cloud CLI extension with its 14 generated clients, and the
+development verb vocabulary. Samples, templates and proofs prove or
 seed the public API without owning a fact another repository project consumes.
 The area detector reads the manifests of repositories that are not Putnami
 workspaces; no repository project imports it, and no existing domain owns that

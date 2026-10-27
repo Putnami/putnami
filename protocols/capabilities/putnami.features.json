@@ -1,0 +1,169 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "capabilities",
+  "features": [
+    {
+      "id": "capabilities/manifest-contract",
+      "type": "feature",
+      "name": "Capability manifest contract",
+      "outcome": "Every Go and TypeScript producer writes one strict, versioned and byte-stable capability manifest per project, whose committed bytes change only when a contribution or its stable provenance changes, so a reviewer, the CLI and a deploy target read the same document.",
+      "owner": "framework",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-reader-is-strict-and-versioned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-undeclared-member-is-refused-with-no-manifest",
+              "input-that-is-not-json-is-refused",
+              "the-document-reader-dispatches-on-the-exact-version-token",
+              "the-typescript-application-reader-requires-the-exact-version-token"
+            ]
+          }
+        },
+        {
+          "id": "every-fixture-gets-its-verdict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-v1-fixture-validates",
+              "every-invalid-v1-fixture-is-refused",
+              "every-v2-fixture-gets-its-verdict"
+            ]
+          }
+        },
+        {
+          "id": "v1-bytes-are-canonical",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-representative-manifest-serializes-to-the-full-fixture",
+              "serialization-is-stable-across-100-marshals",
+              "a-round-trip-is-a-fixed-point"
+            ]
+          }
+        },
+        {
+          "id": "v2-emission-drops-volatile-state",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "v2-canonical-bytes-are-stable-and-carry-no-volatile-state",
+              "a-resolved-version-change-keeps-the-v2-bytes",
+              "the-typescript-application-never-emits-volatile-metadata",
+              "the-go-framework-describes-a-canonical-v2-manifest-without-versions"
+            ]
+          }
+        },
+        {
+          "id": "packages-stay-on-the-capability-surface",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "canonical-packages-are-scoped-to-the-capability-surface",
+              "a-closure-only-package-changes-no-byte",
+              "the-typescript-application-scopes-packages-to-the-capability-surface",
+              "the-go-framework-names-only-the-contributing-packages"
+            ]
+          }
+        },
+        {
+          "id": "a-required-capability-needs-a-provider-in-its-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-required-provider-is-reported-at-its-requirement",
+              "v2-completeness-is-scoped-to-the-manifest",
+              "the-typescript-application-scopes-completeness-to-the-manifest",
+              "the-go-framework-refuses-a-missing-required-provider"
+            ]
+          }
+        },
+        {
+          "id": "a-provider-identity-is-unique",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "duplicate-and-conflicting-providers-are-reported",
+              "an-infra-provider-is-keyed-by-kind-and-name",
+              "the-go-framework-refuses-a-duplicate-contribution"
+            ]
+          }
+        },
+        {
+          "id": "each-schema-accepts-exactly-its-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-schema-accepts-exactly-its-version",
+              "the-typescript-producer-stamps-version-2"
+            ]
+          }
+        },
+        {
+          "id": "the-typescript-application-reproduces-the-go-golden",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-application-serializes-the-shared-v2-golden-to-its-bytes",
+              "the-typescript-application-producer-emits-the-same-canonical-bytes-every-run"
+            ]
+          }
+        },
+        {
+          "id": "typescript-loaders-are-reconciled-into-the-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-extension-reconciles-v1-loaders-canonically",
+              "the-typescript-extension-reconciles-v2-loaders-canonically",
+              "the-typescript-extension-refuses-a-conflicting-loader"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -56,8 +56,10 @@ var declaredDomains = []string{
 // deliberately NOT mapped to a domain, with the reason it is out.
 //
 // An exclusion is an owned decision, exactly like a domain membership. Samples
-// are proofs of the public API, templates are scaffold inputs and template
-// proofs run those inputs against the framework; none of them owns a fact, and
+// are proofs of the public API, templates are scaffold inputs, template
+// proofs run those inputs against the framework, and protocol proofs hold the
+// conformance tests of a protocol that cannot bind them itself; none of them
+// owns a fact, and
 // mapping them would inflate the coverage number without authorizing anything
 // real. A sample that grows into a first-party workload stops being a
 // sample — the fix is to map it, not to widen this reason.
@@ -101,6 +103,8 @@ var excludedProjects = map[string]string{
 	"/go/templates/go-server":                              reasonTemplate,
 	"/go/templates/proof":                                  reasonTemplateProof,
 	"/intelligence/areas":                                  reasonAreaDetector,
+	"/protocols/capabilities/proof":                        reasonProtocolProof,
+	"/protocols/diagnostic/proof":                          reasonProtocolProof,
 	"/python/samples/application":                          reasonSample,
 	"/python/samples/library":                              reasonSample,
 	"/python/templates/python-library":                     reasonTemplate,
@@ -133,6 +137,7 @@ const (
 	reasonTemplate                = "template: scaffold input packaged by @putnami/scaffold, owned by the language vertical"
 	reasonGeneratedClient         = "generated client: produced by @putnami/clientgen inside a sample, owned by the sample"
 	reasonTemplateProof           = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
+	reasonProtocolProof           = "protocol proof: holds the conformance tests of the protocol it sits in, which that protocol cannot bind itself, owned by protocols"
 	reasonAreaDetector            = "standalone Intelligence area detector: no repository project imports it or owns its reading of foreign repository manifests, owned by intelligence"
 	reasonCloudRuntimeDestination = "Cloud runtime destination: a client library of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"

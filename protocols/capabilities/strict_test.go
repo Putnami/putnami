@@ -1,7 +1,6 @@
 package capabilities
 
 import (
-	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -25,27 +24,6 @@ func TestParseManifest_Valid(t *testing.T) {
 	}
 	if m == nil || m.Project != "p" {
 		t.Fatalf("manifest = %v, want project p", m)
-	}
-}
-
-func TestParseManifest_UnknownField(t *testing.T) {
-	data := []byte(`{"protocolVersion": 1, "project": "p", "bogus": true}`)
-	m, diags := ParseManifest(data)
-	if m != nil {
-		t.Error("manifest should be nil on parse error")
-	}
-	if !findCode(diags, ErrorCodeUnknownField) {
-		t.Errorf("want %s, got %v", ErrorCodeUnknownField, diags)
-	}
-}
-
-func TestParseManifest_InvalidJSON(t *testing.T) {
-	_, diags := ParseManifest([]byte("{not json"))
-	if !diag.HasErrors(diags) {
-		t.Fatal("expected parse error")
-	}
-	if diags[0].Code != ErrorCodeParseError {
-		t.Errorf("Code = %q, want %s", diags[0].Code, ErrorCodeParseError)
 	}
 }
 
@@ -155,65 +133,6 @@ func TestValidateManifest_RequiredCapability(t *testing.T) {
 	}
 }
 
-func TestValidateManifest_MissingRequiredProvider(t *testing.T) {
-	prov := Provenance{Project: "p", Package: "example/sql", SourceKind: SourceKindFramework, EvidencePath: "src/sql.go"}
-	m := &Manifest{
-		ProtocolVersion: 1,
-		Project:         "p",
-		Migrations: []MigrationBundle{{
-			Name: "sql", Datasource: "primary", Provenance: prov,
-		}},
-		RequiredCapabilities: []RequiredCapability{{
-			Name: "sql", Requires: []CapabilityKind{
-				CapabilityKindDatasource,
-				CapabilityKindMigration,
-				CapabilityKindReadiness,
-			}, Provenance: prov,
-		}},
-	}
-	diags := ValidateManifest(m)
-	if !findCode(diags, ErrorCodeMissingRequiredProvider) {
-		t.Fatalf("want %s, got %v", ErrorCodeMissingRequiredProvider, diags)
-	}
-	for _, d := range diags {
-		if d.Code != ErrorCodeMissingRequiredProvider {
-			continue
-		}
-		if d.Field != "requiredCapabilities[0].requires[2]" {
-			t.Errorf("Field = %q, want requiredCapabilities[0].requires[2]", d.Field)
-		}
-		for _, context := range []string{`project "p"`, "src/sql.go", `contribute a "readiness" provider`} {
-			if !strings.Contains(d.Message, context) {
-				t.Errorf("Message = %q, want context %q", d.Message, context)
-			}
-		}
-	}
-}
-
-func TestValidateManifest_DuplicateAndConflictingProviders(t *testing.T) {
-	first := Provenance{Project: "p", Package: "example/first", SourceKind: SourceKindFramework}
-	second := Provenance{Project: "p", Package: "example/second", SourceKind: SourceKindFramework}
-	m := &Manifest{
-		ProtocolVersion: 1,
-		Project:         "p",
-		HealthContributors: []HealthContributor{
-			{Name: "db", Probe: ProbeKindReadiness, Provenance: first},
-			{Name: "db", Probe: ProbeKindReadiness, Provenance: second},
-		},
-		ConfigDefinitions: []ConfigDefinition{
-			{Path: "iam", Fields: []ConfigField{{Name: "primary"}}, Provenance: first},
-			{Path: "iam", Fields: []ConfigField{{Name: "replica"}}, Provenance: second},
-		},
-	}
-	diags := ValidateManifest(m)
-	if !findCode(diags, ErrorCodeDuplicateProvider) {
-		t.Errorf("want %s, got %v", ErrorCodeDuplicateProvider, diags)
-	}
-	if !findCode(diags, ErrorCodeConflictingProvider) {
-		t.Errorf("want %s, got %v", ErrorCodeConflictingProvider, diags)
-	}
-}
-
 func TestValidateManifest_MigrationNameIsNotProviderIdentityInV1(t *testing.T) {
 	prov := Provenance{Project: "p", SourceKind: SourceKindFramework}
 	m := &Manifest{
@@ -228,29 +147,6 @@ func TestValidateManifest_MigrationNameIsNotProviderIdentityInV1(t *testing.T) {
 		if d.Code == ErrorCodeDuplicateProvider || d.Code == ErrorCodeConflictingProvider {
 			t.Fatalf("v1 migration names do not carry kind and cannot establish identity: %v", d)
 		}
-	}
-}
-
-func TestValidateManifest_InfraIdentityIncludesKind(t *testing.T) {
-	first := Provenance{Project: "p", Package: "example/first", SourceKind: SourceKindFramework}
-	second := Provenance{Project: "p", Package: "example/second", SourceKind: SourceKindFramework}
-	crossKind := &Manifest{
-		ProtocolVersion: 1,
-		Project:         "p",
-		InfraRequirements: []InfraRequirement{
-			{Name: "primary", Kind: InfraKindDatabase, Provenance: first},
-			{Name: "primary", Kind: InfraKindSecret, Provenance: second},
-		},
-	}
-	if diags := ValidateManifest(crossKind); diag.HasErrors(diags) {
-		t.Fatalf("same infra name across kinds is valid: %v", diags)
-	}
-
-	duplicate := *crossKind
-	duplicate.InfraRequirements = append([]InfraRequirement(nil), crossKind.InfraRequirements...)
-	duplicate.InfraRequirements[1].Kind = InfraKindDatabase
-	if !findCode(ValidateManifest(&duplicate), ErrorCodeDuplicateProvider) {
-		t.Fatal("same infra (kind, name) must be rejected as duplicate")
 	}
 }
 

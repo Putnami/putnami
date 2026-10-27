@@ -231,6 +231,7 @@ func describeCapabilityArtifacts(t *testing.T) ([]byte, []byte, *capMigrationPlu
 // dependency edit anywhere else in the workspace grows the stamp and must not
 // move one byte of this project's manifest.
 func TestDescribeCapabilitiesIgnoresNonContributingClosurePackages(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "packages-stay-on-the-capability-surface", "the-go-framework-names-only-the-contributing-packages")
 	describeWith := func(extra ...generatedCapabilityPackage) []byte {
 		t.Helper()
 		out := t.TempDir()
@@ -272,6 +273,7 @@ func TestDescribeCapabilitiesIgnoresNonContributingClosurePackages(t *testing.T)
 }
 
 func TestDescribeCapabilitiesV2AndFeatureEvidenceAreCanonicalDeterministic(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "v2-emission-drops-volatile-state", "the-go-framework-describes-a-canonical-v2-manifest-without-versions")
 	firstManifest, firstEvidence, migrations := describeCapabilityArtifacts(t)
 	if migrations.calls != 1 {
 		t.Fatalf("MigrationSources calls = %d, want one frozen collection", migrations.calls)
@@ -458,6 +460,8 @@ func TestDescribeCapabilitiesTargetFilterAndRuntimeSidecar(t *testing.T) {
 }
 
 func TestDescribeCapabilitiesMissingAndDuplicateProvidersFailClosed(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "a-required-capability-needs-a-provider-in-its-manifest", "the-go-framework-refuses-a-missing-required-provider")
+	spectest.Proves(t, "capabilities/manifest-contract", "a-provider-identity-is-unique", "the-go-framework-refuses-a-duplicate-contribution")
 	for _, tc := range []struct {
 		name  string
 		build func() *Application

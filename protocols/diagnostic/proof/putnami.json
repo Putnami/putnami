@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/diagnostic-protocol-proof",
+  "tags": ["go"],
+  "extensions": ["/go/extension"],
+  "featureAuthority": {"owner": "diagnostic/finding-record"},
+  "disable": {
+    "jobs": ["serve"]
+  },
+  "options": {
+    "test": {
+      "coverage": false,
+      "coverage-threshold": 0
+    }
+  }
+}

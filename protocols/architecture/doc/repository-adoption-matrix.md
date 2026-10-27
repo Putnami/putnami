@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **96 of its 152 projects** to **10 architecture domains**.
-The other **56 are excluded on purpose**: 28 samples, 7 templates, 2 template
-proofs, the standalone area detector, the 2 Cloud runtime destinations,
-the Cloud CLI extension with its 14 generated clients, and the new development
-verb vocabulary. Every one of the 152 appears in a table below, mapped or
-excluded, with a reason.
+This repository maps **96 of its 154 projects** to **10 architecture domains**.
+The other **58 are excluded on purpose**: 28 samples, 7 templates, 2 template
+proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
+destinations, the Cloud CLI extension with its 14 generated clients, and the new
+development verb vocabulary. Every one of the 154 appears in a table below,
+mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -238,8 +238,8 @@ owning none of their content.
 
 ## Excluded projects
 
-Samples, templates, and template proofs consume the public API without owning a
-fact another repository project depends on. The standalone area detector
+Samples, templates, template proofs, and protocol proofs consume the public API
+without owning a fact another repository project depends on. The standalone area detector
 is also outside the current architecture frontier: it reads the manifests of
 repositories that are not Putnami workspaces, and no project in this
 repository imports it. None of the existing domains owns that reading.
@@ -415,6 +415,24 @@ authority and needs a domain.
 |---|---|---|
 | `/go/templates/proof` | Go template proof | `extension-providers` |
 | `/typescript/templates/proof` | TypeScript template proof | `extension-providers` |
+
+### Protocol proofs — 2 projects
+
+**Why excluded:** a protocol proof is a *test*. It holds the conformance tests
+of the protocol it sits in, bound with `spectest` to the requirements that
+protocol declares. The protocol cannot bind them itself:
+`go.putnami.dev/protocol/features`, which provides `spectest`, requires it, so a
+test of the protocol that imported `spectest` would make the two projects
+depend on each other. The proof uses only the protocol's exported API, declares
+no export, and nothing depends on it.
+
+**What would change it:** a proof that other projects start to read has
+acquired an authority and needs a domain.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/protocols/capabilities/proof` | Protocol proof | `protocols` |
+| `/protocols/diagnostic/proof` | Protocol proof | `protocols` |
 
 ## ARC permissions and DARC flows are not the same thing
 

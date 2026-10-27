@@ -6,7 +6,7 @@
 //		conformance.RunFile(t, "schema/capabilities.json")
 //	}
 //
-// The runner reuses the byte-stability machinery pinned by determinism_test.go:
+// The runner reuses the byte-stability machinery pinned by proof/determinism_test.go:
 // it re-emits the manifest in the canonical json.MarshalIndent form (two-space
 // indent + trailing newline) and byte-compares it to the committed bytes, so any
 // non-canonical key ordering, indentation, or escaping fails; it asserts the
