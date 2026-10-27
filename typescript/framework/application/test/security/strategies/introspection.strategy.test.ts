@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { runInContext } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import type { HttpRequestContext } from '../../../src/http/http-context.type';
@@ -13,6 +14,32 @@ import {
   MemoryIntrospectionCache,
   MIN_INTROSPECT_RETRY_JITTER_MS,
 } from '../../../src/security/strategies';
+
+const inBounds = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'bounded-introspection',
+  check: 'only-an-active-in-bounds-response-resolves',
+};
+const hashedCache = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'bounded-introspection',
+  check: 'the-cache-holds-only-active-results-under-a-hashed-key',
+};
+const unloggedCredential = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'bounded-introspection',
+  check: 'introspection-credentials-never-reach-the-logs',
+};
+const outageBreaker = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'bounded-introspection',
+  check: 'the-breaker-sheds-uncached-tokens-during-an-outage',
+};
+const throttledRetry = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'bounded-introspection',
+  check: 'a-throttled-call-is-retried-once-without-opening-the-breaker',
+};
 
 // TypeScript twin of go/framework/security/introspect_test.go and the
 // through-the-middleware breaker cases in introspect_breaker_test.go. Global
@@ -113,7 +140,7 @@ const SHORT_CIRCUITED_LOG = 'token introspection short-circuited: circuit breake
 // --- Resolver behavior ---
 
 describe('introspectionStrategy — resolver behavior', () => {
-  it('maps an active token to a principal (scopes, client_id, active flag dropped)', async () => {
+  specTest('maps an active token to a principal (scopes, client_id, active flag dropped)', inBounds, async () => {
     const srv = mockFetch(({ form }) => {
       expect(form.get('token')).toBe('opaque-1');
       return {
@@ -140,7 +167,7 @@ describe('introspectionStrategy — resolver behavior', () => {
     expect(srv.calls()).toBe(1);
   });
 
-  it('resolves nothing for an inactive token', async () => {
+  specTest('resolves nothing for an inactive token', inBounds, async () => {
     mockFetch(() => ({ status: 200, body: { active: false } }));
     expect((await runIntrospect(introspectionStrategy({ endpoint: ENDPOINT }), 'revoked')).principal).toBeUndefined();
   });
@@ -151,7 +178,7 @@ describe('introspectionStrategy — resolver behavior', () => {
     expect(srv.calls()).toBe(0);
   });
 
-  it('fails closed when the endpoint exceeds the timeout', async () => {
+  specTest('fails closed when the endpoint exceeds the timeout', inBounds, async () => {
     mockFetch(async ({ signal }) => {
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(resolve, 200);
@@ -172,7 +199,7 @@ describe('introspectionStrategy — resolver behavior', () => {
     expect(srv.calls()).toBe(0);
   });
 
-  it('rejects an insecure non-loopback endpoint without contacting it', async () => {
+  specTest('rejects an insecure non-loopback endpoint without contacting it', inBounds, async () => {
     const srv = mockFetch(() => ({ status: 200, body: activeJSON('x') }));
     expect(
       (await runIntrospect(introspectionStrategy({ endpoint: 'http://example.com/introspect' }), 'tok')).principal,
@@ -361,7 +388,7 @@ describe('introspectionStrategy — caching', () => {
     expect(srv.calls()).toBe(2);
   });
 
-  it('never caches an inactive result', async () => {
+  specTest('never caches an inactive result', hashedCache, async () => {
     const srv = mockFetch(() => ({ status: 200, body: { active: false } }));
     const strategy = introspectionStrategy({ endpoint: ENDPOINT, cache: new MemoryIntrospectionCache() });
     await runIntrospect(strategy, 'tok');
@@ -386,7 +413,7 @@ describe('introspectionStrategy — caching', () => {
     expect(srv.calls()).toBe(2);
   });
 
-  it('never uses the raw token as a cache key (sha256-derived, secret-free)', async () => {
+  specTest('never uses the raw token as a cache key (sha256-derived, secret-free)', hashedCache, async () => {
     mockFetch(() => ({ status: 200, body: activeJSON('x') }));
     const cache = new MemoryIntrospectionCache();
     await runIntrospect(introspectionStrategy({ endpoint: ENDPOINT, cache }), 'secret-token');
@@ -411,14 +438,14 @@ describe('introspectionStrategy — audience', () => {
     ).toBeDefined();
   });
 
-  it('rejects a mismatched audience', async () => {
+  specTest('rejects a mismatched audience', inBounds, async () => {
     mockFetch(() => ({ status: 200, body: { active: true, sub: 'u', aud: 'other-svc' } }));
     expect(
       (await runIntrospect(introspectionStrategy({ endpoint: ENDPOINT, audience: 'my-svc' }), 'tok')).principal,
     ).toBeUndefined();
   });
 
-  it('re-checks the audience on a cache hit (audience is not part of the cache key)', async () => {
+  specTest('re-checks the audience on a cache hit (audience is not part of the cache key)', inBounds, async () => {
     const cache = new MemoryIntrospectionCache();
     const srv = mockFetch(() => ({
       status: 200,
@@ -492,13 +519,17 @@ describe('introspectionStrategy — concurrency', () => {
 // --- Security invariants ---
 
 describe('introspectionStrategy — security invariants', () => {
-  it('caps the response body at 64 KiB before parsing (oversized valid JSON is truncated, not honored)', async () => {
-    mockFetch(() => ({ status: 200, body: { active: true, sub: 'x', pad: 'a'.repeat(70 * 1024) } }));
-    const { principal } = await runIntrospect(introspectionStrategy({ endpoint: ENDPOINT }), 'tok');
-    // The full body is > 64 KiB; truncation makes it invalid JSON → treated as
-    // inactive → no identity. Proves the cap runs before the parse.
-    expect(principal).toBeUndefined();
-  });
+  specTest(
+    'caps the response body at 64 KiB before parsing (oversized valid JSON is truncated, not honored)',
+    inBounds,
+    async () => {
+      mockFetch(() => ({ status: 200, body: { active: true, sub: 'x', pad: 'a'.repeat(70 * 1024) } }));
+      const { principal } = await runIntrospect(introspectionStrategy({ endpoint: ENDPOINT }), 'tok');
+      // The full body is > 64 KiB; truncation makes it invalid JSON → treated as
+      // inactive → no identity. Proves the cap runs before the parse.
+      expect(principal).toBeUndefined();
+    },
+  );
 
   it('accepts an active response comfortably under the 64 KiB cap', async () => {
     mockFetch(() => ({ status: 200, body: { active: true, sub: 'x', pad: 'a'.repeat(1024) } }));
@@ -506,7 +537,7 @@ describe('introspectionStrategy — security invariants', () => {
     expect(principal?.sub).toBe('x');
   });
 
-  it('never logs the client secret', async () => {
+  specTest('never logs the client secret', unloggedCredential, async () => {
     mockFetch(() => ({ status: 401, body: {} }));
     const { logger } = await runIntrospect(
       introspectionStrategy({ endpoint: ENDPOINT, clientId: 'rs-id', clientSecret: 'super-secret-value' }),
@@ -518,7 +549,7 @@ describe('introspectionStrategy — security invariants', () => {
     expect(logger.entries.length).toBeGreaterThan(0); // a credentials-rejected error WAS logged
   });
 
-  it('never logs the client assertion', async () => {
+  specTest('never logs the client assertion', unloggedCredential, async () => {
     mockFetch(() => ({ status: 401, body: {} }));
     const { logger } = await runIntrospect(
       introspectionStrategy({ endpoint: ENDPOINT, clientAssertion: () => 'top-secret-assertion' }),
@@ -527,7 +558,7 @@ describe('introspectionStrategy — security invariants', () => {
     expect(serialize(logger)).not.toContain('top-secret-assertion');
   });
 
-  it('derives a cache key byte-identical to the Go twin (introspectCacheKey parity)', () => {
+  specTest('derives a cache key byte-identical to the Go twin (introspectCacheKey parity)', hashedCache, () => {
     const key = introspectCacheKey(
       'https://issuer.example.com/introspect',
       { issuer: 'https://issuer.example.com', clientId: 'client-a', clientSecret: 'secret-a' },
@@ -541,7 +572,7 @@ describe('introspectionStrategy — security invariants', () => {
 // --- Circuit breaker through the middleware ---
 
 describe('introspectionStrategy — circuit breaker', () => {
-  it('short-circuits uncached tokens after a sustained outage', async () => {
+  specTest('short-circuits uncached tokens after a sustained outage', outageBreaker, async () => {
     const srv = mockFetch(() => ({ status: 503, body: {} })); // endpoint is out from the start
     const strategy = introspectionStrategy({
       endpoint: ENDPOINT,
@@ -560,7 +591,7 @@ describe('introspectionStrategy — circuit breaker', () => {
     expect(srv.calls()).toBe(2); // short-circuited: no more endpoint calls
   });
 
-  it('keeps serving cached tokens while the breaker is open', async () => {
+  specTest('keeps serving cached tokens while the breaker is open', outageBreaker, async () => {
     let down = false;
     const srv = mockFetch(() => (down ? { status: 503, body: {} } : { status: 200, body: activeJSON('svc') }));
     const strategy = introspectionStrategy({
@@ -608,7 +639,7 @@ describe('introspectionStrategy — 429 backpressure', () => {
     ['an absent header (the jittered default)', undefined],
   ];
   for (const [form, retryAfter] of retryAfterForms) {
-    it(`retries a 429 once after ${form} and authenticates the retried 200`, async () => {
+    specTest(`retries a 429 once after ${form} and authenticates the retried 200`, throttledRetry, async () => {
       let seen = 0;
       const srv = mockFetch(({ form: body }) => {
         if (body.get('client_assertion') !== 'signed-jwt') return { status: 401, body: {} };
@@ -645,7 +676,7 @@ describe('introspectionStrategy — 429 backpressure', () => {
 
   // Go: TestIntrospect_ThrottleBurstNeverOpensBreaker — the issue's acceptance
   // check. At failureThreshold 1 a single counted failure would open the breaker.
-  it('fails a burst of 429s closed without ever opening the breaker', async () => {
+  specTest('fails a burst of 429s closed without ever opening the breaker', throttledRetry, async () => {
     let throttling = true;
     const srv = mockFetch(() => (throttling ? throttled('0') : { status: 200, body: activeJSON('recovered') }));
     const strategy = introspectionStrategy({

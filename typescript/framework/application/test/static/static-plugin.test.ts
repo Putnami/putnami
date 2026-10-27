@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
@@ -116,34 +117,42 @@ describe('StaticPlugin', () => {
   });
 
   describe('prefix option', () => {
-    it('should prefix routes with given prefix', async () => {
-      const plugin = new StaticPlugin({ skipLoading: true, prefix: '/assets' });
+    specTest(
+      'should prefix routes with given prefix',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'static-assets',
+        check: 'a-static-file-answers-under-its-prefix-only',
+      },
+      async () => {
+        const plugin = new StaticPlugin({ skipLoading: true, prefix: '/assets' });
 
-      // Create test file in the actual public folder
-      const pubFolder = publicFolder();
-      mkdirSync(pubFolder, { recursive: true });
-      writeFileSync(`${pubFolder}/logo.png`, 'fake-image');
+        // Create test file in the actual public folder
+        const pubFolder = publicFolder();
+        mkdirSync(pubFolder, { recursive: true });
+        writeFileSync(`${pubFolder}/logo.png`, 'fake-image');
 
-      plugin.routeStatic('logo.png', 'logo.png', { gzip: false, mime: 'image/png' });
+        plugin.routeStatic('logo.png', 'logo.png', { gzip: false, mime: 'image/png' });
 
-      app.use(plugin);
-      await app.start();
+        app.use(plugin);
+        await app.start();
 
-      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
 
-      // Should NOT match without prefix
-      const noPrefix = await fetch(`${baseUrl}/logo.png`);
-      expect(noPrefix.status).toBe(404);
+        // Should NOT match without prefix
+        const noPrefix = await fetch(`${baseUrl}/logo.png`);
+        expect(noPrefix.status).toBe(404);
 
-      // Should match with prefix
-      const withPrefix = await fetch(`${baseUrl}/assets/logo.png`);
-      expect(withPrefix.status).toBe(200);
+        // Should match with prefix
+        const withPrefix = await fetch(`${baseUrl}/assets/logo.png`);
+        expect(withPrefix.status).toBe(200);
 
-      // Cleanup
-      rmSync(`${pubFolder}/logo.png`, { force: true });
+        // Cleanup
+        rmSync(`${pubFolder}/logo.png`, { force: true });
 
-      await app.stop();
-    });
+        await app.stop();
+      },
+    );
 
     it('should work without prefix (default)', async () => {
       const plugin = new StaticPlugin({ skipLoading: true });
@@ -167,40 +176,48 @@ describe('StaticPlugin', () => {
       await app.stop();
     });
 
-    it('should serve GET and HEAD requests regardless of Accept when unconstrained', async () => {
-      const plugin = new StaticPlugin({ skipLoading: true });
-      const pubFolder = publicFolder();
-      const staticPath = `${pubFolder}/accept-test.txt`;
-      mkdirSync(pubFolder, { recursive: true });
-      writeFileSync(staticPath, 'hello');
+    specTest(
+      'should serve GET and HEAD requests regardless of Accept when unconstrained',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'static-assets',
+        check: 'a-static-file-answers-get-and-head-whatever-the-accept-header',
+      },
+      async () => {
+        const plugin = new StaticPlugin({ skipLoading: true });
+        const pubFolder = publicFolder();
+        const staticPath = `${pubFolder}/accept-test.txt`;
+        mkdirSync(pubFolder, { recursive: true });
+        writeFileSync(staticPath, 'hello');
 
-      try {
-        plugin.routeStatic('accept-test.txt', 'accept-test.txt', { gzip: false, mime: 'text/plain' });
-        app.use(plugin);
-        await app.start();
+        try {
+          plugin.routeStatic('accept-test.txt', 'accept-test.txt', { gzip: false, mime: 'text/plain' });
+          app.use(plugin);
+          await app.start();
 
-        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-        const matching = await fetch(`${baseUrl}/accept-test.txt`, { headers: { Accept: 'text/plain' } });
-        expect(matching.status).toBe(200);
-        expect(await matching.text()).toBe('hello');
+          const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+          const matching = await fetch(`${baseUrl}/accept-test.txt`, { headers: { Accept: 'text/plain' } });
+          expect(matching.status).toBe(200);
+          expect(await matching.text()).toBe('hello');
 
-        const unrelated = await fetch(`${baseUrl}/accept-test.txt`, {
-          headers: { Accept: 'application/json' },
-        });
-        expect(unrelated.status).toBe(200);
-        expect(await unrelated.text()).toBe('hello');
+          const unrelated = await fetch(`${baseUrl}/accept-test.txt`, {
+            headers: { Accept: 'application/json' },
+          });
+          expect(unrelated.status).toBe(200);
+          expect(await unrelated.text()).toBe('hello');
 
-        const head = await fetch(`${baseUrl}/accept-test.txt`, {
-          method: 'HEAD',
-          headers: { Accept: 'image/png' },
-        });
-        expect(head.status).toBe(200);
-        expect(head.headers.get('Content-Type')).toBe('text/plain');
-        expect(head.headers.get('Content-Length')).toBe('5');
-      } finally {
-        rmSync(staticPath, { force: true });
-      }
-    });
+          const head = await fetch(`${baseUrl}/accept-test.txt`, {
+            method: 'HEAD',
+            headers: { Accept: 'image/png' },
+          });
+          expect(head.status).toBe(200);
+          expect(head.headers.get('Content-Type')).toBe('text/plain');
+          expect(head.headers.get('Content-Length')).toBe('5');
+        } finally {
+          rmSync(staticPath, { force: true });
+        }
+      },
+    );
   });
 
   describe('cacheMaxAge option', () => {
@@ -248,86 +265,110 @@ describe('StaticPlugin', () => {
   });
 
   describe('conditional requests (304 Not Modified)', () => {
-    it('should return 304 when If-None-Match matches ETag', async () => {
-      const plugin = new StaticPlugin({ skipLoading: true });
+    specTest(
+      'should return 304 when If-None-Match matches ETag',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'static-assets',
+        check: 'a-matching-if-none-match-answers-304',
+      },
+      async () => {
+        const plugin = new StaticPlugin({ skipLoading: true });
 
-      const pubFolder = publicFolder();
-      mkdirSync(pubFolder, { recursive: true });
-      writeFileSync(`${pubFolder}/cached.js`, 'console.log("cached");');
+        const pubFolder = publicFolder();
+        mkdirSync(pubFolder, { recursive: true });
+        writeFileSync(`${pubFolder}/cached.js`, 'console.log("cached");');
 
-      plugin.routeStatic('cached.js', 'cached.js', { gzip: false, mime: 'application/javascript' });
+        plugin.routeStatic('cached.js', 'cached.js', { gzip: false, mime: 'application/javascript' });
 
-      app.use(plugin);
-      await app.start();
+        app.use(plugin);
+        await app.start();
 
-      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
 
-      // First request: get the ETag
-      const firstRes = await fetch(`${baseUrl}/cached.js`);
-      expect(firstRes.status).toBe(200);
-      const etag = firstRes.headers.get('ETag') ?? '';
-      expect(etag).not.toBe('');
+        // First request: get the ETag
+        const firstRes = await fetch(`${baseUrl}/cached.js`);
+        expect(firstRes.status).toBe(200);
+        const etag = firstRes.headers.get('ETag') ?? '';
+        expect(etag).not.toBe('');
 
-      // Second request: send If-None-Match with the ETag
-      const secondRes = await fetch(`${baseUrl}/cached.js`, {
-        headers: { 'If-None-Match': etag },
-      });
-      expect(secondRes.status).toBe(304);
+        // Second request: send If-None-Match with the ETag
+        const secondRes = await fetch(`${baseUrl}/cached.js`, {
+          headers: { 'If-None-Match': etag },
+        });
+        expect(secondRes.status).toBe(304);
 
-      // Cleanup
-      rmSync(`${pubFolder}/cached.js`, { force: true });
-      await app.stop();
-    });
+        // Cleanup
+        rmSync(`${pubFolder}/cached.js`, { force: true });
+        await app.stop();
+      },
+    );
 
-    it('should return 200 when If-None-Match does not match', async () => {
-      const plugin = new StaticPlugin({ skipLoading: true });
+    specTest(
+      'should return 200 when If-None-Match does not match',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'static-assets',
+        check: 'a-static-response-carries-cache-control-and-an-etag',
+      },
+      async () => {
+        const plugin = new StaticPlugin({ skipLoading: true });
 
-      const pubFolder = publicFolder();
-      mkdirSync(pubFolder, { recursive: true });
-      writeFileSync(`${pubFolder}/fresh.js`, 'console.log("fresh");');
+        const pubFolder = publicFolder();
+        mkdirSync(pubFolder, { recursive: true });
+        writeFileSync(`${pubFolder}/fresh.js`, 'console.log("fresh");');
 
-      plugin.routeStatic('fresh.js', 'fresh.js', { gzip: false, mime: 'application/javascript' });
+        plugin.routeStatic('fresh.js', 'fresh.js', { gzip: false, mime: 'application/javascript' });
 
-      app.use(plugin);
-      await app.start();
+        app.use(plugin);
+        await app.start();
 
-      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
 
-      const res = await fetch(`${baseUrl}/fresh.js`, {
-        headers: { 'If-None-Match': '"stale-etag"' },
-      });
-      expect(res.status).toBe(200);
-      expect(res.headers.get('Cache-Control')).toBe('public, max-age=86400');
+        const res = await fetch(`${baseUrl}/fresh.js`, {
+          headers: { 'If-None-Match': '"stale-etag"' },
+        });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Cache-Control')).toBe('public, max-age=86400');
 
-      // Cleanup
-      rmSync(`${pubFolder}/fresh.js`, { force: true });
-      await app.stop();
-    });
+        // Cleanup
+        rmSync(`${pubFolder}/fresh.js`, { force: true });
+        await app.stop();
+      },
+    );
 
-    it('should include Cache-Control header in response', async () => {
-      const plugin = new StaticPlugin({ skipLoading: true, cacheMaxAge: 3600 });
+    specTest(
+      'should include Cache-Control header in response',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'static-assets',
+        check: 'a-static-response-carries-cache-control-and-an-etag',
+      },
+      async () => {
+        const plugin = new StaticPlugin({ skipLoading: true, cacheMaxAge: 3600 });
 
-      const pubFolder = publicFolder();
-      mkdirSync(pubFolder, { recursive: true });
-      writeFileSync(`${pubFolder}/header-test.css`, 'body {}');
+        const pubFolder = publicFolder();
+        mkdirSync(pubFolder, { recursive: true });
+        writeFileSync(`${pubFolder}/header-test.css`, 'body {}');
 
-      plugin.routeStatic('header-test.css', 'header-test.css', { gzip: false, mime: 'text/css' });
+        plugin.routeStatic('header-test.css', 'header-test.css', { gzip: false, mime: 'text/css' });
 
-      app.use(plugin);
-      await app.start();
+        app.use(plugin);
+        await app.start();
 
-      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
 
-      const res = await fetch(`${baseUrl}/header-test.css`);
-      expect(res.status).toBe(200);
-      expect(res.headers.get('Cache-Control')).toBe('public, max-age=3600');
-      expect(res.headers.get('Content-Type')).toBe('text/css');
-      expect(res.headers.get('ETag')).toBeDefined();
+        const res = await fetch(`${baseUrl}/header-test.css`);
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Cache-Control')).toBe('public, max-age=3600');
+        expect(res.headers.get('Content-Type')).toBe('text/css');
+        expect(res.headers.get('ETag')).toBeDefined();
 
-      // Cleanup
-      rmSync(`${pubFolder}/header-test.css`, { force: true });
-      await app.stop();
-    });
+        // Cleanup
+        rmSync(`${pubFolder}/header-test.css`, { force: true });
+        await app.stop();
+      },
+    );
   });
 
   describe('Plugin interface', () => {

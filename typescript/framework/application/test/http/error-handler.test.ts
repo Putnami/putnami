@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { HttpException } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { restoreEnv } from '@putnami/utils';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
@@ -26,72 +27,104 @@ describe('onError handler', () => {
     baseUrl = `http://localhost:${plugin.getServer()?.port}`;
   }
 
-  it('sync error handler returns a custom body', async () => {
-    const p = http({
-      port: 0,
-      onError: (error) => ({ customError: String(error) }),
-    });
-    p.get('/fail', () => {
-      throw new Error('boom');
-    });
-    await start(p);
+  specTest(
+    'sync error handler returns a custom body',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'an-on-error-result-becomes-the-500-body',
+    },
+    async () => {
+      const p = http({
+        port: 0,
+        onError: (error) => ({ customError: String(error) }),
+      });
+      p.get('/fail', () => {
+        throw new Error('boom');
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`);
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.customError).toBe('Error: boom');
-  });
+      const res = await fetch(`${baseUrl}/fail`);
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.customError).toBe('Error: boom');
+    },
+  );
 
-  it('async error handler is awaited and returns a custom body', async () => {
-    const p = http({
-      port: 0,
-      onError: async (error) => {
-        // Simulate async work (e.g. reporting to Sentry)
-        await new Promise((r) => setTimeout(r, 5));
-        return { asyncError: String(error) };
-      },
-    });
-    p.get('/fail', () => {
-      throw new Error('async-boom');
-    });
-    await start(p);
+  specTest(
+    'async error handler is awaited and returns a custom body',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'an-on-error-result-becomes-the-500-body',
+    },
+    async () => {
+      const p = http({
+        port: 0,
+        onError: async (error) => {
+          // Simulate async work (e.g. reporting to Sentry)
+          await new Promise((r) => setTimeout(r, 5));
+          return { asyncError: String(error) };
+        },
+      });
+      p.get('/fail', () => {
+        throw new Error('async-boom');
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`);
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.asyncError).toBe('Error: async-boom');
-  });
+      const res = await fetch(`${baseUrl}/fail`);
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.asyncError).toBe('Error: async-boom');
+    },
+  );
 
-  it('error handler returning undefined falls through to default', async () => {
-    const p = http({
-      port: 0,
-      onError: () => undefined,
-    });
-    p.get('/fail', () => {
-      throw new HttpException('Not Found', 404);
-    });
-    await start(p);
+  specTest(
+    'error handler returning undefined falls through to default',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'an-on-error-that-declines-or-throws-falls-through',
+    },
+    async () => {
+      const p = http({
+        port: 0,
+        onError: () => undefined,
+      });
+      p.get('/fail', () => {
+        throw new HttpException('Not Found', 404);
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`);
-    expect(res.status).toBe(404);
-  });
+      const res = await fetch(`${baseUrl}/fail`);
+      expect(res.status).toBe(404);
+    },
+  );
 
-  it('error handler that throws logs and falls through', async () => {
-    const p = http({
-      port: 0,
-      onError: () => {
-        throw new Error('handler-crash');
-      },
-    });
-    p.get('/fail', () => {
-      throw new HttpException('Server Error', 500);
-    });
-    await start(p);
+  specTest(
+    'error handler that throws logs and falls through',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'an-on-error-that-declines-or-throws-falls-through',
+    },
+    async () => {
+      const p = http({
+        port: 0,
+        onError: () => {
+          throw new Error('handler-crash');
+        },
+      });
+      p.get('/fail', () => {
+        throw new HttpException('Server Error', 500);
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`);
-    // Falls through to default HttpException handling
-    expect(res.status).toBe(500);
-  });
+      const res = await fetch(`${baseUrl}/fail`);
+      // Falls through to default HttpException handling
+      expect(res.status).toBe(500);
+    },
+  );
 
   it('error handler receives the HttpRequestContext', async () => {
     let receivedPath: string | undefined;
@@ -112,28 +145,44 @@ describe('onError handler', () => {
     expect(receivedPath).toBe('ctx-check');
   });
 
-  it('without error handler, HttpException produces correct status', async () => {
-    const p = http({ port: 0 });
-    p.get('/fail', () => {
-      throw new HttpException('Bad Request', 400);
-    });
-    await start(p);
+  specTest(
+    'without error handler, HttpException produces correct status',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'a-thrown-http-exception-answers-its-status',
+    },
+    async () => {
+      const p = http({ port: 0 });
+      p.get('/fail', () => {
+        throw new HttpException('Bad Request', 400);
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`);
-    expect(res.status).toBe(400);
-  });
+      const res = await fetch(`${baseUrl}/fail`);
+      expect(res.status).toBe(400);
+    },
+  );
 
-  it('without error handler, HttpResponse thrown is returned as-is', async () => {
-    const p = http({ port: 0 });
-    p.get('/fail', () => {
-      throw new HttpResponse('custom error page', { status: 503 });
-    });
-    await start(p);
+  specTest(
+    'without error handler, HttpResponse thrown is returned as-is',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'a-thrown-http-response-is-sent-as-is',
+    },
+    async () => {
+      const p = http({ port: 0 });
+      p.get('/fail', () => {
+        throw new HttpResponse('custom error page', { status: 503 });
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`);
-    expect(res.status).toBe(503);
-    expect(await res.text()).toBe('custom error page');
-  });
+      const res = await fetch(`${baseUrl}/fail`);
+      expect(res.status).toBe(503);
+      expect(await res.text()).toBe('custom error page');
+    },
+  );
 });
 
 describe('dev error page', () => {
@@ -152,21 +201,29 @@ describe('dev error page', () => {
     baseUrl = `http://localhost:${plugin.getServer()?.port}`;
   }
 
-  it('returns HTML error page when Accept: text/html in development', async () => {
-    const p = http({ port: 0 });
-    p.get('/fail', () => {
-      throw new Error('dev-boom');
-    });
-    await start(p);
+  specTest(
+    'returns HTML error page when Accept: text/html in development',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'development-serves-a-browser-an-html-error-page',
+    },
+    async () => {
+      const p = http({ port: 0 });
+      p.get('/fail', () => {
+        throw new Error('dev-boom');
+      });
+      await start(p);
 
-    const res = await fetch(`${baseUrl}/fail`, HTML_ACCEPT);
-    expect(res.status).toBe(500);
-    expect(res.headers.get('content-type')).toContain('text/html');
-    const body = await res.text();
-    expect(body).toContain('dev-boom');
-    expect(body).toContain('Stack Trace');
-    expect(body).toContain('Request');
-  });
+      const res = await fetch(`${baseUrl}/fail`, HTML_ACCEPT);
+      expect(res.status).toBe(500);
+      expect(res.headers.get('content-type')).toContain('text/html');
+      const body = await res.text();
+      expect(body).toContain('dev-boom');
+      expect(body).toContain('Stack Trace');
+      expect(body).toContain('Request');
+    },
+  );
 
   it('returns JSON with error details in dev mode by default', async () => {
     const p = http({ port: 0 });
@@ -185,68 +242,92 @@ describe('dev error page', () => {
     expect(typeof body.stack).toBe('string');
   });
 
-  it('suppresses error details when PUTNAMI_DEV_ERRORS=false', async () => {
-    const previousVal = process.env.PUTNAMI_DEV_ERRORS;
-    process.env.PUTNAMI_DEV_ERRORS = 'false';
-    const p = http({ port: 0 });
-    p.get('/fail', () => {
-      throw new Error('hidden-error');
-    });
-    await start(p);
+  specTest(
+    'suppresses error details when PUTNAMI_DEV_ERRORS=false',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'the-dev-errors-switch-hides-the-error-details',
+    },
+    async () => {
+      const previousVal = process.env.PUTNAMI_DEV_ERRORS;
+      process.env.PUTNAMI_DEV_ERRORS = 'false';
+      const p = http({ port: 0 });
+      p.get('/fail', () => {
+        throw new Error('hidden-error');
+      });
+      await start(p);
 
-    try {
-      const res = await fetch(`${baseUrl}/fail`);
-      expect(res.status).toBe(500);
-      const body = await res.json();
-      expect(body.error).toBe('Internal Server Error');
-      expect(body.stack).toBeUndefined();
-    } finally {
-      restoreEnv('PUTNAMI_DEV_ERRORS', previousVal);
-    }
-  });
+      try {
+        const res = await fetch(`${baseUrl}/fail`);
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.error).toBe('Internal Server Error');
+        expect(body.stack).toBeUndefined();
+      } finally {
+        restoreEnv('PUTNAMI_DEV_ERRORS', previousVal);
+      }
+    },
+  );
 
-  it('suppresses the HTML dev overlay when PUTNAMI_DEV_ERRORS=false', async () => {
-    const previousVal = process.env.PUTNAMI_DEV_ERRORS;
-    process.env.PUTNAMI_DEV_ERRORS = 'false';
-    const p = http({ port: 0 });
-    p.get('/fail', () => {
-      throw new Error('hidden-html-error');
-    });
-    await start(p);
+  specTest(
+    'suppresses the HTML dev overlay when PUTNAMI_DEV_ERRORS=false',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'the-dev-errors-switch-hides-the-error-details',
+    },
+    async () => {
+      const previousVal = process.env.PUTNAMI_DEV_ERRORS;
+      process.env.PUTNAMI_DEV_ERRORS = 'false';
+      const p = http({ port: 0 });
+      p.get('/fail', () => {
+        throw new Error('hidden-html-error');
+      });
+      await start(p);
 
-    try {
-      // Even with a browser Accept header, the kill-switch must suppress the
-      // stack-trace / source overlay (regression: HTML path ignored the flag).
-      const res = await fetch(`${baseUrl}/fail`, HTML_ACCEPT);
-      expect(res.status).toBe(500);
-      expect(res.headers.get('content-type')).not.toContain('text/html');
-      const body = await res.text();
-      expect(body).not.toContain('hidden-html-error');
-      expect(body).not.toContain('Stack Trace');
-    } finally {
-      restoreEnv('PUTNAMI_DEV_ERRORS', previousVal);
-    }
-  });
+      try {
+        // Even with a browser Accept header, the kill-switch must suppress the
+        // stack-trace / source overlay (regression: HTML path ignored the flag).
+        const res = await fetch(`${baseUrl}/fail`, HTML_ACCEPT);
+        expect(res.status).toBe(500);
+        expect(res.headers.get('content-type')).not.toContain('text/html');
+        const body = await res.text();
+        expect(body).not.toContain('hidden-html-error');
+        expect(body).not.toContain('Stack Trace');
+      } finally {
+        restoreEnv('PUTNAMI_DEV_ERRORS', previousVal);
+      }
+    },
+  );
 
-  it('suppresses error details in production', async () => {
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    const p = http({ port: 0 });
-    p.get('/fail', () => {
-      throw new Error('prod-error');
-    });
-    await start(p);
+  specTest(
+    'suppresses error details in production',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'error-answers',
+      check: 'production-hides-the-error-details',
+    },
+    async () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const p = http({ port: 0 });
+      p.get('/fail', () => {
+        throw new Error('prod-error');
+      });
+      await start(p);
 
-    try {
-      const res = await fetch(`${baseUrl}/fail`);
-      expect(res.status).toBe(500);
-      const body = await res.json();
-      expect(body.error).toBe('Internal Server Error');
-      expect(body.stack).toBeUndefined();
-    } finally {
-      restoreEnv('NODE_ENV', previousNodeEnv);
-    }
-  });
+      try {
+        const res = await fetch(`${baseUrl}/fail`);
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.error).toBe('Internal Server Error');
+        expect(body.stack).toBeUndefined();
+      } finally {
+        restoreEnv('NODE_ENV', previousNodeEnv);
+      }
+    },
+  );
 
   it('HTML page includes source context for errors with stack traces', async () => {
     const p = http({ port: 0 });

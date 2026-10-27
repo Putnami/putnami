@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { encodeFileDescriptorProto } from '../../src/grpc/grpc-reflection';
 import type { ProtoDocument } from '../../src/proto';
 
@@ -113,27 +114,43 @@ describe('FileDescriptorProto encoding', () => {
     expect(str).toContain('GetUsersById');
   });
 
-  it('should encode fully-qualified type names for method input/output', () => {
-    const proto = createTestProto();
-    const bytes = encodeFileDescriptorProto(proto);
-    const str = new TextDecoder().decode(bytes);
-    expect(str).toContain('.test.v1.ListUsersRequest');
-    expect(str).toContain('.test.v1.ListUsersResponse');
-  });
+  specTest(
+    'should encode fully-qualified type names for method input/output',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'health-and-reflection',
+      check: 'reflected-method-types-are-fully-qualified',
+    },
+    () => {
+      const proto = createTestProto();
+      const bytes = encodeFileDescriptorProto(proto);
+      const str = new TextDecoder().decode(bytes);
+      expect(str).toContain('.test.v1.ListUsersRequest');
+      expect(str).toContain('.test.v1.ListUsersResponse');
+    },
+  );
 
-  it('should encode enum types', () => {
-    const proto = createTestProto({
-      enumTypes: ['UserStatus'],
-      enumMeta: { UserStatus: ['active', 'inactive', 'banned'] },
-    });
-    const bytes = encodeFileDescriptorProto(proto);
-    const str = new TextDecoder().decode(bytes);
-    expect(str).toContain('UserStatus');
-    expect(str).toContain('USER_STATUS_UNSPECIFIED');
-    expect(str).toContain('USER_STATUS_ACTIVE');
-    expect(str).toContain('USER_STATUS_INACTIVE');
-    expect(str).toContain('USER_STATUS_BANNED');
-  });
+  specTest(
+    'should encode enum types',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'health-and-reflection',
+      check: 'a-reflected-enum-carries-its-unspecified-zero',
+    },
+    () => {
+      const proto = createTestProto({
+        enumTypes: ['UserStatus'],
+        enumMeta: { UserStatus: ['active', 'inactive', 'banned'] },
+      });
+      const bytes = encodeFileDescriptorProto(proto);
+      const str = new TextDecoder().decode(bytes);
+      expect(str).toContain('UserStatus');
+      expect(str).toContain('USER_STATUS_UNSPECIFIED');
+      expect(str).toContain('USER_STATUS_ACTIVE');
+      expect(str).toContain('USER_STATUS_INACTIVE');
+      expect(str).toContain('USER_STATUS_BANNED');
+    },
+  );
 
   it('should handle proto with no services', () => {
     const proto = createTestProto({ services: {}, serviceMeta: {} });
@@ -152,38 +169,54 @@ describe('FileDescriptorProto encoding', () => {
     expect(str).toContain('UsersService');
   });
 
-  it('should handle empty proto', () => {
-    const proto = createTestProto({
-      services: {},
-      serviceMeta: {},
-      messages: [],
-      messageMeta: {},
-      enumTypes: [],
-      enumMeta: {},
-    });
-    const bytes = encodeFileDescriptorProto(proto);
-    expect(bytes.length).toBeGreaterThan(0);
-    // Should still contain file name and package
-    const str = new TextDecoder().decode(bytes);
-    expect(str).toContain('api.proto');
-    expect(str).toContain('test.v1');
-  });
+  specTest(
+    'should handle empty proto',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'health-and-reflection',
+      check: 'an-empty-document-still-reflects',
+    },
+    () => {
+      const proto = createTestProto({
+        services: {},
+        serviceMeta: {},
+        messages: [],
+        messageMeta: {},
+        enumTypes: [],
+        enumMeta: {},
+      });
+      const bytes = encodeFileDescriptorProto(proto);
+      expect(bytes.length).toBeGreaterThan(0);
+      // Should still contain file name and package
+      const str = new TextDecoder().decode(bytes);
+      expect(str).toContain('api.proto');
+      expect(str).toContain('test.v1');
+    },
+  );
 
-  it('should produce valid proto binary structure (tag-length-value)', () => {
-    const proto = createTestProto();
-    const bytes = encodeFileDescriptorProto(proto);
+  specTest(
+    'should produce valid proto binary structure (tag-length-value)',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'health-and-reflection',
+      check: 'the-reflected-descriptor-is-a-file-descriptor-for-api-proto',
+    },
+    () => {
+      const proto = createTestProto();
+      const bytes = encodeFileDescriptorProto(proto);
 
-    // First byte should be tag for field 1 (name), wire type 2
-    // (1 << 3) | 2 = 0x0A
-    expect(bytes[0]).toBe(0x0a);
+      // First byte should be tag for field 1 (name), wire type 2
+      // (1 << 3) | 2 = 0x0A
+      expect(bytes[0]).toBe(0x0a);
 
-    // Second byte is the length of "api.proto" = 9
-    expect(bytes[1]).toBe(9);
+      // Second byte is the length of "api.proto" = 9
+      expect(bytes[1]).toBe(9);
 
-    // Bytes 2..10 should be "api.proto"
-    const name = new TextDecoder().decode(bytes.subarray(2, 11));
-    expect(name).toBe('api.proto');
-  });
+      // Bytes 2..10 should be "api.proto"
+      const name = new TextDecoder().decode(bytes.subarray(2, 11));
+      expect(name).toBe('api.proto');
+    },
+  );
 
   it('should encode server-streaming methods correctly', () => {
     const proto = createTestProto({

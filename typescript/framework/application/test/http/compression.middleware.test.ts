@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 import { CompressionMiddleware } from '../../src/http/compression.middleware';
@@ -6,81 +7,113 @@ import { CorsMiddleware } from '../../src/http/cors.middleware';
 import { application } from '../../src/application';
 
 describe('CompressionMiddleware', () => {
-  it('should compress JSON responses above threshold', async () => {
-    const largeData = { items: Array.from({ length: 100 }, (_, i) => ({ id: i, name: `item-${i}` })) };
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CompressionMiddleware({ threshold: 10 }));
-    httpPlugin.get('/data', () => HttpResponse.json(largeData));
+  specTest(
+    'should compress JSON responses above threshold',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'response-encoding',
+      check: 'a-large-body-is-compressed-with-an-accepted-encoding',
+    },
+    async () => {
+      const largeData = { items: Array.from({ length: 100 }, (_, i) => ({ id: i, name: `item-${i}` })) };
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CompressionMiddleware({ threshold: 10 }));
+      httpPlugin.get('/data', () => HttpResponse.json(largeData));
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-    const res = await fetch(`${baseUrl}/data`, {
-      headers: { 'Accept-Encoding': 'gzip, deflate' },
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Encoding')).toBe('gzip');
-    expect(res.headers.get('Vary')).toBe('Accept-Encoding');
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const res = await fetch(`${baseUrl}/data`, {
+        headers: { 'Accept-Encoding': 'gzip, deflate' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBe('gzip');
+      expect(res.headers.get('Vary')).toBe('Accept-Encoding');
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
-  it('should not compress responses below threshold', async () => {
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CompressionMiddleware({ threshold: 100_000 }));
-    httpPlugin.get('/small', () => HttpResponse.json({ ok: true }));
+  specTest(
+    'should not compress responses below threshold',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'response-encoding',
+      check: 'a-small-body-or-an-identity-request-stays-uncompressed',
+    },
+    async () => {
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CompressionMiddleware({ threshold: 100_000 }));
+      httpPlugin.get('/small', () => HttpResponse.json({ ok: true }));
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-    const res = await fetch(`${baseUrl}/small`, {
-      headers: { 'Accept-Encoding': 'gzip' },
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Encoding')).toBeNull();
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const res = await fetch(`${baseUrl}/small`, {
+        headers: { 'Accept-Encoding': 'gzip' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBeNull();
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
-  it('should not compress when client does not accept encoding', async () => {
-    const largeData = { items: Array.from({ length: 100 }, (_, i) => ({ id: i })) };
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CompressionMiddleware({ threshold: 10 }));
-    httpPlugin.get('/data', () => HttpResponse.json(largeData));
+  specTest(
+    'should not compress when client does not accept encoding',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'response-encoding',
+      check: 'a-small-body-or-an-identity-request-stays-uncompressed',
+    },
+    async () => {
+      const largeData = { items: Array.from({ length: 100 }, (_, i) => ({ id: i })) };
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CompressionMiddleware({ threshold: 10 }));
+      httpPlugin.get('/data', () => HttpResponse.json(largeData));
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-    const res = await fetch(`${baseUrl}/data`, {
-      headers: { 'Accept-Encoding': 'identity' },
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Encoding')).toBeNull();
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const res = await fetch(`${baseUrl}/data`, {
+        headers: { 'Accept-Encoding': 'identity' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBeNull();
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
-  it('should use deflate when gzip is not accepted', async () => {
-    const largeData = { items: Array.from({ length: 100 }, (_, i) => ({ id: i, name: `item-${i}` })) };
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CompressionMiddleware({ threshold: 10 }));
-    httpPlugin.get('/data', () => HttpResponse.json(largeData));
+  specTest(
+    'should use deflate when gzip is not accepted',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'response-encoding',
+      check: 'a-large-body-is-compressed-with-an-accepted-encoding',
+    },
+    async () => {
+      const largeData = { items: Array.from({ length: 100 }, (_, i) => ({ id: i, name: `item-${i}` })) };
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CompressionMiddleware({ threshold: 10 }));
+      httpPlugin.get('/data', () => HttpResponse.json(largeData));
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-    const res = await fetch(`${baseUrl}/data`, {
-      headers: { 'Accept-Encoding': 'deflate' },
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Encoding')).toBe('deflate');
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const res = await fetch(`${baseUrl}/data`, {
+        headers: { 'Accept-Encoding': 'deflate' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBe('deflate');
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
   it('should preserve headers from downstream middleware', async () => {
     const httpPlugin = http({ port: 0 });

@@ -16,6 +16,27 @@ import {
   signingKeysFromKeyring,
 } from '../../src/security/keyring';
 
+const unsoundKeyring = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'signing-key-lifecycle',
+  check: 'the-provider-refuses-an-unsound-keyring',
+};
+const overlapWindow = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'signing-key-lifecycle',
+  check: 'both-keys-verify-during-the-overlap-window',
+};
+const elapsedWindow = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'signing-key-lifecycle',
+  check: 'a-retiring-key-leaves-the-jwks-after-its-window',
+};
+const activeRevoke = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'signing-key-lifecycle',
+  check: 'revoke-never-removes-the-active-key',
+};
+
 // The shared, language-neutral corpus the Go conformance suite
 // (protocols/keyring/conformance_test.go) also drives. Byte-for-byte parity with
 // the projected JWKS and the key-state machine is the cross-language contract of
@@ -109,11 +130,11 @@ describe('keyring public JWKS projection (cross-language corpus)', () => {
 });
 
 describe('keyring provider fail-closed construction', () => {
-  it('fails closed with no key material and allowEphemeral false', async () => {
+  specTest('fails closed with no key material and allowEphemeral false', unsoundKeyring, async () => {
     await expect(createSigningKeyProvider({})).rejects.toBeInstanceOf(NoSigningKeyError);
   });
 
-  it('mints an ephemeral active key only when explicitly allowed', async () => {
+  specTest('mints an ephemeral active key only when explicitly allowed', unsoundKeyring, async () => {
     const provider = await createSigningKeyProvider({ allowEphemeral: true });
     expect(provider.activeAlg()).toBe('ES256');
     expect(provider.activeKid().startsWith('ephemeral-')).toBe(true);
@@ -124,19 +145,19 @@ describe('keyring provider fail-closed construction', () => {
     expect(payload.sub).toBe('ephemeral-user');
   });
 
-  it('rejects a keyring with more than one active key', async () => {
+  specTest('rejects a keyring with more than one active key', unsoundKeyring, async () => {
     const a = await generateSigningKey({ kid: 'a' });
     const b = await generateSigningKey({ kid: 'b' });
     await expect(createSigningKeyProvider({ keys: [a, b] })).rejects.toThrow(/exactly one active/);
   });
 
-  it('rejects duplicate kids', async () => {
+  specTest('rejects duplicate kids', unsoundKeyring, async () => {
     const a = await generateSigningKey({ kid: 'dup' });
     const b = await generateSigningKey({ kid: 'dup', state: 'retiring' });
     await expect(createSigningKeyProvider({ keys: [a, b] })).rejects.toThrow(/duplicate kid/);
   });
 
-  it('rejects supplied keys with no active key', async () => {
+  specTest('rejects supplied keys with no active key', unsoundKeyring, async () => {
     const retiring = await generateSigningKey({ kid: 'r', state: 'retiring' });
     await expect(createSigningKeyProvider({ keys: [retiring] })).rejects.toThrow(/none is active/);
   });
@@ -149,13 +170,13 @@ describe('keyring persisted key validation', () => {
   const corpus = loadFixture<KeyringCorpus>('keyrings.json');
   const fixtureKeys = corpus.cases[0]?.private.keys ?? [];
 
-  it('rejects an EC key declared as RS256 before the provider can start', async () => {
+  specTest('rejects an EC key declared as RS256 before the provider can start', unsoundKeyring, async () => {
     const ec = fixtureKeys.find((key) => key.kty === 'EC');
     if (!ec) throw new Error('missing EC fixture key');
     await expect(signingKeyFromPrivateJwk({ ...ec, alg: 'RS256' })).rejects.toThrow(/must declare ES256/);
   });
 
-  it('rejects an RSA key declared as ES256 before the provider can start', async () => {
+  specTest('rejects an RSA key declared as ES256 before the provider can start', unsoundKeyring, async () => {
     const rsa = fixtureKeys.find((key) => key.kty === 'RSA');
     if (!rsa) throw new Error('missing RSA fixture key');
     await expect(signingKeyFromPrivateJwk({ ...rsa, alg: 'ES256' })).rejects.toThrow(/must declare RS256/);
@@ -200,7 +221,7 @@ describe('keyring public JWKS isolation', () => {
 });
 
 describe('keyring atomic rotation and overlap', () => {
-  it('rotate demotes the old key to retiring; both keys verify during overlap', async () => {
+  specTest('rotate demotes the old key to retiring; both keys verify during overlap', overlapWindow, async () => {
     const keyA = await generateSigningKey({ kid: 'A' });
     const keyB = await generateSigningKey({ kid: 'B' });
     const provider = await createSigningKeyProvider({ keys: [keyA] });
@@ -229,7 +250,7 @@ describe('keyring atomic rotation and overlap', () => {
     expect(payloadB.sub).toBe('signed-by-B');
   });
 
-  it('a retiring key past the overlap window drops from the published JWKS', async () => {
+  specTest('a retiring key past the overlap window drops from the published JWKS', elapsedWindow, async () => {
     let now = 1_000_000;
     const overlapWindowMs = 1000;
     const keyA = await generateSigningKey({ kid: 'A' });
@@ -249,7 +270,7 @@ describe('keyring atomic rotation and overlap', () => {
     expect(provider.publicJwks().keys.map((k) => k.kid)).toEqual(['B']);
   });
 
-  it('revoke removes a non-active key; the active key cannot be revoked directly', async () => {
+  specTest('revoke removes a non-active key; the active key cannot be revoked directly', activeRevoke, async () => {
     const keyA = await generateSigningKey({ kid: 'A' });
     const keyB = await generateSigningKey({ kid: 'B' });
     const provider = await createSigningKeyProvider({ keys: [keyA] });

@@ -12,6 +12,32 @@ import {
   _hashWithSalt,
 } from '../../src/security/secret-digest';
 
+const freshDigest = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'secret-digest-policy',
+  check: 'a-fresh-digest-verifies-only-its-secret',
+};
+const freshSalt = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'secret-digest-policy',
+  check: 'each-digest-draws-a-fresh-salt',
+};
+const rehashPolicy = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'secret-digest-policy',
+  check: 'rehash-is-required-only-below-the-preset',
+};
+const iterationFloor = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'secret-digest-policy',
+  check: 'the-iteration-floor-cannot-be-undercut',
+};
+const malformedDigest = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'secret-digest-policy',
+  check: 'a-malformed-digest-fails-closed',
+};
+
 // The shared, language-neutral fixture the Go implementation
 // (go/framework/security/secret_test.go) also drives. Byte-for-byte parity with
 // its pinned digests is the core cross-language contract of this slice.
@@ -125,8 +151,9 @@ describe('secret-digest round-trip', () => {
       // Includes multibyte runes to pin the UTF-8 secret encoding.
       const secret = 's3cr3t-éà-value';
 
-      it(
+      specTest(
         'a fresh digest verifies for the correct secret and fails for a wrong one',
+        freshDigest,
         async () => {
           const digest = await hashSecret(secret, { algorithm });
           expect(parseDigest(digest)).toBeDefined();
@@ -141,8 +168,9 @@ describe('secret-digest round-trip', () => {
         HASHING_TIMEOUT_MS,
       );
 
-      it(
+      specTest(
         'two calls draw independent random salts and yield distinct digests',
+        freshSalt,
         async () => {
           const a = await hashSecret(secret, { algorithm });
           const b = await hashSecret(secret, { algorithm });
@@ -159,8 +187,9 @@ describe('secret-digest round-trip', () => {
 describe('secret-digest policy', () => {
   const secret = 'correct horse';
 
-  it(
+  specTest(
     'a below-preset pbkdf2 digest reports rehashRequired on a successful verify',
+    rehashPolicy,
     async () => {
       const weak = await _hashWithSalt(secret, decodeSalt('MDEyMzQ1Njc4OWFiY2RlZg'), {
         algorithm: 'pbkdf2-sha256',
@@ -173,8 +202,9 @@ describe('secret-digest policy', () => {
     HASHING_TIMEOUT_MS,
   );
 
-  it(
+  specTest(
     'a preset pbkdf2 digest does not require a rehash',
+    rehashPolicy,
     async () => {
       const strong = await hashSecret(secret); // default preset
       const res = await verifySecret(secret, strong);
@@ -184,8 +214,9 @@ describe('secret-digest policy', () => {
     HASHING_TIMEOUT_MS,
   );
 
-  it(
+  specTest(
     'the iteration floor cannot be undercut',
+    iterationFloor,
     async () => {
       const floored = await hashSecret(secret, { iterations: 1 });
       const parsed = parseDigest(floored);
@@ -215,7 +246,7 @@ describe('secret-digest fail-closed parsing', () => {
     }
   });
 
-  it('verifySecret fails closed on a malformed or empty stored digest', async () => {
+  specTest('verifySecret fails closed on a malformed or empty stored digest', malformedDigest, async () => {
     for (const bad of malformed) {
       const res = await verifySecret('whatever', bad);
       expect(res.valid).toBe(false);

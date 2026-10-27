@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { UrlScanner } from '../../src/http/url.scanner';
 
 describe('UrlScanner', () => {
@@ -19,11 +20,19 @@ describe('UrlScanner', () => {
       expect(scanner.secured).toBe(true);
     });
 
-    it('honours x-forwarded-proto for plaintext http URLs behind a TLS proxy', () => {
-      const headers = new Headers({ 'x-forwarded-proto': 'https' });
-      const scanner = new UrlScanner('http://example.com/path', headers);
-      expect(scanner.secured).toBe(true);
-    });
+    specTest(
+      'honours x-forwarded-proto for plaintext http URLs behind a TLS proxy',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'secure-by-default',
+        check: 'hsts-is-sent-only-over-https',
+      },
+      () => {
+        const headers = new Headers({ 'x-forwarded-proto': 'https' });
+        const scanner = new UrlScanner('http://example.com/path', headers);
+        expect(scanner.secured).toBe(true);
+      },
+    );
 
     it('stays insecure for http URLs when x-forwarded-proto is not https', () => {
       const headers = new Headers({ 'x-forwarded-proto': 'http' });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { BadRequestException, NotFoundException } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { GrpcPlugin, grpc } from '../../src/grpc/grpc.plugin';
 import { mapErrorToGrpcStatus } from '../../src/grpc/grpc-protocol';
 import { decodeBadRequestDetail, findFrameworkErrorDetail } from '../../src/grpc/connect-protocol';
@@ -216,33 +217,41 @@ describe('HttpResponse.getBodyInit (direct body access)', () => {
 });
 
 describe('Connect error details (mapErrorToGrpcStatus)', () => {
-  it('should map BadRequestException with validation errors to BadRequest detail', () => {
-    const err = new BadRequestException({
-      statusCode: 400,
-      message: 'body.name is required; body.email must be a valid email address',
-      error: 'Bad Request',
-      errors: [
-        { field: 'body.name', message: 'body.name is required' },
-        { field: 'body.email', message: 'body.email must be a valid email address' },
-      ],
-    });
+  specTest(
+    'should map BadRequestException with validation errors to BadRequest detail',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'error-projection',
+      check: 'validation-errors-decode-from-a-bad-request-detail',
+    },
+    () => {
+      const err = new BadRequestException({
+        statusCode: 400,
+        message: 'body.name is required; body.email must be a valid email address',
+        error: 'Bad Request',
+        errors: [
+          { field: 'body.name', message: 'body.name is required' },
+          { field: 'body.email', message: 'body.email must be a valid email address' },
+        ],
+      });
 
-    const result = mapErrorToGrpcStatus(err);
-    expect(result.grpcCode).toBe(3);
-    expect(result.code).toBe('invalid_argument');
-    expect(result.httpStatus).toBe(400);
-    expect(result.details).toBeDefined();
-    expect(result.details?.length).toBe(2); // google.rpc.BadRequest + the framework envelope
+      const result = mapErrorToGrpcStatus(err);
+      expect(result.grpcCode).toBe(3);
+      expect(result.code).toBe('invalid_argument');
+      expect(result.httpStatus).toBe(400);
+      expect(result.details).toBeDefined();
+      expect(result.details?.length).toBe(2); // google.rpc.BadRequest + the framework envelope
 
-    const badRequest = result.details?.find((d) => d.type === 'google.rpc.BadRequest');
-    expect(badRequest).toBeDefined();
-    // The bytes are what a conforming client reads; `debug` is a readability
-    // affordance no client may depend on.
-    expect(decodeBadRequestDetail(badRequest!)).toEqual([
-      { field: 'body.name', description: 'body.name is required' },
-      { field: 'body.email', description: 'body.email must be a valid email address' },
-    ]);
-  });
+      const badRequest = result.details?.find((d) => d.type === 'google.rpc.BadRequest');
+      expect(badRequest).toBeDefined();
+      // The bytes are what a conforming client reads; `debug` is a readability
+      // affordance no client may depend on.
+      expect(decodeBadRequestDetail(badRequest!)).toEqual([
+        { field: 'body.name', description: 'body.name is required' },
+        { field: 'body.email', description: 'body.email must be a valid email address' },
+      ]);
+    },
+  );
 
   it('carries the stable framework code in the first-party detail', () => {
     const err = new NotFoundException('User not found');

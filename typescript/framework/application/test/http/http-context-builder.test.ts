@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { ContainerContext, DetachedScope, ScopeContext } from '@putnami/runtime';
 import { SCOPE_CONTAINER_KEY } from '@putnami/runtime/inject';
+import { specTest } from '@putnami/runtime/spectest';
 import { HttpAbortException } from '../../src/http/http.exception';
 import { attachRequestScope, buildHttpContext, closeRequestScope } from '../../src/http/http-context.builder';
 import type { HttpRequestContext } from '../../src/http/http-context.type';
@@ -160,18 +161,26 @@ describe('buildHttpContext', () => {
     expect(body).toBeUndefined();
   });
 
-  it('rejects body exceeding maxBodySizeBytes via Content-Length', async () => {
-    const req = new Request('http://localhost/test', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': '1000000',
-      },
-      body: JSON.stringify({ data: 'x'.repeat(100) }),
-    });
-    const ctx = buildHttpContext<HttpRequestContext>({ req, maxBodySizeBytes: 1024 });
-    await expect(ctx.body()).rejects.toThrow();
-  });
+  specTest(
+    'rejects body exceeding maxBodySizeBytes via Content-Length',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-bounds',
+      check: 'an-oversized-content-length-is-refused-from-the-header',
+    },
+    async () => {
+      const req = new Request('http://localhost/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': '1000000',
+        },
+        body: JSON.stringify({ data: 'x'.repeat(100) }),
+      });
+      const ctx = buildHttpContext<HttpRequestContext>({ req, maxBodySizeBytes: 1024 });
+      await expect(ctx.body()).rejects.toThrow();
+    },
+  );
 
   it('uses signal from context when provided', () => {
     const controller = new AbortController();

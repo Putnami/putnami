@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { api, endpoint } from '../../src/api';
 import { type Application, application } from '../../src/application';
 import { grpc, type GrpcPlugin } from '../../src/grpc/grpc.plugin';
@@ -38,18 +39,34 @@ describe('gRPC Health/Check', () => {
     return (await res.json()).status as number;
   }
 
-  it('reports SERVING (1) while the app is running', async () => {
-    const { baseUrl } = await setup();
-    expect(await check(baseUrl)).toBe(1);
-  });
+  specTest(
+    'reports SERVING (1) while the app is running',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'health-and-reflection',
+      check: 'health-reports-serving-while-the-application-runs',
+    },
+    async () => {
+      const { baseUrl } = await setup();
+      expect(await check(baseUrl)).toBe(1);
+    },
+  );
 
-  it('reports NOT_SERVING (2) once the gRPC plugin is draining', async () => {
-    const { baseUrl, grpcPlugin } = await setup();
-    expect(await check(baseUrl)).toBe(1);
+  specTest(
+    'reports NOT_SERVING (2) once the gRPC plugin is draining',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'health-and-reflection',
+      check: 'health-reports-not-serving-once-the-plugin-stops',
+    },
+    async () => {
+      const { baseUrl, grpcPlugin } = await setup();
+      expect(await check(baseUrl)).toBe(1);
 
-    // Simulate the shutdown drain: the plugin's stop() runs before the HTTP
-    // server closes, so health flips to NOT_SERVING while still reachable.
-    await (grpcPlugin as GrpcPlugin).stop();
-    expect(await check(baseUrl)).toBe(2);
-  });
+      // Simulate the shutdown drain: the plugin's stop() runs before the HTTP
+      // server closes, so health flips to NOT_SERVING while still reachable.
+      await (grpcPlugin as GrpcPlugin).stop();
+      expect(await check(baseUrl)).toBe(2);
+    },
+  );
 });

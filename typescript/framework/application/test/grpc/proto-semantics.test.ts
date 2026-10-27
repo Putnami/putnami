@@ -76,34 +76,50 @@ describe('integer width is declared, never inferred (D0.2)', () => {
     expect(decodeProto(encoded, meta)['count']).toBe(9007199254740993n);
   });
 
-  it('sign-extends a negative int32 to ten bytes, as protobuf specifies', () => {
-    const meta = fields({
-      name: 'delta',
-      jsonName: 'delta',
-      number: 1,
-      type: 'int32',
-      optional: false,
-      repeated: false,
-    });
-    const encoded = encodeProto({ delta: -1 }, meta);
-    // tag 0x08, then ten 0xff/0x01 bytes: the low 32 bits of -1 sign-extended
-    // to 64. A five-byte varint here reads as 4294967295 on a conforming peer.
-    expect(hex(encoded)).toBe('08ffffffffffffffffff01');
-    expect(decodeProto(encoded, meta)['delta']).toBe(-1);
-  });
+  specTest(
+    'sign-extends a negative int32 to ten bytes, as protobuf specifies',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'binary-codec',
+      check: 'a-negative-int32-is-sign-extended-to-ten-bytes',
+    },
+    () => {
+      const meta = fields({
+        name: 'delta',
+        jsonName: 'delta',
+        number: 1,
+        type: 'int32',
+        optional: false,
+        repeated: false,
+      });
+      const encoded = encodeProto({ delta: -1 }, meta);
+      // tag 0x08, then ten 0xff/0x01 bytes: the low 32 bits of -1 sign-extended
+      // to 64. A five-byte varint here reads as 4294967295 on a conforming peer.
+      expect(hex(encoded)).toBe('08ffffffffffffffffff01');
+      expect(decodeProto(encoded, meta)['delta']).toBe(-1);
+    },
+  );
 
-  it('reads a peer ten-byte negative int32 back as a negative number', () => {
-    const meta = fields({
-      name: 'delta',
-      jsonName: 'delta',
-      number: 1,
-      type: 'int32',
-      optional: false,
-      repeated: false,
-    });
-    const fromPeer = new Uint8Array([0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01]);
-    expect(decodeProto(fromPeer, meta)['delta']).toBe(-1);
-  });
+  specTest(
+    'reads a peer ten-byte negative int32 back as a negative number',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'binary-codec',
+      check: 'a-negative-int32-is-sign-extended-to-ten-bytes',
+    },
+    () => {
+      const meta = fields({
+        name: 'delta',
+        jsonName: 'delta',
+        number: 1,
+        type: 'int32',
+        optional: false,
+        repeated: false,
+      });
+      const fromPeer = new Uint8Array([0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01]);
+      expect(decodeProto(fromPeer, meta)['delta']).toBe(-1);
+    },
+  );
 
   it('keeps a uint64 past the safe integer exact', () => {
     const meta = fields({ name: 'seq', jsonName: 'seq', number: 1, type: 'uint64', optional: false, repeated: false });
@@ -294,19 +310,27 @@ describe('enums with an initial zero', () => {
     },
   );
 
-  it('refuses a member the contract never declared', () => {
-    const proto = generateProto([route], { packageName: 'test.v1' });
-    const enums = { types: new Set(proto.enumTypes), values: proto.enumMeta };
-    expect(() =>
-      encodeProto(
-        { state: 'melted' },
-        proto.messageMeta['CreateWidgetsRequestBody'],
-        proto.messageMeta,
-        enums.types,
-        enums.values,
-      ),
-    ).toThrow(/is not a declared member of enum/);
-  });
+  specTest(
+    'refuses a member the contract never declared',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'binary-codec',
+      check: 'an-undeclared-enum-member-is-refused-on-encode',
+    },
+    () => {
+      const proto = generateProto([route], { packageName: 'test.v1' });
+      const enums = { types: new Set(proto.enumTypes), values: proto.enumMeta };
+      expect(() =>
+        encodeProto(
+          { state: 'melted' },
+          proto.messageMeta['CreateWidgetsRequestBody'],
+          proto.messageMeta,
+          enums.types,
+          enums.values,
+        ),
+      ).toThrow(/is not a declared member of enum/);
+    },
+  );
 
   it('reads the unspecified zero back as absent, not as a declared state', () => {
     const proto = generateProto([route], { packageName: 'test.v1' });
@@ -316,15 +340,23 @@ describe('enums with an initial zero', () => {
     expect(decoded['state']).toBeUndefined();
   });
 
-  it('keeps a member number the contract does not know yet', () => {
-    // Protobuf keeps an unknown enum value; dropping it would hide a provider
-    // that has added a member since this client was generated.
-    const proto = generateProto([route], { packageName: 'test.v1' });
-    const enums = { types: new Set(proto.enumTypes), values: proto.enumMeta };
-    const meta = proto.messageMeta['CreateWidgetsRequestBody'];
-    const fromFuture = new Uint8Array([0x08, 0x09]);
-    expect(decodeProto(fromFuture, meta, proto.messageMeta, enums.types, enums.values)['state']).toBe(9);
-  });
+  specTest(
+    'keeps a member number the contract does not know yet',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'binary-codec',
+      check: 'an-unknown-enum-number-is-kept',
+    },
+    () => {
+      // Protobuf keeps an unknown enum value; dropping it would hide a provider
+      // that has added a member since this client was generated.
+      const proto = generateProto([route], { packageName: 'test.v1' });
+      const enums = { types: new Set(proto.enumTypes), values: proto.enumMeta };
+      const meta = proto.messageMeta['CreateWidgetsRequestBody'];
+      const fromFuture = new Uint8Array([0x08, 0x09]);
+      expect(decodeProto(fromFuture, meta, proto.messageMeta, enums.types, enums.values)['state']).toBe(9);
+    },
+  );
 });
 
 describe('jsonName comes from the proto emitter', () => {

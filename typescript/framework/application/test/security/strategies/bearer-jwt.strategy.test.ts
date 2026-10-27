@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import type { HttpRequestContext } from '../../../src/http/http-context.type';
 import { type OAuthService, setActiveOAuthService } from '../../../src/oauth/oauth.service';
 import { bearerJwtStrategy } from '../../../src/security/strategies/bearer-jwt.strategy';
+
+const verifiedBearer = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'strategy-composition',
+  check: 'a-bearer-jwt-resolves-only-a-verified-token',
+};
 
 // TypeScript twin of go/framework/security/jwt_test.go. The bearer-JWT strategy
 // wraps the active OAuthService's existing RS256/JWKS verifier, so these tests
@@ -32,7 +39,7 @@ function stubService(verify: (token: string, options: Record<string, unknown>) =
 describe('bearerJwtStrategy', () => {
   afterEach(() => setActiveOAuthService(undefined));
 
-  it('resolves the verified claims as a principal', async () => {
+  specTest('resolves the verified claims as a principal', verifiedBearer, async () => {
     stubService(() => ({ sub: 'service-a', scope: 'ingest', iss: 'https://auth.example.com' }));
     const principal = await bearerJwtStrategy()(bearerCtx('good.jwt.token'));
     expect(principal?.sub).toBe('service-a');
@@ -50,10 +57,14 @@ describe('bearerJwtStrategy', () => {
     expect((await bearerJwtStrategy()(bearerCtx('t.o.k')))?.kind).toBe('apikey');
   });
 
-  it('resolves nothing when verification fails (expired / bad signature / malformed)', async () => {
-    stubService(() => undefined); // OAuthService.verify returns undefined on any invalid token
-    expect(await bearerJwtStrategy()(bearerCtx('expired.jwt.token'))).toBeUndefined();
-  });
+  specTest(
+    'resolves nothing when verification fails (expired / bad signature / malformed)',
+    verifiedBearer,
+    async () => {
+      stubService(() => undefined); // OAuthService.verify returns undefined on any invalid token
+      expect(await bearerJwtStrategy()(bearerCtx('expired.jwt.token'))).toBeUndefined();
+    },
+  );
 
   it('resolves nothing when there is no bearer header', async () => {
     const calls = stubService(() => ({ sub: 'x' }));
@@ -61,19 +72,19 @@ describe('bearerJwtStrategy', () => {
     expect(calls).toHaveLength(0); // verify is never called without a token
   });
 
-  it('fails closed when no OAuthService is registered', async () => {
+  specTest('fails closed when no OAuthService is registered', verifiedBearer, async () => {
     setActiveOAuthService(undefined);
     expect(await bearerJwtStrategy()(bearerCtx('some.jwt.token'))).toBeUndefined();
   });
 
-  it('fails closed when verify throws (e.g. JWKS endpoint unconfigured)', async () => {
+  specTest('fails closed when verify throws (e.g. JWKS endpoint unconfigured)', verifiedBearer, async () => {
     stubService(() => {
       throw new Error('JWKS endpoint is not configured');
     });
     expect(await bearerJwtStrategy()(bearerCtx('some.jwt.token'))).toBeUndefined();
   });
 
-  it('forwards issuer and audience constraints to verify', async () => {
+  specTest('forwards issuer and audience constraints to verify', verifiedBearer, async () => {
     const calls = stubService(() => ({ sub: 'u' }));
     await bearerJwtStrategy({ issuer: 'https://auth.example.com', audience: 'billing' })(bearerCtx('t.o.k'));
     expect(calls[0]?.options).toEqual({ issuer: 'https://auth.example.com', audience: 'billing' });

@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { resetConfigLoader } from '@putnami/runtime';
 import { MemorySessionStore } from '../../src/session/memory.store';
+
+const memorySession = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'encrypted-cookie-sessions',
+  check: 'memory-sessions-expire-and-stay-isolated',
+};
 
 const ORIGINAL_CONFIG_DATA = process.env.CONFIG_DATA;
 
@@ -81,7 +88,7 @@ describe('MemorySessionStore', () => {
     store.dispose();
   });
 
-  it('expires sessions after TTL', async () => {
+  specTest('expires sessions after TTL', memorySession, async () => {
     const store = new MemorySessionStore();
     store.set('s1', 'key', 'val');
     expect(store.exists('s1')).toBe(true);
@@ -93,7 +100,7 @@ describe('MemorySessionStore', () => {
     store.dispose();
   });
 
-  it('isolates different session IDs', () => {
+  specTest('isolates different session IDs', memorySession, () => {
     const store = new MemorySessionStore();
     store.set('s1', 'key', 'one');
     store.set('s2', 'key', 'two');

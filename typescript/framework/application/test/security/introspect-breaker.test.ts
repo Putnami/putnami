@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { CircuitBreaker, DEFAULT_BREAKER_OPEN_DURATION_MS } from '../../src/security/introspect-breaker';
+
+const outageBreaker = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'bounded-introspection',
+  check: 'the-breaker-sheds-uncached-tokens-during-an-outage',
+};
 
 // TypeScript twin of go/framework/security/introspect_breaker_test.go, white-box
 // over the breaker state machine. A controllable clock replaces Go's white-box
@@ -39,7 +46,7 @@ describe('CircuitBreaker', () => {
     expect(decision.trial).toBe(true);
   });
 
-  it('opens only after the failure threshold is crossed', () => {
+  specTest('opens only after the failure threshold is crossed', outageBreaker, () => {
     const b = CircuitBreaker.create({ failureThreshold: 3, openDurationMs: 3_600_000 });
     if (!b) throw new Error('expected a breaker');
 

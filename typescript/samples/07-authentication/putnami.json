@@ -3,7 +3,7 @@
   "name": "@example/07-authentication",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension"],
-  "featureAuthority": {"none": "This sample demonstrates OAuth2 sessions and protected routes, which no authored TypeScript feature declares; it is not a product deliverable."},
+  "featureAuthority": {"owner": "typescript/authentication-authorization"},
   "options": {
     "test": {
       "coverage": false,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { negotiateResponse, negotiateType, parseAccept } from '../../src/http/content-negotiation';
 import { HttpResponse } from '../../src/http/http-response';
 
@@ -65,19 +66,35 @@ describe('content negotiation', () => {
       expect(response.getHeader('Content-Type')).toBe('application/json');
     });
 
-    it('should return JSON for wildcard accept', () => {
-      const data = { name: 'John' };
-      const response = negotiateResponse(data, '*/*');
-      expect(response).toBeInstanceOf(HttpResponse);
-      expect(response.getHeader('Content-Type')).toBe('application/json');
-    });
+    specTest(
+      'should return JSON for wildcard accept',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'response-encoding',
+        check: 'json-is-the-default-representation',
+      },
+      () => {
+        const data = { name: 'John' };
+        const response = negotiateResponse(data, '*/*');
+        expect(response).toBeInstanceOf(HttpResponse);
+        expect(response.getHeader('Content-Type')).toBe('application/json');
+      },
+    );
 
-    it('should return JSON for null accept header', () => {
-      const data = { name: 'John' };
-      const response = negotiateResponse(data, null);
-      expect(response).toBeInstanceOf(HttpResponse);
-      expect(response.getHeader('Content-Type')).toBe('application/json');
-    });
+    specTest(
+      'should return JSON for null accept header',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'response-encoding',
+        check: 'json-is-the-default-representation',
+      },
+      () => {
+        const data = { name: 'John' };
+        const response = negotiateResponse(data, null);
+        expect(response).toBeInstanceOf(HttpResponse);
+        expect(response.getHeader('Content-Type')).toBe('application/json');
+      },
+    );
 
     it('should return plain text for text/plain', () => {
       const data = { name: 'John' };
@@ -107,17 +124,25 @@ describe('content negotiation', () => {
       expect(response.getHeader('Content-Type')).toContain('text/xml');
     });
 
-    it('sanitizes object keys into valid XML tag names', async () => {
-      const data = { 'bad key</x>': 'v', '1leading': 'n', xmlReserved: 'r' };
-      const response = negotiateResponse(data, 'application/xml');
-      const body = await response.get().text();
-      // No raw injection from the malicious key, and the value is intact.
-      expect(body).not.toContain('bad key</x>');
-      expect(body).toContain('<bad_key__x_>v</bad_key__x_>');
-      // Keys starting with a digit or the reserved `xml` prefix are defused.
-      expect(body).toContain('<_1leading>n</_1leading>');
-      expect(body).toContain('<_xmlReserved>r</_xmlReserved>');
-    });
+    specTest(
+      'sanitizes object keys into valid XML tag names',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'response-encoding',
+        check: 'object-keys-become-valid-xml-tag-names',
+      },
+      async () => {
+        const data = { 'bad key</x>': 'v', '1leading': 'n', xmlReserved: 'r' };
+        const response = negotiateResponse(data, 'application/xml');
+        const body = await response.get().text();
+        // No raw injection from the malicious key, and the value is intact.
+        expect(body).not.toContain('bad key</x>');
+        expect(body).toContain('<bad_key__x_>v</bad_key__x_>');
+        // Keys starting with a digit or the reserved `xml` prefix are defused.
+        expect(body).toContain('<_1leading>n</_1leading>');
+        expect(body).toContain('<_xmlReserved>r</_xmlReserved>');
+      },
+    );
 
     it('should return YAML for application/yaml', () => {
       const data = { name: 'John', age: 30 };
@@ -160,10 +185,18 @@ describe('content negotiation', () => {
       expect(body).toContain('items: []');
     });
 
-    it('should throw NotAcceptableException for unsupported types', () => {
-      const data = { name: 'John' };
-      expect(() => negotiateResponse(data, 'image/png')).toThrow();
-    });
+    specTest(
+      'should throw NotAcceptableException for unsupported types',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'response-encoding',
+        check: 'an-unsupported-accept-is-not-acceptable',
+      },
+      () => {
+        const data = { name: 'John' };
+        expect(() => negotiateResponse(data, 'image/png')).toThrow();
+      },
+    );
 
     it('should prefer JSON when multiple types include json', () => {
       const data = { name: 'John' };

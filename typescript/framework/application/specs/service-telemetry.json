@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/service-telemetry",
+  "outcomes": [
+    "A TypeScript service pushes its metrics, spans and logs to the OTLP/HTTP collector it names, and sends nothing when telemetry is not configured",
+    "An unreachable or failing collector degrades observability and never fails a request, a log call or a shutdown",
+    "Metric series stay bounded whatever paths callers request",
+    "A span a TypeScript service records joins the caller's trace"
+  ],
+  "nonGoals": [
+    "Defining the OTLP/JSON envelope, its signal paths, its resource keys or its golden bytes, which telemetry/otlp-push-contract owns",
+    "Running a collector, or defining collector-side retention, sampling or routing",
+    "A /metrics scrape endpoint or an OpenTelemetry exporter SDK dependency",
+    "Exporting logs implicitly: the log sink is attached to the application logger deliberately"
+  ],
+  "requirements": [
+    {
+      "id": "opt-in-with-explicit-endpoint",
+      "text": "Telemetry is off by default and when disabled, and enabling it without an endpoint leaves the plugin inert, so no collector is installed and nothing leaves the process. Enabling it with an endpoint installs a collector at warmup that records every HTTP request without further wiring."
+    },
+    {
+      "id": "per-second-aggregation",
+      "text": "The collector buckets every measurement by Unix second: a counter sums its increments, a gauge keeps its last value, and a histogram keeps count, sum, min and max. Attributed counters and histograms aggregate by name and attribute set. A periodic drain returns only completed seconds, in time order, and the shutdown drain returns every bucket, the current second included."
+    },
+    {
+      "id": "bounded-http-metrics",
+      "text": "The HTTP middleware counts each request as http.<method>.<route pattern>.<status> and records its duration histogram under the same route pattern, never the resolved path. A 4xx response also counts under http.error.4xx, and an unmatched request counts under the fixed __unmatched__ route, so a request path never names a series."
+    },
+    {
+      "id": "otlp-metrics-rendering",
+      "text": "The sender renders drained buckets as one OTLP/JSON metrics request whose resource carries the service name and putnami.framework typescript, under the putnami scope. A counter becomes a monotonic delta sum with an integer point, a gauge a double point, a histogram a point with its count, sum, min and max, and a metric seen in several buckets one point per bucket. No buckets render an empty request."
+    },
+    {
+      "id": "push-transport",
+      "text": "The sender posts metrics to <endpoint>/v1/metrics and spans to <endpoint>/v1/traces, collapsing trailing slashes on the base URL. It sends the body verbatim with the configured extra headers, adds an Authorization bearer header only when a token is set, and resolves a non-2xx response or a network error as not ok instead of throwing."
+    },
+    {
+      "id": "log-record-mapping",
+      "text": "The OTLP log sink posts its buffered records as one logs request to <endpoint>/v1/logs on close. Each record carries its severity, message, logger name and error type. Its context and a single structured data object flatten into dotted attributes, the data object winning over the context, and arrays, cyclic values and BigInt values serialize as strings."
+    },
+    {
+      "id": "log-sink-is-best-effort",
+      "text": "The log sink posts nothing when its buffer is empty, drops its oldest records once its queue cap is reached, and resolves close even when the collector is unreachable, so a wedged collector never fails the logging path."
+    },
+    {
+      "id": "collector-ownership",
+      "text": "incCounter, setGauge and observeHistogram record into the active collector and do nothing when none is installed. Stopping an application clears the process-global collector only when it still points at that application's own, so a second application in the same process keeps its telemetry."
+    },
+    {
+      "id": "trace-propagation",
+      "text": "A framework span continues a valid ambient W3C trace context as its child, injects its own traceparent over any existing header along with the caller's tracestate and baggage, and records exactly once with its kind, status and attributes. A remote context with an all-zero trace ID is refused, and an oversized tracestate or baggage is dropped rather than propagated."
+    }
+  ]
+}

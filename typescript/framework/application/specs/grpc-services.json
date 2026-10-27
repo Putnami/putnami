@@ -1,0 +1,57 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/grpc-services",
+  "outcomes": [
+    "An application that declares HTTP endpoints serves them as gRPC and Connect RPCs on the same port, with no second handler to write and no second server to run",
+    "A gRPC or Connect call is admitted, traced and counted the way the equivalent REST call is, and a failure tells the caller no more than its category",
+    "A caller or a tool learns which services exist and whether the instance still serves through the standard gRPC health and reflection services",
+    "A malformed, oversized or newer-schema message never crashes the provider and never corrupts the fields it does know"
+  ],
+  "nonGoals": [
+    "Defining the Connect wire itself: its codes, status pairs, envelopes, Connect-Timeout-Ms and error-detail layout belong to typescript/api-contracts",
+    "Carrying client or bidirectional streams over Connect or gRPC-Web; those RPCs are answered unimplemented and the endpoint serves them over WebSocket",
+    "Writing the grpc-services service inventory document, which only the Go provider emits today",
+    "Preserving unknown fields for re-serialization, because the provider is a leaf service and not a proxy",
+    "Turning server reflection off"
+  ],
+  "requirements": [
+    {
+      "id": "route-derived-services",
+      "text": "The proto plugin derives one service per first path segment and one RPC per route, named from the HTTP method and the path, and emits the same document whatever order the routes are discovered in. The gRPC plugin resolves an RPC name back to exactly the route it came from and resolves an unknown name to none. A nullable collection member, which protobuf cannot represent, fails generation."
+    },
+    {
+      "id": "request-envelope",
+      "text": "An RPC request message carries params, query and body as separate sections, numbered in that order with an absent section skipped, so a body member keeps its own value beside a path parameter of the same name. Snake_case path and query keys reach the handler in camelCase, and a section that is not an object is refused."
+    },
+    {
+      "id": "stream-shapes",
+      "text": "A route's stream mode is declared on its generated RPC: a server stream returns a stream, a client stream takes one, and a bidirectional stream does both. The gRPC plugin answers a client or bidirectional RPC unimplemented: HTTP 501 with the code unimplemented for a Connect caller, and grpc-status 12 in the trailer of a 200 for a gRPC-Web caller."
+    },
+    {
+      "id": "endpoint-pipeline",
+      "text": "A gRPC or Connect call runs through the global HTTP middleware and the endpoint's own security chain. A refused unary call answers the Connect error under its HTTP status, never a 200, and a refused server stream yields only the terminal frame that carries the error. The handler sees the caller's trace ID from X-Correlation-ID or X-Cloud-Trace-Context, or a generated one, and telemetry counts the call under its RPC path."
+    },
+    {
+      "id": "error-projection",
+      "text": "A plain Error is answered internal with the message Internal error, never with the text it was thrown with. Validation errors become a binary google.rpc.BadRequest detail whose bytes alone decode to the field violations. An exception that carries a 2xx status is answered unknown, never as a success. A server error is logged and a client error is not."
+    },
+    {
+      "id": "transport-negotiation",
+      "text": "Accept matching honours lists, quality factors and wildcards, and a response with no descriptor falls back to JSON. A response is gzipped only when the caller accepts gzip through grpc-accept-encoding or accept-encoding and the body is not tiny, and a compressed request that inflates past its bound is refused as resource_exhausted. A grpc-timeout in any unit becomes a deadline of at least one millisecond, and a malformed one sets none."
+    },
+    {
+      "id": "health-and-reflection",
+      "text": "grpc.health.v1.Health/Check answers SERVING while the application runs and NOT_SERVING once the gRPC plugin stops, while the HTTP server still answers. Server reflection encodes the generated schema as the FileDescriptorProto of api.proto, with method types fully qualified and every enum carrying its UNSPECIFIED zero member, and a document with no service and no message still encodes."
+    },
+    {
+      "id": "binary-codec",
+      "text": "The binary codec skips an unknown field of every wire type and still decodes the known ones, decodes a truncated message without throwing, and never lets a __proto__ map key change the decoded object's prototype. A 64-bit value past the safe integer range comes back as an exact bigint, a negative int32 is sign-extended to ten bytes, an unknown enum number is kept, and an undeclared enum member is refused on encode."
+    },
+    {
+      "id": "proto-output",
+      "text": "The proto plugin writes api.proto to schema/api.proto in the project by default, to .gen/schema/api.proto when output is false, and to the path output names otherwise, and publishes it as the build asset schema/api.proto. The default package name derives from the npm package name, so @putnami/application becomes putnami.application.v1, and a missing name becomes api.v1."
+    }
+  ],
+  "decisions": ["typescript/framework/application/doc/adr/0004-connect-carries-the-first-party-error-as-a-typed-detail.md"]
+}

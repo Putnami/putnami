@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { HttpResponse } from '../../src/http/http-response';
 import type { ProtoFieldMeta } from '../../src/proto';
 import { encodeResponse, formatGrpcResponse, formatResult } from '../../src/grpc/grpc-response';
@@ -58,12 +59,20 @@ describe('encodeResponse', () => {
     expect(response.headers.get('Content-Type')).toContain('application/proto');
   });
 
-  it('falls back to JSON when useBinary is true but no responseMeta', () => {
-    const data = { name: 'test' };
-    const res = encodeResponse(data, true, undefined, emptyMessages);
-    const response = res.get();
-    expect(response.headers.get('Content-Type')).toContain('application/json');
-  });
+  specTest(
+    'falls back to JSON when useBinary is true but no responseMeta',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-response-without-a-descriptor-falls-back-to-json',
+    },
+    () => {
+      const data = { name: 'test' };
+      const res = encodeResponse(data, true, undefined, emptyMessages);
+      const response = res.get();
+      expect(response.headers.get('Content-Type')).toContain('application/json');
+    },
+  );
 
   it('builds gRPC-Web JSON response when isGrpcWeb is true', () => {
     const data = { name: 'test' };
