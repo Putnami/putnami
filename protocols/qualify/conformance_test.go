@@ -2,6 +2,7 @@ package qualify
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -222,10 +223,22 @@ func TestPassedRequiresEveryPhaseAndRequestPassed(t *testing.T) {
 			}
 		}
 	}
-	partial := cloneVerdict(t, base)
-	partial.Cleanup = &Cleanup{State: CleanupPartial, Leftovers: []string{"database compose_x"}}
-	if codes := distinctCodes(ValidateVerdict(partial)); !slices.Equal(codes, []string{ErrorCodeUnprovenPass}) {
-		t.Errorf("partial cleanup under passed: codes %v, want unproven_pass", codes)
+	proofless := map[string]func(*Verdict){
+		"partial cleanup": func(v *Verdict) {
+			v.Cleanup = &Cleanup{State: CleanupPartial, Leftovers: []string{"database compose_x"}}
+		},
+		"no teardown phase": func(v *Verdict) {
+			v.Phases = slices.DeleteFunc(v.Phases, func(p Phase) bool { return p.Name == "teardown" })
+		},
+		"no request":               func(v *Verdict) { v.Requests = nil },
+		"a different observed sha": func(v *Verdict) { v.Binding.ObservedSHA = "0000000000000000000000000000000000000000" },
+	}
+	for name, mutate := range proofless {
+		verdict := cloneVerdict(t, base)
+		mutate(verdict)
+		if codes := distinctCodes(ValidateVerdict(verdict)); !slices.Equal(codes, []string{ErrorCodeUnprovenPass}) {
+			t.Errorf("%s under passed: codes %v, want unproven_pass", name, codes)
+		}
 	}
 	if diags := ValidateVerdict(base); diag.HasErrors(diags) {
 		t.Fatalf("the unmodified passed fixture must stay valid: %v", diags)
@@ -258,23 +271,48 @@ func TestStrictDecode_RejectsNonDocuments(t *testing.T) {
 	}
 }
 
+// TestValidateContract_RefusesMalformedRequests mutates one member of a valid
+// contract per case and pins the one code and the one field it gives. A case
+// that changes the requests recomputes the digest, so only its defect shows.
 func TestValidateContract_RefusesMalformedRequests(t *testing.T) {
 	spectest.Proves(t, "qualify/workload-qualification-contract", "contract-defects-get-their-codes", "each-contract-defect-class-gets-its-code")
-	requests := []Request{
-		{ID: "GET /a", Method: "GET", Path: "/a", MaxStatus: 499, Provenance: "typed-api"},
-		{ID: "GET /a", Method: "GET", Path: "/a", MaxStatus: 499, Provenance: "typed-api"},
-		{ID: "wrong", Method: "HEAD", Path: "b", MaxStatus: 99, Provenance: " "},
+	data, err := os.ReadFile(filepath.Join("fixtures", "valid", "contract-service-to-service.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	contract := &Contract{
-		ProtocolVersion: 2,
-		DerivedFrom:     []Source{{Kind: "openapi"}},
-		Requests:        requests,
-		Digest:          "sha256:not-hex",
+	base, diags := ParseAndValidateContract(data)
+	if diag.HasErrors(diags) {
+		t.Fatalf("fixture: %v", diags)
 	}
-	got := distinctCodes(ValidateContract(contract))
-	want := []string{ErrorCodeInvalidDigest, ErrorCodeInvalidRequest, ErrorCodeInvalidSource, ErrorCodeRequired, ErrorCodeUnsupportedProtocolVersion}
-	if !slices.Equal(got, want) {
-		t.Errorf("codes = %v, want %v", got, want)
+	cases := map[string]struct {
+		mutate func(*Contract)
+		code   string
+		field  string
+	}{
+		"version 2":          {func(c *Contract) { c.ProtocolVersion = 2 }, ErrorCodeUnsupportedProtocolVersion, "protocolVersion"},
+		"missing project":    {func(c *Contract) { c.Project = "" }, ErrorCodeRequired, "project"},
+		"openapi source":     {func(c *Contract) { c.DerivedFrom[0].Kind = "openapi" }, ErrorCodeInvalidSource, "derivedFrom[0].kind"},
+		"malformed digest":   {func(c *Contract) { c.Digest = "sha256:not-hex" }, ErrorCodeInvalidDigest, "digest"},
+		"repeated id":        {func(c *Contract) { c.Requests = append(c.Requests, c.Requests[0]) }, ErrorCodeInvalidRequest, fmt.Sprintf("requests[%d].id", len(base.Requests))},
+		"id not method path": {func(c *Contract) { c.Requests[0].ID = "wrong" }, ErrorCodeInvalidRequest, "requests[0].id"},
+		"relative path":      {func(c *Contract) { c.Requests[0].Path = "items"; c.Requests[0].ID = c.Requests[0].Method + " items" }, ErrorCodeInvalidRequest, "requests[0].path"},
+		"maxStatus 99":       {func(c *Contract) { c.Requests[0].MaxStatus = 99 }, ErrorCodeInvalidRequest, "requests[0].maxStatus"},
+		"blank provenance":   {func(c *Contract) { c.Requests[0].Provenance = " " }, ErrorCodeInvalidRequest, "requests[0].provenance"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			contract := *base
+			contract.DerivedFrom = slices.Clone(base.DerivedFrom)
+			contract.Requests = slices.Clone(base.Requests)
+			tc.mutate(&contract)
+			if tc.code != ErrorCodeInvalidDigest {
+				contract.Digest = ContractDigest(contract.Requests)
+			}
+			got := diag.Errors(ValidateContract(&contract))
+			if len(got) != 1 || got[0].Code != tc.code || got[0].Field != tc.field {
+				t.Errorf("diagnostics = %v, want one %s at %s", got, tc.code, tc.field)
+			}
+		})
 	}
 }
 

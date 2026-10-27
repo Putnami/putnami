@@ -31,7 +31,7 @@
     },
     {
       "id": "parsing-is-strict",
-      "text": "A reader refuses with qualify.parse_error a document that is not JSON, is followed by another, is not an object or has a member of the wrong type. A member the schema does not declare, at any depth, is qualify.unknown_field at its dotted path, such as requests[0].extra."
+      "text": "The Go reader refuses with qualify.parse_error bytes that are not JSON or that a second document follows. Every reader refuses with qualify.parse_error a document that is not an object or has a member of the wrong type. A member the schema does not declare, at any depth, is qualify.unknown_field at its dotted path, such as requests[0].extra."
     },
     {
       "id": "contract-defects-get-their-codes",
@@ -43,7 +43,7 @@
     },
     {
       "id": "a-pass-carries-its-proof",
-      "text": "A passed verdict whose phase or request is in any other state, or whose cleanup is partial, is refused with qualify.unproven_pass alone, and the unmodified passed-url fixture stays valid."
+      "text": "A passed verdict is refused with qualify.unproven_pass alone when it lacks a phase, has no request, has a phase or request in any other state, has an observed sha that does not start with the expected one, or has a partial cleanup. The unmodified passed-url fixture stays valid."
     },
     {
       "id": "version-1-derives-safe-read-only-requests",

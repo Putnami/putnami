@@ -11,6 +11,9 @@ import {
   QUALIFY_STATES,
   QUALIFY_VERDICT_SCHEMA_ID,
   QUALIFY_VIOLATION_CODE,
+  type QualifyContract,
+  type QualifyRequest,
+  type QualifySource,
   type QualifyVerdict,
   qualifyContractDigest,
   validateQualifyContract,
@@ -223,9 +226,25 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
         expect(distinctCodes(validateQualifyVerdict(verdict))).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
       }
     }
-    const partial = clone(base);
-    partial.cleanup = { state: 'partial', leftovers: ['database compose_x'] };
-    expect(distinctCodes(validateQualifyVerdict(partial))).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
+    const proofless: Record<string, (v: QualifyVerdict) => void> = {
+      'partial cleanup': (v) => {
+        v.cleanup = { state: 'partial', leftovers: ['database compose_x'] };
+      },
+      'no teardown phase': (v) => {
+        v.phases = v.phases.filter((phase) => phase.name !== 'teardown');
+      },
+      'no request': (v) => {
+        v.requests = [];
+      },
+      'a different observed sha': (v) => {
+        v.binding.observedSHA = '0000000000000000000000000000000000000000';
+      },
+    };
+    for (const [name, mutate] of Object.entries(proofless)) {
+      const verdict = clone(base);
+      mutate(verdict);
+      expect(distinctCodes(validateQualifyVerdict(verdict)), name).toEqual([QUALIFY_VIOLATION_CODE.unprovenPass]);
+    }
   });
 
   specTest('non-documents are parse errors', NON_DOCUMENTS, async () => {
@@ -237,25 +256,59 @@ describe('qualify validator rules (mirrors protocols/qualify conformance_test.go
     expect(nested).toEqual([{ code: QUALIFY_VIOLATION_CODE.unknownField, path: 'requests[0].extra' }]);
   });
 
-  specTest('malformed contract requests', CONTRACT_DEFECTS, async () => {
-    const violations = await validateQualifyContract({
-      protocolVersion: 2,
-      derivedFrom: [{ kind: 'openapi' }],
-      requests: [
-        { id: 'GET /a', method: 'GET', path: '/a', maxStatus: 499, provenance: 'typed-api' },
-        { id: 'GET /a', method: 'GET', path: '/a', maxStatus: 499, provenance: 'typed-api' },
-        { id: 'wrong', method: 'HEAD', path: 'b', maxStatus: 99, provenance: ' ' },
-      ],
-      digest: 'sha256:not-hex',
-    });
-    expect(distinctCodes(violations)).toEqual([
-      QUALIFY_VIOLATION_CODE.invalidDigest,
-      QUALIFY_VIOLATION_CODE.invalidRequest,
+  // One member of a valid contract mutated per case, pinning the one code and
+  // the one path it gives. A case that changes the requests recomputes the
+  // digest, so only its defect shows.
+  const contractBase = readJSON(join(FIXTURES, 'valid', 'contract-service-to-service.json')) as QualifyContract;
+  const contractRules: Record<string, [(c: QualifyContract) => void, string, string]> = {
+    'version 2': [(c) => (c.protocolVersion = 2), QUALIFY_VIOLATION_CODE.unsupportedProtocolVersion, 'protocolVersion'],
+    'missing project': [(c) => (c.project = ''), QUALIFY_VIOLATION_CODE.required, 'project'],
+    'openapi source': [
+      (c) => ((c.derivedFrom[0] as QualifySource).kind = 'openapi'),
       QUALIFY_VIOLATION_CODE.invalidSource,
-      QUALIFY_VIOLATION_CODE.required,
-      QUALIFY_VIOLATION_CODE.unsupportedProtocolVersion,
-    ]);
-  });
+      'derivedFrom[0].kind',
+    ],
+    'malformed digest': [(c) => (c.digest = 'sha256:not-hex'), QUALIFY_VIOLATION_CODE.invalidDigest, 'digest'],
+    'repeated id': [
+      (c) => c.requests.push({ ...(c.requests[0] as QualifyRequest) }),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      `requests[${contractBase.requests.length}].id`,
+    ],
+    'id not method path': [
+      (c) => ((c.requests[0] as QualifyRequest).id = 'wrong'),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].id',
+    ],
+    'relative path': [
+      (c) => {
+        const request = c.requests[0] as QualifyRequest;
+        request.path = 'items';
+        request.id = `${request.method} items`;
+      },
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].path',
+    ],
+    'maxStatus 99': [
+      (c) => ((c.requests[0] as QualifyRequest).maxStatus = 99),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].maxStatus',
+    ],
+    'blank provenance': [
+      (c) => ((c.requests[0] as QualifyRequest).provenance = ' '),
+      QUALIFY_VIOLATION_CODE.invalidRequest,
+      'requests[0].provenance',
+    ],
+  };
+  for (const [name, [mutate, code, path]] of Object.entries(contractRules)) {
+    specTest(`contract rule: ${name}`, CONTRACT_DEFECTS, async () => {
+      const contract = clone(contractBase);
+      mutate(contract);
+      if (code !== QUALIFY_VIOLATION_CODE.invalidDigest) {
+        contract.digest = await qualifyContractDigest(contract.requests);
+      }
+      expect(await validateQualifyContract(contract)).toEqual([{ code, path }]);
+    });
+  }
 
   const shapeRules: Record<string, [(v: QualifyVerdict) => void, string]> = {
     'url target without url': [(v) => (v.target.url = undefined), QUALIFY_VIOLATION_CODE.invalidTarget],
