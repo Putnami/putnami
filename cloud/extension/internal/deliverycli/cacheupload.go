@@ -172,8 +172,8 @@ func (w *uploadWindow) mayBeFull() bool {
 		w.load.blobBytes > w.limit.blobBytes
 }
 
-// touch records that an upload moved forward.
-func (w *uploadWindow) touch() { w.progress.Store(time.Now().UnixNano()) }
+// touch records that an upload moved forward at the given time.
+func (w *uploadWindow) touch(at time.Time) { w.progress.Store(at.UnixNano()) }
 
 // stoppedSignal returns a channel that is closed once no uploader runs. It is
 // already closed when none does.
@@ -236,7 +236,7 @@ func (s *providerSession) drainUploads() {
 	w.mu.Lock()
 	w.drain = true
 	if w.drainSince.IsZero() {
-		w.drainSince = time.Now()
+		w.drainSince = s.clock.now()
 	}
 	w.mu.Unlock()
 	w.signal()
@@ -248,7 +248,7 @@ func (s *providerSession) drainUploads() {
 func (s *providerSession) runUploader() {
 	defer s.bg.Done()
 	w := &s.uploads
-	ctx := remotecache.WithUploadProgress(s.ctx, w.touch)
+	ctx := remotecache.WithUploadProgress(s.ctx, func() { w.touch(s.clock.now()) })
 	for {
 		window, ok := s.nextUploadWindow()
 		if !ok {

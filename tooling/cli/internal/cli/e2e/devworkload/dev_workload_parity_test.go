@@ -288,16 +288,16 @@ func runCase(t *testing.T, cli, root string, tc devWorkloadCase) answer {
 	cmd := exec.Command(cli, tc.args(target)...)
 	cmd.Dir = root
 	cmd.Env = runEnv(t)
-	stdout := &lockedBuffer{}
-	var stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = stdout, &stderr
+	stdout, stderr := &lockedBuffer{}, &lockedBuffer{}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	if tc.stopWhen != nil {
-		awaitOutput(t, stdout, tc.stopWhen, done, &stderr)
+		awaitOutput(t, stdout, tc.stopWhen, done, stderr)
+		awaitServeLogs(t, stderr, done)
 		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 			t.Fatal(err)
 		}
@@ -332,6 +332,38 @@ func awaitOutput(t *testing.T, stdout *lockedBuffer, pattern *regexp.Regexp, don
 			t.Fatalf("putnami exited (%v) before it printed what the case waits for\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 		case <-deadline:
 			t.Fatalf("putnami printed nothing the case waits for within a minute\nstdout:\n%s", stdout.String())
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
+// membersServeLogs are the lines the members' serve runs log on stderr before
+// a composition of /app is ready.
+var membersServeLogs = []string{"fixture /provider starting in serve", "fixture /app starting in started"}
+
+func logsServe(stderr string) bool {
+	for _, line := range membersServeLogs {
+		if !strings.Contains(stderr, line) {
+			return false
+		}
+	}
+	return true
+}
+
+// awaitServeLogs waits until stderr carries the serve log the members wrote
+// before they were ready. The members' serve logs reach stderr through pipes of
+// their own, with no order against the start the composition prints on stdout:
+// a signal sent once stdout shows the start can come before a member's line,
+// and the CLI's interrupt notice then lands above it on stderr.
+func awaitServeLogs(t *testing.T, stderr *lockedBuffer, done <-chan error) {
+	t.Helper()
+	deadline := time.After(time.Minute)
+	for !logsServe(stderr.String()) {
+		select {
+		case err := <-done:
+			t.Fatalf("putnami exited (%v) before the members' serve logs reached stderr\nstderr:\n%s", err, stderr.String())
+		case <-deadline:
+			t.Fatalf("the members' serve logs did not reach stderr within a minute\nstderr:\n%s", stderr.String())
 		case <-time.After(50 * time.Millisecond):
 		}
 	}

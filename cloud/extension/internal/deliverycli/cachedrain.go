@@ -48,6 +48,29 @@ func readDrainLimits() drainLimits {
 	return drainLimits{stall: uploadDrainStall, budget: uploadDrainBudget, shutdown: uploadDrainShutdown}
 }
 
+// drainClock is the clock of the run-end drain: it dates the start of the
+// drain, each step an upload moves forward and the drain's deadlines, and it
+// times the drain's waits. Production reads the wall clock. A test moves the
+// clock by hand, so whether the drain sees a stall or runs out of time does not
+// depend on how fast the machine runs the uploads.
+type drainClock interface {
+	now() time.Time
+	// after returns a channel that is closed once d has passed, and a
+	// function that releases the wait when the caller stops waiting first.
+	after(d time.Duration) (<-chan struct{}, func())
+}
+
+// wallClock is the drain clock of production.
+type wallClock struct{}
+
+func (wallClock) now() time.Time { return time.Now() }
+
+func (wallClock) after(d time.Duration) (<-chan struct{}, func()) {
+	fired := make(chan struct{})
+	timer := time.AfterFunc(d, func() { close(fired) })
+	return fired, func() { timer.Stop() }
+}
+
 // background counts the session's background work: the prefetch, the restores
 // in flight and the uploader. It is a wait group whose wait can be given up: a
 // sync.WaitGroup cannot be waited on with a bound without leaving a goroutine
@@ -124,7 +147,7 @@ func (s *providerSession) awaitIdle(idle <-chan struct{}, deadline time.Time) dr
 	since := w.drainSince
 	w.mu.Unlock()
 	if since.IsZero() {
-		since = time.Now()
+		since = s.clock.now()
 	}
 	for {
 		moved := since
@@ -136,7 +159,7 @@ func (s *providerSession) awaitIdle(idle <-chan struct{}, deadline time.Time) dr
 		if !deadline.After(until) {
 			outcome, until = drainOutOfTime, deadline
 		}
-		wait := time.Until(until)
+		wait := until.Sub(s.clock.now())
 		if wait <= 0 {
 			select {
 			case <-idle:
@@ -145,12 +168,12 @@ func (s *providerSession) awaitIdle(idle <-chan struct{}, deadline time.Time) dr
 				return outcome
 			}
 		}
-		timer := time.NewTimer(wait)
+		fired, stop := s.clock.after(wait)
 		select {
 		case <-idle:
-			timer.Stop()
+			stop()
 			return drainDone
-		case <-timer.C:
+		case <-fired:
 		}
 	}
 }

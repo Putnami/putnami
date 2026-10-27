@@ -94,9 +94,10 @@ step exits before its ready event fails it at once (`compose.member_exited`);
 one that stays silent fails after `--ready-timeout`, default `60s`, counted
 from the start of its serve step (`compose.ready_timeout`). Either way the
 error names the member and the phase, text output prints on stderr the last
-lines of the step that failed the preparation, else of the member's serve run
-output, and everything already started is torn
-down before `compose` exits.
+lines of the step that failed the preparation, else of the serve step that
+ended (its log events, diagnostics and error, as the session stream reports
+them), else of the member's serve run output, and everything already started
+is torn down before `compose` exits.
 
 Dependencies run production-mode (`NODE_ENV=production`) without watch
 (`--no-watch`). The target's serve run watches by default: a change re-plans its

@@ -51,6 +51,11 @@ const (
 	// readiness claim, then, after the second step's claim, stops that step and
 	// exits 1 without its end record, as a run that failed under watch does.
 	fakeCLIRestartThenEnd = "restart-then-end"
+	// fakeCLIUnrenderedLog writes the serve step's log events on the session
+	// stream and renders none of them on stderr: what compose reads when the
+	// serve step's end arrives before the rendered lines, which travel on
+	// another pipe.
+	fakeCLIUnrenderedLog = "unrendered-log"
 )
 
 // What a fail-prepare run's steps write. The describe step succeeds; its log
@@ -325,6 +330,9 @@ func (r *fakeServeRun) startWorkload(key string, env map[string]string) (*fakeWo
 			r.out.event(key, event)
 			switch event["type"] {
 			case "log":
+				if r.fixture.CLI == fakeCLIUnrenderedLog {
+					break
+				}
 				message, _ := event["message"].(string)
 				fmt.Fprintln(os.Stderr, "["+r.project+"] "+message)
 			case "ready":

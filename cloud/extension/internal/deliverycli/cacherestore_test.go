@@ -2,6 +2,7 @@ package deliverycli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -262,10 +263,44 @@ func (f *restoreCacheServer) wantDownloads(t *testing.T, negotiates int, want ..
 	}
 }
 
-// fakeClock is a session clock a test moves by hand.
+// fakeClock is a session clock a test moves by hand. It is also a drainClock:
+// a wait it times ends when the test moves the clock past it.
 type fakeClock struct {
-	mu sync.Mutex
-	t  time.Time
+	mu      sync.Mutex
+	t       time.Time
+	waiters map[*fakeWait]bool
+	// timed, when set, is closed and cleared as a wait is timed (awaitWaiter).
+	timed chan struct{}
+}
+
+// awaitWaiter blocks until a wait is timed on the clock, and reports false
+// when ctx ends first. A test that moves the clock as the code under test
+// works holds that work until the code under test waits on the clock.
+func (c *fakeClock) awaitWaiter(ctx context.Context) bool {
+	for {
+		c.mu.Lock()
+		if len(c.waiters) > 0 {
+			c.mu.Unlock()
+			return true
+		}
+		if c.timed == nil {
+			c.timed = make(chan struct{})
+		}
+		timed := c.timed
+		c.mu.Unlock()
+		select {
+		case <-timed:
+		case <-ctx.Done():
+			return false
+		}
+	}
+}
+
+// fakeWait is a wait the fake clock times: fired closes once the clock reaches
+// at.
+type fakeWait struct {
+	at    time.Time
+	fired chan struct{}
 }
 
 func (c *fakeClock) now() time.Time {
@@ -278,6 +313,35 @@ func (c *fakeClock) advance(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.t = c.t.Add(d)
+	for w := range c.waiters {
+		if !c.t.Before(w.at) {
+			close(w.fired)
+			delete(c.waiters, w)
+		}
+	}
+}
+
+func (c *fakeClock) after(d time.Duration) (<-chan struct{}, func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	w := &fakeWait{at: c.t.Add(d), fired: make(chan struct{})}
+	if d <= 0 {
+		close(w.fired)
+		return w.fired, func() {}
+	}
+	if c.waiters == nil {
+		c.waiters = make(map[*fakeWait]bool)
+	}
+	c.waiters[w] = true
+	if c.timed != nil {
+		close(c.timed)
+		c.timed = nil
+	}
+	return w.fired, func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		delete(c.waiters, w)
+	}
 }
 
 // startRestoreSession opens a serving session in full mode on a clock the test

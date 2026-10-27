@@ -230,6 +230,32 @@ func TestUp_MemberThatExitsBeforeReadyFailsWithoutWaitingForTheTimeout(t *testin
 	}
 }
 
+// stdout and stderr are two pipes with no order between them: the serve
+// step's end can arrive before the lines its run rendered on stderr. The
+// detail of the exit comes from the session stream, which holds the step's
+// log before its end. The fake renders no log on stderr here, so a detail
+// read from stderr misses the member's output every time.
+func TestUp_TheExitDetailComesFromTheSessionStream(t *testing.T) {
+	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", mode: fixtureExitEarly, cli: fakeCLIUnrenderedLog})
+	for _, watchTarget := range []bool{false, true} {
+		ctx, cancel := context.WithTimeout(context.Background(), hangDetector)
+		_, err := up(ctx, Options{
+			Workspace: fixture.ws, Executable: fixture.executable,
+			Target:       fixture.projects["/app"],
+			WatchTarget:  watchTarget,
+			ReadyTimeout: 10 * hangDetector,
+		}, fixture.deps(nil))
+		cancel()
+		composeErr := composeError(t, err)
+		if composeErr.Code != CodeMemberExited || composeErr.Member != "/app" {
+			t.Fatalf("watch=%v: error = %v, want compose.member_exited for /app", watchTarget, err)
+		}
+		if !slices.Contains(composeErr.Detail, "error: fixture /app cannot start") {
+			t.Errorf("watch=%v: detail = %q, want the serve step's log from the session stream", watchTarget, composeErr.Detail)
+		}
+	}
+}
+
 func TestUp_ReportsOrphansReapedBeforeAFailure(t *testing.T) {
 	fixture := newCompositionFixture(t, fixtureProject{id: "/app", name: "app", mode: fixtureExitEarly})
 	orphan := writeOrphanLease(t, fixture.root, Lease{PGIDs: []int{}})

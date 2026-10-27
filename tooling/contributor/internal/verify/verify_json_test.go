@@ -256,6 +256,10 @@ func verifyJSONRepo(t *testing.T) (root, head string) {
 	run("config", "user.name", "Verifier Test")
 	run("config", "user.email", "verifier@example.invalid")
 	run("config", "commit.gpgSign", "false")
+	// No background maintenance after the commit: it would write under .git
+	// while the test's TempDir cleanup removes the fixture.
+	run("config", "maintenance.auto", "false")
+	run("config", "gc.auto", "0")
 	run("config", "core.hooksPath", filepath.Join(root, ".git", "no-hooks"))
 	for name, content := range map[string]string{"AGENTS.md": "# Agents\n", "f.txt": "hello\n", "sub/.keep": ""} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); err != nil {
