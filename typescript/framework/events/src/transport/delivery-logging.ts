@@ -35,7 +35,7 @@ export const DROP_RETRY_ENQUEUE_FAILED = 'retry_enqueue_failed';
 export const DROP_DLQ_ENQUEUE_FAILED = 'dlq_enqueue_failed';
 export const DROP_DLQ_NO_SUBSCRIBER = 'dlq_no_subscriber';
 export const DROP_RETRIES_EXHAUSTED = 'retries_exhausted';
-/** A retry that `stop()` cancels, or a queued delivery it discards at the drain deadline. */
+/** A retry that `stop()` abandons, or a queued delivery it discards at the drain deadline. */
 export const DROP_BROKER_STOPPED = 'broker_stopped';
 
 /** One of the closed drop reasons above. */

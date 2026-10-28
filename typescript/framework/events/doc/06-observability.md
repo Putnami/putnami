@@ -99,9 +99,9 @@ Messages dropped for `dlq_no_subscriber` stay inspectable through
 `broker.getDeadLetters()`.
 
 `stop()` records what it abandons with reason `broker_stopped`: each retry it
-cancels, with the failure that asked for the retry, and each delivery still
-queued behind a concurrency limit at the drain deadline, with no error because
-it never ran.
+cancels or never schedules, with the failure that asked for the retry, and each
+delivery still queued behind a concurrency limit at the drain deadline, with no
+error because it never ran.
 
 Exactly **one** message-level outcome is reported per dead-letter decision: the
 transport enqueues first, then emits `message dead-lettered` if at least one

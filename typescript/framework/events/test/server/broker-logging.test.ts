@@ -3,6 +3,7 @@ import { specTest } from '@putnami/runtime/spectest';
 import { type LogEntry, resetDefaultLogger, setRootLogger, Uuid } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { handler } from '../../src/handler/handler';
 import type { Subscription } from '../../src/server/delivery-queue';
 import { FailureRouter, type FailureRouterHost } from '../../src/server/failure-router';
@@ -57,14 +58,6 @@ function oneRecordOf(logger: MemoryLogger, loggerName: string, message: string):
   const all = logger.entries.map((e) => `[${e.level}] ${e.logger} ${e.message}`).join('\n  ');
   expect(found.length, `expected exactly 1 "${message}" from ${loggerName}, got:\n  ${all}`).toBe(1);
   return found[0] as LogEntry;
-}
-
-function droppedCount(collector: TelemetryCollector, topicName: string): number {
-  let count = 0;
-  for (const bucket of collector.drainAll()) {
-    count += bucket.counters[`events.handle.${topicName}.dropped`] ?? 0;
-  }
-  return count;
 }
 
 function envelopeFor(topicDef: typeof FailingTopic, messageId: string): Envelope {
@@ -395,7 +388,7 @@ describe('broker failure logging', () => {
           outcome: 'failure',
         },
       ]);
-      expect(droppedCount(collector, 'logging.broker.orders')).toBe(2);
+      expect(drainMetrics(collector).counters['events.handle.logging.broker.orders.dropped']).toBe(2);
     },
   );
 
@@ -438,7 +431,7 @@ describe('broker failure logging', () => {
         reason: 'broker_stopped',
         outcome: 'failure',
       });
-      expect(droppedCount(collector, 'logging.broker.orders')).toBe(1);
+      expect(drainMetrics(collector).counters['events.handle.logging.broker.orders.dropped']).toBe(1);
     },
   );
 
@@ -455,24 +448,24 @@ describe('broker failure logging', () => {
       broker = new MemoryBroker({ simulateDuplicates: false, drainTimeout: 1000 });
       await broker.start();
 
-      // m-slow keeps the drain open for 50ms; m-fail fails during the drain and
-      // its 1ms retry timer fires before the drain ends.
+      // m-fail fails before stop() and arms a 20ms retry timer; m-slow keeps the
+      // drain open for 80ms, so the timer fires while stop() drains.
       let attempts = 0;
       const mixed = handler(FailingTopic)
-        .options({ maxRetries: 3, maxBackoff: 1, timeout: 0, dlq: false })
+        .options({ maxRetries: 3, maxBackoff: 20, timeout: 0, dlq: false })
         .handle(async () => {});
       await broker.subscribe(mixed, async (message) => {
         if (message.id === 'm-slow') {
-          await Bun.sleep(50);
+          await Bun.sleep(80);
           return;
         }
         attempts++;
-        await Bun.sleep(5);
         throw new Error(HANDLER_ERROR);
       });
 
       await broker.publish(FailingTopic.name, envelopeFor(FailingTopic, 'm-slow'));
       await broker.publish(FailingTopic.name, envelopeFor(FailingTopic, 'm-fail'));
+      await waitUntil(() => recordsOf(logger, BROKER_LOGGER, 'message retry scheduled').length === 1);
       await broker.stop();
 
       expect(attempts).toBe(1);
@@ -481,6 +474,46 @@ describe('broker failure logging', () => {
       expect(eventGroupOf(dropped)).toEqual({
         topic: 'logging.broker.orders',
         messageId: 'm-fail',
+        attempt: 1,
+        reason: 'broker_stopped',
+        outcome: 'failure',
+      });
+    },
+  );
+
+  specTest(
+    'records a delivery that fails after stop returned as dropped at once, without waiting for its backoff',
+    {
+      feature: 'typescript/event-messaging',
+      requirement: 'graceful-drain',
+      check: 'a-retry-cancelled-by-stop-is-recorded-as-dropped',
+    },
+    async () => {
+      const logger = new MemoryLogger();
+      setRootLogger(logger);
+      broker = new MemoryBroker({ simulateDuplicates: false, drainTimeout: 20 });
+      await broker.start();
+
+      // The handler outlives the 20ms drain and fails at 60ms. A one-minute
+      // backoff shows that the drop does not wait for a retry timer.
+      const late = handler(FailingTopic)
+        .options({ maxRetries: 3, maxBackoff: 60_000, timeout: 0, dlq: false })
+        .handle(async () => {});
+      await broker.subscribe(late, async () => {
+        await Bun.sleep(60);
+        throw new Error(HANDLER_ERROR);
+      });
+
+      await broker.publish(FailingTopic.name, envelopeFor(FailingTopic, 'm-late'));
+      await broker.stop();
+      expect(recordsOf(logger, BROKER_LOGGER, 'message dropped')).toHaveLength(0);
+
+      await waitUntil(() => recordsOf(logger, BROKER_LOGGER, 'message dropped').length === 1);
+      const dropped = oneRecordOf(logger, BROKER_LOGGER, 'message dropped');
+      expect(dropped.error?.message).toBe(HANDLER_ERROR);
+      expect(eventGroupOf(dropped)).toEqual({
+        topic: 'logging.broker.orders',
+        messageId: 'm-late',
         attempt: 1,
         reason: 'broker_stopped',
         outcome: 'failure',

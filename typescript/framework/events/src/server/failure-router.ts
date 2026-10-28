@@ -32,7 +32,7 @@ export interface FailureRouterHost {
   selectTargets(topic: string, subs: Subscription[], envelope: Envelope): Subscription[];
   /** Look up the subscriptions registered for a topic. */
   getSubscriptions(topic: string): Subscription[] | undefined;
-  /** Whether the broker is still running (a retry timer that fires after stop() records a drop instead). */
+  /** Whether the broker is still running (once stop() begins, a retry is recorded dropped instead). */
   isRunning(): boolean;
 }
 
@@ -103,11 +103,18 @@ export class FailureRouter {
     // Telemetry: retry counter
     incCounter(`events.handle.${envelope.topic}.retry`);
 
+    if (!this.host.isRunning()) {
+      // The delivery failed while stop() drains or after it returned: no retry
+      // will run, so the message is lost now, not when a backoff would end.
+      dropStopped(envelope, error);
+      return;
+    }
+
     const timer = setTimeout(() => {
       this.retryTimers.delete(timer);
       if (!this.host.isRunning()) {
         // The timer fired while stop() drains: the retry is abandoned, like one
-        // that stop() cancels.
+        // that stop() cancels at the end of the drain.
         dropStopped(envelope, error);
         return;
       }
