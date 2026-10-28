@@ -279,6 +279,65 @@
           "agent hook"
         ]
       }
+    },
+    {
+      "id": "tooling/change-estimate",
+      "type": "feature",
+      "name": "Change estimate",
+      "outcome": "A contributor writes a change plan in one validated format, and putnami change estimate sizes it S, M or L with a token and a duration range, the same answer for the same plan",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "plan-validation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-plan-in-the-format-is-read-whole",
+              "an-invalid-plan-names-the-value-it-refuses",
+              "the-schema-states-what-the-decoder-applies"
+            ]
+          }
+        },
+        {
+          "id": "estimate-determinism",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-same-plan-gets-the-same-estimate",
+              "a-sensitive-zone-is-never-s",
+              "the-command-prints-text-or-the-json-result"
+            ]
+          }
+        },
+        {
+          "id": "estimate-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-policy-replaces-the-members-it-sets",
+              "an-invalid-policy-table-is-refused"
+            ]
+          }
+        }
+      ],
+      "surface": {
+        "commands": [
+          "change estimate"
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/change-estimate",
+  "outcomes": [
+    "A change plan has one format: the issue it delivers and its slices in order, each with its projects, file count, endpoints, screens and sensitive zones",
+    "putnami change estimate sizes a plan S, M or L with a token range and a duration range, for the plan and for each slice, and gives the same answer for the same plan and policy"
+  ],
+  "nonGoals": [
+    "Writing the plan: an agent or the owner writes it",
+    "Comparing an estimate with the tokens a session spent",
+    "Checking that a plan's project ids name projects of the workspace"
+  ],
+  "requirements": [
+    {
+      "id": "plan-validation",
+      "text": "putnami change estimate reads .putnami/<issue>/plan.json, or the file --plan-file names, as protocolVersion 1 of the plan format. It refuses invalid UTF-8, a repeated member, a member the format does not name, a missing member, a value of the wrong type or out of its bounds, and a slice key two slices share, with exit 1 and the path of the first value it refuses. The JSON Schema of the format states the members and bounds the decoder applies."
+    },
+    {
+      "id": "estimate-determinism",
+      "text": "A slice counts its files plus a fixed allowance per endpoint and per screen, and takes the token and minute ranges of the first bucket of the table that holds that count. The plan's ranges are the sums of its slices'. A range whose high minutes stay within the S threshold is S, within the M threshold M, else L; a slice or plan with a sensitive zone is never S. The command prints one text line for the plan and one per slice, or with --output=json the result document."
+    },
+    {
+      "id": "estimate-policy",
+      "text": "The default table is committed in the contributor. options[\"@putnami/contributor\"].estimate replaces each member it sets: the file buckets, the endpoint and screen allowances, and the size thresholds. A policy table with an unknown member, buckets out of order, a last bucket with a bound, or a range that runs backwards is refused with exit 1."
+    }
+  ]
+}

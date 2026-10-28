@@ -1,0 +1,25 @@
+{
+  "protocolVersion": 1,
+  "issue": "42",
+  "slices": [
+    {
+      "key": "plan-format",
+      "title": "The plan format and its strict decoder",
+      "projects": ["@putnami/contributor"],
+      "files": 6,
+      "endpoints": 0,
+      "screens": 0,
+      "sensitiveZones": []
+    },
+    {
+      "key": "estimate-command",
+      "title": "putnami change estimate sizes a plan",
+      "projects": ["@putnami/contributor", "go.putnami.dev/protocol/telemetry"],
+      "files": 9,
+      "endpoints": 1,
+      "screens": 0,
+      "sensitiveZones": ["public API"],
+      "effort": { "model": "opus", "reasoning": "high" }
+    }
+  ]
+}
