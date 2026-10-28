@@ -7,6 +7,7 @@
 package devversion
 
 import (
+	"debug/buildinfo"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -63,7 +64,9 @@ var versionLine = regexp.MustCompile(`(?m)^  \(workspace root\) \d+\.\d+\.\d+-\d
 // the executable's. The run covers extension discovery, the removed-root
 // refusal that a declared command group lifts, the implicit install, the
 // build of the runtime by bin/prepare, the cache trust the command resolves
-// and the host RPC channel version.lines is answered over.
+// and the host RPC channel version.lines is answered over. It then reads the
+// build information of the runtime the store holds: the release
+// putnami.lock.json pins built it, without cgo and with trimmed paths.
 func TestVersionGetRunsThroughTheDevExtensionBuiltFromSource(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("bin/prepare is a bash script")
@@ -77,14 +80,16 @@ func TestVersionGetRunsThroughTheDevExtensionBuiltFromSource(t *testing.T) {
 	if !ok || pin.Version == "" {
 		t.Fatal("putnami.lock.json pins no Go release")
 	}
-	if wantGo := "go" + pin.Version; runtime.Version() != wantGo {
+	wantGo := "go" + pin.Version
+	if runtime.Version() != wantGo {
 		t.Skipf("this test binary was built by %s, not by %s, the release putnami.lock.json pins", runtime.Version(), wantGo)
 	}
 
 	root := t.TempDir()
 	hometest.Temp(t)
 	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
-	t.Setenv("PUTNAMI_ARTIFACT_DIR", filepath.Join(t.TempDir(), "artifacts"))
+	artifactDir := filepath.Join(t.TempDir(), "artifacts")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", artifactDir)
 	t.Setenv(bootstrappedEnv, "")
 	t.Setenv(noAutoInstallEnv, "")
 
@@ -123,5 +128,73 @@ func TestVersionGetRunsThroughTheDevExtensionBuiltFromSource(t *testing.T) {
 	}
 	if os.Getenv(bootstrappedEnv) == "" {
 		t.Fatalf("%s is unset after the command: the implicit install did not start", bootstrappedEnv)
+	}
+
+	// The artifact store keeps a prepared runtime under
+	// sha256/<digest prefix>/<digest>/runtime, and the extension's manifest
+	// names the executable compiled/putnami-dev in it. The fixture's store is
+	// fresh, so it holds this one build.
+	built, err := filepath.Glob(filepath.Join(artifactDir, "sha256", "*", "*", "runtime", "compiled", "putnami-dev"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(built) != 1 {
+		t.Fatalf("the artifact store holds %d compiled putnami-dev runtimes, want 1: %v", len(built), built)
+	}
+	info, err := buildinfo.ReadFile(built[0])
+	if err != nil {
+		t.Fatalf("read the runtime's build information: %v", err)
+	}
+	if info.GoVersion != wantGo {
+		t.Errorf("the runtime was built by %s, want %s, the release putnami.lock.json pins", info.GoVersion, wantGo)
+	}
+	settings := map[string]string{}
+	for _, setting := range info.Settings {
+		settings[setting.Key] = setting.Value
+	}
+	if settings["CGO_ENABLED"] != "0" || settings["-trimpath"] != "true" {
+		t.Errorf("the runtime was built with CGO_ENABLED=%q and -trimpath=%q, want 0 and true",
+			settings["CGO_ENABLED"], settings["-trimpath"])
+	}
+}
+
+// TestTheContributorPrepareScriptIsTheDevOneUnderItsOwnNames reads the
+// bin/prepare of @putnami/dev and of @putnami/contributor. The host runs both
+// the same way, and the test above runs the dev one end to end. The
+// contributor one is the same script with its own names: the PUTNAMI_CONTRIBUTOR_
+// prefix of the variables the host passes, and the putnami-contributor
+// executable. With those names swapped back, the two files and their
+// permissions are equal, so the run above proves the contributor build too.
+func TestTheContributorPrepareScriptIsTheDevOneUnderItsOwnNames(t *testing.T) {
+	repoRoot := repositoryRoot(t)
+	devPath := filepath.Join(repoRoot, "tooling", "dev", "bin", "prepare")
+	contributorPath := filepath.Join(repoRoot, "tooling", "contributor", "bin", "prepare")
+	dev, err := os.ReadFile(devPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contributor, err := os.ReadFile(contributorPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renamed := strings.NewReplacer(
+		"PUTNAMI_CONTRIBUTOR_", "PUTNAMI_DEV_",
+		"putnami-contributor", "putnami-dev",
+	).Replace(string(contributor))
+	if renamed != string(dev) {
+		t.Errorf("%s differs from %s beyond the extension's names; change both scripts together", contributorPath, devPath)
+	}
+
+	devInfo, err := os.Stat(devPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contributorInfo, err := os.Stat(contributorPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if devInfo.Mode().Perm() != contributorInfo.Mode().Perm() {
+		t.Errorf("%s has mode %v and %s has mode %v, want the same",
+			contributorPath, contributorInfo.Mode().Perm(), devPath, devInfo.Mode().Perm())
 	}
 }
