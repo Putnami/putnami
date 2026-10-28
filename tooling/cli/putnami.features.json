@@ -1328,6 +1328,7 @@
             "checks": [
               "a-hit-no-job-waits-for-moves-no-bytes",
               "a-hit-a-planned-job-waits-for-keeps-its-files",
+              "an-order-only-waiter-whose-key-reads-nothing-the-task-writes-leaves-it-result-only",
               "a-run-that-reads-the-files-restores-them-or-executes"
             ]
           }

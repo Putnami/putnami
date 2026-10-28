@@ -12,7 +12,11 @@
   "requirements": [
     {
       "id": "provider-resolves-its-configuration",
-      "text": "The session mode is the core's intent, else the configured mode, else full."
+      "text": "The session mode is the core's intent, else the configured mode, else minimal for a hosted launch and full otherwise."
+    },
+    {
+      "id": "a-files-restore-receives-downloads",
+      "text": "A restore of a hit's files negotiates its key in a mode that names downloads: the session mode, or full when the session is minimal. Only the keys core restores result-only are negotiated in minimal."
     }
   ]
 }
