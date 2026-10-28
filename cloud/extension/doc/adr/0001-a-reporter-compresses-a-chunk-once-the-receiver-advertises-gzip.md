@@ -44,8 +44,7 @@ retry.
 sends the next one. Holding a line until its task ends would acknowledge bytes
 that no receiver stored, lose them when the reporter restarts, and change the
 bytes of a resent sequence, which the receiver refuses. Trimming belongs to
-the engine, which owns the frames and their checkpoint
-([putnami#668](https://github.com/Putnami/putnami/issues/668)).
+the engine, which owns the frames and their checkpoint.
 
 ## Consequences
 
