@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -8,6 +9,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -15,10 +18,45 @@ func lookPathAt(path string) func(string) (string, error) {
 	return func(string) (string, error) { return path, nil }
 }
 
+func always(string) bool { return true }
+
+func TestExecutableLooksAgainWhenTheForwardedGitIsGone(t *testing.T) {
+	cache := &sync.Map{}
+	paths := []string{"/Applications/Xcode-old.app/git", "/Applications/Xcode.app/git"}
+	calls := 0
+	find := func() string { calls++; return paths[calls-1] }
+	gone := func(path string) bool { return path != paths[0] }
+	if got := resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "", find, always); got != paths[0] {
+		t.Fatalf("got %q, want %q", got, paths[0])
+	}
+	if got := resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "", find, gone); got != "git" {
+		t.Fatalf("a removed git: got %q, want the trampoline", got)
+	}
+	if got := resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "", find, gone); got != paths[1] {
+		t.Fatalf("after a removed git: got %q, want %q", got, paths[1])
+	}
+}
+
+func TestExecutableAsksXcrunOnceForConcurrentFirstCalls(t *testing.T) {
+	cache := &sync.Map{}
+	var calls atomic.Int32
+	release := make(chan struct{})
+	find := func() string { calls.Add(1); <-release; return "/Applications/Xcode.app/git" }
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() { resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "", find, always) })
+	}
+	close(release)
+	wg.Wait()
+	if got := calls.Load(); got != 1 {
+		t.Errorf("xcrun asked %d times, want once", got)
+	}
+}
+
 func TestExecutableIsGitOffMacOS(t *testing.T) {
 	find := func() string { t.Fatal("xcrun asked off macOS"); return "" }
 	for _, goos := range []string{"linux", "windows"} {
-		if got := resolveExecutable(goos, lookPathAt(appleGitTrampoline), "linux-"+goos, find); got != "git" {
+		if got := resolveExecutable(&sync.Map{}, goos, lookPathAt(appleGitTrampoline), "", find, always); got != "git" {
 			t.Errorf("%s: got %q, want git", goos, got)
 		}
 	}
@@ -26,37 +64,39 @@ func TestExecutableIsGitOffMacOS(t *testing.T) {
 
 func TestExecutableKeepsAGitEarlierOnPath(t *testing.T) {
 	find := func() string { t.Fatal("xcrun asked for a git that is not the trampoline"); return "" }
-	if got := resolveExecutable("darwin", lookPathAt("/opt/homebrew/bin/git"), t.Name(), find); got != "git" {
+	if got := resolveExecutable(&sync.Map{}, "darwin", lookPathAt("/opt/homebrew/bin/git"), "", find, always); got != "git" {
 		t.Errorf("got %q, want git", got)
 	}
 	missing := func(string) (string, error) { return "", exec.ErrNotFound }
-	if got := resolveExecutable("darwin", missing, t.Name(), find); got != "git" {
+	if got := resolveExecutable(&sync.Map{}, "darwin", missing, "", find, always); got != "git" {
 		t.Errorf("no git on PATH: got %q, want git", got)
 	}
 }
 
 func TestExecutableRunsTheGitTheTrampolineForwardsTo(t *testing.T) {
+	cache := &sync.Map{}
 	calls := 0
 	find := func() string { calls++; return "/Library/Developer/CommandLineTools/usr/bin/git" }
 	for range 3 {
-		if got := resolveExecutable("darwin", lookPathAt(appleGitTrampoline), t.Name(), find); got != "/Library/Developer/CommandLineTools/usr/bin/git" {
+		if got := resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "", find, always); got != "/Library/Developer/CommandLineTools/usr/bin/git" {
 			t.Fatalf("got %q, want the developer tools' git", got)
 		}
 	}
 	if calls != 1 {
 		t.Errorf("xcrun asked %d times, want once per developer directory", calls)
 	}
-	resolveExecutable("darwin", lookPathAt(appleGitTrampoline), t.Name()+"-other", find)
+	resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "/Applications/Xcode.app/Contents/Developer", find, always)
 	if calls != 2 {
 		t.Errorf("another developer directory asked xcrun %d times in total, want 2", calls)
 	}
 }
 
 func TestExecutableFallsBackToGitWhenXcrunNamesNone(t *testing.T) {
+	cache := &sync.Map{}
 	calls := 0
 	find := func() string { calls++; return "" }
 	for range 2 {
-		if got := resolveExecutable("darwin", lookPathAt(appleGitTrampoline), t.Name(), find); got != "git" {
+		if got := resolveExecutable(cache, "darwin", lookPathAt(appleGitTrampoline), "", find, always); got != "git" {
 			t.Fatalf("got %q, want git", got)
 		}
 	}
@@ -86,6 +126,14 @@ func TestExecutableRunsAWorkingGit(t *testing.T) {
 // out: a split package may not import this one.
 var directGitCall = regexp.MustCompile(`exec\.Command(Context)?\(([A-Za-z_][A-Za-z0-9_]*, )?"git"`)
 
+// startedByName lists the files that start git by name on purpose, with how
+// many times.
+var startedByName = map[string]int{
+	// git worktree add runs repository hooks and filters, which keep the
+	// environment the macOS trampoline gives them.
+	"internal/commands/cachecmd/cache_verify.go": 1,
+}
+
 func TestTheModuleRunsGitThroughExecutable(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -106,9 +154,10 @@ func TestTheModuleRunsGitThroughExecutable(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if directGitCall.Match(data) {
-			rel, _ := filepath.Rel(root, path)
-			found = append(found, filepath.ToSlash(rel))
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		if n := len(directGitCall.FindAll(data, -1)); n != startedByName[rel] {
+			found = append(found, fmt.Sprintf("%s: %d by name, %d allowed", rel, n, startedByName[rel]))
 		}
 		return nil
 	})

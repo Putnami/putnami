@@ -180,7 +180,9 @@ func failedTaskSuffix(results map[string]*jobs.JobResult) string {
 // repository code (runcredential.MarkRepositoryCodeStarted).
 func addDetachedWorktree(ctx context.Context, repoRoot, target, head string) error {
 	runcredential.MarkRepositoryCodeStarted("git worktree add")
-	command := exec.CommandContext(ctx, git.Executable(), "-C", repoRoot, "worktree", "add", "--detach", target, head)
+	// "git", not git.Executable: the checkout runs repository hooks and
+	// filters, which keep the environment the macOS trampoline gives them.
+	command := exec.CommandContext(ctx, "git", "-C", repoRoot, "worktree", "add", "--detach", target, head)
 	if output, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("create detached cache-verification worktree: %w: %s", err, strings.TrimSpace(string(output)))
 	}
