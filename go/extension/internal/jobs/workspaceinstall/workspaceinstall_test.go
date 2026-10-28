@@ -654,6 +654,28 @@ func TestWorkspaceInstall_ToolFailureIsAWarning(t *testing.T) {
 	}
 }
 
+// A tool build whose go command cannot start names the start error: a go
+// command killed before it writes a word leaves nothing else to read.
+func TestResolveToolNamesWhyTheBuildFailed(t *testing.T) {
+	t.Parallel()
+	w, i := resolvedTools(t, jobtest.RealTempDir(t))
+	missing := filepath.Join(t.TempDir(), pkgmeta.ExecutableName(runtime.GOOS, "go"))
+	startErr := exec.Command(missing, "version").Run() //nolint:gosec // G204: the test starts a path it chose
+	if startErr == nil {
+		t.Fatalf("%s started", missing)
+	}
+	w.GoBinary = missing
+
+	if _, ok := w.resolveTool("staticcheck"); ok {
+		t.Fatalf("staticcheck resolved with a go command that cannot start:\n%s", i.rec.Transcript())
+	}
+	spec, _ := tools.Lookup("staticcheck")
+	want := "Failed to install pinned staticcheck " + spec.Version + ": go install " + spec.Install + ": " + startErr.Error()
+	if !i.rec.Contains(want) {
+		t.Errorf("missing %q:\n%s", want, i.rec.Transcript())
+	}
+}
+
 // resolvedTools returns a job whose go command and Go environment are set up,
 // for the tool resolution cases.
 func resolvedTools(t *testing.T, workspace string, extra ...string) (*install, *installJob) {

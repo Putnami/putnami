@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"debug/buildinfo"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -147,19 +149,20 @@ func (w *install) resolveTool(tool string) (string, bool) {
 		return "", false
 	}
 	w.Emit.Log("info", "Installing "+tool+" "+expected+"...")
-	if w.buildTool(tool, spec.Install, expected, dest) {
-		return dest, true
+	if err := w.buildTool(tool, spec.Install, expected, dest); err != nil {
+		w.Emit.Diagnostic("error", "Failed to install pinned "+tool+" "+expected+": "+err.Error(), "", 0)
+		return "", false
 	}
-	w.Emit.Diagnostic("error", "Failed to install pinned "+tool+" "+expected, "", 0)
-	return "", false
+	return dest, true
 }
 
 // buildTool compiles the pinned tool into a throwaway GOPATH and publishes it
-// at dest. The module cache stays shared: SetupGoEnv exported GOMODCACHE.
-func (w *install) buildTool(tool, installSpec, expected, dest string) bool {
+// at dest, or returns why it could not. The module cache stays shared:
+// SetupGoEnv exported GOMODCACHE.
+func (w *install) buildTool(tool, installSpec, expected, dest string) error {
 	gopath, err := scratch.New("putnami-go-tool-")
 	if err != nil {
-		return false
+		return err
 	}
 	defer func() { _ = gopath.Remove() }()
 
@@ -172,17 +175,30 @@ func (w *install) buildTool(tool, installSpec, expected, dest string) bool {
 	// The go command downloads the tool's modules, so on workspace-fetch it
 	// gets the job credential. The version check below runs the built tool,
 	// which must not: the credential file is gone by then.
+	var installErr error
 	installed := w.withCredential(env, func(env []string) bool {
-		return w.Inherit(false, env, w.GoBinary, "install", installSpec) == nil
+		installErr = w.Inherit(false, env, w.GoBinary, "install", installSpec)
+		return installErr == nil
 	})
+	if installErr != nil {
+		return fmt.Errorf("go install %s: %w", installSpec, installErr)
+	}
 	if !installed {
-		return false
+		// withCredential reported why it could not write the credential.
+		return errors.New("the registry credential could not be written")
 	}
 	binary := filepath.Join(gopath.Path(), "bin", toolFileName(tool))
-	if !workspacejob.IsExecutable(binary) || !w.toolVersionMatches(tool, binary, expected) {
-		return false
+	if !workspacejob.IsExecutable(binary) {
+		return errors.New("go install left no executable at " + binary)
 	}
-	return publishToolBinary(binary, dest) == nil
+	matched, output, err := w.askToolVersion(tool, binary, expected)
+	if err != nil {
+		return fmt.Errorf("the built %s does not run: %s", tool, failureCause(strings.TrimSpace(output), err))
+	}
+	if !matched {
+		return fmt.Errorf("the built %s does not report %s: %s", tool, expected, strings.TrimSpace(output))
+	}
+	return publishToolBinary(binary, dest)
 }
 
 // toolVersionMatches reports whether binary reports version, asking the way
