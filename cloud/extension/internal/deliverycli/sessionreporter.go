@@ -100,7 +100,9 @@ const (
 // SessionReportingAck per line from stdout. Each frame becomes one POST of the
 // original artifact bytes to Delivery's run-session ingest under the run
 // credential, so the receiver — not this process — owns durability, replay
-// detection and derivation. On a hosted run the chunks follow the protocol 2
+// detection and derivation. The body is gzip-compressed once an answer of the
+// same destination advertised gzip (chunkEncoder); the receiver stores the
+// decoded bytes. On a hosted run the chunks follow the protocol 2
 // handshake that hands this process the run credential (reportingHandshake);
 // elsewhere the credential is the token in its environment.
 //
@@ -329,6 +331,8 @@ type sessionReporterSender struct {
 	// reporter_not_configured without another read of the stored login.
 	localResolved bool
 	local         *clicore.WorkspaceContext
+	// encoder compresses a frame once its destination advertised gzip.
+	encoder chunkEncoder
 }
 
 // sessionDestination is where one frame goes and the bearer it carries. local
@@ -450,7 +454,7 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 		return nack(chunk, ackCodeInvalidChunk, false)
 	}
 
-	status, body, failure := s.send(ctx, dest, part, chunk)
+	status, body, compressed, failure := s.send(ctx, dest, part, chunk)
 	if failure == "" && status == http.StatusUnauthorized && dest.local != nil && dest.local.RefreshAuth != nil {
 		// The ingest is idempotent per part and sequence, and a 401 stored
 		// nothing, so the frame is sent again under the re-minted bearer.
@@ -459,13 +463,19 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 			return nack(chunk, ackCodeNotConfigured, false)
 		}
 		dest.bearer = fresh
-		status, body, failure = s.send(ctx, dest, part, chunk)
+		status, body, compressed, failure = s.send(ctx, dest, part, chunk)
 	}
 	if failure != "" {
 		return nack(chunk, failure, failure == ackCodeReceiverUnavailable)
 	}
 
 	switch {
+	case status == http.StatusOK && compressed && !s.encoder.accepts(dest.url):
+		// An answer that does not advertise gzip comes from a receiver that
+		// may have stored the compressed bytes as they arrived, so it is not
+		// durable acceptance of the frame. Not retryable: that receiver
+		// refuses the frame's own bytes under the same sequence.
+		return nack(chunk, ackCodeReceiverMismatch, false)
 	case status == http.StatusOK:
 		var accepted struct {
 			Part string `json:"part"`
@@ -505,30 +515,35 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 }
 
 // send makes one POST of chunk's original bytes to dest under dest's bearer,
-// with the receiver's session headers. It returns the receiver's status and
-// at most 64 KiB of its body, or the NACK code of a request that got no
-// answer.
-func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestination, part string, chunk *protocolcli.SessionReportingChunk) (int, []byte, string) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dest.url, bytes.NewReader(chunk.Data))
+// with the receiver's session headers, gzip-compressed when the encoder
+// allows it. It returns the receiver's status, at most 64 KiB of its body and
+// whether the request body was compressed, or the NACK code of a request that
+// got no answer.
+func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestination, part string, chunk *protocolcli.SessionReportingChunk) (int, []byte, bool, string) {
+	payload, coding := s.encoder.body(dest.url, chunk.Data)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dest.url, bytes.NewReader(payload))
 	if err != nil {
-		return 0, nil, ackCodeNotConfigured
+		return 0, nil, false, ackCodeNotConfigured
 	}
 	req.Header.Set("Authorization", dest.bearer.Authorization())
 	req.Header.Set("Content-Type", "application/octet-stream")
+	setContentEncoding(req, coding)
 	req.Header.Set(sessionPartHeader, part)
 	req.Header.Set(sessionSeqHeader, strconv.FormatInt(chunk.Sequence, 10))
 	req.Header.Set(sessionFinalHeader, strconv.FormatBool(chunk.Final))
-	req.ContentLength = int64(len(chunk.Data))
+	req.ContentLength = int64(len(payload))
 
 	resp, err := s.client.Do(req) //nolint:gosec // G704: the destination is the launcher-exported ingest base or the linked workspace's control plane, never frame content
 	if err != nil {
 		// Transport failures (dial, reset, deadline) are the class worth another
 		// bounded attempt; the receiver may never have seen the bytes.
-		return 0, nil, ackCodeReceiverUnavailable
+		s.encoder.observe(dest.url, nil)
+		return 0, nil, false, ackCodeReceiverUnavailable
 	}
 	defer resp.Body.Close()
+	s.encoder.observe(dest.url, resp.Header)
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-	return resp.StatusCode, body, ""
+	return resp.StatusCode, body, coding != "", ""
 }
 
 // platformShedRequest reports whether the platform refused the request before

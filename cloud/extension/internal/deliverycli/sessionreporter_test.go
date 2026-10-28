@@ -32,6 +32,12 @@ type fakeIngest struct {
 	// spec-verification part; without it, it answers that part 400, as a
 	// receiver that predates it does.
 	acceptSpecVerification bool
+	// gzip makes it a receiver that reads gzip: every answer carries
+	// Accept-Encoding: gzip and a gzip body is stored decoded. Without it, it
+	// stores every body as it arrives, whatever its Content-Encoding.
+	gzip bool
+	// encodings is the Content-Encoding of every request, in order.
+	encodings []string
 }
 
 // serves reports whether the receiver knows part.
@@ -56,6 +62,10 @@ func (f *fakeIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.posts = append(f.posts, r.Header.Get(sessionPartHeader)+"/"+r.Header.Get(sessionSeqHeader)+"/"+r.Header.Get(sessionFinalHeader))
+	f.encodings = append(f.encodings, r.Header.Get(contentEncodingHeader))
+	if f.gzip {
+		w.Header().Set(acceptEncodingHeader, gzipCoding)
+	}
 	if f.status != 0 {
 		w.WriteHeader(f.status)
 		return
@@ -75,7 +85,11 @@ func (f *fakeIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	final := r.Header.Get(sessionFinalHeader) == "true"
-	body, _ := io.ReadAll(r.Body)
+	body, ok := receivedChunkBody(r, f.gzip)
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	if f.parts == nil {
 		f.parts = map[string][]storedChunk{}
 	}

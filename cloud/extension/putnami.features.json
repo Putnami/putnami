@@ -101,6 +101,58 @@
       ]
     },
     {
+      "id": "cloud/compressed-session-reporting",
+      "type": "feature",
+      "name": "Session and log chunks sent compressed",
+      "outcome": "The session reporter and the log reporter send each chunk gzip-compressed to a receiver that advertises it reads gzip, and the receiver stores the same bytes as for an uncompressed chunk",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "gzip-only-after-an-advertising-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "gzip-follows-an-advertising-answer",
+              "no-gzip-without-an-advertising-answer"
+            ]
+          }
+        },
+        {
+          "id": "the-chunk-bytes-are-what-the-receiver-stores",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-resent-sequence-compares-decoded",
+              "empty-and-incompressible-chunks-go-as-is",
+              "log-offset-and-digest-describe-the-chunk"
+            ]
+          }
+        },
+        {
+          "id": "unadvertised-gzip-acceptance-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "gzip-accepted-without-advertisement-is-refused"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cloud/secret-config-key",
       "type": "feature",
       "name": "Secrets stored under the config key the application reads",

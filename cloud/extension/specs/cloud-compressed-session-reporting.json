@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/compressed-session-reporting",
+  "outcomes": [
+    "The session reporter and the log reporter send each chunk gzip-compressed to a receiver that advertises it reads gzip, and the receiver stores the same bytes as for an uncompressed chunk"
+  ],
+  "nonGoals": [
+    "Trimming what is sent. The reporter acknowledges each frame before the engine sends the next one, so it cannot hold a line until its task ends",
+    "Compressing across frames. Each chunk is compressed on its own, so the number of requests does not change",
+    "Compressing for a receiver that does not advertise gzip"
+  ],
+  "requirements": [
+    {
+      "id": "gzip-only-after-an-advertising-answer",
+      "text": "The session reporter, on the ingest and on the local-sessions route, and the log reporter send a chunk with Content-Encoding: gzip only when the latest answer of the same destination carried Accept-Encoding: gzip with a nonzero weight. The first chunk to a destination, a chunk after an answer without that header, and a chunk after a request that got no answer go uncompressed."
+    },
+    {
+      "id": "the-chunk-bytes-are-what-the-receiver-stores",
+      "text": "A gzip body decodes to the chunk's bytes. A chunk with no bytes, such as a final marker, and a chunk that gzip does not shrink go uncompressed. A resent sequence therefore compares equal whether it is compressed or not, and the log reporter's offset and SHA-256 headers describe the chunk's bytes."
+    },
+    {
+      "id": "unadvertised-gzip-acceptance-fails-closed",
+      "text": "A 200 answer to a gzip body that does not carry Accept-Encoding: gzip is not acknowledged: the reporter answers receiver_mismatch without retry, because that receiver may have stored the compressed bytes as they arrived."
+    }
+  ],
+  "decisions": [
+    "cloud/extension/doc/adr/0001-a-reporter-compresses-a-chunk-once-the-receiver-advertises-gzip.md"
+  ]
+}

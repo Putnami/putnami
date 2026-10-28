@@ -84,7 +84,7 @@
           "path": "cloud/extension/internal/deliverycli/logreporter.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "9435f65f3523c2daac0b648243ec0790aecec762ffa8327247662b58772c6c01"
+          "fingerprint": "d81bc2e36f21e1c9dea9ec420baf9a5d2f53b096c6396ffb7eb2e2c4a4acac67"
         }
       ],
       "owner": "@putnami/cloud-extension",
@@ -112,7 +112,7 @@
           "path": "cloud/extension/internal/deliverycli/sessionreporter.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "9e7d927f8b3a7dddcad04fe3070f1ecf4068757c3cd042ba1bd3a8915037dcbf"
+          "fingerprint": "8deb666e8c0ff2ce62bfd16aee4b03d2144192c5fd2b958170025942594a9b43"
         }
       ],
       "owner": "@putnami/cloud-extension",
