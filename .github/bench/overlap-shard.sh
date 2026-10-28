@@ -12,7 +12,7 @@ now() { perl -MTime::HiRes=time -e 'printf "%.3f\n", time'; }
 to=timeout; command -v timeout >/dev/null || to=gtimeout; command -v $to >/dev/null || to=""
 export cpus to; export -f now
 work="${RUNNER_TEMP:-/tmp}/overlap"
-mkdir -p "$work/bin" "$out/cov" "$out/universe"
+mkdir -p "$work/bin" "$out/cov" "$out/universe" "$out/baseline"
 cd tooling/cli
 
 # Every shard builds every test binary: items are dealt round-robin.
@@ -44,6 +44,14 @@ echo "items_shard $(wc -l < "$work/mine.txt")" >> "$out/shard-$shard.meta"
 # packages run in parallel, as go test runs them.
 runpkg() {
   name="$1"
+  # What the binary reaches with no test: init and TestMain. Every test of the
+  # package reaches it, so the report subtracts it.
+  dir0="$(grep -m1 "^$name " "$work/mine.txt" | cut -d' ' -f2)"
+  b="$work/cd/$name.baseline"; rm -rf "$b"; mkdir -p "$b"
+  (cd "$dir0" && GOCOVERDIR="$b" ${to:+$to 900} "$work/bin/$name.test" -test.run '^$' -test.gocoverdir="$b" > /dev/null 2>&1)
+  go tool covdata textfmt -i="$b" -o "$b.txt" 2>/dev/null
+  awk 'NR>1 && $3>0 {print $1, $2}' "$b.txt" 2>/dev/null | gzip -c > "$out/baseline/$name.gz"
+  rm -rf "$b" "$b.txt"
   grep "^$name " "$work/mine.txt" | while read -r _ dir t; do
     d="$work/cd/$name.$t"; rm -rf "$d"; mkdir -p "$d"
     s=$(now)

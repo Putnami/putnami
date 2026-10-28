@@ -107,6 +107,22 @@ func main() {
 			fmt.Fprintln(os.Stderr, u, err)
 		}
 	}
+	// What each binary reaches before any test runs.
+	baseline := map[string]map[int]bool{}
+	bases, _ := filepath.Glob(filepath.Join(art, "*", "baseline", "*.gz"))
+	for _, b := range bases {
+		ids, err := readBlocks(b)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, b, err)
+		}
+		bin := strings.TrimSuffix(filepath.Base(b), ".gz")
+		if baseline[bin] == nil {
+			baseline[bin] = map[int]bool{}
+		}
+		for _, i := range ids {
+			baseline[bin][i] = true
+		}
+	}
 	runs, _ := filepath.Glob(filepath.Join(art, "*", "runs-*.tsv"))
 	var tests []*test
 	for _, r := range runs {
@@ -130,9 +146,14 @@ func main() {
 				t.dir = filepath.Join(root, t.dir[i+1:])
 			}
 			cov := filepath.Join(filepath.Dir(r), "cov", t.bin+"."+t.name+".gz")
-			t.blocks, err = readBlocks(cov)
+			all, err := readBlocks(cov)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, cov, err)
+			}
+			for _, b := range all {
+				if !baseline[t.bin][b] {
+					t.blocks = append(t.blocks, b)
+				}
 			}
 			categorize(t, root)
 			tests = append(tests, t)
@@ -352,6 +373,7 @@ func writeReport(out string, tests []*test, order []int, total, union int) {
 	r, _ := os.Create(filepath.Join(out, "report.md"))
 	defer r.Close()
 	fmt.Fprintf(r, "Tests: %d, %.1f s summed (in-test time, coverage on).\n", all.n, all.s)
+	fmt.Fprintln(r, "A test's statements exclude what its binary reaches with no test (init and TestMain).")
 	fmt.Fprintf(r, "Statements: %d instrumented, %d reached by at least one test (%.1f%%).\n\n", total, union, 100*float64(union)/float64(total))
 	fmt.Fprintf(r, "Greedy cover: %d tests, %.0f s, reach every statement the suite reaches.\n\n", len(order), greedyS)
 	fmt.Fprintln(r, "| Category | Tests | Seconds | Reach no statement | Same set as another | Inside one other test | No unique statement | Failed or no result | Skipped |")
