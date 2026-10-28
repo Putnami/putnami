@@ -220,7 +220,20 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-session-mode-is-the-intent-else-the-configured-mode-else-full"
+              "the-session-mode-is-the-intent-else-the-configured-mode-else-minimal-when-hosted-else-full"
+            ]
+          }
+        },
+        {
+          "id": "a-files-restore-receives-downloads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-minimal-session-negotiates-the-keys-core-reads-in-full"
             ]
           }
         }

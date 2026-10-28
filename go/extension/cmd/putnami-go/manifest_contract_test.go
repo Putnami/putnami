@@ -1799,6 +1799,10 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 				"are only current once that step has run, and build-generate's run clears the sidecar", step.DependsOn, want)
 		}
 	}
+	if stepDependsOn(m, "build", step, "compile") {
+		t.Errorf("infra step dependsOn = %v, want no compile: infra reads no binary, and the edge would keep "+
+			"every executable's cache files needed by a run that only checks the build", step.DependsOn)
+	}
 }
 
 // TestDeploymentDeclarationIsAGatedCachedPackageStep pins the manifest half of

@@ -10,6 +10,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -112,6 +113,37 @@ func TestPlan_GoLibraryCompileUsesInvocationAndProjectFacts(t *testing.T) {
 	}
 }
 
+// TestPlan_GoInfraOnlyOrdersAfterCompile pins the Go build's infra step: it
+// reads no binary, so the compile reaches it through write serialization of
+// the project's .gen tree alone, never as a dependency whose key it folds or
+// whose files it reads (ADR 0082).
+func TestPlan_GoInfraOnlyOrdersAfterCompile(t *testing.T) {
+	t.Parallel()
+	ext := loadGoPlannerExtension(t)
+	ws, planned := planGoProjectIn(t, ext, "application", []string{"build"}, "")
+	byKey := JobsByPlanKey(planned)
+	infra, compile := byKey["/subject:build~infra"], byKey["/subject:build~compile"]
+	if infra == nil || compile == nil {
+		t.Fatalf("plan lacks infra or compile: %v", planKeySet(planned))
+	}
+	if slices.Contains(infra.DependsOn, compile.Key()) {
+		t.Errorf("infra DependsOn = %v, want no compile", infra.DependsOn)
+	}
+	if !slices.Contains(infra.SerializeAfter, compile.Key()) {
+		t.Errorf("infra SerializeAfter = %v, want compile: infra rewrites the .gen tree compile reads", infra.SerializeAfter)
+	}
+	// The order-only edge keeps compile's files only when infra's key reads a
+	// file compile writes. Compile writes its binary under the command-output
+	// root, which no project input reads.
+	if ws == nil {
+		t.Fatal("key movement needs the workspace; without it every edge counts and this check proves nothing")
+	}
+	movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws}, planned)
+	if writers := movement.Writers[infra.Key()]; slices.Contains(writers, compile.Key()) {
+		t.Errorf("key movement names compile among infra's writers %v: the executable would keep its files", writers)
+	}
+}
+
 func TestPlan_PlannerConditionCommandSetIsOrderIndependent(t *testing.T) {
 	t.Parallel()
 	ext := loadGoPlannerExtension(t)
@@ -140,6 +172,19 @@ func planGoProject(
 	options string,
 ) []*jobmodel.ScheduledJob {
 	t.Helper()
+	_, planned := planGoProjectIn(t, ext, projectType, commands, options)
+	return planned
+}
+
+// planGoProjectIn is planGoProject that also returns the workspace it planned.
+func planGoProjectIn(
+	t *testing.T,
+	ext *extension.ExtensionDescription,
+	projectType string,
+	commands []string,
+	options string,
+) (*workspace.Workspace, []*jobmodel.ScheduledJob) {
+	t.Helper()
 	root := t.TempDir()
 	writeProjectFile(t, root, "subject", "go.mod", "module example.com/subject\n\ngo 1.25\n")
 	source := "package subject\n"
@@ -165,7 +210,7 @@ func planGoProject(
 	if err != nil {
 		t.Fatalf("Plan(%v, type=%s, options=%s): %v", commands, projectType, options, err)
 	}
-	return planned
+	return ws, planned
 }
 
 // routedImagePackagerName is an extension that packages a Go workload's OCI

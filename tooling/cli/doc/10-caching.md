@@ -1279,15 +1279,19 @@ restore so coordination cannot make the cache less reliable.
 
 | Mode | A remote hit is restored with its files when |
 |------|-----------|
-| `minimal` | a planned job waits for the task, the task declares a post-run report, or the task polices output drift. Every other hit is status only (the CI gate). |
+| `minimal` | a planned job reads the task's files, the task declares a post-run report, or the task polices output drift. Every other hit is status only (the CI gate; the Cloud provider's default for a hosted run). |
 | `toplevel` | the same, or the task belongs to a project the run selected. |
-| `full` | always (local development; the default). |
+| `full` | always (local development; the default elsewhere). |
 
-A planned job waits for a task when it depends on it, or when the plan orders
-it after the task because it reads what the task writes: a resource the task
-writes, or the generated client a contract provider writes into the client's
-directory. The later job may execute and read those files, and even a later
-hit computes its own cache key from the workspace, so the files must be there.
+A planned job reads a task's files when it depends on it. A job the plan only
+orders after the task, through write serialization or a contract client edge,
+reads them when its cache key reads a file the task writes, when the task
+declares an output its dependents read (`readByDependents`), when both belong
+to one shared execution, or when the task is not planned (ADR 0082). The later
+job may execute and read those files, and even a later hit computes its own
+cache key from the workspace, so the files must be there. An edge that only
+orders the two jobs, such as the Go `infra` step after `compile`, keeps no
+file.
 A post-run report is the feature verification report or the executable
 criteria projection, which the spec gate reads from the command output
 directory after the run, or a command-output file whose path the task reports

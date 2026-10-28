@@ -15,12 +15,14 @@ type providerConfigurationCase struct {
 	configured string
 	intent     cache.Mode
 	offer      []string
+	hosted     bool
 	wantMode   cache.Mode
 	wantEcho   bool
 }
 
 // providerConfigurationCases is the table both tests below read. The mode is
-// core's intent, else the configured mode, else full. The provider echoes
+// core's intent, else the configured mode, else minimal for a hosted launch and
+// full otherwise. The provider echoes
 // provider-configuration and returns the mode only when core listed the
 // capability.
 func providerConfigurationCases() []providerConfigurationCase {
@@ -29,6 +31,9 @@ func providerConfigurationCases() []providerConfigurationCase {
 		{name: "configured mode", configured: "toplevel", offer: offered, wantMode: cache.ModeToplevel, wantEcho: true},
 		{name: "no configured mode", offer: offered, wantMode: cache.ModeFull, wantEcho: true},
 		{name: "core intent wins", configured: "toplevel", intent: cache.ModeMinimal, offer: offered, wantMode: cache.ModeMinimal, wantEcho: true},
+		{name: "hosted, no configured mode", offer: offered, hosted: true, wantMode: cache.ModeMinimal, wantEcho: true},
+		{name: "hosted, configured mode", configured: "full", offer: offered, hosted: true, wantMode: cache.ModeFull, wantEcho: true},
+		{name: "hosted, core intent wins", intent: cache.ModeToplevel, offer: offered, hosted: true, wantMode: cache.ModeToplevel, wantEcho: true},
 		{name: "not offered", configured: "toplevel", wantMode: cache.ModeToplevel},
 		{name: "not offered, no configured mode", wantMode: cache.ModeFull},
 	}
@@ -38,6 +43,11 @@ func providerConfigurationCases() []providerConfigurationCase {
 // leaves an absent mode absent, and returns the session and the parsed result.
 func initializeWithConfiguration(t *testing.T, tc providerConfigurationCase) (*providerSession, *cache.InitializeResult) {
 	t.Helper()
+	if tc.hosted {
+		t.Setenv(SessionReporterIngestURLEnv, "https://ingest.invalid")
+	} else {
+		t.Setenv(SessionReporterIngestURLEnv, "")
+	}
 	root := t.TempDir()
 	if tc.configured != "" {
 		if err := WriteCacheConfig(root, &CacheConfig{Enabled: false, URL: "https://cache.invalid", Mode: tc.configured}); err != nil {
@@ -67,10 +77,11 @@ func initializeWithConfiguration(t *testing.T, tc providerConfigurationCase) (*p
 }
 
 // TestInitialize_SessionModePrecedence pins how the provider resolves the
-// session mode: core's intent, else the configured mode, else full.
+// session mode: core's intent, else the configured mode, else minimal for a
+// hosted launch and full otherwise.
 func TestInitialize_SessionModePrecedence(t *testing.T) {
 	spectest.Proves(t, "cloud/cache-provider-configuration", "provider-resolves-its-configuration",
-		"the-session-mode-is-the-intent-else-the-configured-mode-else-full")
+		"the-session-mode-is-the-intent-else-the-configured-mode-else-minimal-when-hosted-else-full")
 	t.Setenv(remotecache.URLEnv, "")
 	t.Setenv(remotecache.ModeEnv, "")
 	for _, tc := range providerConfigurationCases() {

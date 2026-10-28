@@ -225,15 +225,28 @@ func TestResultOnlyHintIsAQuietMiss(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestResultOnlyRestoresTheFilesOfATaskALaterJobWaitsFor pins the reader rule:
-// a task some planned job waits for, by a dependency or by write
-// serialization, is restored with its files even in minimal mode, so a later
-// job that executes finds its inputs. Its own key, a leaf, stays result-only.
+// a task some planned job reads is restored with its files even in minimal
+// mode, so a later job that executes finds its inputs. A job reads the task's
+// files when it depends on the task, or when it is serialized after the task
+// and its key reads a file the task writes or the task declares an output its
+// dependents read (ADR 0082).
 func TestResultOnlyRestoresTheFilesOfATaskALaterJobWaitsFor(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "result-only-remote-restore",
 		"a-hit-a-planned-job-waits-for-keeps-its-files")
 	cases := map[string]func(later, task *ScheduledJob){
-		"depends on":       func(later, task *ScheduledJob) { later.DependsOn = []string{task.Key()} },
-		"serialized after": func(later, task *ScheduledJob) { later.SerializeAfter = []string{task.Key()} },
+		"depends on": func(later, task *ScheduledJob) { later.DependsOn = []string{task.Key()} },
+		"serialized after, its key reads the task's outputs": func(later, task *ScheduledJob) {
+			later.SerializeAfter = []string{task.Key()}
+			later.JobDef.FilePatterns = []string{".gen/**"}
+		},
+		"serialized after a task its dependents read": func(later, task *ScheduledJob) {
+			later.SerializeAfter = []string{task.Key()}
+			definition := task.Extension.Tasks[task.Step.Task]
+			gen := definition.Declares.Outputs["gen"]
+			gen.ReadByDependents = true
+			definition.Declares.Outputs["gen"] = gen
+			task.Extension.Tasks[task.Step.Task] = definition
+		},
 	}
 	for name, wait := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -246,14 +259,9 @@ func TestResultOnlyRestoresTheFilesOfATaskALaterJobWaitsFor(t *testing.T) {
 			later := declaredJob("test~check", "check", &extension.TaskDeclaration{})
 			wait(later, job)
 			planned := []*ScheduledJob{job, later}
-			keys, err := cachekey.PrecomputeKeys(consumer.ws, planned, nil, nil, consumer.cache, cachekey.CacheBypass{})
-			if err != nil || keys[later.Key()] == "" {
-				t.Fatalf("precompute keys: %v (keys %v)", err, keys)
-			}
 			remote.Negotiate(t.Context(), consumer.ws, planned, nil, nil, consumer.cache, cachekey.CacheBypass{})
-			wantResultOnly := []string{store.RemoteTaskEntryKey(keys[later.Key()])}
-			if got := server.prefetchedResultOnly(); !slices.Equal(got, wantResultOnly) {
-				t.Fatalf("result-only prefetch keys = %v, want only the later job's %v", got, wantResultOnly)
+			if got := server.prefetchedResultOnly(); slices.Contains(got, store.RemoteTaskEntryKey(hash)) {
+				t.Fatalf("result-only prefetch keys = %v, want none for the task a later job reads", got)
 			}
 
 			placed := server.placedBlobs()
@@ -269,6 +277,40 @@ func TestResultOnlyRestoresTheFilesOfATaskALaterJobWaitsFor(t *testing.T) {
 				t.Fatal("a full restore recorded a result-only entry")
 			}
 		})
+	}
+}
+
+// TestAnOrderOnlyWaiterLeavesATaskResultOnly pins the other half of the reader
+// rule: a job serialized after a task, whose key reads no file the task writes,
+// only orders the two jobs. The task stays result-only, as a leaf does.
+func TestAnOrderOnlyWaiterLeavesATaskResultOnly(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "result-only-remote-restore",
+		"an-order-only-waiter-whose-key-reads-nothing-the-task-writes-leaves-it-result-only")
+	server := newFakeCacheServer()
+	server.echoResultOnly()
+	hash, _ := publishMatrixEntry(t, server)
+
+	consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
+	job := matrixJob()
+	later := declaredJob("build~infra", "infra", &extension.TaskDeclaration{})
+	later.JobDef.FilePatterns = []string{"infra/**"}
+	later.SerializeAfter = []string{job.Key()}
+	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job, later}, nil, nil, consumer.cache, cachekey.CacheBypass{})
+	if got := server.prefetchedResultOnly(); !slices.Contains(got, store.RemoteTaskEntryKey(hash)) {
+		t.Fatalf("result-only prefetch keys = %v, want the task's key", got)
+	}
+
+	placed := server.placedBlobs()
+	result := consumer.runDeclaredLookup(t, job, hash)
+	if result == nil || result.Reuse != ReuseRemoteCache || result.Status != "success" {
+		t.Fatalf("lookup = %+v, want a successful remote-cache hit", result)
+	}
+	if got := server.placedBlobs() - placed; got != 0 {
+		t.Fatalf("the provider placed %d blobs for a task only an order-only job waits for", got)
+	}
+	assertNoMatrixOutputs(t, consumer)
+	if consumer.cache.LookupResultOnlyTaskEntry(hash) == nil {
+		t.Fatal("the hit recorded no local result-only entry")
 	}
 }
 

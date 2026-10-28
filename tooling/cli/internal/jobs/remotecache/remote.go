@@ -124,7 +124,7 @@ type RemoteCache struct {
 	// (statusOnlyOptionalCaptureHit): a describe whose result reports no
 	// clients legitimately has zero files.
 	requiredInputs map[string]bool
-	// dependedOn holds the key of every job a planned job waits for
+	// dependedOn holds the key of every job whose files a planned job reads
 	// (dependedOnJobs). Negotiate sets it before any job runs; nil means the
 	// plan was never seen, and then every task's files are needed
 	// (TaskFilesNeeded).
@@ -350,7 +350,13 @@ func (r *RemoteCache) Negotiate(
 	if r == nil || cm == nil {
 		return
 	}
-	r.dependedOn = dependedOnJobs(planned)
+	var movement cachekey.KeyMovement
+	if ws != nil {
+		movement = cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned)
+		r.dependedOn = dependedOnJobs(planned, &movement)
+	} else {
+		r.dependedOn = dependedOnJobs(planned, nil)
+	}
 
 	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cm, bypass, r.stats)
 	if err != nil {
@@ -358,7 +364,7 @@ func (r *RemoteCache) Negotiate(
 		return
 	}
 	r.Keys = keys
-	if movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams, Resolver: cm.InputResolver()}, planned); len(movement.Moving) > 0 {
+	if len(movement.Moving) > 0 {
 		r.Keys = make(map[string]string, len(keys))
 		for jobKey, hash := range keys {
 			if !movement.Moving[jobKey] {

@@ -1,6 +1,7 @@
 # ADR 0058 — A hit no job reads is restored without its files
 
-- **Status**: accepted
+- **Status**: accepted, rule 2 amended by
+  [ADR 0082](0082-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md)
 - **Scope**: `@putnami/cli` (`internal/jobs`, `internal/store`,
   `internal/cacheprovider`), `go.putnami.dev/protocol/cache` (provider RPC)
 
@@ -77,7 +78,8 @@ Keeping files only for a dependent that executes is not enough. A dependent
 that is a hit still computes its key from the workspace before it knows it is
 a hit, and its restore can fail and fall back to an execution. The plan cannot
 tell which dependents will execute, so any planned job that waits for a task
-keeps the task's files.
+keeps the task's files. ADR 0082 narrows this to the jobs that read them: an
+edge that only orders two jobs keeps no file.
 
 ### Why a separate entry kind
 
