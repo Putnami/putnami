@@ -104,6 +104,12 @@ _putnami_completions() {
     fi
 
     local cmd="${words[1]}"
+    # A flag goes after the command: the CLI refuses a command line whose
+    # first word is a flag, so nothing completes after it.
+    if [[ "${cmd}" == -* ]]; then
+        COMPREPLY=()
+        return
+    fi
     # A core command takes a job-only flag only as one of its own flags.
     if ! _putnami_core_root "${cmd}"; then
         global_flags="${global_flags} ${job_global_flags}"

@@ -380,7 +380,7 @@ func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
 	// included: the condition names each one as a literal word.
 	jobCommandCondition := false
 	for _, words := range conditions {
-		if len(words) > 0 && words[0] == "__fish_seen_subcommand_from" && slices.Contains(words, "lint-docs") {
+		if len(words) > 0 && words[0] == "__putnami_seen_from" && slices.Contains(words, "lint-docs") {
 			jobCommandCondition = true
 			assertOffersEach(t, "fish", "a job-command condition", words[1:], []string{"j" + hostileNames[0], "j" + hostileNames[3]})
 		}

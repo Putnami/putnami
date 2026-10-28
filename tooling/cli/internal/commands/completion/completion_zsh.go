@@ -144,6 +144,11 @@ _putnami() {
             local cur="${words[CURRENT]}"
             local prev="${words[CURRENT-1]}"
             local path="${words[1]}"
+            # A flag goes after the command: the CLI refuses a command line
+            # whose first word is a flag, so nothing completes after it.
+            if [[ "${path}" == -* ]]; then
+                return 1
+            fi
             # A core command takes a job-only flag only as one of its own flags.
             if ! _putnami_core_root "${path}"; then
                 global_flags=("${global_flags[@]}" "${job_global_flags[@]}")

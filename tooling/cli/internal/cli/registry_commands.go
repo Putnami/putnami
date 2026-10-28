@@ -812,9 +812,6 @@ func warningWriter(env *CommandEnv) io.Writer {
 
 func cmdCompletion(env *CommandEnv) error {
 	shell := env.Sub
-	if shell == "" && len(env.Args) > 0 {
-		shell = env.Args[0]
-	}
 	warnings := env.WorkspaceWarnings()
 	switch shell {
 	case "bash":

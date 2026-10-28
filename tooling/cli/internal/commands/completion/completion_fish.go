@@ -56,6 +56,26 @@ function __putnami_seen_path
     return 0
 end
 
+# A flag goes after the command: the CLI refuses a command line whose first
+# word is a flag, so no completion below offers anything after one. The path
+# checks above fail there already, since no path starts with a flag.
+function __putnami_leading_flag
+    set -l tokens (commandline -opc)
+    test (count $tokens) -ge 2; and string match -q -- '-*' $tokens[2]
+end
+
+function __putnami_use_command
+    not __putnami_leading_flag; and __fish_use_subcommand
+end
+
+function __putnami_no_leading_flag
+    not __putnami_leading_flag
+end
+
+function __putnami_seen_from
+    not __putnami_leading_flag; and __fish_seen_subcommand_from $argv
+end
+
 # A core command takes a job-only flag only as one of its own flags.
 function __putnami_core_root
     set -l tokens (commandline -opc)
@@ -63,6 +83,10 @@ function __putnami_core_root
         return 1
     end
     contains -- $tokens[2] %s
+end
+
+function __putnami_job_flag
+    not __putnami_leading_flag; and not __putnami_core_root
 end
 
 # Job commands
@@ -73,7 +97,7 @@ end
 		if desc == "" {
 			desc = "Run " + cmd + " job"
 		}
-		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a %s -d %s\n", fishArguments(cmd), fishQuote(desc))
+		iox.Fprintf(w, "complete -c putnami -n %s -a %s -d %s\n", fishCondition("__putnami_use_command"), fishArguments(cmd), fishQuote(desc))
 	}
 
 	iox.Fprintf(w, "\n# Structured commands\n")
@@ -83,7 +107,7 @@ end
 		if desc == "" {
 			desc = sc
 		}
-		iox.Fprintf(w, "complete -c putnami -n '__fish_use_subcommand' -a %s -d %s\n", fishArguments(sc), fishQuote(desc))
+		iox.Fprintf(w, "complete -c putnami -n %s -a %s -d %s\n", fishCondition("__putnami_use_command"), fishArguments(sc), fishQuote(desc))
 	}
 
 	iox.Fprintf(w, "\n# Subcommands\n")
@@ -110,11 +134,11 @@ end
 	iox.Fprintf(w, "\n# Global flags\n")
 
 	for _, flag := range ctx.globalFlags {
-		condition := ""
+		condition := fishCondition("__putnami_no_leading_flag")
 		if flag.JobOnly {
-			condition = "-n " + fishCondition("not __putnami_core_root") + " "
+			condition = fishCondition("__putnami_job_flag")
 		}
-		iox.Fprintf(w, "complete -c putnami %s-l %s -d %s\n",
+		iox.Fprintf(w, "complete -c putnami -n %s -l %s -d %s\n",
 			condition, fishQuote(strings.TrimPrefix(flag.Long, "--")), fishQuote(flag.Description))
 	}
 
@@ -148,7 +172,7 @@ end
 	// Output format completion
 	iox.Fprintf(w, "\n# Output format values\n")
 	iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-		fishCondition("__fish_seen_subcommand_from", "--output"), fishArguments(ctx.globalFlagValues("--output")...))
+		fishCondition("__putnami_seen_from", "--output"), fishArguments(ctx.globalFlagValues("--output")...))
 
 	// --projects accepts any target form ResolveTarget understands:
 	// IDs, names, basenames, and aliases.
@@ -160,19 +184,19 @@ end
 	if len(projectTargets) > 0 {
 		iox.Fprintf(w, "\n# Project targets (for --projects flag value)\n")
 		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-			fishCondition("__fish_seen_subcommand_from", "--projects"), fishArguments(projectTargets...))
+			fishCondition("__putnami_seen_from", "--projects"), fishArguments(projectTargets...))
 	}
 
 	// --exclude matches project names.
 	if len(ctx.projects) > 0 && ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, "\n# Project names (for --exclude flag value)\n")
 		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-			fishCondition("__fish_seen_subcommand_from", "--exclude"), fishArguments(ctx.projects...))
+			fishCondition("__putnami_seen_from", "--exclude"), fishArguments(ctx.projects...))
 	}
 
 	// Positional project targets after job commands: IDs, names, basenames, aliases.
 	if len(ctx.projectIDs) > 0 || len(ctx.projects) > 0 || len(ctx.projectBasenames) > 0 || len(ctx.aliases) > 0 {
-		afterJob := fishCondition("__fish_seen_subcommand_from", ctx.commands...)
+		afterJob := fishCondition("__putnami_seen_from", ctx.commands...)
 		iox.Fprintf(w, "\n# Project targets (positional argument after job commands)\n")
 		for _, id := range ctx.projectIDs {
 			iox.Fprintf(w, "complete -c putnami -n %s -a %s -d 'project'\n", afterJob, fishArguments(id))

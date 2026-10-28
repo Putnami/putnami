@@ -622,7 +622,11 @@ func processAliases(
 	groupCommand := func(group, word string) string {
 		return extension.GroupInvocationCommand(extensions, group, word)
 	}
-	return commandAliases{vocabulary: vocabulary, user: user, serveWorkloads: serveWorkloads, groupCommand: groupCommand},
+	groupSubcommand := func(group, word string) bool {
+		_, _, ok := extension.LookupSubcommand(extensions, group, word)
+		return ok
+	}
+	return commandAliases{vocabulary: vocabulary, user: user, serveWorkloads: serveWorkloads, groupCommand: groupCommand, groupSubcommand: groupSubcommand},
 		hiddenAliasWarnings(extensions, user)
 }
 
