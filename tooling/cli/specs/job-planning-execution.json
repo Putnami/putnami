@@ -123,7 +123,7 @@
     },
     {
       "id": "declared-verification-producers",
-      "text": "A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability. A warm hit restores both the verification report and the criteria projection. Coverage comes from verification jobs and replays under their command."
+      "text": "A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability. A warm hit restores both the verification report and the criteria projection. Coverage comes from verification jobs and replays under their command. A local or remote hit reports the coverage its producing run measured, with or without its cached events."
     },
     {
       "id": "batch-parity-and-live-cells-follow-declared-kinds",

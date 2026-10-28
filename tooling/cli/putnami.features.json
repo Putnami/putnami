@@ -1090,6 +1090,7 @@
               "cache-recovery-plans-the-verification-kind-commands",
               "a-warm-hit-restores-the-declared-artifact-by-kind",
               "coverage-is-recorded-and-replayed-under-the-command-that-measured-it",
+              "a-cache-hit-reports-the-coverage-its-producing-run-measured",
               "a-third-party-producer-command-gates-the-run"
             ]
           }

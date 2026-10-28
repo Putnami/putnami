@@ -10,8 +10,9 @@
 // under GitHub Actions), and POSTs a conclusion-only submission authenticated
 // with the existing workspace-scoped token machinery. In the wrapper form
 // (`putnami cloud ci report -- putnami … --output=jsonl`) the wrapped command's
-// stdout is tee'd through internal/reportstream and the folded
-// tests/coverage/builds batch is POSTed at run end. The batch is
+// stdout is tee'd through internal/reportstream, and at run end the
+// tests/coverage/builds batch is folded from the complete session record that
+// stream names (falling back to the stdout fold) and POSTed. The batch is
 // fail-soft by contract: a failed or partial report ingestion never changes
 // the run's conclusion, which comes from the wrapped exit status alone.
 package deliverycli
@@ -161,8 +162,9 @@ type reportBatchStream struct {
 //	putnami cloud ci report -- <cmd…>                        run cmd; its exit code decides
 //
 // The wrapper form additionally tees the wrapped command's stdout through the
-// JSONL parser and, when the stream carried report data (`--output=jsonl`),
-// POSTs the folded tests/coverage/builds batch after the run submission.
+// JSONL parser and, when the run carried report data (`--output=jsonl`),
+// POSTs the folded tests/coverage/builds batch after the run submission
+// (postReportBatch says which stream it is folded from).
 // Report ingestion is fail-soft: a failed batch POST warns on stderr and never
 // changes the command's outcome or the run's conclusion.
 //
@@ -238,7 +240,7 @@ func Report(params map[string]any, args []string, workspaceRoot string, env map[
 	// The run's conclusion is recorded — everything from here on is fail-soft.
 	// The report batch is a side channel: a failed or partial ingestion warns
 	// but never flips the reported outcome or this command's exit code.
-	reportsState := postReportBatch(ioctx, controlURL, auth.AccessToken, workspaceID, submissionID, stream)
+	reportsState := postReportBatch(ioctx, workspaceRoot, controlURL, auth.AccessToken, workspaceID, submissionID, stream)
 
 	result := map[string]any{
 		"run_id":        deref(resp.RunId),
@@ -378,18 +380,26 @@ func reportProvenance(env map[string]string) string {
 	return "local"
 }
 
-// postReportBatch folds the tee'd JSONL stream into a report batch and POSTs
-// it, riding the same workspace token and submission id as the run submission
+// postReportBatch folds the wrapped run into a report batch and POSTs it,
+// riding the same workspace token and submission id as the run submission
 // (the server keys idempotency on submission id + report kind, so retries are
 // safe). It is fail-soft by contract: any failure warns on stderr and returns
 // a state string — it never returns an error, because report ingestion must
 // not flip an already-reported run. Returns "none" when no stream was tee'd or
 // it carried no report data.
-func postReportBatch(ioctx clicore.IO, controlURL, token, workspaceID, submissionID string, stream *reportstream.Parser) string {
+//
+// The batch comes from the complete session record that the tee'd stream's
+// session:end names, under workspaceRoot (reportstream.FoldRun): a large run's
+// bounded stdout elides most of its results. When that record is missing or
+// does not verify, the batch is the stdout fold, and one stderr line says why.
+func postReportBatch(ioctx clicore.IO, workspaceRoot, controlURL, token, workspaceID, submissionID string, stream *reportstream.Parser) string {
 	if stream == nil {
 		return "none"
 	}
-	batch := stream.Batch()
+	batch, note := reportstream.FoldRun(workspaceRoot, stream)
+	if note != "" {
+		ioctx.Stderr("note: delivery reports come from the command's stdout, not its session record: " + note)
+	}
 	if !batch.HasReports() {
 		return "none"
 	}
@@ -404,6 +414,7 @@ func postReportBatch(ioctx clicore.IO, controlURL, token, workspaceID, submissio
 			MalformedLines: batch.Stats.MalformedLines,
 			UnknownEvents:  batch.Stats.UnknownEvents,
 			OversizedLines: batch.Stats.OversizedLines,
+			ElidedLines:    batch.Stats.ElidedLines,
 		},
 		Tests:    batch.Tests,
 		Coverage: batch.Coverage,

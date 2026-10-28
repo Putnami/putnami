@@ -16,6 +16,13 @@
 //     PUTNAMI_MACHINE_OUTPUT=v1 in testdata/v1-twin-lint-test-build.jsonl so the
 //     two mappings are pinned against each other.
 //
+// `ci report` is how CI that runs outside Putnami's hosted runners submits
+// these reports. A bounded v2 stdout drops ordinary records once its live
+// budget is spent, so a large run's stdout can lack most of its test and
+// coverage results. FoldRun (artifact.go) therefore folds the complete
+// events.jsonl that the stream's final session:end names, and falls back to
+// the stdout fold, with a note, when that file is absent or does not verify.
+//
 // The parser is tolerant and versioned against those real captured streams:
 // unknown event and record types are skipped and counted, malformed or oversized
 // lines are skipped and counted, and nothing is ever fatal — a broken stream
@@ -34,6 +41,7 @@ package reportstream
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -50,9 +58,17 @@ const ContractVersion = "3"
 // counted as an unknown event and skipped, never guessed at.
 const PutnamiProtocolVersionV2 = 2
 
-// MaxLineBytes caps a single JSONL line. Longer lines are discarded whole and
-// counted as oversized — a runaway line must never balloon the parser.
+// MaxLineBytes caps a single JSONL line of the wrapped command's stdout. Longer
+// lines are discarded whole and counted as oversized — a runaway line must
+// never balloon the parser.
 const MaxLineBytes = 1 << 20
+
+// MaxArtifactLineBytes caps a single line of a session artifact. It is the
+// bound the putnami CLI puts on one task event line it accepts from a
+// subprocess (cli-model jobs, maxJobEventBytes), so a result the CLI kept in
+// the complete record is not discarded here. The bounded stdout keeps
+// MaxLineBytes.
+const MaxArtifactLineBytes = 16 << 20
 
 // Stats is the parse provenance for one stream.
 type Stats struct {
@@ -65,8 +81,16 @@ type Stats struct {
 	// a versioned record stamped with a protocolVersion other than
 	// PutnamiProtocolVersionV2. They are skipped, never fatal.
 	UnknownEvents int
-	// OversizedLines counts lines discarded for exceeding MaxLineBytes.
+	// OversizedLines counts lines discarded for exceeding the parser's line
+	// cap: MaxLineBytes, or MaxArtifactLineBytes for a session artifact.
 	OversizedLines int
+	// ElidedLines counts the records the producer left out of the folded
+	// stream, as its bounded session:end reports them. FoldRun sets it; it is
+	// zero for a batch folded from the complete session artifact.
+	ElidedLines int
+	// Source names the stream FoldRun folded the batch from: SourceStdout or
+	// SourceSessionArtifact. It is empty on a bare Parser's batch.
+	Source string
 }
 
 // TestsReport twins reports.TestsReport.
@@ -158,17 +182,64 @@ type Parser struct {
 	buf       bytes.Buffer
 	oversized bool
 	flushed   bool
+	// maxLine is the line cap: MaxLineBytes for stdout, MaxArtifactLineBytes
+	// for a session artifact.
+	maxLine int
 
 	stats    Stats
 	projects map[string]*projectAgg
 	order    []string
 	tasks    []TaskBuild
 	starts   map[string]time.Time
+
+	// projectNames maps a v2 identity's project id to its report name. A batch
+	// result names its members by project id only (batchMemberResult).
+	projectNames map[string]string
+	// pendingMembers holds batch member summaries whose project id no record has
+	// named yet. They fold when a record with that id arrives.
+	pendingMembers map[string][]pendingMember
+	// directTests and directCoverage record each project+task whose own result
+	// event supplied that summary, and directFailing each project+task whose
+	// own diagnostic events supplied failing cases. Batch member data never
+	// overrides them.
+	directTests    map[string]bool
+	directCoverage map[string]bool
+	directFailing  map[string]bool
+
+	// sessionEnds counts the v2 session:end records; lastSessionEnd is the most
+	// recent one. endsOnSessionEnd reports whether the last line seen was that
+	// session:end. FoldRun reads them to find and verify the session artifact.
+	sessionEnds      int
+	lastSessionEnd   sessionEnd
+	endsOnSessionEnd bool
+	// elidedRecords sums the elision every bounded session:end reports.
+	elidedRecords int
 }
 
-// NewParser returns an empty stream parser.
+// sessionEnd is what FoldRun needs from a v2 session:end record: the exact line,
+// which the session artifact must end with, and its bounded machineOutput.
+type sessionEnd struct {
+	line          []byte
+	machineOutput *v2MachineOutput
+}
+
+// NewParser returns an empty stream parser with the stdout line cap,
+// MaxLineBytes.
 func NewParser() *Parser {
-	return &Parser{projects: make(map[string]*projectAgg), starts: make(map[string]time.Time)}
+	return newParser(MaxLineBytes)
+}
+
+func newParser(maxLine int) *Parser {
+	return &Parser{
+		maxLine:        maxLine,
+		projects:       make(map[string]*projectAgg),
+		starts:         make(map[string]time.Time),
+		projectNames:   make(map[string]string),
+		pendingMembers: make(map[string][]pendingMember),
+		directTests:    make(map[string]bool),
+		directCoverage: make(map[string]bool),
+		directFailing:  make(map[string]bool),
+	}
 }
 
 // Write implements io.Writer. It never returns an error: parse trouble is
@@ -202,10 +273,11 @@ func (p *Parser) Batch() *Batch {
 	var covProjects []ProjectCoverage
 	for _, name := range p.order {
 		agg := p.projects[name]
-		if agg.hasTests || len(agg.failing) > 0 {
+		failing := p.failingCases(name, agg)
+		if agg.hasTests || len(failing) > 0 {
 			project := agg.tests
 			project.Project = name
-			project.FailingCases = agg.failing
+			project.FailingCases = failing
 			testProjects = append(testProjects, project)
 		}
 		if agg.hasCoverage {
@@ -230,7 +302,7 @@ func (p *Parser) bufferPartial(b []byte) {
 	if p.oversized {
 		return // discard the rest of the runaway line
 	}
-	if p.buf.Len()+len(b) > MaxLineBytes {
+	if p.buf.Len()+len(b) > p.maxLine {
 		p.oversized = true
 		p.buf.Reset()
 		return
@@ -243,11 +315,13 @@ func (p *Parser) completeLine() {
 		p.oversized = false
 		p.stats.Lines++
 		p.stats.OversizedLines++
+		p.endsOnSessionEnd = false
 		return
 	}
 	line := bytes.TrimSpace(p.buf.Bytes())
 	if len(line) > 0 {
 		p.stats.Lines++
+		p.endsOnSessionEnd = false
 		p.parseLine(line)
 	}
 	p.buf.Reset()
@@ -340,11 +414,37 @@ func (p *Parser) parseLine(raw []byte) {
 // GOWORK=off), and tolerance means every member is optional here even where the
 // contract makes it required.
 type v2Record struct {
-	Record   string          `json:"record"`
-	Identity *v2Identity     `json:"identity"`
-	Event    json.RawMessage `json:"event"`
-	Task     *v2TaskRecord   `json:"task"`
-	Time     time.Time       `json:"time"`
+	Record        string           `json:"record"`
+	Identity      *v2Identity      `json:"identity"`
+	Event         json.RawMessage  `json:"event"`
+	Task          *v2TaskRecord    `json:"task"`
+	Time          time.Time        `json:"time"`
+	MachineOutput *v2MachineOutput `json:"machineOutput"`
+}
+
+// v2MachineOutput twins the members of protocols/cli MachineOutputSummary that
+// FoldRun reads off a bounded session:end: how many records the live copy
+// elided, and the session whose events.jsonl artifact holds them all.
+type v2MachineOutput struct {
+	Elided struct {
+		Ordinary struct {
+			Records int `json:"records"`
+		} `json:"ordinary"`
+		Failure struct {
+			Records int `json:"records"`
+		} `json:"failure"`
+	} `json:"elided"`
+	Artifact struct {
+		SessionID string `json:"sessionId"`
+		Path      string `json:"path"`
+	} `json:"artifact"`
+}
+
+func (m *v2MachineOutput) elidedRecords() int {
+	if m == nil {
+		return 0
+	}
+	return m.Elided.Ordinary.Records + m.Elided.Failure.Records
 }
 
 // v2Identity twins protocols/cli TaskIdentity. Key is deliberately NOT read —
@@ -429,15 +529,28 @@ func (p *Parser) parseV2Record(raw []byte) {
 		p.stats.MalformedLines++
 		return
 	}
+	if rec.Identity.validReportKey() {
+		p.learnProject(rec.Identity.Project.ID, rec.Identity.projectName())
+	}
 	switch rec.Record {
 	case "task:start":
 		if rec.Identity.validReportKey() {
 			p.starts[taskTimingKey(rec.Identity.projectName(), rec.Identity.taskName())] = rec.Time
 		}
 	case "session:end":
-		// Recognized. v2's session:end carries a run summary, but the
-		// batch is per-project/per-task report data and has nowhere to put a run
+		// v2's session:end carries a run summary, but the batch is
+		// per-project/per-task report data and has nowhere to put a run
 		// verdict; the conclusion travels on the run submission instead.
+		// FoldRun reads the record to find the session's complete artifact.
+		p.sessionEnds++
+		p.lastSessionEnd = sessionEnd{line: bytes.Clone(raw), machineOutput: rec.MachineOutput}
+		p.endsOnSessionEnd = true
+		p.elidedRecords += rec.MachineOutput.elidedRecords()
+	case "test:case":
+		// Recognized, intentionally not folded: a case is detail under its
+		// task's result, whose testSummary already counts it. The complete
+		// session artifact always carries these records; normal-mode stdout
+		// elides them.
 	case "task:end":
 		// Identity, its report keys, and task are required by the contract; a
 		// partial record is malformed rather than a task with empty or id-based
@@ -446,10 +559,13 @@ func (p *Parser) parseV2Record(raw []byte) {
 			p.stats.MalformedLines++
 			return
 		}
-		// Diagnostics on the task record are deliberately NOT folded: they are the
-		// same diagnostics the task:event stream already delivered, and folding
-		// both would double every failing case. (A cache hit replays neither —
-		// a known upstream gap in the Putnami CLI.)
+		// Diagnostics on the task record are deliberately NOT folded, and the
+		// record carries no test or coverage summary. A task that ran on its own
+		// delivered the same diagnostics as task:event records, and folding both
+		// would double every failing case. A cache hit replays its stored result
+		// as a task:event, so its summaries fold there. A batch member has no
+		// task:event of its own: its summaries and its error diagnostics fold
+		// from the batch result's batchResults entry (foldResult).
 		key := taskTimingKey(rec.Identity.projectName(), rec.Identity.taskName())
 		started := p.starts[key]
 		delete(p.starts, key)
@@ -494,6 +610,29 @@ func (p *Parser) parseV2Record(raw []byte) {
 }
 
 func taskTimingKey(project, task string) string { return project + "\x00" + task }
+
+// v2BatchTaskSuffix ends the task name of the workspace-scoped identity a v2
+// stream records a shared batch subprocess under (putnami
+// machine.BatchTaskEvent). Every member of one batch shares the task, so the
+// name without the suffix is each member's task name.
+const v2BatchTaskSuffix = "-batch"
+
+// learnProject records the report name of a v2 project id, then folds the batch
+// member summaries that were waiting for it. The first name seen for an id
+// wins.
+func (p *Parser) learnProject(id, name string) {
+	if id == "" {
+		return
+	}
+	if _, known := p.projectNames[id]; known {
+		return
+	}
+	p.projectNames[id] = name
+	for _, member := range p.pendingMembers[id] {
+		p.foldMember(name, member)
+	}
+	delete(p.pendingMembers, id)
+}
 
 func validRunnerFraming(raw []byte, kind string) bool {
 	switch kind {
@@ -627,56 +766,13 @@ func (p *Parser) parseJobEvent(line streamLine) {
 		p.applyMetric(line.Package, metric.Name, metric.Value)
 	case "result":
 		var result struct {
-			Data struct {
-				TestSummary *struct {
-					Passed  int `json:"passed"`
-					Failed  int `json:"failed"`
-					Skipped int `json:"skipped"`
-					Total   int `json:"total"`
-				} `json:"testSummary"`
-				CoverageSummary *struct {
-					CoveredStatements int     `json:"coveredStatements"`
-					TotalStatements   int     `json:"totalStatements"`
-					Percentage        float64 `json:"percentage"`
-					Files             []struct {
-						File              string  `json:"file"`
-						CoveredStatements int     `json:"coveredStatements"`
-						TotalStatements   int     `json:"totalStatements"`
-						Percentage        float64 `json:"percentage"`
-					} `json:"files"`
-				} `json:"coverageSummary"`
-			} `json:"data"`
+			Data resultData `json:"data"`
 		}
 		if json.Unmarshal(line.Data, &result) != nil {
 			p.stats.MalformedLines++
 			return
 		}
-		if result.Data.TestSummary != nil {
-			agg := p.agg(line.Package)
-			agg.hasTests = true
-			agg.testsFromResult = true
-			agg.tests.Passed = result.Data.TestSummary.Passed
-			agg.tests.Failed = result.Data.TestSummary.Failed
-			agg.tests.Skipped = result.Data.TestSummary.Skipped
-			agg.tests.Total = result.Data.TestSummary.Total
-		}
-		if cov := result.Data.CoverageSummary; cov != nil {
-			agg := p.agg(line.Package)
-			agg.hasCoverage = true
-			agg.coverageFromResult = true
-			agg.coverage.CoveredStatements = cov.CoveredStatements
-			agg.coverage.TotalStatements = cov.TotalStatements
-			agg.coverage.Percentage = cov.Percentage
-			agg.coverage.Files = nil
-			for _, f := range cov.Files {
-				agg.coverage.Files = append(agg.coverage.Files, FileCoverage{
-					File:              f.File,
-					CoveredStatements: f.CoveredStatements,
-					TotalStatements:   f.TotalStatements,
-					Percentage:        f.Percentage,
-				})
-			}
-		}
+		p.foldResult(line.Package, line.Job, result.Data)
 	case "diagnostic":
 		var diag struct {
 			Code     string `json:"code"`
@@ -694,16 +790,197 @@ func (p *Parser) parseJobEvent(line streamLine) {
 		// Error-severity diagnostics are the failing-case references; warnings
 		// (e.g. UNCOVERED_FILE) are already represented in the coverage data.
 		if diag.Severity == "error" {
+			p.directFailing[taskTimingKey(line.Package, line.Job)] = true
 			agg := p.agg(line.Package)
-			agg.failing = append(agg.failing, FailingCase{
+			agg.failing = append(agg.failing, failingCase{task: line.Job, FailingCase: FailingCase{
 				Name:    diag.Code,
 				Message: diag.Message,
 				File:    diag.Location.File,
 				Line:    diag.Location.Line,
-			})
+			}})
 		}
 	default:
 		p.stats.UnknownEvents++
+	}
+}
+
+// resultSummaries is the report input of one result: a task's own result data,
+// or one batch member's data.
+type resultSummaries struct {
+	TestSummary *struct {
+		Passed  int `json:"passed"`
+		Failed  int `json:"failed"`
+		Skipped int `json:"skipped"`
+		Total   int `json:"total"`
+	} `json:"testSummary"`
+	CoverageSummary *struct {
+		CoveredStatements int     `json:"coveredStatements"`
+		TotalStatements   int     `json:"totalStatements"`
+		Percentage        float64 `json:"percentage"`
+		Files             []struct {
+			File              string  `json:"file"`
+			CoveredStatements int     `json:"coveredStatements"`
+			TotalStatements   int     `json:"totalStatements"`
+			Percentage        float64 `json:"percentage"`
+		} `json:"files"`
+	} `json:"coverageSummary"`
+}
+
+func (s resultSummaries) empty() bool {
+	return s.TestSummary == nil && s.CoverageSummary == nil
+}
+
+// resultData is the data of a result event. BatchResults is set only on the
+// result of a shared batch subprocess (protocols/extension, batched
+// execution): one entry per member, each with that member's own data.
+type resultData struct {
+	resultSummaries
+	BatchResults []batchMemberResult `json:"batchResults"`
+}
+
+// batchMemberResult is one batchResults entry. It names its member by project
+// id, which learnProject resolves to the report name.
+type batchMemberResult struct {
+	ProjectID   string            `json:"projectId"`
+	Data        resultSummaries   `json:"data"`
+	Diagnostics []batchDiagnostic `json:"diagnostics"`
+}
+
+// batchDiagnostic is one batchResults[i].diagnostics entry, in the shape every
+// batch producer writes (protocols/extension, batched execution).
+type batchDiagnostic struct {
+	Category    string `json:"category"`
+	Severity    string `json:"severity"`
+	Description string `json:"description"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+}
+
+// memberFailingCases maps a member's error diagnostics to failing cases the way
+// a task that runs on its own reaches them. That task's extension emits each
+// diagnostic as a runtime diagnostic event: the category as its code, the
+// description as its message, and a location only when there is a file, so a
+// line without a file is dropped (extension-sdk jsonl, DiagnosticWithCode).
+// parseJobEvent then maps that event to a FailingCase.
+func (m batchMemberResult) memberFailingCases() []FailingCase {
+	var cases []FailingCase
+	for _, d := range m.Diagnostics {
+		if d.Severity != "error" {
+			continue
+		}
+		c := FailingCase{Name: d.Category, Message: d.Description}
+		if d.File != "" {
+			c.File = d.File
+			c.Line = d.Line
+		}
+		cases = append(cases, c)
+	}
+	return cases
+}
+
+// pendingMember is a batch member's report input waiting for its project name.
+type pendingMember struct {
+	task      string
+	summaries resultSummaries
+	failing   []FailingCase
+}
+
+// foldResult folds one result event. Its own summaries belong to the event's
+// project and task. A batch result's entries belong to each member, under the
+// batch task name without v2BatchTaskSuffix.
+//
+// A v2 stream records no task:event for a batch member: the member's attributed
+// result and its diagnostics travel only in this entry, and its task:end
+// carries no summary. A member whose project id no record has named yet waits
+// in pendingMembers. When no record ever names it, it folds nowhere: keying a
+// report by project id would fragment the report history (validReportKey).
+func (p *Parser) foldResult(project, task string, data resultData) {
+	p.foldSummaries(project, task, data.resultSummaries, false)
+	memberTask := strings.TrimSuffix(task, v2BatchTaskSuffix)
+	for _, member := range data.BatchResults {
+		failing := member.memberFailingCases()
+		if member.ProjectID == "" || (member.Data.empty() && len(failing) == 0) {
+			continue
+		}
+		if name, known := p.projectNames[member.ProjectID]; known {
+			p.foldMember(name, pendingMember{task: memberTask, summaries: member.Data, failing: failing})
+			continue
+		}
+		p.pendingMembers[member.ProjectID] = append(p.pendingMembers[member.ProjectID],
+			pendingMember{task: memberTask, summaries: member.Data, failing: failing})
+	}
+}
+
+// foldMember folds one batch member's summaries and failing cases into its
+// project's aggregate.
+func (p *Parser) foldMember(project string, member pendingMember) {
+	p.foldSummaries(project, member.task, member.summaries, true)
+	if len(member.failing) == 0 {
+		return
+	}
+	agg := p.agg(project)
+	for _, c := range member.failing {
+		agg.failing = append(agg.failing, failingCase{task: member.task, fromBatch: true, FailingCase: c})
+	}
+}
+
+// failingCases returns a project's failing cases in stream order. A task's own
+// error diagnostics win over batch member diagnostics for the same project and
+// task, in either stream order, so a member that also ran on its own does not
+// list its failures twice.
+func (p *Parser) failingCases(project string, agg *projectAgg) []FailingCase {
+	var cases []FailingCase
+	for _, c := range agg.failing {
+		if c.fromBatch && p.directFailing[taskTimingKey(project, c.task)] {
+			continue
+		}
+		cases = append(cases, c.FailingCase)
+	}
+	return cases
+}
+
+// foldSummaries folds one result's test and coverage summaries into the
+// project's aggregate. A summary sets testsFromResult or coverageFromResult,
+// so it wins over flat metrics either way.
+//
+// The rows are per project, not per task: each summary replaces the project's
+// previous one, so when one project runs two test tasks, the last summary in
+// the stream sets its row. The one exception is batch member data: it never
+// replaces a summary that the same project and task's own result event
+// supplied, and a later own result replaces it, in either stream order.
+func (p *Parser) foldSummaries(project, task string, s resultSummaries, fromBatch bool) {
+	key := taskTimingKey(project, task)
+	if s.TestSummary != nil && !(fromBatch && p.directTests[key]) {
+		agg := p.agg(project)
+		agg.hasTests = true
+		agg.testsFromResult = true
+		agg.tests.Passed = s.TestSummary.Passed
+		agg.tests.Failed = s.TestSummary.Failed
+		agg.tests.Skipped = s.TestSummary.Skipped
+		agg.tests.Total = s.TestSummary.Total
+		if !fromBatch {
+			p.directTests[key] = true
+		}
+	}
+	if cov := s.CoverageSummary; cov != nil && !(fromBatch && p.directCoverage[key]) {
+		agg := p.agg(project)
+		agg.hasCoverage = true
+		agg.coverageFromResult = true
+		agg.coverage.CoveredStatements = cov.CoveredStatements
+		agg.coverage.TotalStatements = cov.TotalStatements
+		agg.coverage.Percentage = cov.Percentage
+		agg.coverage.Files = nil
+		for _, f := range cov.Files {
+			agg.coverage.Files = append(agg.coverage.Files, FileCoverage{
+				File:              f.File,
+				CoveredStatements: f.CoveredStatements,
+				TotalStatements:   f.TotalStatements,
+				Percentage:        f.Percentage,
+			})
+		}
+		if !fromBatch {
+			p.directCoverage[key] = true
+		}
 	}
 }
 
@@ -755,7 +1032,16 @@ type projectAgg struct {
 	coverageFromResult bool
 	coverage           ProjectCoverage
 
-	failing []FailingCase
+	failing []failingCase
+}
+
+// failingCase is one failing case with the task it came from, and whether it
+// came from batch member data, so failingCases can let a task's own
+// diagnostics win.
+type failingCase struct {
+	task      string
+	fromBatch bool
+	FailingCase
 }
 
 func (p *Parser) agg(pkg string) *projectAgg {
