@@ -3,7 +3,6 @@
 - **Status**: accepted
 - **Scope**: `@putnami/contributor` skills and agents, the `missions`
   contract, and this repository's issue labels
-- **Plan**: [#662](https://github.com/Putnami/putnami/issues/662)
 
 ## Context
 
