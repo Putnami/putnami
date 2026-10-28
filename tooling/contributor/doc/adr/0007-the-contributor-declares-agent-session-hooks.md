@@ -35,7 +35,8 @@ event:
 
 - Claude Code: `SessionStart`, `PostToolUse` after `TodoWrite`, `TaskCreate`,
   `TaskUpdate`, `missions.ask` and `missions.reply`, `Stop`, a second `Stop`
-  with `--idle-wake` that may wake the session, and `StopFailure`.
+  with `--idle-wake` that may wake the session, `StopFailure` and
+  `SessionEnd`.
 - Codex: `SessionStart`, `PostToolUse` after `update_plan`, `missions.ask`
   and `missions.reply`, and `Stop`.
 
@@ -43,11 +44,12 @@ The extension never edits a host file. The core writes the entries when the
 workspace opts into this extension's content and binds `missions`, and removes
 them when either goes away. The manifest's `cliContract` is 17.
 
-### 2. Two commands in the `agent` group
+### 2. Three commands in the `agent` group
 
 `agent hook --engine <claude-code|codex> [--idle-wake]` handles one event read
 on stdin. `agent attach --issue <n>` makes `issue-<n>` the mission of the
-checkout's current branch. Both are interactive subcommands that the
+checkout's current branch. `agent stage <name>` records the loop stage of the
+current session. All three are interactive subcommands that the
 executable serves, in `internal/agentsession`. Without an attached issue, a
 session reports to `branch:<branch>`. The repository is the lowercase
 `owner/name` of the `origin` remote; the hook keeps no host and no credential.
@@ -70,6 +72,9 @@ session reports to `branch:<branch>`. The repository is the lowercase
   decision that this session asked. A decision another session asked never
   holds it.
 - `StopFailure` publishes the error.
+- `SessionEnd` publishes the `ended` state.
+- Every sync carries the session's token usage, read from the host's
+  transcript, and the loop stage `agent stage <name>` recorded.
 - The idle wake waits up to 10 minutes after a turn whose `Stop` did not
   continue it. It exits 75 with the message on stderr when one arrives, and
   the core turns that code into the host's wake.

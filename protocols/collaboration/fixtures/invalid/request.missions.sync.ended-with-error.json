@@ -1,0 +1,8 @@
+{
+  "session": { "engine": "host-a", "id": "s-1" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-662" },
+  "event": "session_end",
+  "state": "ended",
+  "observedAt": "2026-10-28T18:00:00Z",
+  "error": "the session failed"
+}

@@ -779,10 +779,53 @@ const (
 	SessionStateWaiting SessionState = "waiting"
 	// SessionStateFailed: the session stopped on an error.
 	SessionStateFailed SessionState = "failed"
+	// SessionStateEnded: the session ended: its host closed it or the user
+	// quit. It carries no error and no WaitUntil.
+	SessionStateEnded SessionState = "ended"
 )
 
 // ValidSessionStates is the closed session-state vocabulary in canonical order.
-var ValidSessionStates = []SessionState{SessionStateFailed, SessionStateHandedBack, SessionStateWaiting, SessionStateWorking}
+var ValidSessionStates = []SessionState{SessionStateEnded, SessionStateFailed, SessionStateHandedBack, SessionStateWaiting, SessionStateWorking}
+
+// LoopStage is the stage of the contribution loop a session's change is at.
+// The loop runs talk, declare, show, code, check, prove, validate, merge.
+type LoopStage string
+
+// Loop stages, in the loop's order.
+const (
+	// LoopStageTalk: the owner and the agent agree on the outcome.
+	LoopStageTalk LoopStage = "talk"
+	// LoopStageDeclare: the change declares its intent: specs and decisions.
+	LoopStageDeclare LoopStage = "declare"
+	// LoopStageShow: the change shows what it will look like before code.
+	LoopStageShow LoopStage = "show"
+	// LoopStageCode: the change is written.
+	LoopStageCode LoopStage = "code"
+	// LoopStageCheck: the change runs its gate.
+	LoopStageCheck LoopStage = "check"
+	// LoopStageProve: the change proves its outcome where it runs.
+	LoopStageProve LoopStage = "prove"
+	// LoopStageValidate: the owner validates the change.
+	LoopStageValidate LoopStage = "validate"
+	// LoopStageMerge: the change merges.
+	LoopStageMerge LoopStage = "merge"
+)
+
+// ValidLoopStages is the closed loop-stage vocabulary in canonical order.
+var ValidLoopStages = []LoopStage{LoopStageCheck, LoopStageCode, LoopStageDeclare, LoopStageMerge, LoopStageProve, LoopStageShow, LoopStageTalk, LoopStageValidate}
+
+// SessionUsage is the tokens a session used, cumulative for the whole
+// session, its subagents included. Each count is 0 to MaxUsageTokens.
+type SessionUsage struct {
+	// InputTokens are the input tokens read neither from nor into the cache.
+	InputTokens int64 `json:"inputTokens"`
+	// OutputTokens are the output tokens.
+	OutputTokens int64 `json:"outputTokens"`
+	// CacheWriteTokens are the input tokens written to the prompt cache.
+	CacheWriteTokens int64 `json:"cacheWriteTokens"`
+	// CacheReadTokens are the input tokens read from the prompt cache.
+	CacheReadTokens int64 `json:"cacheReadTokens"`
+}
 
 // PlanStepStatus is the status of one plan step.
 type PlanStepStatus string
@@ -822,9 +865,9 @@ type MessageReply struct {
 }
 
 // MissionsSyncInput is the missions.sync request. Its natural key is the
-// session and ObservedAt: a provider applies State and Plan only from a sync
-// observed later than the last one it applied for the session, so a repeat
-// changes nothing.
+// session and ObservedAt: a provider applies State, Stage, Usage and Plan only
+// from a sync observed later than the last one it applied for the session, so
+// a repeat changes nothing.
 type MissionsSyncInput struct {
 	// Session is the session that publishes.
 	Session SessionRef `json:"session"`
@@ -861,6 +904,14 @@ type MissionsSyncInput struct {
 	Decisions []string `json:"decisions,omitempty"`
 	// Replies are the agent's replies to inbox messages, one per message.
 	Replies []MessageReply `json:"replies,omitempty"`
+	// Stage is the loop stage the session's change is at; see the
+	// LoopStage* constants. A provider keeps the stage of the last sync it
+	// applied that carried one: absent keeps it.
+	Stage LoopStage `json:"stage,omitempty"`
+	// Usage is the tokens the session used so far. A provider replaces the
+	// usage it holds with the one of the last sync it applied that carried
+	// one: absent keeps it.
+	Usage *SessionUsage `json:"usage,omitempty"`
 }
 
 // SessionStatus is the session as the provider holds it.

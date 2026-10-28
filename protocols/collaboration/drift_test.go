@@ -156,6 +156,7 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 		{"PlanStep", missions.Defs["planStep"], PlanStep{}},
 		{"MissionPlan", missions.Defs["plan"], MissionPlan{}},
 		{"MessageReply", missions.Defs["messageReply"], MessageReply{}},
+		{"SessionUsage", missions.Defs["sessionUsage"], SessionUsage{}},
 		{"SessionStatus", missions.Defs["syncResult"].Properties["session"], SessionStatus{}},
 		{"OpenDecision", missions.Defs["openDecision"], OpenDecision{}},
 		{"MissionView", missions.Defs["missionView"], MissionView{}},
@@ -210,6 +211,7 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 		{"memory kind", memory.Defs["kind"].Enum, stringsOf(ValidMemoryKinds)},
 		{"evidence kind", memory.Defs["evidence"].Properties["kind"].Enum, stringsOf(ValidEvidenceKinds)},
 		{"sessionState", missions.Defs["sessionState"].Enum, stringsOf(ValidSessionStates)},
+		{"loopStage", missions.Defs["loopStage"].Enum, stringsOf(ValidLoopStages)},
 		{"planStep status", missions.Defs["planStep"].Properties["status"].Enum, stringsOf(ValidPlanStepStatuses)},
 		{"inbox kind", missions.Defs["inboxMessage"].Properties["kind"].Enum, stringsOf(ValidInboxKinds)},
 		{"decisionState", missions.Defs["decisionState"].Enum, stringsOf(ValidDecisionStates)},
@@ -303,6 +305,31 @@ func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
 	} {
 		if tc.got == nil || *tc.got != tc.want {
 			t.Errorf("%s is %v in the schema, %d in Go", tc.name, tc.got, tc.want)
+		}
+	}
+	if ref := input["usage"]; ref == nil || ref.Ref != "#/$defs/sessionUsage" {
+		t.Errorf("syncInput.usage does not reference #/$defs/sessionUsage")
+	}
+	if ref := input["stage"]; ref == nil || ref.Ref != "#/$defs/loopStage" {
+		t.Errorf("syncInput.stage does not reference #/$defs/loopStage")
+	}
+	usage := defs["sessionUsage"].Properties
+	for _, field := range []string{"inputTokens", "outputTokens", "cacheWriteTokens", "cacheReadTokens"} {
+		if node := usage[field]; node == nil || node.Minimum == nil || *node.Minimum != 0 || node.Maximum == nil || *node.Maximum != MaxUsageTokens {
+			t.Errorf("sessionUsage.%s is not bounded 0 to %d in the schema", field, int64(MaxUsageTokens))
+		}
+	}
+	for _, tc := range []struct {
+		count int64
+		valid bool
+	}{{-1, false}, {0, true}, {MaxUsageTokens, true}, {MaxUsageTokens + 1, false}} {
+		in := &MissionsSyncInput{
+			Session: SessionRef{Engine: "host-a", ID: "s-1"}, Mission: MissionName{Repository: "putnami/putnami", Key: "k"},
+			Event: "stop", State: SessionStateWorking, ObservedAt: "2026-10-26T09:00:00Z",
+			Usage: &SessionUsage{InputTokens: tc.count, OutputTokens: tc.count, CacheWriteTokens: tc.count, CacheReadTokens: tc.count},
+		}
+		if diags := ValidateInput(in); (diags == nil) != tc.valid {
+			t.Errorf("usage of %d tokens: valid %v, want %v (%v)", tc.count, diags == nil, tc.valid, diags)
 		}
 	}
 

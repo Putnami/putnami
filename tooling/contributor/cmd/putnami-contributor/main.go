@@ -10,6 +10,7 @@
 //	putnami-contributor estimate [flags]          (putnami change estimate)
 //	putnami-contributor agent-hook [flags]        (putnami agent hook)
 //	putnami-contributor agent-attach [flags]      (putnami agent attach)
+//	putnami-contributor agent-stage <name>        (putnami agent stage)
 //
 // It answers the runtime handshake, serves the change and agent commands, and
 // refuses every other invocation. putnami launches each command as an
@@ -50,12 +51,14 @@ var runtimeVersion string
 // path of the job context file.
 const contextFlag = "--putnamiContext"
 
-// agentHookRemedy, languageRemedy and finalizeRemedy name the launch that
-// opens the host channel, for a run that needs the channel and has none.
+// agentHookRemedy, agentStageRemedy, languageRemedy and finalizeRemedy name
+// the launch that opens the host channel, for a run that needs the channel
+// and has none.
 const (
-	agentHookRemedy = "the hook reaches the missions provider only when putnami launches it as `putnami agent hook`"
-	languageRemedy  = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
-	finalizeRemedy  = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
+	agentHookRemedy  = "the hook reaches the missions provider only when putnami launches it as `putnami agent hook`"
+	agentStageRemedy = "the stage reaches the missions provider only when putnami launches it as `putnami agent stage`"
+	languageRemedy   = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
+	finalizeRemedy   = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
 )
 
 // run is main with its process dependencies passed in. It returns the exit
@@ -94,7 +97,10 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "agent-attach" {
 		return runAgentAttach(args[1:], stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, estimate, agent-hook and agent-attach commands")
+	if len(args) > 0 && args[0] == "agent-stage" {
+		return runAgentStage(args[1:], stdout, stderr)
+	}
+	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, estimate, agent-hook, agent-attach and agent-stage commands")
 	return 2
 }
 
@@ -245,6 +251,20 @@ func runAgentAttach(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return agentsession.Attach(context.Background(), agentsession.NewEnv(root, channel), args, stdout, stderr)
+}
+
+// runAgentStage runs putnami agent stage in the workspace root. It records
+// the stage in the session cache and syncs through the host channel when the
+// session reports to a mission.
+func runAgentStage(args []string, stdout, stderr io.Writer) int {
+	channel := host.Take(agentStageRemedy)
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "agent stage: %v\n", err)
+		return 1
+	}
+	return agentsession.Stage(context.Background(), agentsession.NewEnv(root, channel), args, stdout, stderr)
 }
 
 func main() {

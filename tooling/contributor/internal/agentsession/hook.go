@@ -29,12 +29,16 @@ const (
 	sessionEventStop        = "stop"
 	sessionEventWait        = "wait"
 	sessionEventStopFailure = "stop_failure"
+	sessionEventEnd         = "session_end"
+	sessionEventStage       = "stage"
 
-	// The hook events of both engines; StopFailure is Claude Code's only.
+	// The hook events of both engines; StopFailure and SessionEnd are Claude
+	// Code's only.
 	hookEventSessionStart = "SessionStart"
 	hookEventPostToolUse  = "PostToolUse"
 	hookEventStop         = "Stop"
 	hookEventStopFailure  = "StopFailure"
+	hookEventSessionEnd   = "SessionEnd"
 
 	// ExitWake is the exit code of an idle wake that brings a message. The
 	// hook entry the CLI writes turns it into the host's own wake code.
@@ -57,7 +61,8 @@ const (
 	sessionPromptsMax = 20
 	// sessionInboxMax bounds the fetched messages that wait for delivery.
 	sessionInboxMax = collab.MaxInboxMessages
-	// transcriptTailMax bounds the transcript bytes read for the model name.
+	// transcriptTailMax bounds the transcript bytes read for the model name
+	// and for the usage of a Codex session.
 	transcriptTailMax = 256 << 10
 	// promptReminderMax bounds the text of a prompt a reminder repeats.
 	promptReminderMax = 200
@@ -316,6 +321,8 @@ func (e *Env) handleHookEvent(ctx context.Context, engine string, input hookInpu
 		return e.hookStop(ctx, engine, input)
 	case hookEventStopFailure:
 		return nil, pendingDelivery{}, e.hookStopFailure(ctx, engine, input)
+	case hookEventSessionEnd:
+		return nil, pendingDelivery{}, e.hookSessionEnd(ctx, engine, input)
 	}
 	return nil, pendingDelivery{}, nil
 }
@@ -665,6 +672,26 @@ func (e *Env) hookStopFailure(ctx context.Context, engine string, input hookInpu
 		cache = e.openSession(cache, engine, input, identity)
 		setSessionState(cache, collab.SessionStateFailed, sessionEventStopFailure)
 		cache.Error = stopFailureError(input)
+		cache.ActiveAt = now
+		return cache, nil
+	}); err != nil {
+		return err
+	}
+	return e.syncSession(ctx, files)
+}
+
+// hookSessionEnd publishes that the session ended, with its usage. It ends
+// the wait of an idle wake that runs beside it: that wait finds another
+// waiter name and stops without a write. Claude Code ignores its output and
+// exit code.
+func (e *Env) hookSessionEnd(ctx context.Context, engine string, input hookInput) error {
+	files := e.files(engine, input.SessionID)
+	identity := e.peekIdentity(ctx, files, input)
+	now := e.Now()
+	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
+		cache = e.openSession(cache, engine, input, identity)
+		setSessionState(cache, collab.SessionStateEnded, sessionEventEnd)
+		cache.Waiter = ""
 		cache.ActiveAt = now
 		return cache, nil
 	}); err != nil {
@@ -1076,24 +1103,7 @@ func boundedBytes(value string, limit int) string {
 // transcriptModel reads the model of the last assistant turn from the tail
 // of a Claude Code transcript, which its hook payloads do not carry.
 func transcriptModel(path string) string {
-	if path == "" || !filepath.IsAbs(path) {
-		return ""
-	}
-	file, err := os.Open(path) // #nosec G304 -- the engine names its own transcript.
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = file.Close() }()
-	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		return ""
-	}
-	offset := max(info.Size()-transcriptTailMax, 0)
-	tail := make([]byte, info.Size()-offset)
-	if _, err := file.ReadAt(tail, offset); err != nil && !errors.Is(err, io.EOF) {
-		return ""
-	}
-	lines := bytes.Split(tail, []byte("\n"))
+	lines := bytes.Split(transcriptTail(path), []byte("\n"))
 	for i := len(lines) - 1; i >= 0; i-- {
 		if !bytes.Contains(lines[i], []byte(`"assistant"`)) {
 			continue

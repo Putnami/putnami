@@ -37,6 +37,7 @@ func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"an older sync never overwrites a newer one", missionsOlderSync},
 		{"an older sync describes the mission it names", missionsOlderSyncNamesItsMission},
 		{"a sync without a plan keeps it and an empty plan clears it", missionsPlan},
+		{"a session reports its stage, its usage and its end", missionsEnded},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -425,6 +426,30 @@ func missionsOlderSync(t *testing.T, m *missionRun) {
 	}
 	if repeat := m.sync(time.Minute, handBack); repeat.Session.State != collab.SessionStateHandedBack || !slices.Equal(repeat.Mission.Plan.Steps, newer.Steps) {
 		t.Fatalf("a repeated sync answered state %s and plan %+v", repeat.Session.State, repeat.Mission.Plan.Steps)
+	}
+}
+
+// missionsEnded sends a stage and a usage on a working sync, then ends the
+// session: the provider holds the ended state, and an older working sync
+// leaves it ended. The result carries neither stage nor usage, so a provider
+// tests what it stores itself.
+func missionsEnded(t *testing.T, m *missionRun) {
+	working := m.sync(time.Minute, func(in *collab.MissionsSyncInput) {
+		in.Stage = collab.LoopStageCode
+		in.Usage = &collab.SessionUsage{InputTokens: 10, OutputTokens: 20, CacheWriteTokens: 30, CacheReadTokens: 40}
+	})
+	if working.Session.State != collab.SessionStateWorking {
+		t.Fatalf("a working sync with a stage and a usage answered state %s", working.Session.State)
+	}
+	ended := m.sync(2*time.Minute, func(in *collab.MissionsSyncInput) {
+		in.Event, in.State = "session_end", collab.SessionStateEnded
+		in.Usage = &collab.SessionUsage{InputTokens: 11, OutputTokens: 21, CacheWriteTokens: 31, CacheReadTokens: 41}
+	})
+	if ended.Session.State != collab.SessionStateEnded {
+		t.Fatalf("an ended sync answered state %s", ended.Session.State)
+	}
+	if older := m.sync(time.Minute, nil); older.Session.State != collab.SessionStateEnded {
+		t.Fatalf("an older working sync changed an ended session to %s", older.Session.State)
 	}
 }
 

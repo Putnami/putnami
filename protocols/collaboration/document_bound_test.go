@@ -162,7 +162,8 @@ func maximalSyncInput() *MissionsSyncInput {
 	input := &MissionsSyncInput{
 		Session: maximalSession(), Mission: maximalMissionName(), Event: strings.Repeat("e", 32),
 		State: SessionStateFailed, ObservedAt: maximalUTC, Model: fill(MaxModelLength), Branch: fill(MaxBranchLength),
-		LastMessage: fill(MaxLastMessageLength), Error: fill(MaxErrorLength), Plan: &plan,
+		LastMessage: fill(MaxLastMessageLength), Error: fill(MaxErrorLength), Plan: &plan, Stage: LoopStageValidate,
+		Usage: &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
 	}
 	for i := range MaxListMembers {
 		input.Delivered = append(input.Delivered, maximalID(i))

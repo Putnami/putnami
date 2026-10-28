@@ -93,6 +93,34 @@ func TestEverySyncRequestHoldsTheContractRules(t *testing.T) {
 				t.Errorf("%d delivered, %d replies, %d decisions", len(r.Delivered), len(r.Replies), len(r.Decisions))
 			}
 		}},
+		{"ended", func(c *sessionCache) {
+			c.State, c.LastEvent, c.Error, c.WaitUntil = collab.SessionStateEnded, sessionEventEnd, "stale", sessionEpoch.Add(time.Minute)
+		}, func(t *testing.T, r collab.MissionsSyncInput) {
+			if r.State != collab.SessionStateEnded || r.Error != "" || r.WaitUntil != "" {
+				t.Errorf("state %s, error %q, until %q", r.State, r.Error, r.WaitUntil)
+			}
+		}},
+		{"no stage and no usage", nil, func(t *testing.T, r collab.MissionsSyncInput) {
+			if r.Stage != "" || r.Usage != nil {
+				t.Errorf("stage %q, usage %+v", r.Stage, r.Usage)
+			}
+		}},
+		{"stage and usage", func(c *sessionCache) {
+			c.Stage = collab.LoopStageCheck
+			c.Usage = &usageState{Totals: collab.SessionUsage{InputTokens: 1, OutputTokens: 2, CacheWriteTokens: 3, CacheReadTokens: collab.MaxUsageTokens}}
+		}, func(t *testing.T, r collab.MissionsSyncInput) {
+			if r.Stage != collab.LoopStageCheck || r.Usage == nil || *r.Usage != (collab.SessionUsage{InputTokens: 1, OutputTokens: 2, CacheWriteTokens: 3, CacheReadTokens: collab.MaxUsageTokens}) {
+				t.Errorf("stage %q, usage %+v", r.Stage, r.Usage)
+			}
+		}},
+		{"unknown stage and usage out of bounds", func(c *sessionCache) {
+			c.Stage = "release"
+			c.Usage = &usageState{Totals: collab.SessionUsage{InputTokens: -1, OutputTokens: collab.MaxUsageTokens + 1}}
+		}, func(t *testing.T, r collab.MissionsSyncInput) {
+			if r.Stage != "" || r.Usage == nil || *r.Usage != (collab.SessionUsage{OutputTokens: collab.MaxUsageTokens}) {
+				t.Errorf("stage %q, usage %+v", r.Stage, r.Usage)
+			}
+		}},
 		{"cleared plan", func(c *sessionCache) { c.PlanDigest = planDigest(nil) }, func(t *testing.T, r collab.MissionsSyncInput) {
 			if r.Plan == nil || r.Plan.Steps == nil || len(r.Plan.Steps) != 0 {
 				t.Errorf("plan %+v", r.Plan)

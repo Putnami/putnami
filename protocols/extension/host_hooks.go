@@ -43,7 +43,7 @@ const HostHookEventPostToolUse = "PostToolUse"
 // hostHookEvents is the closed list of events each host runs a hook at, in the
 // order the CLI writes new event keys.
 var hostHookEvents = map[string][]string{
-	HostClaudeCode: {"SessionStart", HostHookEventPostToolUse, "Stop", "StopFailure"},
+	HostClaudeCode: {"SessionStart", HostHookEventPostToolUse, "Stop", "StopFailure", "SessionEnd"},
 	HostCodex:      {"SessionStart", HostHookEventPostToolUse, "Stop"},
 }
 

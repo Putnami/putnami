@@ -48,6 +48,34 @@ func TestMissions_InputRules(t *testing.T) {
 		}, nil},
 		{"waiting without waitUntil", func() any { in := syncInput(); in.State = SessionStateWaiting; return in }, []string{ErrorCodeRequired}},
 		{"error outside failed", func() any { in := syncInput(); in.Error = "boom"; return in }, []string{ErrorCodeInvalidValue}},
+		{"an ended session", func() any { in := syncInput(); in.State = SessionStateEnded; return in }, nil},
+		{"an ended session with an error", func() any {
+			in := syncInput()
+			in.State, in.Error = SessionStateEnded, "boom"
+			return in
+		}, []string{ErrorCodeInvalidValue}},
+		{"an ended session with waitUntil", func() any {
+			in := syncInput()
+			in.State, in.WaitUntil = SessionStateEnded, "2026-10-26T10:00:00Z"
+			return in
+		}, []string{ErrorCodeInvalidValue}},
+		{"every loop stage", func() any {
+			in := syncInput()
+			for _, stage := range ValidLoopStages {
+				in.Stage = stage
+				if diags := ValidateInput(in); diags != nil {
+					return &MissionsSyncInput{}
+				}
+			}
+			return in
+		}, nil},
+		{"an unknown loop stage", func() any { in := syncInput(); in.Stage = "release"; return in }, []string{ErrorCodeInvalidValue}},
+		{"a usage", func() any {
+			in := syncInput()
+			in.Usage = &SessionUsage{InputTokens: 1200, OutputTokens: 340, CacheWriteTokens: 5600, CacheReadTokens: 78000}
+			return in
+		}, nil},
+		{"a negative usage", func() any { in := syncInput(); in.Usage = &SessionUsage{OutputTokens: -1}; return in }, []string{ErrorCodeInvalidValue}},
 		{"an empty plan clears it", func() any { in := syncInput(); in.Plan = &MissionPlan{Steps: []PlanStep{}}; return in }, nil},
 		{"a plan without steps", func() any { in := syncInput(); in.Plan = &MissionPlan{}; return in }, []string{ErrorCodeRequired}},
 		{"a repeated step key", func() any {

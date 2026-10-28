@@ -147,7 +147,7 @@
       "id": "tooling/agent-session-hooks",
       "type": "feature",
       "name": "Agent session hooks",
-      "outcome": "A Claude Code or Codex session publishes its state, plan, delivered messages, decisions and replies to its mission through the hooks @putnami/contributor declares, and receives the owner's messages and answers",
+      "outcome": "A Claude Code or Codex session publishes its state, loop stage, token usage, end, plan, delivered messages, decisions and replies to its mission through the hooks @putnami/contributor declares, and receives the owner's messages and answers",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -271,12 +271,57 @@
               "the-hook-reaches-the-provider-through-the-host-channel"
             ]
           }
+        },
+        {
+          "id": "session-end",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "session-end-publishes-the-ended-state-with-the-usage"
+            ]
+          }
+        },
+        {
+          "id": "usage-report",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-usage-sums-each-message-of-the-session-and-its-subagents-once",
+              "each-hook-reads-a-bounded-part-of-the-transcripts",
+              "codex-reports-the-usage-of-its-rollout"
+            ]
+          }
+        },
+        {
+          "id": "agent-stage",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-stage-syncs-the-stage-of-the-current-session",
+              "agent-stage-falls-back-to-the-session-of-the-checkout",
+              "agent-stage-records-the-stage-for-the-first-sync",
+              "agent-stage-refuses-an-unknown-stage-and-a-missing-session"
+            ]
+          }
         }
       ],
       "surface": {
         "commands": [
           "agent attach",
-          "agent hook"
+          "agent hook",
+          "agent stage"
         ]
       }
     },

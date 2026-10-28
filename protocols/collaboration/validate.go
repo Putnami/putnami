@@ -54,6 +54,8 @@ const (
 	MaxInboxTextLength    = 8192
 	MinSyncIntervalMs     = 5000
 	MaxSyncIntervalMs     = 600000
+	// MaxUsageTokens bounds each token count of a session's usage.
+	MaxUsageTokens = 1_000_000_000_000
 )
 
 var (
@@ -1069,6 +1071,24 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 	}
 	if in.Plan != nil {
 		c.plan("plan", *in.Plan)
+	}
+	if in.Stage != "" && !slices.Contains(ValidLoopStages, in.Stage) {
+		c.errorf(ErrorCodeInvalidValue, "stage", "unknown loop stage %q", in.Stage)
+	}
+	if usage := in.Usage; usage != nil {
+		for _, count := range []struct {
+			field string
+			value int64
+		}{
+			{"usage.inputTokens", usage.InputTokens},
+			{"usage.outputTokens", usage.OutputTokens},
+			{"usage.cacheWriteTokens", usage.CacheWriteTokens},
+			{"usage.cacheReadTokens", usage.CacheReadTokens},
+		} {
+			if count.value < 0 || count.value > MaxUsageTokens {
+				c.errorf(ErrorCodeInvalidValue, count.field, "%s must be between 0 and %d", count.field, int64(MaxUsageTokens))
+			}
+		}
 	}
 	c.missionIDs("delivered", in.Delivered, MaxListMembers)
 	c.missionIDs("decisions", in.Decisions, MaxSyncDecisions)

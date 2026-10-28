@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -67,6 +68,16 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 	}
 	if request.State == "" {
 		request.State = collab.SessionStateWorking
+	}
+	if slices.Contains(collab.ValidLoopStages, cache.Stage) {
+		request.Stage = cache.Stage
+	}
+	if cache.Usage != nil {
+		totals := cache.Usage.Totals
+		request.Usage = &collab.SessionUsage{
+			InputTokens: tokenCount(totals.InputTokens), OutputTokens: tokenCount(totals.OutputTokens),
+			CacheWriteTokens: tokenCount(totals.CacheWriteTokens), CacheReadTokens: tokenCount(totals.CacheReadTokens),
+		}
 	}
 	snapshot := syncSnapshot{missionKey: cache.Mission.Key}
 	// The contract takes the branch as one line: a branch with a control
@@ -259,6 +270,8 @@ func without(values, drop []string) []string {
 // syncSession publishes the session through missions.sync and merges the
 // answer. The session lock is held to read and to merge, never across the
 // call. A session that names no mission publishes nothing and answers nil.
+// Each sync first reads the usage the session's transcripts added, and
+// carries the session's stage and usage.
 //
 // What a sync sends leaves the cache only once the provider answered ok: a
 // failed call and any other outcome keep the acknowledgements, the replies
@@ -278,6 +291,7 @@ func (e *Env) syncSession(ctx context.Context, files sessionFiles) error {
 		}
 		refreshMissionKey(cache, dir)
 		if publishable = sessionPublishable(cache); publishable {
+			refreshUsage(cache)
 			request, snapshot = buildSyncRequest(cache, e.Now())
 		}
 		return cache, nil

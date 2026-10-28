@@ -27,6 +27,9 @@ const (
 	failOpenRequirement = "fail-open"
 	budgetRequirement   = "bounded-calls"
 	targetRequirement   = "mission-target"
+	endRequirement      = "session-end"
+	usageRequirement    = "usage-report"
+	stageRequirement    = "agent-stage"
 )
 
 const (
