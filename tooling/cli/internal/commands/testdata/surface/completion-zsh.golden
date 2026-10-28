@@ -528,9 +528,11 @@ _putnami() {
             _describe -t structured 'structured commands' structured_commands
             ;;
         args)
+            # zsh hands completion each word as the user typed it: (Q) removes
+            # the quotes and backslashes, and expands nothing.
             local cur="${words[CURRENT]}"
-            local prev="${words[CURRENT-1]}"
-            local path="${words[1]}"
+            local prev="${(Q)words[CURRENT-1]}"
+            local path="${(Q)words[1]}"
             # A flag goes after the command: the CLI refuses a command line
             # whose first word is a flag, so nothing completes after it.
             if [[ "${path}" == -* ]]; then
@@ -542,7 +544,7 @@ _putnami() {
             fi
             local i=2
             while (( i < CURRENT )); do
-                local word="${words[i]}"
+                local word="${(Q)words[i]}"
                 if [[ "${word}" == -* ]]; then
                     break
                 fi

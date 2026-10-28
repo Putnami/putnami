@@ -300,6 +300,80 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 	return offered
 }
 
+// Bash and zsh hand completion each word as the user typed it, quotes and
+// backslashes included. Each script reads an earlier word as the shell reads
+// it, so a command alias typed with quotes takes the flags of its command: the
+// extension flags for a job command, and no job-only flag for a core command.
+func TestCompletionReadsAQuotedCommandAliasAsItsName(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "a-quoted-command-alias-takes-its-command-flags")
+	ws := writeHostileWorkspace(t)
+	jobOnly := hiddenJobFlags()
+	shells := []struct {
+		name   string
+		offers func(t *testing.T, dir string, words []string) []string
+	}{
+		{"bash", func(t *testing.T, dir string, words []string) []string {
+			var script bytes.Buffer
+			CompletionBash(&script, ws.root, ws.cfg, nil)
+			return bashReadBack(t, bashCompletionReplies(t, dir, script.String(), append([]string{"putnami"}, words...)))
+		}},
+		{"zsh", func(t *testing.T, dir string, words []string) []string {
+			var script bytes.Buffer
+			CompletionZsh(&script, ws.root, ws.cfg, nil)
+			return zshCompletionOffers(t, dir, script.String(), "args", words)
+		}},
+	}
+	for _, shell := range shells {
+		t.Run(shell.name, func(t *testing.T) {
+			if _, err := exec.LookPath(shell.name); err != nil {
+				t.Skip(shell.name + " unavailable on this platform")
+			}
+			for _, name := range hostileNames {
+				for _, typed := range typedForms("j" + name) {
+					dir := t.TempDir()
+					offered := shell.offers(t, dir, []string{typed, "--"})
+					assertNoCodeRan(t, shell.name, dir)
+					assertOffersEach(t, shell.name, typed+" --", offered, append([]string{"--projects"}, ws.flags...))
+				}
+				for _, typed := range typedForms("k" + name) {
+					dir := t.TempDir()
+					offered := shell.offers(t, dir, []string{typed, "--"})
+					assertNoCodeRan(t, shell.name, dir)
+					assertOffersEach(t, shell.name, typed+" --", offered, []string{"--projects"})
+					for _, flag := range jobOnly {
+						if slices.Contains(offered, flag) {
+							t.Errorf("%s offers the job-only flag %s after the core alias %s", shell.name, flag, typed)
+						}
+					}
+				}
+			}
+			dir := t.TempDir()
+			offered := shell.offers(t, dir, []string{"lint-docs", "'--projects'", ""})
+			assertOffersEach(t, shell.name, "lint-docs '--projects'", offered, ws.targets)
+		})
+	}
+}
+
+// typedForms returns the ways a user types name as one word: single-quoted,
+// double-quoted, and with a backslash before each character the shell reads,
+// a newline written $'\n'.
+func typedForms(name string) []string {
+	var escaped strings.Builder
+	for _, c := range name {
+		switch {
+		case c == '\n':
+			escaped.WriteString(`$'\n'`)
+		case !plainWord(string(c)):
+			escaped.WriteRune('\\')
+			escaped.WriteRune(c)
+		default:
+			escaped.WriteRune(c)
+		}
+	}
+	doubled := `"` + strings.NewReplacer(`\`, `\\`, `$`, `\$`, "`", "\\`", `"`, `\"`).Replace(name) + `"`
+	return []string{bashQuote(name), doubled, escaped.String()}
+}
+
 // Each _describe entry and array word reads back, by the rules of zsh's
 // _describe, as the name. This reads the generated text, so it runs where zsh
 // is not installed.
