@@ -7,7 +7,7 @@
     "Contributor workflows reach tasks, proposals and memory through the providers the workspace binds, so a backend changes without a skill edit",
     "A repository states its labels, states, workflow profiles, language rule and publication defaults once, in its own configuration",
     "Only build, spec, design, review and check remain as workflow entries, alongside the configured explicit-only content-bump utility; legacy aliases and duplicated orchestration are removed",
-    "Build coordinates a requested intention, multi-task issue or epic from observable delivery units through its mandated stage, making demonstrated results, blockers and next actions visible",
+    "Build carries a requested intention, task or proposal through the contribution loop in slices, up to its mandated stage, making demonstrated results, blockers and next actions visible",
     "Material specs, designs, prototypes, ADRs and delivery boundaries receive independent challenge before adoption, with original findings and supported resolutions preserved",
     "Versioned local records carry exact native artifact, handoff and producer references across sessions without creating another requirement registry or controller"
   ],

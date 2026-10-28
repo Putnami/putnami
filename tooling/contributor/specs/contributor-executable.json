@@ -18,7 +18,7 @@
     },
     {
       "id": "repository-policy",
-      "text": "options[\"@putnami/contributor\"] holds task sources, claimed/delivered states, tier labels and worker profiles, language/publication controls and active integrations. The finalizer takes the delivered state, the task reference and the language from it. Backlog, filter, rank and plan-label settings have no canonical consumer."
+      "text": "options[\"@putnami/contributor\"] holds task sources, claimed/delivered states, the workflow profile label and the workflow profiles, language/publication controls and active integrations. The finalizer takes the delivered state, the task reference and the language from it. Backlog, filter, rank and plan-label settings have no canonical consumer."
     },
     {
       "id": "squash-ready-publication",
