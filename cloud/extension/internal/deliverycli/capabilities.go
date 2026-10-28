@@ -36,8 +36,10 @@ const (
 // credential. planning takes an empty JSON object and answers the run's
 // publication authority with a read-only release-set bearer; publish takes the
 // publication plan, freezes its digest on the run, and answers the plan's
-// write bearer; advance takes an empty JSON object and answers whether the
-// run may move its forward-only channels now.
+// write bearer; advance answers whether the run may move its forward-only
+// channels now. Its body is an empty JSON object, or, for a staged run, the
+// set the run releases onto its staging channel with the head each
+// forward-only channel had when the set was cut.
 const (
 	nativePublicationPlanningPath = "/native-publication/planning"
 	nativePublicationPublishPath  = "/native-publication/publish"
@@ -49,6 +51,13 @@ const (
 	// planning answer and leaves the move to the caller.
 	channelAdvanceHeader      = "X-Putnami-Channel-Advance"
 	channelAdvanceForwardOnly = "forward-only"
+
+	// channelStagingHeader with channelStagingSupported states that the caller
+	// can stage: release the run's set onto the staging channel Delivery's
+	// planning answer names, and leave the run's own channels to Delivery,
+	// which moves them in the run's deploy phase after a green gate.
+	channelStagingHeader    = "X-Putnami-Channel-Staging"
+	channelStagingSupported = "supported"
 )
 
 // capabilityProtocolVersion is the version a granted capability body carries.
@@ -233,8 +242,9 @@ func (c *capabilityCaller) attempt(ctx context.Context, delivery *deliveryapicli
 }
 
 // sendCapability makes the generated call of route. The capability routes but
-// the plan take exactly {}; the plan's own bytes become the generated plan, so
-// Delivery decodes the same values and recomputes the same digest.
+// the plan and the advance take exactly {}; the plan's and the advance's own
+// bytes become the generated body, so Delivery decodes the same values and
+// recomputes the same digest.
 func sendCapability(ctx context.Context, delivery *deliveryapiclient.DeliveryClient, route string, payload []byte) error {
 	var err error
 	switch route {
@@ -245,7 +255,11 @@ func sendCapability(ctx context.Context, delivery *deliveryapiclient.DeliveryCli
 	case nativePublicationPlanningPath:
 		_, err = delivery.CreateV1DeliveryRecordsNativePublicationPlanning(ctx, deliveryapiclient.CreateV1DeliveryRecordsNativePublicationPlanningInput{})
 	case nativePublicationAdvancePath:
-		_, err = delivery.CreateV1DeliveryRecordsNativePublicationAdvance(ctx, deliveryapiclient.CreateV1DeliveryRecordsNativePublicationAdvanceInput{})
+		var request deliveryapiclient.NativePublicationAdvanceRequest
+		if err := json.Unmarshal(payload, &request); err != nil {
+			return err
+		}
+		_, err = delivery.CreateV1DeliveryRecordsNativePublicationAdvance(ctx, deliveryapiclient.CreateV1DeliveryRecordsNativePublicationAdvanceInput{Body: request})
 	case nativePublicationPublishPath:
 		var plan deliveryapiclient.NativePublicationPlan
 		if err := json.Unmarshal(payload, &plan); err != nil {

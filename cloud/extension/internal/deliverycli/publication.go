@@ -53,15 +53,18 @@ const (
 //
 // Delivery decides what the run may publish. Its planning answer names the
 // namespace, the commit, the channels and the forward-only channels, with a
-// read-only bearer for resolve; its answer to the plan freezes the plan's
-// digest on the run and carries the plan's write bearer. put-server resolves
-// and releases release sets under those bearers. This provider holds the
-// session's state between them: the heads it resolved, the open plan, and the
-// one release of that plan. Before a release moves a forward-only channel, it
-// asks Delivery whether the run is still the head of its default branch: a run
-// that is not publishes its set and leaves those channels where they are. A
-// plan whose immutable channel already has a head when it opens is a rerun of
-// a commit that released it: it publishes its set and moves no channel.
+// read-only bearer for resolve, and the staging channel of a staged run; its
+// answer to the plan freezes the plan's digest on the run and carries the
+// plan's write bearer. put-server resolves and releases release sets under
+// those bearers. This provider holds the session's state between them: the
+// heads it resolved, the open plan, and the one release of that plan. Before a
+// release moves a forward-only channel, it asks Delivery whether the run is
+// still the head of its default branch: a run that is not publishes its set
+// and leaves those channels where they are. A plan whose immutable channel
+// already has a head when it opens is a rerun of a commit that released it: it
+// publishes its set and moves no channel. A staged run releases its set onto
+// the staging channel alone; Delivery moves the run's channels to it in the
+// deploy phase, after a green gate.
 type publisher struct {
 	caller        *capabilityCaller
 	runCredential string
@@ -524,6 +527,9 @@ func (p *publisher) rerun(ctx context.Context, plan registry.PublicationPlan, re
 // forward-only channels follow Delivery's advance answer, and every other
 // channel goes to put-server as the engine sent it.
 func (p *publisher) releaseChannels(ctx context.Context, plan registry.PublicationPlan, authority publicationAuthority, request *distribution.ReleaseRequest, body []byte) (publicationAnswer, bool) {
+	if authority.StagingChannel != "" {
+		return p.releaseStaged(ctx, plan, authority.StagingChannel, request, body)
+	}
 	forwardOnly := make(map[string]bool)
 	for _, channel := range request.Channels {
 		if authority.forwardOnly(channel.Name) {
@@ -550,28 +556,12 @@ func (p *publisher) releaseChannels(ctx context.Context, plan registry.Publicati
 // channels. The third result reports a put-server conflict on forward-only
 // channels alone: their heads moved between the read and the move.
 func (p *publisher) releaseForwardOnly(ctx context.Context, plan registry.PublicationPlan, request *distribution.ReleaseRequest, body []byte, forwardOnly map[string]bool) (publicationAnswer, bool, bool) {
-	advance, head, refusal := p.askAdvance(ctx)
+	advance, head, refusal := p.askAdvance(ctx, []byte("{}"))
 	if refusal != nil {
 		return publicationAnswer{refusal: refusal}, refusal.Code != refusalPublicationUnavailable, false
 	}
 	if !advance {
-		// A superseded run or a rerun of an older commit: its artifacts are
-		// uploaded, and its forward-only channels stay where they are.
-		names := make([]string, 0, len(forwardOnly))
-		left := staying{}
-		for _, channel := range request.Channels {
-			if forwardOnly[channel.Name] {
-				names = append(names, channel.Name)
-				left[channel.Name] = p.resolvedGeneration(channel)
-			}
-		}
-		newer := "Delivery names no newer head"
-		if head != "" {
-			newer = "its head is " + head
-		}
-		p.diagnose("release: %s is not the head of its default branch (%s); forward-only channels [%s] stay where they are",
-			plan.SourceRevision, newer, strings.Join(names, " "))
-		answer, definitive, _ := p.releaseExcept(ctx, plan, request, body, request.Channels, false, left, nil)
+		answer, definitive := p.leaveForwardOnly(ctx, plan, request, body, forwardOnly, head)
 		return answer, definitive, false
 	}
 	names := make([]string, 0, len(request.Channels))
@@ -603,6 +593,123 @@ func (p *publisher) releaseForwardOnly(ctx context.Context, plan registry.Public
 		refreshed = true
 	}
 	return p.releaseExcept(ctx, plan, request, body, channels, refreshed, nil, forwardOnly)
+}
+
+// leaveForwardOnly answers the release of a superseded run, or of a rerun of an
+// older commit: its artifacts are uploaded, and its forward-only channels stay
+// where they are. head is the newer head of the default branch Delivery named,
+// or "".
+func (p *publisher) leaveForwardOnly(ctx context.Context, plan registry.PublicationPlan, request *distribution.ReleaseRequest, body []byte, forwardOnly map[string]bool, head string) (publicationAnswer, bool) {
+	names := make([]string, 0, len(forwardOnly))
+	left := staying{}
+	for _, channel := range request.Channels {
+		if forwardOnly[channel.Name] {
+			names = append(names, channel.Name)
+			left[channel.Name] = p.resolvedGeneration(channel)
+		}
+	}
+	newer := "Delivery names no newer head"
+	if head != "" {
+		newer = "its head is " + head
+	}
+	p.diagnose("release: %s is not the head of its default branch (%s); forward-only channels [%s] stay where they are",
+		plan.SourceRevision, newer, strings.Join(names, " "))
+	answer, definitive, _ := p.releaseExcept(ctx, plan, request, body, request.Channels, false, left, nil)
+	return answer, definitive
+}
+
+// releaseStaged releases the set of a staged run onto its staging channel and
+// moves none of the run's channels: Delivery moves them to that set in the
+// run's deploy phase, after the runner's green terminal, so a run whose gate
+// is red, or whose terminal never arrives, moves no channel an environment
+// follows. Every channel of a staged run is forward-only.
+//
+// The advance question names the set and the head each channel had when the
+// set was cut: the heads the engine expects, which this session resolved.
+// Delivery records them, and its deploy move compares against them. A run that
+// may not advance releases nothing, as an unstaged superseded run does. One
+// that may releases the set onto the staging channel from the head that
+// channel carries now: any run of the namespace may have moved it, and Delivery
+// moves a followed channel only while the staging channel still holds this
+// run's set. A staging head that moves between the read and the release is
+// read once more; a second miss moves nothing and has an unknown outcome.
+//
+// The staging channel confers the widest level of the run's channels, so every
+// member resolves the level an unstaged release would give it.
+//
+// The engine is answered as for a skipped forward-only channel: every channel
+// at the released set, at the generation this session resolved.
+func (p *publisher) releaseStaged(ctx context.Context, plan registry.PublicationPlan, staging string, request *distribution.ReleaseRequest, body []byte) (publicationAnswer, bool) {
+	ref, _ := distribution.DeriveReleaseSetRef(&request.ReleaseSet)
+	expected := make(map[string]string, len(request.Channels))
+	forwardOnly := make(map[string]bool, len(request.Channels))
+	names := make([]string, 0, len(request.Channels))
+	left := staying{}
+	var level distribution.Visibility
+	for _, channel := range request.Channels {
+		head := ""
+		if channel.Expected != nil {
+			head = channel.Expected.ID
+		}
+		expected[channel.Name] = head
+		forwardOnly[channel.Name] = true
+		names = append(names, channel.Name)
+		left[channel.Name] = p.resolvedGeneration(channel)
+		level = distribution.MaxVisibility(level, channel.Visibility)
+	}
+	question, err := json.Marshal(stagedAdvanceRequest{ReleaseSet: ref.ID, Expected: expected})
+	if err != nil {
+		return publicationRefusal(refusalInvalidRequest, "the channel advance cannot be encoded"), true
+	}
+	advance, head, refusal := p.askAdvance(ctx, question)
+	if refusal != nil {
+		return publicationAnswer{refusal: refusal}, refusal.Code != refusalPublicationUnavailable
+	}
+	if !advance {
+		return p.leaveForwardOnly(ctx, plan, request, body, forwardOnly, head)
+	}
+	for attempt := 0; ; attempt++ {
+		heads, refusal, decided := p.readHeads(ctx, request.Namespace, []string{staging})
+		if refusal != nil {
+			refusal.Message += "; no channel moved"
+			return publicationAnswer{refusal: refusal}, decided
+		}
+		channels := []distribution.ChannelRequest{{Name: staging, Expected: headRef(heads[staging]), Visibility: level}}
+		encoded, err := withChannels(body, channels)
+		if err != nil {
+			return publicationRefusal(refusalInvalidRequest, "the release request cannot be encoded for put-server"), true
+		}
+		narrowed := *request
+		narrowed.Channels = channels
+		grant := p.publishBearer(ctx, plan, true)
+		if grant.refusal != nil {
+			return publicationAnswer{refusal: grant.refusal}, grant.refusal.Code != refusalPublicationUnavailable
+		}
+		released, err := p.putRelease(ctx, grant.bearer.bearer, encoded, &narrowed)
+		if err != nil {
+			return p.releaseRefusal(plan, err)
+		}
+		if released.Outcome != distribution.ReleaseOutcomeConflict {
+			p.diagnose("release: set %s is on staging channel %s; channels [%s] advance in the deploy phase after a green gate",
+				ref.ID, staging, strings.Join(names, " "))
+			outcome := &distribution.ReleaseResponse{ProtocolVersion: distribution.ProtocolVersion, Outcome: released.Outcome, Current: map[string]*distribution.ChannelHead{}}
+			answer, definitive, _ := p.answerEngine(plan, request, outcome, left)
+			return answer, definitive
+		}
+		if attempt > 0 {
+			p.diagnose("release: staging channel %s moved again after it was read; put-server moved no channel (conflict)", staging)
+			return publicationRefusal(refusalPublicationUnavailable, "staging channel %s moved twice while this run released onto it; no channel moved", staging), false
+		}
+		p.diagnose("release: staging channel %s moved after it was read; reading it again", staging)
+	}
+}
+
+// stagedAdvanceRequest is the advance question of a staged run: the set it
+// releases onto its staging channel, and per channel of the run the head the
+// set was cut from, "" for a channel with no head.
+type stagedAdvanceRequest struct {
+	ReleaseSet string            `json:"releaseSet"`
+	Expected   map[string]string `json:"expected"`
 }
 
 // releaseExcept releases the set on put-server for every channel not skipped,
@@ -681,9 +788,10 @@ func (p *publisher) answerEngine(plan registry.PublicationPlan, request *distrib
 }
 
 // askAdvance asks Delivery whether the run may move its forward-only channels
-// now. A refusal moved no channel; only one Delivery decided is definitive.
-func (p *publisher) askAdvance(ctx context.Context) (advance bool, head string, refusal *registry.CredentialRefusal) {
-	answer := p.caller.post(ctx, nativePublicationAdvancePath, p.runCredential, []byte("{}"), forwardOnlyHeaders)
+// now, with question as the body: {} for an unstaged run. A refusal moved no
+// channel; only one Delivery decided is definitive.
+func (p *publisher) askAdvance(ctx context.Context, question []byte) (advance bool, head string, refusal *registry.CredentialRefusal) {
+	answer := p.caller.post(ctx, nativePublicationAdvancePath, p.runCredential, question, publicationHeaders)
 	if answer.outcome != capabilityGranted {
 		refusal := p.deliveryRefusal("channel advance", nativePublicationAdvancePath, answer)
 		refusal.Message += "; no channel moved"
@@ -1034,7 +1142,7 @@ func (p *publisher) planningAuthority(ctx context.Context) planningResult {
 
 func (p *publisher) mintPlanning(ctx context.Context) planningResult {
 	issuedAt := p.now()
-	answer := p.caller.post(ctx, nativePublicationPlanningPath, p.runCredential, []byte("{}"), forwardOnlyHeaders)
+	answer := p.caller.post(ctx, nativePublicationPlanningPath, p.runCredential, []byte("{}"), publicationHeaders)
 	if answer.outcome != capabilityGranted {
 		return planningResult{refusal: p.deliveryRefusal("publication planning", nativePublicationPlanningPath, answer)}
 	}
@@ -1084,7 +1192,7 @@ func (p *publisher) mintPublish(ctx context.Context, plan registry.PublicationPl
 		return bearerResult{refusal: &registry.CredentialRefusal{Code: refusalInvalidRequest, Message: "the plan cannot be encoded"}}
 	}
 	issuedAt := p.now()
-	answer := p.caller.post(ctx, nativePublicationPublishPath, p.runCredential, body, forwardOnlyHeaders)
+	answer := p.caller.post(ctx, nativePublicationPublishPath, p.runCredential, body, publicationHeaders)
 	if answer.outcome != capabilityGranted {
 		return bearerResult{refusal: p.deliveryRefusal("publication plan", nativePublicationPublishPath, answer)}
 	}
