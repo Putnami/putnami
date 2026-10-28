@@ -129,7 +129,7 @@
         {
           "id": "infra",
           "task": "build-infra",
-          "dependsOn": ["generate", "describe", "compile"]
+          "dependsOn": ["generate", "describe"]
         }
       ]
     },

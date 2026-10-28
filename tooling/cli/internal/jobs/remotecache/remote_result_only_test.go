@@ -11,6 +11,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -154,4 +155,67 @@ func TestNegotiateNamesAKeyResultOnlyOnlyWhenNoJobSharingItReadsTheFiles(t *test
 	if want := []string{"k-leaf"}; !slices.Equal(got, want) {
 		t.Fatalf("resultOnlyKeys = %v, want %v", got, want)
 	}
+}
+
+// TestDependedOnJobsCountsOnlyTheEdgesThatReadFiles pins which predecessors
+// keep their files (ADR 0082): every functional dependency, and a
+// serialization predecessor only when the waiter's key reads what it writes,
+// it declares an output its dependents read, it shares the waiter's execution,
+// or it is not planned. Without key movement every serialization edge counts.
+func TestDependedOnJobsCountsOnlyTheEdgesThatReadFiles(t *testing.T) {
+	waiterNamed := func(name string) *jobmodel.ScheduledJob {
+		return declaredJob(name, name, &extension.TaskDeclaration{})
+	}
+	cases := []struct {
+		name     string
+		arrange  func(task, waiter *jobmodel.ScheduledJob, movement *cachekey.KeyMovement)
+		noMoving bool
+		want     bool
+	}{
+		{"a functional dependency", func(task, waiter *jobmodel.ScheduledJob, _ *cachekey.KeyMovement) {
+			waiter.DependsOn = []string{task.Key()}
+		}, false, true},
+		{"order only", func(task, waiter *jobmodel.ScheduledJob, _ *cachekey.KeyMovement) {
+			waiter.SerializeAfter = []string{task.Key()}
+		}, false, false},
+		{"order only, the waiter's key reads the task's writes", func(task, waiter *jobmodel.ScheduledJob, movement *cachekey.KeyMovement) {
+			waiter.SerializeAfter = []string{task.Key()}
+			movement.Writers[waiter.Key()] = []string{task.Key()}
+		}, false, true},
+		{"order only, the task's dependents read an output", func(task, waiter *jobmodel.ScheduledJob, _ *cachekey.KeyMovement) {
+			waiter.SerializeAfter = []string{task.Key()}
+			gen := task.Extension.Tasks["emit"].Declares.Outputs["gen"]
+			gen.ReadByDependents = true
+			task.Extension.Tasks["emit"].Declares.Outputs["gen"] = gen
+		}, false, true},
+		{"order only, one shared execution", func(task, waiter *jobmodel.ScheduledJob, _ *cachekey.KeyMovement) {
+			waiter.SerializeAfter = []string{task.Key()}
+			task.SharedExecutionID, waiter.SharedExecutionID = "shared", "shared"
+		}, false, true},
+		{"order only, no key movement", func(task, waiter *jobmodel.ScheduledJob, _ *cachekey.KeyMovement) {
+			waiter.SerializeAfter = []string{task.Key()}
+		}, true, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			task, waiter := matrixJob(), waiterNamed("build~infra")
+			movement := &cachekey.KeyMovement{Writers: map[string][]string{}, Moving: map[string]bool{}}
+			tc.arrange(task, waiter, movement)
+			if tc.noMoving {
+				movement = nil
+			}
+			got := dependedOnJobs([]*jobmodel.ScheduledJob{task, waiter}, movement)
+			if got[task.Key()] != tc.want {
+				t.Fatalf("task files needed = %v, want %v", got[task.Key()], tc.want)
+			}
+		})
+	}
+	t.Run("an unplanned predecessor", func(t *testing.T) {
+		waiter := waiterNamed("build~infra")
+		waiter.SerializeAfter = []string{"/elsewhere:build~compile"}
+		movement := &cachekey.KeyMovement{Writers: map[string][]string{}, Moving: map[string]bool{}}
+		if got := dependedOnJobs([]*jobmodel.ScheduledJob{waiter}, movement); !got["/elsewhere:build~compile"] {
+			t.Fatal("an unplanned serialization predecessor lost its files")
+		}
+	})
 }

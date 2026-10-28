@@ -301,16 +301,53 @@ func TestPrefetchNegotiatesResultOnlyKeysInMinimalModeAndFetchesOnlyFilesCoreRea
 	}
 }
 
-// A session in minimal mode has one mode to ask in, so its prefetch is one
-// negotiate whatever core marks result-only.
-func TestPrefetchInAMinimalSessionIsOneNegotiate(t *testing.T) {
+// A session in minimal mode still restores the files of a key core does not
+// mark result-only: its prefetch negotiates that key in full, so the answer
+// names the downloads, and the result-only keys in minimal (ADR 0082).
+func TestPrefetchInAMinimalSessionNegotiatesTheKeysCoreReadsInFull(t *testing.T) {
+	spectest.Proves(t, "cloud/cache-provider-configuration", "a-files-restore-receives-downloads",
+		"a-minimal-session-negotiates-the-keys-core-reads-in-full")
 	only, files := resultOnlyKey("a"), resultOnlyKey("c")
-	f := newResultOnlyCacheServer(t, map[string][]byte{only: []byte("result only"), files: []byte("with files")})
-	s, _ := startResultOnlySession(t, f, cache.ModeMinimal, cache.CapabilityRestoreResultOnly)
+	blob := []byte("with files")
+	f := newResultOnlyCacheServer(t, map[string][]byte{only: []byte("result only"), files: blob})
+	s, exchangeDir := startResultOnlySession(t, f, cache.ModeMinimal, cache.CapabilityRestoreResultOnly)
 
 	prefetchKeys(t, s, []string{only, files}, []string{only})
+	calls, _ := f.calls()
+	want := []negotiateCall{{cache.ModeFull, []string{files}}, {cache.ModeMinimal, []string{only}}}
+	if !sameCalls(calls, want) {
+		t.Fatalf("negotiates = %+v, want %+v", calls, want)
+	}
 
-	f.wantNegotiatesOnly(t, negotiateCall{cache.ModeMinimal, []string{only, files}})
+	if got := restoreKey(t, s, files, false).Status; got != cache.RestoreHit {
+		t.Fatalf("restore status = %q, want hit", got)
+	}
+	path, _ := cache.BlobExchangePath(exchangeDir, cache.DigestOf(blob))
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, blob) {
+		t.Fatalf("exchange blob = %q, %v; want the restore to place it", got, err)
+	}
+}
+
+// A restore of the files outside any prefetch, in a minimal session, negotiates
+// its key in full and places the blob.
+func TestAFilesRestoreInAMinimalSessionNegotiatesInFull(t *testing.T) {
+	spectest.Proves(t, "cloud/cache-provider-configuration", "a-files-restore-receives-downloads",
+		"a-minimal-session-negotiates-the-keys-core-reads-in-full")
+	key := resultOnlyKey("a")
+	blob := []byte("compiled output bytes")
+	f := newResultOnlyCacheServer(t, map[string][]byte{key: blob})
+	s, exchangeDir := startResultOnlySession(t, f, cache.ModeMinimal, cache.CapabilityRestoreResultOnly)
+
+	if got := restoreKey(t, s, key, false).Status; got != cache.RestoreHit {
+		t.Fatalf("restore status = %q, want hit", got)
+	}
+	if calls, _ := f.calls(); !sameCalls(calls, []negotiateCall{{cache.ModeFull, []string{key}}}) {
+		t.Fatalf("negotiates = %+v, want one full negotiate of the key", calls)
+	}
+	path, _ := cache.BlobExchangePath(exchangeDir, cache.DigestOf(blob))
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, blob) {
+		t.Fatalf("exchange blob = %q, %v; want the restore to place it", got, err)
+	}
 }
 
 func TestPrefetchBatches(t *testing.T) {
@@ -325,7 +362,6 @@ func TestPrefetchBatches(t *testing.T) {
 		{"no result-only key", []string{a, b}, nil, cache.ModeFull, []negotiateCall{{cache.ModeFull, []string{a, b}}}},
 		{"every key result-only", []string{a, b}, []string{a, b}, cache.ModeFull, []negotiateCall{{cache.ModeMinimal, []string{a, b}}}},
 		{"both kinds", []string{a, b, c}, []string{b}, cache.ModeToplevel, []negotiateCall{{cache.ModeMinimal, []string{b}}, {cache.ModeToplevel, []string{a, c}}}},
-		{"minimal session", []string{a, b}, []string{a}, cache.ModeMinimal, []negotiateCall{{cache.ModeMinimal, []string{a, b}}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got []negotiateCall

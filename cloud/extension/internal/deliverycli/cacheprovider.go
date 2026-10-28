@@ -195,10 +195,20 @@ type providerCacheResult struct {
 var restoreTransferMaxAge = 5 * time.Minute
 
 // lacksDownloads reports whether the outcome cannot serve a restore of the
-// files in a session of the given mode: it is a hit negotiated in minimal mode,
-// which names no download, while the session's mode names them.
-func (r providerCacheResult) lacksDownloads(session cache.Mode) bool {
-	return r.result.Hit && r.mode == cache.ModeMinimal && session != cache.ModeMinimal
+// files: it is a hit negotiated in minimal mode, which names no download.
+func (r providerCacheResult) lacksDownloads() bool {
+	return r.result.Hit && r.mode == cache.ModeMinimal
+}
+
+// filesMode is the mode a negotiate of a key whose files core reads asks in: the
+// session mode, or full in a minimal session. The session mode tells core which
+// hits it may serve from their result alone; a key core restores with its files
+// still needs the downloads that a minimal answer lacks (ADR 0082).
+func (s *providerSession) filesMode() cache.Mode {
+	if s.mode == cache.ModeMinimal {
+		return cache.ModeFull
+	}
+	return s.mode
 }
 
 func newProviderSession(workspaceRoot string, logw io.Writer) *providerSession {
@@ -628,7 +638,7 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	s.hosted = hostedLaunch()
 	s.applyMachineToken(cfg)
 
-	mode := resolveSessionMode(p.Mode, cfg.Mode)
+	mode := resolveSessionMode(p.Mode, cfg.Mode, s.hosted)
 	s.mode = mode
 	s.providerProtocolVersion = cache.ProviderProtocolMinVersion
 	for _, capability := range p.Capabilities {
@@ -686,13 +696,17 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 }
 
 // resolveSessionMode is the materialization mode of a session: core's intent,
-// else the configured mode, else cache.ModeFull.
-func resolveSessionMode(intent, configured cache.Mode) cache.Mode {
+// else the configured mode, else cache.ModeMinimal for a hosted launch and
+// cache.ModeFull otherwise. A hosted run reads the files of a hit only when a
+// job of the run reads them; a developer expects every output on disk.
+func resolveSessionMode(intent, configured cache.Mode, hosted bool) cache.Mode {
 	switch {
 	case intent.Valid():
 		return intent
 	case configured.Valid():
 		return configured
+	case hosted:
+		return cache.ModeMinimal
 	default:
 		return cache.ModeFull
 	}
@@ -934,7 +948,7 @@ func (s *providerSession) serving() bool {
 // one minimal negotiate of the key. Core cannot verify such a hit, so the answer
 // is the entry the server reported under exactly this key, and a miss otherwise.
 // A restore of the files needs the downloads, which a minimal answer lacks: it
-// then negotiates the key once more, in the session's mode.
+// then negotiates the key once more, in filesMode.
 //
 // The downloads of the index do not last (see restoreTransferMaxAge), so a
 // restore of the files negotiates its key again, once, in two cases: before it
@@ -950,7 +964,7 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 		return providerOK(req, &cache.RestoreResult{Status: cache.RestoreMiss})
 	}
 	cacheResult, negotiated := s.negotiatedResult(p.Key)
-	if negotiated && !p.ResultOnly && cacheResult.lacksDownloads(s.mode) {
+	if negotiated && !p.ResultOnly && cacheResult.lacksDownloads() {
 		negotiated = false
 	}
 	// renegotiated is set once this restore asked the server for the key
@@ -961,7 +975,7 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 		// The key was not covered by a prefetch batch (or the batch failed), or
 		// the batch answered it for its result only: negotiate it, with the
 		// other restores that need a negotiate now (see cachenegotiate.go).
-		mode := s.mode
+		mode := s.filesMode()
 		if p.ResultOnly {
 			mode = cache.ModeMinimal
 		}
@@ -976,7 +990,7 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 		// fails, the indexed downloads are still tried; they may have a longer
 		// life than the bound assumes.
 		renegotiated = true
-		result, err := s.negotiateKey(s.mode, p.Key)
+		result, err := s.negotiateKey(s.filesMode(), p.Key)
 		if err != nil {
 			s.logCacheError(fmt.Sprintf("restore %s negotiate again", short(p.Key)), err)
 		} else {
@@ -993,7 +1007,7 @@ func (s *providerSession) restore(req *cache.ProviderRequest, p *cache.RestorePa
 		if err != nil && !renegotiated && remotecache.DownloadRefused(err) {
 			// The storage refused a download of the index. Blobs already placed
 			// stay placed; the second pass fetches the rest.
-			again, nerr := s.negotiateKey(s.mode, p.Key)
+			again, nerr := s.negotiateKey(s.filesMode(), p.Key)
 			if nerr != nil {
 				s.logCacheError(fmt.Sprintf("restore %s negotiate again", short(p.Key)), nerr)
 				return providerOK(req, &cache.RestoreResult{Status: cache.RestoreError})
@@ -1069,7 +1083,7 @@ func (s *providerSession) prefetch(req *cache.ProviderRequest, p *cache.Prefetch
 		return providerOK(req, &cache.PrefetchResult{Started: 0})
 	}
 	// The keys are owned by ParseAndValidatePrefetchParams; safe to hand to the goroutine.
-	batches := prefetchBatches(p.Keys, p.ResultOnlyKeys, s.mode)
+	batches := prefetchBatches(p.Keys, p.ResultOnlyKeys, s.filesMode())
 	var done chan struct{}
 	s.mu.Lock()
 	if s.prefetchDone == nil {
@@ -1096,11 +1110,10 @@ type prefetchBatch struct {
 
 // prefetchBatches splits a prefetch into its negotiates, two at most: the
 // result-only keys in minimal mode, so the server checks and signs no download
-// for files core will not read, and the other keys in the session's mode. A
-// session already in minimal mode, or a prefetch without result-only keys, is
-// one batch.
+// for files core will not read, and the other keys in mode, the session's
+// filesMode. A prefetch without result-only keys is one batch.
 func prefetchBatches(keys, resultOnly []string, mode cache.Mode) []prefetchBatch {
-	if mode == cache.ModeMinimal || len(resultOnly) == 0 {
+	if len(resultOnly) == 0 {
 		return []prefetchBatch{{mode: mode, keys: keys}}
 	}
 	only := make(map[string]bool, len(resultOnly))

@@ -15,7 +15,8 @@ import (
 // An agent session exports its workspace machine token the same way; a test
 // that reads the cache with one sets it itself. A hosted runner exports the
 // cache URL, mode and read-only overrides to its gate, and the cache status
-// builds its config from them, so no test inherits those either.
+// builds its config from them, so no test inherits those either. Its ingest
+// URL marks a hosted launch, which changes the default session mode.
 func TestMain(m *testing.M) {
 	for _, name := range []string{
 		remotecache.TokenSourceEnv,
@@ -24,6 +25,7 @@ func TestMain(m *testing.M) {
 		remotecache.ModeEnv,
 		remotecache.ReadOnlyEnv,
 		cloudTokenEnv,
+		SessionReporterIngestURLEnv,
 	} {
 		_ = os.Unsetenv(name)
 	}

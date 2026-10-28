@@ -112,6 +112,27 @@ func TestPlan_GoLibraryCompileUsesInvocationAndProjectFacts(t *testing.T) {
 	}
 }
 
+// TestPlan_GoInfraOnlyOrdersAfterCompile pins the Go build's infra step: it
+// reads no binary, so the compile reaches it through write serialization of
+// the project's .gen tree alone, never as a dependency whose key it folds or
+// whose files it reads (ADR 0082).
+func TestPlan_GoInfraOnlyOrdersAfterCompile(t *testing.T) {
+	t.Parallel()
+	ext := loadGoPlannerExtension(t)
+	planned := planGoProject(t, ext, "application", []string{"build"}, "")
+	byKey := JobsByPlanKey(planned)
+	infra, compile := byKey["/subject:build~infra"], byKey["/subject:build~compile"]
+	if infra == nil || compile == nil {
+		t.Fatalf("plan lacks infra or compile: %v", planKeySet(planned))
+	}
+	if slices.Contains(infra.DependsOn, compile.Key()) {
+		t.Errorf("infra DependsOn = %v, want no compile", infra.DependsOn)
+	}
+	if !slices.Contains(infra.SerializeAfter, compile.Key()) {
+		t.Errorf("infra SerializeAfter = %v, want compile: infra rewrites the .gen tree compile reads", infra.SerializeAfter)
+	}
+}
+
 func TestPlan_PlannerConditionCommandSetIsOrderIndependent(t *testing.T) {
 	t.Parallel()
 	ext := loadGoPlannerExtension(t)

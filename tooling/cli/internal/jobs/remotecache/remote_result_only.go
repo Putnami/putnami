@@ -14,24 +14,66 @@ import (
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
-// dependedOnJobs returns the key of every job that some planned job must wait
-// for: its functional dependencies and its write-serialization predecessors.
-func dependedOnJobs(planned []*jobmodel.ScheduledJob) map[string]bool {
+// dependedOnJobs returns the key of every job whose files some planned job
+// reads (ADR 0082). A functional dependency always reads them. A job that is
+// only serialized after another reads its files when its key reads a file the
+// other writes (movement.Writers), when the other declares an output its
+// dependents read, or when both belong to one shared execution, whose follower
+// captures what its leader wrote. Otherwise the edge only orders the two jobs.
+// A nil movement counts every serialization edge.
+func dependedOnJobs(planned []*jobmodel.ScheduledJob, movement *cachekey.KeyMovement) map[string]bool {
+	byKey := cachekey.JobsByKey(planned)
 	out := make(map[string]bool)
 	for _, job := range planned {
 		if job == nil {
 			continue
 		}
-		for _, predecessor := range job.SchedulingPredecessors() {
-			out[predecessor] = true
+		for _, dependency := range job.DependsOn {
+			out[dependency] = true
+		}
+		for _, predecessor := range job.SerializeAfter {
+			if movement == nil || readsSerializedFiles(job, byKey[predecessor], movement) {
+				out[predecessor] = true
+			}
 		}
 	}
 	return out
 }
 
+// readsSerializedFiles reports whether job, serialized after predecessor,
+// reads the files predecessor writes. An unplanned predecessor counts.
+func readsSerializedFiles(job, predecessor *jobmodel.ScheduledJob, movement *cachekey.KeyMovement) bool {
+	if predecessor == nil || predecessor.JobDef == nil || predecessor.Project == nil {
+		return true
+	}
+	if slices.Contains(movement.Writers[job.Key()], predecessor.Key()) {
+		return true
+	}
+	if job.SharedExecutionID != "" && job.SharedExecutionID == predecessor.SharedExecutionID {
+		return true
+	}
+	return declaresReadByDependents(predecessor)
+}
+
+// declaresReadByDependents reports whether job declares an output that the
+// projects depending on its project read, such as a generated client.
+func declaresReadByDependents(job *jobmodel.ScheduledJob) bool {
+	declaration := jobmodel.TaskDeclarationOf(job)
+	if declaration == nil {
+		return false
+	}
+	for _, output := range declaration.Outputs {
+		if output.ReadByDependents {
+			return true
+		}
+	}
+	return false
+}
+
 // TaskFilesNeeded reports whether this run reads the files of job's cache
 // entry. It is true unless the provider echoed the result-only capability and
-// the plan proves that no reader exists; see this file's header for the rule.
+// the plan proves that no reader exists (ADR 0058, rule 2 as ADR 0082 amends
+// it). It reads job keys and the plan, never cache keys.
 func (r *RemoteCache) TaskFilesNeeded(job *jobmodel.ScheduledJob) bool {
 	if r == nil || job == nil || r.dependedOn == nil {
 		return true
