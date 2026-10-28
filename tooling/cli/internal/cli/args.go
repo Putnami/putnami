@@ -201,11 +201,22 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	// undeclared one is rejected here. Job commands and extension groups are
 	// served by manifests and get a deprecation warning from their dispatch path
 	// instead (see parse.go).
-	if structured && result.Subcommand == "" && len(rest) > 0 && isFlagToken(rest[0]) {
-		result.Err = flagBeforeSubcommand(commands[0], rest[0], result.RawJobArgs, aliases)
-	}
-	if result.Err == nil && structured && !extensionGroups[commands[0]] {
-		result.Err = validateStructuredFlags(commands[0], result.Subcommand, result.RawJobArgs, supplied)
+	//
+	// help takes a command, not a subcommand, as its words, so it checks its own
+	// flags first: an unknown flag before the command is a typo, not a flag out
+	// of place.
+	if commands[0] == helpCommand {
+		result.Err = validateStructuredFlags(helpCommand, "", result.RawJobArgs, supplied)
+		if result.Err == nil {
+			result.Err = flagBeforeHelpCommand(result.Subcommand, rest)
+		}
+	} else {
+		if structured && result.Subcommand == "" && len(rest) > 0 && isFlagToken(rest[0]) {
+			result.Err = flagBeforeSubcommand(commands[0], rest[0], result.RawJobArgs, aliases)
+		}
+		if result.Err == nil && structured && !extensionGroups[commands[0]] {
+			result.Err = validateStructuredFlags(commands[0], result.Subcommand, result.RawJobArgs, supplied)
+		}
 	}
 
 	// --help and --version must keep working on a malformed invocation: a user
@@ -246,16 +257,10 @@ func leadingCommandWord(args []string) bool {
 // remaining the arguments the global pass left. Every positional is checked,
 // because the core cannot tell which of them is the value of a flag it does
 // not know.
-//
-// help is the one root whose positional is a command: any word after the flag
-// is the command it was asked about, which it would otherwise not see.
 func flagBeforeSubcommand(root, flag string, remaining []string, aliases commandAliases) error {
 	for _, word := range remaining[:passthroughCut(remaining)] {
 		if isFlagToken(word) {
 			continue
-		}
-		if root == "help" {
-			return usageErrorf("%s comes before the command %q; a flag goes after it: putnami help %s [options]", flagSpelling(flag), word, word)
 		}
 		if slices.Contains(commandmeta.Subcommands(root), word) ||
 			(aliases.groupSubcommand != nil && aliases.groupSubcommand(root, word)) {
@@ -263,6 +268,51 @@ func flagBeforeSubcommand(root, flag string, remaining []string, aliases command
 		}
 	}
 	return nil
+}
+
+// helpCommand is the root whose words name the command it describes.
+const helpCommand = "help"
+
+// flagBeforeHelpCommand refuses a flag before a word of the command help
+// describes, as in `putnami help -v projects` or `putnami help projects -v
+// list`: help reads the command from its leading words only, so it would
+// describe another command than the one typed. command is the word the parser
+// selected as the subcommand of help, and rest the arguments after it. A value
+// that follows a global value flag belongs to that flag.
+func flagBeforeHelpCommand(command string, rest []string) error {
+	words := []string{}
+	if command != "" {
+		words = append(words, command)
+	}
+	flag, word := "", ""
+	cut := passthroughCut(rest)
+	for i := 0; i < cut; i++ {
+		arg := rest[i]
+		if !isFlagToken(arg) {
+			if flag != "" && word == "" {
+				word = arg
+			}
+			words = append(words, arg)
+			continue
+		}
+		if flag == "" {
+			flag = arg
+		}
+		if strings.Contains(arg, "=") {
+			continue
+		}
+		if spec, ok := globalFlagSpec(arg); ok && spec.Type == commandmeta.FlagValue {
+			i++
+		}
+	}
+	if word == "" {
+		return nil
+	}
+	kind := "command"
+	if command != "" {
+		kind = "subcommand"
+	}
+	return usageErrorf("%s comes before the %s %q; a flag goes after it: putnami help %s [options]", flagSpelling(flag), kind, word, strings.Join(words, " "))
 }
 
 // resolveCommands splits comma-separated commands and resolves aliases.

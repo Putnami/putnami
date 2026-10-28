@@ -125,39 +125,50 @@ func TestParseArgs_FlagBeforeTheCommandHelpNamesIsRefused(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "flags-follow-the-command", "a-flag-before-the-command-help-names-is-refused")
 
+	aliases := commandAliases{user: map[string]string{"h": "help"}}
 	refused := []struct {
 		args []string
 		want string
 	}{
 		{[]string{"help", "-v", "projects"}, `-v comes before the command "projects"; a flag goes after it: putnami help projects [options]`},
+		{[]string{"help", "-v", "projects", "list"}, `a flag goes after it: putnami help projects list [options]`},
 		{[]string{"help", "--output", "json", "build"}, `--output comes before the command "build"`},
+		{[]string{"help", "--output=json", "build"}, `--output comes before the command "build"`},
+		{[]string{"help", "projects", "-v", "list"}, `-v comes before the subcommand "list"; a flag goes after it: putnami help projects list [options]`},
+		{[]string{"h", "-v", "projects"}, `-v comes before the command "projects"`},
+		{[]string{"help", "--mna", "projects"}, `unknown flag --mna for ` + "`putnami help`"},
+		{[]string{"help", "projects", "--nope", "list"}, `unknown flag --nope for ` + "`putnami help`"},
 	}
 	for _, tc := range refused {
-		parsed := ParseArgs(tc.args, nil, nil)
+		parsed := parseArgs(tc.args, aliases, nil)
 		if !errors.Is(parsed.Err, cmderr.ErrUsage) {
-			t.Errorf("ParseArgs(%v) error = %v, want a usage error", tc.args, parsed.Err)
+			t.Errorf("parseArgs(%v) error = %v, want a usage error", tc.args, parsed.Err)
 			continue
 		}
 		if !strings.Contains(parsed.Err.Error(), tc.want) {
-			t.Errorf("ParseArgs(%v) error = %q, want it to contain %q", tc.args, parsed.Err, tc.want)
+			t.Errorf("parseArgs(%v) error = %q, want it to contain %q", tc.args, parsed.Err, tc.want)
 		}
 	}
 
+	// --man and --markdown render the whole reference, so like --help they
+	// answer even with a command after them.
 	accepted := [][]string{
 		{"help"},
 		{"help", "-v"},
+		{"help", "--output", "json"},
 		{"help", "--man"},
 		{"help", "--man", "projects", "list"},
 		{"help", "projects", "-v"},
 		{"help", "projects", "list", "-v"},
+		{"help", "projects", "list", "--output", "json"},
 	}
 	for _, args := range accepted {
-		if parsed := ParseArgs(args, nil, nil); parsed.Err != nil {
-			t.Errorf("ParseArgs(%v) error = %v, want none", args, parsed.Err)
+		if parsed := parseArgs(args, aliases, nil); parsed.Err != nil {
+			t.Errorf("parseArgs(%v) error = %v, want none", args, parsed.Err)
 		}
 	}
 
-	helped := ParseArgs([]string{"help", "-v", "projects", "--help"}, nil, nil)
+	helped := parseArgs([]string{"help", "-v", "projects", "--help"}, aliases, nil)
 	if helped.Err != nil || !helped.Global.Help {
 		t.Errorf("help -v projects --help: err = %v, help = %v, want help with no error", helped.Err, helped.Global.Help)
 	}
