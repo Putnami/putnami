@@ -698,6 +698,21 @@
           }
         },
         {
+          "id": "flags-follow-the-command",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-flag-before-the-command-is-refused",
+              "a-flag-before-a-subcommand-is-refused",
+              "completion-offers-nothing-after-a-leading-flag"
+            ]
+          }
+        },
+        {
           "id": "help-lists-command-groups",
           "stage": "coded",
           "evidenceKinds": [

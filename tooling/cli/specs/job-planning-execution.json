@@ -30,6 +30,10 @@
       "text": "Help, its references and shell completion list a flag that only extension commands read, such as --retry, only where a loaded extension declares a job command or command group, and a provider-bound flag, such as --providers, only where its provider is declared. A core command refuses a flag that only extension commands read unless its own catalog entry declares it, with a usage error naming the flag, and its help and completion omit it. --help still prints. --credential-fd stays listed."
     },
     {
+      "id": "flags-follow-the-command",
+      "text": "A flag goes after the full command: putnami <command> [subcommand] [options]. A flag before the command word, or between a command root and a word that names one of its subcommands, is a usage error that names the flag and says where flags go; the CLI runs nothing else in its place. --help still prints, --version still answers, and a flag with no command word still prints help. Shell completion offers nothing after a flag that comes before the command."
+    },
+    {
       "id": "help-lists-command-groups",
       "text": "Help inside a workspace lists the command groups of the loaded extensions in a section titled Commands (from extensions), after the job commands: one row per group, in name order, with its description. A group named like a core command is not listed, because the core answers that name first. A name that a group shares with a flat extension command is listed once, as the group. Outside a workspace the section is absent."
     },
