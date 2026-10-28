@@ -92,7 +92,8 @@ _putnami_reply() {
 # without its single quotes, double quotes, backslashes and $'...' quoting:
 # completion receives each word as the user typed it. It expands nothing and
 # uses no eval, because a typed word can hold a command substitution. Inside
-# $'...', it reads \n and \t, and any other escaped character as itself.
+# $'...', it decodes the escapes that printf %%q writes: a letter such as \n or
+# \E, an octal \NNN and a hex \xHH; it reads \cX as cX.
 _putnami_dequote() {
     _putnami_word=""
     local rest="$1" c quote=""
@@ -107,12 +108,35 @@ _putnami_dequote() {
             if [[ "${c}" == "'" ]]; then
                 quote=""
             elif [[ "${c}" == "\\" && -n "${rest}" ]]; then
-                case "${rest:0:1}" in
-                    n) _putnami_word+=$'\n' ;;
-                    t) _putnami_word+=$'\t' ;;
-                    *) _putnami_word+="${rest:0:1}" ;;
-                esac
+                c="${rest:0:1}"
                 rest="${rest:1}"
+                # printf reads a format of a backslash and checked escape
+                # characters only, so it decodes and runs nothing else.
+                case "${c}" in
+                    [abfnrtv]) printf -v c "\\${c}" ;;
+                    [eE]) c=$'\E' ;;
+                    [0-7])
+                        while [[ ${#c} -lt 3 && "${rest:0:1}" == [0-7] ]]; do
+                            c+="${rest:0:1}"
+                            rest="${rest:1}"
+                        done
+                        printf -v c "\\${c}"
+                        ;;
+                    x)
+                        if [[ "${rest:0:1}" == [0-9A-Fa-f] ]]; then
+                            c="${rest:0:1}"
+                            rest="${rest:1}"
+                            if [[ "${rest:0:1}" == [0-9A-Fa-f] ]]; then
+                                c+="${rest:0:1}"
+                                rest="${rest:1}"
+                            fi
+                            printf -v c "\\x${c}"
+                        else
+                            c="\\x"
+                        fi
+                        ;;
+                esac
+                _putnami_word+="${c}"
             else
                 _putnami_word+="${c}"
             fi

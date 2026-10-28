@@ -304,20 +304,38 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 // backslashes included. Each script reads an earlier word as the shell reads
 // it, so a command alias typed with quotes takes the flags of its command: the
 // extension flags for a job command, and no job-only flag for a core command.
+// In bash, a word is also typed as printf %q writes it in the C locale, which
+// is how a completed reply reaches the command line: $'...' with a letter,
+// octal or hex escape for a byte that is not printable ASCII.
 func TestCompletionReadsAQuotedCommandAliasAsItsName(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "a-quoted-command-alias-takes-its-command-flags")
 	ws := writeHostileWorkspace(t)
+	jobAliases := make([]string, 0, len(hostileNames)+4)
+	coreAliases := make([]string, 0, len(hostileNames))
+	for _, name := range hostileNames {
+		jobAliases = append(jobAliases, "j"+name)
+		coreAliases = append(coreAliases, "k"+name)
+	}
+	for _, name := range []string{"jd\u00e9ploy", "jc\rr", "je\x1be", "jo\x01o"} {
+		ws.cfg.Aliases[name] = "lint-docs"
+		jobAliases = append(jobAliases, name)
+	}
 	jobOnly := hiddenJobFlags()
 	shells := []struct {
 		name   string
+		forms  func(t *testing.T, name string) []string
 		offers func(t *testing.T, dir string, words []string) []string
 	}{
-		{"bash", func(t *testing.T, dir string, words []string) []string {
+		{"bash", func(t *testing.T, name string) []string {
+			return append(typedForms(name), bashPrintfQ(t, name))
+		}, func(t *testing.T, dir string, words []string) []string {
 			var script bytes.Buffer
 			CompletionBash(&script, ws.root, ws.cfg, nil)
 			return bashReadBack(t, bashCompletionReplies(t, dir, script.String(), append([]string{"putnami"}, words...)))
 		}},
-		{"zsh", func(t *testing.T, dir string, words []string) []string {
+		{"zsh", func(t *testing.T, name string) []string {
+			return typedForms(name)
+		}, func(t *testing.T, dir string, words []string) []string {
 			var script bytes.Buffer
 			CompletionZsh(&script, ws.root, ws.cfg, nil)
 			return zshCompletionOffers(t, dir, script.String(), "args", words)
@@ -328,14 +346,16 @@ func TestCompletionReadsAQuotedCommandAliasAsItsName(t *testing.T) {
 			if _, err := exec.LookPath(shell.name); err != nil {
 				t.Skip(shell.name + " unavailable on this platform")
 			}
-			for _, name := range hostileNames {
-				for _, typed := range typedForms("j" + name) {
+			for _, alias := range jobAliases {
+				for _, typed := range shell.forms(t, alias) {
 					dir := t.TempDir()
 					offered := shell.offers(t, dir, []string{typed, "--"})
 					assertNoCodeRan(t, shell.name, dir)
 					assertOffersEach(t, shell.name, typed+" --", offered, append([]string{"--projects"}, ws.flags...))
 				}
-				for _, typed := range typedForms("k" + name) {
+			}
+			for _, alias := range coreAliases {
+				for _, typed := range shell.forms(t, alias) {
 					dir := t.TempDir()
 					offered := shell.offers(t, dir, []string{typed, "--"})
 					assertNoCodeRan(t, shell.name, dir)
@@ -352,6 +372,18 @@ func TestCompletionReadsAQuotedCommandAliasAsItsName(t *testing.T) {
 			assertOffersEach(t, shell.name, "lint-docs '--projects'", offered, ws.targets)
 		})
 	}
+}
+
+// bashPrintfQ returns name as bash's printf %q writes it in the C locale.
+func bashPrintfQ(t *testing.T, name string) string {
+	t.Helper()
+	cmd := exec.Command("bash", "-c", `LC_ALL=C; printf '%q' "$1"`, "bash", name)
+	cmd.Dir = t.TempDir()
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("bash printf %%q of %q: %v", name, err)
+	}
+	return string(out)
 }
 
 // typedForms returns the ways a user types name as one word: single-quoted,
