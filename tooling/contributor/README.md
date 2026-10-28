@@ -156,6 +156,7 @@ session:
 - [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)
 - [ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)
 - [ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)
+- [ADR 0009](doc/adr/0009-one-contribution-loop-from-talk-to-merge.md)
 
 ## Publication
 

@@ -204,6 +204,70 @@
       "settledBy": "fdumay",
       "adr": "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-027",
+      "statement": "a change runs one loop of stages, talk, declare, show, code, check, prove, validate and merge; no other list of stages exists, and deployment after merge is CI/CD, not a stage",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-028",
+      "statement": "an issue is delivered by one pull request with no line or time cap; several pull requests mean several issues, grouped in an epic that orders them",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-029",
+      "statement": "the slices of one issue run in sequence in the main session; parallel work means several issues of an epic, and by default only review runs in a subagent",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-030",
+      "statement": "code starts without the owner's approval unless the plan spans several slices with important design or spec decisions, or touches a sensitive zone; then the owner approves the study and a cost envelope first",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-031",
+      "statement": "a project declares its sensitive zones in SDD; for a project that declares none, data migrations and the public API are its sensitive zones",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-032",
+      "statement": "the issue holds the intent and labels, the mission holds the live state, the pull request description is the archive, and a change's screenshots and reports live under .putnami/, outside Git",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-033",
+      "statement": "an issue carries type/, priority/ (urgent, high, normal, low) and scope/ labels, and workflow/<profile> selects a workflow profile; P1 to P3 name review finding severity only",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-034",
+      "statement": "a workflow profile becomes the default for an issue type only after paired runs, five to start, show lower cost with no more P1 or P2 findings and no more rework",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+      "reviewOnly": true
     }
   ]
 }
