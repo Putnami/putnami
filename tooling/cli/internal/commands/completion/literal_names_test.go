@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -148,6 +149,7 @@ func assertOffersEach(t *testing.T, shell, position string, offered, names []str
 // The bash script holds each name as one word of an array, and offers it
 // quoted, so the command line reads it back as the same word.
 func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "bash-offers-each-name-as-one-literal-word")
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash unavailable on this platform")
 	}
@@ -296,6 +298,22 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 		offered = append(offered, value)
 	}
 	return offered
+}
+
+// Each extension flag spec reads back, by the rules of zsh's _values parser, as
+// the flag's name, and its description ends where the spec says. This reads
+// the generated text, so it runs where zsh is not installed.
+func TestZshFlagSpecReadsBackEveryNameLiterally(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "zsh-flag-specs-read-each-name-literally")
+	for _, name := range hostileNames {
+		flag := "--f" + name
+		for _, valueName := range []string{"", "<value>"} {
+			spec := zshFlagSpec(flag, name+`\`, valueName, nil)
+			if got := zshValuesName(spec); got != flag {
+				t.Errorf("_values reads the spec %q as %q, not %q", spec, got, flag)
+			}
+		}
+	}
 }
 
 // zshValuesName returns the name _values reads from one spec
@@ -452,6 +470,7 @@ func fishCompletions(t *testing.T, script string) (conditions, arguments [][]str
 // candidates of -a and in the condition of -n. This reads the generated text
 // as fish does, so it runs where fish is not installed.
 func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "fish-quotes-each-name-for-both-reads")
 	ws := writeHostileWorkspace(t)
 	var script bytes.Buffer
 	CompletionFish(&script, ws.root, ws.cfg, nil)
