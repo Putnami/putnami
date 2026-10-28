@@ -1,9 +1,9 @@
 // Package finalize is `putnami change finalize`: it publishes a draft, or a
 // clean committed candidate with current proof, through the collaboration
-// contracts, and runs no local gate. It is a copy of the finalizer of
-// `putnami proposals finalize`, the core command it replaced, with the same
-// checks, order and messages. It reaches the providers, the workspace graph and the task cache
-// through the host RPC channel putnami opens for the launch.
+// contracts, and runs no local gate. It began as a copy of the finalizer of
+// `putnami proposals finalize`, the core command it replaced. It reaches the
+// providers, the workspace graph and the task cache through the host RPC
+// channel putnami opens for the launch.
 package finalize
 
 import (
@@ -211,6 +211,8 @@ func (f Finalizer) frozen(ctx context.Context, opts Options, originalBody []byte
 	if actualHead != head {
 		return Verified{}, errors.New("HEAD changed during finalization")
 	}
+	// The merge base binds the candidate, not the tip of origin/<base>: worktrees
+	// of one clone share that ref, so any fetch elsewhere moves the tip.
 	actualBaseSHA, err := f.Git.BaseSHA(baseRef)
 	if err != nil {
 		return Verified{}, err

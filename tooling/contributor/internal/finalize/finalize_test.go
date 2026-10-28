@@ -827,7 +827,11 @@ func TestHostedChecksRejectProposalThatReturnsToDraft(t *testing.T) {
 }
 
 func TestChangedHeadMergeBaseOrBodyAfterPushStopsBeforeProviderWrite(t *testing.T) {
-	for _, changed := range []string{"head", "merge base", "body"} {
+	for changed, message := range map[string]string{
+		"head":       "HEAD changed during finalization",
+		"merge base": "publication merge base moved during finalization",
+		"body":       "body file changed during finalization",
+	} {
 		t.Run(changed, func(t *testing.T) {
 			f, git, provider, opts := finalizerFixture(t)
 			git.pushHook = func() {
@@ -839,7 +843,7 @@ func TestChangedHeadMergeBaseOrBodyAfterPushStopsBeforeProviderWrite(t *testing.
 					_ = os.WriteFile(opts.BodyFile, []byte("Changed after push"), 0600)
 				}
 			}
-			if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 0 {
+			if _, err := f.Run(context.Background(), opts); err == nil || err.Error() != message || provider.upserts != 0 {
 				t.Fatalf("changed %s reached provider upsert: %v", changed, err)
 			}
 		})
