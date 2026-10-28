@@ -2,10 +2,12 @@ package sessionreporter
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/json"
 	"errors"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -36,7 +38,8 @@ var errViewOutside = errors.New("position outside the event stream view")
 // subscription, splits it into records itself, and decides each record once,
 // whole, from the records before it: it drops progress events, holds an
 // owner's task:event records from its first debug line to its task:end, and
-// drops the held debug lines of an owner that passes. What leaves is a queue
+// drops the held debug lines of an owner that passes. A record that names an
+// owner the cap made live leaves live. What leaves is a queue
 // of raw byte ranges, each at its view offset; a frame reads its bytes back
 // from disk. The view keeps byte ranges, never record bytes, beyond the window
 // it scans, the record it decodes and the frame it cuts.
@@ -58,6 +61,12 @@ type view struct {
 	partial     []byte
 	// owners are the owners that hold records, and the ones the cap made live.
 	owners map[string]*viewOwner
+	// groups are the open groups, by their key (group). key, holderKeys and
+	// holders are scratch space for the record being decided.
+	groups     map[string]*viewGroup
+	key        []byte
+	holderKeys []string
+	holders    []*viewOwner
 	// held counts the records held, a shared record once.
 	held int
 	// queue is the ranges that left and are not wholly before cursor, in view
@@ -78,20 +87,31 @@ type viewRange struct{ raw, size, at int64 }
 // and the view offset it ends at.
 type viewLow struct{ raw, end int64 }
 
-// viewEntry is one held record: its raw range, whether it is a debug log
-// line, and how many owners still hold it. gone marks a record that left or
-// was dropped; an owner's held list skips it.
-type viewEntry struct {
-	raw, size int64
-	debug     bool
-	holders   int
-	gone      bool
+// viewEntry is one held record: its raw range.
+type viewEntry struct{ raw, size int64 }
+
+// viewGroup holds, once, the records one set of owners holds, each list in raw
+// order: debug the debug log lines, other the other records. Each of its
+// owners references the group, never its records, so a record that many
+// owners hold costs one entry, and an owner one reference per owner set it
+// shares. members counts the owners that reference it.
+//
+// A group takes records while it is open, until one of its owners ends or the
+// cap releases one: a record of the same owners then opens a new group. Its
+// lists leave whole: other at its first owner's end, debug at the first end
+// that fails, or dropped at the last one, which passes.
+type viewGroup struct {
+	// key is the group's key while it is open, and empty once it is closed.
+	key          string
+	members      int
+	debug, other []viewEntry
 }
 
-// viewOwner is one owner of records (ADR 0083, rule 2). held is in raw order.
+// viewOwner is one owner of records (ADR 0083, rule 2): one that holds, from
+// its first debug log line to its task:end, or one the cap made live.
 type viewOwner struct {
-	held    []*viewEntry
-	holding bool
+	// groups are the groups the owner holds records in.
+	groups []*viewGroup
 	// live: the cap released this owner, which never holds again.
 	live bool
 }
@@ -118,7 +138,7 @@ type viewRecord struct {
 // newView starts a view of events at raw offset 0, its acknowledged cursor
 // at view offset cursor.
 func newView(events *sessionstream.Subscription, cursor int64) *view {
-	return &view{events: events, cursor: cursor, owners: map[string]*viewOwner{}}
+	return &view{events: events, cursor: cursor, owners: map[string]*viewOwner{}, groups: map[string]*viewGroup{}}
 }
 
 // available is how many view bytes past offset are ready to frame. It scans
@@ -152,8 +172,10 @@ func (v *view) acknowledged(cursor int64) int64 {
 		low = min(low, v.lows[0].raw)
 	}
 	for _, o := range v.owners {
-		if e := o.first(); e != nil {
-			low = min(low, e.raw)
+		for _, g := range o.groups {
+			if raw, ok := g.first(); ok {
+				low = min(low, raw)
+			}
 		}
 	}
 	return low
@@ -257,41 +279,73 @@ func (v *view) decide(line []byte, raw, size int64) {
 	v.emit(raw, size)
 }
 
-// taskEvent drops a progress event, holds a record one of its owners holds,
-// and sends any other one live. An owner starts holding at its first debug
+// taskEvent drops a progress event, sends live a record that names an owner
+// the cap made live or that no owner holds, and holds any other one in the
+// group of the owners that hold it. An owner starts holding at its first debug
 // log line, unless the cap made it live.
 func (v *view) taskEvent(record *viewRecord, raw, size int64) {
 	if record.Event.Type == string(runtimeproto.EventProgress) {
 		return
 	}
 	debug := record.Event.Type == string(runtimeproto.EventLog) && record.Event.Level == string(runtimeproto.LevelDebug)
-	var entry *viewEntry
+	live := false
+	v.holderKeys, v.holders = v.holderKeys[:0], v.holders[:0]
 	for _, key := range record.owners() {
 		o := v.owners[key]
 		if debug && o == nil {
 			o = &viewOwner{}
 			v.owners[key] = o
 		}
-		if o == nil || o.live {
-			continue
+		switch {
+		case o == nil:
+		case o.live:
+			live = true
+		default:
+			v.holderKeys, v.holders = append(v.holderKeys, key), append(v.holders, o)
 		}
-		o.holding = o.holding || debug
-		if !o.holding {
-			continue
-		}
-		if entry == nil {
-			entry = &viewEntry{raw: raw, size: size, debug: debug}
-			v.held++
-		}
-		entry.holders++
-		o.hold(entry)
 	}
-	if entry == nil {
+	if live || len(v.holders) == 0 {
 		v.emit(raw, size)
 		return
 	}
+	g := v.group()
+	if debug {
+		g.debug = append(g.debug, viewEntry{raw: raw, size: size})
+	} else {
+		g.other = append(g.other, viewEntry{raw: raw, size: size})
+	}
+	v.held++
 	if v.held > viewHeldCap {
 		v.releaseLargest()
+	}
+}
+
+// group returns the open group of the holders of the record being decided,
+// and opens it, referenced by each of them, at its first record. Its key lists
+// the owner keys in record order, each prefixed with its length.
+func (v *view) group() *viewGroup {
+	v.key = v.key[:0]
+	for _, key := range v.holderKeys {
+		v.key = strconv.AppendInt(v.key, int64(len(key)), 10)
+		v.key = append(v.key, ':')
+		v.key = append(v.key, key...)
+	}
+	if g, ok := v.groups[string(v.key)]; ok {
+		return g
+	}
+	g := &viewGroup{key: string(v.key), members: len(v.holders)}
+	v.groups[g.key] = g
+	for _, o := range v.holders {
+		o.join(g)
+	}
+	return g
+}
+
+// close stops g from taking records.
+func (v *view) close(g *viewGroup) {
+	if g.key != "" {
+		delete(v.groups, g.key)
+		g.key = ""
 	}
 }
 
@@ -301,90 +355,119 @@ func (v *view) taskEvent(record *viewRecord, raw, size int64) {
 // dropped when none does.
 func (v *view) taskEnd(key, status string) {
 	o := v.owners[key]
-	if o == nil {
+	if o == nil || o.live {
 		return
 	}
 	passed := status == protocolcli.TaskStatusSuccess || status == protocolcli.TaskStatusSkipped
-	for _, e := range o.held {
-		if e.gone {
-			continue
+	var lists [][]viewEntry
+	for _, g := range o.groups {
+		v.close(g)
+		g.members--
+		lists = append(lists, g.other)
+		v.held -= len(g.other)
+		g.other = nil
+		if !passed {
+			lists = append(lists, g.debug)
 		}
-		e.holders--
-		switch {
-		case !passed || !e.debug:
-			v.release(e)
-		case e.holders == 0:
-			e.gone = true
-			v.held--
+		if !passed || g.members == 0 {
+			v.held -= len(g.debug)
+			g.debug = nil
 		}
 	}
-	o.held, o.holding = nil, false
-	if !o.live {
-		delete(v.owners, key)
-	}
+	delete(v.owners, key)
+	v.emitMerged(lists)
 }
 
 // releaseLargest releases every record of the owner that holds the most, as
 // a failure would, and makes it live (D-R2). A tie goes to the owner whose
 // first held record comes first, then to the smaller owner key.
 func (v *view) releaseLargest() {
-	// A held list counts the records other owners released until it is
-	// compacted, so its length bounds what it holds: owners are compacted in
-	// the order of that bound, until no bound can reach the largest count.
-	keys := make([]string, 0, len(v.owners))
-	for key, o := range v.owners {
-		if len(o.held) > 0 {
-			keys = append(keys, key)
-		}
-	}
-	slices.SortFunc(keys, func(a, b string) int { return len(v.owners[b].held) - len(v.owners[a].held) })
 	var largest *viewOwner
-	largestKey, largestFirst := "", int64(0)
-	for _, key := range keys {
-		o := v.owners[key]
-		if largest != nil && len(o.held) < len(largest.held) {
-			break
-		}
-		o.compact()
-		if len(o.held) == 0 {
+	largestKey, largestCount, largestFirst := "", 0, int64(0)
+	for key, o := range v.owners {
+		count, first := o.holds()
+		if count == 0 {
 			continue
 		}
-		first := o.held[0].raw
-		if largest == nil || len(o.held) > len(largest.held) ||
-			len(o.held) == len(largest.held) && (first < largestFirst || first == largestFirst && key < largestKey) {
-			largest, largestKey, largestFirst = o, key, first
+		if largest == nil || count > largestCount ||
+			count == largestCount && (first < largestFirst || first == largestFirst && key < largestKey) {
+			largest, largestKey, largestCount, largestFirst = o, key, count, first
 		}
 	}
 	if largest == nil {
 		return
 	}
-	for _, e := range largest.held {
-		v.release(e)
+	lists := make([][]viewEntry, 0, 2*len(largest.groups))
+	for _, g := range largest.groups {
+		v.close(g)
+		g.members--
+		lists = append(lists, g.debug, g.other)
+		v.held -= len(g.debug) + len(g.other)
+		g.debug, g.other = nil, nil
 	}
-	largest.held, largest.holding, largest.live = nil, false, true
+	largest.groups, largest.live = nil, true
+	v.emitMerged(lists)
 }
 
 // releaseAll releases every held record, in raw order, as a session:end
 // record or the final marker does. Owners the cap made live stay live.
 func (v *view) releaseAll() {
-	var held []*viewEntry
+	var lists [][]viewEntry
 	for key, o := range v.owners {
-		for _, e := range o.held {
-			if !e.gone {
-				held = append(held, e)
+		for _, g := range o.groups {
+			v.close(g)
+			if !g.empty() {
+				lists = append(lists, g.debug, g.other)
+				v.held -= len(g.debug) + len(g.other)
+				g.debug, g.other = nil, nil
 			}
 		}
-		o.held, o.holding = nil, false
+		o.groups = nil
 		if !o.live {
 			delete(v.owners, key)
 		}
 	}
-	sort.Slice(held, func(i, j int) bool { return held[i].raw < held[j].raw })
-	for _, e := range held {
-		if !e.gone {
-			v.release(e)
+	v.emitMerged(lists)
+}
+
+// emitMerged sends the records of lists, each in raw order, merged in raw
+// order. No two records share a raw offset: each is held in one group only.
+func (v *view) emitMerged(lists [][]viewEntry) {
+	merge := make(viewMerge, 0, len(lists))
+	for _, list := range lists {
+		if len(list) > 0 {
+			heap.Push(&merge, list)
 		}
 	}
+	for len(merge) > 0 {
+		e := merge[0][0]
+		v.emit(e.raw, e.size)
+		if merge[0] = merge[0][1:]; len(merge[0]) == 0 {
+			heap.Pop(&merge)
+		} else {
+			heap.Fix(&merge, 0)
+		}
+	}
+}
+
+// viewMerge is a heap of non-empty record lists by their first raw offset.
+type viewMerge [][]viewEntry
+
+func (m viewMerge) Len() int           { return len(m) }
+func (m viewMerge) Less(i, j int) bool { return m[i][0].raw < m[j][0].raw }
+func (m viewMerge) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
+
+func (m *viewMerge) Push(x any) {
+	if list, ok := x.([]viewEntry); ok {
+		*m = append(*m, list)
+	}
+}
+
+func (m *viewMerge) Pop() any {
+	old := *m
+	last := old[len(old)-1]
+	*m = old[:len(old)-1]
+	return last
 }
 
 // finish ends the view of a final stream that ends at end: what is still
@@ -397,13 +480,6 @@ func (v *view) finish(end int64) {
 	}
 	v.partial, v.window = nil, nil
 	v.done = true
-}
-
-// release sends a held record now, and removes it from every owner.
-func (v *view) release(e *viewEntry) {
-	e.gone = true
-	v.held--
-	v.emit(e.raw, e.size)
 }
 
 // emit appends raw bytes [raw, raw+size) to the view. A range wholly before
@@ -506,37 +582,46 @@ func (r *viewRecord) owners() []string {
 	return keys
 }
 
-// hold appends a held record. A full list first drops the records that
-// already left, so records another owner released do not accumulate, then
-// keeps room for as many again: each compaction is followed by at least half
-// its length of appends.
-func (o *viewOwner) hold(e *viewEntry) {
-	if len(o.held) == cap(o.held) {
-		o.compact()
-		o.held = slices.Grow(o.held, len(o.held)+1)
+// join references g. A full list first drops the groups that closed empty,
+// so the groups of owner sets that ended do not accumulate, then keeps room
+// for as many again.
+func (o *viewOwner) join(g *viewGroup) {
+	if len(o.groups) == cap(o.groups) {
+		o.groups = slices.DeleteFunc(o.groups, func(g *viewGroup) bool { return g.key == "" && g.empty() })
+		o.groups = slices.Grow(o.groups, len(o.groups)+1)
 	}
-	o.held = append(o.held, e)
+	o.groups = append(o.groups, g)
 }
 
-// compact drops the records that left or were dropped from the held list.
-func (o *viewOwner) compact() {
-	kept := o.held[:0]
-	for _, e := range o.held {
-		if !e.gone {
-			kept = append(kept, e)
+// holds is how many records the owner holds, and the raw offset of the first.
+func (o *viewOwner) holds() (int, int64) {
+	count, first := 0, int64(0)
+	for _, g := range o.groups {
+		raw, ok := g.first()
+		if !ok {
+			continue
 		}
+		if count == 0 || raw < first {
+			first = raw
+		}
+		count += len(g.debug) + len(g.other)
 	}
-	clear(o.held[len(kept):])
-	o.held = kept
+	return count, first
 }
 
-// first is the first record the owner still holds, or nil.
-func (o *viewOwner) first() *viewEntry {
-	for len(o.held) > 0 && o.held[0].gone {
-		o.held = o.held[1:]
+// empty reports whether the group holds no record.
+func (g *viewGroup) empty() bool { return len(g.debug) == 0 && len(g.other) == 0 }
+
+// first is the raw offset of the group's first record, or false when it holds
+// none.
+func (g *viewGroup) first() (int64, bool) {
+	switch {
+	case g.empty():
+		return 0, false
+	case len(g.debug) == 0:
+		return g.other[0].raw, true
+	case len(g.other) == 0:
+		return g.debug[0].raw, true
 	}
-	if len(o.held) == 0 {
-		return nil
-	}
-	return o.held[0]
+	return min(g.debug[0].raw, g.other[0].raw), true
 }

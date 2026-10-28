@@ -55,7 +55,9 @@ stream, not its bytes
 4. Sends what is still held at `session:end` and at the stream's final
    marker, then a torn last line, as it is.
 5. Past 1,000,000 held records, sends the records of the task that holds the
-   most, and sends that task live from then on.
+   most, and sends that task live from then on. A tie goes to the task whose
+   first held record comes first, then to the task whose `identity.key` sorts
+   first. A record that names a task sent live leaves live.
 
 Every `task:start`, `task:end`, `test:case` and `session:end` record leaves,
 and a line that is not a JSON record leaves as it is. A task that logs `debug`

@@ -371,7 +371,8 @@ func TestSessionEndAndTheFinalMarkerReleaseWhatIsHeld(t *testing.T) {
 // TestHeldRecordsPastTheCapReleaseTheTaskThatHoldsTheMost lowers the cap
 // (D-R2): past it, the owner that holds the most releases every record, as a
 // failure would, and sends live from then on. A tie goes to the owner whose
-// first held record comes first, and a shared record counts once.
+// first held record comes first, then to the smaller owner key, a shared
+// record counts once, and a record that names a live owner leaves live.
 func TestHeldRecordsPastTheCapReleaseTheTaskThatHoldsTheMost(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "trimmed-upload", "held-records-past-the-cap-release-the-task-that-holds-the-most")
 	defer func(held int) { viewHeldCap = held }(viewHeldCap)
@@ -401,6 +402,83 @@ func TestHeldRecordsPastTheCapReleaseTheTaskThatHoldsTheMost(t *testing.T) {
 	again := batchRecord(batch, "debug", "shared again", `{"batchProjectIds":["/y","/x"]}`)
 	assertView(t, []string{shared, debug(x, "x1"), debug(y, "y1"), again, debug(y, "y2"), endRecord(y, pass), endRecord(x, pass)},
 		shared, debug(x, "x1"), again, endRecord(y, pass), endRecord(x, pass))
+
+	// The cap makes b live. A shared debug line that names a and b then
+	// leaves live: it is not held for a, which passes, while b fails. a
+	// starts holding at that line, its first debug line, so its info line
+	// leaves after c's, at its end.
+	c := "/c:test"
+	withLive := batchRecord(batch, "debug", "shared with a live owner", `{"batchProjectIds":["/a","/b"]}`)
+	a1, c1 := logRecord(a, "info", "a1", 0), logRecord(c, "info", "c1", 0)
+	failed := endRecord(b, protocolcli.TaskStatusFailed)
+	assertView(t, []string{debug(b, "b1"), debug(b, "b2"), debug(b, "b3"), debug(b, "b4"), withLive, a1, c1, debug(a, "a2"), endRecord(a, pass), failed},
+		debug(b, "b1"), debug(b, "b2"), debug(b, "b3"), debug(b, "b4"), withLive, c1, a1, endRecord(a, pass), failed)
+}
+
+// TestASharedRecordIsHeldOnce holds batch lines that name every member of a
+// 200-member batch: each line is one entry in one group, and each member
+// references that group once, whatever the number of lines. When every
+// member passes, the lines are dropped.
+func TestASharedRecordIsHeldOnce(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "trimmed-upload", "held-records-past-the-cap-release-the-task-that-holds-the-most")
+	spectest.Proves(t, "cli/native-session-reporting", "trimmed-upload", "a-shared-batch-line-leaves-at-its-first-failing-member")
+	ids := make([]string, 200)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("/m%03d", i)
+	}
+	context, err := json.Marshal(map[string][]string{"batchProjectIds": ids})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lines := range []int{10, 1000} {
+		log, err := sessionstream.Create(t.TempDir(), batchSessionID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range lines {
+			if err := log.Append([]byte(batchRecord("/workspace:test-batch", "debug", fmt.Sprintf("shared %d", i), string(context)))); err != nil {
+				t.Fatal(err)
+			}
+		}
+		sub, err := log.Subscribe("view-test", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v := newView(sub, 0)
+		if err := v.fill(math.MaxInt64); err != nil {
+			t.Fatal(err)
+		}
+		references, groups := 0, map[*viewGroup]bool{}
+		for _, o := range v.owners {
+			references += len(o.groups)
+			for _, g := range o.groups {
+				groups[g] = true
+			}
+		}
+		entries := 0
+		for g := range groups {
+			entries += len(g.debug) + len(g.other)
+		}
+		if len(v.owners) != len(ids) || references != len(ids) || len(groups) != 1 || entries != lines || v.held != lines {
+			t.Fatalf("%d shared lines: %d owners hold %d entries in %d groups through %d references (held %d), want %d owners, %d entries, 1 group, %d references",
+				lines, len(v.owners), entries, len(groups), references, v.held, len(ids), lines, len(ids))
+		}
+		var ends []string
+		for _, id := range ids {
+			ends = append(ends, endRecord(id+":test", protocolcli.TaskStatusSuccess))
+			if err := log.Append([]byte(ends[len(ends)-1])); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := v.fill(math.MaxInt64); err != nil {
+			t.Fatal(err)
+		}
+		if v.held != 0 || len(v.owners) != 0 || len(v.groups) != 0 || v.end != int64(len(stream(ends...))) {
+			t.Fatalf("after every member passed: held %d, %d owners, %d open groups, %d view bytes", v.held, len(v.owners), len(v.groups), v.end)
+		}
+		_ = sub.Close()
+		_ = log.Close()
+	}
 }
 
 // TestViewFramesKeepTheirBytesAfterARetry has the receiver refuse every
@@ -531,12 +609,15 @@ func TestViewFramesKeepTheirBytesAfterAnEngineRestart(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			stopped := awaitCheckpoint(t, dir, func(s state) bool { return s.Events.Sequence >= 2 })
+			awaitCheckpoint(t, dir, func(s state) bool { return s.Events.Sequence >= 2 })
 			run.cancel()
 			<-run.done
 			_ = run.events.Close()
-			if stopped.Version != viewCheckpointVersion {
-				t.Fatalf("checkpoint version %d, want 2", stopped.Version)
+			stopped := readCheckpoint(t, dir)
+			heldAt := int64(len(first[0]) + 1)
+			if stopped.Version != viewCheckpointVersion || stopped.EventsRaw > heldAt || stopped.Events.Offset <= heldAt {
+				t.Fatalf("checkpoint version %d at view offset %d acknowledges raw offset %d, want version 2 ahead of a raw offset at or before the held line at %d",
+					stopped.Version, stopped.Events.Offset, stopped.EventsRaw, heldAt)
 			}
 			second := append(viewSession(2, 4), logRecord(held, "info", "after the restart", 0), endRecord(held, protocolcli.TaskStatusFailed))
 			for _, record := range second {
@@ -549,6 +630,9 @@ func TestViewFramesKeepTheirBytesAfterAnEngineRestart(t *testing.T) {
 			}
 			if err := os.WriteFile(filepath.Join(dir, sessionFile), []byte(`{"protocolVersion":2}`), 0o644); err != nil {
 				t.Fatal(err)
+			}
+			if got := resumedAcknowledgement(t, dir, log); got.Offset != stopped.EventsRaw {
+				t.Fatalf("the resumed run subscribes at raw offset %d, want the checkpoint's %d", got.Offset, stopped.EventsRaw)
 			}
 			var chunks []protocolcli.SessionReportingChunk
 			var s state
@@ -579,6 +663,75 @@ func TestViewFramesKeepTheirBytesAfterAnEngineRestart(t *testing.T) {
 				t.Fatalf("checkpoint after the restart = %+v", s)
 			}
 		})
+	}
+}
+
+// resumedAcknowledgement opens the session reporter's checkpoint in dir on
+// log, a final stream, as a resumed run does, and returns the position its
+// subscription starts acknowledged at.
+func resumedAcknowledgement(t *testing.T, dir string, log *sessionstream.Log) sessionstream.Position {
+	t.Helper()
+	r, err := openRun(context.Background(), SessionReporter, dir, batchSessionID, holderProvider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.release()
+	if err := r.subscribe(log); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.events.Close() }()
+	evidence, err := r.events.Evidence()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return evidence.Acknowledged
+}
+
+// TestAResumedViewRunSubscribesAtItsRawOffset resumes version 2 checkpoints:
+// the subscription starts at eventsRaw, behind the line a task still holds,
+// not at the view cursor. A checkpoint that acknowledged the view's final
+// marker, with spec-verification.json still open, acknowledges the raw
+// stream's final marker, and the evidence reads delivered.
+func TestAResumedViewRunSubscribesAtItsRawOffset(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "trimmed-upload", "the-view-final-marker-reads-delivered")
+	held := "/held:test"
+	records := append([]string{startRecord(held), logRecord(held, "debug", "held", 0)}, viewSession(0, 2)...)
+	data := stream(records...)
+	view, _ := viewOf(t, data)
+	heldAt := int64(len(records[0]) + 1)
+	frames := int64(len(view)+protocolcli.SessionReportingChunkBytes-1) / protocolcli.SessionReportingChunkBytes
+	dir := finishedSession(t, data)
+	write := func(s state) {
+		t.Helper()
+		s.Version, s.Provider, s.SessionID = viewCheckpointVersion, holderProvider, batchSessionID
+		checkpoint, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, StateFile), checkpoint, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	log, err := sessionstream.Open(dir, batchSessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	write(state{Events: cursor{Offset: 2 * protocolcli.SessionReportingChunkBytes, Sequence: 2}, EventsRaw: heldAt, PlanOmitted: planAbsent})
+	if got, want := resumedAcknowledgement(t, dir, log), (sessionstream.Position{Offset: heldAt, Records: 1}); got != want {
+		t.Fatalf("the resumed run starts acknowledged at %+v, want the checkpoint's raw offset %+v", got, want)
+	}
+
+	write(state{
+		Events: cursor{Offset: int64(len(view)), Sequence: frames + 1, Final: true}, EventsRaw: int64(len(data)),
+		Session: cursor{Offset: 21, Sequence: 2, Final: true}, PlanOmitted: planAbsent,
+	})
+	sent, s := resumePlan(t, dir)
+	if len(sent) != 0 || !s.Complete || s.SpecVerificationOmitted != specVerificationAbsent || s.EventsRaw != int64(len(data)) {
+		t.Fatalf("replay sent %s and left %+v", frameOrder(sent), s)
+	}
+	if got := sessionReporterEvidence(t, dir); got != protocolcli.SubscriberEvidenceDelivered {
+		t.Fatalf("evidence %q, want delivered", got)
 	}
 }
 
