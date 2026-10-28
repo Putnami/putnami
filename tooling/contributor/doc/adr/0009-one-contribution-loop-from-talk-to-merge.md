@@ -50,6 +50,11 @@ owner approves the study and a cost envelope first. After approval the agent
 stops only when it exceeds the envelope, must change the approved design, or
 contradicts an ADR.
 
+`putnami change estimate` sizes the plan. S is the smallest measured class:
+a range whose high bound stays within 90 active minutes. A change of 5 files
+or fewer took 31 to 86 active minutes in the measured sessions, so a
+30-minute line would leave no plan in S. An S plan starts without waiting.
+
 A project declares its sensitive zones in SDD. For a project that declares
 none, data migrations and the public API are sensitive zones.
 
@@ -73,6 +78,11 @@ A workflow profile maps each stage to a model, an effort level, and the place
 it runs. A profile becomes the default for an issue type only after paired
 runs on the same base commit, five to start, show lower cost with no more P1
 or P2 findings and no more rework.
+
+Profiles live in the contributor policy, `options["@putnami/contributor"]` of
+`putnami.workspace.json`, where they replace the tier labels and workers.
+`decisions.json` holds statements with a check, not configuration; a decision
+there names the default profile.
 
 ## Consequences
 
