@@ -6,17 +6,18 @@ on:
 permissions:
   contents: read
   packages: read
+env:
+  REF: 8225583be0d17c8ac5f116feb39116a02ec67a2a
+  SHARDS: '6'
 jobs:
-  bench:
-    name: ${{ matrix.name }}
+  overlap:
+    name: overlap-${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { name: s2-a, kind: ab, ref: 0b3216bfe3d8be25251f0f185602fe26ea28ae6d, cmd: ab, args: 'inst-old-1 inst-new-1 inst-new-2 inst-old-2 put-cli-old put-cli-new' }
-          - { name: s2-b, kind: ab, ref: 0b3216bfe3d8be25251f0f185602fe26ea28ae6d, cmd: ab, args: 'put-cli-new put-cli-old inst-new-1 inst-old-1 inst-old-2 inst-new-2' }
+        shard: [0, 1, 2, 3, 4, 5]
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -42,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ matrix.ref }}
+          ref: ${{ env.REF }}
           fetch-depth: 0
       - uses: actions/checkout@v5
         with:
@@ -59,53 +60,50 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Machine
         run: nproc; free -g; df -h / | tail -1
-      - name: Raw tools
-        if: matrix.kind == 'raw'
-        run: |
-          GOCACHE="$RUNNER_TEMP/toolcache" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.1
-          GOCACHE="$RUNNER_TEMP/toolcache" go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-          GOCACHE="$RUNNER_TEMP/toolcache" go list -deps -test $(go list -m -f '{{.Path}}/...') > /dev/null || true
-          go clean -cache
       - name: Install
-        if: matrix.kind != 'raw'
-        run: /usr/bin/time -v -o "$RUNNER_TEMP/time-install.txt" ./putnamiw install
-      - name: Cache off
-        if: matrix.kind != 'raw'
+        run: ./putnamiw install
+      - name: Per-test coverage
         run: |
-          echo '{"enabled": false}' > .putnami/cache.json
-      - name: Bench
-        env:
-          CMD: ${{ matrix.cmd }}
-          ARGS: ${{ matrix.args }}
-          BASE_REF: 0c249fbb9131326cb274b1eeb41c7856c4a94b31
-        run: |
-          set +e
           vmstat -t 5 > "$RUNNER_TEMP/vmstat.txt" &
-          VM=$!
-          $RUNNER_TEMP/bench-tools/.github/bench/sample.sh "$RUNNER_TEMP/out/sample" &
-          SP=$!
-          mkdir -p "$RUNNER_TEMP/out"
-          if [ "${{ matrix.kind }}" = ab ]; then
-            /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" $RUNNER_TEMP/bench-tools/.github/bench/ab.sh "$RUNNER_TEMP/out" $ARGS > "$RUNNER_TEMP/out/run.log" 2>&1
-          elif [ "${{ matrix.kind }}" = raw ]; then
-            export GOCACHE="$RUNNER_TEMP/gocache-run"
-            /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" $RUNNER_TEMP/bench-tools/.github/bench/raw.sh "$CMD" > "$RUNNER_TEMP/out/run.log" 2>&1
-          else
-            /usr/bin/time -v -o "$RUNNER_TEMP/out/time.txt" ./putnamiw "$CMD" $ARGS --continue-on-error --trace-profile "$RUNNER_TEMP/out/trace.json" > "$RUNNER_TEMP/out/run.log" 2>&1
-          fi
-          echo "exit=$?" >> "$RUNNER_TEMP/out/time.txt"
-          kill $VM $SP
-          tail -n 40 "$RUNNER_TEMP/out/run.log"
-          cat "$RUNNER_TEMP/out/time.txt"
-          cp -r .putnami/stats 2>/dev/null "$RUNNER_TEMP/out/"
-          cp "$RUNNER_TEMP/vmstat.txt" "$RUNNER_TEMP/out/"
-          find . -path ./node_modules -prune -o -name '*.json' -newer "$RUNNER_TEMP/vmstat.txt" -path '*test*' -print 2>/dev/null | head -50 > "$RUNNER_TEMP/out/newjson.txt"
-          find . -path '*/.putnami/*' -name '*.jsonl' -newer go.work 2>/dev/null | head -50 >> "$RUNNER_TEMP/out/newjson.txt"
-          cp -r .putnami/sessions "$RUNNER_TEMP/out/" 2>/dev/null || true
-          exit 0
+          /usr/bin/time -v -o "$RUNNER_TEMP/time.txt" \
+            "$RUNNER_TEMP/bench-tools/.github/bench/overlap-shard.sh" ${{ matrix.shard }} "$SHARDS" "$RUNNER_TEMP/out/s${{ matrix.shard }}"
+          cat "$RUNNER_TEMP/out/s${{ matrix.shard }}/shard-${{ matrix.shard }}.meta" "$RUNNER_TEMP/time.txt"
+          cp "$RUNNER_TEMP/time.txt" "$RUNNER_TEMP/vmstat.txt" "$RUNNER_TEMP/out/s${{ matrix.shard }}/"
+          ls "$RUNNER_TEMP/out/s${{ matrix.shard }}/cov" | grep -c '\.fail\.log$' || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench7-${{ matrix.name }}
+          name: overlap-s${{ matrix.shard }}
           path: ${{ runner.temp }}/out
+
+  report:
+    needs: overlap
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.REF }}
+      - uses: actions/checkout@v5
+        with:
+          path: bench-tools
+      - name: Move bench tools out of the workspace
+        run: mv bench-tools "$RUNNER_TEMP/bench-tools"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: overlap-s*
+          path: ${{ runner.temp }}/art
+          merge-multiple: true
+      - name: Report
+        run: |
+          cd "$RUNNER_TEMP/bench-tools/.github/bench/overlap-report"
+          GOWORK=off go run . "$RUNNER_TEMP/art" "$GITHUB_WORKSPACE" "$RUNNER_TEMP/report"
+          cat "$RUNNER_TEMP/report/report.md" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overlap-report
+          path: ${{ runner.temp }}/report
