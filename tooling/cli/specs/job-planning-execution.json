@@ -31,7 +31,7 @@
     },
     {
       "id": "flags-follow-the-command",
-      "text": "A flag goes after the full command: putnami <command> [subcommand] [options]. A flag before the command word, between a command root and a word that names one of its subcommands, or between help and the command it names, is a usage error that names the flag and says where flags go; the CLI runs nothing else in its place. --help still prints, --version still answers, and flags alone, each global flag with its value, still print help. Shell completion offers nothing after a flag that comes before the command."
+      "text": "A flag goes after the full command: putnami <command> [subcommand] [options]. A flag before the command word, between a command root and a word that names one of its subcommands, or before a word of the command that help describes, is a usage error that names the flag and says where flags go; the CLI runs nothing else in its place. --help still prints, help --man and --markdown still render the reference, --version still answers, and flags alone, each global flag with its value, still print help. Shell completion offers nothing after a flag that comes before the command."
     },
     {
       "id": "help-lists-command-groups",
