@@ -20,8 +20,8 @@ import (
 // words, or as another word, unless the script quotes them for every read. A
 // name that runs code creates a file whose name starts with "pwned-" in the
 // shell's working directory. "y:z\w" holds the colon and the backslash that
-// zsh's _describe reads, and "r[s]t" the brackets that zsh's _values reads.
-// "l\nm" holds a newline, which splits a line of compgen replies.
+// zsh's _describe and _values read, and "r[s]t" the brackets that _values
+// reads. "l\nm" holds a newline.
 var hostileNames = []string{
 	"a$(touch pwned-a)",
 	"b(touch pwned-b)",
@@ -38,7 +38,8 @@ var hostileNames = []string{
 
 // hostileWorkspace is a workspace whose command aliases, project aliases,
 // groups, project names, project directories and the flags of "lint-docs" are
-// the hostileNames, with a prefix per kind. A project directory gives the
+// the hostileNames, with a prefix per kind. A flag's description is its name
+// followed by a backslash. A project directory gives the
 // project its ID and its basename. The command aliases of "lint-docs" are job
 // commands; those of "projects" are core commands. A project alias also starts
 // with "~", which bash reads as a home directory.
@@ -59,7 +60,7 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 	includes := []string{"flow"}
 	flags := map[string]extension.FlagDefinition{}
 	for i, name := range hostileNames {
-		flags["f"+name] = extension.FlagDefinition{Type: "boolean", Description: "Flag."}
+		flags["f"+name] = extension.FlagDefinition{Type: "boolean", Description: name + `\`}
 		ws.flags = append(ws.flags, "--f"+name)
 		ws.cfg.Aliases["j"+name] = "lint-docs"
 		ws.cfg.Aliases["k"+name] = "projects"
@@ -164,6 +165,10 @@ func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 		{[]string{"putnami", "lint-docs", "--"}, ws.flags},
 		{[]string{"putnami", ws.commands[0], "--"}, []string{"--projects"}},
 		{[]string{"putnami", ws.commands[1], "--"}, []string{"--projects"}},
+		// The current word as the command line holds it: quoted, escaped.
+		{[]string{"putnami", `jp\ \$`}, []string{"jp $l"}},
+		{[]string{"putnami", "'jp"}, []string{"jp $l"}},
+		{[]string{"putnami", "lint-docs", `nd\'`}, []string{"nd'e"}},
 	} {
 		dir := t.TempDir()
 		replies := bashCompletionReplies(t, dir, script.String(), c.words)
@@ -172,15 +177,16 @@ func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 	}
 }
 
-// bashCompletionReplies runs the bash script in dir to complete words and
-// returns COMPREPLY.
+// bashCompletionReplies runs the bash script in dir, with set -u, to complete
+// words and returns COMPREPLY.
 func bashCompletionReplies(t *testing.T, dir, script string, words []string) []string {
 	t.Helper()
 	quoted := make([]string, len(words))
 	for i, word := range words {
 		quoted[i] = bashQuote(word)
 	}
-	driver := `complete() { :; }
+	driver := `set -u
+complete() { :; }
 _init_completion() {
     words=("${COMP_WORDS[@]}"); cword=${COMP_CWORD}
     cur="${COMP_WORDS[COMP_CWORD]}"; prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -222,8 +228,10 @@ done
 	return strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 }
 
-// The zsh script keeps each name one word in its arrays, and escapes the colon
-// that _describe reads as the start of a description.
+// The zsh script keeps each name one word in its arrays, escapes the colon
+// that _describe reads as the start of a description, and escapes what _values
+// reads in a flag spec. The test records the specs _values receives and reads
+// them by the rules of zsh's parser; it does not run _values.
 func TestZshCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 	if _, err := exec.LookPath("zsh"); err != nil {
 		t.Skip("zsh unavailable on this platform")
@@ -283,17 +291,47 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 		case "describe":
 			value = zshReadName(value, ":")
 		case "value":
-			value = zshReadName(value, "[]:")
+			value = zshValuesName(value)
 		}
 		offered = append(offered, value)
 	}
 	return offered
 }
 
+// zshValuesName returns the name _values reads from one spec
+// ("name[description]:..."): up to the first "[" or ":" that no backslash
+// escapes, with the escapes removed. A description runs to the first "]" that
+// no backslash escapes; _values refuses a spec whose description has no end,
+// and so does this.
+func zshValuesName(spec string) string {
+	name := zshReadName(spec, "[:")
+	rest := spec[len(zshEscapedPrefix(spec, "[:")):]
+	if !strings.HasPrefix(rest, "[") {
+		return name
+	}
+	description := rest[1:]
+	if len(zshEscapedPrefix(description, "]")) == len(description) {
+		return "unterminated description: " + spec
+	}
+	return name
+}
+
+// zshEscapedPrefix returns s up to its first stop that no backslash escapes.
+func zshEscapedPrefix(s, stops string) string {
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] == '\\' && i+1 < len(s):
+			i++
+		case strings.IndexByte(stops, s[i]) >= 0:
+			return s[:i]
+		}
+	}
+	return s
+}
+
 // zshReadName returns the name zsh reads from one _describe entry
-// ("name:description", stops ":") or _values spec ("name[description]:...",
-// stops "[]:"): up to the first stop that no backslash escapes, with the
-// escapes removed.
+// ("name:description", stops ":") or _values spec (stops "[:"): up to the
+// first stop that no backslash escapes, with the escapes removed.
 func zshReadName(entry, stops string) string {
 	var name strings.Builder
 	for i := 0; i < len(entry); i++ {

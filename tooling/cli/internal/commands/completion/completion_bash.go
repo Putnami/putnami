@@ -69,18 +69,17 @@ _putnami_flags_for() {
 	iox.Fprintf(w, `    esac
 }
 
-# _putnami_reply offers each argument that starts with the current word. It
-# matches in bash, not with compgen, whose replies a newline in a name would
-# split. Each reply is quoted, so the command line reads it back as the same
-# word. Bash 3.2 leaves a leading "~" bare, which the command line would expand
-# to a home directory.
+# _putnami_reply offers each argument that compgen matches with the current
+# word, which compgen reads as the shell does, quotes and backslashes removed.
+# compgen reads one argument at a time, single-quoted, and only its exit status
+# counts, so each argument stays one word, a newline included. Each reply is
+# quoted, so the command line reads it back as the same word. Bash 3.2 leaves a
+# leading "~" bare, which the command line would expand to a home directory.
 _putnami_reply() {
     COMPREPLY=()
-    local word quoted
+    local word quoted q="'\\''"
     for word in "$@"; do
-        if [[ "${word}" != "${cur}"* ]]; then
-            continue
-        fi
+        compgen -W "'${word//\'/${q}}'" -- "${cur}" >/dev/null || continue
         printf -v quoted '%%q' "${word}"
         if [[ "${quoted}" == \~* ]]; then
             quoted="\\${quoted}"
@@ -93,6 +92,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
+    # An array expands as ${name[@]+"${name[@]}"}: bash before 4.4 refuses
+    # "${name[@]}" for an empty array under set -u.
     local -a _putnami_words
     local -a commands=(%s)
     local -a structured=(%s)
@@ -103,11 +104,11 @@ _putnami_completions() {
     local -a project_basenames=(%s)
     local -a project_aliases=(%s)
     # Every form ResolveTarget accepts for a positional/--projects target.
-    local -a project_targets=("${project_ids[@]}" "${projects[@]}" "${project_basenames[@]}" "${project_aliases[@]}")
+    local -a project_targets=(${project_ids[@]+"${project_ids[@]}"} ${projects[@]+"${projects[@]}"} ${project_basenames[@]+"${project_basenames[@]}"} ${project_aliases[@]+"${project_aliases[@]}"})
 
     # First argument: command name
     if [[ ${cword} -eq 1 ]]; then
-        _putnami_reply "${commands[@]}"
+        _putnami_reply ${commands[@]+"${commands[@]}"}
         return
     fi
 
@@ -120,7 +121,7 @@ _putnami_completions() {
     fi
     # A core command takes a job-only flag only as one of its own flags.
     if ! _putnami_core_root "${cmd}"; then
-        global_flags+=("${job_global_flags[@]}")
+        global_flags+=(${job_global_flags[@]+"${job_global_flags[@]}"})
     fi
 
     local path="${cmd}"
@@ -140,12 +141,12 @@ _putnami_completions() {
     done
 
     _putnami_subcommands_for "${path}"
-    local -a nested_subcommands=("${_putnami_words[@]}")
+    local -a nested_subcommands=(${_putnami_words[@]+"${_putnami_words[@]}"})
     if [[ ${#nested_subcommands[@]} -gt 0 && "${cur}" != -* && ${i} -eq ${cword} ]]; then
         if _putnami_takes_project "${path}"; then
-            nested_subcommands+=("${project_ids[@]}")
+            nested_subcommands+=(${project_ids[@]+"${project_ids[@]}"})
         fi
-        _putnami_reply "${nested_subcommands[@]}"
+        _putnami_reply ${nested_subcommands[@]+"${nested_subcommands[@]}"}
         return
     fi
 `, bashWords(allCommands),
@@ -183,17 +184,17 @@ _putnami_completions() {
 	iox.Fprintf(w, `    esac
 
     if [[ ${#structured_values[@]} -gt 0 ]]; then
-        _putnami_reply "${structured_values[@]}"
+        _putnami_reply ${structured_values[@]+"${structured_values[@]}"}
     elif [[ "${cur}" == -* ]]; then
         _putnami_flags_for "${path}"
-        _putnami_reply "${_putnami_words[@]}" "${global_flags[@]}"
+        _putnami_reply ${_putnami_words[@]+"${_putnami_words[@]}"} ${global_flags[@]+"${global_flags[@]}"}
     elif [[ "${prev}" == "--projects" ]]; then
-        _putnami_reply "${project_targets[@]}"
+        _putnami_reply ${project_targets[@]+"${project_targets[@]}"}
 `)
 	if ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, `    elif [[ "${prev}" == "--exclude" ]]; then
         # --exclude matches project names.
-        _putnami_reply "${projects[@]}"
+        _putnami_reply ${projects[@]+"${projects[@]}"}
 `)
 	}
 	iox.Fprintf(w, `    elif [[ "${prev}" == "--output" ]]; then
@@ -203,7 +204,7 @@ _putnami_completions() {
         :
     else
         # Positional project target: IDs, names, basenames, and aliases
-        _putnami_reply "${project_targets[@]}" "${global_flags[@]}"
+        _putnami_reply ${project_targets[@]+"${project_targets[@]}"} ${global_flags[@]+"${global_flags[@]}"}
     fi
 }
 

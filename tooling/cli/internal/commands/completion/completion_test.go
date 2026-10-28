@@ -970,10 +970,10 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 		}
 	}
 	// The positional branch must complete the full target set, not just IDs.
-	if !strings.Contains(bashOut, `_putnami_reply "${project_targets[@]}" "${global_flags[@]}"`) {
+	if !strings.Contains(bashOut, `_putnami_reply ${project_targets[@]+"${project_targets[@]}"} ${global_flags[@]+"${global_flags[@]}"}`) {
 		t.Error("bash: positional target should use project_targets (ids+names+basenames+aliases)")
 	}
-	if strings.Contains(bashOut, `_putnami_reply "${projects[@]}" "${project_ids[@]}"`) {
+	if strings.Contains(bashOut, `_putnami_reply ${projects[@]+"${projects[@]}"} ${project_ids[@]+"${project_ids[@]}"}`) {
 		t.Error("bash: --exclude should not suggest project IDs")
 	}
 
