@@ -61,6 +61,17 @@ _putnami_core_root() {
     esac
 }
 
+# help and its aliases read the command they describe from their next words.
+_putnami_is_help() {
+    case "$1" in
+`)
+	for _, name := range ctx.helpNames() {
+		iox.Fprintf(w, "        %s) return 0 ;;\n", bashQuote(name))
+	}
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami_flags_for() {
     _putnami_words=()
     case "$1" in
@@ -117,6 +128,22 @@ _putnami_completions() {
     # first word is a flag, so nothing completes after it.
     if [[ "${cmd}" == -* ]]; then
         COMPREPLY=()
+        return
+    fi
+    # help, or an alias of it, reads the command it describes from its next two
+    # words, and the CLI refuses a flag before either of them: the first word
+    # completes the command names, the second the subcommands of the first, and
+    # nothing else, since help takes no project target. Its flags and the value
+    # of --output complete below.
+    if _putnami_is_help "${cmd}" && [[ "${cur}" != -* && "${prev}" != "--output" ]]; then
+        if [[ ${cword} -eq 2 ]]; then
+            _putnami_reply ${commands[@]+"${commands[@]}"}
+        elif [[ ${cword} -eq 3 && "${words[2]}" != -* ]]; then
+            _putnami_subcommands_for "${words[2]}"
+            _putnami_reply ${_putnami_words[@]+"${_putnami_words[@]}"}
+        else
+            COMPREPLY=()
+        fi
         return
     fi
     # A core command takes a job-only flag only as one of its own flags.

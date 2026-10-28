@@ -287,7 +287,7 @@ func TestCompletionOffersNothingAfterALeadingFlag(t *testing.T) {
 	}
 	// Each condition is a function that fails after a leading flag: a guard,
 	// or a path check, since no path starts with a flag.
-	guarded := regexp.MustCompile(`^complete -c putnami -n '(__putnami_use_command|__putnami_no_leading_flag|__putnami_job_flag|__putnami_seen_from|__putnami_complete_children|__putnami_seen_path)[ ']`)
+	guarded := regexp.MustCompile(`^complete -c putnami -n '(__putnami_use_command|__putnami_no_leading_flag|__putnami_job_flag|__putnami_seen_from|__putnami_job_target|__putnami_help_word|__putnami_flag_value|__putnami_target_value|__putnami_complete_children|__putnami_seen_path)[ ']`)
 	for _, line := range strings.Split(fish.String(), "\n") {
 		if strings.HasPrefix(line, "complete -c putnami ") && line != "complete -c putnami -f" && !guarded.MatchString(line) {
 			t.Errorf("fish completes after a leading flag: %s", line)

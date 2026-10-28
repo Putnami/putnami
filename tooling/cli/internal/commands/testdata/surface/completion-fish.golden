@@ -4,16 +4,12 @@
 # Disable file completions by default
 complete -c putnami -f
 
+# commandline -opc lists the words before the one under the cursor.
 function __putnami_complete_children
     set -l path $argv
     set -l tokens (commandline -opc)
-    set -l current (commandline -ct)
-    set -l completed_count (count $tokens)
-    if test -n "$current"
-        set completed_count (math $completed_count - 1)
-    end
     set -l expected (math (count $path) + 1)
-    if test $completed_count -ne $expected
+    if test (count $tokens) -ne $expected
         return 1
     end
     for i in (seq (count $path))
@@ -71,6 +67,35 @@ end
 
 function __putnami_job_flag
     not __putnami_leading_flag; and not __putnami_core_root
+end
+
+# help and its aliases read the command they describe from their next words,
+# and take no project target.
+function __putnami_is_help
+    set -l tokens (commandline -opc)
+    test (count $tokens) -ge 2; and contains -- $tokens[2] 'help'
+end
+
+# The first word after help completes the command names; with a command as
+# argument, the second word completes its subcommands.
+function __putnami_help_word
+    set -l tokens (commandline -opc)
+    __putnami_is_help; and test (count $tokens) -eq (math (count $argv) + 2)
+    and begin; test (count $argv) -eq 0; or test "$tokens[3]" = "$argv[1]"; end
+end
+
+function __putnami_job_target
+    not __putnami_is_help; and __putnami_seen_from $argv
+end
+
+# The value of a flag follows that flag, the last word before the cursor.
+function __putnami_flag_value
+    set -l tokens (commandline -opc)
+    not __putnami_leading_flag; and test "$tokens[-1]" = "$argv[1]"
+end
+
+function __putnami_target_value
+    not __putnami_is_help; and __putnami_flag_value $argv
 end
 
 # Job commands
@@ -153,6 +178,83 @@ complete -c putnami -n '__putnami_complete_children templates' -a 'validate'
 complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'describe'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'init'
+
+# The command help describes
+complete -c putnami -n '__putnami_help_word' -a 'cache'
+complete -c putnami -n '__putnami_help_word' -a 'cli'
+complete -c putnami -n '__putnami_help_word' -a 'completion'
+complete -c putnami -n '__putnami_help_word' -a 'config'
+complete -c putnami -n '__putnami_help_word' -a 'context'
+complete -c putnami -n '__putnami_help_word' -a 'deps'
+complete -c putnami -n '__putnami_help_word' -a 'doctor'
+complete -c putnami -n '__putnami_help_word' -a 'extensions'
+complete -c putnami -n '__putnami_help_word' -a 'help'
+complete -c putnami -n '__putnami_help_word' -a 'impact-plan'
+complete -c putnami -n '__putnami_help_word' -a 'init'
+complete -c putnami -n '__putnami_help_word' -a 'install'
+complete -c putnami -n '__putnami_help_word' -a 'mcp'
+complete -c putnami -n '__putnami_help_word' -a 'migrate'
+complete -c putnami -n '__putnami_help_word' -a 'pin'
+complete -c putnami -n '__putnami_help_word' -a 'projects'
+complete -c putnami -n '__putnami_help_word' -a 'report'
+complete -c putnami -n '__putnami_help_word' -a 'scopes'
+complete -c putnami -n '__putnami_help_word' -a 'sessions'
+complete -c putnami -n '__putnami_help_word' -a 'telemetry'
+complete -c putnami -n '__putnami_help_word' -a 'templates'
+complete -c putnami -n '__putnami_help_word' -a 'tree'
+complete -c putnami -n '__putnami_help_word' -a 'upgrade'
+complete -c putnami -n '__putnami_help_word' -a 'workspace'
+complete -c putnami -n '__putnami_help_word cache' -a 'clean'
+complete -c putnami -n '__putnami_help_word cache' -a 'gc'
+complete -c putnami -n '__putnami_help_word cache' -a 'verify'
+complete -c putnami -n '__putnami_help_word cli' -a 'list'
+complete -c putnami -n '__putnami_help_word cli' -a 'use'
+complete -c putnami -n '__putnami_help_word completion' -a 'bash'
+complete -c putnami -n '__putnami_help_word completion' -a 'fish'
+complete -c putnami -n '__putnami_help_word completion' -a 'zsh'
+complete -c putnami -n '__putnami_help_word config' -a 'set'
+complete -c putnami -n '__putnami_help_word config' -a 'show'
+complete -c putnami -n '__putnami_help_word context' -a 'generate'
+complete -c putnami -n '__putnami_help_word context' -a 'map'
+complete -c putnami -n '__putnami_help_word context' -a 'pack'
+complete -c putnami -n '__putnami_help_word deps' -a 'add'
+complete -c putnami -n '__putnami_help_word deps' -a 'install'
+complete -c putnami -n '__putnami_help_word deps' -a 'prune'
+complete -c putnami -n '__putnami_help_word deps' -a 'remove'
+complete -c putnami -n '__putnami_help_word deps' -a 'rm'
+complete -c putnami -n '__putnami_help_word extensions' -a 'install'
+complete -c putnami -n '__putnami_help_word extensions' -a 'list'
+complete -c putnami -n '__putnami_help_word extensions' -a 'prepare'
+complete -c putnami -n '__putnami_help_word extensions' -a 'remove'
+complete -c putnami -n '__putnami_help_word extensions' -a 'update'
+complete -c putnami -n '__putnami_help_word extensions' -a 'validate'
+complete -c putnami -n '__putnami_help_word mcp' -a 'install'
+complete -c putnami -n '__putnami_help_word migrate' -a 'vnext'
+complete -c putnami -n '__putnami_help_word projects' -a 'create'
+complete -c putnami -n '__putnami_help_word projects' -a 'describe'
+complete -c putnami -n '__putnami_help_word projects' -a 'list'
+complete -c putnami -n '__putnami_help_word projects' -a 'sync'
+complete -c putnami -n '__putnami_help_word projects' -a 'tag'
+complete -c putnami -n '__putnami_help_word scopes' -a 'list'
+complete -c putnami -n '__putnami_help_word sessions' -a 'export'
+complete -c putnami -n '__putnami_help_word sessions' -a 'inspect'
+complete -c putnami -n '__putnami_help_word sessions' -a 'list'
+complete -c putnami -n '__putnami_help_word sessions' -a 'replay'
+complete -c putnami -n '__putnami_help_word sessions' -a 'summary'
+complete -c putnami -n '__putnami_help_word telemetry' -a 'off'
+complete -c putnami -n '__putnami_help_word telemetry' -a 'on'
+complete -c putnami -n '__putnami_help_word telemetry' -a 'show'
+complete -c putnami -n '__putnami_help_word telemetry' -a 'status'
+complete -c putnami -n '__putnami_help_word templates' -a 'install'
+complete -c putnami -n '__putnami_help_word templates' -a 'list'
+complete -c putnami -n '__putnami_help_word templates' -a 'package'
+complete -c putnami -n '__putnami_help_word templates' -a 'remove'
+complete -c putnami -n '__putnami_help_word templates' -a 'test'
+complete -c putnami -n '__putnami_help_word templates' -a 'update'
+complete -c putnami -n '__putnami_help_word templates' -a 'validate'
+complete -c putnami -n '__putnami_help_word tree' -a 'fingerprint'
+complete -c putnami -n '__putnami_help_word workspace' -a 'describe'
+complete -c putnami -n '__putnami_help_word workspace' -a 'init'
 
 # Global flags
 complete -c putnami -n '__putnami_no_leading_flag' -l 'verbose' -d 'Show job results and diagnostics'
@@ -254,4 +356,4 @@ complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -r
 
 # Output format values
-complete -c putnami -n '__putnami_seen_from --output' -a 'text json jsonl cloud-logging'
+complete -c putnami -n '__putnami_flag_value --output' -a 'text json jsonl cloud-logging'
