@@ -11,7 +11,7 @@ for step in "$@"; do
   go clean -cache -testcache >/dev/null 2>&1
   mkdir -p "$out/$step"
   ./putnamiw --version >/dev/null 2>&1
-  /usr/bin/time -v -o "$out/$step/time.txt" ./putnamiw test --projects @putnami/cli --no-race-changed > "$out/$step/run.log" 2>&1
+  /usr/bin/time -v -o "$out/$step/time.txt" ./putnamiw test --projects @putnami/cli --no-race-changed --no-cache > "$out/$step/run.log" 2>&1
   echo "exit=$?" >> "$out/$step/time.txt"
   cp -r .putnami/sessions "$out/$step/" 2>/dev/null
   echo "$step $(grep Elapsed "$out/$step/time.txt" | awk '{print $NF}') $(awk '/User time|System time/{s+=$NF} END{printf "%.1f CPU-min", s/60}' "$out/$step/time.txt") $(grep exit= "$out/$step/time.txt")" | tee -a "$out/summary.txt"

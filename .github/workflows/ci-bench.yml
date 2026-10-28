@@ -15,8 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: s8-a, kind: ab, ref: 9b781508e39cb8b1db2a703f98603af30017b7cb, cmd: ab, args: 'cli-old-1 cli-new-1 cli-new-2 cli-old-2' }
-          - { name: s8-b, kind: ab, ref: 9b781508e39cb8b1db2a703f98603af30017b7cb, cmd: ab, args: 'cli-new-1 cli-old-1 cli-old-2 cli-new-2' }
+          - { name: s8-a, kind: ab, ref: 03034415ba065c5122d7ae1505c0bd1d53518b75, cmd: ab, args: 'cli-old-1 cli-new-1 cli-new-2 cli-old-2' }
+          - { name: s8-b, kind: ab, ref: 03034415ba065c5122d7ae1505c0bd1d53518b75, cmd: ab, args: 'cli-new-1 cli-old-1 cli-old-2 cli-new-2' }
     services:
       postgres:
         image: ghcr.io/putnami/putnami/postgres:17-alpine
@@ -107,5 +107,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bench9-${{ matrix.name }}
+          name: bench10-${{ matrix.name }}
           path: ${{ runner.temp }}/out
