@@ -32,7 +32,7 @@
     },
     {
       "id": "shutdown",
-      "text": "Broker shutdown rejects new publishes, cancels pending retry timers, drains counted in-flight deliveries up to the configured deadline, and never invokes a retry after Stop returns."
+      "text": "Broker shutdown rejects new publishes, cancels pending retry timers, drains in-flight deliveries and the deliveries queued behind a concurrency limit up to the configured deadline, and never invokes a retry after Stop returns. Each retry it cancels and each queued delivery still waiting at the deadline is reported dropped with reason broker_stopped, in a message dropped record and to Observer.Dropped."
     },
     {
       "id": "ingress-authority",
