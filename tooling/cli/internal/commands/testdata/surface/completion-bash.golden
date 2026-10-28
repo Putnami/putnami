@@ -2,24 +2,27 @@
 # Install: putnami completion bash > /etc/bash_completion.d/putnami
 #      or: putnami completion bash >> ~/.bashrc
 
+# _putnami_subcommands_for and _putnami_flags_for set the array _putnami_words,
+# which _putnami_completions declares local.
 _putnami_subcommands_for() {
+    _putnami_words=()
     case "$1" in
-        'cache') printf '%s\n' 'clean gc verify' ;;
-        'cli') printf '%s\n' 'list use' ;;
-        'completion') printf '%s\n' 'bash fish zsh' ;;
-        'config') printf '%s\n' 'set show' ;;
-        'context') printf '%s\n' 'generate map pack' ;;
-        'deps') printf '%s\n' 'add install prune remove rm' ;;
-        'extensions') printf '%s\n' 'install list prepare remove update validate' ;;
-        'mcp') printf '%s\n' 'install' ;;
-        'migrate') printf '%s\n' 'vnext' ;;
-        'projects') printf '%s\n' 'create describe list sync tag' ;;
-        'scopes') printf '%s\n' 'list' ;;
-        'sessions') printf '%s\n' 'export inspect list replay summary' ;;
-        'telemetry') printf '%s\n' 'off on show status' ;;
-        'templates') printf '%s\n' 'install list package remove test update validate' ;;
-        'tree') printf '%s\n' 'fingerprint' ;;
-        'workspace') printf '%s\n' 'describe init' ;;
+        'cache') _putnami_words=(clean gc verify) ;;
+        'cli') _putnami_words=(list use) ;;
+        'completion') _putnami_words=(bash fish zsh) ;;
+        'config') _putnami_words=(set show) ;;
+        'context') _putnami_words=(generate map pack) ;;
+        'deps') _putnami_words=(add install prune remove rm) ;;
+        'extensions') _putnami_words=(install list prepare remove update validate) ;;
+        'mcp') _putnami_words=(install) ;;
+        'migrate') _putnami_words=(vnext) ;;
+        'projects') _putnami_words=(create describe list sync tag) ;;
+        'scopes') _putnami_words=(list) ;;
+        'sessions') _putnami_words=(export inspect list replay summary) ;;
+        'telemetry') _putnami_words=(off on show status) ;;
+        'templates') _putnami_words=(install list package remove test update validate) ;;
+        'tree') _putnami_words=(fingerprint) ;;
+        'workspace') _putnami_words=(describe init) ;;
     esac
 }
 
@@ -141,78 +144,83 @@ _putnami_core_root() {
 }
 
 _putnami_flags_for() {
+    _putnami_words=()
     case "$1" in
-        'cache verify') printf '%s\n' '--continue-on-error --cpu-policy --exclude --impacted-strict --profile --retry --trace-profile' ;;
-        'cli list') printf '%s\n' '--global' ;;
-        'cli use') printf '%s\n' '--global' ;;
-        'context generate') printf '%s\n' '--force' ;;
-        'context pack') printf '%s\n' '--project' ;;
-        'deps add') printf '%s\n' '--dry-run' ;;
-        'deps prune') printf '%s\n' '--dry-run' ;;
-        'deps remove') printf '%s\n' '--dry-run' ;;
-        'deps rm') printf '%s\n' '--dry-run' ;;
-        'doctor') printf '%s\n' '--machine --profile --project' ;;
-        'extensions install') printf '%s\n' '--dest --latest --platform --user' ;;
-        'extensions list') printf '%s\n' '--user' ;;
-        'extensions remove') printf '%s\n' '--user' ;;
-        'help') printf '%s\n' '--man --markdown' ;;
-        'impact-plan') printf '%s\n' '--base --head' ;;
-        'init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
-        'install') printf '%s\n' '--latest' ;;
-        'migrate vnext') printf '%s\n' '--apply --check' ;;
-        'pin') printf '%s\n' '--remove' ;;
-        'projects create') printf '%s\n' '--channel --force --path --template' ;;
-        'projects sync') printf '%s\n' '--dry-run --prune --skip-install' ;;
-        'projects tag') printf '%s\n' '--remove --set' ;;
-        'report') printf '%s\n' '--session' ;;
-        'sessions export') printf '%s\n' '--since' ;;
-        'sessions inspect') printf '%s\n' '--run' ;;
-        'sessions list') printf '%s\n' '--revision' ;;
-        'sessions replay') printf '%s\n' '--session' ;;
-        'sessions summary') printf '%s\n' '--by-digest --command --since' ;;
-        'templates install') printf '%s\n' '--latest' ;;
-        'templates package') printf '%s\n' '--stable --version' ;;
-        'templates test') printf '%s\n' '--channel --keep --skip-build' ;;
-        'upgrade') printf '%s\n' '--channel --cli --continue-on-error --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
-        'workspace init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
+        'cache verify') _putnami_words=(--continue-on-error --cpu-policy --exclude --impacted-strict --profile --retry --trace-profile) ;;
+        'cli list') _putnami_words=(--global) ;;
+        'cli use') _putnami_words=(--global) ;;
+        'context generate') _putnami_words=(--force) ;;
+        'context pack') _putnami_words=(--project) ;;
+        'deps add') _putnami_words=(--dry-run) ;;
+        'deps prune') _putnami_words=(--dry-run) ;;
+        'deps remove') _putnami_words=(--dry-run) ;;
+        'deps rm') _putnami_words=(--dry-run) ;;
+        'doctor') _putnami_words=(--machine --profile --project) ;;
+        'extensions install') _putnami_words=(--dest --latest --platform --user) ;;
+        'extensions list') _putnami_words=(--user) ;;
+        'extensions remove') _putnami_words=(--user) ;;
+        'help') _putnami_words=(--man --markdown) ;;
+        'impact-plan') _putnami_words=(--base --head) ;;
+        'init') _putnami_words=(--channel --extension --force --project --project-path --workspace) ;;
+        'install') _putnami_words=(--latest) ;;
+        'migrate vnext') _putnami_words=(--apply --check) ;;
+        'pin') _putnami_words=(--remove) ;;
+        'projects create') _putnami_words=(--channel --force --path --template) ;;
+        'projects sync') _putnami_words=(--dry-run --prune --skip-install) ;;
+        'projects tag') _putnami_words=(--remove --set) ;;
+        'report') _putnami_words=(--session) ;;
+        'sessions export') _putnami_words=(--since) ;;
+        'sessions inspect') _putnami_words=(--run) ;;
+        'sessions list') _putnami_words=(--revision) ;;
+        'sessions replay') _putnami_words=(--session) ;;
+        'sessions summary') _putnami_words=(--by-digest --command --since) ;;
+        'templates install') _putnami_words=(--latest) ;;
+        'templates package') _putnami_words=(--stable --version) ;;
+        'templates test') _putnami_words=(--channel --keep --skip-build) ;;
+        'upgrade') _putnami_words=(--channel --cli --continue-on-error --deps --dry-run --extensions --from-source --global --namespace --release --version) ;;
+        'workspace init') _putnami_words=(--channel --extension --force --project --project-path --workspace) ;;
     esac
 }
 
-# _putnami_reply offers the words of the compgen word list $1 that start with
-# the current word. compgen expands each word of the list once, so the list
-# holds quoted words; each reply is quoted again, so the command line reads it
-# back as the same word. Bash 3.2 leaves a leading "~" bare, which the command
-# line would expand to a home directory.
+# _putnami_reply offers each argument that starts with the current word. It
+# matches in bash, not with compgen, whose replies a newline in a name would
+# split. Each reply is quoted, so the command line reads it back as the same
+# word. Bash 3.2 leaves a leading "~" bare, which the command line would expand
+# to a home directory.
 _putnami_reply() {
     COMPREPLY=()
-    local match quoted
-    while IFS= read -r match; do
-        printf -v quoted '%q' "${match}"
+    local word quoted
+    for word in "$@"; do
+        if [[ "${word}" != "${cur}"* ]]; then
+            continue
+        fi
+        printf -v quoted '%q' "${word}"
         if [[ "${quoted}" == \~* ]]; then
             quoted="\\${quoted}"
         fi
         COMPREPLY+=("${quoted}")
-    done < <(compgen -W "$1" -- "${cur}")
+    done
 }
 
 _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands='cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace'
-    local structured='cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace'
-    local global_flags='--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --output --json --quiet --color --no-color --version'
-    local job_global_flags=''
-    local projects=''
-    local project_ids=''
-    local project_basenames=''
-    local project_aliases=''
+    local -a _putnami_words
+    local -a commands=(cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
+    local -a structured=(cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
+    local -a global_flags=(--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --output --json --quiet --color --no-color --version)
+    local -a job_global_flags=()
+    local -a projects=()
+    local -a project_ids=()
+    local -a project_basenames=()
+    local -a project_aliases=()
     # Every form ResolveTarget accepts for a positional/--projects target.
-    local project_targets="${project_ids} ${projects} ${project_basenames} ${project_aliases}"
+    local -a project_targets=("${project_ids[@]}" "${projects[@]}" "${project_basenames[@]}" "${project_aliases[@]}")
 
     # First argument: command name
     if [[ ${cword} -eq 1 ]]; then
-        _putnami_reply "${commands}"
+        _putnami_reply "${commands[@]}"
         return
     fi
 
@@ -225,7 +233,7 @@ _putnami_completions() {
     fi
     # A core command takes a job-only flag only as one of its own flags.
     if ! _putnami_core_root "${cmd}"; then
-        global_flags="${global_flags} ${job_global_flags}"
+        global_flags+=("${job_global_flags[@]}")
     fi
 
     local path="${cmd}"
@@ -244,38 +252,39 @@ _putnami_completions() {
         fi
     done
 
-    local nested_subcommands="$(_putnami_subcommands_for "${path}")"
-    if [[ -n "${nested_subcommands}" && "${cur}" != -* && ${i} -eq ${cword} ]]; then
+    _putnami_subcommands_for "${path}"
+    local -a nested_subcommands=("${_putnami_words[@]}")
+    if [[ ${#nested_subcommands[@]} -gt 0 && "${cur}" != -* && ${i} -eq ${cword} ]]; then
         if _putnami_takes_project "${path}"; then
-            nested_subcommands="${nested_subcommands} ${project_ids}"
+            nested_subcommands+=("${project_ids[@]}")
         fi
-        _putnami_reply "${nested_subcommands}"
+        _putnami_reply "${nested_subcommands[@]}"
         return
     fi
 
     # Flags and project names
-    local structured_values=""
+    local -a structured_values=()
     case "${path} ${prev}" in
         'workspace init --extension')
-            structured_values='go py ts'
+            structured_values=(go py ts)
             ;;
     esac
 
-    if [[ -n "${structured_values}" ]]; then
-        _putnami_reply "${structured_values}"
+    if [[ ${#structured_values[@]} -gt 0 ]]; then
+        _putnami_reply "${structured_values[@]}"
     elif [[ "${cur}" == -* ]]; then
-        local structured_flags="$(_putnami_flags_for "${path}")"
-        _putnami_reply "${structured_flags} ${global_flags}"
+        _putnami_flags_for "${path}"
+        _putnami_reply "${_putnami_words[@]}" "${global_flags[@]}"
     elif [[ "${prev}" == "--projects" ]]; then
-        _putnami_reply "${project_targets}"
+        _putnami_reply "${project_targets[@]}"
     elif [[ "${prev}" == "--output" ]]; then
-        _putnami_reply 'text json jsonl cloud-logging'
+        _putnami_reply text json jsonl cloud-logging
     elif [[ "${prev}" == "--tag" || "${prev}" == "--exclude-tag" ]]; then
         # Tags are dynamic — no static completion
         :
     else
         # Positional project target: IDs, names, basenames, and aliases
-        _putnami_reply "${project_targets} ${global_flags}"
+        _putnami_reply "${project_targets[@]}" "${global_flags[@]}"
     fi
 }
 

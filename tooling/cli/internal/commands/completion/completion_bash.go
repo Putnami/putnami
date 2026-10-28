@@ -23,7 +23,10 @@ func CompletionBash(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings *w
 # Install: putnami completion bash > /etc/bash_completion.d/putnami
 #      or: putnami completion bash >> ~/.bashrc
 
+# _putnami_subcommands_for and _putnami_flags_for set the array _putnami_words,
+# which _putnami_completions declares local.
 _putnami_subcommands_for() {
+    _putnami_words=()
     case "$1" in
 `)
 	writeBashSubcommandCases(w, ctx)
@@ -59,47 +62,52 @@ _putnami_core_root() {
 }
 
 _putnami_flags_for() {
+    _putnami_words=()
     case "$1" in
 `)
 	writeBashFlagCases(w, ctx)
 	iox.Fprintf(w, `    esac
 }
 
-# _putnami_reply offers the words of the compgen word list $1 that start with
-# the current word. compgen expands each word of the list once, so the list
-# holds quoted words; each reply is quoted again, so the command line reads it
-# back as the same word. Bash 3.2 leaves a leading "~" bare, which the command
-# line would expand to a home directory.
+# _putnami_reply offers each argument that starts with the current word. It
+# matches in bash, not with compgen, whose replies a newline in a name would
+# split. Each reply is quoted, so the command line reads it back as the same
+# word. Bash 3.2 leaves a leading "~" bare, which the command line would expand
+# to a home directory.
 _putnami_reply() {
     COMPREPLY=()
-    local match quoted
-    while IFS= read -r match; do
-        printf -v quoted '%%q' "${match}"
+    local word quoted
+    for word in "$@"; do
+        if [[ "${word}" != "${cur}"* ]]; then
+            continue
+        fi
+        printf -v quoted '%%q' "${word}"
         if [[ "${quoted}" == \~* ]]; then
             quoted="\\${quoted}"
         fi
         COMPREPLY+=("${quoted}")
-    done < <(compgen -W "$1" -- "${cur}")
+    done
 }
 
 _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands=%s
-    local structured=%s
-    local global_flags=%s
-    local job_global_flags=%s
-    local projects=%s
-    local project_ids=%s
-    local project_basenames=%s
-    local project_aliases=%s
+    local -a _putnami_words
+    local -a commands=(%s)
+    local -a structured=(%s)
+    local -a global_flags=(%s)
+    local -a job_global_flags=(%s)
+    local -a projects=(%s)
+    local -a project_ids=(%s)
+    local -a project_basenames=(%s)
+    local -a project_aliases=(%s)
     # Every form ResolveTarget accepts for a positional/--projects target.
-    local project_targets="${project_ids} ${projects} ${project_basenames} ${project_aliases}"
+    local -a project_targets=("${project_ids[@]}" "${projects[@]}" "${project_basenames[@]}" "${project_aliases[@]}")
 
     # First argument: command name
     if [[ ${cword} -eq 1 ]]; then
-        _putnami_reply "${commands}"
+        _putnami_reply "${commands[@]}"
         return
     fi
 
@@ -112,7 +120,7 @@ _putnami_completions() {
     fi
     # A core command takes a job-only flag only as one of its own flags.
     if ! _putnami_core_root "${cmd}"; then
-        global_flags="${global_flags} ${job_global_flags}"
+        global_flags+=("${job_global_flags[@]}")
     fi
 
     local path="${cmd}"
@@ -131,26 +139,27 @@ _putnami_completions() {
         fi
     done
 
-    local nested_subcommands="$(_putnami_subcommands_for "${path}")"
-    if [[ -n "${nested_subcommands}" && "${cur}" != -* && ${i} -eq ${cword} ]]; then
+    _putnami_subcommands_for "${path}"
+    local -a nested_subcommands=("${_putnami_words[@]}")
+    if [[ ${#nested_subcommands[@]} -gt 0 && "${cur}" != -* && ${i} -eq ${cword} ]]; then
         if _putnami_takes_project "${path}"; then
-            nested_subcommands="${nested_subcommands} ${project_ids}"
+            nested_subcommands+=("${project_ids[@]}")
         fi
-        _putnami_reply "${nested_subcommands}"
+        _putnami_reply "${nested_subcommands[@]}"
         return
     fi
-`, bashWordList(allCommands),
-		bashWordList(ctx.structured),
-		bashWordList(ctx.sharedGlobalFlagNames()),
-		bashWordList(ctx.jobGlobalFlagNames()),
-		bashWordList(ctx.projects),
-		bashWordList(ctx.projectIDs),
-		bashWordList(ctx.projectBasenames),
-		bashWordList(aliasNames(ctx.aliases)))
+`, bashWords(allCommands),
+		bashWords(ctx.structured),
+		bashWords(ctx.sharedGlobalFlagNames()),
+		bashWords(ctx.jobGlobalFlagNames()),
+		bashWords(ctx.projects),
+		bashWords(ctx.projectIDs),
+		bashWords(ctx.projectBasenames),
+		bashWords(aliasNames(ctx.aliases)))
 
 	iox.Fprintf(w, `
     # Flags and project names
-    local structured_values=""
+    local -a structured_values=()
     case "${path} ${prev}" in
 `)
 
@@ -167,24 +176,24 @@ _putnami_completions() {
 			names = append(names, value.Value)
 		}
 		iox.Fprintf(w, "        %s)\n", bashQuote(key))
-		iox.Fprintf(w, "            structured_values=%s\n", bashWordList(names))
+		iox.Fprintf(w, "            structured_values=(%s)\n", bashWords(names))
 		iox.Fprintf(w, "            ;;\n")
 	}
 
 	iox.Fprintf(w, `    esac
 
-    if [[ -n "${structured_values}" ]]; then
-        _putnami_reply "${structured_values}"
+    if [[ ${#structured_values[@]} -gt 0 ]]; then
+        _putnami_reply "${structured_values[@]}"
     elif [[ "${cur}" == -* ]]; then
-        local structured_flags="$(_putnami_flags_for "${path}")"
-        _putnami_reply "${structured_flags} ${global_flags}"
+        _putnami_flags_for "${path}"
+        _putnami_reply "${_putnami_words[@]}" "${global_flags[@]}"
     elif [[ "${prev}" == "--projects" ]]; then
-        _putnami_reply "${project_targets}"
+        _putnami_reply "${project_targets[@]}"
 `)
 	if ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, `    elif [[ "${prev}" == "--exclude" ]]; then
         # --exclude matches project names.
-        _putnami_reply "${projects}"
+        _putnami_reply "${projects[@]}"
 `)
 	}
 	iox.Fprintf(w, `    elif [[ "${prev}" == "--output" ]]; then
@@ -194,12 +203,12 @@ _putnami_completions() {
         :
     else
         # Positional project target: IDs, names, basenames, and aliases
-        _putnami_reply "${project_targets} ${global_flags}"
+        _putnami_reply "${project_targets[@]}" "${global_flags[@]}"
     fi
 }
 
 complete -F _putnami_completions putnami
-`, bashWordList(ctx.globalFlagValues("--output")))
+`, bashWords(ctx.globalFlagValues("--output")))
 }
 
 func writeBashSubcommandCases(w io.Writer, ctx completionContext) {
@@ -213,7 +222,7 @@ func writeBashSubcommandCases(w io.Writer, ctx completionContext) {
 		if len(subs) == 0 {
 			continue
 		}
-		iox.Fprintf(w, "        %s) printf '%%s\\n' %s ;;\n", bashQuote(key), bashWordList(subs))
+		iox.Fprintf(w, "        %s) _putnami_words=(%s) ;;\n", bashQuote(key), bashWords(subs))
 	}
 }
 
@@ -243,7 +252,7 @@ func writeBashFlagCases(w io.Writer, ctx completionContext) {
 		if len(names) == 0 {
 			continue
 		}
-		iox.Fprintf(w, "        %s) printf '%%s\\n' %s ;;\n", bashQuote(key), bashWordList(names))
+		iox.Fprintf(w, "        %s) _putnami_words=(%s) ;;\n", bashQuote(key), bashWords(names))
 	}
 }
 
@@ -259,15 +268,6 @@ func bashWord(value string) string {
 		return value
 	}
 	return bashQuote(value)
-}
-
-// bashWordList renders values as a compgen word list, quoted as one word of
-// the script. Bash reads the list twice: once with the script, and again when
-// compgen -W expands each of its words. Each value is quoted for the second
-// read and the whole list for the first, so a name such as "p $l" or
-// "x$(cmd)" is one literal candidate.
-func bashWordList(values []string) string {
-	return bashQuote(bashWords(values))
 }
 
 // bashWords renders values as bash or zsh words separated by spaces
