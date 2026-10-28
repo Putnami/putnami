@@ -315,9 +315,10 @@ The `--output=jsonl` stream follows the session stream contract defined by the C
 A flag goes after the full command: `putnami <command> [subcommand] [options]`.
 A flag before the command word, as in `putnami -v projects list`, or between a
 command and its subcommand, as in `putnami projects -v describe web`, is a
-usage error that names the flag. `putnami --help`, `putnami --version` and a
-flag with no command after it still print help or the version. Shell
-completion offers nothing after a flag that comes before the command.
+usage error that names the flag. `putnami --help`, `putnami --version`, and
+flags alone, such as `putnami -v` or `putnami --output json`, still print help
+or the version. Shell completion offers nothing after a flag that comes before
+the command.
 
 ## Shell completion
 

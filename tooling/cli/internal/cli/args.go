@@ -71,7 +71,8 @@ type commandAliases struct {
 	// extension is loaded.
 	groupCommand func(group, word string) string
 	// groupSubcommand reports whether word names a subcommand of an extension
-	// group (extension.LookupSubcommand). It is nil when no extension is loaded.
+	// group (extension.LookupSubcommand). It is nil through ParseArgs and in
+	// provider mode; with no extension loaded it reports false.
 	groupSubcommand func(group, word string) bool
 }
 
@@ -129,7 +130,7 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 		// vocabulary. A command word after the flags is refused instead: the CLI
 		// would otherwise print help in place of the command the user typed.
 		result.Global, result.RawJobArgs, _ = parseFlags(args)
-		if firstPositional(result.RawJobArgs) != "" && !result.Global.Help {
+		if leadingCommandWord(args) && !result.Global.Help {
 			result.Err = usageErrorf("%s comes before the command; a flag goes after it: putnami <command> [subcommand] [options]", flagSpelling(cmdArg))
 			return result
 		}
@@ -216,15 +217,26 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	return result
 }
 
-// firstPositional returns the first argument before the passthrough separator
-// that is not a flag, or "".
-func firstPositional(args []string) string {
-	for _, arg := range args[:passthroughCut(args)] {
+// leadingCommandWord reports whether a word that is not a flag or the value of
+// a global flag comes before the passthrough separator, in an invocation whose
+// first argument is a flag: the word the user meant as the command. An inline
+// value ("--output=json") belongs to its flag, so `putnami --foo=bar` still
+// prints help.
+func leadingCommandWord(args []string) bool {
+	cut := passthroughCut(args)
+	for i := 0; i < cut; i++ {
+		arg := args[i]
 		if !isFlagToken(arg) {
-			return arg
+			return true
+		}
+		if strings.Contains(arg, "=") {
+			continue
+		}
+		if spec, ok := globalFlagSpec(arg); ok && spec.Type == commandmeta.FlagValue {
+			i++
 		}
 	}
-	return ""
+	return false
 }
 
 // flagBeforeSubcommand refuses `putnami <root> <flag> <subcommand>`: the

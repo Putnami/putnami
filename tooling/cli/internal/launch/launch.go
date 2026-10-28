@@ -177,12 +177,11 @@ func IsExemptInvocation(args []string) bool {
 	}
 	switch args[0] {
 	case "cli":
-		switch firstNonFlag(args[1:]) {
-		case "list", "use":
+		if len(args) > 1 && (args[1] == "list" || args[1] == "use") {
 			return true
 		}
 	case "migrate":
-		if firstNonFlag(args[1:]) == "vnext" {
+		if len(args) > 1 && args[1] == "vnext" {
 			return true
 		}
 	case "upgrade":
@@ -213,21 +212,6 @@ func IsExemptInvocation(args []string) bool {
 // predates the flag would otherwise refuse the one command that installs a
 // user-scope extension.
 const UserScopeFlag = "--user"
-
-// firstNonFlag returns the first argument that does not start with "-", or ""
-// when there is none before a bare "--" — used to read a subcommand past any
-// leading flags. A token after "--" is a payload, never a subcommand.
-func firstNonFlag(args []string) string {
-	for _, a := range args {
-		if a == "--" {
-			return ""
-		}
-		if a == "" || a[0] != '-' {
-			return a
-		}
-	}
-	return ""
-}
 
 // ConsumeLaunched reports whether this process was entered through the launcher
 // and removes the loop guard from the environment before any child commands are

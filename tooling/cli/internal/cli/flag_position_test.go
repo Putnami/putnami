@@ -10,8 +10,9 @@ import (
 )
 
 // A flag before the command word used to print the top-level help in place of
-// the command, with exit 0. It is a usage error that names the flag; a flag
-// with no command word after it still prints help.
+// the command, with exit 0. It is a usage error that names the flag. Flags
+// alone, each global flag with its value, still print help; the core cannot
+// tell the value of a flag it does not know from a command word.
 func TestParseArgs_FlagBeforeTheCommandIsRefused(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "flags-follow-the-command", "a-flag-before-the-command-is-refused")
@@ -25,6 +26,7 @@ func TestParseArgs_FlagBeforeTheCommandIsRefused(t *testing.T) {
 		{[]string{"--projects", "web", "build"}, "--projects"},
 		{[]string{"--projects=web", "build"}, "--projects"},
 		{[]string{"--custom", "build"}, "--custom"},
+		{[]string{"--port", "3000"}, "--port"},
 	}
 	for _, tc := range refused {
 		parsed := ParseArgs(tc.args, nil, nil)
@@ -45,6 +47,8 @@ func TestParseArgs_FlagBeforeTheCommandIsRefused(t *testing.T) {
 	helped := [][]string{
 		{"-v"},
 		{"--projects", "web"},
+		{"--output", "json", "-v"},
+		{"--foo=bar"},
 		{"-v", "--help"},
 		{"--help", "projects", "list"},
 		{"-v", "projects", "-h"},
