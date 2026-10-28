@@ -99,6 +99,97 @@ _putnami_reply() {
     done
 }
 
+# _putnami_dequote sets _putnami_word to the word $1 as the shell reads it,
+# without its single quotes, double quotes, backslashes and $'...' quoting:
+# completion receives each word as the user typed it. It expands nothing and
+# uses no eval, because a typed word can hold a command substitution. Inside
+# $'...', it decodes the escapes that printf %%q writes: a letter such as \n or
+# \E, an octal \NNN and a hex \xHH. It keeps the backslash of an escape it
+# does not decode, such as \cX.
+_putnami_dequote() {
+    _putnami_word=""
+    local rest="$1" c quote=""
+    while [[ -n "${rest}" ]]; do
+        c="${rest:0:1}"
+        rest="${rest:1}"
+        case "${quote}" in
+        single)
+            if [[ "${c}" == "'" ]]; then quote=""; else _putnami_word+="${c}"; fi
+            ;;
+        ansi)
+            if [[ "${c}" == "'" ]]; then
+                quote=""
+            elif [[ "${c}" == "\\" && -n "${rest}" ]]; then
+                c="${rest:0:1}"
+                rest="${rest:1}"
+                # printf reads a format of a backslash and checked escape
+                # characters only, so it decodes and runs nothing else.
+                case "${c}" in
+                    [abfnrtv]) printf -v c "\\${c}" ;;
+                    [eE]) c=$'\E' ;;
+                    [0-7])
+                        while [[ ${#c} -lt 3 && "${rest:0:1}" == [0-7] ]]; do
+                            c+="${rest:0:1}"
+                            rest="${rest:1}"
+                        done
+                        printf -v c "\\${c}"
+                        ;;
+                    x)
+                        if [[ "${rest:0:1}" == [0-9A-Fa-f] ]]; then
+                            c="${rest:0:1}"
+                            rest="${rest:1}"
+                            if [[ "${rest:0:1}" == [0-9A-Fa-f] ]]; then
+                                c+="${rest:0:1}"
+                                rest="${rest:1}"
+                            fi
+                            printf -v c "\\x${c}"
+                        else
+                            c="\\x"
+                        fi
+                        ;;
+                    "\\"|"'"|'"'|'?') ;;
+                    *) c="\\${c}" ;;
+                esac
+                _putnami_word+="${c}"
+            else
+                _putnami_word+="${c}"
+            fi
+            ;;
+        double)
+            if [[ "${c}" == '"' ]]; then
+                quote=""
+            elif [[ "${c}" == "\\" ]]; then
+                case "${rest:0:1}" in
+                    '$'|'"'|"\\"|'`+"`"+`') _putnami_word+="${rest:0:1}"; rest="${rest:1}" ;;
+                    $'\n') rest="${rest:1}" ;;
+                    *) _putnami_word+="${c}" ;;
+                esac
+            else
+                _putnami_word+="${c}"
+            fi
+            ;;
+        *)
+            case "${c}" in
+                "'") quote=single ;;
+                '"') quote=double ;;
+                "\\")
+                    if [[ "${rest:0:1}" != $'\n' ]]; then _putnami_word+="${rest:0:1}"; fi
+                    rest="${rest:1}"
+                    ;;
+                '$')
+                    case "${rest:0:1}" in
+                        "'") quote=ansi; rest="${rest:1}" ;;
+                        '"') quote=double; rest="${rest:1}" ;;
+                        *) _putnami_word+="${c}" ;;
+                    esac
+                    ;;
+                *) _putnami_word+="${c}" ;;
+            esac
+            ;;
+        esac
+    done
+}
+
 _putnami_completions() {
     local cur prev words cword
     _init_completion || return
@@ -106,6 +197,7 @@ _putnami_completions() {
     # An array expands as ${name[@]+"${name[@]}"}: bash before 4.4 refuses
     # "${name[@]}" for an empty array under set -u.
     local -a _putnami_words
+    local _putnami_word
     local -a commands=(%s)
     local -a structured=(%s)
     local -a global_flags=(%s)
@@ -123,7 +215,10 @@ _putnami_completions() {
         return
     fi
 
-    local cmd="${words[1]}"
+    _putnami_dequote "${words[1]}"
+    local cmd="${_putnami_word}"
+    _putnami_dequote "${prev}"
+    prev="${_putnami_word}"
     # A flag goes after the command: the CLI refuses a command line whose
     # first word is a flag, so nothing completes after it.
     if [[ "${cmd}" == -* ]]; then
@@ -154,7 +249,8 @@ _putnami_completions() {
     local path="${cmd}"
     local i=2
     while [[ ${i} -lt ${cword} ]]; do
-        local word="${words[${i}]}"
+        _putnami_dequote "${words[${i}]}"
+        local word="${_putnami_word}"
         if [[ "${word}" == -* ]]; then
             break
         fi

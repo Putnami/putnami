@@ -1283,6 +1283,10 @@ putnami completion fish
 
 Pipe the output to the appropriate completion file for your shell.
 
+Completion reads a word typed with quotes or backslashes as the shell will run
+it, and runs none of it. A command alias that holds a space or a `$`, typed as
+`putnami 'ship it' --`, completes with the flags of its command.
+
 The script embeds the project names the workspace resolves. On a workspace with
 no index, `completion` writes the same provider-view warning as `projects list`
 to stderr, and the script on stdout is unchanged. `--quiet` hides the warning.

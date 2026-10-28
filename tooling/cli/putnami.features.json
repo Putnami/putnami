@@ -752,7 +752,8 @@
               "bash-offers-each-name-as-one-literal-word",
               "zsh-flag-specs-read-each-name-literally",
               "zsh-describe-entries-read-each-name-literally",
-              "fish-quotes-each-name-for-both-reads"
+              "fish-quotes-each-name-for-both-reads",
+              "a-quoted-command-alias-takes-its-command-flags"
             ]
           }
         },
