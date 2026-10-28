@@ -112,6 +112,24 @@ makes `issue-<n>` the mission of the checkout's branch. A hook never fails a
 turn: a failure leaves one line in `hook.log` under
 `<Putnami home>/contributor/sessions`.
 
+Codex needs three things from the workspace before these hooks report a
+session:
+
+- Trust. Codex runs project hooks only in a trusted project, after you
+  review them with `/hooks`.
+- The plan tool. Since Codex 0.152, `update_plan` is off by default, and
+  without it no Codex plan reaches the mission. Turn it on in
+  `.codex/config.toml`:
+
+  ```toml
+  [tools.update_plan]
+  enabled = true
+  ```
+
+- A committed `.codex/hooks.json`. In a linked git worktree, Codex 0.165
+  reads project hooks from the main checkout's `.codex/hooks.json`, not the
+  worktree's. Commit the file, so the main checkout has it too.
+
 ## What it deliberately excludes
 
 - Backend calls, tracker labels, hosted addresses and memory storage layouts:
