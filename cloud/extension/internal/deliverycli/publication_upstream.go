@@ -46,11 +46,17 @@ const publicationMaxBearerSeconds = 300
 // putServerReaderProfile is put-server's forwarded-bearer credential profile.
 const putServerReaderProfile = "reader"
 
-// forwardOnlyHeaders declare forward-only advance on every native publication
-// call: this provider moves a forward-only channel only when Delivery's
-// advance answer says the run is still the head of its default branch, so
-// Delivery never refuses the run's plan as superseded.
-var forwardOnlyHeaders = map[string]string{channelAdvanceHeader: channelAdvanceForwardOnly}
+// publicationHeaders go on every native publication call. The first declares
+// forward-only advance: this provider moves a forward-only channel only when
+// Delivery's advance answer says the run is still the head of its default
+// branch, so Delivery never refuses the run's plan as superseded. The second
+// declares that this provider can stage: when Delivery's planning answer names
+// a staging channel, the release puts the set there and leaves the run's
+// channels to Delivery's deploy phase.
+var publicationHeaders = map[string]string{
+	channelAdvanceHeader: channelAdvanceForwardOnly,
+	channelStagingHeader: channelStagingSupported,
+}
 
 // publicationEndpoints are the registry origins of the hosted run's
 // publication. err says why publication-v1 is not served.
@@ -173,7 +179,8 @@ func (b deliveryBearer) issued(issuedAt time.Time) (issuedBearer, error) {
 
 // publicationAuthority is what Delivery derives for the run, and the only
 // plan this provider opens: the namespace, the commit, the channels with the
-// immutable one, and the channels that move only forward.
+// immutable one, the channels that move only forward, and the staging channel
+// when Delivery moves those channels itself.
 type publicationAuthority struct {
 	WorkspaceID      string
 	RunID            string
@@ -182,6 +189,11 @@ type publicationAuthority struct {
 	Channels         []string
 	ImmutableChannel string
 	ForwardOnly      []string
+	// StagingChannel, when set, is the one channel the run's release moves.
+	// Every channel of the plan is then forward-only, and Delivery moves them
+	// to the set on this channel in the run's deploy phase, after a green
+	// gate.
+	StagingChannel string
 }
 
 func (a publicationAuthority) forwardOnly(channel string) bool {
@@ -191,7 +203,8 @@ func (a publicationAuthority) forwardOnly(channel string) bool {
 func (a publicationAuthority) equal(b publicationAuthority) bool {
 	return a.WorkspaceID == b.WorkspaceID && a.RunID == b.RunID && a.SourceRevision == b.SourceRevision &&
 		a.Namespace == b.Namespace && slices.Equal(a.Channels, b.Channels) &&
-		a.ImmutableChannel == b.ImmutableChannel && slices.Equal(a.ForwardOnly, b.ForwardOnly)
+		a.ImmutableChannel == b.ImmutableChannel && slices.Equal(a.ForwardOnly, b.ForwardOnly) &&
+		a.StagingChannel == b.StagingChannel
 }
 
 // deliverySourceRevision is a full lowercase SHA-1 or SHA-256 commit.
@@ -209,6 +222,7 @@ func parsePlanningGrant(body []byte, issuedAt time.Time) (publicationAuthority, 
 		Channels            []string `json:"channels"`
 		ImmutableChannel    string   `json:"immutableChannel"`
 		ForwardOnlyChannels []string `json:"forwardOnlyChannels"`
+		StagingChannel      string   `json:"stagingChannel"`
 		ExpiresUnix         int64    `json:"expiresUnix"`
 		deliveryBearer
 	}
@@ -239,6 +253,9 @@ func parsePlanningGrant(body []byte, issuedAt time.Time) (publicationAuthority, 
 		}
 		forwardOnly = append(forwardOnly, channel)
 	}
+	if err := checkStagingChannel(granted.StagingChannel, granted.Namespace, granted.Channels, granted.ImmutableChannel, forwardOnly); err != nil {
+		return publicationAuthority{}, issuedBearer{}, err
+	}
 	bearer, err := granted.issued(issuedAt)
 	if err != nil {
 		return publicationAuthority{}, issuedBearer{}, err
@@ -251,7 +268,29 @@ func parsePlanningGrant(body []byte, issuedAt time.Time) (publicationAuthority, 
 		Channels:         slices.Clone(granted.Channels),
 		ImmutableChannel: granted.ImmutableChannel,
 		ForwardOnly:      forwardOnly,
+		StagingChannel:   granted.StagingChannel,
 	}, bearer, nil
+}
+
+// checkStagingChannel checks the staging channel of a planning answer. A
+// staged run releases its set onto that channel alone, so the channel must be
+// a valid channel name outside the run's channels, and every channel of the
+// run must be one Delivery moves later: a mutable, forward-only channel. A run
+// with an immutable channel is a tag release and never stages.
+func checkStagingChannel(staging, namespace string, channels []string, immutable string, forwardOnly []string) error {
+	if staging == "" {
+		return nil
+	}
+	selector := distribution.ResolveRequest{ProtocolVersion: distribution.ProtocolVersion, Namespace: namespace, Channels: []string{staging}}
+	switch {
+	case diag.HasErrors(distribution.ValidateResolveRequest(&selector)):
+		return errors.New("stagingChannel is not a valid channel name")
+	case slices.Contains(channels, staging):
+		return errors.New("stagingChannel is one of the run's channels")
+	case immutable != "" || !slices.Equal(forwardOnly, channels):
+		return errors.New("stagingChannel names a run whose channels are not all forward-only")
+	}
+	return nil
 }
 
 // parsePublishGrant reads Delivery's answer to a plan: the plan's write

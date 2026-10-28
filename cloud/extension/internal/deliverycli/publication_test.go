@@ -240,6 +240,10 @@ type fakeDelivery struct {
 	advanceHead  string
 	advanceCalls int
 	onAdvance    func(call int, w http.ResponseWriter) bool
+	// staging is the staging channel the planning answer names, "" for an
+	// unstaged run; advanceBodies are the staged advance questions.
+	staging       string
+	advanceBodies []stagedAdvanceRequest
 }
 
 func newFakeDelivery(t *testing.T, clock *pubClock) *fakeDelivery {
@@ -281,6 +285,9 @@ func (d *fakeDelivery) serve(w http.ResponseWriter, r *http.Request) {
 	if got := r.Header.Get(channelAdvanceHeader); got != channelAdvanceForwardOnly {
 		d.t.Errorf("Delivery %s = %q, want %s", channelAdvanceHeader, got, channelAdvanceForwardOnly)
 	}
+	if got := r.Header.Get(channelStagingHeader); got != channelStagingSupported {
+		d.t.Errorf("Delivery %s = %q, want %s", channelStagingHeader, got, channelStagingSupported)
+	}
 	body, _ := io.ReadAll(r.Body)
 	switch r.URL.Path {
 	case pubIngestAPI + nativePublicationPlanningPath:
@@ -291,9 +298,27 @@ func (d *fakeDelivery) serve(w http.ResponseWriter, r *http.Request) {
 	case pubIngestAPI + nativePublicationPublishPath:
 		d.publish(w, body)
 	case pubIngestAPI + nativePublicationAdvancePath:
-		if string(body) != "{}" {
-			d.t.Errorf("advance body = %q, want {}", body)
+		d.mu.Lock()
+		staged := d.staging != ""
+		d.mu.Unlock()
+		if !staged {
+			if string(body) != "{}" {
+				d.t.Errorf("advance body = %q, want {}", body)
+			}
+			d.answerAdvance(w)
+			return
 		}
+		// A staged run names its set and every channel's head, as Delivery
+		// requires: an rs_ id, or "" for a channel with no head.
+		var question stagedAdvanceRequest
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&question); err != nil || !distribution.IsReleaseSetID(question.ReleaseSet) {
+			d.t.Errorf("staged advance body = %q, want a release set and the expected heads", body)
+		}
+		d.mu.Lock()
+		d.advanceBodies = append(d.advanceBodies, question)
+		d.mu.Unlock()
 		d.answerAdvance(w)
 	default:
 		d.t.Errorf("Delivery request path = %s", r.URL.Path)
@@ -308,7 +333,7 @@ func (d *fakeDelivery) planning(w http.ResponseWriter) {
 	answer := map[string]any{
 		"protocolVersion": 1, "workspaceId": "ws_acme", "runId": "run_42", "sourceRevision": pubSource,
 		"namespace": d.namespace, "channels": d.channels, "immutableChannel": d.immutable,
-		"forwardOnlyChannels": d.forwardOnly, "expiresUnix": d.clock.Now().Add(time.Hour).Unix(),
+		"forwardOnlyChannels": d.forwardOnly, "stagingChannel": d.staging, "expiresUnix": d.clock.Now().Add(time.Hour).Unix(),
 		"access_token": fmt.Sprintf("planning-bearer-%d", call), "token_type": "Bearer", "expires_in": d.expiresIn,
 		"scope": "put:acme/release-set:read", "jti": fmt.Sprintf("jti-planning-%d", call),
 	}

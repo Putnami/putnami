@@ -278,7 +278,8 @@ owns coverage enforcement.
 On a hosted run the credential provider also serves the engine's
 publication-v1 ops: `resolve`, `open`, the publish credential, and `release`
 (see [registry ADR 0003](../../../../protocols/registry/doc/adr/0003-publication-ops-behind-a-negotiated-capability.md)).
-`publication_test.go` and `publication_advance_test.go` drive the provider
+`publication_test.go`, `publication_advance_test.go` and
+`publication_staged_test.go` drive the provider
 over its JSONL protocol, the way the engine does, and check every answer with
 the protocol's strict parsers and exchange validators. Delivery's
 `/native-publication/planning`, `/native-publication/publish` and
@@ -290,7 +291,7 @@ provider reaches put-server through its generated client. The tests need no
 database and run in the ordinary gate:
 
 ```sh
-./putnamiw test --projects @putnami/cloud-extension --run 'Publication|ReadRequestLine|ParsePlanningGrant|ParsePublishGrant|ParseAdvanceAnswer|PreservesHead|WithChannels'
+./putnamiw test --projects @putnami/cloud-extension --run 'Publication|Staged|ReadRequestLine|ParsePlanningGrant|ParsePublishGrant|ParseAdvanceAnswer|PreservesHead|WithChannels'
 ```
 
 Forward-only channels follow one rule. The provider never refuses with
@@ -311,6 +312,29 @@ run is still the head of its default branch:
   a second miss is the `conflict`.
 - Delivery not answering moves no channel and stores nothing, so the engine
   can send the release again.
+
+A staged run moves none of its channels. The provider sends
+`X-Putnami-Channel-Staging: supported` on every Delivery call. When Delivery
+can move the run's channels itself, its planning answer names a
+`stagingChannel`, and every channel of the run is forward-only. At release:
+
+- The provider asks `advance` with the set's `rs_` id and, for each channel,
+  the head the engine expects (`""` for no head). Delivery records them.
+- Not the head: nothing is released, as for an unstaged superseded run.
+- The head: the provider reads the staging channel and releases the set onto
+  it alone, at the widest level of the run's channels, so every member gets
+  the level an unstaged release would give it. A staging head that moves
+  before the release is read once more; a second miss is
+  `publication_unavailable` and moves nothing.
+- The engine reads the set as the head of every channel, at the generation
+  the session resolved, as for a skipped forward-only channel.
+
+Delivery moves the run's channels to the staging channel's set in the run's
+`deploy` phase, after a green terminal. A run whose gate is red, or whose
+terminal never arrives, moves no channel an environment follows. A namespace
+with a `public` channel and an npm or OCI mirror target also gets a tag named
+after the staging channel on that target, because the staging channel then
+confers `public`.
 
 A run whose immutable channel already has a head is a rerun. When the tag's
 channel already has a head at `open` (a rerun of a commit whose run released

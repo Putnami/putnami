@@ -132,6 +132,12 @@
       "WorkspaceMembership": {
         "additionalProperties": false,
         "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },

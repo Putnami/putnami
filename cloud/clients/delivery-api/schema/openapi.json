@@ -488,6 +488,33 @@
         },
         "type": "object"
       },
+      "CIRunPhaseProgressResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "done": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "planned": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CIRunPhaseResponse": {
         "additionalProperties": false,
         "properties": {
@@ -525,6 +552,30 @@
           },
           "status": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunProgressResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunPhaseProgressResponse"
+            },
+            "type": "array"
+          },
+          "plannedTasks": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "projects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -590,6 +641,10 @@
               "$ref": "#/components/schemas/CIRunPhaseResponse"
             },
             "type": "array"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/CIRunProgressResponse",
+            "nullable": true
           },
           "provenance": {
             "type": "string"
@@ -1003,6 +1058,31 @@
             "type": "string"
           },
           "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "waits": {
+            "$ref": "#/components/schemas/CIRunVerdictWaitsResponse",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
+      "CIRunVerdictWaitsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "conclusion": {
+            "type": "string"
+          },
+          "declarations": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "gaps": {
             "format": "int64",
             "maximum": 9223372036854775807,
             "minimum": -9223372036854775808,
@@ -2181,6 +2261,21 @@
         },
         "type": "object"
       },
+      "NativePublicationAdvanceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "releaseSet": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NativePublicationAdvanceResponse": {
         "additionalProperties": false,
         "properties": {
@@ -2308,6 +2403,9 @@
             "type": "string"
           },
           "sourceRevision": {
+            "type": "string"
+          },
+          "stagingChannel": {
             "type": "string"
           },
           "token_type": {
@@ -2790,6 +2888,10 @@
               "$ref": "#/components/schemas/CISubscriptionTrackRequest"
             },
             "type": "array"
+          },
+          "verdict_only_checks": {
+            "nullable": true,
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -3551,6 +3653,9 @@
           "updated_by": {
             "type": "string"
           },
+          "verdict_only_checks": {
+            "type": "boolean"
+          },
           "workspace_id": {
             "type": "string"
           }
@@ -4281,13 +4386,13 @@
     },
     "/v1/delivery/records/native-publication/advance": {
       "post": {
-        "description": "Answer whether the run may move its forward-only channels now: false only for a default-branch run whose commit is no longer the head of that branch. Mints nothing and moves nothing. Authenticated by the run credential alone; the body is exactly {}.",
+        "description": "Answer whether the run may move its forward-only channels now: false only for a default-branch run whose commit is no longer the head of that branch. Mints nothing and moves nothing. Authenticated by the run credential alone. A staged run names the release set it puts on its staging channel and the head each forward-only channel had when the set was cut; every other run sends {}.",
         "operationId": "postV1_Delivery_Records_Native-publication_Advance",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CapabilityEmptyRequest"
+                "$ref": "#/components/schemas/NativePublicationAdvanceRequest"
               }
             }
           },
@@ -4305,7 +4410,7 @@
             "description": "Successful response"
           },
           "400": {
-            "description": "The body is not exactly {}"
+            "description": "The body is invalid, or its release set does not match the run's staging authority"
           },
           "401": {
             "description": "Run credential missing, invalid or expired"
@@ -6130,6 +6235,14 @@
           {
             "in": "query",
             "name": "detail",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "progress",
             "required": false,
             "schema": {
               "type": "boolean"
