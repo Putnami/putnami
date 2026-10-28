@@ -1,6 +1,7 @@
 import { incCounter } from '@putnami/application';
 import type { ResolvedHandlerOptions } from '../handler/handler.type';
 import {
+  DROP_BROKER_STOPPED,
   DROP_DLQ_ENQUEUE_FAILED,
   DROP_DLQ_NO_SUBSCRIBER,
   DROP_RETRIES_EXHAUSTED,
@@ -31,8 +32,14 @@ export interface FailureRouterHost {
   selectTargets(topic: string, subs: Subscription[], envelope: Envelope): Subscription[];
   /** Look up the subscriptions registered for a topic. */
   getSubscriptions(topic: string): Subscription[] | undefined;
-  /** Whether the broker is still running (retries scheduled before stop() bail). */
+  /** Whether the broker is still running (a retry timer that fires after stop() records a drop instead). */
   isRunning(): boolean;
+}
+
+/** A retry waiting for its backoff: the failed delivery and the failure that asked for it. */
+interface PendingRetry {
+  readonly envelope: Envelope;
+  readonly error: unknown;
 }
 
 /**
@@ -41,7 +48,7 @@ export interface FailureRouterHost {
  * or capture it as a dead-letter when none exist.
  */
 export class FailureRouter {
-  private readonly retryTimers = new Set<ReturnType<typeof setTimeout>>();
+  private readonly retryTimers = new Map<ReturnType<typeof setTimeout>, PendingRetry>();
   private readonly deadLetters: DeadLetterBuffer;
 
   constructor(
@@ -59,10 +66,15 @@ export class FailureRouter {
     return this.deadLetters.drain();
   }
 
-  /** Cancel all pending retry timers (used during shutdown). */
+  /**
+   * Cancel all pending retry timers (used during shutdown). Each cancelled retry
+   * loses its message, so each one is recorded dropped with reason
+   * `broker_stopped` and the failure that asked for the retry.
+   */
   cancelRetries(): void {
-    for (const timer of this.retryTimers) {
+    for (const [timer, retry] of this.retryTimers) {
       clearTimeout(timer);
+      dropStopped(retry.envelope, retry.error);
     }
     this.retryTimers.clear();
   }
@@ -93,7 +105,12 @@ export class FailureRouter {
 
     const timer = setTimeout(() => {
       this.retryTimers.delete(timer);
-      if (!this.host.isRunning()) return;
+      if (!this.host.isRunning()) {
+        // The timer fired while stop() drains: the retry is abandoned, like one
+        // that stop() cancels.
+        dropStopped(envelope, error);
+        return;
+      }
       const retryEnvelope: Envelope = { ...envelope, attempt: envelope.attempt + 1 };
       // Re-enqueue can throw (e.g. queue full with overflow:'throw'). This runs
       // in a bare timer callback, so a throw would become an uncaught exception
@@ -108,7 +125,7 @@ export class FailureRouter {
         this.sendToDlq(retryEnvelope, opts, enqueueError, DROP_RETRY_ENQUEUE_FAILED);
       }
     }, delay);
-    this.retryTimers.add(timer);
+    this.retryTimers.set(timer, { envelope, error });
   }
 
   private sendToDlq(
@@ -184,6 +201,16 @@ export class FailureRouter {
     // not lost, so a drop record here would be false.
     logDeadLettered(envelope, dlqTopicName, error);
   }
+}
+
+/**
+ * Record a delivery that a stopping broker abandons: the `message dropped` record
+ * with reason `broker_stopped`, and the drop counter. `error` is the handler
+ * failure behind an abandoned retry; a queued delivery that never ran has none.
+ */
+export function dropStopped(envelope: Envelope, error?: unknown): void {
+  logDropped(envelope, DROP_BROKER_STOPPED, error);
+  incCounter(`events.handle.${envelope.topic}.dropped`);
 }
 
 function calculateBackoff(attempt: number, maxBackoff: number): number {
