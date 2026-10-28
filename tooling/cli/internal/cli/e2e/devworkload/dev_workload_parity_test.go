@@ -55,6 +55,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	gitexec "go.putnami.dev/tooling/cli/internal/git"
 )
@@ -74,9 +75,19 @@ type devWorkloadCase struct {
 	// stopWhen, when set, is the stdout the run must print before the case
 	// sends it SIGTERM: a composition runs until it is stopped.
 	stopWhen *regexp.Regexp
+	// startsMembers is set on a case that starts a composition's members but
+	// does not run until stopped: a local qualification that composes, or a
+	// composition whose member exits. A case with stopWhen starts them too.
+	startsMembers bool
 	// wantExit is the exit code the extension must return. It is stated so a
 	// recording edited into another verdict shows here.
 	wantExit int
+}
+
+// takesSlot reports whether tc starts a composition's members, and so runs
+// only once limitConcurrency hands it a slot.
+func (tc devWorkloadCase) takesSlot() bool {
+	return tc.stopWhen != nil || tc.startsMembers
 }
 
 // deploymentSHA is the sha the deterministic deployment reports, and
@@ -124,7 +135,7 @@ func devWorkloadCases() []devWorkloadCase {
 		},
 		{
 			name: "compose member exited", args: fixed("compose", "app", "--port", "0", "--no-watch", "--output=jsonl"),
-			before: providerExitsEarly, wantExit: 1,
+			before: providerExitsEarly, startsMembers: true, wantExit: 1,
 		},
 		{name: "qualify without a project", args: fixed("qualify", "--target", "local"), wantExit: 2},
 		{name: "qualify without a target", args: fixed("qualify", "app"), wantExit: 2},
@@ -140,10 +151,13 @@ func devWorkloadCases() []devWorkloadCase {
 		{name: "qualify print-contract json", args: fixed("qualify", "app", "--print-contract", "--output=json")},
 		{name: "qualify print-contract without routes", args: fixed("qualify", "provider", "--print-contract")},
 		{name: "qualify print-contract without routes jsonl", args: fixed("qualify", "provider", "--print-contract", "--output=jsonl")},
-		{name: "qualify local", args: fixed("qualify", "app", "--target", "local")},
-		{name: "qualify local json", args: fixed("qualify", "app", "--target", "local", "--output=json")},
-		{name: "qualify local jsonl", args: fixed("qualify", "/app", "--target", "local", "--output=jsonl")},
-		{name: "qualify local composition failed", args: fixed("qualify", "app", "--target", "local", "--output=json"), before: providerExitsEarly, wantExit: 1},
+		{name: "qualify local", args: fixed("qualify", "app", "--target", "local"), startsMembers: true},
+		{name: "qualify local json", args: fixed("qualify", "app", "--target", "local", "--output=json"), startsMembers: true},
+		{name: "qualify local jsonl", args: fixed("qualify", "/app", "--target", "local", "--output=jsonl"), startsMembers: true},
+		{
+			name: "qualify local composition failed", args: fixed("qualify", "app", "--target", "local", "--output=json"),
+			before: providerExitsEarly, startsMembers: true, wantExit: 1,
+		},
 		{name: "qualify local library", args: fixed("qualify", "lib", "--target", "local", "--output=json"), wantExit: 1},
 		{
 			name: "qualify url", deployment: deploymentSHA, wantExit: 0,
@@ -183,7 +197,9 @@ func TestDevWorkloadCommandsMatchTheRecordedCore(t *testing.T) {
 	for _, tc := range devWorkloadCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			limitConcurrency(t)
+			if tc.takesSlot() {
+				limitConcurrency(t)
+			}
 			root := newFixture(t, runtimePath)
 			got := runCase(t, cli, root, tc)
 			want := expectedAnswer(t, tc)
@@ -263,7 +279,9 @@ func TestRecordDevWorkloadParity(t *testing.T) {
 	for _, tc := range devWorkloadCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			limitConcurrency(t)
+			if tc.takesSlot() {
+				limitConcurrency(t)
+			}
 			root := newFixture(t, "")
 			recorded := runCase(t, core, root, tc)
 			path := filepath.Join(recordingDir(), paritySlug(tc.name)+".txt")
@@ -437,8 +455,13 @@ func runEnv(t *testing.T) []string {
 	return append(env, "HOME="+t.TempDir(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C", "DO_NOT_TRACK=1")
 }
 
-// limitConcurrency bounds how many cases run at once: each one starts a CLI
-// that starts its members' serve runs.
+// limitConcurrency bounds how many runs that start a composition's members run
+// at once, at two. Such a run starts, for each member, a nested serve run of
+// the CLI and a fixture serve step, and the test waits a bounded time for the
+// members to be ready: too many compositions at once load the machine until a
+// member misses that bound. The parity cases whose takesSlot holds and the two
+// compose tests take a slot. A case refused before any member starts runs only
+// the CLI and the @putnami/dev executable, so it runs without a slot.
 var concurrency = make(chan struct{}, 2)
 
 func limitConcurrency(t *testing.T) {
@@ -590,18 +613,52 @@ func devManifest(t *testing.T, runtimePath string) string {
 	return string(out) + "\n"
 }
 
-// devRuntime builds the @putnami/dev executable for the test, as
-// tooling/dev/bin/prepare does, and returns its path.
+// builtDevRuntime is the @putnami/dev executable devRuntime builds, once per
+// test process. Every test reads it and none writes or removes it: a fixture
+// only names its path in the manifest it writes.
+var builtDevRuntime struct {
+	once sync.Once
+	// dir holds the build. Keeping it reachable keeps its owner lock held.
+	dir  *scratch.Dir
+	path string
+	err  error
+}
+
+// devRuntime returns the path of the @putnami/dev executable, built once per
+// test process as tooling/dev/bin/prepare builds it. removeDevRuntime deletes
+// the build.
 func devRuntime(t *testing.T) string {
 	t.Helper()
-	output := filepath.Join(t.TempDir(), "putnami-dev")
-	cmd := exec.Command("go", "build", "-o", output, "./cmd/putnami-dev")
+	builtDevRuntime.once.Do(buildDevRuntime)
+	if builtDevRuntime.err != nil {
+		t.Fatalf("could not build the @putnami/dev runtime: %v", builtDevRuntime.err)
+	}
+	return builtDevRuntime.path
+}
+
+func buildDevRuntime() {
+	// scratch.New, not os.MkdirTemp: a test process that dies before
+	// removeDevRuntime leaves the build to the next run's sweep.
+	dir, err := scratch.New("putnami-dev-workload-runtime-")
+	if err != nil {
+		builtDevRuntime.err = err
+		return
+	}
+	builtDevRuntime.dir = dir
+	builtDevRuntime.path = filepath.Join(dir.Path(), "putnami-dev")
+	cmd := exec.Command("go", "build", "-o", builtDevRuntime.path, "./cmd/putnami-dev")
 	cmd.Dir = filepath.Join("..", "..", "..", "..", "..", "dev")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("could not build the @putnami/dev runtime, so parity cannot be measured:\n%s", out)
+		builtDevRuntime.err = fmt.Errorf("build ./cmd/putnami-dev: %w\n%s", err, out)
 	}
-	return output
+}
+
+// removeDevRuntime deletes the @putnami/dev build, if any.
+func removeDevRuntime() {
+	if builtDevRuntime.dir != nil {
+		_ = builtDevRuntime.dir.Remove()
+	}
 }
 
 // disableProviderServe has /provider disable its serve command.

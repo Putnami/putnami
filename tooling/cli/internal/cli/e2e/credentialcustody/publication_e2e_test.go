@@ -967,15 +967,17 @@ func failureLines(output string) string {
 // probe, pack them into the outbox and find no credential, and after the one
 // open the engine sends each member's upload to the provider, which uploads
 // it with the credential it holds. The engine asks no publish credential. It
-// then releases the opened plan forward from the channel's head. A head that
-// is not an ancestor of the commit is refused at open and nothing is
-// uploaded; a release whose members the registries do not store is refused,
-// and no channel moves.
+// then releases the opened plan forward from the channel's head. A hosted run
+// of the same commit opens a byte-identical plan and releases the same set,
+// and only its initialize carries the run credential. A head that is not an
+// ancestor of the commit is refused at open and nothing is uploaded; a release
+// whose members the registries do not store is refused, and no channel moves.
 func TestReleaseSetE2EPublicationV1UploadsThroughTheProviderAndReleasesForwardOnly(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "real-extension-jobs-pack-and-the-session-uploads")
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-engine-asks-no-publish-credential")
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "real-extensions-open-once-and-release-forward-only")
+	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "a-local-and-a-hosted-run-open-the-same-plan")
 	fx := writePublicationE2EFixture(t)
 
 	t.Run("forward", func(t *testing.T) {
@@ -1059,6 +1061,41 @@ func TestReleaseSetE2EPublicationV1UploadsThroughTheProviderAndReleasesForwardOn
 		if released := setRef(t, rel.Request.ReleaseSet); run.end.Releases != 1 || run.end.Heads[e2eChannel] != released.ID {
 			t.Errorf("provider ended with %d releases and head %q; want one release and head %s", run.end.Releases, run.end.Heads[e2eChannel], released.ID)
 		}
+
+		// A hosted run of the same commit, through a provider that starts
+		// from the same head, opens a byte-identical plan and releases the
+		// same set. Each run starts its own provider from the setup file and
+		// empties the logs, the ledger and the registries first, so the
+		// hosted run's records are its own and the local release does not
+		// move the head it starts from. Only the hosted run's initialize
+		// carries the run credential, and its publication jobs find no
+		// credential either.
+		hosted := fx.publish(t, true, providerSetup{Heads: map[string]distribution.ReleaseSet{e2eChannel: forward}})
+		if hosted.code != 0 {
+			t.Fatalf("hosted publish exit=%d, want 0: %s\n%s", hosted.code, failureLines(hosted.output), hosted.output)
+		}
+		if len(run.initialize) != 1 || run.initialize[0].RunCredential {
+			t.Errorf("local initialize %+v; want one, without the run credential", run.initialize)
+		}
+		if len(hosted.initialize) != 1 || !hosted.initialize[0].RunCredential {
+			t.Errorf("hosted initialize %+v; want one, carrying the run credential", hosted.initialize)
+		}
+		if len(hosted.openRaw) != 1 || len(hosted.releases) != 1 {
+			t.Fatalf("hosted ledger has %d opens and %d releases; want one each\n%s", len(hosted.openRaw), len(hosted.releases), hosted.output)
+		}
+		assertProbesFoundNothing(t, "npm publication (hosted)", fx.npmProbe)
+		assertProbesFoundNothing(t, "go publication (hosted)", fx.goProbe)
+		if !bytes.Equal(run.openRaw[0], hosted.openRaw[0]) {
+			t.Errorf("open payloads differ:\nlocal  %s\nhosted %s", run.openRaw[0], hosted.openRaw[0])
+		}
+		if open.Plan.PlanDigest != hosted.opens[0].Plan.PlanDigest {
+			t.Errorf("plan digests differ: local %s, hosted %s", open.Plan.PlanDigest, hosted.opens[0].Plan.PlanDigest)
+		}
+		localSet, hostedSet := setRef(t, rel.Request.ReleaseSet), setRef(t, hosted.releases[0].Request.ReleaseSet)
+		if localSet != hostedSet || run.end.Heads[e2eChannel] != localSet.ID || hosted.end.Heads[e2eChannel] != hostedSet.ID {
+			t.Errorf("local released %s (head %q), hosted %s (head %q); want one set, accepted by both",
+				localSet.ID, run.end.Heads[e2eChannel], hostedSet.ID, hosted.end.Heads[e2eChannel])
+		}
 	})
 
 	t.Run("not forward", func(t *testing.T) {
@@ -1104,45 +1141,6 @@ func TestReleaseSetE2EPublicationV1UploadsThroughTheProviderAndReleasesForwardOn
 			t.Errorf("provider ended with %d releases and head %q; want the head %s unchanged", run.end.Releases, run.end.Heads[e2eChannel], headRef.ID)
 		}
 	})
-}
-
-// A local run and a hosted run of one commit, through the same provider, open
-// byte-identical plans and release the same set. Only the hosted run's
-// initialize carries the run credential, and neither run's publication jobs
-// hold it or the publish credential.
-func TestReleaseSetE2ELocalAndHostedRunsOpenTheSamePlan(t *testing.T) {
-	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "a-local-and-a-hosted-run-open-the-same-plan")
-	fx := writePublicationE2EFixture(t)
-
-	runs := map[bool]e2eRun{}
-	for _, hosted := range []bool{false, true} {
-		run := fx.publish(t, hosted, providerSetup{})
-		if run.code != 0 {
-			t.Fatalf("publish (hosted=%t) exit=%d, want 0: %s\n%s", hosted, run.code, failureLines(run.output), run.output)
-		}
-		if len(run.initialize) != 1 || run.initialize[0].RunCredential != hosted {
-			t.Errorf("hosted=%t: initialize %+v; want one, carrying the run credential only on the hosted run", hosted, run.initialize)
-		}
-		if len(run.openRaw) != 1 || len(run.releases) != 1 {
-			t.Fatalf("hosted=%t: ledger has %d opens and %d releases; want one each\n%s", hosted, len(run.openRaw), len(run.releases), run.output)
-		}
-		assertProbesFoundNothing(t, fmt.Sprintf("npm publication (hosted=%t)", hosted), fx.npmProbe)
-		assertProbesFoundNothing(t, fmt.Sprintf("go publication (hosted=%t)", hosted), fx.goProbe)
-		runs[hosted] = run
-	}
-	local, hosted := runs[false], runs[true]
-	if !bytes.Equal(local.openRaw[0], hosted.openRaw[0]) {
-		t.Errorf("open payloads differ:\nlocal  %s\nhosted %s", local.openRaw[0], hosted.openRaw[0])
-	}
-	if local.opens[0].Plan.PlanDigest != hosted.opens[0].Plan.PlanDigest {
-		t.Errorf("plan digests differ: local %s, hosted %s", local.opens[0].Plan.PlanDigest, hosted.opens[0].Plan.PlanDigest)
-	}
-	localSet, hostedSet := setRef(t, local.releases[0].Request.ReleaseSet), setRef(t, hosted.releases[0].Request.ReleaseSet)
-	if localSet != hostedSet || local.end.Heads[e2eChannel] != localSet.ID || hosted.end.Heads[e2eChannel] != hostedSet.ID {
-		t.Errorf("local released %s (head %q), hosted %s (head %q); want one set, accepted by both",
-			localSet.ID, local.end.Heads[e2eChannel], hostedSet.ID, hosted.end.Heads[e2eChannel])
-	}
 }
 
 // indexesOf returns the positions in lines of every line equal to one of

@@ -68,9 +68,10 @@ var lockedFiles = []string{"bun.lock", ".npmrc", "putnami.lock.json"}
 // keeps its bytes and the checkout stays clean. Without the run credential, or
 // with another one, the pinned CLI never downloads and nothing changes.
 //
-// It builds the CLI twice from this module, in parallel: about 5 s for the
-// whole test on a warm build cache, about 15 s on a cold one. Each run is its
-// own process with a fresh home and a fresh checkout.
+// It builds the CLI twice from this module, one build after the other, so the
+// second build only links: the whole test takes about 5 s on a warm build
+// cache, longer on a cold one, where the first build compiles the module. Each
+// run is its own process with a fresh home and a fresh checkout.
 func TestHostedInstallOfAPrivatePinWorksCold(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "cold-install-leaves-locks-unchanged", "private-pin-installs-cold")
 	clitest.RequireShell(t)
@@ -209,15 +210,13 @@ func buildCLIs(t *testing.T) (bootstrapCLI, pinnedCLI string) {
 		}
 		return output, nil
 	}
-	var (
-		wg                      sync.WaitGroup
-		bootstrapErr, pinnedErr error
-	)
-	wg.Add(2)
-	go func() { defer wg.Done(); bootstrapCLI, bootstrapErr = build(bootstrapVersion) }()
-	go func() { defer wg.Done(); pinnedCLI, pinnedErr = build(pinnedVersion) }()
-	wg.Wait()
-	if err := errors.Join(bootstrapErr, pinnedErr); err != nil {
+	// One build after the other: the first fills the build cache, so the
+	// second, which differs only in its version stamp, only links. Two builds
+	// started together both miss the cache and both compile every package.
+	if bootstrapCLI, err = build(bootstrapVersion); err != nil {
+		t.Fatal(err)
+	}
+	if pinnedCLI, err = build(pinnedVersion); err != nil {
 		t.Fatal(err)
 	}
 	return bootstrapCLI, pinnedCLI

@@ -78,6 +78,9 @@ type parityCase struct {
 	// before prepares the tree ahead of the run. It reproduces exactly what the
 	// tree looked like when core answered.
 	before func(t *testing.T, root string)
+	// after checks the tree once the run's answer matched, for what a case
+	// writes that its answer does not show.
+	after func(t *testing.T, root string)
 	// wantExit is the exit code the recorded answer must carry. It is stated
 	// rather than merely read from the file so a recording that was edited into
 	// a different verdict is visible here instead of silently accepted.
@@ -108,6 +111,9 @@ func TestSDDSubcommandsMatchTheRecordedBuiltIn(t *testing.T) {
 			out, errOut, code := runParityExtension(t, root, extensions, sdd.args)
 			assertRecordedParityAnswer(t, filepath.Join("structured", paritySlug(sdd.name)),
 				root, sdd.wantExit, code, out, errOut)
+			if sdd.after != nil {
+				sdd.after(t, root)
+			}
 		})
 	}
 }
@@ -221,8 +227,9 @@ func parityCases() []parityCase {
 			// Generate is idempotent — the second run rewrites identical bytes —
 			// so it needs no restore between the two: the report names the
 			// artifacts, not what changed.
-			name: "contracts generate",
-			args: []string{"contracts", "generate", "--project", "@acme/billing", "--output=json"},
+			name:  "contracts generate",
+			args:  []string{"contracts", "generate", "--project", "@acme/billing", "--output=json"},
+			after: assertRecordedContractArtifacts,
 		},
 		{
 			name: "contracts check clean",
@@ -688,22 +695,13 @@ func recordedContractName(rel string) string {
 	return strings.ReplaceAll(rel, "/", "_")
 }
 
-// TestContractsGenerateWritesTheRecordedArtifactBytes closes the gap the report
-// comparison leaves open: `contracts generate`'s ENVELOPE only names the four
-// artifacts, so an extension that wrote different bytes into them would still
-// match the recorded report. The artifacts are what land in a user's repository,
-// so they are compared directly.
-func TestContractsGenerateWritesTheRecordedArtifactBytes(t *testing.T) {
-	t.Parallel()
-	limitParityConcurrency(t)
-	root := parityWorkspace(t)
-	extensions := parityExtensions(t, root, parityExtensionRuntime(t))
-
-	if _, errOut, code := runParityExtension(t, root, extensions,
-		[]string{"contracts", "generate", "--project", "@acme/billing", "--output=json"}); code != 0 {
-		t.Fatalf("contracts generate exited %d: %s", code, errOut)
-	}
-
+// assertRecordedContractArtifacts closes the gap the report comparison leaves
+// open: `contracts generate`'s ENVELOPE only names the four artifacts, so an
+// extension that wrote different bytes into them would still match the
+// recorded report. The artifacts are what land in a user's repository, so they
+// are compared directly.
+func assertRecordedContractArtifacts(t *testing.T, root string) {
+	t.Helper()
 	for _, rel := range parityContractArtifacts {
 		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
@@ -951,81 +949,70 @@ func TestParityCasesCoverTheWholeInventory(t *testing.T) {
 //
 // `--baseline` is a global the CLI consumes before dispatch and the resolved
 // `selection` block cannot carry unless `--impacted` used it, so it reaches the
-// extension only through the param the interactive path forwards. If that
-// forwarding broke, `architecture validate --baseline HEAD` would silently
-// become `architecture validate` — and the byte comparison would still pass,
-// because BOTH sides would be compared against each other and not against a
-// baseline. This asserts the flag CHANGES the answer.
+// extension only through the param the interactive path forwards. The parity
+// cases compare the extension's answer with and without the flag against the
+// two recordings byte for byte. If the recordings were the same answer, a
+// broken forwarding would turn `architecture validate --baseline HEAD` into
+// `architecture validate` and still match. This asserts the two recordings
+// differ, and differ by the baseline the user asked for.
 func TestBaselineActuallyReachesTheExtension(t *testing.T) {
 	t.Parallel()
-	limitParityConcurrency(t)
 	spectest.Proves(t, "cli/sdd-extraction", "recorded-parity-with-the-replaced-surface", "the-baseline-actually-reaches-the-extension")
-	root := parityWorkspace(t)
-	extensions := parityExtensions(t, root, parityExtensionRuntime(t))
 
-	// An empty answer is a failed run, not a flag that changed nothing: the
-	// failure reports its exit code, where -1 is a child that a signal ended,
-	// and its stderr.
-	answer := func(args ...string) string {
+	recorded := func(name string) string {
 		t.Helper()
-		out, errOut, code := runParityExtension(t, root, extensions, args)
-		if out == "" {
-			t.Fatalf("%v wrote no answer and exited %d:\n%s", args, code, errOut)
+		answer := readRecordedParityAnswer(t, filepath.Join("structured", paritySlug(name)))
+		if answer.stdout == "" {
+			t.Fatalf("the recorded answer of %q is empty", name)
 		}
-		return out
+		return answer.stdout
 	}
-	without := answer("architecture", "validate", "--output=json")
-	with := answer("architecture", "validate", "--baseline", "HEAD", "--output=json")
+	without := recorded("architecture validate")
+	with := recorded("architecture validate baseline")
 
 	if with == without {
-		t.Fatal("--baseline changed nothing; the flag never reached the extension")
+		t.Fatal("the recordings with and without --baseline are the same answer, so the parity cases cannot tell whether the flag reaches the extension")
 	}
 	if !strings.Contains(with, `"requested": "HEAD"`) {
-		t.Errorf("the baseline the user asked for is not in the answer:\n%s", with)
+		t.Errorf("the baseline the user asked for is not in the recorded answer:\n%s", with)
 	}
 	if strings.Contains(without, `"requested": "HEAD"`) {
-		t.Errorf("a run with no --baseline reported one:\n%s", without)
+		t.Errorf("the recorded answer with no --baseline reports one:\n%s", without)
 	}
 }
 
 // TestParityEnvelopesAreWellFormedResults guards against the failure mode a
 // byte comparison cannot see: two identical WRONG answers.
 //
-// If both sides degraded to an empty stdout, every case above would pass. This
-// decodes one structured answer per group and asserts it is a v2 result
-// envelope naming the command that produced it.
+// The parity cases match the extension's stdout with the recordings byte for
+// byte, so a recording that is not a result envelope, an empty one included,
+// would pass them all. This decodes one recorded structured answer per group
+// and asserts it is a v2 success envelope naming the command that produced it.
 func TestParityEnvelopesAreWellFormedResults(t *testing.T) {
 	t.Parallel()
-	limitParityConcurrency(t)
-	root := parityWorkspace(t)
-	extensions := parityExtensions(t, root, parityExtensionRuntime(t))
 
-	for _, args := range [][]string{
-		{"features", "list", "--output=json"},
-		{"specs", "list", "--output=json"},
-		{"architecture", "snapshot", "--output=json"},
-		{"contracts", "generate", "--project", "@acme/billing", "--output=json"},
+	for _, name := range []string{
+		"features list",
+		"specs list",
+		"architecture snapshot",
+		"contracts generate",
 	} {
-		out, _, code := runParityExtension(t, root, extensions, args)
-		if code != 0 {
-			t.Errorf("%v exited %d:\n%s", args, code, out)
-			continue
-		}
+		answer := readRecordedParityAnswer(t, filepath.Join("structured", paritySlug(name)))
 		var envelope struct {
 			ProtocolVersion int    `json:"protocolVersion"`
 			Command         string `json:"command"`
 			Status          string `json:"status"`
 			Data            any    `json:"data"`
 		}
-		if err := json.Unmarshal([]byte(out), &envelope); err != nil {
-			t.Errorf("%v did not write one JSON document: %v\n%s", args, err, out)
+		if err := json.Unmarshal([]byte(answer.stdout), &envelope); err != nil {
+			t.Errorf("the recorded answer of %q is not one JSON document: %v\n%s", name, err, answer.stdout)
 			continue
 		}
-		if want := args[0] + " " + args[1]; envelope.Command != want {
-			t.Errorf("%v envelope command = %q, want %q", args, envelope.Command, want)
+		if envelope.Command != name {
+			t.Errorf("the recorded answer of %q names the command %q", name, envelope.Command)
 		}
-		if envelope.Status != "success" || envelope.ProtocolVersion == 0 || envelope.Data == nil {
-			t.Errorf("%v envelope = %+v, want a populated v2 success", args, envelope)
+		if answer.exit != 0 || envelope.Status != "success" || envelope.ProtocolVersion != 2 || envelope.Data == nil {
+			t.Errorf("the recorded answer of %q exits %d with envelope %+v, want a populated v2 success", name, answer.exit, envelope)
 		}
 	}
 }
