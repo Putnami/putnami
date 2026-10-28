@@ -434,8 +434,10 @@ those bytes.
    - Findings (a malformed contribution, a merge conflict, an unused override)
      are reported as task warnings and never fail the build
    - Skipped for libraries (see [Project classification](#project-classification))
-   - Does not wait for compile: it reads no binary, so a cache hit of the
-     compile serves its result without the executable
+   - Does not depend on compile: it reads no binary and its key does not fold
+     the compile key. Write serialization of `.gen` still orders it after the
+     compile, an edge that keeps none of the compile's files, so a cache hit
+     of the compile can serve its result without the executable
    - Cached. The key holds every file the step reads: the committed
      `infra/requirements.json` of every project in the closure, with that
      project's path, and the workload's `infra/runtime.json` and
