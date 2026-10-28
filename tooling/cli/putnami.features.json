@@ -3164,6 +3164,33 @@
               "canonical-recipe-materialization"
             ]
           }
+        },
+        {
+          "id": "one-contribution-loop",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["build-is-a-short-core-and-one-reference-per-stage"]
+          }
+        },
+        {
+          "id": "workflow-profiles",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["workflow-profiles-replace-tiers-and-workers"]
+          }
+        },
+        {
+          "id": "review-cycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-review-cycle-blocks-on-p1-and-p2"]
+          }
         }
       ]
     },
