@@ -979,15 +979,19 @@ codex_mcp_definition_matches() {
         && codex_json_field_absent_or "$compact" disabled_tools null
 }
 
+# The host commands below run from the installer's scratch directory, not the
+# caller's: a project's own .mcp.json or local-scope entry named putnami would
+# otherwise shadow the user-scope entry the installer wrote, and the installer
+# would keep a registration it should remove.
 remove_claude_code_registration() {
     local installed_binary="$1"
     command -v claude >/dev/null 2>&1 || return 0
 
     local details="${TEMP_DIR}/claude-mcp.txt"
     local get_status=0
-    claude mcp get putnami >"$details" 2>&1 || get_status=$?
+    (cd "$TEMP_DIR" && claude mcp get putnami) >"$details" 2>&1 || get_status=$?
     if claude_mcp_definition_matches "$details" "$installed_binary"; then
-        if claude mcp remove --scope user putnami >"$details" 2>&1; then
+        if (cd "$TEMP_DIR" && claude mcp remove --scope user putnami) >"$details" 2>&1; then
             print_success "Removed the Putnami MCP server that an earlier install registered in Claude Code"
         else
             print_warning "Could not remove the Putnami MCP server from Claude Code; the CLI installation is still usable."
@@ -997,7 +1001,7 @@ remove_claude_code_registration() {
     fi
     if [[ "$get_status" -eq 0 ]] || grep -qxF 'putnami:' "$details"; then
         print_warning "Claude Code defines a putnami MCP server that Putnami did not register as is; it was kept."
-        print_hint "Putnami serves no MCP server any more. Remove it with: claude mcp remove putnami"
+        print_hint "Putnami serves no MCP server any more. Remove it with: claude mcp remove --scope user putnami"
     fi
     return 0
 }
@@ -1008,10 +1012,10 @@ remove_codex_registration() {
 
     local details="${TEMP_DIR}/codex-mcp.txt"
     local json_details="${TEMP_DIR}/codex-mcp.json"
-    codex mcp get putnami >"$details" 2>&1 || return 0
-    if codex mcp get putnami --json >"$json_details" 2>&1 \
+    (cd "$TEMP_DIR" && codex mcp get putnami) >"$details" 2>&1 || return 0
+    if (cd "$TEMP_DIR" && codex mcp get putnami --json) >"$json_details" 2>&1 \
         && codex_mcp_definition_matches "$details" "$json_details" "$installed_binary"; then
-        if codex mcp remove putnami >"$details" 2>&1; then
+        if (cd "$TEMP_DIR" && codex mcp remove putnami) >"$details" 2>&1; then
             print_success "Removed the Putnami MCP server that an earlier install registered in Codex"
         else
             print_warning "Could not remove the Putnami MCP server from Codex; the CLI installation is still usable."

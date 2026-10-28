@@ -75,10 +75,12 @@ validated, tested, cached on, and reasoned about by tooling in any language.
   orphan lease reaping, so recovery can never also classify an invocation as
   failed.
 - `ToolCallRequest` / `ToolCallResult` define the stdin/stdout boundary for
-  extension-contributed MCP tools. The CLI owns MCP JSON-RPC; extensions retain
-  their own execution, authentication and network behaviour. An opted-in
-  `ToolCallRequest.agent` object carries bounded MCP client/model provenance,
-  and `AgentIdentity.ApplyHTTPHeaders` applies its stable `User-Agent`,
+  extension-contributed tools. The core serves no MCP server and owns no MCP
+  JSON-RPC; the manifest `tools` section remains as the call contract of
+  collaboration providers. Extensions retain their own execution,
+  authentication and network behaviour. A `ToolCallRequest.agent` object, when
+  present, is vocabulary kept for collaboration providers; the core sets none.
+  `AgentIdentity.ApplyHTTPHeaders` applies its stable `User-Agent`,
   `Putnami-Agent-Harness` and `Putnami-Agent-Model` headers safely.
 - `ToolDefinition.workspaceSelection` is how a tool that answers ABOUT THE
   WORKSPACE asks the orchestrator for the view it already holds. The CLI then

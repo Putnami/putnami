@@ -2083,6 +2083,38 @@ func TestInstallPS1RemovesTheRegistrationItWroteLikeInstallSh(t *testing.T) {
 	}
 }
 
+// A project's own putnami entry shadows the user-scope one in `claude mcp get`
+// when it runs in the project. install.ps1 run from such a project must still
+// remove the registration it wrote.
+func TestInstallPS1RemovesTheRegistrationFromInsideAProject(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-discovery", "host-registration-removal", "a-registration-the-installer-wrote-is-removed")
+	registry, _, _ := defaultPS1Registry(t)
+	e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
+	binary := filepath.Join(e.binDir(), "putnami.exe")
+	claude := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", false)
+	claude.seedInstallerWritten(t, binary, true)
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".mcp.json"), []byte(`{"mcpServers":{"putnami":{"command":"putnami","args":["mcp"]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.workDir = project
+
+	res := e.run(t)
+	if res.exitCode != 0 {
+		t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output())
+	}
+	if calls := readHostCalls(t, claude); !strings.Contains(calls, "mcp remove --scope user putnami") {
+		t.Fatalf("Claude Code was not asked to remove the user-scope server:\n%s", calls)
+	}
+	if hostHasDefinition(claude) {
+		t.Fatal("the user-scope definition survived an install run inside a project")
+	}
+	if res.contains("it was kept") {
+		t.Fatalf("the installer reported a customized definition:\n%s", res.output())
+	}
+}
+
 func TestInstallPS1RegistersNoAgentHostServer(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-discovery", "host-registration-removal", "the-installer-registers-no-host-server")

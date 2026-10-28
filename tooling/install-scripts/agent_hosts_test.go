@@ -26,7 +26,9 @@ func installFakeAgentHost(t *testing.T, e *env, name string, rejectRemove bool) 
 // records its calls and keeps its MCP definition in files under stateDir. It
 // has no `mcp add`: a call to it is an unexpected command and exits 2, so a
 // test sees it in the call log. `mcp remove` deletes the definition, unless
-// rejectRemove makes the host refuse as a managed policy would. binary is the
+// rejectRemove makes the host refuse as a managed policy would. Like Claude
+// Code, the fake claude answers `mcp get` from a project's .mcp.json, ahead of
+// the user-scope definition, when its working directory holds one. binary is the
 // launcher a definition seeded by seedInstallerWritten names.
 func writeFakeAgentHost(t *testing.T, stateDir, binDir, binary, name string, rejectRemove bool) fakeAgentHost {
 	t.Helper()
@@ -47,6 +49,10 @@ func writeFakeAgentHost(t *testing.T, stateDir, binDir, binary, name string, rej
 		script = fmt.Sprintf(`#!/bin/sh
 printf '%%s\n' "$*" >> %s
 if [ "$1" = mcp ] && [ "$2" = get ] && [ "$3" = putnami ]; then
+  if [ -f .mcp.json ]; then
+    printf 'putnami:\n  Scope: Project config (shared via .mcp.json)\n  Status: \342\234\224 Connected\n  Command: putnami\n  Args: mcp\n'
+    exit 0
+  fi
   [ -f %s ] || exit 1
   cat %s
   grep -Eq '^  Status: .*Connected$' %s || exit 17
@@ -218,6 +224,37 @@ func TestInstallRemovesTheRegistrationItWrote(t *testing.T) {
 			}
 			e.assertNeverEscalated(t)
 		})
+	}
+}
+
+// A project's own putnami entry shadows the user-scope one in `claude mcp get`
+// when it runs in the project. The installer run from such a project must
+// still find and remove the registration it wrote.
+func TestInstallRemovesTheRegistrationFromInsideAProject(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "host-registration-removal", "a-registration-the-installer-wrote-is-removed")
+	requireBash(t)
+	server, _ := defaultRegistry(t)
+	e := newEnv(t).set("PUTNAMI_REGISTRY_URL", server.URL)
+	claude := installFakeAgentHost(t, e, "claude", false)
+	claude.seedInstallerWritten(t, filepath.Join(e.installDir, "putnami"), true)
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".mcp.json"), []byte(`{"mcpServers":{"putnami":{"command":"putnami","args":["mcp"]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.workDir = project
+
+	res := e.run(t, "--install-dir", e.installDir)
+	if res.exitCode != 0 {
+		t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output)
+	}
+	if calls := readHostCalls(t, claude); !strings.Contains(calls, "mcp remove --scope user putnami") {
+		t.Fatalf("Claude Code was not asked to remove the user-scope server:\n%s", calls)
+	}
+	if hostHasDefinition(claude) {
+		t.Fatal("the user-scope definition survived an install run inside a project")
+	}
+	if res.contains("it was kept") {
+		t.Fatalf("the installer reported a customized definition:\n%s", res.output)
 	}
 }
 

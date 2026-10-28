@@ -148,6 +148,7 @@ var escalators = []string{"sudo", "doas", "pkexec", "run0"}
 
 type env struct {
 	home             string
+	workDir          string // the directory the installer starts in; defaults to home
 	installDir       string
 	escalationMarker string
 	pathDirs         []string
@@ -229,6 +230,9 @@ func (e *env) run(t *testing.T, args ...string) result {
 	t.Helper()
 	cmd := exec.Command("bash", append([]string{installScriptPath(t)}, args...)...)
 	cmd.Dir = e.home
+	if e.workDir != "" {
+		cmd.Dir = e.workDir
+	}
 	cmd.Env = e.materialize()
 	out, err := cmd.CombinedOutput()
 	code := 0

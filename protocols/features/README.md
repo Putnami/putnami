@@ -610,21 +610,21 @@ task:
   evidence, and diagnostics;
 - `putnami features diff <base> <head>` for revision changes.
 
-Those commands and the MCP tools below are provided by the `@putnami/sdd`
-extension, not by the CLI itself; a workspace that does not declare it has
-neither.
+Those commands and the `sdd.*` tool descriptors below are provided by the
+`@putnami/sdd` extension, not by the CLI itself; a workspace that does not
+declare it has neither. The core serves no MCP server and calls no `sdd.*`
+descriptor: they remain protocol vocabulary, and agents reach the same
+information through the `putnami features` commands above.
 
-Through the local Putnami MCP server, use `sdd.list_features` (optionally with
-query terms) to page through short catalog entries and `sdd.feature_context` to
-retrieve one compact authored feature. These tools merge only explicit authority from
+The `sdd.list_features` descriptor (optionally with query terms) pages through
+short catalog entries and `sdd.feature_context` retrieves one compact authored
+feature. These tools merge only explicit authority from
 native design feature nodes and durable `putnami.features.json` files at the
 workspace or exact project roots. `sdd.feature_context` preserves every sorted
 declaration source and durable manifest field; technical categories and critical
 paths appear only when a native graph declares them. A catalog entry carries
 counts and a one-line summary instead. A spec, nested file, directory name, or
-heuristic never mints a feature. `agent_context` also exposes the native feature
-summaries for its selected project while keeping the durable agent-context
-document unchanged.
+heuristic never mints a feature.
 
 Do not inject an entire manifest/evidence corpus or a full snapshot into an
 agent prompt when a scoped inspection is sufficient. Whole-corpus JSON is a
@@ -665,9 +665,9 @@ Go/TypeScript/Python-authored and hand-authored vectors live under
   `parity` claim.
 - **Evidence**: the `@putnami/sdd` extension consumes these contracts for feature
   and spec discovery, validation, inspection, initialization, and diffing, and
-  runs the first two as DAG jobs. The same builders expose agent-facing MCP
+  runs the first two as DAG jobs. The same builders back the
   `sdd.list_features`, `sdd.feature_context`, `sdd.list_specs`, and
-  `sdd.spec_context` surfaces. Strict parsers, repository validators, canonical
+  `sdd.spec_context` tool descriptors, which the core does not serve over MCP. Strict parsers, repository validators, canonical
   marshallers, the pure verification evaluator, valid/invalid fixture corpora,
   reusable conformance runners, and Go/TypeScript/Python-authored equivalence
   vectors exercise the wire contracts.

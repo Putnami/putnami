@@ -963,10 +963,22 @@ function Test-ClaudeDefinition([string[]]$Lines, [string]$InstalledBinary) {
         ($environmentLines.Count -eq 1)
 }
 
+# Run a host command from the temp directory, not the caller's: a project's own
+# .mcp.json or local-scope entry named putnami would otherwise shadow the
+# user-scope entry the installer wrote.
+function Invoke-HostCapture([string]$FilePath, [string[]]$ArgumentList) {
+    Push-Location -LiteralPath ([IO.Path]::GetTempPath())
+    try {
+        return Invoke-NativeCapture -FilePath $FilePath -ArgumentList $ArgumentList -MergeError
+    } finally {
+        Pop-Location
+    }
+}
+
 function Remove-ClaudeCodeRegistration([string]$Claude, [string]$InstalledBinary) {
-    $get = Invoke-NativeCapture -FilePath $Claude -ArgumentList @('mcp', 'get', 'putnami') -MergeError
+    $get = Invoke-HostCapture -FilePath $Claude -ArgumentList @('mcp', 'get', 'putnami')
     if (Test-ClaudeDefinition $get.Lines $InstalledBinary) {
-        $remove = Invoke-NativeCapture -FilePath $Claude -ArgumentList @('mcp', 'remove', '--scope', 'user', 'putnami') -MergeError
+        $remove = Invoke-HostCapture -FilePath $Claude -ArgumentList @('mcp', 'remove', '--scope', 'user', 'putnami')
         if ($remove.ExitCode -eq 0) {
             Write-Success 'Removed the Putnami MCP server that an earlier install registered in Claude Code'
         } else {
@@ -977,7 +989,7 @@ function Remove-ClaudeCodeRegistration([string]$Claude, [string]$InstalledBinary
     }
     if (($get.ExitCode -eq 0) -or ($get.Lines -ccontains 'putnami:')) {
         Write-InstallWarning 'Claude Code defines a putnami MCP server that Putnami did not register as is; it was kept.'
-        Write-Hint 'Putnami serves no MCP server any more. Remove it with: claude mcp remove putnami'
+        Write-Hint 'Putnami serves no MCP server any more. Remove it with: claude mcp remove --scope user putnami'
     }
 }
 
@@ -1037,18 +1049,18 @@ function Test-CodexDefinition([string[]]$Lines, [string[]]$JsonLines, [string]$I
 }
 
 function Test-CodexRegistration([string]$Codex, [string]$InstalledBinary) {
-    $get = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami') -MergeError
+    $get = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami')
     if ($get.ExitCode -ne 0) { return $false }
-    $json = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami', '--json') -MergeError
+    $json = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami', '--json')
     if ($json.ExitCode -ne 0) { return $false }
     return Test-CodexDefinition $get.Lines $json.Lines $InstalledBinary
 }
 
 function Remove-CodexRegistration([string]$Codex, [string]$InstalledBinary) {
-    $get = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami') -MergeError
+    $get = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami')
     if ($get.ExitCode -ne 0) { return }
     if (Test-CodexRegistration $Codex $InstalledBinary) {
-        $remove = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'remove', 'putnami') -MergeError
+        $remove = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'remove', 'putnami')
         if ($remove.ExitCode -eq 0) {
             Write-Success 'Removed the Putnami MCP server that an earlier install registered in Codex'
         } else {
