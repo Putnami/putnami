@@ -105,6 +105,9 @@ A reporting capability is one row of `Capabilities()` in
   `spec-verification.json` was omitted.
   Provider identity, sequence, byte offset, SHA-256 and final identity survive
   retry and replay.
+- The session reporter frames `events.jsonl` from a trimmed view of the
+  stream, under its checkpoint, and the log reporter frames the stream itself
+  ([ADR 0083](0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md)).
 - ACK means durable acceptance. An identical duplicate succeeds; conflicting
   bytes fail. A provider binds the destination to the execution identity and
   refuses a changed destination. Core refuses a different extension on an

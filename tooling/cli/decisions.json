@@ -10,6 +10,27 @@
       "reviewOnly": true
     },
     {
+      "id": "D-R1",
+      "statement": "from a task's first debug line to its task:end, the session reporter's upload holds every task:event of that task, so a failed task's lines keep their order and its info, warn and diagnostic events leave at its end",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-R2",
+      "statement": "the session reporter's upload holds at most 1,000,000 records; past it, the task that holds the most releases them and sends live from then on",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-R3",
+      "statement": "a batch line that several members share leaves the session reporter's upload just before the task:end of the first member that fails, and is dropped when every member passes",
+      "settled": "2026-10-28",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
       "id": "D-W1",
       "statement": "Windows support targets windows/amd64 on Windows 10 1803 or later and Windows 11; windows/arm64 is added only when a host can prove it",
       "settled": "2026-09-26",
