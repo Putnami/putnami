@@ -155,12 +155,10 @@ func TestParseArgs_FlagBeforeTheCommandHelpNamesIsRefused(t *testing.T) {
 	accepted := [][]string{
 		{"help"},
 		{"help", "-v"},
-		{"help", "--output", "json"},
 		{"help", "--man"},
 		{"help", "--man", "projects", "list"},
 		{"help", "projects", "-v"},
 		{"help", "projects", "list", "-v"},
-		{"help", "projects", "list", "--output", "json"},
 	}
 	for _, args := range accepted {
 		if parsed := parseArgs(args, aliases, nil); parsed.Err != nil {

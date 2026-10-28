@@ -313,12 +313,13 @@ The `--output=jsonl` stream follows the session stream contract defined by the C
 | `--trace-profile <path>` | Collect trace events (Chrome trace format) |
 
 A flag goes after the full command: `putnami <command> [subcommand] [options]`.
-A flag before the command word, as in `putnami -v projects list`, or between a
-command and its subcommand, as in `putnami projects -v describe web`, or
-before a word of the command that `help` describes, as in `putnami help -v
-projects`, is a usage error that names the flag. `putnami --help`, `putnami --version`, and
-flags alone, such as `putnami -v` or `putnami --output json`, still print help
-or the version. Shell completion offers nothing after a flag that comes before
+A flag before the command word, as in `putnami -v projects list`, between a
+command and its subcommand, as in `putnami projects -v describe web`, or before
+a word of the command that `help` describes, as in `putnami help -v projects`,
+is a usage error that names the flag. `putnami --help`, `putnami --version`,
+`putnami help --man`, `putnami help --markdown`, and flags alone, such as
+`putnami -v` or `putnami --output json`, still print help, the reference or the
+version. Shell completion offers nothing after a flag that comes before
 the command.
 
 ## Shell completion

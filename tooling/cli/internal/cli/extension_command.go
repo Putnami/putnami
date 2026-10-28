@@ -54,6 +54,10 @@ func (a *App) runExtensionStructuredCommand(
 	// is read before a positional default, which would take the word.
 	if sub == "help" {
 		if _, _, ok := extension.LookupSubcommand(extensions, group, "help"); !ok {
+			if err := flagBeforeGroupHelpSubcommand(extensions, group, parsed.RawJobArgs); err != nil {
+				iox.Fprintf(stderr, "putnami: %v\n", err)
+				return ExitUsage
+			}
 			if len(parsed.RawJobArgs) > 0 && !strings.HasPrefix(parsed.RawJobArgs[0], "-") {
 				printExtensionSubcommandHelp(extensions, group, parsed.RawJobArgs[0], parsed.Global.Output)
 			} else {
@@ -901,4 +905,26 @@ func buildSubcommandHelpJSON(ext *extension.ExtensionDescription, group, sub str
 		Flags:       flagList,
 		Examples:    examples,
 	}
+}
+
+// flagBeforeGroupHelpSubcommand refuses `putnami <group> help <flag> <sub>`:
+// the help alias reads the subcommand from its first argument only, so it
+// would print the group's help in place of the help of sub. args are the
+// arguments the global pass left after `help`. A word is refused only when it
+// names a subcommand of the group, because the core cannot tell the value of a
+// flag it does not know from a word.
+func flagBeforeGroupHelpSubcommand(extensions []*extension.ExtensionDescription, group string, args []string) error {
+	cut := passthroughCut(args)
+	if cut == 0 || !isFlagToken(args[0]) {
+		return nil
+	}
+	for _, word := range args[1:cut] {
+		if isFlagToken(word) {
+			continue
+		}
+		if _, _, ok := extension.LookupSubcommand(extensions, group, word); ok {
+			return usageErrorf("%s comes before the subcommand %q; a flag goes after it: putnami %s help %s [options]", flagSpelling(args[0]), word, group, word)
+		}
+	}
+	return nil
 }

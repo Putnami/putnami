@@ -13,6 +13,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
@@ -526,6 +527,28 @@ func TestAppRun_ExtensionHelpAlias(t *testing.T) {
 	})
 	if !strings.Contains(subHelp, "Authenticate with the demo backend.") {
 		t.Errorf("demo help login did not render per-subcommand help:\n%s", subHelp)
+	}
+}
+
+// A flag between the help alias and the subcommand used to hide the
+// subcommand: `demo help --x login` printed the group's help with exit 0.
+func TestAppRun_FlagBeforeTheSubcommandGroupHelpNamesIsRefused(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "flags-follow-the-command", "a-flag-before-the-command-help-names-is-refused")
+	wsRoot := t.TempDir()
+	writeWorkspaceFixture(t, wsRoot)
+
+	out := captureStdoutStderr(t, func() {
+		app, err := NewApp()
+		if err != nil {
+			t.Fatalf("NewApp: %v", err)
+		}
+		t.Chdir(wsRoot)
+		if code := app.Run(context.Background(), []string{"demo", "help", "--x", "login"}); code != ExitUsage {
+			t.Fatalf("demo help --x login exit = %d, want %d", code, ExitUsage)
+		}
+	})
+	if want := `--x comes before the subcommand "login"; a flag goes after it: putnami demo help login [options]`; !strings.Contains(out, want) {
+		t.Errorf("demo help --x login output = %q, want it to contain %q", out, want)
 	}
 }
 
