@@ -251,7 +251,7 @@
     },
     {
       "id": "extension-flags-reach-their-command",
-      "text": "putnami extensions validate refuses a manifest flag that the core parses as its own global flag, by name, by short alias or, for a boolean, by its --no- negation, on a command, a command group or a subcommand that never receives it, and names the field and the global flag. A command receives --max-parallel and --no-cache. It receives --dry-run, or the core previews its plan and runs nothing. A serve workload receives --watch through the watch the core runs and --no-watch. An interactive subcommand receives --projects, --all and --baseline. A command whose own traits declare no workload may take serve from its verb, so --watch stays allowed on it.""
+      "text": "extensions validate refuses a manifest flag the core parses as a global flag, by name, short alias or boolean --no- negation, where its command never receives it, naming the field and the global. Every command receives --max-parallel and --no-cache; one whose resolved flags declare --dry-run receives it. A serve workload, or a command with no workload trait, receives --watch; an interactive one only if watch defaults to true. An interactive subcommand receives --projects, --all and --baseline."
     },
     {
       "id": "source-bound-stamp",
