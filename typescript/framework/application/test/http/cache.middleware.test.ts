@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { CacheMiddleware, buildCacheControl, computeETag } from '../../src/http/cache.middleware';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
@@ -27,56 +28,112 @@ describe('buildCacheControl', () => {
     );
   });
 
-  it('combines all shorthands', () => {
-    expect(buildCacheControl({ maxAge: 60, sMaxAge: 300, staleWhileRevalidate: 3600 })).toBe(
-      'public, max-age=60, s-maxage=300, stale-while-revalidate=3600',
-    );
-  });
+  specTest(
+    'combines all shorthands',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-cache-control',
+      check: 'shared-and-stale-directives-are-appended',
+    },
+    () => {
+      expect(buildCacheControl({ maxAge: 60, sMaxAge: 300, staleWhileRevalidate: 3600 })).toBe(
+        'public, max-age=60, s-maxage=300, stale-while-revalidate=3600',
+      );
+    },
+  );
 
-  it('prefers cacheControl string over shorthands', () => {
-    expect(buildCacheControl({ cacheControl: 'private, no-cache', maxAge: 3600 })).toBe('private, no-cache');
-  });
+  specTest(
+    'prefers cacheControl string over shorthands',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-cache-control',
+      check: 'a-raw-cache-control-string-wins',
+    },
+    () => {
+      expect(buildCacheControl({ cacheControl: 'private, no-cache', maxAge: 3600 })).toBe('private, no-cache');
+    },
+  );
 
   it('returns empty string when no options provided', () => {
     expect(buildCacheControl({})).toBe('');
   });
 
-  it('prefers privateMaxAge over maxAge when both provided', () => {
-    expect(buildCacheControl({ privateMaxAge: 300, maxAge: 600 })).toBe('private, max-age=300');
-  });
+  specTest(
+    'prefers privateMaxAge over maxAge when both provided',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-cache-control',
+      check: 'private-max-age-wins-over-max-age',
+    },
+    () => {
+      expect(buildCacheControl({ privateMaxAge: 300, maxAge: 600 })).toBe('private, max-age=300');
+    },
+  );
 });
 
 describe('computeETag', () => {
-  it('returns a quoted string', () => {
-    const etag = computeETag('hello');
-    expect(etag.startsWith('"')).toBe(true);
-    expect(etag.endsWith('"')).toBe(true);
-  });
+  specTest(
+    'returns a quoted string',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-conditional-request',
+      check: 'a-computed-etag-is-quoted-and-deterministic',
+    },
+    () => {
+      const etag = computeETag('hello');
+      expect(etag.startsWith('"')).toBe(true);
+      expect(etag.endsWith('"')).toBe(true);
+    },
+  );
 
-  it('produces deterministic output', () => {
-    expect(computeETag('test-data')).toBe(computeETag('test-data'));
-  });
+  specTest(
+    'produces deterministic output',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-conditional-request',
+      check: 'a-computed-etag-is-quoted-and-deterministic',
+    },
+    () => {
+      expect(computeETag('test-data')).toBe(computeETag('test-data'));
+    },
+  );
 
-  it('produces different output for different inputs', () => {
-    expect(computeETag('data-a')).not.toBe(computeETag('data-b'));
-  });
+  specTest(
+    'produces different output for different inputs',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-conditional-request',
+      check: 'a-computed-etag-is-quoted-and-deterministic',
+    },
+    () => {
+      expect(computeETag('data-a')).not.toBe(computeETag('data-b'));
+    },
+  );
 });
 
 describe('CacheMiddleware', () => {
-  it('sets Cache-Control header on response', async () => {
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CacheMiddleware({ maxAge: 3600 }));
-    httpPlugin.get('/test', () => 'ok');
+  specTest(
+    'sets Cache-Control header on response',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-cache-control',
+      check: 'the-middleware-sets-the-built-cache-control',
+    },
+    async () => {
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CacheMiddleware({ maxAge: 3600 }));
+      httpPlugin.get('/test', () => 'ok');
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-    const res = await fetch(`${baseUrl}/test`);
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=3600');
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const res = await fetch(`${baseUrl}/test`);
+      expect(res.headers.get('Cache-Control')).toBe('public, max-age=3600');
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
   it('sets private Cache-Control header', async () => {
     const httpPlugin = http({ port: 0 });
@@ -93,69 +150,93 @@ describe('CacheMiddleware', () => {
     await app.stop();
   });
 
-  it('returns 304 when ETag matches If-None-Match', async () => {
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CacheMiddleware({ etag: true }));
-    httpPlugin.get('/test', () => {
-      const body = JSON.stringify({ data: 'test' });
-      const etag = computeETag(body);
-      return new HttpResponse(body, { headers: { ETag: etag, 'Content-Type': 'application/json' } });
-    });
+  specTest(
+    'returns 304 when ETag matches If-None-Match',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-conditional-request',
+      check: 'a-matching-if-none-match-receives-304',
+    },
+    async () => {
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CacheMiddleware({ etag: true }));
+      httpPlugin.get('/test', () => {
+        const body = JSON.stringify({ data: 'test' });
+        const etag = computeETag(body);
+        return new HttpResponse(body, { headers: { ETag: etag, 'Content-Type': 'application/json' } });
+      });
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
 
-    // First request to get the ETag
-    const res1 = await fetch(`${baseUrl}/test`);
-    const etag = res1.headers.get('ETag');
-    expect(etag).toBeTruthy();
+      // First request to get the ETag
+      const res1 = await fetch(`${baseUrl}/test`);
+      const etag = res1.headers.get('ETag');
+      expect(etag).toBeTruthy();
 
-    // Second request with If-None-Match
-    const res2 = await fetch(`${baseUrl}/test`, {
-      headers: { 'If-None-Match': etag! },
-    });
-    expect(res2.status).toBe(304);
-    expect(res2.headers.get('ETag')).toBe(etag);
+      // Second request with If-None-Match
+      const res2 = await fetch(`${baseUrl}/test`, {
+        headers: { 'If-None-Match': etag! },
+      });
+      expect(res2.status).toBe(304);
+      expect(res2.headers.get('ETag')).toBe(etag);
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
-  it('cancels a streamed response replaced by 304', async () => {
-    let canceled = 0;
-    const etag = '"stream"';
-    const context = {
-      headers: new Headers({ 'If-None-Match': etag }),
-    } as Parameters<ReturnType<typeof CacheMiddleware>>[0];
-    const response = await CacheMiddleware({ etag: true })(
-      context,
-      async () =>
-        new HttpResponse(
-          new ReadableStream<Uint8Array>({
-            cancel() {
-              canceled++;
-            },
-          }),
-          { headers: { ETag: etag } },
-        ),
-    );
-    expect(response?.status).toBe(304);
-    expect(canceled).toBe(1);
-  });
+  specTest(
+    'cancels a streamed response replaced by 304',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-conditional-request',
+      check: 'a-streamed-body-replaced-by-304-is-canceled',
+    },
+    async () => {
+      let canceled = 0;
+      const etag = '"stream"';
+      const context = {
+        headers: new Headers({ 'If-None-Match': etag }),
+      } as Parameters<ReturnType<typeof CacheMiddleware>>[0];
+      const response = await CacheMiddleware({ etag: true })(
+        context,
+        async () =>
+          new HttpResponse(
+            new ReadableStream<Uint8Array>({
+              cancel() {
+                canceled++;
+              },
+            }),
+            { headers: { ETag: etag } },
+          ),
+      );
+      expect(response?.status).toBe(304);
+      expect(canceled).toBe(1);
+    },
+  );
 
-  it('does not set Cache-Control when no options match', async () => {
-    const httpPlugin = http({ port: 0 });
-    httpPlugin.use(CacheMiddleware({}));
-    httpPlugin.get('/test', () => 'ok');
+  specTest(
+    'does not set Cache-Control when no options match',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'http-cache-control',
+      check: 'no-option-sets-no-cache-control',
+    },
+    async () => {
+      const httpPlugin = http({ port: 0 });
+      httpPlugin.use(CacheMiddleware({}));
+      httpPlugin.get('/test', () => 'ok');
 
-    const app = application().use(httpPlugin);
-    await app.start();
+      const app = application().use(httpPlugin);
+      await app.start();
 
-    const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-    const res = await fetch(`${baseUrl}/test`);
-    expect(res.headers.get('Cache-Control')).toBeNull();
+      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+      const res = await fetch(`${baseUrl}/test`);
+      expect(res.headers.get('Cache-Control')).toBeNull();
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import type { HttpRequestContext } from '../../src/http/http-context.type';
 import type { HttpResponse } from '../../src/http/http-response';
 import { type OAuthService, setActiveOAuthService } from '../../src/oauth/oauth.service';
@@ -7,6 +8,32 @@ import { SecurityMiddleware } from '../../src/security/security.middleware';
 import type { Principal } from '../../src/security/security.types';
 import type { AuthStrategy } from '../../src/security/strategies';
 import { bearerJwtStrategy } from '../../src/security/strategies/bearer-jwt.strategy';
+
+const neverRejects = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'strategy-composition',
+  check: 'authenticate-never-rejects-a-request',
+};
+const firstResolved = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'strategy-composition',
+  check: 'any-of-keeps-the-first-resolved-principal',
+};
+const throwingStrategy = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'strategy-composition',
+  check: 'a-throwing-strategy-resolves-nothing',
+};
+const everyStrategy = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'strategy-composition',
+  check: 'all-of-requires-and-merges-every-strategy',
+};
+const firstWin = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'strategy-composition',
+  check: 'an-identified-request-is-not-resolved-again',
+};
 
 function ctx(user?: Principal): HttpRequestContext {
   return { user, req: new Request('http://localhost/') } as HttpRequestContext;
@@ -39,20 +66,20 @@ describe('authenticate', () => {
     expect(() => authenticate({ anyOf: [fails], allOf: [fails] })).toThrow(/either anyOf or allOf/);
   });
 
-  it('never rejects a request — it always proceeds to next()', async () => {
+  specTest('never rejects a request — it always proceeds to next()', neverRejects, async () => {
     const context = ctx();
     expect(await run(authenticate({ anyOf: [fails] }), context)).toBe(true);
     expect(context.user).toBeUndefined();
   });
 
   describe('anyOf', () => {
-    it('sets the principal of the first strategy that succeeds', async () => {
+    specTest('sets the principal of the first strategy that succeeds', firstResolved, async () => {
       const context = ctx();
       await run(authenticate({ anyOf: [fails, succeeds({ sub: 'second' }), succeeds({ sub: 'third' })] }), context);
       expect(context.user?.sub).toBe('second');
     });
 
-    it('short-circuits: later strategies do not run once one succeeds', async () => {
+    specTest('short-circuits: later strategies do not run once one succeeds', firstResolved, async () => {
       let laterRan = false;
       const later: AuthStrategy = () => {
         laterRan = true;
@@ -64,13 +91,13 @@ describe('authenticate', () => {
       expect(laterRan).toBe(false);
     });
 
-    it('treats a throwing strategy as "did not authenticate" and tries the next', async () => {
+    specTest('treats a throwing strategy as "did not authenticate" and tries the next', throwingStrategy, async () => {
       const context = ctx();
       await run(authenticate({ anyOf: [throws, succeeds({ sub: 'recovered' })] }), context);
       expect(context.user?.sub).toBe('recovered');
     });
 
-    it('leaves ctx.user unset when every strategy fails', async () => {
+    specTest('leaves ctx.user unset when every strategy fails', throwingStrategy, async () => {
       const context = ctx();
       await run(authenticate({ anyOf: [fails, throws] }), context);
       expect(context.user).toBeUndefined();
@@ -78,13 +105,13 @@ describe('authenticate', () => {
   });
 
   describe('allOf', () => {
-    it('requires every strategy to succeed', async () => {
+    specTest('requires every strategy to succeed', everyStrategy, async () => {
       const context = ctx();
       await run(authenticate({ allOf: [succeeds({ sub: 'a' }), fails] }), context);
       expect(context.user).toBeUndefined(); // one failure → no identity
     });
 
-    it('merges principals in declaration order, last-write-wins on collision', async () => {
+    specTest('merges principals in declaration order, last-write-wins on collision', everyStrategy, async () => {
       const context = ctx();
       await run(
         authenticate({
@@ -99,7 +126,7 @@ describe('authenticate', () => {
       expect(context.user).toEqual({ sub: 'override', scope: 'read', kind: 'apikey', client_id: 'svc' });
     });
 
-    it('is deterministic regardless of async completion order', async () => {
+    specTest('is deterministic regardless of async completion order', everyStrategy, async () => {
       // Strategy 0 resolves slowly, strategy 1 quickly; the merge must still be by
       // declaration order (strategy 1 wins the `sub` collision), not by which
       // promise settled first.
@@ -113,24 +140,28 @@ describe('authenticate', () => {
       expect(context.user?.sub).toBe('quick-declared-second');
     });
 
-    it('fails closed when a strategy throws', async () => {
+    specTest('fails closed when a strategy throws', throwingStrategy, async () => {
       const context = ctx();
       await run(authenticate({ allOf: [succeeds({ sub: 'a' }), throws] }), context);
       expect(context.user).toBeUndefined();
     });
   });
 
-  it('is first-win at the chain level: an already-authenticated request is not re-resolved', async () => {
-    let ran = false;
-    const strategy: AuthStrategy = () => {
-      ran = true;
-      return { sub: 'new' };
-    };
-    const context = ctx({ sub: 'existing' });
-    await run(authenticate({ anyOf: [strategy] }), context);
-    expect(context.user?.sub).toBe('existing');
-    expect(ran).toBe(false);
-  });
+  specTest(
+    'is first-win at the chain level: an already-authenticated request is not re-resolved',
+    firstWin,
+    async () => {
+      let ran = false;
+      const strategy: AuthStrategy = () => {
+        ran = true;
+        return { sub: 'new' };
+      };
+      const context = ctx({ sub: 'existing' });
+      await run(authenticate({ anyOf: [strategy] }), context);
+      expect(context.user?.sub).toBe('existing');
+      expect(ran).toBe(false);
+    },
+  );
 });
 
 // End-to-end seam: a principal resolved by the framework's OWN bearer strategy

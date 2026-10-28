@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { joinPath } from '@putnami/utils';
 import { DiskCacheStorage, evictOldVersionsInDir } from '../../src/cache/disk-cache.storage';
 
@@ -17,13 +18,21 @@ describe('DiskCacheStorage', () => {
     rmSync(TEST_CACHE_DIR, { recursive: true, force: true });
   });
 
-  test('set and get a value', async () => {
-    await cache.set('key1', { name: 'test' });
-    const entry = await cache.get<{ name: string }>('key1');
-    expect(entry).toBeDefined();
-    expect(entry?.value).toEqual({ name: 'test' });
-    expect(entry?.expiresAt).toBeNull();
-  });
+  specTest(
+    'set and get a value',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'expiration',
+      check: 'an-entry-without-ttl-does-not-expire',
+    },
+    async () => {
+      await cache.set('key1', { name: 'test' });
+      const entry = await cache.get<{ name: string }>('key1');
+      expect(entry).toBeDefined();
+      expect(entry?.value).toEqual({ name: 'test' });
+      expect(entry?.expiresAt).toBeNull();
+    },
+  );
 
   test('set with TTL and get before expiry', async () => {
     await cache.set('key2', 'value', 60_000);
@@ -33,12 +42,20 @@ describe('DiskCacheStorage', () => {
     expect(entry?.expiresAt).toBeGreaterThan(Date.now());
   });
 
-  test('returns undefined for expired entry', async () => {
-    await cache.set('expired', 'value', 1); // 1ms TTL
-    await Bun.sleep(10);
-    const entry = await cache.get<string>('expired');
-    expect(entry).toBeUndefined();
-  });
+  specTest(
+    'returns undefined for expired entry',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'expiration',
+      check: 'a-disk-entry-expires-after-its-ttl',
+    },
+    async () => {
+      await cache.set('expired', 'value', 1); // 1ms TTL
+      await Bun.sleep(10);
+      const entry = await cache.get<string>('expired');
+      expect(entry).toBeUndefined();
+    },
+  );
 
   test('returns undefined for non-existent key', async () => {
     const entry = await cache.get<string>('nonexistent');
@@ -71,21 +88,37 @@ describe('DiskCacheStorage', () => {
     expect(await cache.size()).toBe(2);
   });
 
-  test('deletePattern with exact key', async () => {
-    await cache.set('exact-key', 'value');
-    const count = await cache.deletePattern('exact-key');
-    expect(count).toBe(1);
-    expect(await cache.get('exact-key')).toBeUndefined();
-  });
+  specTest(
+    'deletePattern with exact key',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'disk-storage',
+      check: 'an-exact-pattern-deletes-one-disk-key',
+    },
+    async () => {
+      await cache.set('exact-key', 'value');
+      const count = await cache.deletePattern('exact-key');
+      expect(count).toBe(1);
+      expect(await cache.get('exact-key')).toBeUndefined();
+    },
+  );
 
-  test('deletePattern with wildcard clears all', async () => {
-    await cache.set('a', 1);
-    await cache.set('b', 2);
-    await cache.set('c', 3);
-    const count = await cache.deletePattern('*');
-    expect(count).toBe(3);
-    expect(await cache.size()).toBe(0);
-  });
+  specTest(
+    'deletePattern with wildcard clears all',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'disk-storage',
+      check: 'a-wildcard-pattern-clears-the-disk-namespace',
+    },
+    async () => {
+      await cache.set('a', 1);
+      await cache.set('b', 2);
+      await cache.set('c', 3);
+      const count = await cache.deletePattern('*');
+      expect(count).toBe(3);
+      expect(await cache.size()).toBe(0);
+    },
+  );
 
   test('deletePattern with question mark clears all', async () => {
     await cache.set('x', 1);
@@ -98,20 +131,28 @@ describe('DiskCacheStorage', () => {
     expect(count).toBe(0);
   });
 
-  test('handles corrupted cache file gracefully', async () => {
-    // Write a corrupted file
-    await cache.set('good', 'value');
-    mkdirSync(TEST_CACHE_DIR, { recursive: true });
+  specTest(
+    'handles corrupted cache file gracefully',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'disk-storage',
+      check: 'a-corrupted-disk-file-reads-as-a-miss',
+    },
+    async () => {
+      // Write a corrupted file
+      await cache.set('good', 'value');
+      mkdirSync(TEST_CACHE_DIR, { recursive: true });
 
-    // Create a corrupted file with a known hash
-    const hasher = new Bun.CryptoHasher('sha256');
-    hasher.update('corrupted-key');
-    const hash = hasher.digest('hex').substring(0, 16);
-    writeFileSync(joinPath(TEST_CACHE_DIR, `${hash}.json`), 'not-valid-json');
+      // Create a corrupted file with a known hash
+      const hasher = new Bun.CryptoHasher('sha256');
+      hasher.update('corrupted-key');
+      const hash = hasher.digest('hex').substring(0, 16);
+      writeFileSync(joinPath(TEST_CACHE_DIR, `${hash}.json`), 'not-valid-json');
 
-    const entry = await cache.get<string>('corrupted-key');
-    expect(entry).toBeUndefined();
-  });
+      const entry = await cache.get<string>('corrupted-key');
+      expect(entry).toBeUndefined();
+    },
+  );
 
   test('overwrite existing key', async () => {
     await cache.set('overwrite', 'first');
@@ -155,22 +196,30 @@ describe('evictOldVersionsInDir', () => {
     expect(Bun.file(joinPath(BASE_DIR, 'v1')).size).toBeDefined();
   });
 
-  test('evicts oldest versions when exceeding max', async () => {
-    // Create 7 version directories with staggered mtimes
-    for (let i = 1; i <= 7; i++) {
-      const dir = joinPath(BASE_DIR, `v${i}`);
-      mkdirSync(dir, { recursive: true });
-      // Write a file to ensure different mtimes
-      writeFileSync(joinPath(dir, 'data.json'), `${i}`);
-      // Small delay to ensure different mtimes
-      if (i < 7) await Bun.sleep(10);
-    }
+  specTest(
+    'evicts oldest versions when exceeding max',
+    {
+      feature: 'typescript/cache-lifecycle',
+      requirement: 'build-version-retention',
+      check: 'only-the-five-newest-build-versions-remain',
+    },
+    async () => {
+      // Create 7 version directories with staggered mtimes
+      for (let i = 1; i <= 7; i++) {
+        const dir = joinPath(BASE_DIR, `v${i}`);
+        mkdirSync(dir, { recursive: true });
+        // Write a file to ensure different mtimes
+        writeFileSync(joinPath(dir, 'data.json'), `${i}`);
+        // Small delay to ensure different mtimes
+        if (i < 7) await Bun.sleep(10);
+      }
 
-    await evictOldVersionsInDir(BASE_DIR);
+      await evictOldVersionsInDir(BASE_DIR);
 
-    // Should keep 5 most recent, remove 2 oldest
-    const { readdirSync } = require('node:fs');
-    const remaining = readdirSync(BASE_DIR) as string[];
-    expect(remaining.length).toBe(5);
-  });
+      // Should keep 5 most recent, remove 2 oldest
+      const { readdirSync } = require('node:fs');
+      const remaining = readdirSync(BASE_DIR) as string[];
+      expect(remaining.length).toBe(5);
+    },
+  );
 });

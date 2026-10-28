@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { Router } from '../../src/http/router';
 
 describe('Router', () => {
@@ -46,36 +47,52 @@ describe('Router', () => {
     expect(topicMatches[0].params).toEqual({ package: 'core', topic: 'config' });
   });
 
-  it('should not match parameter route if parameter is missing', () => {
-    const router = new Router<string>();
-    router.add('/[a]/[b]', 'handler');
+  specTest(
+    'should not match parameter route if parameter is missing',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'routing',
+      check: 'a-parameter-matches-exactly-one-segment',
+    },
+    () => {
+      const router = new Router<string>();
+      router.add('/[a]/[b]', 'handler');
 
-    // correctly matching
-    const matchFull = router.find('/1/2');
-    expect(matchFull.length).toBe(1);
+      // correctly matching
+      const matchFull = router.find('/1/2');
+      expect(matchFull.length).toBe(1);
 
-    // missing last param
-    const matchPartial = router.find('/1');
-    expect(matchPartial.length).toBe(0);
-  });
+      // missing last param
+      const matchPartial = router.find('/1');
+      expect(matchPartial.length).toBe(0);
+    },
+  );
 
-  it('should match parameter routes with suffix patterns like .json', () => {
-    const router = new Router<string>();
-    router.add('/docs/[package].json', 'json-handler');
-    router.add('/docs/[package]', 'package-handler');
+  specTest(
+    'should match parameter routes with suffix patterns like .json',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'routing',
+      check: 'a-parameter-may-precede-a-literal-suffix',
+    },
+    () => {
+      const router = new Router<string>();
+      router.add('/docs/[package].json', 'json-handler');
+      router.add('/docs/[package]', 'package-handler');
 
-    // Match the .json suffix route
-    const jsonMatches = router.find('/docs/core.json');
-    expect(jsonMatches.length).toBeGreaterThan(0);
-    expect(jsonMatches[0].handler).toBe('json-handler');
-    expect(jsonMatches[0].params).toEqual({ package: 'core' });
+      // Match the .json suffix route
+      const jsonMatches = router.find('/docs/core.json');
+      expect(jsonMatches.length).toBeGreaterThan(0);
+      expect(jsonMatches[0].handler).toBe('json-handler');
+      expect(jsonMatches[0].params).toEqual({ package: 'core' });
 
-    // Match the plain parameter route
-    const plainMatches = router.find('/docs/core');
-    expect(plainMatches.length).toBeGreaterThan(0);
-    expect(plainMatches[0].handler).toBe('package-handler');
-    expect(plainMatches[0].params).toEqual({ package: 'core' });
-  });
+      // Match the plain parameter route
+      const plainMatches = router.find('/docs/core');
+      expect(plainMatches.length).toBeGreaterThan(0);
+      expect(plainMatches[0].handler).toBe('package-handler');
+      expect(plainMatches[0].params).toEqual({ package: 'core' });
+    },
+  );
 });
 
 describe('Router static fast path', () => {
@@ -97,18 +114,26 @@ describe('Router static fast path', () => {
     expect(router.find('/').map((m) => m.handler)).toEqual(['root']);
   });
 
-  it('applies content negotiation identically to the trie', () => {
-    const router = new Router<string>();
-    router.add('/data', 'json', { accept: ['application/json'] });
+  specTest(
+    'applies content negotiation identically to the trie',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'routing',
+      check: 'a-route-with-accept-types-matches-only-a-request-that-accepts-them',
+    },
+    () => {
+      const router = new Router<string>();
+      router.add('/data', 'json', { accept: ['application/json'] });
 
-    expect(router.find('/data', ['application/json']).length).toBe(1);
-    // No match and the request does not accept anything → filtered out.
-    expect(router.find('/data', ['application/xml']).length).toBe(0);
-    // Wildcard / empty Accept falls back to a 0.5 score and is kept.
-    expect(router.find('/data', ['*/*']).length).toBe(1);
-    expect(router.find('/data', []).length).toBe(1);
-    expect(router.find('/data', ['*/*'])[0].score).toBeLessThan(router.find('/data', ['application/json'])[0].score);
-  });
+      expect(router.find('/data', ['application/json']).length).toBe(1);
+      // No match and the request does not accept anything → filtered out.
+      expect(router.find('/data', ['application/xml']).length).toBe(0);
+      // Wildcard / empty Accept falls back to a 0.5 score and is kept.
+      expect(router.find('/data', ['*/*']).length).toBe(1);
+      expect(router.find('/data', []).length).toBe(1);
+      expect(router.find('/data', ['*/*'])[0].score).toBeLessThan(router.find('/data', ['application/json'])[0].score);
+    },
+  );
 
   it('treats a route without an accept option as unconstrained', () => {
     const router = new Router<string>();
@@ -139,22 +164,30 @@ describe('Router static fast path', () => {
     expect(router.find('/legacy/')).toEqual([]);
   });
 
-  it('keeps cross-route fallthrough when a static and a dynamic route overlap', () => {
-    const router = new Router<string>();
-    router.add('/users/me', 'me');
-    router.add('/users/[id]', 'by-id');
+  specTest(
+    'keeps cross-route fallthrough when a static and a dynamic route overlap',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'routing',
+      check: 'the-most-specific-match-runs-first-and-the-rest-stay-for-fallthrough',
+    },
+    () => {
+      const router = new Router<string>();
+      router.add('/users/me', 'me');
+      router.add('/users/[id]', 'by-id');
 
-    // Static + dynamic match the same concrete path; the static route scores
-    // higher but the dynamic candidate must remain available for fallthrough.
-    const both = router.find('/users/me');
-    expect(both[0].handler).toBe('me');
-    expect(both.map((m) => m.handler)).toContain('by-id');
+      // Static + dynamic match the same concrete path; the static route scores
+      // higher but the dynamic candidate must remain available for fallthrough.
+      const both = router.find('/users/me');
+      expect(both[0].handler).toBe('me');
+      expect(both.map((m) => m.handler)).toContain('by-id');
 
-    // A different path matches only the dynamic route.
-    const dynamic = router.find('/users/42');
-    expect(dynamic.map((m) => m.handler)).toEqual(['by-id']);
-    expect(dynamic[0].params).toEqual({ id: '42' });
-  });
+      // A different path matches only the dynamic route.
+      const dynamic = router.find('/users/42');
+      expect(dynamic.map((m) => m.handler)).toEqual(['by-id']);
+      expect(dynamic[0].params).toEqual({ id: '42' });
+    },
+  );
 
   it('preserves fast-path results across a merge of static routers', () => {
     const a = new Router<string>();

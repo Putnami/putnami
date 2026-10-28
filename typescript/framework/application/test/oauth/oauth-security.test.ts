@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { resetConfigLoader } from '@putnami/runtime';
 import { application } from '../../src/application';
 import { config } from '../../src/config';
@@ -6,6 +7,47 @@ import { http } from '../../src/http/http.plugin';
 import { safeRedirectPath } from '../../src/oauth/handlers/login.get';
 import { oAuth2 } from '../../src/oauth/oauth.plugin';
 import { computeExpireAt, OAuthService } from '../../src/oauth/oauth.service';
+
+const pkcePolicy = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-authorization-code-flow',
+  check: 'pkce-follows-the-configured-policy',
+};
+const sameOriginRedirect = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-authorization-code-flow',
+  check: 'the-post-login-redirect-stays-same-origin',
+};
+const logoutHint = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-authorization-code-flow',
+  check: 'logout-hands-the-id-token-to-the-end-session-endpoint',
+};
+const invalidIdToken = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-callback-failures',
+  check: 'an-invalid-id-token-fails-the-callback',
+};
+const providerError = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-callback-failures',
+  check: 'a-provider-error-fails-with-its-code',
+};
+const failurePage = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-callback-failures',
+  check: 'a-browser-receives-an-escaped-failure-page',
+};
+const unknownKid = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-token-validation',
+  check: 'an-unknown-kid-refetches-the-jwks-once',
+};
+const claimBinding = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-token-validation',
+  check: 'expired-or-misbound-tokens-are-refused',
+};
 
 const AUTH_BASE = 'http://auth.test';
 const DISCOVERY_URI = `${AUTH_BASE}/.well-known/openid-configuration`;
@@ -254,7 +296,7 @@ describe('OAuth security hardening', () => {
   // safeRedirectPath
   // ===========================================================================
   describe('safeRedirectPath', () => {
-    it.each<[string, unknown]>([
+    const rejected: [string, unknown][] = [
       ['non-string', 42],
       ['empty', ''],
       ['too long', `/${'a'.repeat(2048)}`],
@@ -265,9 +307,12 @@ describe('OAuth security hardening', () => {
       ['no leading slash', 'evil.example.com'],
       ['javascript: scheme', 'javascript:alert(1)'],
       ['http: scheme', 'http://evil.example.com'],
-    ])('rejects %s', (_label, value) => {
-      expect(safeRedirectPath(value)).toBeUndefined();
-    });
+    ];
+    for (const [label, value] of rejected) {
+      specTest(`rejects ${label}`, sameOriginRedirect, () => {
+        expect(safeRedirectPath(value)).toBeUndefined();
+      });
+    }
 
     it.each([['/'], ['/dashboard'], ['/path/with?query=1&more=2'], ['/path#hash']])('accepts %s', (value) => {
       expect(safeRedirectPath(value)).toBe(value);
@@ -338,22 +383,22 @@ describe('OAuth security hardening', () => {
       return authorize;
     }
 
-    it('auto + discovery advertising S256 → PKCE on', async () => {
+    specTest('auto + discovery advertising S256 → PKCE on', pkcePolicy, async () => {
       const url = await authorizeWith('auto', DISCOVERY_URI);
       expect(url.searchParams.get('code_challenge')).toBeTruthy();
     });
 
-    it('auto + no discovery → PKCE on (defense in depth)', async () => {
+    specTest('auto + no discovery → PKCE on (defense in depth)', pkcePolicy, async () => {
       const url = await authorizeWith('auto');
       expect(url.searchParams.get('code_challenge')).toBeTruthy();
     });
 
-    it('never → PKCE off', async () => {
+    specTest('never → PKCE off', pkcePolicy, async () => {
       const url = await authorizeWith('never', DISCOVERY_URI);
       expect(url.searchParams.get('code_challenge')).toBeNull();
     });
 
-    it('always → PKCE on', async () => {
+    specTest('always → PKCE on', pkcePolicy, async () => {
       const url = await authorizeWith('always');
       expect(url.searchParams.get('code_challenge')).toBeTruthy();
     });
@@ -363,7 +408,7 @@ describe('OAuth security hardening', () => {
   // id_token validation + nonce binding
   // ===========================================================================
   describe('id_token validation', () => {
-    it('rejects callback when id_token.nonce does not match the pending nonce', async () => {
+    specTest('rejects callback when id_token.nonce does not match the pending nonce', invalidIdToken, async () => {
       setConfig({
         oauth: {
           clientId: 'test-client',
@@ -398,7 +443,7 @@ describe('OAuth security hardening', () => {
       }
     });
 
-    it('rejects callback when id_token has the wrong aud', async () => {
+    specTest('rejects callback when id_token has the wrong aud', invalidIdToken, async () => {
       setConfig({
         oauth: {
           clientId: 'test-client',
@@ -438,7 +483,7 @@ describe('OAuth security hardening', () => {
       }
     });
 
-    it('rejects callback when OIDC scope was requested but no id_token returned', async () => {
+    specTest('rejects callback when OIDC scope was requested but no id_token returned', invalidIdToken, async () => {
       setConfig({
         oauth: {
           clientId: 'test-client',
@@ -519,7 +564,7 @@ describe('OAuth security hardening', () => {
   // Kid rotation
   // ===========================================================================
   describe('JWKS kid rotation', () => {
-    it('refetches JWKS once when the token kid is missing, then verifies', async () => {
+    specTest('refetches JWKS once when the token kid is missing, then verifies', unknownKid, async () => {
       // First JWKS response only has the OLD key; rotation makes the NEW key available.
       const state: MockState = {
         requests: [],
@@ -550,7 +595,7 @@ describe('OAuth security hardening', () => {
       expect(jwksHits).toBe(2);
     });
 
-    it('rejects a token whose kid is not in the JWKS even after refetch', async () => {
+    specTest('rejects a token whose kid is not in the JWKS even after refetch', unknownKid, async () => {
       const state: MockState = {
         requests: [],
         codes: new Map(),
@@ -591,7 +636,7 @@ describe('OAuth security hardening', () => {
       return new OAuthService();
     }
 
-    it('rejects expired tokens', async () => {
+    specTest('rejects expired tokens', claimBinding, async () => {
       const state: MockState = {
         requests: [],
         codes: new Map(),
@@ -605,7 +650,7 @@ describe('OAuth security hardening', () => {
       expect(await service.verify(token)).toBeUndefined();
     });
 
-    it('rejects wrong issuer', async () => {
+    specTest('rejects wrong issuer', claimBinding, async () => {
       const state: MockState = {
         requests: [],
         codes: new Map(),
@@ -619,7 +664,7 @@ describe('OAuth security hardening', () => {
       expect(await service.verify(token, { issuer: AUTH_BASE })).toBeUndefined();
     });
 
-    it('rejects wrong audience', async () => {
+    specTest('rejects wrong audience', claimBinding, async () => {
       const state: MockState = {
         requests: [],
         codes: new Map(),
@@ -638,7 +683,7 @@ describe('OAuth security hardening', () => {
   // /auth/callback error path
   // ===========================================================================
   describe('callback error path', () => {
-    it('returns 401 with the provider error code when /authorize denies', async () => {
+    specTest('returns 401 with the provider error code when /authorize denies', providerError, async () => {
       setConfig({
         oauth: {
           clientId: 'test-client',
@@ -671,62 +716,69 @@ describe('OAuth security hardening', () => {
       }
     });
 
-    it('renders a provider error as HTML for browsers without echoing error_description', async () => {
-      setConfig({
-        oauth: {
-          clientId: 'test-client',
-          clientSecret: 'test-secret',
-          discoveryUri: DISCOVERY_URI,
-          callbackRoute: '/auth/callback',
-          pkce: 'never',
-        },
-      });
-      const state: MockState = {
-        requests: [],
-        codes: new Map(),
-        userInfo: {},
-        jwks: { keys: [publicJwk] },
-        clientId: 'test-client',
-      };
-      const { port, cookie, authorize, app } = await runLogin(state);
-      try {
-        const stateParam = authorize.searchParams.get('state');
-        const description = encodeURIComponent('<script>alert(1)</script>');
-        const errorCode = encodeURIComponent('access_denied"><img src=x>');
-        const cb = await fetch(
-          `http://localhost:${port}/auth/callback?error=${errorCode}&error_description=${description}&state=${stateParam}`,
-          { headers: { Cookie: cookie, Accept: 'text/html' }, redirect: 'manual' },
-        );
-        expect(cb.status).toBe(401);
-        expect(cb.headers.get('content-type')).toContain('text/html');
-        const html = await cb.text();
-        expect(html).toContain('Sign-in could not be completed');
-        expect(html).toContain('<a href="/login">Sign in again</a>');
-        expect(html).not.toContain('<script>alert(1)</script>');
-        expect(html).not.toContain('alert(1)');
-        expect(html).not.toContain('<img src=x>');
-        expect(html).toContain('access_denied&quot;&gt;&lt;img src=x&gt;');
-
-        const secondLogin = await fetch(`http://localhost:${port}/login`, { redirect: 'manual' });
-        const secondCookie = secondLogin.headers.get('set-cookie') ?? '';
-        const secondState = new URL(secondLogin.headers.get('location') ?? '').searchParams.get('state');
-        const denied = await fetch(`http://localhost:${port}/auth/callback?error=access_denied&state=${secondState}`, {
-          headers: { Cookie: secondCookie, Accept: 'text/html' },
-          redirect: 'manual',
+    specTest(
+      'renders a provider error as HTML for browsers without echoing error_description',
+      failurePage,
+      async () => {
+        setConfig({
+          oauth: {
+            clientId: 'test-client',
+            clientSecret: 'test-secret',
+            discoveryUri: DISCOVERY_URI,
+            callbackRoute: '/auth/callback',
+            pkce: 'never',
+          },
         });
-        expect(denied.status).toBe(401);
-        expect(await denied.text()).toContain('Sign-in was cancelled');
-      } finally {
-        await app.stop();
-      }
-    });
+        const state: MockState = {
+          requests: [],
+          codes: new Map(),
+          userInfo: {},
+          jwks: { keys: [publicJwk] },
+          clientId: 'test-client',
+        };
+        const { port, cookie, authorize, app } = await runLogin(state);
+        try {
+          const stateParam = authorize.searchParams.get('state');
+          const description = encodeURIComponent('<script>alert(1)</script>');
+          const errorCode = encodeURIComponent('access_denied"><img src=x>');
+          const cb = await fetch(
+            `http://localhost:${port}/auth/callback?error=${errorCode}&error_description=${description}&state=${stateParam}`,
+            { headers: { Cookie: cookie, Accept: 'text/html' }, redirect: 'manual' },
+          );
+          expect(cb.status).toBe(401);
+          expect(cb.headers.get('content-type')).toContain('text/html');
+          const html = await cb.text();
+          expect(html).toContain('Sign-in could not be completed');
+          expect(html).toContain('<a href="/login">Sign in again</a>');
+          expect(html).not.toContain('<script>alert(1)</script>');
+          expect(html).not.toContain('alert(1)');
+          expect(html).not.toContain('<img src=x>');
+          expect(html).toContain('access_denied&quot;&gt;&lt;img src=x&gt;');
+
+          const secondLogin = await fetch(`http://localhost:${port}/login`, { redirect: 'manual' });
+          const secondCookie = secondLogin.headers.get('set-cookie') ?? '';
+          const secondState = new URL(secondLogin.headers.get('location') ?? '').searchParams.get('state');
+          const denied = await fetch(
+            `http://localhost:${port}/auth/callback?error=access_denied&state=${secondState}`,
+            {
+              headers: { Cookie: secondCookie, Accept: 'text/html' },
+              redirect: 'manual',
+            },
+          );
+          expect(denied.status).toBe(401);
+          expect(await denied.text()).toContain('Sign-in was cancelled');
+        } finally {
+          await app.stop();
+        }
+      },
+    );
   });
 
   // ===========================================================================
   // Logout — id_token_hint + post_logout_redirect_uri
   // ===========================================================================
   describe('logout', () => {
-    it('passes id_token_hint and post_logout_redirect_uri per OIDC RP-Initiated Logout', async () => {
+    specTest('passes id_token_hint and post_logout_redirect_uri per OIDC RP-Initiated Logout', logoutHint, async () => {
       setConfig({
         oauth: {
           clientId: 'test-client',

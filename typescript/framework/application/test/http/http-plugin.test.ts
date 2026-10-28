@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
 import { HttpPlugin, http, resolveIdleTimeoutSeconds } from '../../src/http/http.plugin';
@@ -83,25 +84,33 @@ describe('HttpPlugin', () => {
       expect(plugin.getServer()).toBeUndefined();
     });
 
-    it('drains in-flight requests on stop() instead of aborting them', async () => {
-      plugin.get('/slow', async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        return new HttpResponse('drained');
-      });
-      await app.start();
-      const baseUrl = `http://localhost:${plugin.getServer()?.port}`;
+    specTest(
+      'drains in-flight requests on stop() instead of aborting them',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-bounds',
+        check: 'stop-lets-an-in-flight-request-finish',
+      },
+      async () => {
+        plugin.get('/slow', async () => {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          return new HttpResponse('drained');
+        });
+        await app.start();
+        const baseUrl = `http://localhost:${plugin.getServer()?.port}`;
 
-      // Fire a request and let it reach the handler (in-flight) before shutdown.
-      const inflight = fetch(`${baseUrl}/slow`);
-      await new Promise((resolve) => setTimeout(resolve, 30));
+        // Fire a request and let it reach the handler (in-flight) before shutdown.
+        const inflight = fetch(`${baseUrl}/slow`);
+        await new Promise((resolve) => setTimeout(resolve, 30));
 
-      // Graceful drain must let the in-flight request finish, not abort it.
-      await app.stop();
+        // Graceful drain must let the in-flight request finish, not abort it.
+        await app.stop();
 
-      const res = await inflight;
-      expect(res.status).toBe(200);
-      expect(await res.text()).toBe('drained');
-    });
+        const res = await inflight;
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe('drained');
+      },
+    );
   });
 
   describe('HTTP Requests', () => {
@@ -166,25 +175,41 @@ describe('HttpPlugin', () => {
       expect(json.received).toEqual({ name: 'test' });
     });
 
-    it('should return 404 for unknown routes', async () => {
-      const res = await fetch(`${baseUrl}/not-found`);
-      expect(res.status).toBe(404);
-      expect(res.headers.get('content-type')).toContain('application/json');
-      const body = await res.json();
-      expect(body.error).toBe('Not Found');
-      expect(body.statusCode).toBe(404);
-    });
+    specTest(
+      'should return 404 for unknown routes',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'an-unknown-path-answers-404',
+      },
+      async () => {
+        const res = await fetch(`${baseUrl}/not-found`);
+        expect(res.status).toBe(404);
+        expect(res.headers.get('content-type')).toContain('application/json');
+        const body = await res.json();
+        expect(body.error).toBe('Not Found');
+        expect(body.statusCode).toBe(404);
+      },
+    );
 
-    it('should return 405 for known path with unsupported method', async () => {
-      const res = await fetch(`${baseUrl}/text`, { method: 'POST' });
-      expect(res.status).toBe(405);
-      expect(res.headers.get('allow')).toContain('GET');
-      expect(res.headers.get('allow')).toContain('HEAD');
-      expect(res.headers.get('allow')).toContain('OPTIONS');
-      const body = await res.json();
-      expect(body.error).toBe('Method Not Allowed');
-      expect(body.statusCode).toBe(405);
-    });
+    specTest(
+      'should return 405 for known path with unsupported method',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'an-unrouted-method-answers-405-with-the-allow-header',
+      },
+      async () => {
+        const res = await fetch(`${baseUrl}/text`, { method: 'POST' });
+        expect(res.status).toBe(405);
+        expect(res.headers.get('allow')).toContain('GET');
+        expect(res.headers.get('allow')).toContain('HEAD');
+        expect(res.headers.get('allow')).toContain('OPTIONS');
+        const body = await res.json();
+        expect(body.error).toBe('Method Not Allowed');
+        expect(body.statusCode).toBe(405);
+      },
+    );
   });
 
   describe('Secure-by-default headers', () => {
@@ -201,15 +226,23 @@ describe('HttpPlugin', () => {
       return `http://localhost:${plugin.getServer()?.port}`;
     };
 
-    it('applies hardened security headers without an extra plugin', async () => {
-      const baseUrl = await startServer(http({ port: 0 }));
-      const res = await fetch(`${baseUrl}/text`);
+    specTest(
+      'applies hardened security headers without an extra plugin',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'secure-by-default',
+        check: 'security-headers-apply-without-an-extra-plugin',
+      },
+      async () => {
+        const baseUrl = await startServer(http({ port: 0 }));
+        const res = await fetch(`${baseUrl}/text`);
 
-      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-      expect(res.headers.get('x-frame-options')).toBe('DENY');
-      expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
-      expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
-    });
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+        expect(res.headers.get('x-frame-options')).toBe('DENY');
+        expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
+        expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+      },
+    );
 
     it('omits security headers when securityHeaders is false', async () => {
       const baseUrl = await startServer(http({ port: 0, securityHeaders: false }));
@@ -232,24 +265,32 @@ describe('HttpPlugin', () => {
       expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     });
 
-    it('applies security headers to origin-guard rejection responses', async () => {
-      const plugin = http({ port: 0 });
-      plugin.post('/mutate', () => HttpResponse.json({ ok: true }));
-      app = application().use(plugin);
-      await app.start();
-      const baseUrl = `http://localhost:${plugin.getServer()?.port}`;
+    specTest(
+      'applies security headers to origin-guard rejection responses',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'secure-by-default',
+        check: 'a-refusal-carries-the-security-headers',
+      },
+      async () => {
+        const plugin = http({ port: 0 });
+        plugin.post('/mutate', () => HttpResponse.json({ ok: true }));
+        app = application().use(plugin);
+        await app.start();
+        const baseUrl = `http://localhost:${plugin.getServer()?.port}`;
 
-      // Cross-origin state-changing request is rejected by the origin guard (403),
-      // and the security headers still wrap that response.
-      const res = await fetch(`${baseUrl}/mutate`, {
-        method: 'POST',
-        headers: { Origin: 'https://evil.example.com' },
-      });
+        // Cross-origin state-changing request is rejected by the origin guard (403),
+        // and the security headers still wrap that response.
+        const res = await fetch(`${baseUrl}/mutate`, {
+          method: 'POST',
+          headers: { Origin: 'https://evil.example.com' },
+        });
 
-      expect(res.status).toBe(403);
-      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-      expect(res.headers.get('x-frame-options')).toBe('DENY');
-    });
+        expect(res.status).toBe(403);
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+        expect(res.headers.get('x-frame-options')).toBe('DENY');
+      },
+    );
   });
 
   describe('Handler Auto-Wrap', () => {
@@ -321,24 +362,40 @@ describe('HttpPlugin', () => {
       await app.stop();
     });
 
-    it('should reject requests bigger than maxBodySizeBytes', async () => {
-      const payload = JSON.stringify({ text: 'x'.repeat(512) });
-      const res = await fetch(`${baseUrl}/echo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      });
+    specTest(
+      'should reject requests bigger than maxBodySizeBytes',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-bounds',
+        check: 'an-oversized-body-answers-413',
+      },
+      async () => {
+        const payload = JSON.stringify({ text: 'x'.repeat(512) });
+        const res = await fetch(`${baseUrl}/echo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        });
 
-      expect(res.status).toBe(413);
-    });
+        expect(res.status).toBe(413);
+      },
+    );
 
-    it('should timeout long-running requests', async () => {
-      const res = await fetch(`${baseUrl}/slow`);
-      expect(res.status).toBe(408);
-      const body = await res.json();
-      expect(body.error).toBe('Request Timeout');
-      expect(body.statusCode).toBe(408);
-    });
+    specTest(
+      'should timeout long-running requests',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-bounds',
+        check: 'a-request-past-the-timeout-answers-408',
+      },
+      async () => {
+        const res = await fetch(`${baseUrl}/slow`);
+        expect(res.status).toBe(408);
+        const body = await res.json();
+        expect(body.error).toBe('Request Timeout');
+        expect(body.statusCode).toBe(408);
+      },
+    );
   });
 
   describe('Application Integration', () => {
@@ -383,17 +440,41 @@ describe('HttpPlugin', () => {
 });
 
 describe('resolveIdleTimeoutSeconds', () => {
-  it('derives an explicit idle timeout (seconds) from the request timeout, with buffer', () => {
-    expect(resolveIdleTimeoutSeconds(30_000)).toBe(35);
-    expect(resolveIdleTimeoutSeconds(10_000)).toBe(15);
-  });
+  specTest(
+    'derives an explicit idle timeout (seconds) from the request timeout, with buffer',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-bounds',
+      check: 'the-idle-timeout-follows-the-request-timeout-within-bun-bounds',
+    },
+    () => {
+      expect(resolveIdleTimeoutSeconds(30_000)).toBe(35);
+      expect(resolveIdleTimeoutSeconds(10_000)).toBe(15);
+    },
+  );
 
-  it('falls back to a sane default when the request timeout is disabled', () => {
-    expect(resolveIdleTimeoutSeconds(0)).toBe(35);
-  });
+  specTest(
+    'falls back to a sane default when the request timeout is disabled',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-bounds',
+      check: 'the-idle-timeout-follows-the-request-timeout-within-bun-bounds',
+    },
+    () => {
+      expect(resolveIdleTimeoutSeconds(0)).toBe(35);
+    },
+  );
 
-  it('clamps to Bun supported range [1, 255]', () => {
-    expect(resolveIdleTimeoutSeconds(10_000_000)).toBe(255);
-    expect(resolveIdleTimeoutSeconds(1)).toBeGreaterThanOrEqual(1);
-  });
+  specTest(
+    'clamps to Bun supported range [1, 255]',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-bounds',
+      check: 'the-idle-timeout-follows-the-request-timeout-within-bun-bounds',
+    },
+    () => {
+      expect(resolveIdleTimeoutSeconds(10_000_000)).toBe(255);
+      expect(resolveIdleTimeoutSeconds(1)).toBeGreaterThanOrEqual(1);
+    },
+  );
 });

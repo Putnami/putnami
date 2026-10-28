@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
 import {
   clearCollector,
@@ -22,43 +23,75 @@ describe('telemetry utils', () => {
     setCollector(undefined);
   });
 
-  it('incCounter should delegate to the collector', () => {
-    incCounter('my.counter');
-    incCounter('my.counter', 5);
+  specTest(
+    'incCounter should delegate to the collector',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'collector-ownership',
+      check: 'custom-metrics-record-into-the-active-collector',
+    },
+    () => {
+      incCounter('my.counter');
+      incCounter('my.counter', 5);
 
-    const bucket = drainMetrics(collector);
-    expect(bucket.counters['my.counter']).toBe(6);
-  });
+      const bucket = drainMetrics(collector);
+      expect(bucket.counters['my.counter']).toBe(6);
+    },
+  );
 
-  it('setGauge should delegate to the collector', () => {
-    setGauge('my.gauge', 42);
+  specTest(
+    'setGauge should delegate to the collector',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'collector-ownership',
+      check: 'custom-metrics-record-into-the-active-collector',
+    },
+    () => {
+      setGauge('my.gauge', 42);
 
-    const bucket = drainMetrics(collector);
-    expect(bucket.gauges['my.gauge']).toBe(42);
-  });
+      const bucket = drainMetrics(collector);
+      expect(bucket.gauges['my.gauge']).toBe(42);
+    },
+  );
 
-  it('observeHistogram should delegate to the collector', () => {
-    observeHistogram('my.hist', 10);
-    observeHistogram('my.hist', 20);
+  specTest(
+    'observeHistogram should delegate to the collector',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'collector-ownership',
+      check: 'custom-metrics-record-into-the-active-collector',
+    },
+    () => {
+      observeHistogram('my.hist', 10);
+      observeHistogram('my.hist', 20);
 
-    const bucket = drainMetrics(collector);
-    const h = bucket.histograms['my.hist'];
-    expect(h.count).toBe(2);
-    expect(h.sum).toBe(30);
-    expect(h.min).toBe(10);
-    expect(h.max).toBe(20);
-  });
+      const bucket = drainMetrics(collector);
+      const h = bucket.histograms['my.hist'];
+      expect(h.count).toBe(2);
+      expect(h.sum).toBe(30);
+      expect(h.min).toBe(10);
+      expect(h.max).toBe(20);
+    },
+  );
 
-  it('should be a no-op when no collector is set', () => {
-    setCollector(undefined);
+  specTest(
+    'should be a no-op when no collector is set',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'collector-ownership',
+      check: 'custom-metrics-are-no-ops-without-a-collector',
+    },
+    () => {
+      setCollector(undefined);
 
-    // These should not throw
-    incCounter('x');
-    setGauge('x', 1);
-    observeHistogram('x', 1);
+      // These should not throw
+      incCounter('x');
+      setGauge('x', 1);
+      observeHistogram('x', 1);
 
-    expect(getCollector()).toBeUndefined();
-  });
+      expect(getCollector()).toBeUndefined();
+    },
+  );
 });
 
 describe('clearCollector (multi-app safety)', () => {
@@ -66,28 +99,44 @@ describe('clearCollector (multi-app safety)', () => {
     setCollector(undefined);
   });
 
-  it('clears the global only when it still points at the given collector', () => {
-    const a = new TelemetryCollector();
-    setCollector(a);
-    clearCollector(a);
-    expect(getCollector()).toBeUndefined();
-  });
+  specTest(
+    'clears the global only when it still points at the given collector',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'collector-ownership',
+      check: 'stop-clears-only-its-own-collector',
+    },
+    () => {
+      const a = new TelemetryCollector();
+      setCollector(a);
+      clearCollector(a);
+      expect(getCollector()).toBeUndefined();
+    },
+  );
 
-  it('does not clear a collector installed by another app', () => {
-    const a = new TelemetryCollector();
-    const b = new TelemetryCollector();
+  specTest(
+    'does not clear a collector installed by another app',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'collector-ownership',
+      check: 'stop-clears-only-its-own-collector',
+    },
+    () => {
+      const a = new TelemetryCollector();
+      const b = new TelemetryCollector();
 
-    // App A starts, then App B starts and overwrites the global.
-    setCollector(a);
-    setCollector(b);
-    expect(getCollector()).toBe(b);
+      // App A starts, then App B starts and overwrites the global.
+      setCollector(a);
+      setCollector(b);
+      expect(getCollector()).toBe(b);
 
-    // App A shutting down must not null out App B's collector.
-    clearCollector(a);
-    expect(getCollector()).toBe(b);
+      // App A shutting down must not null out App B's collector.
+      clearCollector(a);
+      expect(getCollector()).toBe(b);
 
-    // App B shutting down clears it.
-    clearCollector(b);
-    expect(getCollector()).toBeUndefined();
-  });
+      // App B shutting down clears it.
+      clearCollector(b);
+      expect(getCollector()).toBeUndefined();
+    },
+  );
 });

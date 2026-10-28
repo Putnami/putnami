@@ -527,6 +527,770 @@
           }
         }
       ]
+    },
+    {
+      "id": "typescript/authentication-authorization",
+      "type": "feature",
+      "name": "TypeScript authentication and authorization",
+      "outcome": "A TypeScript application signs browsers in through OAuth2, keeps their session encrypted, resolves callers through configured strategies, refuses cross-site state changes and decides every protected request as 401 or 403 without disclosing a credential",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "oauth-authorization-code-flow",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "login-redirects-with-state-nonce-and-challenge",
+              "the-token-request-carries-the-pkce-verifier",
+              "each-pending-state-is-consumed-once",
+              "pkce-follows-the-configured-policy",
+              "the-post-login-redirect-stays-same-origin",
+              "logout-hands-the-id-token-to-the-end-session-endpoint"
+            ]
+          }
+        },
+        {
+          "id": "oauth-callback-failures",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-state-never-exchanges-a-code",
+              "a-replayed-callback-of-a-signed-in-session-redirects",
+              "a-browser-receives-an-escaped-failure-page",
+              "an-invalid-id-token-fails-the-callback",
+              "a-provider-error-fails-with-its-code"
+            ]
+          }
+        },
+        {
+          "id": "oauth-token-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-signed-token-verifies-against-the-discovered-jwks",
+              "a-wrong-audience-access-token-yields-no-user",
+              "an-unknown-kid-refetches-the-jwks-once",
+              "expired-or-misbound-tokens-are-refused",
+              "a-tampered-or-confused-token-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "encrypted-cookie-sessions",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-session-cookie-is-encrypted-and-flagged",
+              "an-untouched-session-writes-no-cookie",
+              "an-untrusted-cookie-reads-as-an-empty-session",
+              "a-missing-or-malformed-cookie-secret-is-refused",
+              "a-post-login-session-fits-the-browser-cookie-cap",
+              "memory-sessions-expire-and-stay-isolated"
+            ]
+          }
+        },
+        {
+          "id": "authorization-decision",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-identity-is-unauthenticated",
+              "a-missing-permission-is-forbidden",
+              "an-absent-claim-fails-closed",
+              "every-decision-is-counted-by-decision-and-reason",
+              "a-denial-does-not-disclose-the-missing-permission",
+              "a-failed-verification-never-logs-the-token",
+              "require-client-admits-only-a-listed-client"
+            ]
+          }
+        },
+        {
+          "id": "strategy-composition",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "authenticate-never-rejects-a-request",
+              "any-of-keeps-the-first-resolved-principal",
+              "a-throwing-strategy-resolves-nothing",
+              "all-of-requires-and-merges-every-strategy",
+              "an-identified-request-is-not-resolved-again",
+              "an-api-key-matches-only-a-configured-key",
+              "a-bearer-jwt-resolves-only-a-verified-token"
+            ]
+          }
+        },
+        {
+          "id": "bounded-introspection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-an-active-in-bounds-response-resolves",
+              "the-cache-holds-only-active-results-under-a-hashed-key",
+              "introspection-credentials-never-reach-the-logs",
+              "the-breaker-sheds-uncached-tokens-during-an-outage",
+              "a-throttled-call-is-retried-once-without-opening-the-breaker"
+            ]
+          }
+        },
+        {
+          "id": "cross-site-request-forgery",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cross-site-state-change-is-refused",
+              "a-trusted-or-non-browser-request-passes",
+              "report-mode-and-a-disabled-guard-let-requests-through",
+              "an-unsafe-request-needs-a-matching-csrf-token",
+              "api-routes-are-csrf-exempt-unless-they-opt-in",
+              "an-oversized-form-body-is-refused-first"
+            ]
+          }
+        },
+        {
+          "id": "signing-key-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-provider-refuses-an-unsound-keyring",
+              "both-keys-verify-during-the-overlap-window",
+              "a-retiring-key-leaves-the-jwks-after-its-window",
+              "revoke-never-removes-the-active-key"
+            ]
+          }
+        },
+        {
+          "id": "secret-digest-policy",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-fresh-digest-verifies-only-its-secret",
+              "each-digest-draws-a-fresh-salt",
+              "rehash-is-required-only-below-the-preset",
+              "the-iteration-floor-cannot-be-undercut",
+              "a-malformed-digest-fails-closed"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/cache-lifecycle",
+      "type": "feature",
+      "name": "TypeScript cache lifecycle",
+      "outcome": "A TypeScript service caches loader results in memory, on disk or in layers, never serves an entry past its TTL or eviction, and publishes HTTP cache headers that let a client revalidate with 304",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "cache-aside-fetch",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cached-key-skips-the-loader",
+              "a-key-function-separates-arguments",
+              "the-arguments-key-a-cache-without-for",
+              "a-synchronous-loader-is-cached",
+              "the-cache-name-prefixes-the-stored-key"
+            ]
+          }
+        },
+        {
+          "id": "single-flight",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["concurrent-misses-on-a-cold-key-run-the-loader-once"]
+          }
+        },
+        {
+          "id": "expiration",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-fetch-after-the-ttl-runs-the-loader-again",
+              "an-in-memory-entry-expires-after-its-ttl",
+              "a-disk-entry-expires-after-its-ttl",
+              "an-entry-without-ttl-does-not-expire"
+            ]
+          }
+        },
+        {
+          "id": "eviction",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "evict-cache-deletes-only-matching-keys",
+              "clear-cache-deletes-every-key",
+              "an-evicted-key-is-loaded-again"
+            ]
+          }
+        },
+        {
+          "id": "value-isolation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["in-memory-values-are-isolated-from-caller-mutation"]
+          }
+        },
+        {
+          "id": "disk-storage",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-disk-value-survives-a-new-instance",
+              "a-corrupted-disk-file-reads-as-a-miss",
+              "an-exact-pattern-deletes-one-disk-key",
+              "a-wildcard-pattern-clears-the-disk-namespace"
+            ]
+          }
+        },
+        {
+          "id": "build-version-retention",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-the-five-newest-build-versions-remain",
+              "five-or-fewer-build-versions-are-kept",
+              "a-missing-cache-directory-is-ignored"
+            ]
+          }
+        },
+        {
+          "id": "layered-storage",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-empty-layer-list-is-refused",
+              "the-first-layer-answers-first",
+              "a-slower-layer-hit-fills-the-faster-layers",
+              "a-fill-keeps-the-remaining-ttl",
+              "a-write-reaches-every-layer"
+            ]
+          }
+        },
+        {
+          "id": "http-cache-control",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-raw-cache-control-string-wins",
+              "private-max-age-wins-over-max-age",
+              "shared-and-stale-directives-are-appended",
+              "the-middleware-sets-the-built-cache-control",
+              "no-option-sets-no-cache-control"
+            ]
+          }
+        },
+        {
+          "id": "http-conditional-request",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-matching-if-none-match-receives-304",
+              "a-streamed-body-replaced-by-304-is-canceled",
+              "a-computed-etag-is-quoted-and-deterministic"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/grpc-services",
+      "type": "feature",
+      "name": "TypeScript gRPC and Connect services",
+      "outcome": "TypeScript workloads serve their HTTP endpoints as gRPC and Connect RPCs on the same port, through the same endpoint pipeline, with standard health and reflection services and a codec that survives malformed input",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "route-derived-services",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-nullable-collection-member-fails-generation",
+              "an-rpc-name-resolves-back-to-its-route",
+              "an-unknown-rpc-name-resolves-no-route",
+              "routes-group-into-one-service-per-first-path-segment",
+              "the-proto-document-ignores-route-discovery-order"
+            ]
+          }
+        },
+        {
+          "id": "request-envelope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-body-member-keeps-its-value-beside-a-same-named-path-parameter",
+              "a-non-object-request-section-is-refused",
+              "params-query-and-body-are-separate-request-sections",
+              "request-sections-are-numbered-params-query-body",
+              "snake-case-path-and-query-keys-arrive-camel-case"
+            ]
+          }
+        },
+        {
+          "id": "stream-shapes",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-connect-caller-of-a-client-or-bidirectional-rpc-gets-unimplemented",
+              "a-grpc-web-caller-reads-unimplemented-in-the-trailer",
+              "the-stream-mode-is-declared-on-the-generated-rpc"
+            ]
+          }
+        },
+        {
+          "id": "endpoint-pipeline",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-call-is-counted-under-its-rpc-path",
+              "a-call-without-a-trace-header-gets-a-generated-trace-id",
+              "a-refused-server-stream-yields-only-the-error-terminal",
+              "a-refused-unary-call-answers-its-error-status",
+              "the-caller-trace-id-reaches-the-handler"
+            ]
+          }
+        },
+        {
+          "id": "error-projection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-exception-with-a-success-status-is-answered-unknown",
+              "an-unexpected-error-is-internal-with-a-redacted-message",
+              "only-a-server-error-is-logged",
+              "validation-errors-decode-from-a-bad-request-detail"
+            ]
+          }
+        },
+        {
+          "id": "transport-negotiation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-decompression-bomb-is-refused-as-resource-exhausted",
+              "a-grpc-timeout-becomes-a-deadline-in-its-unit",
+              "a-malformed-grpc-timeout-sets-no-deadline",
+              "a-response-without-a-descriptor-falls-back-to-json",
+              "a-sub-millisecond-grpc-timeout-rounds-up-to-one-millisecond",
+              "a-tiny-response-is-not-compressed",
+              "accept-matching-honours-quality-factors-and-wildcards",
+              "gzip-is-negotiated-from-grpc-accept-encoding-then-accept-encoding"
+            ]
+          }
+        },
+        {
+          "id": "health-and-reflection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-reflected-enum-carries-its-unspecified-zero",
+              "an-empty-document-still-reflects",
+              "health-reports-not-serving-once-the-plugin-stops",
+              "health-reports-serving-while-the-application-runs",
+              "reflected-method-types-are-fully-qualified",
+              "the-reflected-descriptor-is-a-file-descriptor-for-api-proto"
+            ]
+          }
+        },
+        {
+          "id": "binary-codec",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-64-bit-value-past-the-safe-range-stays-exact",
+              "a-map-key-cannot-change-the-decoded-prototype",
+              "a-negative-int32-is-sign-extended-to-ten-bytes",
+              "a-truncated-message-decodes-without-throwing",
+              "an-undeclared-enum-member-is-refused-on-encode",
+              "an-unknown-enum-number-is-kept",
+              "unknown-fields-of-every-wire-type-are-skipped"
+            ]
+          }
+        },
+        {
+          "id": "proto-output",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-custom-output-path-is-honoured",
+              "a-missing-package-name-falls-back-to-api-v1",
+              "output-false-writes-the-proto-under-gen",
+              "the-default-package-name-derives-from-the-npm-package-name",
+              "the-proto-is-written-under-schema-by-default"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/http-services",
+      "type": "feature",
+      "name": "TypeScript HTTP services",
+      "outcome": "A TypeScript workload serves its routes, middleware and static files through one secure-by-default HTTP server that bounds every request, logs each one once and reports the address and routes it serves",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "routing",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-parameter-matches-exactly-one-segment",
+              "a-parameter-may-precede-a-literal-suffix",
+              "the-most-specific-match-runs-first-and-the-rest-stay-for-fallthrough",
+              "a-route-with-accept-types-matches-only-a-request-that-accepts-them",
+              "a-trailing-slash-on-the-request-is-ignored",
+              "middleware-wraps-the-handler-in-registration-order"
+            ]
+          }
+        },
+        {
+          "id": "method-fallbacks",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-head-request-answers-the-get-headers-with-no-body",
+              "head-meta-answers-head-without-running-the-handler",
+              "options-answers-204-with-the-allow-header",
+              "a-cors-preflight-reaches-the-cors-middleware",
+              "trace-answers-404-unless-enabled",
+              "a-trace-echo-omits-credentials",
+              "an-unrouted-method-answers-405-with-the-allow-header",
+              "an-unknown-path-answers-404"
+            ]
+          }
+        },
+        {
+          "id": "request-bounds",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-oversized-body-answers-413",
+              "a-request-past-the-timeout-answers-408",
+              "stop-lets-an-in-flight-request-finish",
+              "the-idle-timeout-follows-the-request-timeout-within-bun-bounds",
+              "an-oversized-content-length-is-refused-from-the-header"
+            ]
+          }
+        },
+        {
+          "id": "error-answers",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-thrown-http-exception-answers-its-status",
+              "a-thrown-http-response-is-sent-as-is",
+              "an-on-error-result-becomes-the-500-body",
+              "an-on-error-that-declines-or-throws-falls-through",
+              "production-hides-the-error-details",
+              "the-dev-errors-switch-hides-the-error-details",
+              "development-serves-a-browser-an-html-error-page"
+            ]
+          }
+        },
+        {
+          "id": "secure-by-default",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "security-headers-apply-without-an-extra-plugin",
+              "a-refusal-carries-the-security-headers",
+              "hsts-is-sent-only-over-https",
+              "a-header-the-handler-set-wins",
+              "secure-false-removes-the-headers-and-the-origin-guard",
+              "a-minimal-route-alone-skips-the-security-chain",
+              "a-native-route-bypasses-the-pipeline"
+            ]
+          }
+        },
+        {
+          "id": "cross-origin",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-preflight-answers-204-with-the-allowed-methods",
+              "only-an-allowed-origin-is-echoed",
+              "credentials-with-a-wildcard-origin-fail-at-construction"
+            ]
+          }
+        },
+        {
+          "id": "rate-limit",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-past-the-limit-answers-429-with-retry-after",
+              "concurrent-requests-never-pass-more-than-the-limit",
+              "a-forwarded-address-from-an-untrusted-peer-is-ignored",
+              "a-trusted-proxy-forwards-the-client-address"
+            ]
+          }
+        },
+        {
+          "id": "response-encoding",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "json-is-the-default-representation",
+              "object-keys-become-valid-xml-tag-names",
+              "an-unsupported-accept-is-not-acceptable",
+              "a-large-body-is-compressed-with-an-accepted-encoding",
+              "a-small-body-or-an-identity-request-stays-uncompressed"
+            ]
+          }
+        },
+        {
+          "id": "request-log-and-trace",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-server-error-logs-at-error-without-its-text-in-the-message",
+              "a-client-outcome-logs-as-success",
+              "an-excluded-path-logs-nothing",
+              "the-request-record-matches-the-cross-language-log-corpus",
+              "the-trace-id-follows-the-request-and-returns-in-the-response"
+            ]
+          }
+        },
+        {
+          "id": "readiness-marker",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-listening-record-carries-the-bound-port",
+              "the-marker-sits-at-the-top-level-of-the-record",
+              "an-unaddressable-listener-writes-no-marker",
+              "the-bound-endpoint-is-reported-from-start-until-stop"
+            ]
+          }
+        },
+        {
+          "id": "static-assets",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-static-file-answers-under-its-prefix-only",
+              "a-static-file-answers-get-and-head-whatever-the-accept-header",
+              "a-static-response-carries-cache-control-and-an-etag",
+              "a-matching-if-none-match-answers-304",
+              "an-unknown-extension-is-served-as-octet-stream"
+            ]
+          }
+        },
+        {
+          "id": "route-fragments",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "pipeline-and-native-routes-reach-the-build-result",
+              "secure-false-drops-the-implicit-head",
+              "a-static-folder-never-claims-a-root-prefix",
+              "a-static-mount-reports-one-prefix",
+              "framework-assets-are-not-claimed"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "typescript/service-telemetry",
+      "type": "feature",
+      "name": "TypeScript service telemetry",
+      "outcome": "A TypeScript service that opts in pushes its metrics, spans and logs as OTLP/JSON to the collector it names, with bounded metric series and without a failing collector ever failing the service",
+      "owner": "typescript",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "opt-in-with-explicit-endpoint",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-enabled-plugin-collects-http-metrics",
+              "telemetry-is-off-by-default",
+              "enabling-without-an-endpoint-stays-inert"
+            ]
+          }
+        },
+        {
+          "id": "per-second-aggregation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "metrics-aggregate-per-second",
+              "a-periodic-drain-returns-only-completed-seconds",
+              "the-shutdown-drain-returns-every-bucket",
+              "attributed-series-aggregate-by-attribute-set"
+            ]
+          }
+        },
+        {
+          "id": "bounded-http-metrics",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-is-counted-under-its-route-pattern",
+              "a-client-error-is-counted-by-class",
+              "an-unmatched-request-never-names-a-series"
+            ]
+          }
+        },
+        {
+          "id": "otlp-metrics-rendering",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["buckets-render-as-otlp-metrics", "no-bucket-renders-an-empty-request"]
+          }
+        },
+        {
+          "id": "push-transport",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-signal-posts-to-its-collector-path",
+              "a-collector-failure-resolves-not-ok",
+              "the-bearer-is-sent-only-when-set"
+            ]
+          }
+        },
+        {
+          "id": "log-record-mapping",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-log-record-maps-to-an-otlp-record", "log-context-flattens-to-dotted-attributes"]
+          }
+        },
+        {
+          "id": "log-sink-is-best-effort",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-empty-sink-posts-nothing",
+              "the-queue-drops-the-oldest-records",
+              "a-collector-error-never-rejects-close"
+            ]
+          }
+        },
+        {
+          "id": "collector-ownership",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "custom-metrics-record-into-the-active-collector",
+              "stop-clears-only-its-own-collector",
+              "custom-metrics-are-no-ops-without-a-collector"
+            ]
+          }
+        },
+        {
+          "id": "trace-propagation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-span-continues-the-caller-trace", "malformed-or-unbounded-remote-context-is-refused"]
+          }
+        }
+      ]
     }
   ]
 }

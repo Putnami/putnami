@@ -1,9 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import type { Application } from '../../src/application/application';
 import { application } from '../../src/application';
 import { http } from '../../src/http/http.plugin';
 import { requireClient } from '../../src/http/require-client.middleware';
 import { HttpResponse } from '../../src/http/http-response';
+
+const listedClient = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'require-client-admits-only-a-listed-client',
+};
 
 let app: Application;
 let baseUrl: string;
@@ -36,7 +43,7 @@ afterAll(async () => {
 });
 
 describe('requireClient', () => {
-  test('allows request from authorized client', async () => {
+  specTest('allows request from authorized client', listedClient, async () => {
     const res = await fetch(`${baseUrl}/internal/data`, {
       headers: { 'X-Client-Id': 'orders-service' },
     });
@@ -50,14 +57,14 @@ describe('requireClient', () => {
     expect(res.status).toBe(200);
   });
 
-  test('rejects request from unauthorized client', async () => {
+  specTest('rejects request from unauthorized client', listedClient, async () => {
     const res = await fetch(`${baseUrl}/internal/data`, {
       headers: { 'X-Client-Id': 'evil-service' },
     });
     expect(res.status).toBe(403);
   });
 
-  test('rejects request with no X-Client-Id header', async () => {
+  specTest('rejects request with no X-Client-Id header', listedClient, async () => {
     const res = await fetch(`${baseUrl}/internal/data`);
     expect(res.status).toBe(403);
   });

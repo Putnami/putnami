@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { getMimeFromPath } from '../../src/static/mime-types';
 
 describe('getMimeFromPath', () => {
@@ -22,10 +23,18 @@ describe('getMimeFromPath', () => {
     expect(getMimeFromPath('/static/image.png')).toBe('image/png');
   });
 
-  it('returns octet-stream for unknown extensions', () => {
-    expect(getMimeFromPath('file.xyz')).toBe('application/octet-stream');
-    expect(getMimeFromPath('file.unknown')).toBe('application/octet-stream');
-  });
+  specTest(
+    'returns octet-stream for unknown extensions',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'static-assets',
+      check: 'an-unknown-extension-is-served-as-octet-stream',
+    },
+    () => {
+      expect(getMimeFromPath('file.xyz')).toBe('application/octet-stream');
+      expect(getMimeFromPath('file.unknown')).toBe('application/octet-stream');
+    },
+  );
 
   it('returns octet-stream for files without extension', () => {
     expect(getMimeFromPath('Makefile')).toBe('application/octet-stream');

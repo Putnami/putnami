@@ -1,0 +1,58 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/cache-lifecycle",
+  "outcomes": [
+    "A service wraps a loader with the cache-aside call shape and runs it once per cold key, however many callers miss at the same time",
+    "A cached value stops being served once its TTL elapses or a caller evicts its key, in memory, on disk and through the layered storage",
+    "A disk cache survives a restart and keeps only the most recent build versions",
+    "An HTTP route publishes its Cache-Control policy and answers a matching conditional request with 304 and no body"
+  ],
+  "nonGoals": [
+    "Providing distributed cache coherence or a network cache backend",
+    "Bounding the number of in-memory entries or counting hits and misses",
+    "Matching glob patterns against individual disk keys, which the disk storage hashes"
+  ],
+  "requirements": [
+    {
+      "id": "cache-aside-fetch",
+      "text": "cache(name).fetch runs the loader on a miss and returns the stored value on a hit, without running the loader again. The stored key is the cache name, a colon and the key: a static string, the result of a key function over the fetch arguments, or the JSON of the arguments when no key is set. A synchronous loader is cached the same way."
+    },
+    {
+      "id": "single-flight",
+      "text": "Concurrent fetches of one cold key run the loader once, and every caller receives its value."
+    },
+    {
+      "id": "expiration",
+      "text": "An entry stored with a positive TTL is not served once the TTL elapses, in memory and on disk, and the next fetch runs the loader again. An entry stored without a TTL carries no expiration and stays served."
+    },
+    {
+      "id": "eviction",
+      "text": "evictCache deletes the keys that match its glob pattern and returns their count, clearCache deletes every key, and the next fetch of an evicted key runs the loader again."
+    },
+    {
+      "id": "value-isolation",
+      "text": "InMemoryCacheStorage stores a copy of each value: mutating a value after set, or mutating a value that get returned, never changes what later readers receive."
+    },
+    {
+      "id": "disk-storage",
+      "text": "DiskCacheStorage serves a value to a new instance that uses the same directory, reads a corrupted cache file as a miss, deletes exactly one entry for a pattern without wildcards, and clears its whole namespace for a pattern with a wildcard."
+    },
+    {
+      "id": "build-version-retention",
+      "text": "evictOldVersionsInDir keeps the five most recently modified build-version directories and removes the older ones. It removes nothing when the directory holds five or fewer, and it resolves without error when the directory does not exist."
+    },
+    {
+      "id": "layered-storage",
+      "text": "LayeredCacheStorage refuses an empty layer list. It reads layers in order and returns the first hit, copies a hit from a slower layer into the faster layers with its remaining TTL, and writes every set to all layers."
+    },
+    {
+      "id": "http-cache-control",
+      "text": "CacheMiddleware sets the Cache-Control header built from its options: a raw cacheControl string wins over every shorthand, privateMaxAge wins over maxAge, and s-maxage and stale-while-revalidate are appended. When no option applies, the response carries no Cache-Control header."
+    },
+    {
+      "id": "http-conditional-request",
+      "text": "With etag enabled, a request whose If-None-Match equals the response ETag receives a 304 that carries the ETag and no body, and a streamed body that the 304 replaces is canceled. computeETag returns a quoted value that is the same for the same body and differs for different bodies."
+    }
+  ]
+}

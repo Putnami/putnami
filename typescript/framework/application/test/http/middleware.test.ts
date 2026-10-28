@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { type HttpMiddleware, http } from '../../src/http';
 import { application } from '../../src/application';
 
@@ -30,34 +31,42 @@ describe('Http Middleware', () => {
     await app.stop();
   });
 
-  it('should stack middlewares', async () => {
-    const executed: string[] = [];
-    const m1: HttpMiddleware = async (_c, n) => {
-      executed.push('m1-start');
-      const r = await n();
-      executed.push('m1-end');
-      return r;
-    };
-    const m2: HttpMiddleware = async (_c, n) => {
-      executed.push('m2-start');
-      const r = await n();
-      executed.push('m2-end');
-      return r;
-    };
+  specTest(
+    'should stack middlewares',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'routing',
+      check: 'middleware-wraps-the-handler-in-registration-order',
+    },
+    async () => {
+      const executed: string[] = [];
+      const m1: HttpMiddleware = async (_c, n) => {
+        executed.push('m1-start');
+        const r = await n();
+        executed.push('m1-end');
+        return r;
+      };
+      const m2: HttpMiddleware = async (_c, n) => {
+        executed.push('m2-start');
+        const r = await n();
+        executed.push('m2-end');
+        return r;
+      };
 
-    const plugin = http({ port: 0 }).use(m1).use(m2);
-    plugin.get('/', () => 'ok');
+      const plugin = http({ port: 0 }).use(m1).use(m2);
+      plugin.get('/', () => 'ok');
 
-    const app = application().use(plugin);
-    await app.start();
+      const app = application().use(plugin);
+      await app.start();
 
-    const port = plugin.getServer()?.port;
-    await fetch(`http://localhost:${port}/`);
+      const port = plugin.getServer()?.port;
+      await fetch(`http://localhost:${port}/`);
 
-    expect(executed).toEqual(['m1-start', 'm2-start', 'm2-end', 'm1-end']);
+      expect(executed).toEqual(['m1-start', 'm2-start', 'm2-end', 'm1-end']);
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
   it('should have route available in middleware', async () => {
     let capturedRoute: string | undefined;

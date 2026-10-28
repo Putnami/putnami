@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { CSRF_TOKEN_CONTEXT_KEY } from '../../src/http/csrf.middleware';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 import { application } from '../../src/application';
 import { api } from '../../src/api/api.plugin';
 import { endpoint } from '../../src/api/route';
+
+const matchingToken = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'cross-site-request-forgery',
+  check: 'an-unsafe-request-needs-a-matching-csrf-token',
+};
+const apiExempt = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'cross-site-request-forgery',
+  check: 'api-routes-are-csrf-exempt-unless-they-opt-in',
+};
+const oversizedForm = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'cross-site-request-forgery',
+  check: 'an-oversized-form-body-is-refused-first',
+};
 
 describe('CsrfMiddleware', () => {
   it('should allow safe methods (GET) without a token', async () => {
@@ -45,7 +62,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('should reject POST without CSRF token', async () => {
+  specTest('should reject POST without CSRF token', matchingToken, async () => {
     const httpPlugin = http({ port: 0, csrf: true });
     httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -65,7 +82,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('should accept POST with valid CSRF token', async () => {
+  specTest('should accept POST with valid CSRF token', matchingToken, async () => {
     const httpPlugin = http({ port: 0, csrf: true });
     httpPlugin.get('/form', () => HttpResponse.json({ ok: true }));
     httpPlugin.post('/submit', () => HttpResponse.json({ submitted: true }));
@@ -152,7 +169,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('should reject POST with mismatched CSRF token', async () => {
+  specTest('should reject POST with mismatched CSRF token', matchingToken, async () => {
     const httpPlugin = http({ port: 0, csrf: true });
     httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -298,7 +315,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('should automatically exempt api() routes from CSRF validation', async () => {
+  specTest('should automatically exempt api() routes from CSRF validation', apiExempt, async () => {
     const httpPlugin = http({ port: 0, csrf: true });
     httpPlugin.post('/consent', () => HttpResponse.json({ ok: true }));
 
@@ -337,7 +354,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('enforces CSRF on api() routes when opted in with api({ csrf: true })', async () => {
+  specTest('enforces CSRF on api() routes when opted in with api({ csrf: true })', apiExempt, async () => {
     const httpPlugin = http({ port: 0, csrf: true });
     httpPlugin.get('/form', () => HttpResponse.json({ ok: true }));
 
@@ -452,7 +469,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('should reject POST with wrong CSRF token in form body field', async () => {
+  specTest('should reject POST with wrong CSRF token in form body field', matchingToken, async () => {
     const httpPlugin = http({ port: 0, csrf: true });
     httpPlugin.get('/form', () => HttpResponse.json({ ok: true }));
     httpPlugin.post('/submit', () => HttpResponse.json({ submitted: true }));
@@ -554,7 +571,7 @@ describe('CsrfMiddleware', () => {
     await app.stop();
   });
 
-  it('should reject oversized form bodies with 413 before extracting the CSRF token', async () => {
+  specTest('should reject oversized form bodies with 413 before extracting the CSRF token', oversizedForm, async () => {
     const httpPlugin = http({ port: 0, csrf: true, maxBodySizeBytes: 1024 });
     let handlerCalled = false;
     httpPlugin.post('/submit', () => {

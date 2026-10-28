@@ -60,25 +60,33 @@ async function startAndCaptureListeningRecord(): Promise<Record<string, unknown>
 }
 
 describe('http readiness marker', () => {
-  it('attaches a typed readiness payload to the listening log record', async () => {
-    const record = await startAndCaptureListeningRecord();
+  specTest(
+    'attaches a typed readiness payload to the listening log record',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'readiness-marker',
+      check: 'the-listening-record-carries-the-bound-port',
+    },
+    async () => {
+      const record = await startAndCaptureListeningRecord();
 
-    const data = readyMarkerFromLogRecord(record);
-    expect(data).not.toBeNull();
-    expect(data?.target).toBe('server');
+      const data = readyMarkerFromLogRecord(record);
+      expect(data).not.toBeNull();
+      expect(data?.target).toBe('server');
 
-    const endpoints = data?.endpoints ?? [];
-    expect(endpoints).toHaveLength(1);
-    for (const endpoint of endpoints) {
-      expect(endpoint.scheme).toBe('http');
-      expect(endpoint.host).toBe('localhost');
-      // port 0 asks the kernel for an ephemeral port: the marker must carry the
-      // BOUND port, or a consumer would be handed an address nothing listens on.
-      expect(endpoint.port).toBeGreaterThan(0);
-      expect(readyEndpointUrl(endpoint)).toBe(`http://localhost:${endpoint.port}`);
-    }
-    expect(JSON.stringify(record[READY_LOG_KEY])).not.toContain('"url"');
-  });
+      const endpoints = data?.endpoints ?? [];
+      expect(endpoints).toHaveLength(1);
+      for (const endpoint of endpoints) {
+        expect(endpoint.scheme).toBe('http');
+        expect(endpoint.host).toBe('localhost');
+        // port 0 asks the kernel for an ephemeral port: the marker must carry the
+        // BOUND port, or a consumer would be handed an address nothing listens on.
+        expect(endpoint.port).toBeGreaterThan(0);
+        expect(readyEndpointUrl(endpoint)).toBe(`http://localhost:${endpoint.port}`);
+      }
+      expect(JSON.stringify(record[READY_LOG_KEY])).not.toContain('"url"');
+    },
+  );
 
   it('keeps the listening log human-readable', async () => {
     const record = await startAndCaptureListeningRecord();
@@ -92,35 +100,59 @@ describe('http readiness marker', () => {
     expect(record['durationMs']).toBeNumber();
   });
 
-  it('places the marker at the top level of the record the forwarder reads', async () => {
-    const record = await startAndCaptureListeningRecord();
+  specTest(
+    'places the marker at the top level of the record the forwarder reads',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'readiness-marker',
+      check: 'the-marker-sits-at-the-top-level-of-the-record',
+    },
+    async () => {
+      const record = await startAndCaptureListeningRecord();
 
-    // The forwarder looks for exactly one reserved top-level member; nesting it
-    // under `data` (the sink's fallback for non-object payloads) would make it
-    // invisible and silently drop typed readiness.
-    expect(record[READY_LOG_KEY]).toBeDefined();
-    expect(record['data']).toBeUndefined();
-  });
+      // The forwarder looks for exactly one reserved top-level member; nesting it
+      // under `data` (the sink's fallback for non-object payloads) would make it
+      // invisible and silently drop typed readiness.
+      expect(record[READY_LOG_KEY]).toBeDefined();
+      expect(record['data']).toBeUndefined();
+    },
+  );
 
-  it('writes no marker for a listener that is not addressable', () => {
-    for (const port of [undefined, 0, 65_536, 1.5]) {
-      const record = listeningRecord(port, 12);
-      expect(record[READY_LOG_KEY]).toBeUndefined();
-      expect(record).toEqual({ durationMs: 12 });
-    }
-  });
+  specTest(
+    'writes no marker for a listener that is not addressable',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'readiness-marker',
+      check: 'an-unaddressable-listener-writes-no-marker',
+    },
+    () => {
+      for (const port of [undefined, 0, 65_536, 1.5]) {
+        const record = listeningRecord(port, 12);
+        expect(record[READY_LOG_KEY]).toBeUndefined();
+        expect(record).toEqual({ durationMs: 12 });
+      }
+    },
+  );
 
-  it('reports the bound endpoint from start until stop', async () => {
-    expect(http({ port: 0 }).readyEndpoints()).toEqual([]);
-    const { plugin, record } = await startHttpApplication();
-    const claim = readyMarkerFromLogRecord(record('listening http://'));
-    expect(claim?.endpoints).toHaveLength(1);
-    expect(plugin.readyEndpoints()).toEqual(claim?.endpoints ?? []);
+  specTest(
+    'reports the bound endpoint from start until stop',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'readiness-marker',
+      check: 'the-bound-endpoint-is-reported-from-start-until-stop',
+    },
+    async () => {
+      expect(http({ port: 0 }).readyEndpoints()).toEqual([]);
+      const { plugin, record } = await startHttpApplication();
+      const claim = readyMarkerFromLogRecord(record('listening http://'));
+      expect(claim?.endpoints).toHaveLength(1);
+      expect(plugin.readyEndpoints()).toEqual(claim?.endpoints ?? []);
 
-    await app?.stop();
-    app = undefined;
-    expect(plugin.readyEndpoints()).toEqual([]);
-  });
+      await app?.stop();
+      app = undefined;
+      expect(plugin.readyEndpoints()).toEqual([]);
+    },
+  );
 
   specTest(
     'puts the bound endpoint in the application ready record',

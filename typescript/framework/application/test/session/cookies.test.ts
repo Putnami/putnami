@@ -1,5 +1,6 @@
 import { createCipheriv, randomBytes as legacyRandomBytes } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { resetConfigLoader, resetLoggerConfig, runInContext, useConfig } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { type HttpRequestContext, HttpResponse } from '../../src/http';
@@ -8,6 +9,32 @@ import { CookieSessionStore } from '../../src/session/cookie.store';
 import { OAUTH_PENDING_SESSION_LIMIT } from '../../src/oauth/oauth-session';
 import { cookies } from '../../src/session/cookies';
 import { SessionConfig } from '../../src/session/session.config';
+
+const encryptedCookie = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'encrypted-cookie-sessions',
+  check: 'the-session-cookie-is-encrypted-and-flagged',
+};
+const untouchedSession = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'encrypted-cookie-sessions',
+  check: 'an-untouched-session-writes-no-cookie',
+};
+const untrustedCookie = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'encrypted-cookie-sessions',
+  check: 'an-untrusted-cookie-reads-as-an-empty-session',
+};
+const secretRefusal = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'encrypted-cookie-sessions',
+  check: 'a-missing-or-malformed-cookie-secret-is-refused',
+};
+const cookieCap = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'encrypted-cookie-sessions',
+  check: 'a-post-login-session-fits-the-browser-cookie-cap',
+};
 
 type TestCookieContext = HttpRequestContext & {
   cookies?: unknown;
@@ -162,7 +189,7 @@ describe('SessionConfig', () => {
 });
 
 describe('cookies()', () => {
-  it('encrypts values into Set-Cookie headers and decrypts them on the next request', () => {
+  specTest('encrypts values into Set-Cookie headers and decrypts them on the next request', encryptedCookie, () => {
     setSessionConfig({ sameSite: 'strict', ttl: 300 });
     const context = createContext();
 
@@ -222,7 +249,7 @@ describe('cookies()', () => {
     });
   });
 
-  it('discards forged non-encrypted cookie values instead of falling back to raw', () => {
+  specTest('discards forged non-encrypted cookie values instead of falling back to raw', untrustedCookie, () => {
     setSessionConfig();
     const forgedPayload = JSON.stringify({ userId: 999 });
     const context = createContext({ cookie: `session=${encodeURIComponent(forgedPayload)}` });
@@ -234,7 +261,7 @@ describe('cookies()', () => {
     });
   });
 
-  it('does not append Set-Cookie headers when the store is untouched', () => {
+  specTest('does not append Set-Cookie headers when the store is untouched', untouchedSession, () => {
     setSessionConfig();
     const context = createContext();
 
@@ -245,7 +272,7 @@ describe('cookies()', () => {
     });
   });
 
-  it('refuses to read cookies when cookieSecret is not set', () => {
+  specTest('refuses to read cookies when cookieSecret is not set', secretRefusal, () => {
     process.env.CONFIG_DATA = JSON.stringify({});
     resetConfigLoader();
     const context = createContext();
@@ -253,45 +280,53 @@ describe('cookies()', () => {
     expect(() => runInContext(context, () => cookies())).toThrow(/session\.cookieSecret is not set/);
   });
 
-  it('rejects a wrong-length cookieSecret with an actionable error instead of an opaque crypto failure', () => {
-    setSessionConfig({ cookieSecret: 'not-a-valid-hex-key' });
-    const context = createContext();
+  specTest(
+    'rejects a wrong-length cookieSecret with an actionable error instead of an opaque crypto failure',
+    secretRefusal,
+    () => {
+      setSessionConfig({ cookieSecret: 'not-a-valid-hex-key' });
+      const context = createContext();
 
-    expect(() =>
+      expect(() =>
+        runInContext(context, () => {
+          cookies().set('session', JSON.stringify({ userId: 1 }));
+          applyCallbacks(context);
+        }),
+      ).toThrow(/64-character hex string \(32 bytes\)/);
+    },
+  );
+
+  specTest(
+    'keeps the Secure flag behind a TLS-terminating proxy (http URL + x-forwarded-proto)',
+    encryptedCookie,
+    () => {
+      setSessionConfig({ secure: true });
+      // Simulate Bun receiving plaintext http from a proxy that terminated TLS.
+      const headers = new Headers({ 'x-forwarded-proto': 'https' });
+      const req = new Request('http://app.example.com/profile', { headers });
+      const urlScanner = new UrlScanner(req.url, req.headers);
+      const context = {
+        ...createContext(),
+        headers: req.headers,
+        req,
+        url: req.url,
+        // Wire secured() to the real scanner so the proxy header is honoured.
+        secured: () => urlScanner.secured,
+      } as TestCookieContext;
+      context.__callbacks = [];
+
       runInContext(context, () => {
         cookies().set('session', JSON.stringify({ userId: 1 }));
-        applyCallbacks(context);
-      }),
-    ).toThrow(/64-character hex string \(32 bytes\)/);
-  });
-
-  it('keeps the Secure flag behind a TLS-terminating proxy (http URL + x-forwarded-proto)', () => {
-    setSessionConfig({ secure: true });
-    // Simulate Bun receiving plaintext http from a proxy that terminated TLS.
-    const headers = new Headers({ 'x-forwarded-proto': 'https' });
-    const req = new Request('http://app.example.com/profile', { headers });
-    const urlScanner = new UrlScanner(req.url, req.headers);
-    const context = {
-      ...createContext(),
-      headers: req.headers,
-      req,
-      url: req.url,
-      // Wire secured() to the real scanner so the proxy header is honoured.
-      secured: () => urlScanner.secured,
-    } as TestCookieContext;
-    context.__callbacks = [];
-
-    runInContext(context, () => {
-      cookies().set('session', JSON.stringify({ userId: 1 }));
-      const response = applyCallbacks(context);
-      const header = response.getHeaders('Set-Cookie')[0] ?? '';
-      expect(header).toContain('Secure');
-    });
-  });
+        const response = applyCallbacks(context);
+        const header = response.getHeaders('Set-Cookie')[0] ?? '';
+        expect(header).toContain('Secure');
+      });
+    },
+  );
 });
 
 describe('CookieSessionStore', () => {
-  it('returns an empty session for tampered ciphertext and logs the failure', () => {
+  specTest('returns an empty session for tampered ciphertext and logs the failure', untrustedCookie, () => {
     setSessionConfig();
     const cookiePair = issueSessionCookie({ role: 'admin' });
 
@@ -311,7 +346,7 @@ describe('CookieSessionStore', () => {
     ).toBe(true);
   });
 
-  it('returns an empty session when the cookie was encrypted with a different key', () => {
+  specTest('returns an empty session when the cookie was encrypted with a different key', untrustedCookie, () => {
     setSessionConfig({ cookieSecret: PRIMARY_SECRET });
     const cookiePair = issueSessionCookie({ userId: 7 });
 
@@ -420,7 +455,7 @@ describe('cookie payload format', () => {
     });
   });
 
-  it('keeps a real-size OAuth token session under the browser cookie cap', () => {
+  specTest('keeps a real-size OAuth token session under the browser cookie cap', cookieCap, () => {
     setSessionConfig();
     // Mirrors what the OAuth client stores after login, at production token
     // sizes: a ~1KB access JWT, a ~800B id JWT, and a FULL pending-login list

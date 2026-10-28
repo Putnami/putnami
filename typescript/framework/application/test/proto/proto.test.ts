@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { DiscoveredRoute } from '@putnami/application';
 import { ArrayOf, Desc, Email, Int, MapOf, OneOf, Optional, Uuid } from '@putnami/application';
 import { validateSchema } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { decodeProto, encodeProto } from '../../src/grpc/proto-codec';
 import { readRequestEnvelope } from '../../src/grpc/grpc-request';
 import { generateProto } from '../../src/proto/proto';
@@ -33,15 +34,23 @@ describe('generateProto', () => {
   });
 
   describe('service grouping', () => {
-    it('should group routes by first path segment into services', () => {
-      const routes: DiscoveredRoute[] = [
-        { method: 'GET', path: '/users' },
-        { method: 'GET', path: '/orders' },
-      ];
-      const proto = generateProto(routes, defaultOptions);
-      expect(proto.services.UsersService).toBeDefined();
-      expect(proto.services.OrdersService).toBeDefined();
-    });
+    specTest(
+      'should group routes by first path segment into services',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'route-derived-services',
+        check: 'routes-group-into-one-service-per-first-path-segment',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          { method: 'GET', path: '/users' },
+          { method: 'GET', path: '/orders' },
+        ];
+        const proto = generateProto(routes, defaultOptions);
+        expect(proto.services.UsersService).toBeDefined();
+        expect(proto.services.OrdersService).toBeDefined();
+      },
+    );
 
     it('should group nested routes under the same service', () => {
       const routes: DiscoveredRoute[] = [
@@ -53,19 +62,27 @@ describe('generateProto', () => {
       expect(proto.services.UsersService).toHaveLength(3);
     });
 
-    it('emits the same document whatever order the routes are discovered in', () => {
-      const routes: DiscoveredRoute[] = [
-        { method: 'POST', path: '/users' },
-        { method: 'GET', path: '/users/[id]' },
-        { method: 'GET', path: '/orders' },
-        { method: 'GET', path: '/users' },
-      ];
-      const forward = generateProto(routes, defaultOptions);
-      const reversed = generateProto([...routes].reverse(), defaultOptions);
-      expect(reversed.content).toBe(forward.content);
-      expect(Object.keys(forward.services)).toEqual(['OrdersService', 'UsersService']);
-      expect(forward.services.UsersService).toEqual(['ListUsers', 'CreateUsers', 'GetUsersById']);
-    });
+    specTest(
+      'emits the same document whatever order the routes are discovered in',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'route-derived-services',
+        check: 'the-proto-document-ignores-route-discovery-order',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          { method: 'POST', path: '/users' },
+          { method: 'GET', path: '/users/[id]' },
+          { method: 'GET', path: '/orders' },
+          { method: 'GET', path: '/users' },
+        ];
+        const forward = generateProto(routes, defaultOptions);
+        const reversed = generateProto([...routes].reverse(), defaultOptions);
+        expect(reversed.content).toBe(forward.content);
+        expect(Object.keys(forward.services)).toEqual(['OrdersService', 'UsersService']);
+        expect(forward.services.UsersService).toEqual(['ListUsers', 'CreateUsers', 'GetUsersById']);
+      },
+    );
   });
 
   describe('RPC naming', () => {
@@ -213,48 +230,64 @@ describe('generateProto', () => {
   });
 
   describe('the request envelope', () => {
-    it('should carry params and query as named sections of the request message', () => {
-      const routes: DiscoveredRoute[] = [
-        {
-          method: 'GET',
-          path: '/users/[id]',
-          schemas: {
-            params: { id: Uuid },
-            query: { include: Optional(String) },
+    specTest(
+      'should carry params and query as named sections of the request message',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'request-envelope',
+        check: 'params-query-and-body-are-separate-request-sections',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          {
+            method: 'GET',
+            path: '/users/[id]',
+            schemas: {
+              params: { id: Uuid },
+              query: { include: Optional(String) },
+            },
           },
-        },
-      ];
-      const proto = generateProto(routes, defaultOptions);
-      expect(proto.content).toContain('GetUsersByIdRequestParams params = 1;');
-      expect(proto.content).toContain('GetUsersByIdRequestQuery query = 2;');
-      expect(proto.messageMeta.GetUsersByIdRequestParams?.map((field) => `${field.name}=${field.number}`)).toEqual([
-        'id=1',
-      ]);
-      expect(proto.messageMeta.GetUsersByIdRequestQuery?.map((field) => `${field.name}=${field.number}`)).toEqual([
-        'include=1',
-      ]);
-    });
+        ];
+        const proto = generateProto(routes, defaultOptions);
+        expect(proto.content).toContain('GetUsersByIdRequestParams params = 1;');
+        expect(proto.content).toContain('GetUsersByIdRequestQuery query = 2;');
+        expect(proto.messageMeta.GetUsersByIdRequestParams?.map((field) => `${field.name}=${field.number}`)).toEqual([
+          'id=1',
+        ]);
+        expect(proto.messageMeta.GetUsersByIdRequestQuery?.map((field) => `${field.name}=${field.number}`)).toEqual([
+          'include=1',
+        ]);
+      },
+    );
 
-    it('should number the sections in params, query, body order, skipping an absent one', () => {
-      const routes: DiscoveredRoute[] = [
-        {
-          method: 'PUT',
-          path: '/users/[id]',
-          schemas: {
-            params: { id: Uuid },
-            body: { id: String, name: String, email: Email },
+    specTest(
+      'should number the sections in params, query, body order, skipping an absent one',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'request-envelope',
+        check: 'request-sections-are-numbered-params-query-body',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          {
+            method: 'PUT',
+            path: '/users/[id]',
+            schemas: {
+              params: { id: Uuid },
+              body: { id: String, name: String, email: Email },
+            },
           },
-        },
-      ];
-      const proto = generateProto(routes, defaultOptions);
-      const request = Object.entries(proto.messageMeta).find(
-        ([name, fields]) => name.endsWith('Request') && fields.some((field) => field.name === 'params'),
-      );
-      expect(request?.[1].map((field) => `${field.name}=${field.number}`)).toEqual(['params=1', 'body=2']);
-      // A body member named like the path parameter stays apart from it.
-      const body = proto.messageMeta[`${request?.[0]}Body`];
-      expect(body?.map((field) => `${field.name}=${field.number}`)).toEqual(['id=1', 'name=2', 'email=3']);
-    });
+        ];
+        const proto = generateProto(routes, defaultOptions);
+        const request = Object.entries(proto.messageMeta).find(
+          ([name, fields]) => name.endsWith('Request') && fields.some((field) => field.name === 'params'),
+        );
+        expect(request?.[1].map((field) => `${field.name}=${field.number}`)).toEqual(['params=1', 'body=2']);
+        // A body member named like the path parameter stays apart from it.
+        const body = proto.messageMeta[`${request?.[0]}Body`];
+        expect(body?.map((field) => `${field.name}=${field.number}`)).toEqual(['id=1', 'name=2', 'email=3']);
+      },
+    );
   });
 
   describe('response messages', () => {
@@ -367,26 +400,40 @@ describe('generateProto', () => {
       expect((absent.body as Record<string, unknown>).profile).toBeUndefined();
     });
 
-    it('refuses nullable collection members that protobuf cannot represent', () => {
-      expect(() =>
-        generateProto(
-          [{ method: 'POST', path: '/profiles', schemas: { body: { entries: ArrayOf(Optional({ name: String })) } } }],
-          defaultOptions,
-        ),
-      ).toThrow(/optional collection item/);
-      expect(() =>
-        generateProto(
-          [
-            {
-              method: 'POST',
-              path: '/profiles',
-              schemas: { body: { lookup: MapOf(String, Optional({ name: String })) } },
-            },
-          ],
-          defaultOptions,
-        ),
-      ).toThrow(/optional collection value/);
-    });
+    specTest(
+      'refuses nullable collection members that protobuf cannot represent',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'route-derived-services',
+        check: 'a-nullable-collection-member-fails-generation',
+      },
+      () => {
+        expect(() =>
+          generateProto(
+            [
+              {
+                method: 'POST',
+                path: '/profiles',
+                schemas: { body: { entries: ArrayOf(Optional({ name: String })) } },
+              },
+            ],
+            defaultOptions,
+          ),
+        ).toThrow(/optional collection item/);
+        expect(() =>
+          generateProto(
+            [
+              {
+                method: 'POST',
+                path: '/profiles',
+                schemas: { body: { lookup: MapOf(String, Optional({ name: String })) } },
+              },
+            ],
+            defaultOptions,
+          ),
+        ).toThrow(/optional collection value/);
+      },
+    );
 
     it('should create sub-messages for nested objects in body', () => {
       const routes: DiscoveredRoute[] = [
@@ -412,47 +459,71 @@ describe('generateProto', () => {
   });
 
   describe('streaming', () => {
-    it('should generate server streaming RPC for server stream mode', () => {
-      const routes: DiscoveredRoute[] = [
-        {
-          method: 'GET',
-          path: '/events',
-          streamMode: 'server',
-          schemas: { returns: { type: String, data: String } },
-        },
-      ];
-      const proto = generateProto(routes, defaultOptions);
-      expect(proto.content).toContain('rpc ListEvents(ListEventsRequest) returns (stream ListEventsResponse);');
-    });
-
-    it('should generate client streaming RPC for client stream mode', () => {
-      const routes: DiscoveredRoute[] = [
-        {
-          method: 'GET',
-          path: '/upload',
-          streamMode: 'client',
-          schemas: { body: { chunk: String } },
-        },
-      ];
-      const proto = generateProto(routes, defaultOptions);
-      expect(proto.content).toContain('rpc ListUpload(stream ListUploadRequest) returns (ListUploadResponse);');
-    });
-
-    it('should generate bidirectional streaming RPC', () => {
-      const routes: DiscoveredRoute[] = [
-        {
-          method: 'GET',
-          path: '/chat',
-          streamMode: 'bidirectional',
-          schemas: {
-            body: { message: String },
-            returns: { reply: String },
+    specTest(
+      'should generate server streaming RPC for server stream mode',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'stream-shapes',
+        check: 'the-stream-mode-is-declared-on-the-generated-rpc',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          {
+            method: 'GET',
+            path: '/events',
+            streamMode: 'server',
+            schemas: { returns: { type: String, data: String } },
           },
-        },
-      ];
-      const proto = generateProto(routes, defaultOptions);
-      expect(proto.content).toContain('rpc ListChat(stream ListChatRequest) returns (stream ListChatResponse);');
-    });
+        ];
+        const proto = generateProto(routes, defaultOptions);
+        expect(proto.content).toContain('rpc ListEvents(ListEventsRequest) returns (stream ListEventsResponse);');
+      },
+    );
+
+    specTest(
+      'should generate client streaming RPC for client stream mode',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'stream-shapes',
+        check: 'the-stream-mode-is-declared-on-the-generated-rpc',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          {
+            method: 'GET',
+            path: '/upload',
+            streamMode: 'client',
+            schemas: { body: { chunk: String } },
+          },
+        ];
+        const proto = generateProto(routes, defaultOptions);
+        expect(proto.content).toContain('rpc ListUpload(stream ListUploadRequest) returns (ListUploadResponse);');
+      },
+    );
+
+    specTest(
+      'should generate bidirectional streaming RPC',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'stream-shapes',
+        check: 'the-stream-mode-is-declared-on-the-generated-rpc',
+      },
+      () => {
+        const routes: DiscoveredRoute[] = [
+          {
+            method: 'GET',
+            path: '/chat',
+            streamMode: 'bidirectional',
+            schemas: {
+              body: { message: String },
+              returns: { reply: String },
+            },
+          },
+        ];
+        const proto = generateProto(routes, defaultOptions);
+        expect(proto.content).toContain('rpc ListChat(stream ListChatRequest) returns (stream ListChatResponse);');
+      },
+    );
   });
 
   describe('service rendering', () => {

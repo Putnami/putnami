@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { HttpResponse } from '../../src/http/http-response';
 import { CSP_NONCE_CONTEXT_KEY, SecurityHeadersMiddleware } from '../../src/http/security-headers.middleware';
 
@@ -19,15 +20,23 @@ describe('SecurityHeadersMiddleware', () => {
     expect(response?.getHeader('Permissions-Policy')).toContain('camera=()');
   });
 
-  it('omits HSTS over a plaintext (insecure) request', async () => {
-    const middleware = SecurityHeadersMiddleware();
-    const response = await middleware(ctx({ secured: () => false }), async () => new HttpResponse('ok'));
+  specTest(
+    'omits HSTS over a plaintext (insecure) request',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'secure-by-default',
+      check: 'hsts-is-sent-only-over-https',
+    },
+    async () => {
+      const middleware = SecurityHeadersMiddleware();
+      const response = await middleware(ctx({ secured: () => false }), async () => new HttpResponse('ok'));
 
-    expect(response?.getHeader('Strict-Transport-Security')).toBeUndefined();
-    // The rest of the header suite is still applied.
-    expect(response?.getHeader('X-Content-Type-Options')).toBe('nosniff');
-    expect(response?.getHeader('Content-Security-Policy')).toContain("default-src 'self'");
-  });
+      expect(response?.getHeader('Strict-Transport-Security')).toBeUndefined();
+      // The rest of the header suite is still applied.
+      expect(response?.getHeader('X-Content-Type-Options')).toBe('nosniff');
+      expect(response?.getHeader('Content-Security-Policy')).toContain("default-src 'self'");
+    },
+  );
 
   it('allows overriding specific headers', async () => {
     const middleware = SecurityHeadersMiddleware({
@@ -38,23 +47,31 @@ describe('SecurityHeadersMiddleware', () => {
     expect(response?.getHeader('X-Frame-Options')).toBe('SAMEORIGIN');
   });
 
-  it('does not overwrite headers already set by inner middleware', async () => {
-    const middleware = SecurityHeadersMiddleware();
-    const response = await middleware(
-      ctx(),
-      async () =>
-        new HttpResponse('ok', {
-          headers: {
-            'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.example.com",
-            'X-Frame-Options': 'SAMEORIGIN',
-          },
-        }),
-    );
+  specTest(
+    'does not overwrite headers already set by inner middleware',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'secure-by-default',
+      check: 'a-header-the-handler-set-wins',
+    },
+    async () => {
+      const middleware = SecurityHeadersMiddleware();
+      const response = await middleware(
+        ctx(),
+        async () =>
+          new HttpResponse('ok', {
+            headers: {
+              'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.example.com",
+              'X-Frame-Options': 'SAMEORIGIN',
+            },
+          }),
+      );
 
-    expect(response?.getHeader('Content-Security-Policy')).toContain('https://cdn.example.com');
-    expect(response?.getHeader('X-Frame-Options')).toBe('SAMEORIGIN');
-    expect(response?.getHeader('X-Content-Type-Options')).toBe('nosniff');
-  });
+      expect(response?.getHeader('Content-Security-Policy')).toContain('https://cdn.example.com');
+      expect(response?.getHeader('X-Frame-Options')).toBe('SAMEORIGIN');
+      expect(response?.getHeader('X-Content-Type-Options')).toBe('nosniff');
+    },
+  );
 
   it('threads the request CSP nonce into the default policy', async () => {
     const middleware = SecurityHeadersMiddleware();

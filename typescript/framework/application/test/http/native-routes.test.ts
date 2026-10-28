@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { application } from '../../src/application';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
@@ -9,27 +10,35 @@ function nativeParams(req: Request): Record<string, string> {
 }
 
 describe('native (pipeline-bypassing) routes', () => {
-  it('serves a static native route and bypasses the pipeline (no security headers)', async () => {
-    const plugin = http({ port: 0 }); // secure by default
-    plugin.native('/healthz', HttpResponse.json({ status: 'ok' }));
-    plugin.get('/normal', () => HttpResponse.json({ status: 'ok' }));
-    const app = application().use(plugin);
-    await app.start();
-    const base = `http://localhost:${plugin.getServer()?.port}`;
+  specTest(
+    'serves a static native route and bypasses the pipeline (no security headers)',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'secure-by-default',
+      check: 'a-native-route-bypasses-the-pipeline',
+    },
+    async () => {
+      const plugin = http({ port: 0 }); // secure by default
+      plugin.native('/healthz', HttpResponse.json({ status: 'ok' }));
+      plugin.get('/normal', () => HttpResponse.json({ status: 'ok' }));
+      const app = application().use(plugin);
+      await app.start();
+      const base = `http://localhost:${plugin.getServer()?.port}`;
 
-    const native = await fetch(`${base}/healthz`);
-    expect(native.status).toBe(200);
-    expect(await native.json()).toEqual({ status: 'ok' });
-    // Pipeline bypassed → none of the secure-by-default headers are present.
-    expect(native.headers.get('X-Frame-Options')).toBeNull();
+      const native = await fetch(`${base}/healthz`);
+      expect(native.status).toBe(200);
+      expect(await native.json()).toEqual({ status: 'ok' });
+      // Pipeline bypassed → none of the secure-by-default headers are present.
+      expect(native.headers.get('X-Frame-Options')).toBeNull();
 
-    // A normal pipeline route on the same server still gets the security headers.
-    const normal = await fetch(`${base}/normal`);
-    expect(normal.headers.get('X-Frame-Options')).toBe('DENY');
-    await normal.arrayBuffer();
+      // A normal pipeline route on the same server still gets the security headers.
+      const normal = await fetch(`${base}/normal`);
+      expect(normal.headers.get('X-Frame-Options')).toBe('DENY');
+      await normal.arrayBuffer();
 
-    await app.stop();
-  });
+      await app.stop();
+    },
+  );
 
   it('serves a bare function native route', async () => {
     const plugin = http({ port: 0 });

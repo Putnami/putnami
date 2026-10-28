@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { type LogEntry, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import type { HttpRequestContext } from '../../src/http/http-context.type';
@@ -6,6 +7,22 @@ import type { HttpResponse } from '../../src/http/http-response';
 import { SecurityMiddleware } from '../../src/security/security.middleware';
 import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
 import { clearCollector, setCollector } from '../../src/telemetry/telemetry.utils';
+
+const countedDecision = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'every-decision-is-counted-by-decision-and-reason',
+};
+const undisclosedPermission = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'a-denial-does-not-disclose-the-missing-permission',
+};
+const unloggedToken = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'a-failed-verification-never-logs-the-token',
+};
 
 // ---------------------------------------------------------------------------
 // Harness: capture the security log entries and the in-process metric counters
@@ -69,7 +86,7 @@ function securityEntries(): LogEntry[] {
 }
 
 describe('security decision telemetry', () => {
-  it('counts and logs a grant at debug keyed by the allow label', async () => {
+  specTest('counts and logs a grant at debug keyed by the allow label', countedDecision, async () => {
     const mw = SecurityMiddleware({ roles: ['admin'] });
     const ctx = createMockContext({ sub: 'user-1', roles: ['admin'] });
 
@@ -83,38 +100,50 @@ describe('security decision telemetry', () => {
     expect(entries[0].data?.[0]).toMatchObject({ decision: 'allow', status: 200, subject: 'user-1' });
   });
 
-  it('counts and logs a denial at warn keyed by the decision label plus the failing dimension', async () => {
-    const mw = SecurityMiddleware({ scopes: ['admin:write'] });
-    const ctx = createMockContext({ sub: 'user-1', scope: 'read' });
+  specTest(
+    'counts and logs a denial at warn keyed by the decision label plus the failing dimension',
+    countedDecision,
+    async () => {
+      const mw = SecurityMiddleware({ scopes: ['admin:write'] });
+      const ctx = createMockContext({ sub: 'user-1', scope: 'read' });
 
-    const res = await run(mw, ctx);
+      const res = await run(mw, ctx);
 
-    expect(res?.status).toBe(403);
-    // Counter carries the coarse decision AND the failing dimension (the reason).
-    expect(counters()['security.auth_decisions.deny_scope.missing_required_scope']).toBe(1);
+      expect(res?.status).toBe(403);
+      // Counter carries the coarse decision AND the failing dimension (the reason).
+      expect(counters()['security.auth_decisions.deny_scope.missing_required_scope']).toBe(1);
 
-    const entries = securityEntries();
-    expect(entries).toHaveLength(1);
-    expect(entries[0].level).toBe('warn');
-    expect(entries[0].message).toBe('authorization denied');
-    expect(entries[0].data?.[0]).toMatchObject({
-      decision: 'deny_scope',
-      status: 403,
-      reason: 'missing required scope',
-    });
-  });
+      const entries = securityEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].level).toBe('warn');
+      expect(entries[0].message).toBe('authorization denied');
+      expect(entries[0].data?.[0]).toMatchObject({
+        decision: 'deny_scope',
+        status: 403,
+        reason: 'missing required scope',
+      });
+    },
+  );
 
-  it('records an unauthenticated denial as 401 with the deny_unauthenticated label', async () => {
-    const mw = SecurityMiddleware({ roles: ['admin'] });
-    const ctx = createMockContext(undefined);
+  specTest(
+    'records an unauthenticated denial as 401 with the deny_unauthenticated label',
+    countedDecision,
+    async () => {
+      const mw = SecurityMiddleware({ roles: ['admin'] });
+      const ctx = createMockContext(undefined);
 
-    const res = await run(mw, ctx);
+      const res = await run(mw, ctx);
 
-    expect(res?.status).toBe(401);
-    expect(counters()['security.auth_decisions.deny_unauthenticated.no_identity']).toBe(1);
-    const entries = securityEntries();
-    expect(entries[0].data?.[0]).toMatchObject({ decision: 'deny_unauthenticated', status: 401, subject: 'anonymous' });
-  });
+      expect(res?.status).toBe(401);
+      expect(counters()['security.auth_decisions.deny_unauthenticated.no_identity']).toBe(1);
+      const entries = securityEntries();
+      expect(entries[0].data?.[0]).toMatchObject({
+        decision: 'deny_unauthenticated',
+        status: 401,
+        subject: 'anonymous',
+      });
+    },
+  );
 
   // -------------------------------------------------------------------------
   // Redaction contract (ported from observe.go): never log the token, and never
@@ -122,7 +151,7 @@ describe('security decision telemetry', () => {
   // -------------------------------------------------------------------------
 
   describe('redaction contract', () => {
-    it('does not leak the missing-scope detail to the client body', async () => {
+    specTest('does not leak the missing-scope detail to the client body', undisclosedPermission, async () => {
       const mw = SecurityMiddleware({ scopes: ['secret:scope'] });
       const ctx = createMockContext({ sub: 'user-1', scope: 'read' });
 
@@ -136,7 +165,7 @@ describe('security decision telemetry', () => {
       expect(rawBody).not.toContain('secret:scope');
     });
 
-    it('does not leak the missing-role detail to the client body', async () => {
+    specTest('does not leak the missing-role detail to the client body', undisclosedPermission, async () => {
       const mw = SecurityMiddleware({ roles: ['secret-role'] });
       const ctx = createMockContext({ sub: 'user-1', roles: ['viewer'] });
 
@@ -149,7 +178,7 @@ describe('security decision telemetry', () => {
       expect(rawBody).not.toContain('secret-role');
     });
 
-    it('never writes the bearer token to the logs on a failed verification', async () => {
+    specTest('never writes the bearer token to the logs on a failed verification', unloggedToken, async () => {
       const secretToken = 'tok_live_SUPER_SECRET_credential_value';
       const mw = SecurityMiddleware({ verify: async () => undefined });
       const ctx = createMockContext(undefined);

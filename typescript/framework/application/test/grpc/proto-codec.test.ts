@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { createEnvelope, decodeProto, encodeProto, encodeVarint, readEnvelope } from '../../src/grpc/proto-codec';
 import type { ProtoFieldMeta } from '../../src/proto/proto';
 
@@ -250,15 +251,23 @@ describe('proto-codec', () => {
       expect(decoded.val).toBe(1_099_511_627_776);
     });
 
-    it('should return BigInt for values exceeding safe integer range', () => {
-      const fields: ProtoFieldMeta[] = [{ name: 'val', number: 1, type: 'uint64', optional: false, repeated: false }];
-      const bigValue = BigInt('18446744073709551615'); // UINT64_MAX
-      const data = { val: bigValue };
-      const encoded = encodeProto(data, fields);
-      const decoded = decodeProto(encoded, fields);
-      expect(typeof decoded.val).toBe('bigint');
-      expect(decoded.val).toBe(bigValue);
-    });
+    specTest(
+      'should return BigInt for values exceeding safe integer range',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'a-64-bit-value-past-the-safe-range-stays-exact',
+      },
+      () => {
+        const fields: ProtoFieldMeta[] = [{ name: 'val', number: 1, type: 'uint64', optional: false, repeated: false }];
+        const bigValue = BigInt('18446744073709551615'); // UINT64_MAX
+        const data = { val: bigValue };
+        const encoded = encodeProto(data, fields);
+        const decoded = decodeProto(encoded, fields);
+        expect(typeof decoded.val).toBe('bigint');
+        expect(decoded.val).toBe(bigValue);
+      },
+    );
 
     it('should skip unknown 64-bit varint fields without corrupting subsequent fields', () => {
       // Encode with int64 field that produces >5 byte varint
@@ -537,36 +546,44 @@ describe('proto-codec', () => {
       expect(decoded.labels).toEqual({ env: 'prod', region: 'us-east' });
     });
 
-    it('does not let a __proto__ wire key poison the decoded map prototype', () => {
-      const fields: ProtoFieldMeta[] = [
-        {
-          name: 'labels',
-          number: 1,
-          type: 'map',
-          optional: false,
-          repeated: false,
-          mapKeyType: 'string',
-          mapValueType: 'string',
-        },
-      ];
-      // Build an input map with an *own* "__proto__" key (a literal would set the
-      // prototype instead). The decoder must screen it / use a null prototype.
-      const labels: Record<string, string> = { env: 'prod' };
-      Object.defineProperty(labels, '__proto__', {
-        value: 'evil',
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
+    specTest(
+      'does not let a __proto__ wire key poison the decoded map prototype',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'a-map-key-cannot-change-the-decoded-prototype',
+      },
+      () => {
+        const fields: ProtoFieldMeta[] = [
+          {
+            name: 'labels',
+            number: 1,
+            type: 'map',
+            optional: false,
+            repeated: false,
+            mapKeyType: 'string',
+            mapValueType: 'string',
+          },
+        ];
+        // Build an input map with an *own* "__proto__" key (a literal would set the
+        // prototype instead). The decoder must screen it / use a null prototype.
+        const labels: Record<string, string> = { env: 'prod' };
+        Object.defineProperty(labels, '__proto__', {
+          value: 'evil',
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
 
-      const encoded = encodeProto({ labels }, fields);
-      const decoded = decodeProto(encoded, fields) as { labels: Record<string, string> };
+        const encoded = encodeProto({ labels }, fields);
+        const decoded = decodeProto(encoded, fields) as { labels: Record<string, string> };
 
-      expect(decoded.labels.env).toBe('prod');
-      // Prototype must not be reassigned by the attacker-controlled key.
-      expect(Object.getPrototypeOf(decoded.labels)).toBeNull();
-      expect(Object.hasOwn(decoded.labels, '__proto__')).toBe(false);
-    });
+        expect(decoded.labels.env).toBe('prod');
+        // Prototype must not be reassigned by the attacker-controlled key.
+        expect(Object.getPrototypeOf(decoded.labels)).toBeNull();
+        expect(Object.hasOwn(decoded.labels, '__proto__')).toBe(false);
+      },
+    );
 
     it('should round-trip map<string, double>', () => {
       const fields: ProtoFieldMeta[] = [
@@ -689,123 +706,179 @@ describe('proto-codec', () => {
   });
 
   describe('truncated / malformed input', () => {
-    it('does not throw RangeError on a truncated 64-bit (double) field', () => {
-      const fields: ProtoFieldMeta[] = [{ name: 'age', number: 2, type: 'double', optional: false, repeated: false }];
-      // tag = (field 2 << 3) | wire 64BIT(1) = 0x11, then only 3 of 8 needed bytes.
-      const truncated = new Uint8Array([0x11, 0x00, 0x00, 0x00]);
-      expect(() => decodeProto(truncated, fields)).not.toThrow();
-      // The field never arrived, so implicit presence reads it back as 0.
-      expect(decodeProto(truncated, fields).age).toBe(0);
-    });
+    specTest(
+      'does not throw RangeError on a truncated 64-bit (double) field',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'a-truncated-message-decodes-without-throwing',
+      },
+      () => {
+        const fields: ProtoFieldMeta[] = [{ name: 'age', number: 2, type: 'double', optional: false, repeated: false }];
+        // tag = (field 2 << 3) | wire 64BIT(1) = 0x11, then only 3 of 8 needed bytes.
+        const truncated = new Uint8Array([0x11, 0x00, 0x00, 0x00]);
+        expect(() => decodeProto(truncated, fields)).not.toThrow();
+        // The field never arrived, so implicit presence reads it back as 0.
+        expect(decodeProto(truncated, fields).age).toBe(0);
+      },
+    );
 
-    it('does not throw RangeError on a truncated 32-bit (fixed32) field', () => {
-      const fields: ProtoFieldMeta[] = [
-        { name: 'count', number: 1, type: 'fixed32', optional: false, repeated: false },
-      ];
-      // tag = (field 1 << 3) | wire 32BIT(5) = 0x0d, then only 2 of 4 needed bytes.
-      const truncated = new Uint8Array([0x0d, 0x00, 0x00]);
-      expect(() => decodeProto(truncated, fields)).not.toThrow();
-    });
+    specTest(
+      'does not throw RangeError on a truncated 32-bit (fixed32) field',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'a-truncated-message-decodes-without-throwing',
+      },
+      () => {
+        const fields: ProtoFieldMeta[] = [
+          { name: 'count', number: 1, type: 'fixed32', optional: false, repeated: false },
+        ];
+        // tag = (field 1 << 3) | wire 32BIT(5) = 0x0d, then only 2 of 4 needed bytes.
+        const truncated = new Uint8Array([0x0d, 0x00, 0x00]);
+        expect(() => decodeProto(truncated, fields)).not.toThrow();
+      },
+    );
   });
 
   describe('unknown field skipping', () => {
-    it('should skip unknown varint fields and decode remaining fields', () => {
-      // Encode a message with fields 1 (name) and 2 (age)
-      const fullFields: ProtoFieldMeta[] = [
-        { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'age', number: 2, type: 'int32', optional: false, repeated: false },
-      ];
-      const encoded = encodeProto({ name: 'Alice', age: 30 }, fullFields);
+    specTest(
+      'should skip unknown varint fields and decode remaining fields',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'unknown-fields-of-every-wire-type-are-skipped',
+      },
+      () => {
+        // Encode a message with fields 1 (name) and 2 (age)
+        const fullFields: ProtoFieldMeta[] = [
+          { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'age', number: 2, type: 'int32', optional: false, repeated: false },
+        ];
+        const encoded = encodeProto({ name: 'Alice', age: 30 }, fullFields);
 
-      // Decode with only field 1 — field 2 (varint) should be skipped
-      const partialFields: ProtoFieldMeta[] = [
-        { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
-      ];
-      const decoded = decodeProto(encoded, partialFields);
-      expect(decoded.name).toBe('Alice');
-      expect(decoded.age).toBeUndefined();
-    });
+        // Decode with only field 1 — field 2 (varint) should be skipped
+        const partialFields: ProtoFieldMeta[] = [
+          { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
+        ];
+        const decoded = decodeProto(encoded, partialFields);
+        expect(decoded.name).toBe('Alice');
+        expect(decoded.age).toBeUndefined();
+      },
+    );
 
-    it('should skip unknown length-delimited fields and decode remaining fields', () => {
-      // Encode: field 1 (string), field 2 (string), field 3 (int32)
-      const fullFields: ProtoFieldMeta[] = [
-        { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'extra', number: 2, type: 'string', optional: false, repeated: false },
-        { name: 'count', number: 3, type: 'int32', optional: false, repeated: false },
-      ];
-      const encoded = encodeProto({ id: 'abc', extra: 'unknown-data', count: 42 }, fullFields);
+    specTest(
+      'should skip unknown length-delimited fields and decode remaining fields',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'unknown-fields-of-every-wire-type-are-skipped',
+      },
+      () => {
+        // Encode: field 1 (string), field 2 (string), field 3 (int32)
+        const fullFields: ProtoFieldMeta[] = [
+          { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'extra', number: 2, type: 'string', optional: false, repeated: false },
+          { name: 'count', number: 3, type: 'int32', optional: false, repeated: false },
+        ];
+        const encoded = encodeProto({ id: 'abc', extra: 'unknown-data', count: 42 }, fullFields);
 
-      // Decode with only fields 1 and 3 — field 2 should be skipped
-      const partialFields: ProtoFieldMeta[] = [
-        { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'count', number: 3, type: 'int32', optional: false, repeated: false },
-      ];
-      const decoded = decodeProto(encoded, partialFields);
-      expect(decoded.id).toBe('abc');
-      expect(decoded.count).toBe(42);
-      expect(decoded.extra).toBeUndefined();
-    });
+        // Decode with only fields 1 and 3 — field 2 should be skipped
+        const partialFields: ProtoFieldMeta[] = [
+          { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'count', number: 3, type: 'int32', optional: false, repeated: false },
+        ];
+        const decoded = decodeProto(encoded, partialFields);
+        expect(decoded.id).toBe('abc');
+        expect(decoded.count).toBe(42);
+        expect(decoded.extra).toBeUndefined();
+      },
+    );
 
-    it('should skip unknown 64-bit fields and decode remaining fields', () => {
-      const fullFields: ProtoFieldMeta[] = [
-        { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'value', number: 2, type: 'double', optional: false, repeated: false },
-        { name: 'active', number: 3, type: 'bool', optional: false, repeated: false },
-      ];
-      const encoded = encodeProto({ name: 'test', value: 3.14, active: true }, fullFields);
+    specTest(
+      'should skip unknown 64-bit fields and decode remaining fields',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'unknown-fields-of-every-wire-type-are-skipped',
+      },
+      () => {
+        const fullFields: ProtoFieldMeta[] = [
+          { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'value', number: 2, type: 'double', optional: false, repeated: false },
+          { name: 'active', number: 3, type: 'bool', optional: false, repeated: false },
+        ];
+        const encoded = encodeProto({ name: 'test', value: 3.14, active: true }, fullFields);
 
-      // Decode with only fields 1 and 3 — field 2 (64-bit double) should be skipped
-      const partialFields: ProtoFieldMeta[] = [
-        { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'active', number: 3, type: 'bool', optional: false, repeated: false },
-      ];
-      const decoded = decodeProto(encoded, partialFields);
-      expect(decoded.name).toBe('test');
-      expect(decoded.active).toBe(true);
-      expect(decoded.value).toBeUndefined();
-    });
+        // Decode with only fields 1 and 3 — field 2 (64-bit double) should be skipped
+        const partialFields: ProtoFieldMeta[] = [
+          { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'active', number: 3, type: 'bool', optional: false, repeated: false },
+        ];
+        const decoded = decodeProto(encoded, partialFields);
+        expect(decoded.name).toBe('test');
+        expect(decoded.active).toBe(true);
+        expect(decoded.value).toBeUndefined();
+      },
+    );
 
-    it('should skip unknown 32-bit fields and decode remaining fields', () => {
-      const fullFields: ProtoFieldMeta[] = [
-        { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'score', number: 2, type: 'float', optional: false, repeated: false },
-        { name: 'label', number: 3, type: 'string', optional: false, repeated: false },
-      ];
-      const encoded = encodeProto({ name: 'test', score: 1.5, label: 'ok' }, fullFields);
+    specTest(
+      'should skip unknown 32-bit fields and decode remaining fields',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'unknown-fields-of-every-wire-type-are-skipped',
+      },
+      () => {
+        const fullFields: ProtoFieldMeta[] = [
+          { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'score', number: 2, type: 'float', optional: false, repeated: false },
+          { name: 'label', number: 3, type: 'string', optional: false, repeated: false },
+        ];
+        const encoded = encodeProto({ name: 'test', score: 1.5, label: 'ok' }, fullFields);
 
-      // Decode with only fields 1 and 3 — field 2 (32-bit float) should be skipped
-      const partialFields: ProtoFieldMeta[] = [
-        { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'label', number: 3, type: 'string', optional: false, repeated: false },
-      ];
-      const decoded = decodeProto(encoded, partialFields);
-      expect(decoded.name).toBe('test');
-      expect(decoded.label).toBe('ok');
-      expect(decoded.score).toBeUndefined();
-    });
+        // Decode with only fields 1 and 3 — field 2 (32-bit float) should be skipped
+        const partialFields: ProtoFieldMeta[] = [
+          { name: 'name', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'label', number: 3, type: 'string', optional: false, repeated: false },
+        ];
+        const decoded = decodeProto(encoded, partialFields);
+        expect(decoded.name).toBe('test');
+        expect(decoded.label).toBe('ok');
+        expect(decoded.score).toBeUndefined();
+      },
+    );
 
-    it('should skip multiple unknown fields of mixed types', () => {
-      const fullFields: ProtoFieldMeta[] = [
-        { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'unknown_str', number: 2, type: 'string', optional: false, repeated: false },
-        { name: 'unknown_int', number: 3, type: 'int32', optional: false, repeated: false },
-        { name: 'unknown_dbl', number: 4, type: 'double', optional: false, repeated: false },
-        { name: 'result', number: 5, type: 'string', optional: false, repeated: false },
-      ];
-      const encoded = encodeProto(
-        { id: 'start', unknown_str: 'skip-me', unknown_int: 999, unknown_dbl: Math.E, result: 'end' },
-        fullFields,
-      );
+    specTest(
+      'should skip multiple unknown fields of mixed types',
+      {
+        feature: 'typescript/grpc-services',
+        requirement: 'binary-codec',
+        check: 'unknown-fields-of-every-wire-type-are-skipped',
+      },
+      () => {
+        const fullFields: ProtoFieldMeta[] = [
+          { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'unknown_str', number: 2, type: 'string', optional: false, repeated: false },
+          { name: 'unknown_int', number: 3, type: 'int32', optional: false, repeated: false },
+          { name: 'unknown_dbl', number: 4, type: 'double', optional: false, repeated: false },
+          { name: 'result', number: 5, type: 'string', optional: false, repeated: false },
+        ];
+        const encoded = encodeProto(
+          { id: 'start', unknown_str: 'skip-me', unknown_int: 999, unknown_dbl: Math.E, result: 'end' },
+          fullFields,
+        );
 
-      // Decode with only fields 1 and 5 — all middle fields skipped
-      const partialFields: ProtoFieldMeta[] = [
-        { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
-        { name: 'result', number: 5, type: 'string', optional: false, repeated: false },
-      ];
-      const decoded = decodeProto(encoded, partialFields);
-      expect(decoded.id).toBe('start');
-      expect(decoded.result).toBe('end');
-    });
+        // Decode with only fields 1 and 5 — all middle fields skipped
+        const partialFields: ProtoFieldMeta[] = [
+          { name: 'id', number: 1, type: 'string', optional: false, repeated: false },
+          { name: 'result', number: 5, type: 'string', optional: false, repeated: false },
+        ];
+        const decoded = decodeProto(encoded, partialFields);
+        expect(decoded.id).toBe('start');
+        expect(decoded.result).toBe('end');
+      },
+    );
 
     it('should handle empty schema (all fields unknown)', () => {
       const fullFields: ProtoFieldMeta[] = [

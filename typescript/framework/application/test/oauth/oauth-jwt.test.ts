@@ -4,6 +4,12 @@ import { join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
 import { decodeBase64Url, importPublicKey, verifyJwt, verifyJwtES256, verifyJwtRS256 } from '../../src/oauth/oauth-jwt';
 
+const forgedToken = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-token-validation',
+  check: 'a-tampered-or-confused-token-is-refused',
+};
+
 // The shared, language-neutral corpus the Go conformance suite
 // (protocols/keyring/conformance_test.go → TestJWTVectors) also drives. The
 // `valid` tokens are REAL ES256/RS256 signatures produced by the Go keyring; this
@@ -117,7 +123,7 @@ describe('oauth-jwt ES256 verification', () => {
     expect(payload.sub).toBe('user-123');
   });
 
-  it('verifyJwtES256 rejects a token whose signature has been tampered', async () => {
+  specTest('verifyJwtES256 rejects a token whose signature has been tampered', forgedToken, async () => {
     if (!es256) throw new Error('missing ES256 vector');
     const key = await importPublicKey({ kind: 'jwk', jwk: es256.jwk as JsonWebKey & { kid?: string } });
     const [h, p, s] = es256.token.split('.');
@@ -127,7 +133,7 @@ describe('oauth-jwt ES256 verification', () => {
     await expect(verifyJwtES256(forged, key, {})).rejects.toThrow();
   });
 
-  it('verifyJwt rejects a symmetric HS256 token (algorithm-confusion defense)', async () => {
+  specTest('verifyJwt rejects a symmetric HS256 token (algorithm-confusion defense)', forgedToken, async () => {
     if (!es256) throw new Error('missing ES256 vector');
     const key = await importPublicKey({ kind: 'jwk', jwk: es256.jwk as JsonWebKey & { kid?: string } });
     const hs256 = corpus.invalid.find((v) => v.id === 'symmetric-hs256-alg');
@@ -135,14 +141,18 @@ describe('oauth-jwt ES256 verification', () => {
     await expect(verifyJwt(hs256.token, key, {})).rejects.toThrow(/unsupported algorithm/);
   });
 
-  it('verifyJwt rejects an ES256 header verified against RS256 material (alg confusion)', async () => {
-    if (!rs256) throw new Error('missing RS256 vector');
-    // Import the RSA verify key but present the ES256 token: the dispatcher runs the
-    // ECDSA verify against an RSA key, which fails closed.
-    const key = await importPublicKey({ kind: 'jwk', jwk: rs256.jwk as JsonWebKey & { kid?: string } });
-    if (!es256) throw new Error('missing ES256 vector');
-    await expect(verifyJwt(es256.token, key, {})).rejects.toThrow();
-  });
+  specTest(
+    'verifyJwt rejects an ES256 header verified against RS256 material (alg confusion)',
+    forgedToken,
+    async () => {
+      if (!rs256) throw new Error('missing RS256 vector');
+      // Import the RSA verify key but present the ES256 token: the dispatcher runs the
+      // ECDSA verify against an RSA key, which fails closed.
+      const key = await importPublicKey({ kind: 'jwk', jwk: rs256.jwk as JsonWebKey & { kid?: string } });
+      if (!es256) throw new Error('missing ES256 vector');
+      await expect(verifyJwt(es256.token, key, {})).rejects.toThrow();
+    },
+  );
 
   it('verifyJwtRS256 still verifies the RS256 vector (no regression)', async () => {
     if (!rs256) throw new Error('missing RS256 vector');

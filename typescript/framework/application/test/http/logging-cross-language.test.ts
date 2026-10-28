@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect } from 'bun:test';
 import { resetDefaultLogger, setRootLogger } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { assertRecord, findCase, findRecord, loadCases, MemoryLogger } from '@putnami/runtime/testing';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
@@ -55,29 +56,45 @@ async function driveRequest(configure: (plugin: HttpPlugin) => void, method = 'G
 }
 
 describe('http logging conformance', () => {
-  it('emits the corpus record for a 2xx response', async () => {
-    const want = findCase(cases, 'http.terminal.success');
+  specTest(
+    'emits the corpus record for a 2xx response',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-log-and-trace',
+      check: 'the-request-record-matches-the-cross-language-log-corpus',
+    },
+    async () => {
+      const want = findCase(cases, 'http.terminal.success');
 
-    const memory = await driveRequest((plugin) => {
-      plugin.get(ROUTE, () => HttpResponse.json({ ok: true }));
-    });
-
-    assertRecord(findRecord(memory.entries, want), want);
-  });
-
-  it('emits the corpus record for a handler failure mapped to 500', async () => {
-    const want = findCase(cases, 'http.terminal.5xx');
-
-    const memory = await driveRequest((plugin) => {
-      plugin.get(ROUTE, () => {
-        // The dispatcher records this on the context as `__requestError`, and the
-        // terminal record reads it back — the message stays a stable constant.
-        throw new Error('boom');
+      const memory = await driveRequest((plugin) => {
+        plugin.get(ROUTE, () => HttpResponse.json({ ok: true }));
       });
-    });
 
-    const terminal = findRecord(memory.entries, want);
-    assertRecord(terminal, want);
-    expect(terminal.message).not.toContain('boom');
-  });
+      assertRecord(findRecord(memory.entries, want), want);
+    },
+  );
+
+  specTest(
+    'emits the corpus record for a handler failure mapped to 500',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-log-and-trace',
+      check: 'the-request-record-matches-the-cross-language-log-corpus',
+    },
+    async () => {
+      const want = findCase(cases, 'http.terminal.5xx');
+
+      const memory = await driveRequest((plugin) => {
+        plugin.get(ROUTE, () => {
+          // The dispatcher records this on the context as `__requestError`, and the
+          // terminal record reads it back — the message stays a stable constant.
+          throw new Error('boom');
+        });
+      });
+
+      const terminal = findRecord(memory.entries, want);
+      assertRecord(terminal, want);
+      expect(terminal.message).not.toContain('boom');
+    },
+  );
 });

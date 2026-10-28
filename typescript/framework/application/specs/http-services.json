@@ -1,0 +1,68 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/http-services",
+  "outcomes": [
+    "A service registers routes, middleware and static files once and serves them through one router that tries the most specific match first",
+    "Every response leaves with hardened security headers unless a route opts out explicitly, and a failure leaves without its stack outside development",
+    "A client cannot widen the rate limit by spoofing a forwarded address, and the server, not the handler, cuts off an oversized or stalled request",
+    "An operator reads one record per request, correlated by its trace ID, and a supervising tool learns the address the server bound from the record the server already logs",
+    "A build reports every route the server and its static folders answer, so a deployment edge never has to guess one"
+  ],
+  "nonGoals": [
+    "Terminating TLS: the server listens in cleartext and reads X-Forwarded-Proto from the TLS-terminating proxy in front of it",
+    "Refusing cross-site requests and caching responses, which the origin guard, the CSRF middleware and the cache middleware own",
+    "Declaring API operations and streams and publishing their contracts, which typescript/api-contracts and typescript/server-streams own",
+    "Validating and canonicalizing the route inventory a deployment edge consumes, which http-routes/route-inventory-contract owns"
+  ],
+  "requirements": [
+    {
+      "id": "routing",
+      "text": "A [param] segment matches exactly one path segment and may sit before a literal suffix such as .json; a trailing slash on the request is ignored. When several routes match, the most specific runs first, a static route before a parameter route before a wildcard, and the others stay available for fallthrough. A route that declares accept types matches only a request that accepts one of them or accepts anything. Middleware wraps the handler in registration order, the first registered outermost."
+    },
+    {
+      "id": "method-fallbacks",
+      "text": "A HEAD request to a GET route answers the GET response's status and headers with no body, or the route's headMeta answer without running the handler. An OPTIONS request to a routed path answers 204 with an Allow header naming its methods, HEAD and OPTIONS, unless a CORS middleware answers the preflight. A routed path called with an unrouted method answers 405 with that Allow header, and an unknown path answers 404. TRACE answers 404 unless enabled, and its echo omits Cookie and Authorization."
+    },
+    {
+      "id": "request-bounds",
+      "text": "A request body larger than maxBodySizeBytes answers 413, and a Content-Length past the bound is refused from the header alone. A handler that outlives requestTimeoutMs answers 408 Request Timeout. Stopping the application lets an in-flight request finish instead of aborting it. The idle timeout is the request timeout plus five seconds, 35 seconds when the request timeout is off, and stays within the 1 to 255 seconds Bun accepts."
+    },
+    {
+      "id": "error-answers",
+      "text": "A thrown HttpException answers its own status, and a thrown HttpResponse is sent as is. The value an onError handler returns, awaited when async, becomes the 500 body; an onError that returns undefined or throws falls through to the default answer. In production, or with PUTNAMI_DEV_ERRORS=false, a failure answers Internal Server Error with no stack and no HTML page. In development, a browser receives an HTML page with the stack and the request."
+    },
+    {
+      "id": "secure-by-default",
+      "text": "Every pipeline response, refusals included, carries nosniff, X-Frame-Options DENY, a self-only Content-Security-Policy and a strict referrer policy, plus HSTS only when the URL or X-Forwarded-Proto is https. A header the handler set wins, an option overrides or removes one header, and secure false removes them with the origin guard. A minimal route skips them and the origin guard only when every matched route is minimal, and a native route bypasses the whole pipeline."
+    },
+    {
+      "id": "cross-origin",
+      "text": "The CORS middleware answers a preflight with 204 and the allowed methods, and adds Access-Control-Allow-Origin to an actual response: * by default, or the request origin with Vary: Origin when the configured list or predicate allows it, and nothing for any other origin. Credentials with a wildcard origin fail when the middleware is built."
+    },
+    {
+      "id": "rate-limit",
+      "text": "The rate limiter admits max requests per key and window and answers the next with 429, Retry-After and RateLimit-Remaining 0. Concurrent requests never pass more than max, with the memory store or an asynchronous one. The key is the socket peer address; X-Forwarded-For counts only when the peer matches a trusted proxy address or CIDR, an IPv4-mapped IPv6 peer included, and an empty trusted list trusts nothing."
+    },
+    {
+      "id": "response-encoding",
+      "text": "negotiateResponse serializes a value as JSON by default and for */*, or as text, HTML, XML or YAML when Accept asks for one, turns object keys into valid XML tag names, and refuses any other type as not acceptable. The compression middleware gzips a body above its threshold, or deflates it when only deflate is accepted, adds Vary: Accept-Encoding and keeps the downstream headers; a smaller body or an identity request leaves uncompressed."
+    },
+    {
+      "id": "request-log-and-trace",
+      "text": "The logger writes one record per request, with the message [METHOD] route and the status, method, route path, duration and outcome. A 5xx or a thrown error logs at ERROR with the outcome failure and the error on the record, never in the message; any other status, a missing response as 404, logs with the outcome success. An excluded path logs nothing. The trace ID comes from X-Cloud-Trace-Context, then X-Correlation-ID, else a new one, and returns in X-Correlation-ID."
+    },
+    {
+      "id": "readiness-marker",
+      "text": "The listening log record keeps its human-readable message and carries, at its top level, the reserved readiness marker with the server target and the port the listener actually bound. A listener that is not addressable writes no marker. The plugin reports that endpoint from start until stop, and none before or after."
+    },
+    {
+      "id": "static-assets",
+      "text": "A static file answers GET and HEAD under its prefix, and only there, whatever the Accept header, with the MIME type its extension names, application/octet-stream when unknown, Cache-Control public with the configured max-age, one day by default, and a content ETag. A request whose If-None-Match matches that ETag answers 304."
+    },
+    {
+      "id": "route-fragments",
+      "text": "build() reports each pipeline route with GET and HEAD, or GET alone under secure false, and each native route with its own method, or every method when it names none. A static folder reports its root files as exact routes and its directories as bounded prefixes, never a root prefix; a declared mount reports one prefix; and framework assets already in the generated public output are not claimed."
+    }
+  ]
+}

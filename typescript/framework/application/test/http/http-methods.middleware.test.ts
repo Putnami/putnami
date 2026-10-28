@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
 import { CorsMiddleware } from '../../src/http/cors.middleware';
@@ -24,30 +25,46 @@ describe('HttpMethodsMiddleware', () => {
   };
 
   describe('HEAD', () => {
-    it('should derive HEAD response from GET handler', async () => {
-      const p = http({ port: 0 });
-      p.get('/hello', () => 'Hello, World!');
-      await start(p);
+    specTest(
+      'should derive HEAD response from GET handler',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'a-head-request-answers-the-get-headers-with-no-body',
+      },
+      async () => {
+        const p = http({ port: 0 });
+        p.get('/hello', () => 'Hello, World!');
+        await start(p);
 
-      const res = await fetch(`${baseUrl}/hello`, { method: 'HEAD' });
-      expect(res.status).toBe(200);
+        const res = await fetch(`${baseUrl}/hello`, { method: 'HEAD' });
+        expect(res.status).toBe(200);
 
-      const body = await res.text();
-      expect(body).toBe('');
-    });
+        const body = await res.text();
+        expect(body).toBe('');
+      },
+    );
 
-    it('should preserve headers from GET handler', async () => {
-      const p = http({ port: 0 });
-      p.get('/json', () => HttpResponse.json({ key: 'value' }));
-      await start(p);
+    specTest(
+      'should preserve headers from GET handler',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'a-head-request-answers-the-get-headers-with-no-body',
+      },
+      async () => {
+        const p = http({ port: 0 });
+        p.get('/json', () => HttpResponse.json({ key: 'value' }));
+        await start(p);
 
-      const res = await fetch(`${baseUrl}/json`, { method: 'HEAD' });
-      expect(res.status).toBe(200);
-      expect(res.headers.get('content-type')).toBe('application/json');
+        const res = await fetch(`${baseUrl}/json`, { method: 'HEAD' });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('application/json');
 
-      const body = await res.text();
-      expect(body).toBe('');
-    });
+        const body = await res.text();
+        expect(body).toBe('');
+      },
+    );
 
     it('should execute the handler to compute response metadata', async () => {
       let handlerCalled = false;
@@ -109,40 +126,48 @@ describe('HttpMethodsMiddleware', () => {
       expect(res.status).toBe(404);
     });
 
-    it('should use headMeta when provided and skip the handler', async () => {
-      let handlerCalled = false;
-      const p = http({ port: 0 });
-      p.route(
-        'GET',
-        '/static',
-        () => {
-          handlerCalled = true;
-          return HttpResponse.json({ data: 'large' });
-        },
-        {
-          headMeta: () =>
-            new HttpResponse(undefined, {
-              status: 200,
-              headers: {
-                'Content-Type': 'text/html',
-                'Content-Length': '1234',
-                'Cache-Control': 'public, max-age=86400',
-                ETag: '"abc123"',
-              },
-            }),
-        },
-      );
-      await start(p);
+    specTest(
+      'should use headMeta when provided and skip the handler',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'head-meta-answers-head-without-running-the-handler',
+      },
+      async () => {
+        let handlerCalled = false;
+        const p = http({ port: 0 });
+        p.route(
+          'GET',
+          '/static',
+          () => {
+            handlerCalled = true;
+            return HttpResponse.json({ data: 'large' });
+          },
+          {
+            headMeta: () =>
+              new HttpResponse(undefined, {
+                status: 200,
+                headers: {
+                  'Content-Type': 'text/html',
+                  'Content-Length': '1234',
+                  'Cache-Control': 'public, max-age=86400',
+                  ETag: '"abc123"',
+                },
+              }),
+          },
+        );
+        await start(p);
 
-      const res = await fetch(`${baseUrl}/static`, { method: 'HEAD' });
-      expect(res.status).toBe(200);
-      expect(res.headers.get('content-type')).toBe('text/html');
-      expect(res.headers.get('content-length')).toBe('1234');
-      expect(res.headers.get('cache-control')).toBe('public, max-age=86400');
-      expect(res.headers.get('etag')).toBe('"abc123"');
-      expect(await res.text()).toBe('');
-      expect(handlerCalled).toBe(false);
-    });
+        const res = await fetch(`${baseUrl}/static`, { method: 'HEAD' });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('text/html');
+        expect(res.headers.get('content-length')).toBe('1234');
+        expect(res.headers.get('cache-control')).toBe('public, max-age=86400');
+        expect(res.headers.get('etag')).toBe('"abc123"');
+        expect(await res.text()).toBe('');
+        expect(handlerCalled).toBe(false);
+      },
+    );
 
     it('should fall back to handler when headMeta returns undefined', async () => {
       let handlerCalled = false;
@@ -192,22 +217,30 @@ describe('HttpMethodsMiddleware', () => {
   });
 
   describe('OPTIONS', () => {
-    it('should respond with Allow header listing available methods', async () => {
-      const p = http({ port: 0 });
-      p.get('/items', () => 'list');
-      p.post('/items', () => 'create');
-      await start(p);
+    specTest(
+      'should respond with Allow header listing available methods',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'options-answers-204-with-the-allow-header',
+      },
+      async () => {
+        const p = http({ port: 0 });
+        p.get('/items', () => 'list');
+        p.post('/items', () => 'create');
+        await start(p);
 
-      const res = await fetch(`${baseUrl}/items`, { method: 'OPTIONS' });
-      expect(res.status).toBe(204);
+        const res = await fetch(`${baseUrl}/items`, { method: 'OPTIONS' });
+        expect(res.status).toBe(204);
 
-      const allow = res.headers.get('allow');
-      expect(allow).toBeDefined();
-      expect(allow).toContain('GET');
-      expect(allow).toContain('POST');
-      expect(allow).toContain('HEAD');
-      expect(allow).toContain('OPTIONS');
-    });
+        const allow = res.headers.get('allow');
+        expect(allow).toBeDefined();
+        expect(allow).toContain('GET');
+        expect(allow).toContain('POST');
+        expect(allow).toContain('HEAD');
+        expect(allow).toContain('OPTIONS');
+      },
+    );
 
     it('should include DELETE when registered', async () => {
       const p = http({ port: 0 });
@@ -263,34 +296,50 @@ describe('HttpMethodsMiddleware', () => {
       expect(res.status).toBe(404);
     });
 
-    it('should cooperate with CORS middleware', async () => {
-      const p = http({ port: 0 });
-      p.use(CorsMiddleware());
-      p.get('/data', () => HttpResponse.json({ v: 1 }));
-      await start(p);
+    specTest(
+      'should cooperate with CORS middleware',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'a-cors-preflight-reaches-the-cors-middleware',
+      },
+      async () => {
+        const p = http({ port: 0 });
+        p.use(CorsMiddleware());
+        p.get('/data', () => HttpResponse.json({ v: 1 }));
+        await start(p);
 
-      // CORS preflight with Origin header — CORS should handle it
-      const preflight = await fetch(`${baseUrl}/data`, {
-        method: 'OPTIONS',
-        headers: {
-          Origin: 'https://example.com',
-          'Access-Control-Request-Method': 'GET',
-        },
-      });
-      expect(preflight.status).toBe(204);
-      expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
-    });
+        // CORS preflight with Origin header — CORS should handle it
+        const preflight = await fetch(`${baseUrl}/data`, {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'https://example.com',
+            'Access-Control-Request-Method': 'GET',
+          },
+        });
+        expect(preflight.status).toBe(204);
+        expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+      },
+    );
   });
 
   describe('TRACE', () => {
-    it('should be disabled by default', async () => {
-      const p = http({ port: 0 });
-      p.get('/hello', () => 'Hello');
-      await start(p);
+    specTest(
+      'should be disabled by default',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'trace-answers-404-unless-enabled',
+      },
+      async () => {
+        const p = http({ port: 0 });
+        p.get('/hello', () => 'Hello');
+        await start(p);
 
-      const res = await fetch(`${baseUrl}/hello`, { method: 'TRACE' });
-      expect(res.status).toBe(404);
-    });
+        const res = await fetch(`${baseUrl}/hello`, { method: 'TRACE' });
+        expect(res.status).toBe(404);
+      },
+    );
 
     it('should respond with 200 and message/http content-type when enabled', async () => {
       const p = http({ port: 0, httpMethods: { trace: true } });
@@ -332,31 +381,39 @@ describe('HttpMethodsMiddleware', () => {
       });
     });
 
-    it('should exclude sensitive headers', () => {
-      const req = new Request('http://localhost/secure', {
-        method: 'TRACE',
-        headers: {
-          Cookie: 'session=abc123',
-          Authorization: 'Bearer secret',
-          'X-Safe': 'visible',
-        },
-      });
-      const ctx = {
-        path: () => '/secure',
-        query: () => '',
-        req,
-      };
-      // biome-ignore lint/suspicious/noExplicitAny: test helper
-      const res = buildTraceResponse(req, ctx as any);
-      const native = res.get();
+    specTest(
+      'should exclude sensitive headers',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'method-fallbacks',
+        check: 'a-trace-echo-omits-credentials',
+      },
+      () => {
+        const req = new Request('http://localhost/secure', {
+          method: 'TRACE',
+          headers: {
+            Cookie: 'session=abc123',
+            Authorization: 'Bearer secret',
+            'X-Safe': 'visible',
+          },
+        });
+        const ctx = {
+          path: () => '/secure',
+          query: () => '',
+          req,
+        };
+        // biome-ignore lint/suspicious/noExplicitAny: test helper
+        const res = buildTraceResponse(req, ctx as any);
+        const native = res.get();
 
-      const body = new Response(native.body).text();
-      return body.then((text) => {
-        expect(text).not.toContain('session=abc123');
-        expect(text).not.toContain('Bearer secret');
-        expect(text).toContain('x-safe: visible');
-      });
-    });
+        const body = new Response(native.body).text();
+        return body.then((text) => {
+          expect(text).not.toContain('session=abc123');
+          expect(text).not.toContain('Bearer secret');
+          expect(text).toContain('x-safe: visible');
+        });
+      },
+    );
   });
 
   describe('globally disabled', () => {

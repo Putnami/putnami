@@ -1,0 +1,61 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/authentication-authorization",
+  "outcomes": [
+    "A browser signs in through the OAuth2 authorization code flow and keeps its tokens in an encrypted session that it cannot forge",
+    "A route accepts a caller only after a configured strategy resolves an identity, and it tells a missing identity (401) from a missing permission (403)",
+    "A failed sign-in, a denied request or an introspection call never discloses a token, a client credential or the missing permission",
+    "A state-changing browser request from another site is refused before it reaches its handler",
+    "Signing keys rotate without breaking verification, and stored secrets verify under an explicit rehash policy"
+  ],
+  "nonGoals": [
+    "Choosing an identity provider, a role model or a route policy for an application",
+    "Serving a caller that presents no credential on an optional route, which typescript/api-contracts specifies",
+    "Admitting a WebSocket conversation through the security chain, which typescript/api-contracts specifies",
+    "Defining the keyring wire, the key-state machine, the digest grammar or the cross-language vectors, which keyring/signing-keyring-contract specifies",
+    "Storing sessions in a database"
+  ],
+  "requirements": [
+    {
+      "id": "oauth-authorization-code-flow",
+      "text": "GET on the login route redirects to the authorization endpoint with response_type code, the client id, the callback redirect_uri, the scopes, a fresh state, a nonce when openid is requested, and an S256 code challenge unless pkce is never. The callback consumes the pending state it matches, sends the PKCE verifier to the token endpoint and redirects to the captured same-origin path. GET on the logout route redirects to the end-session endpoint with id_token_hint and post_logout_redirect_uri."
+    },
+    {
+      "id": "oauth-callback-failures",
+      "text": "A callback whose state matches no pending request never exchanges a code: it redirects to defaultLoginRedirectUrl when the session is signed in, else it fails with 400 invalid_state. A provider error fails with 401 and its code, and an id_token with a wrong nonce or audience, or none when openid was requested, fails with 401. A browser that ranks text/html first receives an escaped HTML page sent with no-store that never echoes error_description."
+    },
+    {
+      "id": "oauth-token-validation",
+      "text": "OAuthService.verify accepts a token only when its signature verifies against the discovered JWKS, refetched once for an unknown kid, and it refuses an expired token, a wrong issuer or audience, a tampered signature, a symmetric HS256 token and an algorithm that does not match the key. With oauth.audience set, useUser() rejects a wrong-audience access token and never asks userinfo to rescue it."
+    },
+    {
+      "id": "encrypted-cookie-sessions",
+      "text": "The cookie session store encrypts its payload into an HttpOnly, Secure, SameSite cookie, keeps Secure behind a TLS-terminating proxy and writes no Set-Cookie for an untouched session. A tampered, forged plain or other-key cookie reads as an empty session, a missing or wrong-length cookieSecret is refused, and a full post-login OAuth session fits the 4093-byte browser cap. The memory store expires a session after its TTL and isolates session ids."
+    },
+    {
+      "id": "authorization-decision",
+      "text": "SecurityMiddleware answers 401 when no identity resolves and 403 when an identity misses a required role, scope, client, issuer, audience or principal kind, an absent claim counting as a miss, or when its guard returns false. The 403 body is {error: Forbidden} without the missing scope or role, no log holds the bearer token, and each decision increments a security.auth_decisions counter named by decision and reason. requireClient answers 403 to an X-Client-Id outside its list."
+    },
+    {
+      "id": "strategy-composition",
+      "text": "authenticate() never rejects a request: anyOf keeps the principal of the first strategy that resolves one, allOf requires every strategy and merges principals in declaration order, a throwing strategy resolves nothing, and a request that already has an identity is not resolved again. An API key resolves only when it matches a configured key on its header, and a bearer JWT resolves a user principal only when OAuthService verifies it under the configured issuer and audience."
+    },
+    {
+      "id": "bounded-introspection",
+      "text": "Token introspection resolves a principal only from an active response of an HTTPS or loopback endpoint inside the timeout, the 64 KiB body cap and the expected audience. It caches active results under a SHA-256 key, never the raw token, and logs no client secret, assertion or bearer token. After a sustained outage the breaker refuses uncached tokens without calling the endpoint while cached tokens still resolve, and a 429 is retried once and never opens the breaker."
+    },
+    {
+      "id": "cross-site-request-forgery",
+      "text": "The origin guard answers 403 to a POST, PUT or DELETE that Sec-Fetch-Site marks cross-site, or same-site when allowSameSite is false, or whose Origin differs from the Host, unless the origin is trusted; a request without Origin, a safe method, report mode and a disabled guard pass. With csrf on, an unsafe request to an http() route without a matching double-submit token gets 403, api() routes are exempt unless they opt in, and an oversized form body gets 413 first."
+    },
+    {
+      "id": "signing-key-lifecycle",
+      "text": "The signing key provider refuses to start without key material unless ephemeral keys are explicitly allowed, and it refuses a keyring with no active key, several active keys, duplicate kids or a key whose algorithm does not match its type. Rotation publishes the new and the retiring key so both verify during the overlap window, the retiring key leaves the JWKS once the window elapses, and revoke removes a non-active key but refuses the active one."
+    },
+    {
+      "id": "secret-digest-policy",
+      "text": "hashSecret draws a fresh salt on every call and never goes below the iteration floor. verifySecret accepts the correct secret and refuses a wrong one, reports rehashRequired only for a valid secret under a below-preset pbkdf2 digest, and fails closed on a malformed or empty stored digest."
+    }
+  ]
+}

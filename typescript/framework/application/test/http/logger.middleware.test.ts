@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { runInContext } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { application } from '../../src/application';
 import { HttpResponse } from '../../src/http/http-response';
@@ -55,21 +56,29 @@ describe('LoggerMiddleware', () => {
     expect(entry?.data).toBeUndefined();
   });
 
-  it('should log 404 with failure-free outcome when no response is returned', async () => {
-    const logger = await runWithLogger(
-      {
-        method: 'GET',
-        route: '/missing',
-        path: () => '/missing',
-      },
-      async () => undefined,
-    );
+  specTest(
+    'should log 404 with failure-free outcome when no response is returned',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'request-log-and-trace',
+      check: 'a-client-outcome-logs-as-success',
+    },
+    async () => {
+      const logger = await runWithLogger(
+        {
+          method: 'GET',
+          route: '/missing',
+          path: () => '/missing',
+        },
+        async () => undefined,
+      );
 
-    expect(logger.entries).toHaveLength(1);
-    const payload = logger.entries[0]?.context?.['http'] as Record<string, unknown>;
-    expect(payload['status']).toBe(404);
-    // 404 < 500 ⇒ success outcome (a handled client outcome, not a failure).
-    expect(payload['outcome']).toBe('success');
-    expect(typeof payload['durationMs']).toBe('number');
-  });
+      expect(logger.entries).toHaveLength(1);
+      const payload = logger.entries[0]?.context?.['http'] as Record<string, unknown>;
+      expect(payload['status']).toBe(404);
+      // 404 < 500 ⇒ success outcome (a handled client outcome, not a failure).
+      expect(payload['outcome']).toBe('success');
+      expect(typeof payload['durationMs']).toBe('number');
+    },
+  );
 });

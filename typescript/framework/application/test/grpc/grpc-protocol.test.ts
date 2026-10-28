@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
 import { HttpException, NotFoundException } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import {
   acceptContains,
   buildGrpcWebErrorResponse,
@@ -39,13 +40,29 @@ describe('acceptContains', () => {
     expect(acceptContains('text/html, application/json', 'application/json')).toBe(true);
   });
 
-  it('matches with quality factor', () => {
-    expect(acceptContains('application/proto;q=0.9, application/json', 'application/proto')).toBe(true);
-  });
+  specTest(
+    'matches with quality factor',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'accept-matching-honours-quality-factors-and-wildcards',
+    },
+    () => {
+      expect(acceptContains('application/proto;q=0.9, application/json', 'application/proto')).toBe(true);
+    },
+  );
 
-  it('matches wildcard', () => {
-    expect(acceptContains('application/*', 'application/proto')).toBe(true);
-  });
+  specTest(
+    'matches wildcard',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'accept-matching-honours-quality-factors-and-wildcards',
+    },
+    () => {
+      expect(acceptContains('application/*', 'application/proto')).toBe(true);
+    },
+  );
 
   it('returns false for no match', () => {
     expect(acceptContains('text/html', 'application/json')).toBe(false);
@@ -62,17 +79,33 @@ describe('parseGrpcTimeout', () => {
     expect(parseGrpcTimeout(headers)).toBeUndefined();
   });
 
-  it('returns undefined for invalid format', () => {
-    const headers = new Headers({ 'grpc-timeout': 'invalid' });
-    expect(parseGrpcTimeout(headers)).toBeUndefined();
-  });
+  specTest(
+    'returns undefined for invalid format',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-malformed-grpc-timeout-sets-no-deadline',
+    },
+    () => {
+      const headers = new Headers({ 'grpc-timeout': 'invalid' });
+      expect(parseGrpcTimeout(headers)).toBeUndefined();
+    },
+  );
 
-  it('parses hours', () => {
-    const headers = new Headers({ 'grpc-timeout': '2H' });
-    const result = parseGrpcTimeout(headers);
-    expect(result).toBeDefined();
-    expect(result?.timeoutMs).toBe(7_200_000);
-  });
+  specTest(
+    'parses hours',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-grpc-timeout-becomes-a-deadline-in-its-unit',
+    },
+    () => {
+      const headers = new Headers({ 'grpc-timeout': '2H' });
+      const result = parseGrpcTimeout(headers);
+      expect(result).toBeDefined();
+      expect(result?.timeoutMs).toBe(7_200_000);
+    },
+  );
 
   it('parses minutes', () => {
     const headers = new Headers({ 'grpc-timeout': '5M' });
@@ -86,23 +119,47 @@ describe('parseGrpcTimeout', () => {
     expect(result?.timeoutMs).toBe(30_000);
   });
 
-  it('parses milliseconds', () => {
-    const headers = new Headers({ 'grpc-timeout': '500m' });
-    const result = parseGrpcTimeout(headers);
-    expect(result?.timeoutMs).toBe(500);
-  });
+  specTest(
+    'parses milliseconds',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-grpc-timeout-becomes-a-deadline-in-its-unit',
+    },
+    () => {
+      const headers = new Headers({ 'grpc-timeout': '500m' });
+      const result = parseGrpcTimeout(headers);
+      expect(result?.timeoutMs).toBe(500);
+    },
+  );
 
-  it('parses microseconds (rounds up to at least 1ms)', () => {
-    const headers = new Headers({ 'grpc-timeout': '100u' });
-    const result = parseGrpcTimeout(headers);
-    expect(result?.timeoutMs).toBe(1);
-  });
+  specTest(
+    'parses microseconds (rounds up to at least 1ms)',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-sub-millisecond-grpc-timeout-rounds-up-to-one-millisecond',
+    },
+    () => {
+      const headers = new Headers({ 'grpc-timeout': '100u' });
+      const result = parseGrpcTimeout(headers);
+      expect(result?.timeoutMs).toBe(1);
+    },
+  );
 
-  it('parses nanoseconds (rounds up to at least 1ms)', () => {
-    const headers = new Headers({ 'grpc-timeout': '500000n' });
-    const result = parseGrpcTimeout(headers);
-    expect(result?.timeoutMs).toBe(1);
-  });
+  specTest(
+    'parses nanoseconds (rounds up to at least 1ms)',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-sub-millisecond-grpc-timeout-rounds-up-to-one-millisecond',
+    },
+    () => {
+      const headers = new Headers({ 'grpc-timeout': '500000n' });
+      const result = parseGrpcTimeout(headers);
+      expect(result?.timeoutMs).toBe(1);
+    },
+  );
 
   it('returns AbortController', () => {
     const headers = new Headers({ 'grpc-timeout': '10S' });
@@ -112,20 +169,44 @@ describe('parseGrpcTimeout', () => {
 });
 
 describe('clientAcceptsGzip', () => {
-  it('checks grpc-accept-encoding first', () => {
-    const headers = new Headers({ 'grpc-accept-encoding': 'gzip, identity' });
-    expect(clientAcceptsGzip(headers)).toBe(true);
-  });
+  specTest(
+    'checks grpc-accept-encoding first',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'gzip-is-negotiated-from-grpc-accept-encoding-then-accept-encoding',
+    },
+    () => {
+      const headers = new Headers({ 'grpc-accept-encoding': 'gzip, identity' });
+      expect(clientAcceptsGzip(headers)).toBe(true);
+    },
+  );
 
-  it('falls back to accept-encoding', () => {
-    const headers = new Headers({ 'accept-encoding': 'gzip, deflate' });
-    expect(clientAcceptsGzip(headers)).toBe(true);
-  });
+  specTest(
+    'falls back to accept-encoding',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'gzip-is-negotiated-from-grpc-accept-encoding-then-accept-encoding',
+    },
+    () => {
+      const headers = new Headers({ 'accept-encoding': 'gzip, deflate' });
+      expect(clientAcceptsGzip(headers)).toBe(true);
+    },
+  );
 
-  it('returns false when no gzip support', () => {
-    const headers = new Headers({ 'accept-encoding': 'deflate' });
-    expect(clientAcceptsGzip(headers)).toBe(false);
-  });
+  specTest(
+    'returns false when no gzip support',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'gzip-is-negotiated-from-grpc-accept-encoding-then-accept-encoding',
+    },
+    () => {
+      const headers = new Headers({ 'accept-encoding': 'deflate' });
+      expect(clientAcceptsGzip(headers)).toBe(false);
+    },
+  );
 
   it('returns false when no encoding headers', () => {
     const headers = new Headers();
@@ -141,27 +222,35 @@ describe('compressGzip / decompressGzip', () => {
     expect(new TextDecoder().decode(decompressed)).toBe('hello world test data');
   });
 
-  it('bounds decompressed output to prevent a decompression bomb', () => {
-    // 256 KiB of zeros compresses to a tiny gzip payload but inflates far past a
-    // small cap — the classic decompression-bomb shape.
-    const bomb = compressGzip(new Uint8Array(256 * 1024));
-    expect(bomb.length).toBeLessThan(2048);
+  specTest(
+    'bounds decompressed output to prevent a decompression bomb',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-decompression-bomb-is-refused-as-resource-exhausted',
+    },
+    () => {
+      // 256 KiB of zeros compresses to a tiny gzip payload but inflates far past a
+      // small cap — the classic decompression-bomb shape.
+      const bomb = compressGzip(new Uint8Array(256 * 1024));
+      expect(bomb.length).toBeLessThan(2048);
 
-    let thrown: unknown;
-    try {
-      decompressGzip(bomb, 4096);
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown).toBeInstanceOf(HttpException);
-    expect((thrown as HttpException).getStatus()).toBe(413);
-    // 413 maps to gRPC RESOURCE_EXHAUSTED (8).
-    expect(mapErrorToGrpcStatus(thrown).grpcCode).toBe(8);
-    expect(mapErrorToGrpcStatus(thrown).code).toBe('resource_exhausted');
+      let thrown: unknown;
+      try {
+        decompressGzip(bomb, 4096);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(HttpException);
+      expect((thrown as HttpException).getStatus()).toBe(413);
+      // 413 maps to gRPC RESOURCE_EXHAUSTED (8).
+      expect(mapErrorToGrpcStatus(thrown).grpcCode).toBe(8);
+      expect(mapErrorToGrpcStatus(thrown).code).toBe('resource_exhausted');
 
-    // Within the default cap it still round-trips.
-    expect(decompressGzip(bomb).length).toBe(256 * 1024);
-  });
+      // Within the default cap it still round-trips.
+      expect(decompressGzip(bomb).length).toBe(256 * 1024);
+    },
+  );
 });
 
 describe('compressResponse', () => {
@@ -172,11 +261,19 @@ describe('compressResponse', () => {
     expect(compressed.getHeader('Content-Encoding')).toBe('gzip');
   });
 
-  it('skips tiny payloads', () => {
-    const response = new HttpResponse('hi', { headers: { 'Content-Type': 'text/plain' } });
-    const result = compressResponse(response);
-    expect(result.getHeader('Content-Encoding')).toBeUndefined();
-  });
+  specTest(
+    'skips tiny payloads',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'transport-negotiation',
+      check: 'a-tiny-response-is-not-compressed',
+    },
+    () => {
+      const response = new HttpResponse('hi', { headers: { 'Content-Type': 'text/plain' } });
+      const result = compressResponse(response);
+      expect(result.getHeader('Content-Encoding')).toBeUndefined();
+    },
+  );
 });
 
 describe('connectResponseHeaders', () => {
@@ -267,14 +364,22 @@ describe('mapErrorToGrpcStatus', () => {
     expect(result.grpcCode).toBe(14);
   });
 
-  it('maps a 2xx HttpException to unknown, because the protocol has no success code', () => {
-    // An exception carrying a success status is not a category the protocol can
-    // name; reporting `OK` would tell a gRPC-Web caller the RPC succeeded.
-    const err = new HttpException('OK', 200);
-    const result = mapErrorToGrpcStatus(err);
-    expect(result.grpcCode).toBe(2);
-    expect(result.code).toBe('unknown');
-  });
+  specTest(
+    'maps a 2xx HttpException to unknown, because the protocol has no success code',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'error-projection',
+      check: 'an-exception-with-a-success-status-is-answered-unknown',
+    },
+    () => {
+      // An exception carrying a success status is not a category the protocol can
+      // name; reporting `OK` would tell a gRPC-Web caller the RPC succeeded.
+      const err = new HttpException('OK', 200);
+      const result = mapErrorToGrpcStatus(err);
+      expect(result.grpcCode).toBe(2);
+      expect(result.code).toBe('unknown');
+    },
+  );
 
   it('maps unknown HTTP status to UNKNOWN', () => {
     const err = new HttpException("I'm a teapot", 418);
@@ -282,30 +387,46 @@ describe('mapErrorToGrpcStatus', () => {
     expect(result.grpcCode).toBe(2);
   });
 
-  it('maps plain Error to INTERNAL and redacts the message', () => {
-    const err = new Error('connection refused at db.internal:5432');
-    const result = mapErrorToGrpcStatus(err);
-    expect(result.grpcCode).toBe(13);
-    expect(result.code).toBe('internal');
-    // Internal error detail must not leak to the client.
-    expect(result.message).toBe('Internal error');
-    expect(result.message).not.toContain('db.internal');
-  });
+  specTest(
+    'maps plain Error to INTERNAL and redacts the message',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'error-projection',
+      check: 'an-unexpected-error-is-internal-with-a-redacted-message',
+    },
+    () => {
+      const err = new Error('connection refused at db.internal:5432');
+      const result = mapErrorToGrpcStatus(err);
+      expect(result.grpcCode).toBe(13);
+      expect(result.code).toBe('internal');
+      // Internal error detail must not leak to the client.
+      expect(result.message).toBe('Internal error');
+      expect(result.message).not.toContain('db.internal');
+    },
+  );
 
-  it('extracts validation errors as a binary google.rpc.BadRequest detail', () => {
-    const err = new HttpException(
-      { message: 'Validation failed', errors: [{ field: 'name', message: 'required' }] },
-      400,
-    );
-    const result = mapErrorToGrpcStatus(err);
-    expect(result.details).toBeDefined();
-    const violation = result.details?.find((detail) => detail.type === 'google.rpc.BadRequest');
-    expect(violation).toBeDefined();
-    // The specification calls the binary `value` normative and forbids a client
-    // from depending on `debug`, so the violations must survive a decode of the
-    // bytes alone.
-    expect(decodeBadRequestDetail(violation!)).toEqual([{ field: 'name', description: 'required' }]);
-  });
+  specTest(
+    'extracts validation errors as a binary google.rpc.BadRequest detail',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'error-projection',
+      check: 'validation-errors-decode-from-a-bad-request-detail',
+    },
+    () => {
+      const err = new HttpException(
+        { message: 'Validation failed', errors: [{ field: 'name', message: 'required' }] },
+        400,
+      );
+      const result = mapErrorToGrpcStatus(err);
+      expect(result.details).toBeDefined();
+      const violation = result.details?.find((detail) => detail.type === 'google.rpc.BadRequest');
+      expect(violation).toBeDefined();
+      // The specification calls the binary `value` normative and forbids a client
+      // from depending on `debug`, so the violations must survive a decode of the
+      // bytes alone.
+      expect(decodeBadRequestDetail(violation!)).toEqual([{ field: 'name', description: 'required' }]);
+    },
+  );
 
   it('carries the first-party envelope as a typed detail', () => {
     const declaredBy = (projection: ReturnType<typeof projectConnectError>) =>
@@ -334,21 +455,37 @@ describe('handleGrpcError', () => {
     expect(response.status).toBe(404);
   });
 
-  it('logs 500 errors', () => {
-    const errorFn = mock(() => {});
-    const logger = { error: errorFn };
-    const err = new Error('server crash');
-    handleGrpcError(logger, err);
-    expect(errorFn).toHaveBeenCalledTimes(1);
-  });
+  specTest(
+    'logs 500 errors',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'error-projection',
+      check: 'only-a-server-error-is-logged',
+    },
+    () => {
+      const errorFn = mock(() => {});
+      const logger = { error: errorFn };
+      const err = new Error('server crash');
+      handleGrpcError(logger, err);
+      expect(errorFn).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it('does not log client errors', () => {
-    const errorFn = mock(() => {});
-    const logger = { error: errorFn };
-    const err = new HttpException('Bad Request', 400);
-    handleGrpcError(logger, err);
-    expect(errorFn).not.toHaveBeenCalled();
-  });
+  specTest(
+    'does not log client errors',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'error-projection',
+      check: 'only-a-server-error-is-logged',
+    },
+    () => {
+      const errorFn = mock(() => {});
+      const logger = { error: errorFn };
+      const err = new HttpException('Bad Request', 400);
+      handleGrpcError(logger, err);
+      expect(errorFn).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns gRPC-Web response when isGrpcWeb=true', async () => {
     const logger = { error: mock(() => {}) };

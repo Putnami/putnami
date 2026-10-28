@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 import { CorsMiddleware } from '../../src/http/cors.middleware';
@@ -6,25 +7,33 @@ import { application } from '../../src/application';
 
 describe('CorsMiddleware', () => {
   describe('preflight (OPTIONS)', () => {
-    it('should respond to preflight with default settings', async () => {
-      const httpPlugin = http({ port: 0 });
-      httpPlugin.use(CorsMiddleware());
-      httpPlugin.get('/test', () => 'ok');
+    specTest(
+      'should respond to preflight with default settings',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'cross-origin',
+        check: 'a-preflight-answers-204-with-the-allowed-methods',
+      },
+      async () => {
+        const httpPlugin = http({ port: 0 });
+        httpPlugin.use(CorsMiddleware());
+        httpPlugin.get('/test', () => 'ok');
 
-      const app = application().use(httpPlugin);
-      await app.start();
+        const app = application().use(httpPlugin);
+        await app.start();
 
-      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
-      const res = await fetch(`${baseUrl}/test`, {
-        method: 'OPTIONS',
-        headers: { Origin: 'https://example.com' },
-      });
-      expect(res.status).toBe(204);
-      expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
-      expect(res.headers.get('Access-Control-Allow-Methods')).toContain('GET');
+        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+        const res = await fetch(`${baseUrl}/test`, {
+          method: 'OPTIONS',
+          headers: { Origin: 'https://example.com' },
+        });
+        expect(res.status).toBe(204);
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+        expect(res.headers.get('Access-Control-Allow-Methods')).toContain('GET');
 
-      await app.stop();
-    });
+        await app.stop();
+      },
+    );
 
     it('should include requested headers in preflight', async () => {
       const httpPlugin = http({ port: 0 });
@@ -85,29 +94,37 @@ describe('CorsMiddleware', () => {
       await app.stop();
     });
 
-    it('should restrict origin to allowed list', async () => {
-      const httpPlugin = http({ port: 0 });
-      httpPlugin.use(CorsMiddleware({ origin: ['https://allowed.com'] }));
-      httpPlugin.get('/data', () => HttpResponse.json({ value: 42 }));
+    specTest(
+      'should restrict origin to allowed list',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'cross-origin',
+        check: 'only-an-allowed-origin-is-echoed',
+      },
+      async () => {
+        const httpPlugin = http({ port: 0 });
+        httpPlugin.use(CorsMiddleware({ origin: ['https://allowed.com'] }));
+        httpPlugin.get('/data', () => HttpResponse.json({ value: 42 }));
 
-      const app = application().use(httpPlugin);
-      await app.start();
+        const app = application().use(httpPlugin);
+        await app.start();
 
-      const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
+        const baseUrl = `http://localhost:${httpPlugin.getServer()?.port}`;
 
-      const allowed = await fetch(`${baseUrl}/data`, {
-        headers: { Origin: 'https://allowed.com' },
-      });
-      expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.com');
-      expect(allowed.headers.get('Vary')).toBe('Origin');
+        const allowed = await fetch(`${baseUrl}/data`, {
+          headers: { Origin: 'https://allowed.com' },
+        });
+        expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.com');
+        expect(allowed.headers.get('Vary')).toBe('Origin');
 
-      const denied = await fetch(`${baseUrl}/data`, {
-        headers: { Origin: 'https://evil.com' },
-      });
-      expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
+        const denied = await fetch(`${baseUrl}/data`, {
+          headers: { Origin: 'https://evil.com' },
+        });
+        expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
 
-      await app.stop();
-    });
+        await app.stop();
+      },
+    );
 
     it('should support origin as a function', async () => {
       const httpPlugin = http({ port: 0 });
@@ -143,11 +160,19 @@ describe('CorsMiddleware', () => {
       await app.stop();
     });
 
-    it('should throw when credentials are enabled with wildcard origin', () => {
-      expect(() => CorsMiddleware({ credentials: true })).toThrow(
-        'CORS: origin "*" cannot be used with credentials:true',
-      );
-    });
+    specTest(
+      'should throw when credentials are enabled with wildcard origin',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'cross-origin',
+        check: 'credentials-with-a-wildcard-origin-fail-at-construction',
+      },
+      () => {
+        expect(() => CorsMiddleware({ credentials: true })).toThrow(
+          'CORS: origin "*" cannot be used with credentials:true',
+        );
+      },
+    );
 
     it('should set exposed headers', async () => {
       const httpPlugin = http({ port: 0 });

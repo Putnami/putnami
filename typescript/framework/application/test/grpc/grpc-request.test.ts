@@ -1,38 +1,63 @@
 import { describe, expect, it } from 'bun:test';
 import { HttpException } from '@putnami/runtime';
+import { specTest } from '@putnami/runtime/spectest';
 import { buildForwardHeaders, buildInternalUrl, readRequestEnvelope } from '../../src/grpc/grpc-request';
 import type { DiscoveredRoute } from '../../src/api';
 import type { HttpRequestContext } from '../../src/http/http-context.type';
 
 describe('readRequestEnvelope', () => {
-  it('reads the params, query and body sections', () => {
-    const result = readRequestEnvelope({
-      params: { id: '123' },
-      query: { page: 1 },
-      body: { name: 'test', id: 'the body keeps its own id' },
-    });
+  specTest(
+    'reads the params, query and body sections',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'request-envelope',
+      check: 'a-body-member-keeps-its-value-beside-a-same-named-path-parameter',
+    },
+    () => {
+      const result = readRequestEnvelope({
+        params: { id: '123' },
+        query: { page: 1 },
+        body: { name: 'test', id: 'the body keeps its own id' },
+      });
 
-    expect(result.params).toEqual({ id: '123' });
-    expect(result.query).toEqual({ page: '1' });
-    // A body member named like a path parameter stays in the body.
-    expect(result.body).toEqual({ name: 'test', id: 'the body keeps its own id' });
-  });
+      expect(result.params).toEqual({ id: '123' });
+      expect(result.query).toEqual({ page: '1' });
+      // A body member named like a path parameter stays in the body.
+      expect(result.body).toEqual({ name: 'test', id: 'the body keeps its own id' });
+    },
+  );
 
-  it('converts snake_case keys of path and query values to camelCase', () => {
-    const result = readRequestEnvelope({ params: { user_id: '42' }, query: { page_size: 10 } });
-    expect(result.params).toEqual({ userId: '42' });
-    expect(result.query).toEqual({ pageSize: '10' });
-  });
+  specTest(
+    'converts snake_case keys of path and query values to camelCase',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'request-envelope',
+      check: 'snake-case-path-and-query-keys-arrive-camel-case',
+    },
+    () => {
+      const result = readRequestEnvelope({ params: { user_id: '42' }, query: { page_size: 10 } });
+      expect(result.params).toEqual({ userId: '42' });
+      expect(result.query).toEqual({ pageSize: '10' });
+    },
+  );
 
   it('reads an absent section as empty and ignores a member that names no section', () => {
     const result = readRequestEnvelope({ unknown: 'ignored' });
     expect(result).toEqual({ params: {}, query: {}, body: {} });
   });
 
-  it('refuses a section that is not an object', () => {
-    expect(() => readRequestEnvelope({ params: 'id=1' })).toThrow(HttpException);
-    expect(() => readRequestEnvelope({ body: [1, 2] })).toThrow(/carries "body" as a non-object/);
-  });
+  specTest(
+    'refuses a section that is not an object',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'request-envelope',
+      check: 'a-non-object-request-section-is-refused',
+    },
+    () => {
+      expect(() => readRequestEnvelope({ params: 'id=1' })).toThrow(HttpException);
+      expect(() => readRequestEnvelope({ body: [1, 2] })).toThrow(/carries "body" as a non-object/);
+    },
+  );
 });
 
 describe('buildInternalUrl', () => {

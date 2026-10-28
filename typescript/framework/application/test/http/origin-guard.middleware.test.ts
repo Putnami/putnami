@@ -1,11 +1,28 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { http } from '../../src/http/http.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 import { application } from '../../src/application';
 
+const crossSite = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'cross-site-request-forgery',
+  check: 'a-cross-site-state-change-is-refused',
+};
+const trustedRequest = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'cross-site-request-forgery',
+  check: 'a-trusted-or-non-browser-request-passes',
+};
+const reportMode = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'cross-site-request-forgery',
+  check: 'report-mode-and-a-disabled-guard-let-requests-through',
+};
+
 describe('OriginGuardMiddleware', () => {
   describe('safe methods', () => {
-    it('should allow GET with cross-origin Origin header', async () => {
+    specTest('should allow GET with cross-origin Origin header', trustedRequest, async () => {
       const httpPlugin = http({ port: 0 });
       httpPlugin.get('/data', () => HttpResponse.json({ ok: true }));
 
@@ -95,7 +112,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should reject POST with Sec-Fetch-Site: same-site when allowSameSite is false', async () => {
+    specTest('should reject POST with Sec-Fetch-Site: same-site when allowSameSite is false', crossSite, async () => {
       const httpPlugin = http({ port: 0, originGuard: { allowSameSite: false } });
       httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -115,7 +132,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should reject POST with Sec-Fetch-Site: cross-site', async () => {
+    specTest('should reject POST with Sec-Fetch-Site: cross-site', crossSite, async () => {
       const httpPlugin = http({ port: 0 });
       httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -136,7 +153,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should allow cross-site POST when origin is trusted', async () => {
+    specTest('should allow cross-site POST when origin is trusted', trustedRequest, async () => {
       const httpPlugin = http({
         port: 0,
         originGuard: { trustedOrigins: ['https://admin.example.com'] },
@@ -181,7 +198,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should reject POST when Origin does not match Host', async () => {
+    specTest('should reject POST when Origin does not match Host', crossSite, async () => {
       const httpPlugin = http({ port: 0 });
       httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -199,7 +216,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should allow POST with no Origin header (non-browser client)', async () => {
+    specTest('should allow POST with no Origin header (non-browser client)', trustedRequest, async () => {
       const httpPlugin = http({ port: 0 });
       httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -216,7 +233,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should reject PUT with mismatched Origin', async () => {
+    specTest('should reject PUT with mismatched Origin', crossSite, async () => {
       const httpPlugin = http({ port: 0 });
       httpPlugin.put('/item', () => HttpResponse.json({ ok: true }));
 
@@ -234,7 +251,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should reject DELETE with mismatched Origin', async () => {
+    specTest('should reject DELETE with mismatched Origin', crossSite, async () => {
       const httpPlugin = http({ port: 0 });
       httpPlugin.delete('/item', () => HttpResponse.json({ ok: true }));
 
@@ -253,7 +270,7 @@ describe('OriginGuardMiddleware', () => {
   });
 
   describe('configuration', () => {
-    it('should be disabled when originGuard is false', async () => {
+    specTest('should be disabled when originGuard is false', reportMode, async () => {
       const httpPlugin = http({ port: 0, originGuard: false });
       httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 
@@ -271,7 +288,7 @@ describe('OriginGuardMiddleware', () => {
       await app.stop();
     });
 
-    it('should allow through in report mode', async () => {
+    specTest('should allow through in report mode', reportMode, async () => {
       const httpPlugin = http({ port: 0, originGuard: { mode: 'report' } });
       httpPlugin.post('/submit', () => HttpResponse.json({ ok: true }));
 

@@ -1,10 +1,52 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { resetConfigLoader } from '@putnami/runtime';
 import { application } from '../../src/application';
 import { config } from '../../src/config';
 import { http } from '../../src/http/http.plugin';
 import { oAuth2 } from '../../src/oauth/oauth.plugin';
 import { OAuthService } from '../../src/oauth/oauth.service';
+
+const loginRedirect = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-authorization-code-flow',
+  check: 'login-redirects-with-state-nonce-and-challenge',
+};
+const pkceVerifier = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-authorization-code-flow',
+  check: 'the-token-request-carries-the-pkce-verifier',
+};
+const pendingState = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-authorization-code-flow',
+  check: 'each-pending-state-is-consumed-once',
+};
+const unknownState = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-callback-failures',
+  check: 'an-unknown-state-never-exchanges-a-code',
+};
+const signedInReplay = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-callback-failures',
+  check: 'a-replayed-callback-of-a-signed-in-session-redirects',
+};
+const failurePage = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-callback-failures',
+  check: 'a-browser-receives-an-escaped-failure-page',
+};
+const discoveredJwks = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-token-validation',
+  check: 'a-signed-token-verifies-against-the-discovered-jwks',
+};
+const wrongAudience = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'oauth-token-validation',
+  check: 'a-wrong-audience-access-token-yields-no-user',
+};
 
 const AUTH_BASE = 'http://auth.test';
 const DISCOVERY_URI = `${AUTH_BASE}/.well-known/openid-configuration`;
@@ -191,7 +233,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
 
   // -----------------------------------------------------------------------
 
-  it('sends client_id, redirect_uri, response_type, scope, state to /authorize', async () => {
+  specTest('sends client_id, redirect_uri, response_type, scope, state to /authorize', loginRedirect, async () => {
     setConfig({
       oauth: {
         clientId: 'test-client',
@@ -294,7 +336,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
 
   // -----------------------------------------------------------------------
 
-  it('sends code_verifier on the token request when PKCE is in use', async () => {
+  specTest('sends code_verifier on the token request when PKCE is in use', pkceVerifier, async () => {
     setConfig({
       oauth: {
         clientId: 'public-client',
@@ -409,7 +451,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
 
   // -----------------------------------------------------------------------
 
-  it('verifies the access token via the discovered jwks_uri (useUser)', async () => {
+  specTest('verifies the access token via the discovered jwks_uri (useUser)', discoveredJwks, async () => {
     setConfig({
       oauth: {
         clientId: 'test-client',
@@ -540,7 +582,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
     return cbRes.headers.get('set-cookie') ?? '';
   }
 
-  it('useUser() rejects an access token whose aud does not match oauth.audience', async () => {
+  specTest('useUser() rejects an access token whose aud does not match oauth.audience', wrongAudience, async () => {
     setConfig({
       oauth: {
         clientId: 'test-client',
@@ -582,7 +624,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
     }
   });
 
-  it('useUser() does not rescue a wrong-audience token via the userinfo fallback', async () => {
+  specTest('useUser() does not rescue a wrong-audience token via the userinfo fallback', wrongAudience, async () => {
     setConfig({
       oauth: {
         clientId: 'test-client',
@@ -698,7 +740,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
 
   // -----------------------------------------------------------------------
 
-  it('matches callbacks against multiple pending login states in the same session', async () => {
+  specTest('matches callbacks against multiple pending login states in the same session', pendingState, async () => {
     setConfig({
       oauth: {
         clientId: 'test-client',
@@ -783,7 +825,7 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
 
   // -----------------------------------------------------------------------
 
-  it('rejects callbacks with a mismatched state', async () => {
+  specTest('rejects callbacks with a mismatched state', unknownState, async () => {
     setConfig({
       oauth: {
         clientId: 'test-client',
@@ -824,104 +866,112 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
 
   // -----------------------------------------------------------------------
 
-  it('redirects a replayed callback to defaultLoginRedirectUrl when the session is signed in', async () => {
-    setConfig({
-      oauth: {
+  specTest(
+    'redirects a replayed callback to defaultLoginRedirectUrl when the session is signed in',
+    signedInReplay,
+    async () => {
+      setConfig({
+        oauth: {
+          clientId: 'test-client',
+          clientSecret: 'test-secret',
+          discoveryUri: DISCOVERY_URI,
+          callbackRoute: '/auth/callback',
+          defaultLoginRedirectUrl: '/home',
+          scopes: [],
+          pkce: 'never',
+        },
+      });
+      const state: MockState = {
+        requests: [],
+        codes: new Map([['code-once', { redirectUri: undefined, subject: { sub: 'user-once' } }]]),
+        refreshTokens: new Map(),
+        userInfo: {},
+        jwks: { keys: [publicJwk] },
         clientId: 'test-client',
-        clientSecret: 'test-secret',
-        discoveryUri: DISCOVERY_URI,
-        callbackRoute: '/auth/callback',
-        defaultLoginRedirectUrl: '/home',
-        scopes: [],
-        pkce: 'never',
-      },
-    });
-    const state: MockState = {
-      requests: [],
-      codes: new Map([['code-once', { redirectUri: undefined, subject: { sub: 'user-once' } }]]),
-      refreshTokens: new Map(),
-      userInfo: {},
-      jwks: { keys: [publicJwk] },
-      clientId: 'test-client',
-    };
-    globalThis.fetch = makeFetch(state);
+      };
+      globalThis.fetch = makeFetch(state);
 
-    const hp = http({ port: 0 });
-    const app = application().use(hp).use(config()).use(oAuth2());
-    await app.start();
-    try {
-      const port = hp.getServer()?.port;
-      state.codes.get('code-once')!.redirectUri = `http://localhost:${port}/auth/callback`;
+      const hp = http({ port: 0 });
+      const app = application().use(hp).use(config()).use(oAuth2());
+      await app.start();
+      try {
+        const port = hp.getServer()?.port;
+        state.codes.get('code-once')!.redirectUri = `http://localhost:${port}/auth/callback`;
 
-      const login = await fetch(`http://localhost:${port}/login?redirect=/dashboard`, { redirect: 'manual' });
-      const loginCookie = login.headers.get('set-cookie') ?? '';
-      const stateParam = new URL(login.headers.get('location') ?? '').searchParams.get('state') ?? '';
-      const callbackUrl = `http://localhost:${port}/auth/callback?code=code-once&state=${stateParam}`;
-      const browserAccept = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+        const login = await fetch(`http://localhost:${port}/login?redirect=/dashboard`, { redirect: 'manual' });
+        const loginCookie = login.headers.get('set-cookie') ?? '';
+        const stateParam = new URL(login.headers.get('location') ?? '').searchParams.get('state') ?? '';
+        const callbackUrl = `http://localhost:${port}/auth/callback?code=code-once&state=${stateParam}`;
+        const browserAccept = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
 
-      const first = await fetch(callbackUrl, {
-        headers: { Cookie: loginCookie, Accept: browserAccept },
-        redirect: 'manual',
-      });
-      expect(first.status).toBe(302);
-      expect(first.headers.get('location')).toBe('/dashboard');
-      const signedInCookie = first.headers.get('set-cookie') ?? '';
+        const first = await fetch(callbackUrl, {
+          headers: { Cookie: loginCookie, Accept: browserAccept },
+          redirect: 'manual',
+        });
+        expect(first.status).toBe(302);
+        expect(first.headers.get('location')).toBe('/dashboard');
+        const signedInCookie = first.headers.get('set-cookie') ?? '';
 
-      const replay = await fetch(callbackUrl, {
-        headers: { Cookie: signedInCookie, Accept: browserAccept },
-        redirect: 'manual',
-      });
-      expect(replay.status).toBe(302);
-      expect(replay.headers.get('location')).toBe('/home');
+        const replay = await fetch(callbackUrl, {
+          headers: { Cookie: signedInCookie, Accept: browserAccept },
+          redirect: 'manual',
+        });
+        expect(replay.status).toBe(302);
+        expect(replay.headers.get('location')).toBe('/home');
 
-      const exchanges = state.requests.filter((r) => r.url === `${AUTH_BASE}/token` && r.method === 'POST');
-      expect(exchanges).toHaveLength(1);
-    } finally {
-      await app.stop();
-    }
-  });
+        const exchanges = state.requests.filter((r) => r.url === `${AUTH_BASE}/token` && r.method === 'POST');
+        expect(exchanges).toHaveLength(1);
+      } finally {
+        await app.stop();
+      }
+    },
+  );
 
   // -----------------------------------------------------------------------
 
-  it('answers an unknown state without a signed-in session with an HTML page for browsers', async () => {
-    setConfig({
-      oauth: {
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
-        discoveryUri: DISCOVERY_URI,
-        callbackRoute: '/auth/callback',
-        loginRoute: '/sign-in',
-        scopes: [],
-        pkce: 'never',
-      },
-    });
-    globalThis.fetch = makeFetch({
-      requests: [],
-      codes: new Map(),
-      refreshTokens: new Map(),
-      userInfo: {},
-      jwks: { keys: [publicJwk] },
-    });
-
-    const hp = http({ port: 0 });
-    const app = application().use(hp).use(config()).use(oAuth2());
-    await app.start();
-    try {
-      const port = hp.getServer()?.port;
-      const res = await fetch(`http://localhost:${port}/auth/callback?code=x&state=consumed`, {
-        headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
-        redirect: 'manual',
+  specTest(
+    'answers an unknown state without a signed-in session with an HTML page for browsers',
+    failurePage,
+    async () => {
+      setConfig({
+        oauth: {
+          clientId: 'test-client',
+          clientSecret: 'test-secret',
+          discoveryUri: DISCOVERY_URI,
+          callbackRoute: '/auth/callback',
+          loginRoute: '/sign-in',
+          scopes: [],
+          pkce: 'never',
+        },
       });
-      expect(res.status).toBe(400);
-      expect(res.headers.get('content-type')).toContain('text/html');
-      expect(res.headers.get('cache-control')).toBe('no-store');
-      const html = await res.text();
-      expect(html).toContain('This sign-in link has expired');
-      expect(html).toContain('<a href="/sign-in">Sign in again</a>');
-      expect(html).not.toContain('error_description');
-      expect(html).not.toContain('state mismatch');
-    } finally {
-      await app.stop();
-    }
-  });
+      globalThis.fetch = makeFetch({
+        requests: [],
+        codes: new Map(),
+        refreshTokens: new Map(),
+        userInfo: {},
+        jwks: { keys: [publicJwk] },
+      });
+
+      const hp = http({ port: 0 });
+      const app = application().use(hp).use(config()).use(oAuth2());
+      await app.start();
+      try {
+        const port = hp.getServer()?.port;
+        const res = await fetch(`http://localhost:${port}/auth/callback?code=x&state=consumed`, {
+          headers: { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+          redirect: 'manual',
+        });
+        expect(res.status).toBe(400);
+        expect(res.headers.get('content-type')).toContain('text/html');
+        expect(res.headers.get('cache-control')).toBe('no-store');
+        const html = await res.text();
+        expect(html).toContain('This sign-in link has expired');
+        expect(html).toContain('<a href="/sign-in">Sign in again</a>');
+        expect(html).not.toContain('error_description');
+        expect(html).not.toContain('state mismatch');
+      } finally {
+        await app.stop();
+      }
+    },
+  );
 });

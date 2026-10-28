@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { SecurityMiddleware } from '../../src/security/security.middleware';
 import type { HttpRequestContext } from '../../src/http/http-context.type';
 import type { HttpResponse } from '../../src/http/http-response';
+
+const noIdentity = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'a-missing-identity-is-unauthenticated',
+};
+const missingPermission = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'a-missing-permission-is-forbidden',
+};
+const absentClaim = {
+  feature: 'typescript/authentication-authorization',
+  requirement: 'authorization-decision',
+  check: 'an-absent-claim-fails-closed',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,7 +71,7 @@ describe('SecurityMiddleware', () => {
   describe('no options (require any authenticated user)', () => {
     const mw = SecurityMiddleware();
 
-    it('should return 401 when ctx.user is undefined', async () => {
+    specTest('should return 401 when ctx.user is undefined', noIdentity, async () => {
       const ctx = createMockContext(undefined);
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(401);
@@ -93,7 +110,7 @@ describe('SecurityMiddleware', () => {
       expect(result.status).toBe(403);
     });
 
-    it('should return 403 when user has only some required roles', async () => {
+    specTest('should return 403 when user has only some required roles', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'user-1', roles: ['admin'] });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -115,7 +132,7 @@ describe('SecurityMiddleware', () => {
   describe('rolesAny (require ANY)', () => {
     const mw = SecurityMiddleware({ rolesAny: ['admin', 'editor'] });
 
-    it('should return 403 when user has no matching role', async () => {
+    specTest('should return 403 when user has no matching role', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'user-1', roles: ['viewer'] });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -137,7 +154,7 @@ describe('SecurityMiddleware', () => {
       expect(result.status).toBe(403);
     });
 
-    it('should return 403 when user has only some required scopes', async () => {
+    specTest('should return 403 when user has only some required scopes', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'user-1', scope: 'read' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -153,7 +170,7 @@ describe('SecurityMiddleware', () => {
   describe('scopesAny (require ANY)', () => {
     const mw = SecurityMiddleware({ scopesAny: ['read', 'write'] });
 
-    it('should return 403 when user has no matching scope', async () => {
+    specTest('should return 403 when user has no matching scope', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'user-1', scope: 'delete' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -169,7 +186,7 @@ describe('SecurityMiddleware', () => {
   describe('client', () => {
     const mw = SecurityMiddleware({ client: 'my-app' });
 
-    it('should return 403 when token has no client claim', async () => {
+    specTest('should return 403 when token has no client claim', absentClaim, async () => {
       const ctx = createMockContext({ sub: 'user-1' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -199,7 +216,7 @@ describe('SecurityMiddleware', () => {
       expect(result.passedThrough).toBe(true);
     });
 
-    it('should return 403 when client does not match', async () => {
+    specTest('should return 403 when client does not match', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'user-1', azp: 'other-app' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -259,14 +276,14 @@ describe('SecurityMiddleware', () => {
   });
 
   describe('custom guard function', () => {
-    it('should return 401 when user is undefined', async () => {
+    specTest('should return 401 when user is undefined', noIdentity, async () => {
       const mw = SecurityMiddleware(() => true);
       const ctx = createMockContext(undefined);
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(401);
     });
 
-    it('should return 403 when guard returns false', async () => {
+    specTest('should return 403 when guard returns false', missingPermission, async () => {
       const mw = SecurityMiddleware(() => false);
       const ctx = createMockContext({ sub: 'user-1' });
       const result = await runMiddleware(mw, ctx);
@@ -368,13 +385,13 @@ describe('SecurityMiddleware', () => {
       expect(result.passedThrough).toBe(true);
     });
 
-    it('should return 403 when iss does not match', async () => {
+    specTest('should return 403 when iss does not match', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'u', iss: 'https://evil.example.com' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
     });
 
-    it('should return 403 when iss claim is absent (fail-closed)', async () => {
+    specTest('should return 403 when iss claim is absent (fail-closed)', absentClaim, async () => {
       const ctx = createMockContext({ sub: 'u' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -403,13 +420,13 @@ describe('SecurityMiddleware', () => {
       expect(result.passedThrough).toBe(true);
     });
 
-    it('should return 403 when aud does not match', async () => {
+    specTest('should return 403 when aud does not match', missingPermission, async () => {
       const ctx = createMockContext({ sub: 'u', aud: 'sibling-api' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
     });
 
-    it('should return 403 when aud claim is absent (fail-closed)', async () => {
+    specTest('should return 403 when aud claim is absent (fail-closed)', absentClaim, async () => {
       const ctx = createMockContext({ sub: 'u' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
@@ -424,14 +441,14 @@ describe('SecurityMiddleware', () => {
       expect(result.passedThrough).toBe(true);
     });
 
-    it('should return 403 when the principal kind does not match', async () => {
+    specTest('should return 403 when the principal kind does not match', missingPermission, async () => {
       const mw = SecurityMiddleware({ principalKind: 'apikey' });
       const ctx = createMockContext({ sub: 'user-1', kind: 'user' });
       const result = await runMiddleware(mw, ctx);
       expect(result.status).toBe(403);
     });
 
-    it('should fail closed when the principal has no kind', async () => {
+    specTest('should fail closed when the principal has no kind', absentClaim, async () => {
       const mw = SecurityMiddleware({ principalKind: 'user' });
       const ctx = createMockContext({ sub: 'user-1' });
       const result = await runMiddleware(mw, ctx);
@@ -460,7 +477,7 @@ describe('SecurityMiddleware', () => {
       expect(result.status).toBe(401);
     });
 
-    it('should return 401 when token verification fails', async () => {
+    specTest('should return 401 when token verification fails', noIdentity, async () => {
       const mw = SecurityMiddleware({ verify: verifier });
       const ctx = createMockContext(undefined);
       ctx.req = new Request('http://localhost/test', {
