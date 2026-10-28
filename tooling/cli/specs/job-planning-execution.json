@@ -46,6 +46,10 @@
       "text": "Shell completion offers each name it lists as one literal word in bash, zsh and fish: a workspace command, alias, project group or project name, and an extension flag name. A quote, space, newline, bracket, colon, backslash or command substitution in a name neither splits, changes nor runs it. A backslash or bracket in a flag description hides no flag in zsh. Bash matches the current word, and bash and zsh read each earlier word, without its quotes, running nothing: a quoted alias takes its command's flags."
     },
     {
+      "id": "completion-keeps-a-colon-in-its-word",
+      "text": "In bash 4 and later, which split a completion word at each colon, completion keeps a colon inside its word: a command alias such as build:prod takes the flags of its command, and a name that holds a colon completes in place."
+    },
+    {
       "id": "extension-verb-vocabulary",
       "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },

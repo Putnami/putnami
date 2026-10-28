@@ -758,6 +758,19 @@
           }
         },
         {
+          "id": "completion-keeps-a-colon-in-its-word",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bash-reads-a-colon-word-as-one-word"
+            ]
+          }
+        },
+        {
           "id": "extension-verb-vocabulary",
           "stage": "coded",
           "evidenceKinds": [
