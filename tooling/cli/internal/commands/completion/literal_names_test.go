@@ -202,10 +202,14 @@ func bashCompletionReplies(t *testing.T, dir, script string, words []string) []s
 	driver := `set -u
 complete() { :; }
 _init_completion() {
-    local i n=-1
+    local i n=-1 exclude=""
+    while [[ $# -gt 0 ]]; do
+        if [[ "$1" == -n ]]; then exclude+="${2-}"; shift; fi
+        shift
+    done
     words=()
     for ((i = 0; i < ${#COMP_WORDS[@]}; i++)); do
-        if [[ "${1-} ${2-}" == "-n "*:* && ${GLUE[i]} -eq 1 ]]; then
+        if [[ "${exclude}" == *:* && ${GLUE[i]} -eq 1 ]]; then
             words[n]+="${COMP_WORDS[i]}"
         else
             n=$((n + 1))
@@ -531,6 +535,19 @@ func TestBashCompletionKeepsAColonInsideItsWord(t *testing.T) {
 				lines = append(lines, typed[:colon]+reply)
 			}
 			assertOffersEach(t, "bash", strings.Join(words, " "), bashReadBack(t, lines), []string{c.name})
+		}
+		// A colon that a quote or a backslash protects splits nothing, so the
+		// reply replaces the whole word. The script reads a current word that
+		// starts with a quote as no flag, so a flag is typed escaped only.
+		prefix := typedForms(c.name[:strings.LastIndex(c.name, ":")+2])
+		protected := []string{strings.ReplaceAll(prefix[2], ":", `\:`)}
+		if !strings.HasPrefix(c.name, "-") {
+			protected = append(protected, prefix[0], prefix[1])
+		}
+		for _, typed := range protected {
+			words := append(append([]string{"putnami"}, c.before...), typed)
+			replies := bashCompletionReplies(t, t.TempDir(), script.String(), words)
+			assertOffersEach(t, "bash", strings.Join(words, " "), bashReadBack(t, replies), []string{c.name})
 		}
 	}
 }

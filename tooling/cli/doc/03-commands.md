@@ -1288,7 +1288,8 @@ it, and runs none of it. A command alias that holds a space or a `$`, typed as
 `putnami 'ship it' --`, completes with the flags of its command.
 In bash 4 and later, which split a word at each colon, completion keeps a
 colon inside its word: `putnami build:prod --` completes with the flags of the
-command that `build:prod` names. An equals sign still splits a word.
+command that `build:prod` names. Bash still splits a word at an equals sign, so
+an alias that holds one gets no command flags.
 
 The script embeds the project names the workspace resolves. On a workspace with
 no index, `completion` writes the same provider-view warning as `projects list`
