@@ -3,7 +3,7 @@
 This is an ignored local index, not a new public review protocol,
 controller or storage service. It references existing producer records and
 attributed Markdown notes. Keep snapshots and original outputs under
-`.context/execute/<run>/`; append revisions instead of editing another author's
+`.putnami/<issue>/`; append revisions instead of editing another author's
 report. The current dossier is a projection, not a separately maintained plan.
 
 Cloud's existing `ReviewReportV1` stays unchanged: its hosted revision, reviewer,
@@ -32,9 +32,9 @@ PUTNAMI_CLI=putnami
 if [ -x ./putnamiw ]; then
   PUTNAMI_CLI=./putnamiw
 fi
-"$PUTNAMI_CLI" change verify --snapshot --base origin/main > .context/execute/run/candidate.json
-"$PUTNAMI_CLI" change verify --ref .context/execute/run/review-1.md
-"$PUTNAMI_CLI" change verify --record .context/execute/run/candidate.json
+"$PUTNAMI_CLI" change verify --snapshot --base origin/main > .putnami/42/candidate.json
+"$PUTNAMI_CLI" change verify --ref .putnami/42/review-1.md
+"$PUTNAMI_CLI" change verify --record .putnami/42/candidate.json
 "$PUTNAMI_CLI" change verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json --base origin/main
 ```
 

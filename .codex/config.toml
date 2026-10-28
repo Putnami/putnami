@@ -7,21 +7,17 @@ review_model = "gpt-6-astra"
 [features]
 multi_agent = true
 
-[agents."epic-analyst"]
-description = "Read-only GPT-6 Astra analyst for epic decomposition, integration diagnosis, and whole-epic review."
-config_file = "agents/epic-analyst.toml"
-
 [agents."fix-heavy"]
 description = "GPT-6 Sol implementation worker for high-risk fixes involving invariants, security, concurrency, or protocols."
 config_file = "agents/fix-heavy.toml"
 
-[agents."fix-light"]
-description = "GPT-6 Luna implementation worker for prescribed mechanical fixes with escalation on scope growth."
-config_file = "agents/fix-light.toml"
-
 [agents."fix-standard"]
-description = "GPT-6 Sol implementation worker for settled multi-file fixes following established repository patterns."
+description = "GPT-6 Sol implementation worker for settled slices, mechanical changes included, following established repository patterns."
 config_file = "agents/fix-standard.toml"
+
+[agents."reviewer"]
+description = "Read-only GPT-6 Astra reviewer: the independent check of a frozen candidate, and the second round on P1 and P2 fixes."
+config_file = "agents/reviewer.toml"
 
 [agents."prune-triage"]
 description = "Read-only GPT-6 Astra triage worker for /audit --prune: apply / verdict / drop per removal candidate, against every consumer repository."

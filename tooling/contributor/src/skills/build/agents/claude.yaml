@@ -1,4 +1,4 @@
 name: build
-description: Deliver an authorized outcome through one implementation, review and evidence loop
+description: Deliver an authorized outcome through the contribution loop, from talk to merge
 allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch
-argument-hint: [<intention|task|proposal>] [--resume <record>] [--tier <light|standard|heavy>] [--base <ref>] [--local] [--dry-run]
+argument-hint: [<intention|task|proposal>] [--resume <record>] [--profile <name>] [--base <ref>] [--local] [--dry-run]

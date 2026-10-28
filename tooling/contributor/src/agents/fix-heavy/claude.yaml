@@ -1,5 +1,5 @@
 name: fix-heavy
-description: Implementation worker for the /build skill, heavy tier — units touching determinism/cache keys, concurrency, security, or cross-language protocols. Use only when /build delegates a unit; not for general delegation.
+description: Implementation worker for the /build skill, slices touching determinism/cache keys, concurrency, security, or cross-language protocols. Use only when /build delegates a slice; not for general delegation.
 tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch
 model: claude-opus-5-5
 effort: xhigh

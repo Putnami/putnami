@@ -1,5 +1,5 @@
 name: fix-standard
-description: Implementation worker for the /build skill, standard tier — multi-file changes with settled design following established patterns. Use only when /build delegates a unit; not for general delegation.
+description: Implementation worker for the /build skill, settled design, from prescribed mechanical changes to multi-file changes following established patterns. Use only when /build delegates a slice; not for general delegation.
 tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch
 model: sonnet
 effort: high
