@@ -312,6 +312,13 @@ The `--output=jsonl` stream follows the session stream contract defined by the C
 | `--profile <dev\|test\|production>` | Select the deployment profile (resolution: flag > `PUTNAMI_PROFILE` > workspace `profile` > `dev`) |
 | `--trace-profile <path>` | Collect trace events (Chrome trace format) |
 
+A flag goes after the full command: `putnami <command> [subcommand] [options]`.
+A flag before the command word, as in `putnami -v projects list`, or between a
+command and its subcommand, as in `putnami projects -v describe web`, is a
+usage error that names the flag. `putnami --help`, `putnami --version` and a
+flag with no command after it still print help or the version. Shell
+completion offers nothing after a flag that comes before the command.
+
 ## Shell completion
 
 The install script sets up completions automatically. Manual setup:

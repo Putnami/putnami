@@ -40,6 +40,26 @@ function __putnami_seen_path
     return 0
 end
 
+# A flag goes after the command: the CLI refuses a command line whose first
+# word is a flag, so no completion below offers anything after one. The path
+# checks above fail there already, since no path starts with a flag.
+function __putnami_leading_flag
+    set -l tokens (commandline -opc)
+    test (count $tokens) -ge 2; and string match -q -- '-*' $tokens[2]
+end
+
+function __putnami_use_command
+    not __putnami_leading_flag; and __fish_use_subcommand
+end
+
+function __putnami_no_leading_flag
+    not __putnami_leading_flag
+end
+
+function __putnami_seen_from
+    not __putnami_leading_flag; and __fish_seen_subcommand_from $argv
+end
+
 # A core command takes a job-only flag only as one of its own flags.
 function __putnami_core_root
     set -l tokens (commandline -opc)
@@ -49,33 +69,37 @@ function __putnami_core_root
     contains -- $tokens[2] 'cache' 'cli' 'completion' 'config' 'context' 'deps' 'doctor' 'extensions' 'help' 'impact-plan' 'init' 'install' 'mcp' 'migrate' 'pin' 'projects' 'report' 'scopes' 'sessions' 'telemetry' 'templates' 'tree' 'upgrade' 'workspace'
 end
 
+function __putnami_job_flag
+    not __putnami_leading_flag; and not __putnami_core_root
+end
+
 # Job commands
 
 # Structured commands
-complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
-complete -c putnami -n '__fish_use_subcommand' -a 'cli' -d 'Installed CLI binaries'
-complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
-complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
-complete -c putnami -n '__fish_use_subcommand' -a 'context' -d 'Manage AI context'
-complete -c putnami -n '__fish_use_subcommand' -a 'deps' -d 'Manage dependencies'
-complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
-complete -c putnami -n '__fish_use_subcommand' -a 'extensions' -d 'Manage extensions'
-complete -c putnami -n '__fish_use_subcommand' -a 'help' -d 'Show help for a command'
-complete -c putnami -n '__fish_use_subcommand' -a 'impact-plan' -d 'Emit the impacted plan of a change for a command list'
-complete -c putnami -n '__fish_use_subcommand' -a 'init' -d 'Initialize a new workspace'
-complete -c putnami -n '__fish_use_subcommand' -a 'install' -d 'Install extensions and dependencies'
-complete -c putnami -n '__fish_use_subcommand' -a 'mcp' -d 'Run the MCP server over stdio for AI agent harnesses'
-complete -c putnami -n '__fish_use_subcommand' -a 'migrate' -d 'Migrate Putnami workspace files forward'
-complete -c putnami -n '__fish_use_subcommand' -a 'pin' -d 'Pin the CLI version this workspace uses'
-complete -c putnami -n '__fish_use_subcommand' -a 'projects' -d 'Manage projects'
-complete -c putnami -n '__fish_use_subcommand' -a 'report' -d 'Read back a run\'s report'
-complete -c putnami -n '__fish_use_subcommand' -a 'scopes' -d 'List workspace scopes'
-complete -c putnami -n '__fish_use_subcommand' -a 'sessions' -d 'Inspect execution sessions'
-complete -c putnami -n '__fish_use_subcommand' -a 'telemetry' -d 'Manage anonymous telemetry'
-complete -c putnami -n '__fish_use_subcommand' -a 'templates' -d 'Manage templates'
-complete -c putnami -n '__fish_use_subcommand' -a 'tree' -d 'Identify the worktree the CLI runs in'
-complete -c putnami -n '__fish_use_subcommand' -a 'upgrade' -d 'Upgrade CLI, extensions, and dependencies'
-complete -c putnami -n '__fish_use_subcommand' -a 'workspace' -d 'Manage workspace'
+complete -c putnami -n '__putnami_use_command' -a 'cache' -d 'Manage cache'
+complete -c putnami -n '__putnami_use_command' -a 'cli' -d 'Installed CLI binaries'
+complete -c putnami -n '__putnami_use_command' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
+complete -c putnami -n '__putnami_use_command' -a 'config' -d 'Manage configuration'
+complete -c putnami -n '__putnami_use_command' -a 'context' -d 'Manage AI context'
+complete -c putnami -n '__putnami_use_command' -a 'deps' -d 'Manage dependencies'
+complete -c putnami -n '__putnami_use_command' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
+complete -c putnami -n '__putnami_use_command' -a 'extensions' -d 'Manage extensions'
+complete -c putnami -n '__putnami_use_command' -a 'help' -d 'Show help for a command'
+complete -c putnami -n '__putnami_use_command' -a 'impact-plan' -d 'Emit the impacted plan of a change for a command list'
+complete -c putnami -n '__putnami_use_command' -a 'init' -d 'Initialize a new workspace'
+complete -c putnami -n '__putnami_use_command' -a 'install' -d 'Install extensions and dependencies'
+complete -c putnami -n '__putnami_use_command' -a 'mcp' -d 'Run the MCP server over stdio for AI agent harnesses'
+complete -c putnami -n '__putnami_use_command' -a 'migrate' -d 'Migrate Putnami workspace files forward'
+complete -c putnami -n '__putnami_use_command' -a 'pin' -d 'Pin the CLI version this workspace uses'
+complete -c putnami -n '__putnami_use_command' -a 'projects' -d 'Manage projects'
+complete -c putnami -n '__putnami_use_command' -a 'report' -d 'Read back a run\'s report'
+complete -c putnami -n '__putnami_use_command' -a 'scopes' -d 'List workspace scopes'
+complete -c putnami -n '__putnami_use_command' -a 'sessions' -d 'Inspect execution sessions'
+complete -c putnami -n '__putnami_use_command' -a 'telemetry' -d 'Manage anonymous telemetry'
+complete -c putnami -n '__putnami_use_command' -a 'templates' -d 'Manage templates'
+complete -c putnami -n '__putnami_use_command' -a 'tree' -d 'Identify the worktree the CLI runs in'
+complete -c putnami -n '__putnami_use_command' -a 'upgrade' -d 'Upgrade CLI, extensions, and dependencies'
+complete -c putnami -n '__putnami_use_command' -a 'workspace' -d 'Manage workspace'
 
 # Subcommands
 complete -c putnami -n '__putnami_complete_children cache' -a 'clean'
@@ -131,23 +155,23 @@ complete -c putnami -n '__putnami_complete_children workspace' -a 'describe'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'init'
 
 # Global flags
-complete -c putnami -l 'verbose' -d 'Show job results and diagnostics'
-complete -c putnami -l 'debug' -d 'Stream all events in real-time'
-complete -c putnami -l 'help' -d 'Show help'
-complete -c putnami -l 'all' -d 'All projects'
-complete -c putnami -l 'impacted' -d 'Projects affected by git changes'
-complete -c putnami -l 'projects' -d 'Comma-separated project names'
-complete -c putnami -l 'tag' -d 'Filter by tags'
-complete -c putnami -l 'exclude-tag' -d 'Exclude by tags'
-complete -c putnami -l 'baseline' -d 'Custom git baseline for --impacted; a job command with no target or --all implies --impacted'
-complete -c putnami -l 'credential-fd' -d 'Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2'
-complete -c putnami -l 'no-cache' -d 'Force re-execution (skip cache)'
-complete -c putnami -l 'output' -d 'Output format: text | json | jsonl | cloud-logging'
-complete -c putnami -l 'json' -d 'Shorthand for --output=json'
-complete -c putnami -l 'quiet' -d 'Suppress non-error output'
-complete -c putnami -l 'color' -d 'Force color output'
-complete -c putnami -l 'no-color' -d 'Disable color output'
-complete -c putnami -l 'version' -d 'Show version'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'verbose' -d 'Show job results and diagnostics'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'debug' -d 'Stream all events in real-time'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'help' -d 'Show help'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'all' -d 'All projects'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'impacted' -d 'Projects affected by git changes'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'projects' -d 'Comma-separated project names'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'tag' -d 'Filter by tags'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'exclude-tag' -d 'Exclude by tags'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'baseline' -d 'Custom git baseline for --impacted; a job command with no target or --all implies --impacted'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'credential-fd' -d 'Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'no-cache' -d 'Force re-execution (skip cache)'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'output' -d 'Output format: text | json | jsonl | cloud-logging'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'json' -d 'Shorthand for --output=json'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'quiet' -d 'Suppress non-error output'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'color' -d 'Force color output'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'no-color' -d 'Disable color output'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'version' -d 'Show version'
 
 # Structured command flags
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'continue-on-error' -d 'Don\'t abort a verified run on the first failure'
@@ -230,4 +254,4 @@ complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -r
 
 # Output format values
-complete -c putnami -n '__fish_seen_subcommand_from --output' -a 'text json jsonl cloud-logging'
+complete -c putnami -n '__putnami_seen_from --output' -a 'text json jsonl cloud-logging'

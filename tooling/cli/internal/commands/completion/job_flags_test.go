@@ -262,7 +262,52 @@ func TestCompletionOffersAJobFlagOnlyAfterACommandThatTakesIt(t *testing.T) {
 	if !strings.Contains(fish.String(), `-a '\'p $l;x\'' -d `) {
 		t.Error("fish does not quote an alias name it completes as a command for both reads")
 	}
-	if !strings.Contains(fish.String(), "complete -c putnami -n 'not __putnami_core_root' -l 'dry-run'") {
+	if !strings.Contains(fish.String(), "complete -c putnami -n '__putnami_job_flag' -l 'dry-run'") {
 		t.Error("fish offers --dry-run after a core command")
+	}
+}
+
+// The CLI refuses a command line whose first word is a flag, so completion
+// offers nothing after it: `putnami -v projects list --` used to read -v as
+// the command and offer the job-only flags `projects list` refuses.
+func TestCompletionOffersNothingAfterALeadingFlag(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "flags-follow-the-command", "completion-offers-nothing-after-a-leading-flag")
+	wsRoot := writeExtensionWorkspace(t, "lint-docs")
+	var bash, zsh, fish bytes.Buffer
+	CompletionBash(&bash, wsRoot, &wsproto.Config{}, nil)
+	CompletionZsh(&zsh, wsRoot, &wsproto.Config{}, nil)
+	CompletionFish(&fish, wsRoot, &wsproto.Config{}, nil)
+
+	if !strings.Contains(zsh.String(), "if [[ \"${path}\" == -* ]]; then\n                return 1") {
+		t.Error("zsh completes after a leading flag")
+	}
+	if !strings.Contains(fish.String(), "function __putnami_leading_flag") {
+		t.Error("fish declares no leading-flag guard")
+	}
+	// Each condition is a function that fails after a leading flag: a guard,
+	// or a path check, since no path starts with a flag.
+	guarded := regexp.MustCompile(`^complete -c putnami -n '(__putnami_use_command|__putnami_no_leading_flag|__putnami_job_flag|__putnami_seen_from|__putnami_complete_children|__putnami_seen_path)[ ']`)
+	for _, line := range strings.Split(fish.String(), "\n") {
+		if strings.HasPrefix(line, "complete -c putnami ") && line != "complete -c putnami -f" && !guarded.MatchString(line) {
+			t.Errorf("fish completes after a leading flag: %s", line)
+		}
+	}
+
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash unavailable on this platform")
+	}
+	for _, words := range [][]string{
+		{"putnami", "-v", "projects", "list", "--"},
+		{"putnami", "--projects", "web", "projects", "list", "--"},
+		{"putnami", "-v", ""},
+		{"putnami", "-v", "lint-docs", ""},
+	} {
+		if got := runBashCompletion(t, bash.String(), words); got != "" {
+			t.Errorf("bash offers %q after %v", got, words)
+		}
+	}
+	if got := runBashCompletion(t, bash.String(), []string{"putnami", "projects", "list", "--"}); !strings.Contains(" "+got+" ", " --output ") {
+		t.Errorf("bash does not offer --output after `projects list`: %s", got)
 	}
 }

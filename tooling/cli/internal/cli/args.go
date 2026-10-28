@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"slices"
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
@@ -69,6 +70,9 @@ type commandAliases struct {
 	// (extension.GroupInvocationCommand), or "" for none. It is nil when no
 	// extension is loaded.
 	groupCommand func(group, word string) string
+	// groupSubcommand reports whether word names a subcommand of an extension
+	// group (extension.LookupSubcommand). It is nil when no extension is loaded.
+	groupSubcommand func(group, word string) bool
 }
 
 // lookup returns the command alias name stands for.
@@ -122,8 +126,13 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	if strings.HasPrefix(cmdArg, "-") {
 		// No command specified, just flags: this invocation prints help, so a bad
 		// flag value is not worth failing on — the user is already being shown the
-		// vocabulary.
+		// vocabulary. A command word after the flags is refused instead: the CLI
+		// would otherwise print help in place of the command the user typed.
 		result.Global, result.RawJobArgs, _ = parseFlags(args)
+		if firstPositional(result.RawJobArgs) != "" && !result.Global.Help {
+			result.Err = usageErrorf("%s comes before the command; a flag goes after it: putnami <command> [subcommand] [options]", flagSpelling(cmdArg))
+			return result
+		}
 		result.Global.Help = true
 		return result
 	}
@@ -191,7 +200,10 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	// undeclared one is rejected here. Job commands and extension groups are
 	// served by manifests and get a deprecation warning from their dispatch path
 	// instead (see parse.go).
-	if structured && !extensionGroups[commands[0]] {
+	if structured && result.Subcommand == "" && len(rest) > 0 && isFlagToken(rest[0]) {
+		result.Err = flagBeforeSubcommand(commands[0], rest[0], result.RawJobArgs, aliases)
+	}
+	if result.Err == nil && structured && !extensionGroups[commands[0]] {
 		result.Err = validateStructuredFlags(commands[0], result.Subcommand, result.RawJobArgs, supplied)
 	}
 
@@ -202,6 +214,37 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	}
 
 	return result
+}
+
+// firstPositional returns the first argument before the passthrough separator
+// that is not a flag, or "".
+func firstPositional(args []string) string {
+	for _, arg := range args[:passthroughCut(args)] {
+		if !isFlagToken(arg) {
+			return arg
+		}
+	}
+	return ""
+}
+
+// flagBeforeSubcommand refuses `putnami <root> <flag> <subcommand>`: the
+// parser selects a subcommand only from the word right after the root, so the
+// subcommand word would stay a stray argument and the root would run its
+// default subcommand in its place. flag is the token after the root, and
+// remaining the arguments the global pass left. Every positional is checked,
+// because the core cannot tell which of them is the value of a flag it does
+// not know.
+func flagBeforeSubcommand(root, flag string, remaining []string, aliases commandAliases) error {
+	for _, word := range remaining[:passthroughCut(remaining)] {
+		if isFlagToken(word) {
+			continue
+		}
+		if slices.Contains(commandmeta.Subcommands(root), word) ||
+			(aliases.groupSubcommand != nil && aliases.groupSubcommand(root, word)) {
+			return usageErrorf("%s comes before the subcommand %q; a flag goes after it: putnami %s %s [options]", flagSpelling(flag), word, root, word)
+		}
+	}
+	return nil
 }
 
 // resolveCommands splits comma-separated commands and resolves aliases.
