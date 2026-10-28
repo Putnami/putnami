@@ -18,7 +18,7 @@
 
 The CLI provides two categories of commands: **job commands** provided dynamically by extensions, and **structured commands** with fixed subcommand trees.
 
-Flags go after the full command: `putnami <command> [subcommand] [options]`. The parser refuses a flag before the command word, or between a command and its subcommand, built-in or from an extension, with a usage error that names the flag; it never runs the default subcommand in place of the one typed after the flag.
+Flags go after the full command: `putnami <command> [subcommand] [options]`. The parser refuses a flag before the command word, between a command and its subcommand, built-in or from an extension, or between `help` and the command it names, with a usage error that names the flag; it never runs the default subcommand, or prints the top-level help, in place of the command typed after the flag.
 
 ## Job Commands
 

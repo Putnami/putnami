@@ -117,3 +117,48 @@ func TestParseArgs_FlagBeforeASubcommandIsRefused(t *testing.T) {
 		t.Errorf("projects -v describe --help: err = %v, help = %v, want help with no error", helped.Err, helped.Global.Help)
 	}
 }
+
+// help reads the command it describes from its first positional, so a flag
+// before that command used to hide it: `help -v projects` printed the
+// top-level help with exit 0.
+func TestParseArgs_FlagBeforeTheCommandHelpNamesIsRefused(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "flags-follow-the-command", "a-flag-before-the-command-help-names-is-refused")
+
+	refused := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"help", "-v", "projects"}, `-v comes before the command "projects"; a flag goes after it: putnami help projects [options]`},
+		{[]string{"help", "--output", "json", "build"}, `--output comes before the command "build"`},
+	}
+	for _, tc := range refused {
+		parsed := ParseArgs(tc.args, nil, nil)
+		if !errors.Is(parsed.Err, cmderr.ErrUsage) {
+			t.Errorf("ParseArgs(%v) error = %v, want a usage error", tc.args, parsed.Err)
+			continue
+		}
+		if !strings.Contains(parsed.Err.Error(), tc.want) {
+			t.Errorf("ParseArgs(%v) error = %q, want it to contain %q", tc.args, parsed.Err, tc.want)
+		}
+	}
+
+	accepted := [][]string{
+		{"help"},
+		{"help", "-v"},
+		{"help", "--man"},
+		{"help", "--man", "projects", "list"},
+		{"help", "projects", "-v"},
+		{"help", "projects", "list", "-v"},
+	}
+	for _, args := range accepted {
+		if parsed := ParseArgs(args, nil, nil); parsed.Err != nil {
+			t.Errorf("ParseArgs(%v) error = %v, want none", args, parsed.Err)
+		}
+	}
+
+	helped := ParseArgs([]string{"help", "-v", "projects", "--help"}, nil, nil)
+	if helped.Err != nil || !helped.Global.Help {
+		t.Errorf("help -v projects --help: err = %v, help = %v, want help with no error", helped.Err, helped.Global.Help)
+	}
+}

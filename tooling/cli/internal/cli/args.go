@@ -246,10 +246,16 @@ func leadingCommandWord(args []string) bool {
 // remaining the arguments the global pass left. Every positional is checked,
 // because the core cannot tell which of them is the value of a flag it does
 // not know.
+//
+// help is the one root whose positional is a command: any word after the flag
+// is the command it was asked about, which it would otherwise not see.
 func flagBeforeSubcommand(root, flag string, remaining []string, aliases commandAliases) error {
 	for _, word := range remaining[:passthroughCut(remaining)] {
 		if isFlagToken(word) {
 			continue
+		}
+		if root == "help" {
+			return usageErrorf("%s comes before the command %q; a flag goes after it: putnami help %s [options]", flagSpelling(flag), word, word)
 		}
 		if slices.Contains(commandmeta.Subcommands(root), word) ||
 			(aliases.groupSubcommand != nil && aliases.groupSubcommand(root, word)) {
