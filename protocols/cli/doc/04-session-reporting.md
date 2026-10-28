@@ -89,6 +89,34 @@ Selecting a name does not prove the repository manifest/runtime is trusted.
 This capability enforces no same-principal, file or metadata/network
 isolation; hosted launchers must establish these independently.
 
+### The trimmed event stream
+
+The session reporter's `events.jsonl` frames carry a trimmed view of the
+session's `events.jsonl`, not its raw bytes
+([ADR 0083](../../../tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md)).
+Their `offset` and `sequence` are view offsets and view ordinals: they count
+the bytes the view sent, and the final marker's offset is the length of the
+view, not of the file. The log reporter's frames carry the raw stream, at raw
+offsets. The wire is unchanged: the view is whole lines of the stream, in an
+order the engine decides, so a receiver reassembles and parses it like the raw
+stream.
+
+The view drops every `progress` event. From a task's first `debug` log line
+to its `task:end`, it holds the task's `task:event` records, and sends them in
+stream order just before that `task:end`. A `success` or `skipped` end drops
+the held `debug` lines and sends the others. A record that several batch
+members hold (`batchProjectId`, `batchProjectIds`) leaves once. A
+`session:end` record and the final marker send what is still held. Every
+`task:start`, `task:end`, `test:case` and `session:end` record leaves, and a
+line that is not a JSON record leaves as it is. A receiver therefore reads a
+held task's `info`, `warn` and diagnostic events at its end, not live.
+
+The engine rebuilds the view from the start of the stream after a restart or
+a replay, so a resent sequence always carries the same bytes. Once the
+receiver acknowledges the view's final marker, `subscribers.json` reads
+`delivered` at the end of the raw stream. A session whose checkpoint already
+framed a raw `events.jsonl` chunk keeps raw framing to its end.
+
 ### The recorded plan
 
 The session reporter sends `plan.json` before any other frame: the session's
@@ -221,14 +249,16 @@ TypeScript exports `parseSessionReportingHandshake`,
 `log-reporter` is a second reporting capability for an extension that needs
 only the live event stream. It uses this wire unchanged, restricted to
 `events.jsonl`: every frame and ACK names `events.jsonl`, and the provider never
-receives `session.json`, `plan.json` or `spec-verification.json`. Its events
-final marker follows graph termination.
+receives `session.json`, `plan.json` or `spec-verification.json`. Its frames
+carry the raw stream, at raw offsets, never the trimmed view. Its events final
+marker follows graph termination.
 
 | | `session-reporter` | `log-reporter` |
 | --- | --- | --- |
 | Selector | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_LOG_REPORTER` |
 | Optional token | `PUTNAMI_SESSION_REPORTER_TOKEN` | `PUTNAMI_LOG_REPORTER_TOKEN` |
 | Artifacts | `plan.json` first, then `session.json` closes before `events.jsonl`, then `spec-verification.json` | `events.jsonl` |
+| `events.jsonl` frames | the trimmed view, at view offsets | the raw stream, at raw offsets |
 | Live chunk leaves at | a full frame or 10 s | a full frame or 2 s |
 
 Each selected capability is a separate subscriber of the session event stream,

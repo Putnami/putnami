@@ -1,12 +1,14 @@
 package sessionreporter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -153,11 +155,17 @@ type cursor struct {
 // plan.json is closed once its final marker is acknowledged or PlanOmitted
 // records why it is not sent (planAbsent and the other reasons), and
 // spec-verification.json likewise with SpecVerificationOmitted.
+//
+// At version 2 (viewCheckpointVersion), Events is the cursor of the view the
+// events.jsonl frames are cut from, and EventsRaw the raw offset of
+// events.jsonl the subscription acknowledged. At version 1, Events is a raw
+// cursor and EventsRaw is zero, absent from the checkpoint.
 type state struct {
 	Version                 int                                `json:"version"`
 	Provider                string                             `json:"provider"`
 	SessionID               string                             `json:"sessionId"`
 	Events                  cursor                             `json:"events"`
+	EventsRaw               int64                              `json:"eventsRaw,omitempty"`
 	Session                 cursor                             `json:"session"`
 	Plan                    cursor                             `json:"plan"`
 	PlanOmitted             string                             `json:"planOmitted,omitempty"`
@@ -196,9 +204,12 @@ func (c Cause) Error() string { return string(c) }
 // the capability's batch interval has passed, never once per append. The
 // producer never waits for it, and no callback waits for a pipe or a remote ACK.
 type Run struct {
-	capability    Capability
-	dir           string
-	events        *sessionstream.Subscription
+	capability Capability
+	dir        string
+	events     *sessionstream.Subscription
+	// view is the view events.jsonl frames are cut from at checkpoint version
+	// 2, built from raw offset 0 at the run's first use (eventsView).
+	view          *view
 	state         state
 	launch        LaunchSpec
 	process       *process
@@ -277,19 +288,24 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 	}
 	workerCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	r := &Run{capability: capability, dir: dir, lock: lock, ctx: workerCtx, graphCtx: ctx, cancel: cancel, finish: make(chan struct{}), done: make(chan struct{}), opTimeout: operationTimeout, clock: systemClock{}, batchInterval: eventsBatchInterval(ctx, capability)}
-	r.state = state{Version: 1, Provider: provider, SessionID: sessionID}
+	r.state = state{Version: capability.checkpointVersion(), Provider: provider, SessionID: sessionID}
 	data, err := readBounded(filepath.Join(dir, capability.StateFile), 2*protocolcli.SessionReportingLineBytes)
 	if err == nil {
-		if json.Unmarshal(data, &r.state) != nil || r.state.Version != 1 || r.state.Provider != provider || r.state.SessionID != sessionID {
+		// The members a checkpoint omits keep the values an earlier CLI
+		// assumed for them: a checkpoint without a version is a version 1 one.
+		saved := state{Version: rawCheckpointVersion, Provider: provider, SessionID: sessionID}
+		if json.Unmarshal(data, &saved) != nil || !knownCheckpointVersion(saved.Version) || saved.Provider != provider || saved.SessionID != sessionID {
 			r.release()
 			return nil, fmt.Errorf("reporting checkpoint is invalid or belongs to a different provider/session")
 		}
+		r.state = saved
 		r.omitLatePlan()
 		r.omitLateSpecVerification()
 		if err := r.validate(); err != nil {
 			r.release()
 			return nil, err
 		}
+		r.moveToView()
 	} else if !os.IsNotExist(err) {
 		r.release()
 		return nil, fmt.Errorf("read reporting checkpoint")
@@ -302,15 +318,50 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 	return r, nil
 }
 
-// subscribe declares the capability on the stream at its durable events cursor.
-// A cursor the checkpoint already finalized acknowledges the final marker too.
+func knownCheckpointVersion(version int) bool {
+	return version == rawCheckpointVersion || version == viewCheckpointVersion
+}
+
+// moveToView moves a version 1 checkpoint of a View capability to version 2
+// when it framed no events.jsonl chunk yet. One that did keeps raw framing for
+// its session: its receiver holds raw offsets.
+func (r *Run) moveToView() {
+	s := &r.state
+	if !r.capability.View || s.Version != rawCheckpointVersion || s.Events.Sequence > 0 || s.Pending != nil && s.Pending.Artifact == sessionstream.EventsFile {
+		return
+	}
+	s.Version, s.EventsRaw = viewCheckpointVersion, 0
+}
+
+// viewFraming reports whether events.jsonl frames are cut from the view: a
+// View capability at checkpoint version 2.
+func (r *Run) viewFraming() bool {
+	return r.capability.View && r.state.Version == viewCheckpointVersion
+}
+
+// eventsView is the run's view, built from raw offset 0 at its first use and
+// positioned at the checkpoint's view cursor.
+func (r *Run) eventsView() *view {
+	if r.view == nil {
+		r.view = newView(r.events, r.state.Events.Offset)
+	}
+	return r.view
+}
+
+// subscribe declares the capability on the stream at its durable raw position:
+// the events cursor, or at version 2 the raw offset it acknowledged. A cursor
+// the checkpoint already finalized acknowledges the final marker too.
 func (r *Run) subscribe(events *sessionstream.Log) error {
-	sub, err := events.Subscribe(r.capability.Name, r.state.Events.Offset)
+	from := r.state.Events.Offset
+	if r.viewFraming() {
+		from = r.state.EventsRaw
+	}
+	sub, err := events.Subscribe(r.capability.Name, from)
 	if err != nil {
 		return fmt.Errorf("reporting artifact changed: %s", sessionstream.EventsFile)
 	}
 	if r.state.Events.Final {
-		_ = sub.Ack(r.state.Events.Offset, true)
+		_ = sub.Ack(from, true)
 	}
 	r.events = sub
 	return nil
@@ -364,10 +415,8 @@ func (r *Run) specVerificationStarted() bool {
 }
 
 func (r *Run) validate() error {
-	for _, c := range []cursor{r.state.Events, r.state.Session, r.state.Plan, r.state.SpecVerification} {
-		if c.Offset < 0 || c.Sequence < 0 {
-			return fmt.Errorf("invalid reporting cursor")
-		}
+	if !r.validCursors() {
+		return fmt.Errorf("invalid reporting cursor")
 	}
 	if !r.capability.sends(sessionFile) && r.state.Session != (cursor{}) {
 		return fmt.Errorf("invalid reporting cursor")
@@ -402,6 +451,21 @@ func (r *Run) validate() error {
 		}
 	}
 	return nil
+}
+
+// validCursors reports whether no cursor is negative and the checkpoint's
+// version and raw offset agree: only a View capability frames the view, and
+// only a view checkpoint records a raw offset beside its cursor.
+func (r *Run) validCursors() bool {
+	for _, c := range []cursor{r.state.Events, r.state.Session, r.state.Plan, r.state.SpecVerification} {
+		if c.Offset < 0 || c.Sequence < 0 {
+			return false
+		}
+	}
+	if r.state.Version == viewCheckpointVersion {
+		return r.capability.View && r.state.EventsRaw >= 0
+	}
+	return r.state.EventsRaw == 0
 }
 
 func (r *Run) cursor(artifact string) *cursor {
@@ -479,6 +543,9 @@ func (r *Run) work() {
 }
 
 func (r *Run) deliver() error {
+	if err := r.verifyPendingView(); err != nil {
+		return err
+	}
 	terminal := false
 	// The batch interval starts with the worker, so a trickle's first events
 	// chunk waits one interval like every later one.
@@ -522,6 +589,13 @@ func (r *Run) deliver() error {
 		c.Offset += int64(len(p.Data))
 		c.Sequence++
 		c.Final = p.Final
+		raw := c.Offset
+		if p.Artifact == sessionstream.EventsFile && r.viewFraming() {
+			// The view cursor moved: the raw offset it acknowledges only
+			// moves forward.
+			r.state.EventsRaw = max(r.state.EventsRaw, r.eventsView().acknowledged(c.Offset))
+			raw = r.state.EventsRaw
+		}
 		r.state.Pending = nil
 		r.state.Complete = r.complete()
 		if err := r.save(); err != nil {
@@ -531,8 +605,33 @@ func (r *Run) deliver() error {
 		if p.Artifact == sessionstream.EventsFile {
 			// Acknowledged only once the checkpoint is durable. A refused
 			// acknowledgement can only make the evidence under-report delivery.
-			_ = r.events.Ack(c.Offset, c.Final)
+			_ = r.events.Ack(raw, c.Final)
 		}
+	}
+	return nil
+}
+
+// verifyPendingView fails delivery when the pending events.jsonl frame of a
+// view checkpoint is not the bytes the rebuilt view holds at its offset, or a
+// pending final marker does not end it: the stream changed since the frame
+// was cut.
+func (r *Run) verifyPendingView() error {
+	p := r.state.Pending
+	if p == nil || p.Artifact != sessionstream.EventsFile || !r.viewFraming() {
+		return nil
+	}
+	v := r.eventsView()
+	target := p.Offset + int64(len(p.Data))
+	if p.Final {
+		target = math.MaxInt64
+	}
+	err := v.fill(target)
+	var data []byte
+	if err == nil {
+		data, err = v.read(p.Offset, len(p.Data))
+	}
+	if err != nil || !bytes.Equal(data, p.Data) || p.Final && (!v.done || v.end != p.Offset) {
+		return fmt.Errorf("reporting artifact changed: %s", sessionstream.EventsFile)
 	}
 	return nil
 }
@@ -684,14 +783,26 @@ func (r *Run) lastProgress(since time.Time) time.Time {
 	return since
 }
 
-// eventsBatchWait applies the live batching rule to the bytes committed past the
-// events cursor, measured from the stream's extent without reading them. A full
-// frame leaves at once; a shorter one once the interval since the last events
-// send has passed. With nothing pending the worker waits a whole interval, or
-// until an append wakes it. Zero means send now.
+// eventsBatchWait applies the live batching rule to the bytes ready past the
+// events cursor: for raw framing, the bytes committed, measured from the
+// stream's extent without reading them; for the view, the view bytes its
+// records left as, scanned only as far as one frame needs. A full frame leaves
+// at once; a shorter one once the interval since the last events send has
+// passed. With nothing pending the worker waits a whole interval, or until an
+// append wakes it. Zero means send now, as for a view that cannot be read,
+// whose next frame then reports why.
 func (r *Run) eventsBatchWait(lastSend time.Time) time.Duration {
-	end, _ := r.events.Extent()
-	pending := end.Offset - r.state.Events.Offset
+	var pending int64
+	if r.viewFraming() {
+		available, err := r.eventsView().available(r.state.Events.Offset)
+		if err != nil {
+			return 0
+		}
+		pending = available
+	} else {
+		end, _ := r.events.Extent()
+		pending = end.Offset - r.state.Events.Offset
+	}
 	switch {
 	case pending >= protocolcli.SessionReportingChunkBytes:
 		return 0
@@ -718,20 +829,20 @@ func (r *Run) awaitEvents(wait time.Duration) (bool, error) {
 
 // next frames the artifact bytes after its cursor. events.jsonl is read through
 // the stream subscription, which never reads past what the producer committed;
-// its final marker additionally waits for the stream's own final marker.
-// session.json is not a stream: it is read once it exists. plan.json is whole
-// before the worker starts, and spec-verification.json before Finish, so
-// neither final marker waits for the graph.
+// its final marker additionally waits for the stream's own final marker, and
+// for the view to be done. session.json is not a stream: it is read once it
+// exists. plan.json is whole before the worker starts, and
+// spec-verification.json before Finish, so neither final marker waits for the
+// graph.
 func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportingChunk, error) {
 	c := r.cursor(artifact)
 	var data []byte
 	switch artifact {
 	case sessionstream.EventsFile:
-		read, err := r.events.Read(c.Offset, protocolcli.SessionReportingChunkBytes)
+		read, final, err := r.readEvents(c.Offset)
 		if err != nil {
 			return nil, fmt.Errorf("reporting artifact changed: %s", artifact)
 		}
-		_, final := r.events.Extent()
 		data, terminal = read, terminal && final
 	case planFile, specVerificationFile:
 		read, err := readDocument(r.dir, artifact, *c)
@@ -751,6 +862,18 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 	}
 	chunk := protocolcli.NewSessionReportingChunk(r.state.SessionID, artifact, c.Offset, c.Sequence, data, len(data) == 0)
 	return &chunk, nil
+}
+
+// readEvents reads up to one chunk of events.jsonl frame bytes at offset, from
+// the view or from the raw stream, and reports whether a final marker may
+// follow them.
+func (r *Run) readEvents(offset int64) ([]byte, bool, error) {
+	if r.viewFraming() {
+		return r.eventsView().frame(offset)
+	}
+	read, err := r.events.Read(offset, protocolcli.SessionReportingChunkBytes)
+	_, final := r.events.Extent()
+	return read, final, err
 }
 
 // documentBounds are the whole documents a capability may transmit, each with
