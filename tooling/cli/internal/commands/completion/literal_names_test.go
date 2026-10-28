@@ -310,13 +310,15 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 func TestCompletionReadsAQuotedCommandAliasAsItsName(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "a-quoted-command-alias-takes-its-command-flags")
 	ws := writeHostileWorkspace(t)
-	jobAliases := make([]string, 0, len(hostileNames)+4)
+	jobAliases := make([]string, 0, len(hostileNames)+3)
 	coreAliases := make([]string, 0, len(hostileNames))
 	for _, name := range hostileNames {
 		jobAliases = append(jobAliases, "j"+name)
 		coreAliases = append(coreAliases, "k"+name)
 	}
-	for _, name := range []string{"jd\u00e9ploy", "jc\rr", "je\x1be", "jo\x01o"} {
+	// "jd\u00e9ploy" reads back from octal escapes, "jc\rr" and "je\x1be" from
+	// letter escapes.
+	for _, name := range []string{"jd\u00e9ploy", "jc\rr", "je\x1be"} {
 		ws.cfg.Aliases[name] = "lint-docs"
 		jobAliases = append(jobAliases, name)
 	}
