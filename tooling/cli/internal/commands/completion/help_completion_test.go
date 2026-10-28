@@ -44,6 +44,8 @@ func TestCompletionAfterHelpOffersTheCommandItDescribes(t *testing.T) {
 			{[]string{"help", "stage", ""}, []string{"list", "up"}, targets},
 			{[]string{"help", "projects", ""}, []string{"list", "describe"}, targets},
 			{[]string{"help", "-v", ""}, nothing, append([]string{"stage", "projects", "--output"}, targets...)},
+			// fish's test reads -h as an operator unless each word is its own test.
+			{[]string{"help", "-h", ""}, nothing, append([]string{"stage", "projects", "--output"}, targets...)},
 			{[]string{"help", "stage", "-v", ""}, nothing, append([]string{"list", "up", "--output"}, targets...)},
 			{[]string{"help", "projects", "-v", ""}, nothing, append([]string{"list", "describe", "--output"}, targets...)},
 			{[]string{"help", "stage", "up", ""}, nothing, append([]string{"--output"}, targets...)},
@@ -108,7 +110,8 @@ func assertHelpCompletion(t *testing.T, shell, line string, offered []string, c 
 }
 
 // fishCompletionOffers runs fish on the script at scriptPath to complete line
-// and returns each candidate.
+// and returns each candidate. A completion that writes to stderr fails: the
+// text lands in the user's terminal.
 func fishCompletionOffers(t *testing.T, scriptPath, line string) []string {
 	t.Helper()
 	dir := t.TempDir()
@@ -119,9 +122,11 @@ for line in (complete --escape -C $argv[2])
 end`, scriptPath, line)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "HOME="+dir, "XDG_CONFIG_HOME="+dir)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("fish completion of %q: %v\n%s", line, err, out)
+	if err != nil || stderr.Len() > 0 {
+		t.Fatalf("fish completion of %q: %v\n%s", line, err, stderr.String())
 	}
 	return strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 }
