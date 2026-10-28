@@ -132,7 +132,7 @@ func TestRequireFullClone(t *testing.T) {
 		t.Fatalf("RequireFullClone on a full clone = %v", err)
 	}
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	cmd := exec.Command("git", "clone", "--depth", "1", "file://"+ws.Root, shallow)
+	cmd := exec.Command(putnamigit.Executable(), "clone", "--depth", "1", "file://"+ws.Root, shallow)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("shallow clone unavailable in this environment: %v\n%s", err, out)
 	}
@@ -144,7 +144,7 @@ func TestRequireFullClone(t *testing.T) {
 
 func runVersionsGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(putnamigit.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {

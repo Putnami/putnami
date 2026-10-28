@@ -29,7 +29,7 @@ func gitInputWrite(t *testing.T, root, path, data string) {
 
 func gitInputRun(t *testing.T, root string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(gitutil.Executable(), args...)
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -373,7 +373,7 @@ func TestGitInputsRefuseUnmergedAndSubmoduleCandidates(t *testing.T) {
 	gitInputRun(t, root, "checkout", "main")
 	gitInputWrite(t, root, "conflict.txt", "main\n")
 	gitInputRun(t, root, "commit", "-am", "main")
-	merge := exec.Command("git", "merge", "other")
+	merge := exec.Command(gitutil.Executable(), "merge", "other")
 	merge.Dir = root
 	if out, err := merge.CombinedOutput(); err == nil {
 		t.Fatalf("the merge did not conflict:\n%s", out)

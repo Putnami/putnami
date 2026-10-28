@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestNewProviderScope_NormalizesAndSorts(t *testing.T) {
@@ -317,7 +318,7 @@ func initGitRepo(t *testing.T, root string) {
 		t.Skip("git not available; gitignore exclusion is untestable here")
 	}
 	for _, args := range [][]string{{"init"}, {"add", "-A"}} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -339,7 +340,7 @@ func TestGlobInput_SkipsGitIgnoredDirectories(t *testing.T) {
 		{"config", "user.email", "test@example.com"},
 		{"config", "user.name", "test"},
 	} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = root
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Skipf("git unavailable: %v: %s", err, out)

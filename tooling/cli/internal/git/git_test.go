@@ -39,12 +39,12 @@ func initGitRepo(t *testing.T) string {
 	if err := os.WriteFile(file, []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("git", "add", ".")
+	cmd := exec.Command(Executable(), "add", ".")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command("git", "commit", "-m", "initial")
+	cmd = exec.Command(Executable(), "commit", "-m", "initial")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)
@@ -55,7 +55,7 @@ func initGitRepo(t *testing.T) string {
 
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(Executable(), args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -309,7 +309,7 @@ func TestCurrentBranch_OtherBranch(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
-	cmd := exec.Command("git", "checkout", "-b", "feature")
+	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
 	cmd.Dir = dir
 	cmd.CombinedOutput()
 
@@ -334,7 +334,7 @@ func TestIsMainBranch_Feature(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)
 
-	cmd := exec.Command("git", "checkout", "-b", "feature")
+	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
 	cmd.Dir = dir
 	cmd.CombinedOutput()
 
@@ -372,7 +372,7 @@ func TestCommonDir_WorktreesAgree(t *testing.T) {
 	// A linked worktree must resolve to the SAME common dir as the main
 	// checkout — this is what lets every worktree of a repo share one store.
 	wt := filepath.Join(t.TempDir(), "linked")
-	cmd := exec.Command("git", "worktree", "add", "-b", "wt-branch", wt)
+	cmd := exec.Command(Executable(), "worktree", "add", "-b", "wt-branch", wt)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
@@ -626,7 +626,7 @@ func TestGetVersionInfo_ShallowCloneIsRefused(t *testing.T) {
 	origin := initGitRepo(t)
 	writeCommit(t, origin, "second.txt", "chore: second")
 	shallow := filepath.Join(t.TempDir(), "shallow")
-	cmd := exec.Command("git", "clone", "--depth", "1", "file://"+origin, shallow)
+	cmd := exec.Command(Executable(), "clone", "--depth", "1", "file://"+origin, shallow)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("shallow clone unavailable in this environment: %v\n%s", err, out)
 	}
@@ -647,7 +647,7 @@ func TestGetVersionInfo_InvalidRepo(t *testing.T) {
 // gitDo runs one git command in dir and fails the test when it does not.
 func gitDo(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -989,7 +989,7 @@ func TestDiffFiles(t *testing.T) {
 	dir := initGitRepo(t)
 
 	// Create a feature branch and add a file
-	cmd := exec.Command("git", "checkout", "-b", "feature")
+	cmd := exec.Command(Executable(), "checkout", "-b", "feature")
 	cmd.Dir = dir
 	cmd.CombinedOutput()
 
@@ -997,12 +997,12 @@ func TestDiffFiles(t *testing.T) {
 	if err := os.WriteFile(newFile, []byte("package main"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd = exec.Command("git", "add", "new.go")
+	cmd = exec.Command(Executable(), "add", "new.go")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v\n%s", err, out)
 	}
-	cmd = exec.Command("git", "commit", "-m", "add new.go")
+	cmd = exec.Command(Executable(), "commit", "-m", "add new.go")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git commit: %v\n%s", err, out)

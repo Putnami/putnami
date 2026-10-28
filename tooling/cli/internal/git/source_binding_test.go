@@ -293,7 +293,7 @@ func TestProjectSourceBindingRejectsUnmergedAndMalformedStageEntries(t *testing.
 		t.Fatal(err)
 	}
 	runGit(t, repo, "commit", "-am", "main")
-	cmd := exec.Command("git", "merge", "other")
+	cmd := exec.Command(Executable(), "merge", "other")
 	cmd.Dir = repo
 	if err := cmd.Run(); err == nil {
 		t.Fatal("expected merge conflict")

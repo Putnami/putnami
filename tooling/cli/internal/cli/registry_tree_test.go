@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -29,7 +30,7 @@ func treeCommandRepo(t *testing.T) string {
 		{"config", "user.name", "Test"},
 		{"config", "commit.gpgsign", "false"},
 	} {
-		command := exec.Command("git", args...)
+		command := exec.Command(git.Executable(), args...)
 		command.Dir = dir
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -39,7 +40,7 @@ func treeCommandRepo(t *testing.T) string {
 		t.Fatalf("write README: %v", err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "initial"}} {
-		command := exec.Command("git", args...)
+		command := exec.Command(git.Executable(), args...)
 		command.Dir = dir
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)

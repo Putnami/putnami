@@ -16,6 +16,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	gitexec "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/mapgen"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -253,7 +254,7 @@ func TestContextMapCommand_ImpactedNarrowsThePrintedMap(t *testing.T) {
 	root := mapCommandWorkspace(t)
 	runGit := func(args ...string) {
 		t.Helper()
-		if output, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+		if output, err := exec.Command(gitexec.Executable(), append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}

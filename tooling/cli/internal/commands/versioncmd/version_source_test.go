@@ -11,6 +11,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestVersionInstallFromSource_NoWorkspace(t *testing.T) {
@@ -69,7 +70,7 @@ func TestSourceBuildVersion_GitWorkspace(t *testing.T) {
 		{"config", "user.name", "t"},
 		{"commit", "--allow-empty", "-m", "init"},
 	} {
-		cmd := exec.Command("git", append([]string{"-C", wsRoot}, args...)...)
+		cmd := exec.Command(git.Executable(), append([]string{"-C", wsRoot}, args...)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

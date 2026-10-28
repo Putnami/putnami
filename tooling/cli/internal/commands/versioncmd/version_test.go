@@ -18,6 +18,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
+	gitexec "go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestVersionList_Empty(t *testing.T) {
@@ -110,7 +111,7 @@ func versionLineRepo(t *testing.T) string {
 
 func gitInRepo(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(gitexec.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
 	if out, err := cmd.CombinedOutput(); err != nil {
