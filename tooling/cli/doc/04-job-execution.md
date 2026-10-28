@@ -133,6 +133,14 @@ Bare command names are same-project prerequisites. `dependsOn: ["build"]`
 plans `build` for each project that has the dependent command, then the
 dependent command's root steps wait for that project's `build` leaf steps.
 
+`dependsOn: ["build~describe"]` plans all of `build` the same way, but the
+dependent command's root steps wait for that project's `describe` step alone,
+in every extension that runs it. A step the plan does not hold adds no edge.
+Each dependency counts as a read of the producer's files, so naming the step
+lets a `minimal` cache session serve the other `build` leaves, such as a
+compile, from their result alone. `clientgen` depends on `build~generate` and
+`build~describe`. The form requires extension contract 18.
+
 The `!` prefix creates a session barrier. `!build` plans `build` across the
 current project selection, then root steps of the dependent command wait for
 every `build` leaf job in the final plan. These are functional dependencies, so

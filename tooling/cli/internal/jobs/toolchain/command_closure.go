@@ -8,7 +8,8 @@ import (
 
 // CommandDependencyClosure returns the commands a run of commands can reach:
 // each command, the commands it depends on, and the target command and gates
-// of each session prerequisite, transitively across extensions.
+// of each session prerequisite, transitively across extensions. A dependency
+// on one step ("build~describe") reaches the whole command it names.
 func CommandDependencyClosure(
 	extensions []*extension.ExtensionDescription,
 	commands []string,
@@ -21,7 +22,7 @@ func CommandDependencyClosure(
 	for changed {
 		changed = false
 		addDependency := func(rawDependency string) {
-			dependency := strings.TrimPrefix(strings.TrimSpace(rawDependency), "!")
+			dependency := extension.ParseCommandDependency(strings.TrimSpace(rawDependency)).Command
 			if dependency != "" && !active[dependency] {
 				active[dependency] = true
 				changed = true

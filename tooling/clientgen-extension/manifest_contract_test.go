@@ -320,7 +320,10 @@ func TestOnlyTheAdoptionCommandWritesAuthoredSources(t *testing.T) {
 
 // TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild pins the
 // ordering contract. The project command is scheduler-mediated through the
-// provider's build; sync and adopt take no dependsOn because they must snapshot
+// provider's build: it waits for the build step that writes the contract it
+// reads, describe for a Go app and generate for a Go library or a TypeScript
+// provider, and never for the compile, whose files it does not read (protocol
+// ADR 0017). Sync and adopt take no dependsOn because they must snapshot
 // the worktree BEFORE any build of their own can rewrite it and then build the
 // providers themselves; the check builds nothing, so the explicit check command
 // depends on nothing either, while the validate contribution waits on the
@@ -334,8 +337,9 @@ func TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild(t *tes
 	if !ok {
 		t.Fatal("manifest declares no clientgen command")
 	}
-	if got := append([]string(nil), projectCommand.DependsOn...); !reflect.DeepEqual(got, []string{"build"}) {
-		t.Errorf("clientgen dependsOn = %v, want [build]; without it a generator can run before the OpenAPI document exists", got)
+	if got := append([]string(nil), projectCommand.DependsOn...); !reflect.DeepEqual(got, []string{"build~generate", "build~describe"}) {
+		t.Errorf("clientgen dependsOn = %v, want [build~generate build~describe]; without them a generator can run "+
+			"before the OpenAPI document exists, and the whole build would keep the compile's files needed", got)
 	}
 	for _, name := range []string{"clientgen-sync", "clientgen-adopt", "clientgen-check"} {
 		command, exists := manifest.Commands[name]

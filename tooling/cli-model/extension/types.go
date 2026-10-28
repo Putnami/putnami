@@ -42,6 +42,13 @@ const (
 	TaskInputFromRuntime   = proto.TaskInputFromRuntime
 )
 
+// CommandDependency is one entry of a command's dependsOn, read by
+// ParseCommandDependency. Every reader of CommandDependsOn parses through it.
+type CommandDependency = proto.CommandDependency
+
+// ParseCommandDependency reads `command`, `command~step` or `!command`.
+var ParseCommandDependency = proto.ParseCommandDependency
+
 type CommandGroupDefinition = proto.CommandGroupDefinition
 type SubcommandDefinition = proto.SubcommandDefinition
 type PositionalDefinition = proto.PositionalDefinition
@@ -258,7 +265,7 @@ type JobDefinition struct {
 	Toolchains       []string
 	TimeoutMs        int
 	DependsOn        []string
-	CommandDependsOn []string // command-level deps (e.g., ["build"] same-project, ["!build"] session barrier)
+	CommandDependsOn []string // command-level deps (e.g., ["build"] and ["build~describe"] same-project, ["!build"] session barrier)
 	// SessionPrerequisites are dependent-command-owned, same-session command
 	// invocations with optional selection, policy, gates, and local params.
 	SessionPrerequisites []SessionPrerequisiteDefinition

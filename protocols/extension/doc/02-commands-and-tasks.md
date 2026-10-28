@@ -37,7 +37,7 @@ A command is a user-facing operation invoked via `putnami <command>`:
 | `traits` | no | Orchestration hints that replace the verb's default traits: `heavy`, `requiresRunnable`, `injectPublishChannels`, `sideEffects`, and from contract 11 `kind`, `workload`, `rewritesSources` and `consumesReleaseSet` ([traits](06-verbs.md#declaring-traits)) |
 | `flags` | no | CLI flags the command accepts |
 | `defaults` | no | Default parameter values |
-| `dependsOn` | no | Command prerequisites. Bare names are same-project prerequisites; `!command` is a session barrier across the current project selection |
+| `dependsOn` | no | Command prerequisites. Bare names are same-project prerequisites; `command~step` waits for one step of a same-project prerequisite (contract 18); `!command` is a session barrier across the current project selection |
 | `sessionPrerequisites` | no | Dependent-owned same-session commands with optional condition, selection, project policy, gates, and local parameter bindings |
 | `priority` | no | Higher priority sorts earlier when multiple extensions provide the same command |
 | `quiet` | no | Suppress from job recap |
@@ -73,11 +73,37 @@ Bare command names are same-project prerequisites: `dependsOn: ["build"]`
 plans `build` for each project that has the dependent command, then root steps
 of the dependent command wait for that project's `build` leaf steps.
 
+`command~step` names one step of a same-project prerequisite. The planner plans
+the whole command, as for a bare name, and the root steps of the dependent
+command wait for that step alone, in each extension that runs it for the
+project. A step the plan does not hold adds no edge: a step the command does
+not declare for the project, or one that an `if`, an activation gate or
+`disable` removes. A dependent that reads a step only some providers run names
+each candidate step:
+
+```json
+{
+  "commands": {
+    "clientgen": {
+      "dependsOn": ["build~generate", "build~describe"],
+      "run": [{ "id": "generate-go", "task": "clientgen-go" }]
+    }
+  }
+}
+```
+
+Name a step when the dependent reads only what that step writes. A dependency
+tells the cache that the dependent reads the producer's files, so a `minimal`
+cache session then serves the other leaf steps of the prerequisite, such as a
+compile, from their result alone. A manifest that uses the form requires
+`cliContract: 18`.
+
 Names prefixed with `!` are session barriers. `!build` plans `build` across the
 current project selection, then every root step of the dependent command waits
 for every `build` leaf job in the final plan. These are functional dependencies:
 if a barrier job fails, downstream release/deploy jobs are skipped.
 
+A session barrier names a whole command, so `!command~step` is invalid.
 Pipeline-step references prefixed with `^`, `/`, or `*` are invalid at command
 level; put them on the relevant entry in `run` instead.
 

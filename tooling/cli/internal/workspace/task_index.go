@@ -213,15 +213,18 @@ func (idx *taskIndex) addExtension(
 			register(idx.byExtension, cleanWorkspacePath(ext.RelPath), scope)
 		}
 		// A session barrier ("!cmd") orders two commands across the session
-		// and carries no data, so it is not an impact edge.
-		for _, prerequisite := range job.CommandDependsOn {
-			if strings.HasPrefix(prerequisite, "!") {
+		// and carries no data, so it is not an impact edge. A dependency on
+		// one step ("cmd~step") links the whole command, which widens the
+		// closure and never narrows it.
+		for _, rawPrerequisite := range job.CommandDependsOn {
+			prerequisite := extension.ParseCommandDependency(rawPrerequisite)
+			if prerequisite.Session || prerequisite.Command == "" {
 				continue
 			}
 			if commandDeps[command] == nil {
 				commandDeps[command] = make(map[string]bool)
 			}
-			commandDeps[command][prerequisite] = true
+			commandDeps[command][prerequisite.Command] = true
 		}
 	}
 }

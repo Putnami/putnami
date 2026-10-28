@@ -444,6 +444,14 @@ var lifecycleInvalidFixtureCodes = map[string][]string{
 	// context path, the `command` source and a path without a source would
 	// each reach the task as no value.
 	"binding-unresolvable.json": {"unresolvable-binding", "unresolvable-binding", "unresolvable-binding"},
+	// A command dependency names a command, one step of it, or a session
+	// barrier on a whole command. An empty command or step, a second
+	// separator, a session barrier on one step and a pipeline-step prefix
+	// would each plan nothing; the well-formed first entry passes.
+	"command-dependency-step-invalid.json": {
+		"invalid-command-dependency", "invalid-command-dependency", "invalid-command-dependency",
+		"invalid-command-dependency", "invalid-command-dependency", "invalid-command-dependency",
+	},
 }
 
 // TestConformance_FixtureProtocolVersions pins that adding the v3 vocabulary did

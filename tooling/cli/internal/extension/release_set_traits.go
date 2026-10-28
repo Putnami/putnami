@@ -67,7 +67,12 @@ func MemberPackageCommand(extensions []*ExtensionDescription, publisher, package
 		return ""
 	}
 	found := ""
-	for _, command := range publishes.Jobs[publishCommand].CommandDependsOn {
+	for _, dependency := range publishes.Jobs[publishCommand].CommandDependsOn {
+		parsed := ParseCommandDependency(dependency)
+		if parsed.Session {
+			continue
+		}
+		command := parsed.Command
 		job := packages.Jobs[command]
 		if command == publishCommand || job == nil || !job.Traits.InjectPublishChannels || command == found {
 			continue

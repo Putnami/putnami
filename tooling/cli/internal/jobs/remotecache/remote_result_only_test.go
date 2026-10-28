@@ -8,6 +8,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -218,4 +219,55 @@ func TestDependedOnJobsCountsOnlyTheEdgesThatReadFiles(t *testing.T) {
 			t.Fatal("an unplanned serialization predecessor lost its files")
 		}
 	})
+}
+
+// TestAStepDependencyLeavesTheCompileResultOnly pins the clientgen half of
+// protocol ADR 0017 in a minimal session. The plan has the shape the planner
+// builds for a Go app whose clientgen depends on build~generate and
+// build~describe (planner TestPlan_StepDependencyWaitsForTheNamedStepsOnly):
+// each generator waits for generate and describe, and infra is serialized
+// after compile without reading it. No job reads the compile's files, so its
+// hit is result-only, while describe, which the generators read, keeps its
+// files. With the bare build dependency, the generators wait for the compile
+// leaf and it keeps its files.
+func TestAStepDependencyLeavesTheCompileResultOnly(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "result-only-remote-restore", "a-hit-no-job-waits-for-moves-no-bytes")
+	step := func(name string, dependsOn ...*jobmodel.ScheduledJob) *jobmodel.ScheduledJob {
+		job := declaredJob(name, name, &extension.TaskDeclaration{})
+		for _, dependency := range dependsOn {
+			job.DependsOn = append(job.DependsOn, dependency.Key())
+		}
+		return job
+	}
+	plan := func(generatorsWaitFor func(generate, describe, compile, infra *jobmodel.ScheduledJob) []*jobmodel.ScheduledJob) (compile, describe *jobmodel.ScheduledJob, remote *RemoteCache) {
+		generate := step("build~generate")
+		describe = step("build~describe", generate)
+		compile = step("build~compile", describe)
+		infra := step("build~infra", generate, describe)
+		infra.SerializeAfter = []string{compile.Key()}
+		waited := generatorsWaitFor(generate, describe, compile, infra)
+		planned := []*jobmodel.ScheduledJob{generate, describe, compile, infra,
+			step("clientgen~generate-go", waited...), step("clientgen~generate-ts", waited...)}
+		movement := &cachekey.KeyMovement{Writers: map[string][]string{}, Moving: map[string]bool{}}
+		remote = resultOnlyRemote(t, cache.ModeMinimal, true)
+		remote.dependedOn = dependedOnJobs(planned, movement)
+		return compile, describe, remote
+	}
+
+	compile, describe, remote := plan(func(generate, describe, _, _ *jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
+		return []*jobmodel.ScheduledJob{describe, generate}
+	})
+	if remote.TaskFilesNeeded(compile) {
+		t.Error("TaskFilesNeeded(compile) = true, want false: no job reads the compile's files")
+	}
+	if !remote.TaskFilesNeeded(describe) {
+		t.Error("TaskFilesNeeded(describe) = false, want true: the generators read the contract describe writes")
+	}
+
+	compile, _, remote = plan(func(_, _, compile, infra *jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
+		return []*jobmodel.ScheduledJob{compile, infra}
+	})
+	if !remote.TaskFilesNeeded(compile) {
+		t.Error("TaskFilesNeeded(compile) = false with the generators waiting for the build leaves, want true")
+	}
 }

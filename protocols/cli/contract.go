@@ -45,6 +45,15 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	18: ADDITIVE — a command's dependency on one step of another command
+//	   (`dependsOn: ["<command>~<step>"]`). From 18 on, the planner plans the
+//	   whole prerequisite command for the project, as for `<command>`, and
+//	   makes every root step of the dependent command wait for that step
+//	   alone. A step the plan does not hold adds no edge. An older reader
+//	   would read the entry as a command name, plan nothing and run the
+//	   dependent before the step it reads, so it must refuse the stamp. A
+//	   manifest with such an entry is stamped 18, and the floor binds it from
+//	   every origin. A manifest without one keeps its stamp.
 //	17: ADDITIVE — the host hooks an extension declares (`hostHooks`). From
 //	   17 on, an explicit `putnami install`, `init` or `upgrade` writes the
 //	   declared hooks into the agent hosts' own hook files, for a workspace
@@ -276,7 +285,15 @@ const ChangedFilesContract = 16
 // which would install the extension without them, refuses the stamp instead.
 const HostHooksContract = 17
 
+// StepDependencyContract is required by a manifest whose command depends on
+// one step of another command (`<command>~<step>` in a command's dependsOn).
+// A reader at this contract plans the whole prerequisite command and makes the
+// dependent's root steps wait for that step alone, so an older reader, which
+// would read the entry as a command name and plan nothing, refuses the stamp
+// instead.
+const StepDependencyContract = 18
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = HostHooksContract
+const LatestContract = StepDependencyContract
