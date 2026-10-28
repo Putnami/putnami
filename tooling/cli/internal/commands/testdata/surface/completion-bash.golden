@@ -206,7 +206,8 @@ _putnami_reply() {
 # completion receives each word as the user typed it. It expands nothing and
 # uses no eval, because a typed word can hold a command substitution. Inside
 # $'...', it decodes the escapes that printf %q writes: a letter such as \n or
-# \E, an octal \NNN and a hex \xHH; it reads \cX as cX.
+# \E, an octal \NNN and a hex \xHH. It keeps the backslash of an escape it
+# does not decode, such as \cX.
 _putnami_dequote() {
     _putnami_word=""
     local rest="$1" c quote=""
@@ -248,6 +249,8 @@ _putnami_dequote() {
                             c="\\x"
                         fi
                         ;;
+                    "\\"|"'"|'"'|'?') ;;
+                    *) c="\\${c}" ;;
                 esac
                 _putnami_word+="${c}"
             else
