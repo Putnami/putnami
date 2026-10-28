@@ -3,6 +3,7 @@ import { specTest } from '@putnami/runtime/spectest';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
+import { chdir, cwd } from 'node:process';
 
 /**
  * Server-only `@putnami/runtime` APIs the SSR implementation imports. None of
@@ -416,11 +417,21 @@ console.log(JSON.stringify(result));
       // Separates a missing file from a stale resolver view if this regresses.
       expect(existsSync(packagedBundle)).toBe(true);
 
-      const built = await Bun.build({
-        entrypoints: [consumerEntrypoint],
-        target: 'bun',
-        compile: { outfile: executable },
-      });
+      // Bun writes the executable to a temporary `.<hash>-<n>.bun-build` file
+      // in the working directory before it renames it. From the package root,
+      // that file would join the package's source-v1 binding while it exists.
+      const workingDirectory = cwd();
+      chdir(executableRoot);
+      let built: Awaited<ReturnType<typeof Bun.build>>;
+      try {
+        built = await Bun.build({
+          entrypoints: [consumerEntrypoint],
+          target: 'bun',
+          compile: { outfile: executable },
+        });
+      } finally {
+        chdir(workingDirectory);
+      }
       if (!built.success) {
         throw new Error(built.logs.map((log) => log.message).join('\n'));
       }

@@ -311,8 +311,12 @@ await checkStatic('bun run bundle (baseline)', [options.bun, 'run', options.bund
 // ---------------------------------------------------------------------------
 {
   const probeBinary = `${options.embeddedCwd}/native-routes-probe.bin`;
+  // Bun writes the executable to a temporary `.<hash>-<n>.bun-build` file in
+  // its working directory first; the scratch directory keeps it out of the
+  // directory the bench was started from.
   const build = Bun.spawnSync({
     cmd: [options.bun, 'build', '--compile', options.nativeProbe, '--outfile', probeBinary],
+    cwd: options.embeddedCwd,
     stdout: 'pipe',
     stderr: 'pipe',
   });
@@ -450,14 +454,23 @@ if (options.sample) {
   // outfile with a regular file — handing it the device node destroys it the
   // day this compile starts succeeding. A scratch path costs nothing.
   const probeOut = `${options.embeddedCwd}/bytecode-cjs-probe.bin`;
+  // From the scratch directory, like every compile of the bench: the sample
+  // would otherwise hold Bun's temporary `.bun-build` file while it exists.
   const build = Bun.spawnSync({
-    cmd: [options.bun, 'build', '--compile', '--bytecode', options.entry, '--outfile', probeOut],
-    cwd: options.sample,
+    cmd: [options.bun, 'build', '--compile', '--bytecode', `${options.sample}/${options.entry}`, '--outfile', probeOut],
+    cwd: options.embeddedCwd,
     stdout: 'pipe',
     stderr: 'pipe',
   });
   rmSync(probeOut, { force: true });
-  const message = build.stderr.toString().replace(/\s+/g, ' ').trim().slice(0, 200);
+  // Bun names the entrypoint by the absolute path it was given; the row names
+  // it relative to the sample, so it reads the same on every machine.
+  const message = build.stderr
+    .toString()
+    .replaceAll(`${options.sample}/`, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
   // The interesting outcome is the *specific* top-level-await rejection; any
   // other failure (disk, permissions) must not read as "still rejected".
   const expectedRejection = message.includes('"await" can only be used inside an "async" function');
