@@ -14,9 +14,8 @@ _putnami_subcommands_for() {
         'context') _putnami_words=(generate map pack) ;;
         'deps') _putnami_words=(add install prune remove rm) ;;
         'extensions') _putnami_words=(install list prepare remove update validate) ;;
-        'mcp') _putnami_words=(install) ;;
         'migrate') _putnami_words=(vnext) ;;
-        'projects') _putnami_words=(create describe list sync tag) ;;
+        'projects') _putnami_words=(create deps describe list owner sync tag why) ;;
         'scopes') _putnami_words=(list) ;;
         'sessions') _putnami_words=(export inspect list replay summary) ;;
         'telemetry') _putnami_words=(off on show status) ;;
@@ -64,17 +63,18 @@ _putnami_path_known() {
         'impact-plan') return 0 ;;
         'init') return 0 ;;
         'install') return 0 ;;
-        'mcp') return 0 ;;
-        'mcp install') return 0 ;;
         'migrate') return 0 ;;
         'migrate vnext') return 0 ;;
         'pin') return 0 ;;
         'projects') return 0 ;;
         'projects create') return 0 ;;
+        'projects deps') return 0 ;;
         'projects describe') return 0 ;;
         'projects list') return 0 ;;
+        'projects owner') return 0 ;;
         'projects sync') return 0 ;;
         'projects tag') return 0 ;;
+        'projects why') return 0 ;;
         'report') return 0 ;;
         'scopes') return 0 ;;
         'scopes list') return 0 ;;
@@ -127,7 +127,6 @@ _putnami_core_root() {
         'impact-plan') return 0 ;;
         'init') return 0 ;;
         'install') return 0 ;;
-        'mcp') return 0 ;;
         'migrate') return 0 ;;
         'pin') return 0 ;;
         'projects') return 0 ;;
@@ -174,6 +173,7 @@ _putnami_flags_for() {
         'migrate vnext') _putnami_words=(--apply --check) ;;
         'pin') _putnami_words=(--remove) ;;
         'projects create') _putnami_words=(--channel --force --path --template) ;;
+        'projects deps') _putnami_words=(--dependents --transitive) ;;
         'projects sync') _putnami_words=(--dry-run --prune --skip-install) ;;
         'projects tag') _putnami_words=(--remove --set) ;;
         'report') _putnami_words=(--session) ;;
@@ -324,8 +324,8 @@ _putnami_completions() {
     # "${name[@]}" for an empty array under set -u.
     local -a _putnami_words
     local _putnami_word _putnami_colon
-    local -a commands=(cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
-    local -a structured=(cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
+    local -a commands=(cache cli completion config context deps doctor extensions help impact-plan init install migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
+    local -a structured=(cache cli completion config context deps doctor extensions help impact-plan init install migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
     local -a global_flags=(--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --output --json --quiet --color --no-color --version)
     local -a job_global_flags=()
     local -a projects=()
