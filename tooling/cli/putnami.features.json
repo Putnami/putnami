@@ -709,7 +709,8 @@
               "a-flag-before-the-command-is-refused",
               "a-flag-before-a-subcommand-is-refused",
               "a-flag-before-the-command-help-names-is-refused",
-              "completion-offers-nothing-after-a-leading-flag"
+              "completion-offers-nothing-after-a-leading-flag",
+              "completion-after-help-offers-the-command-it-describes"
             ]
           }
         },
