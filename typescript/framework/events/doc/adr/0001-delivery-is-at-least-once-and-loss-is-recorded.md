@@ -29,8 +29,9 @@ messages on stop loses work during every deploy.
 3. **One record per message, never per subscriber.** A dead-letter record is
    emitted once, after at least one `<topic>.dlq` subscriber accepted the message.
    Otherwise one drop record is emitted with a reason: `retries_exhausted`,
-   `retry_enqueue_failed`, `dlq_no_subscriber`, `dlq_enqueue_failed`, or
-   `queue_full`. The recorded attempt is the true final attempt.
+   `retry_enqueue_failed`, `dlq_no_subscriber`, `dlq_enqueue_failed`,
+   `queue_full`, or `broker_stopped`. The recorded attempt is the true final
+   attempt.
 4. **An unrouted dead letter is kept.** `dlq: true` with no `<topic>.dlq`
    subscriber stores the full envelope and error in a bounded, configurable
    buffer that operators and tests drain; the oldest entries are evicted first.
@@ -41,8 +42,11 @@ messages on stop loses work during every deploy.
    subject to the same policy.
 6. **Shutdown drains what was admitted.** `stop()` refuses new publishes and
    drains in-flight and queued deliveries until empty or the drain timeout
-   (default 10 s), then reports how many are pending. Pending retry timers are
-   cancelled.
+   (default 10 s), then reports how many are pending. At the deadline it
+   discards the deliveries still queued and records each one dropped with
+   reason `broker_stopped`. It cancels the pending retry timers and records
+   each cancelled retry dropped with the same reason and the failure that asked
+   for it. The Go memory broker reports both cases with the same reason.
 7. **Transports are structural interfaces, not SDKs.** Redis, Google Pub/Sub,
    and Postgres describe the client shape they need and the application supplies
    it. The package has no vendor dependency, so the root barrel re-exports every
@@ -66,6 +70,8 @@ messages on stop loses work during every deploy.
 ## Consequences
 
 - Application code pays for idempotency; it is the only place it can be paid.
+- Work that `stop()` abandons is visible data loss, like queue overflow and a
+  missing or refusing dead-letter queue.
 - Without `concurrency` and `queueLimit`, a burst is admitted without bound;
   services that need backpressure declare both.
 - Supplying a transport means supplying a client object, which keeps the vendor

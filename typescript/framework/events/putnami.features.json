@@ -97,6 +97,8 @@
             "checks": [
               "a-failing-in-flight-handler-does-not-hold-up-the-drain",
               "a-pending-retry-is-cancelled-by-stop-and-never-redelivered",
+              "a-queued-delivery-abandoned-at-the-deadline-is-recorded-as-dropped",
+              "a-retry-cancelled-by-stop-is-recorded-as-dropped",
               "a-retry-scheduled-before-stop-is-not-delivered-afterwards",
               "a-stopped-broker-refuses-new-publishes",
               "queued-deliveries-drain-before-stop-resolves",

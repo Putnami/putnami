@@ -42,7 +42,8 @@ A failed delivery retries with exponential backoff up to the handler's maximum,
 then goes to `<topic>.dlq` when the handler declared one. A message that is
 genuinely lost always leaves exactly one drop record naming why — retries
 exhausted, re-delivery refused, no dead-letter subscriber, dead-letter enqueue
-refused, or queue full — and never both a drop and a dead-letter record. A
+refused, queue full, or broker stopped — and one delivery never gets both a drop
+and a dead-letter record. A
 dead-letter with `dlq: true` and no subscriber is kept, whole, in a bounded
 buffer you can drain.
 

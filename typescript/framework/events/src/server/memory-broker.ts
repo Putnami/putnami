@@ -6,7 +6,7 @@ import { createTransportMessage } from '../transport/message-utils';
 import type { Envelope, Transport } from '../transport/transport';
 import type { DeadLetter } from './dead-letter';
 import { ConcurrencyQueue, type Subscription } from './delivery-queue';
-import { FailureRouter, type FailureRouterHost } from './failure-router';
+import { dropStopped, FailureRouter, type FailureRouterHost } from './failure-router';
 import { runHandler, type HandlerRunnerDeps } from './handler-runner';
 
 export type { DeadLetter };
@@ -142,9 +142,9 @@ export class MemoryBroker implements Transport {
       // queues. Dequeuing a queued delivery (see completeDelivery) registers a
       // fresh in-flight entry, so we loop until both the in-flight set and all
       // queues are empty — bounded by the configured drain timeout.
-      if (this.inFlight.size > 0 || this.hasQueuedDeliveries()) {
+      if (this.inFlight.size > 0 || this.queue.queued() > 0) {
         const logger = useLogger(EVENT_BROKER_LOGGER);
-        logger.debug(`Draining ${this.inFlight.size} in-flight and ${this.queuedDeliveryCount()} queued message(s)...`);
+        logger.debug(`Draining ${this.inFlight.size} in-flight and ${this.queue.queued()} queued message(s)...`);
 
         const deadline = Date.now() + this.drainTimeout;
         let timedOut = false;
@@ -157,7 +157,7 @@ export class MemoryBroker implements Transport {
         });
 
         try {
-          while ((this.inFlight.size > 0 || this.hasQueuedDeliveries()) && Date.now() < deadline) {
+          while ((this.inFlight.size > 0 || this.queue.queued() > 0) && Date.now() < deadline) {
             const drain = Promise.all([...this.inFlight].map((e) => e.promise));
             await Promise.race([drain, timeout]);
             if (timedOut) break;
@@ -168,7 +168,7 @@ export class MemoryBroker implements Transport {
           }
         }
 
-        const remaining = this.inFlight.size + this.queuedDeliveryCount();
+        const remaining = this.inFlight.size + this.queue.queued();
         if (remaining > 0) {
           logger.warn(`Drain timed out after ${this.drainTimeout}ms with ${remaining} message(s) still pending`);
         }
@@ -179,31 +179,12 @@ export class MemoryBroker implements Transport {
       this.subscriptions.clear();
       this.roundRobin.clear();
       this.inFlight.clear();
-      this.queue.reset();
-    }
-  }
-
-  /** Whether any subscription still has queued (admitted-but-not-started) deliveries. */
-  private hasQueuedDeliveries(): boolean {
-    for (const subs of this.subscriptions.values()) {
-      for (const sub of subs) {
-        if (this.queue.queuedFor(sub) > 0) {
-          return true;
-        }
+      // A delivery still queued at the drain deadline never runs: its publish
+      // already resolved, so the message is lost and each one is recorded.
+      for (const abandoned of this.queue.reset()) {
+        dropStopped(abandoned.envelope);
       }
     }
-    return false;
-  }
-
-  /** Total number of queued deliveries across all subscriptions. */
-  private queuedDeliveryCount(): number {
-    let count = 0;
-    for (const subs of this.subscriptions.values()) {
-      for (const sub of subs) {
-        count += this.queue.queuedFor(sub);
-      }
-    }
-    return count;
   }
 
   async publish(_topic: string, envelope: Envelope): Promise<void> {

@@ -98,6 +98,11 @@ dead-letter record never points an operator at a DLQ the message never reached.
 Messages dropped for `dlq_no_subscriber` stay inspectable through
 `broker.getDeadLetters()`.
 
+`stop()` records what it abandons with reason `broker_stopped`: each retry it
+cancels or never schedules, with the failure that asked for the retry, and each
+delivery still queued behind a concurrency limit at the drain deadline, with no
+error because it never ran.
+
 Exactly **one** message-level outcome is reported per dead-letter decision: the
 transport enqueues first, then emits `message dead-lettered` if at least one
 target accepted, or a single `message dropped` (`dlq_enqueue_failed`) if none
@@ -141,6 +146,7 @@ When the telemetry plugin is active, the events module emits these metrics autom
 | `events.handle.{topic}.duration` | Histogram | Handler execution time (ms) |
 | `events.handle.{topic}.retry` | Counter | Retry attempts |
 | `events.handle.{topic}.dlq` | Counter | Messages sent to dead-letter queue |
+| `events.handle.{topic}.dropped` | Counter | Messages dropped for `queue_full` or `broker_stopped` |
 
 ### Publisher Metrics
 

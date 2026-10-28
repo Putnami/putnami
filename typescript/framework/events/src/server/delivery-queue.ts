@@ -13,7 +13,7 @@ export interface Subscription {
   readonly callback: (message: Message<unknown>) => Promise<void>;
 }
 
-interface Delivery {
+export interface Delivery {
   readonly envelope: Envelope;
   readonly subscription: Subscription;
 }
@@ -33,6 +33,13 @@ interface DeliveryState {
  */
 export class ConcurrencyQueue {
   private states = new WeakMap<Subscription, DeliveryState>();
+  /**
+   * The states whose queue holds a delivery. `states` is weak so an unsubscribed
+   * handler's state can go; this set keeps a reference only while it has queued
+   * work, so `stop()` can count and discard every queued delivery, including one
+   * whose handler was unsubscribed meanwhile.
+   */
+  private readonly parked = new Set<DeliveryState>();
 
   constructor(
     private readonly deliver: (envelope: Envelope, sub: Subscription) => void,
@@ -56,6 +63,7 @@ export class ConcurrencyQueue {
 
     if (opts.queueLimit <= 0 || state.queue.length < opts.queueLimit) {
       state.queue.push({ envelope, subscription: sub });
+      this.parked.add(state);
       return;
     }
 
@@ -96,19 +104,35 @@ export class ConcurrencyQueue {
     if (!next) {
       return;
     }
+    if (state.queue.length === 0) {
+      this.parked.delete(state);
+    }
 
     state.active++;
     this.deliver(next.envelope, next.subscription);
   }
 
-  /** Number of queued (admitted-but-not-started) deliveries for a subscription. */
-  queuedFor(sub: Subscription): number {
-    return this.states.get(sub)?.queue.length ?? 0;
+  /** Number of queued (admitted-but-not-started) deliveries across all subscriptions. */
+  queued(): number {
+    let count = 0;
+    for (const state of this.parked) {
+      count += state.queue.length;
+    }
+    return count;
   }
 
-  /** Drop all delivery state (used during shutdown). */
-  reset(): void {
+  /**
+   * Drop all delivery state (used during shutdown) and return the deliveries
+   * that were still queued, so the caller can record each one it abandons.
+   */
+  reset(): Delivery[] {
+    const abandoned: Delivery[] = [];
+    for (const state of this.parked) {
+      abandoned.push(...state.queue);
+    }
+    this.parked.clear();
     this.states = new WeakMap();
+    return abandoned;
   }
 
   private getState(sub: Subscription): DeliveryState {
