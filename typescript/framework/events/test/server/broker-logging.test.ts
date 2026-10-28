@@ -448,15 +448,15 @@ describe('broker failure logging', () => {
       broker = new MemoryBroker({ simulateDuplicates: false, drainTimeout: 1000 });
       await broker.start();
 
-      // m-fail fails before stop() and arms a 20ms retry timer; m-slow keeps the
-      // drain open for 80ms, so the timer fires while stop() drains.
+      // m-fail fails before stop() and arms a 200ms retry timer; m-slow keeps the
+      // drain open for 400ms, so the timer fires while stop() drains.
       let attempts = 0;
       const mixed = handler(FailingTopic)
-        .options({ maxRetries: 3, maxBackoff: 20, timeout: 0, dlq: false })
+        .options({ maxRetries: 3, maxBackoff: 200, timeout: 0, dlq: false })
         .handle(async () => {});
       await broker.subscribe(mixed, async (message) => {
         if (message.id === 'm-slow') {
-          await Bun.sleep(80);
+          await Bun.sleep(400);
           return;
         }
         attempts++;
@@ -494,8 +494,9 @@ describe('broker failure logging', () => {
       broker = new MemoryBroker({ simulateDuplicates: false, drainTimeout: 20 });
       await broker.start();
 
-      // The handler outlives the 20ms drain and fails at 60ms. A one-minute
-      // backoff shows that the drop does not wait for a retry timer.
+      // The handler outlives the 20ms drain and fails at 60ms. A first retry waits
+      // at least 1s, so a drop recorded within 1s of the retry record did not wait
+      // for a retry timer.
       const late = handler(FailingTopic)
         .options({ maxRetries: 3, maxBackoff: 60_000, timeout: 0, dlq: false })
         .handle(async () => {});
@@ -510,6 +511,8 @@ describe('broker failure logging', () => {
 
       await waitUntil(() => recordsOf(logger, BROKER_LOGGER, 'message dropped').length === 1);
       const dropped = oneRecordOf(logger, BROKER_LOGGER, 'message dropped');
+      const scheduled = oneRecordOf(logger, BROKER_LOGGER, 'message retry scheduled');
+      expect(Date.parse(dropped.timestamp) - Date.parse(scheduled.timestamp)).toBeLessThan(1000);
       expect(dropped.error?.message).toBe(HANDLER_ERROR);
       expect(eventGroupOf(dropped)).toEqual({
         topic: 'logging.broker.orders',
