@@ -13,6 +13,7 @@
  *     --port 39880 --native-probe <path> [--out result.json]
  */
 import { rmSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 type Status = 'pass' | 'fail' | 'partial';
 
@@ -39,10 +40,12 @@ const options = {
   bundle: arg('bundle'),
   bun: arg('bun', 'bun'),
   diskCwd: arg('disk-cwd'),
-  embeddedCwd: arg('embedded-cwd'),
+  // embeddedCwd, nativeProbe and sample are absolute: the compiles run from
+  // embeddedCwd.
+  embeddedCwd: resolve(arg('embedded-cwd')),
   assetsDir: arg('assets-dir'),
-  nativeProbe: arg('native-probe'),
-  sample: arg('sample', ''),
+  nativeProbe: resolve(arg('native-probe')),
+  sample: arg('sample', '') && resolve(arg('sample')),
   entry: arg('entry', '.gen/src/serve.bundled.ts'),
 };
 

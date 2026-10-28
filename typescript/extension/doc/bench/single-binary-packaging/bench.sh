@@ -44,9 +44,11 @@ BENCH_BUN="${BENCH_BUN:-bun}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 SAMPLE_DIR="${BENCH_SAMPLE:-$REPO_ROOT/typescript/samples/08-real-time}"
-# Absolute, because the compiles name the sample's files from another directory.
-case "$SAMPLE_DIR" in /*) ;; *) SAMPLE_DIR="$PWD/$SAMPLE_DIR" ;; esac
 WORK="${BENCH_WORK:-${TMPDIR:-/tmp}/putnami-single-binary-bench}"
+# Absolute, because the compiles name the sample's files and write their
+# outputs from another directory.
+case "$SAMPLE_DIR" in /*) ;; *) SAMPLE_DIR="$PWD/$SAMPLE_DIR" ;; esac
+case "$WORK" in /*) ;; *) WORK="$PWD/$WORK" ;; esac
 BASE_PORT="${BENCH_BASE_PORT:-45080}"
 COLD_STARTS="${BENCH_COLD_STARTS:-10}"
 DOCKER_COLD_STARTS="${BENCH_DOCKER_COLD_STARTS:-5}"
