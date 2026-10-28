@@ -109,7 +109,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	defer boot.close()
 
 	// Re-exec into the workspace-pinned CLI when the running binary isn't it, so
-	// putnami, putnamiw, and the MCP server all run one engine. On a successful
+	// putnami and putnamiw run one engine. On a successful
 	// relaunch under Unix this call does not return.
 	//
 	// A pin is fail-closed: when the workspace pins a CLI this process could not
@@ -299,7 +299,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// Analysis-oriented reads need the exact locked extension manifests, tools
 	// and documentation even in a fresh worktree. This narrow preparation never
 	// invokes the full install lifecycle; failures degrade to the core local
-	// answer and are surfaced by MCP guidance when applicable.
+	// answer.
 	ctx = withInvocationReadPreparation(ctx, wsRoot, cfg, parsed)
 
 	// First-use workspace bootstrap: a fresh checkout, a new worktree, or
@@ -467,7 +467,8 @@ func automaticReadPreparationCommand(command, subcommand string) bool {
 	case "workspace":
 		return subcommand == "" || subcommand == "describe"
 	case "projects":
-		return subcommand == "" || subcommand == "list" || subcommand == "describe"
+		return subcommand == "" || subcommand == "list" || subcommand == "describe" ||
+			subcommand == "owner" || subcommand == "deps" || subcommand == "why"
 	case "extensions":
 		return subcommand == "list"
 	case "context":
@@ -533,10 +534,7 @@ func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, extensio
 // enterProcess takes what the invocation hands this process before anything
 // else runs. The run credential is read, and its descriptor closed, before
 // anything can start a process or replace this one: the relaunch hands it to
-// the pinned CLI on a fresh descriptor, and nothing else inherits it. An agent
-// host can then supply its active session directory independently from the
-// process cwd; it is entered before root discovery and pin relaunch so even an
-// older pinned CLI inherits the correct worktree after exec.
+// the pinned CLI on a fresh descriptor, and nothing else inherits it.
 //
 // A CLI started inside the workspace-fetch of a hosted run runs beside the job
 // credential, so it refuses first, before it reads a workspace, discovers an
@@ -553,10 +551,7 @@ func enterProcess(args []string) error {
 	if err := runcredential.Capture(args); err != nil {
 		return err
 	}
-	if err := requireHostedArtifactStore(runcredential.Hosted(), store.GlobalArtifactRoot); err != nil {
-		return err
-	}
-	return launch.EnterAgentWorkspace(args)
+	return requireHostedArtifactStore(runcredential.Hosted(), store.GlobalArtifactRoot)
 }
 
 // ErrHostedArtifactStore refuses a hosted run whose artifact store would fall

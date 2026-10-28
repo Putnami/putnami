@@ -1,9 +1,6 @@
 package mapgen
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,48 +10,10 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 )
 
-// AbsentDigest is the typed absence recorded for a declared input the project
-// does not have. It is a VALUE in the digest, not an omission, so "the README
-// was deleted" and "the README never existed" are different inputs sets and the
-// second cannot be mistaken for the first.
-const AbsentDigest = "absent"
-
-// Fragment is one project's map contribution plus the provenance needed to
-// validate it: the digest of the inputs it was computed from.
+// Fragment is one project's map contribution.
 type Fragment struct {
-	// Inputs records what this fragment was computed from.
-	Inputs FragmentInputs `json:"inputs"`
 	// Project is the project-scoped half of a map entry.
 	Project FragmentProject `json:"project"`
-}
-
-// FragmentInputs is the fragment's cache key, spelled out so a reader can audit
-// it rather than trust it.
-type FragmentInputs struct {
-	// Digest is the single value the reduce compares: sha256 over the identity
-	// digest and every file entry, in canonical order.
-	Digest string `json:"digest"`
-	// Identity is the digest of the workspace-resolved project identity the
-	// fragment consumed (id, path, name, type, description, tags, extensions,
-	// declared dependency names). It is an INPUT because those values reach the
-	// fragment from the loaded workspace (the language provider's probe view),
-	// not only from the files below — without it, a renamed TypeScript package or
-	// a new dependency edge could leave a matching file digest on a stale entry.
-	Identity string `json:"identity"`
-	// Files are the project-scoped inputs, sorted by path, each with a content
-	// digest or AbsentDigest: the four ProjectInputFiles plus the SchemaDirInput
-	// listing entry.
-	Files []InputFile `json:"files"`
-}
-
-// InputFile is one declared project-scoped input and its content address.
-type InputFile struct {
-	// Path is the project-relative, slash-formed input path. A trailing slash
-	// marks a DIRECTORY LISTING input (SchemaDirInput).
-	Path string `json:"path"`
-	// Digest is "sha256:<64hex>" for a present file (or, for a listing input, over
-	// its sorted name list), AbsentDigest otherwise.
-	Digest string `json:"digest"`
 }
 
 // FragmentProject is everything about a project that is derivable WITHOUT
@@ -76,8 +35,7 @@ type FragmentProject struct {
 	Endpoints    []Endpoint  `json:"endpoints,omitempty"`
 	ConfigKeys   []ConfigKey `json:"configKeys,omitempty"`
 	// Schemas are the project-relative paths of the JSON artifacts committed
-	// directly under SchemaDir, sorted. Covered by the SchemaDirInput listing
-	// digest, so adding or removing one invalidates this fragment.
+	// directly under SchemaDir, sorted.
 	Schemas []string `json:"schemas,omitempty"`
 }
 
@@ -92,63 +50,41 @@ func path3(parts ...string) string {
 	return strings.Join(kept, "/")
 }
 
-// readInputs reads the declared project-scoped inputs once, returning the digest
-// record, the file contents keyed by project-relative path (absent files are
-// simply missing from the content map), and the schema listing.
-//
-// Reading is unconditional even when the caller only wants to VALIDATE a
-// cached fragment: a digest that is not computed from the bytes on disk is
-// not a digest. What validation saves is the parsing and scanning — the openapi
-// walk, the JSON-Schema flatten, the README scan — not the reads.
-func readInputs(projDir string) (FragmentInputs, map[string][]byte, []string, error) {
-	files := make([]InputFile, 0, len(ProjectInputFiles)+1)
+// readInputs reads the declared project-scoped inputs once, returning the file
+// contents keyed by project-relative path (absent files are missing from the
+// map) and the schema listing.
+func readInputs(projDir string) (map[string][]byte, []string, error) {
 	contents := make(map[string][]byte, len(ProjectInputFiles))
-
-	rels := append([]string(nil), ProjectInputFiles...)
-	sort.Strings(rels)
-	for _, rel := range rels {
+	for _, rel := range ProjectInputFiles {
 		data, err := os.ReadFile(filepath.Join(projDir, filepath.FromSlash(rel)))
 		if err != nil {
 			if os.IsNotExist(err) {
-				files = append(files, InputFile{Path: rel, Digest: AbsentDigest})
 				continue
 			}
-			return FragmentInputs{}, nil, nil, fmt.Errorf("read map input %s: %w", rel, err)
+			return nil, nil, fmt.Errorf("read map input %s: %w", rel, err)
 		}
 		contents[rel] = data
-		files = append(files, InputFile{Path: rel, Digest: digestBytes(data)})
 	}
 
-	schemas, listing, err := readSchemaListing(projDir)
+	schemas, err := readSchemaListing(projDir)
 	if err != nil {
-		return FragmentInputs{}, nil, nil, err
+		return nil, nil, err
 	}
-	files = append(files, listing)
-	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	return FragmentInputs{Files: files}, contents, schemas, nil
+	return contents, schemas, nil
 }
 
 // readSchemaListing lists the JSON artifacts committed directly under
 // <project>/schema/ (non-recursive: every such directory in this tree is flat)
-// and returns them as sorted project-relative paths, together with the input
-// entry that covers them.
-//
-// The digest is over the sorted NAME LIST, never the file bytes: names are all
-// the fragment emits, so a content edit to an unparsed schema must leave the
-// fragment valid — while adding or removing a schema must invalidate it, which
-// is precisely what a listing digest does and what four file digests cannot.
-//
-// A missing (or non-directory) schema/ is a typed ABSENCE for the same reason an
-// absent file is: "the directory was emptied" and "there never was one" must not
-// hash alike.
-func readSchemaListing(projDir string) ([]string, InputFile, error) {
+// and returns them as sorted project-relative paths. A missing (or
+// non-directory) schema/ lists nothing.
+func readSchemaListing(projDir string) ([]string, error) {
 	dir := filepath.Join(projDir, filepath.FromSlash(SchemaDir))
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		return nil, InputFile{Path: SchemaDirInput, Digest: AbsentDigest}, nil //nolint:nilerr // no schema/ directory is an absence, not a failure
+		return nil, nil //nolint:nilerr // no schema/ directory lists nothing, it is not a failure
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, InputFile{}, fmt.Errorf("read map input %s: %w", SchemaDirInput, err)
+		return nil, fmt.Errorf("read map input %s/: %w", SchemaDir, err)
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -159,33 +95,27 @@ func readSchemaListing(projDir string) ([]string, InputFile, error) {
 	}
 	sort.Strings(names)
 
-	var listing strings.Builder
 	rels := make([]string, 0, len(names))
 	for _, name := range names {
-		listing.WriteString(name)
-		listing.WriteString("\n")
 		rels = append(rels, SchemaDir+"/"+name)
 	}
 	if len(rels) == 0 {
 		rels = nil
 	}
-	return rels, InputFile{Path: SchemaDirInput, Digest: digestBytes([]byte(listing.String()))}, nil
+	return rels, nil
 }
 
 // identityView is the normalized projection of the workspace-resolved project
-// identity the fragment consumes. It is serialized canonically and hashed into
-// FragmentInputs.Identity; the field set here IS the contract, so adding a field
-// to FragmentProject that comes from the workspace (rather than from a file)
-// requires adding it here too or the digest stops covering the fragment.
+// identity the fragment consumes.
 type identityView struct {
-	ID           string   `json:"id"`
-	Path         string   `json:"path"`
-	Name         string   `json:"name"`
-	Type         string   `json:"type"`
-	Description  string   `json:"description"`
-	Tags         []string `json:"tags"`
-	Extensions   []string `json:"extensions"`
-	Dependencies []string `json:"dependencies"`
+	ID           string
+	Path         string
+	Name         string
+	Type         string
+	Description  string
+	Tags         []string
+	Extensions   []string
+	Dependencies []string
 }
 
 // projectIdentity normalizes a workspace project into the identity view: sorted,
@@ -207,73 +137,18 @@ func projectIdentity(p *workspace.Project) identityView {
 	}
 }
 
-// digestIdentity hashes the canonical JSON of the identity view. json.Marshal of
-// a struct emits fields in declaration order, and every slice is already sorted,
-// so the bytes are stable.
-func digestIdentity(view identityView) (string, error) {
-	data, err := json.Marshal(view)
-	if err != nil {
-		return "", fmt.Errorf("serialize project identity: %w", err)
-	}
-	return digestBytes(data), nil
-}
-
-// digestInputs folds the identity digest and every file entry into the single
-// value the reduce compares. The serialization is explicit (length-free but
-// NUL-separated and newline-terminated per record, over a sorted file list) so
-// two different input sets cannot collide by concatenation.
-func digestInputs(in FragmentInputs) string {
-	var sb strings.Builder
-	sb.WriteString("identity\x00")
-	sb.WriteString(in.Identity)
-	sb.WriteString("\n")
-	for _, f := range in.Files {
-		sb.WriteString(f.Path)
-		sb.WriteString("\x00")
-		sb.WriteString(f.Digest)
-		sb.WriteString("\n")
-	}
-	return digestBytes([]byte(sb.String()))
-}
-
 // BuildFragment computes a project's fragment from its four declared inputs plus
 // its workspace-resolved identity. It is a pure function of those inputs: no
 // timestamps, no absolute paths, no CLI version.
 func BuildFragment(wsRoot string, p *workspace.Project) (*Fragment, error) {
-	inputs, contents, schemas, view, err := digestFragmentInputs(wsRoot, p)
+	projDir := filepath.Join(wsRoot, filepath.FromSlash(p.Path))
+	contents, schemas, err := readInputs(projDir)
 	if err != nil {
 		return nil, err
 	}
-	return assembleFragment(p, view, inputs, contents, schemas)
-}
-
-// digestFragmentInputs is the CHEAP half of a fragment build: it reads the
-// declared input files and computes the inputs digest, without parsing any of
-// them. It exists so ResolveFragment can decide a cache hit from the digest
-// alone — the digest is a pure function of the raw bytes plus the resolved
-// identity, so it never needs the parsed forms.
-func digestFragmentInputs(wsRoot string, p *workspace.Project) (FragmentInputs, map[string][]byte, []string, identityView, error) {
-	projDir := filepath.Join(wsRoot, filepath.FromSlash(p.Path))
-	inputs, contents, schemas, err := readInputs(projDir)
-	if err != nil {
-		return FragmentInputs{}, nil, nil, identityView{}, err
-	}
 	view := projectIdentity(p)
-	identity, err := digestIdentity(view)
-	if err != nil {
-		return FragmentInputs{}, nil, nil, identityView{}, err
-	}
-	inputs.Identity = identity
-	inputs.Digest = digestInputs(inputs)
-	return inputs, contents, schemas, view, nil
-}
 
-// assembleFragment is the EXPENSIVE half: it parses the README summary, the
-// OpenAPI document, and the config schema out of the already-read contents.
-// ResolveFragment runs it only on a cache miss.
-func assembleFragment(p *workspace.Project, view identityView, inputs FragmentInputs, contents map[string][]byte, schemas []string) (*Fragment, error) {
 	projPath := filepath.ToSlash(p.Path)
-
 	project := FragmentProject{
 		ID:           view.ID,
 		Path:         view.Path,
@@ -304,43 +179,7 @@ func assembleFragment(p *workspace.Project, view identityView, inputs FragmentIn
 		project.ConfigKeys = keys
 	}
 
-	return &Fragment{Inputs: inputs, Project: project}, nil
-}
-
-// ResolveFragment returns the fragment for p and whether it was REUSED from
-// cache. A nil cache builds every fragment.
-//
-// A cached fragment is reused only when its recorded inputs digest equals the
-// digest of the inputs on disk right now. Anything else — no entry, a stale
-// digest — rebuilds the fragment and stores it in the cache. Drift is therefore
-// not something the caller can observe after the fact: a fragment that does
-// not match its inputs is never used.
-//
-// The digest is computed and compared BEFORE any parsing happens: a hit costs
-// the input reads and the hash, never the README summary, OpenAPI, or config
-// schema parse — which is what makes the warm path O(changed) instead of
-// O(projects).
-func ResolveFragment(wsRoot string, p *workspace.Project, cache *FragmentCache) (*Fragment, bool, error) {
-	inputs, contents, schemas, view, err := digestFragmentInputs(wsRoot, p)
-	if err != nil {
-		return nil, false, err
-	}
-	if stored := cache.lookup(p.ID); stored != nil &&
-		stored.Inputs.Digest != "" && stored.Inputs.Digest == inputs.Digest {
-		return stored, true, nil
-	}
-	fresh, err := assembleFragment(p, view, inputs, contents, schemas)
-	if err != nil {
-		return nil, false, err
-	}
-	cache.store(p.ID, fresh)
-	return fresh, false, nil
-}
-
-// digestBytes returns the canonical "sha256:<64hex>" content address of data.
-func digestBytes(data []byte) string {
-	sum := sha256.Sum256(data)
-	return "sha256:" + hex.EncodeToString(sum[:])
+	return &Fragment{Project: project}, nil
 }
 
 // sortedSet returns the sorted, deduped, blank-free copy of items, or nil when

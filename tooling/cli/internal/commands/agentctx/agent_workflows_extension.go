@@ -390,10 +390,9 @@ func localExtensionAgentContent(wsRoot string, cfg *wsproto.Config, ref AgentArt
 }
 
 // pinnedExtensionAgentContent resolves an opted-in contribution for the
-// passes that act only on what is already installed — the first-run ensure
-// pass and the session-start reconcile. It reports false, with no error, for a
-// local extension (those passes never build), for a registry extension the
-// lock does not pin (an explicit install pins it first).
+// pass that acts only on what is already installed — the first-run ensure
+// pass. It reports false, with no error, for a local extension (that pass
+// never builds), for a registry extension the lock does not pin (an explicit install pins it first).
 func pinnedExtensionAgentContent(wsRoot string, cfg *wsproto.Config, lf *lockfile.LockFile, ref AgentArtifactRef) (AgentArtifactResolution, bool, error) {
 	declared, err := extension.FindDeclaredExtension(wsRoot, cfg, ref.Extension)
 	if err != nil {

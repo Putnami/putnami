@@ -119,9 +119,7 @@ func TestIsExemptCommand(t *testing.T) {
 	if !IsExemptCommand("pin") {
 		t.Error("pin must be exempt from relaunch")
 	}
-	// mcp must NOT be exempt: `putnami mcp` should relaunch into the pinned
-	// engine so an agent's MCP server runs the same version as the CLI.
-	for _, c := range []string{"build", "test", "version", "upgrade", "mcp", ""} {
+	for _, c := range []string{"build", "test", "version", "upgrade", ""} {
 		if IsExemptCommand(c) {
 			t.Errorf("%q should not be exempt from relaunch", c)
 		}
@@ -168,7 +166,6 @@ func TestIsExemptInvocation(t *testing.T) {
 		{"version", "use", "go-dev"},
 		{"cli"},
 		{"build"},
-		{"mcp"},
 		{"extensions", "install", "@acme/audit"},
 		{"extensions", "list"},
 		{"extensions", "install", "--", "--user"},

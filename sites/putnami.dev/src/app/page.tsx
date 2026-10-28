@@ -43,7 +43,7 @@ const CHAIN = [
   {
     declare: '— nothing. it’s derived',
     derives: 'the agent context',
-    reads: 'your agent, over MCP',
+    reads: 'your agent, through the CLI',
     derived: true,
   },
 ];
@@ -89,7 +89,7 @@ const SURFACES = [
   {
     key: 'intelligence',
     name: 'Putnami Intelligence',
-    desc: 'What ships today: agent orientation over MCP, a versioned workspace index, and spec-driven development — features, specs and architecture recorded next to the code. The review-and-audit loop, with freshness and receipts on every finding, is where this is going. It stands alone: useful with neither Putnami frameworks nor Putnami Cloud.',
+    desc: 'What ships today: agent orientation through the CLI, a versioned workspace index, and spec-driven development — features, specs and architecture recorded next to the code. The review-and-audit loop, with freshness and receipts on every finding, is where this is going. It stands alone: useful with neither Putnami frameworks nor Putnami Cloud.',
   },
 ];
 
@@ -233,7 +233,7 @@ export default page()
               A deterministic per-project orientation document: identity and dependency graph, composition roots,
               capability and contract references, representative source ranges, tests, docs, provenance. Aggregated{' '}
               <strong>by reference</strong> — paths, digests and ranges, never file contents — behind a fail-closed
-              publish-safety gate. Served read-only over MCP.
+              publish-safety gate. Printed read-only by the CLI.
             </SurfaceCard>
             <SurfaceCard title='--impacted'>
               The blast radius of a change, before anything acts on it. An agent that knows what it is about to affect

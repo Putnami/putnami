@@ -195,7 +195,6 @@ var structuredHelpSubcommands = []string{
 	"features inspect",
 	"features snapshot",
 	"features validate",
-	"mcp install",
 	"migrate vnext",
 	"projects create",
 	"projects describe",

@@ -4,31 +4,28 @@ Use AI coding assistants like Claude Code, Codex, Cursor, or GitHub Copilot to b
 
 ## What you get
 
-`putnami init` writes two things for assistants at the workspace root:
+`putnami init` writes one thing for assistants at the workspace root:
 
 - **`AGENTS.md` / `CLAUDE.md`** — one delimited Putnami block. A new `CLAUDE.md` is only `@AGENTS.md`; an existing file keeps every line outside the block, and an edited block is preserved, never overwritten
-- **`.mcp.json`** — the `putnami` MCP server entry, so a new Claude Code session reaches the Putnami tools with no manual step. `putnami install` and `putnami upgrade` add the entry too when it is missing
-
 The block is short on purpose. It states:
 
 - **CLI commands** — use `./putnamiw` when present, otherwise `putnami`; never npm, bun, go, pip, or cargo for build, test, lint, install, dependency, or generation work
 - **Selection** — iterate with `--projects <a>,<b>`, and run the gate once with `--impacted --enforce-coverage` before declaring work complete
-- **Discovery** — the first code-discovery step is a Putnami MCP call (`putnami.search`, `putnami.context`, `putnami.impact`), even when the agent already knows a keyword or a file name; file search is for literal text, or for when a tool answers stale or unavailable
+- **Discovery** — discover code through the CLI first: `putnami projects list|describe|owner|deps|why` for the project graph, `putnami context map|pack` to orient, and `putnami <verb> --impacted --dry-run` for what a change affects; file search is for literal text
 - **Skills** — the skills and agents an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami
 - **Your rules** — read `.agents/constraints.md` when it exists
 
 `.agents/constraints.md` is a file *you* write when you have durable project rules to state; Putnami only reads it. A workspace that kept its rules in `.AI/constraints.md` moves the file with `git mv .AI/constraints.md .agents/constraints.md`.
 
-Framework recipes are not copied into your repository. An MCP-aware assistant reads them live from the `putnami://extension-guidance/AI.md` resources, which carry the exact bytes of the extension versions your lock pins.
+Putnami does not copy framework recipes into your repository.
 
 ## Context, tools, and workflows are separate layers
 
-Putnami onboarding has three independent layers:
+Putnami onboarding has two independent layers:
 
 | Layer | Drives |
 |---|---|
 | the Putnami block in `AGENTS.md` / `CLAUDE.md` | the commands, selection rules, and discovery routing the assistant follows; plus your own `.agents/constraints.md` when you write one |
-| `.mcp.json`, written by `putnami init`, `install` and `upgrade` when the entry is missing | read-only structured workspace facts for assistants that support MCP |
 | the agent content of `@putnami/contributor` | repeatable workflows such as planning, implementing, checking, and reviewing |
 
 You need a Putnami workspace (preferably with its pinned `./putnamiw` wrapper)
@@ -37,17 +34,10 @@ skills. You do **not** need an account with a source host, work-item tracker, or
 review service to use the core workflows. Connectors for those services are
 optional and are installed only when you want that automation.
 
-An MCP-aware assistant should use Putnami's read-only structural tools before
-enumerating files. A non-MCP assistant uses `./putnamiw` (or `putnami` when the
-workspace has no wrapper) and focused file reads. In both cases the pinned
-Putnami command remains authoritative for build, test, lint, validation,
-dependency, and install workflows.
-
-| Setup | Workspace discovery | Default workflow result |
-|---|---|---|
-| MCP-aware + core only | local Putnami MCP tools | local plan/change/check/review |
-| Non-MCP + core only | wrapper/CLI fallback | the same local result |
-| Core + optional integrations | Putnami tools plus separately configured host capabilities | local by default; an external write only when explicitly requested |
+An assistant uses `./putnamiw` (or `putnami` when the workspace has no wrapper)
+and focused file reads. The pinned Putnami command is authoritative for
+discovery, build, test, lint, validation, dependency, and install workflows.
+Putnami serves no protocol server and writes no host registration.
 
 Source hosting and work-item tracking are independent choices. A team may use
 either, combine services from different vendors, or configure neither. The core
@@ -139,19 +129,20 @@ extension, delete the ownership records the refusal names, and run
 differs from the content is a collision that writes nothing: move or delete
 it, then rerun.
 
-## Reach the MCP server
+## Reach the workspace
 
-Claude Code discovers the server through a `.mcp.json` file at the workspace root. Other hosts do not read that file: Codex reads `.codex/config.toml`, Cursor reads `.cursor/mcp.json`, and VS Code reads `.vscode/mcp.json`. Putnami commands write none of them. `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry when it is missing. They merge: other servers and unknown keys are preserved, a `putnami` entry you changed is kept as you wrote it, and a file that does not parse is left untouched with a warning. The entry runs `putnami mcp`, or `./putnamiw mcp` in a workspace that builds its own CLI from source and has a `putnamiw` file at its root.
+An assistant reaches the workspace through the CLI:
 
-To write or repair the entry explicitly, run:
+| Need | Command |
+|---|---|
+| Orientation | `putnami context map`, `putnami context pack` |
+| Projects | `putnami projects list`, `putnami projects describe <project>` |
+| Owner of a path | `putnami projects owner <path>` |
+| Dependencies | `putnami projects deps <project> [--dependents] [--transitive]` |
+| Why a change reaches a project | `putnami projects why <from> <to>` |
+| What a job would run | `putnami <verb> --impacted --dry-run` |
 
-```bash
-putnami mcp install
-```
-
-It merges the same way, and it also rewrites a diverged `putnami` entry.
-
-When an agent session starts, the server brings the managed skills to the extension release your lock pins, so a worktree that switched branches does not keep the skills of its old lock. It copies them from the installed extension only; when you edited a managed file, it logs a warning and starts anyway, and `putnami install` finishes the job.
+An earlier Putnami wrote a `putnami` entry to `.mcp.json`. `putnami install` and `putnami upgrade` remove that entry when it is the one Putnami wrote, and delete the file when nothing else remains. An entry you changed stays as you wrote it, with a warning, and a file that does not parse stays untouched.
 
 ## Polyglot workspaces
 
@@ -162,11 +153,10 @@ putnami extensions install @putnami/go
 putnami context generate
 ```
 
-Language recipes do not land in your repository: each extension's `AI.md` is served live by the MCP server at the version your lock pins.
 
 ## Orient in a project with agent context
 
-When an assistant (Claude, Codex, or any MCP-aware tool) needs to understand a single project — where its composition roots are, which contracts and capabilities it exposes, which source is worth reading first, and how it is tested — Putnami can hand it those framework-owned facts directly instead of making it enumerate the repository.
+When an assistant (Claude, Codex, or any other tool) needs to understand a single project — where its composition roots are, which contracts and capabilities it exposes, which source is worth reading first, and how it is tested — Putnami can hand it those framework-owned facts directly instead of making it enumerate the repository.
 
 ### `putnami context pack`
 
@@ -179,19 +169,13 @@ putnami context pack --output=json
 
 It writes no file. The document embeds content digests and the workspace revision, so a stored copy would churn on every commit and go stale behind the code. Every run builds it again from the working tree.
 
-### The `agent_context` MCP tool
-
-The Putnami MCP server exposes a read-only `agent_context` tool. An agent calls it to get a single project's identity, composition roots, contracts, representative sources, and tests in **one structured response**, built from the working tree on every call, instead of listing directories and reading files one by one. It complements `describe_project`: `describe_project` answers "what commands/tasks/dependencies does this project have", while `agent_context` answers "how is this project composed and where should I read first".
-
-The MCP server advertises these tools at initialization, so an agent connected to your workspace already knows they exist.
-
 ## Say what you want built, once
 
 Framework facts tell an assistant how your project is composed; they never say what a change is *for*. That is what a spec holds — intended outcomes, non-goals, and the sentences your team agreed to — in one small, strictly validated file per feature. See [Write a feature spec](/docs/how-to/write-a-feature-spec).
 
 ## Prompt recipes
 
-Here are prompts that work well with AI assistants in a Putnami project. The assistant reads the framework patterns live from the MCP server's extension-guidance resources.
+Here are prompts that work well with AI assistants in a Putnami project.
 
 ### Web applications (typescript-web)
 

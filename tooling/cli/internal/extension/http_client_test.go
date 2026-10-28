@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/recorded"
 	"go.putnami.dev/tooling/cli/internal/useragent"
 )
@@ -120,37 +119,6 @@ func TestDoWithRetrySetsUserAgent(t *testing.T) {
 
 	if gotUA != "putnami-cli/v9.8.7" {
 		t.Fatalf("User-Agent = %q, want putnami-cli/v9.8.7", gotUA)
-	}
-}
-
-func TestRegistryHTTPClientPropagatesOptedInMCPIdentity(t *testing.T) {
-	identity := useragent.MCPIdentity("v9.8.7", "claude-cli", "1.0", "haiku")
-	useragent.SetAgentIdentity(identity)
-	t.Cleanup(useragent.ClearAgentIdentity)
-
-	var gotUA, gotHarness, gotModel string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotUA = r.Header.Get("User-Agent")
-		gotHarness = r.Header.Get(proto.AgentHarnessHeader)
-		gotModel = r.Header.Get(proto.AgentModelHeader)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	resp, err := NewRegistryHTTPClient().Get(srv.URL)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if gotUA != identity.UserAgent {
-		t.Errorf("User-Agent = %q, want %q", gotUA, identity.UserAgent)
-	}
-	if gotHarness != identity.Harness {
-		t.Errorf("%s = %q, want %q", proto.AgentHarnessHeader, gotHarness, identity.Harness)
-	}
-	if gotModel != identity.Model {
-		t.Errorf("%s = %q, want %q", proto.AgentModelHeader, gotModel, identity.Model)
 	}
 }
 

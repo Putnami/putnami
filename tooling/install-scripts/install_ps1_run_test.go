@@ -1104,7 +1104,7 @@ func TestInstallPS1RunRejectsAnInvalidCommandBeforeAnyNetworkCall(t *testing.T) 
 	}
 }
 
-// Declining agent-host registration is independent of running a command.
+// Declining the agent-host step is independent of running a command.
 func TestInstallPS1RunHonorsNoAgentHosts(t *testing.T) {
 	t.Parallel()
 	for _, decline := range []struct {
@@ -1126,7 +1126,7 @@ func TestInstallPS1RunHonorsNoAgentHosts(t *testing.T) {
 			if res.exitCode != 0 {
 				t.Fatalf("run failed (exit %d):\n%s", res.exitCode, res.output())
 			}
-			if !strings.Contains(res.stderr, "Skipping agent-host registration") {
+			if !strings.Contains(res.stderr, "Skipping agent-host cleanup") {
 				t.Fatalf("the declined registration was not reported on stderr:\n%s", res.output())
 			}
 			if data, err := os.ReadFile(claude.log); err == nil && len(data) != 0 {

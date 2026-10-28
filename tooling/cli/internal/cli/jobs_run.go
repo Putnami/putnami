@@ -65,9 +65,8 @@ func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wspro
 
 // terminalRequest is the whole terminal→engine mapping, in one named place so
 // another adapter's mapping can be compared against it rather than against a
-// copy. An earlier change pulled it out of runJobCommands for exactly that: the
-// MCP equivalence test builds its terminal side here, so "terminal and MCP agree"
-// is a claim about the shipping mapping and not about a restatement of it.
+// copy, so a claim that two entry paths agree is a claim about the shipping
+// mapping and not about a restatement of it.
 func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, extensions ...*extension.ExtensionDescription) engine.Request {
 	req := engine.Request{
 		WorkspaceRoot: wsRoot,
@@ -166,8 +165,8 @@ func commandFlagValidator(parsed *ParsedArgs, stderr io.Writer) func(*extension.
 }
 
 // sessionObserver is the terminal adapter's implementation of the engine's
-// telemetry seam (ADR 0001 §4). It is the ONLY observer in the tree: MCP, watch,
-// and lifecycle adapters pass nil, so routing them through the engine can never
+// telemetry seam (ADR 0001 §4). It is the ONLY observer in the tree: watch and
+// lifecycle adapters pass nil, so routing them through the engine can never
 // start reporting sessions from a surface that never reported before (the
 // "never send before notice" rule).
 //

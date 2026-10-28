@@ -13,11 +13,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// The human-notice seam is an ACCEPTANCE CRITERION: the MCP
-// adapter's stdout IS the JSON-RPC frame stream, so a single "Nothing to do."
-// line written there desynchronizes the session's framing and kills the agent
-// connection. Request.Stdout is how an adapter takes that stream over; these
-// tests fail before a stage that bypasses it ships, not after.
+// The human-notice seam is an ACCEPTANCE CRITERION: an adapter that owns its
+// stdout, such as `cache verify`, prints one document there, so a single
+// "Nothing to do." line written there corrupts it. Request.Stdout is how an
+// adapter takes that stream over; these tests fail before a stage that
+// bypasses it ships, not after.
 
 // TestEngineWritesNoticesOnlyThroughTheRequestSeam is the structural half: after
 // A4 exactly ONE production statement in this package names os.Stdout, and it is
@@ -53,8 +53,8 @@ func TestEngineWritesNoticesOnlyThroughTheRequestSeam(t *testing.T) {
 	if len(sites) != 1 || !strings.HasPrefix(sites[0], "engine.go:") {
 		t.Fatalf("os.Stdout statements in internal/engine = %v, want exactly one in engine.go "+
 			"(the default inside Request.stdout()).\n"+
-			"  Every notice the engine prints must go through req.stdout(), or the MCP adapter's "+
-			"JSON-RPC transport gets it.", sites)
+			"  Every notice the engine prints must go through req.stdout(), or an adapter "+
+			"that owns its stdout gets it.", sites)
 	}
 }
 

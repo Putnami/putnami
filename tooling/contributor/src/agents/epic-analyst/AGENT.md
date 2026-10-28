@@ -20,7 +20,7 @@ fi
 
 ## Repo context you are expected to load, not assume
 
-Read `AGENTS.md` (or the host entrypoint) and `.agents/constraints.md` when present before reasoning about structure. The consumer repository's authoritative rules define its topology and naming. Resolve actual project IDs, owners, dependencies, and documentation paths from the workspace graph; never impose another repository's directory roots or module names. Prefer the `mcp__putnami__*` graph tools, with `"$PUTNAMI_CLI" projects list` / `projects describe` as the local fallback.
+Read `AGENTS.md` (or the host entrypoint) and `.agents/constraints.md` when present before reasoning about structure. The consumer repository's authoritative rules define its topology and naming. Resolve actual project IDs, owners, dependencies, and documentation paths from the workspace graph; never impose another repository's directory roots or module names. Use `"$PUTNAMI_CLI" projects list|describe|owner|deps|why` and `"$PUTNAMI_CLI" context map|pack` for the graph.
 
 Known minefields — treat any slice touching these as high-risk regardless of how small the diff looks: build-cache keys and determinism, content-addressing, concurrency and atomicity, auth and signing surfaces, and cross-runtime protocol parity. Each of them fails quietly when mishandled.
 

@@ -429,8 +429,8 @@ absent when a declaration file could not be read. The byte stream is specified i
 
 ### The launching agent
 
-`agent` names **the agent session that launched the run** through the MCP
-server's `run_jobs` tool:
+A session can carry an `agent` block that names the agent session that launched
+the run:
 
 ```json
 {
@@ -438,12 +438,11 @@ server's `run_jobs` tool:
 }
 ```
 
-`kind` is the name the MCP client sent in `initialize`. `sessionId` is
-`PUTNAMI_AGENT_SESSION_ID` from the MCP server environment, else
-`CLAUDE_CODE_SESSION_ID`, which Claude Code exports to the servers it starts.
-Each member is absent when nobody stated it, and a terminal run records no
-`agent` block at all. The block is recorded locally; it leaves the machine only
-through a session reporter the workspace turned on.
+The core records no `agent` block for a terminal run, and it serves no protocol
+server that launches runs for an agent. The member stays in the session schema
+so a reader still parses sessions recorded by an earlier CLI. The block is
+recorded locally; it leaves the machine only through a session reporter the
+workspace turned on.
 
 ### Declared-check failure codes
 
@@ -932,8 +931,8 @@ outlive the worktree are collected with
 [`sessions export`](#export-sessions) while it still exists.
 
 Ordinary terminal runs move the
-`latest` symlink when they finalize. Ephemeral adapter runs (currently MCP
-`run_jobs`) remain listable but do not move it, so `latest` is the most recently
+`latest` symlink when they finalize. Ephemeral adapter runs (currently
+`cache verify`) remain listable but do not move it, so `latest` is the most recently
 finalized non-ephemeral user run and may be older than other session directories.
 Pruning always preserves that target and removes the oldest other sessions,
 preventing the symlink from becoming dangling.

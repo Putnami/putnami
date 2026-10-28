@@ -84,10 +84,11 @@ UNSAFE_INSTALL_ENV="PUTNAMI_UNSAFE_INSTALL"
 ALLOW_INSECURE_REGISTRY_ENV="PUTNAMI_ALLOW_INSECURE_REGISTRY"
 EXPECTED_SHA256_ENV="PUTNAMI_EXPECTED_SHA256"
 
-# Opt-out for agent-host registration. Installing the CLI otherwise writes a
-# user-scoped MCP entry into two other applications, which an image build, a CI
-# cache warm, or a user who configures those hosts by hand has every reason to
-# decline. Declining changes nothing else about the install.
+# Opt-out for the agent-host step. Earlier releases wrote a user-scoped MCP
+# entry into two other applications, and this release removes it again; an
+# image build, a CI cache warm, or a user who configures those hosts by hand
+# has every reason to decline touching them. Declining changes nothing else
+# about the install.
 NO_AGENT_HOSTS_ENV="PUTNAMI_NO_AGENT_HOSTS"
 NO_AGENT_HOSTS="${PUTNAMI_NO_AGENT_HOSTS:-}"
 
@@ -912,11 +913,14 @@ autoload -Uz compinit && compinit" || true
     fi
 }
 
-# Register Putnami's stable installed path with agent hosts through each host's
-# supported CLI. Host configuration is human-owned: an existing `putnami`
-# definition is inspected and preserved byte-for-byte, even when it points at a
-# different command. This is intentionally best-effort because managed host
-# policy may prohibit user configuration while still allowing the CLI install.
+# Putnami serves no MCP server, so the installer registers none. Earlier
+# releases registered a user-scoped `putnami` server in Claude Code and Codex
+# through each host's supported CLI; this release removes that registration
+# when it is exactly the one the installer wrote, and keeps any other: host
+# configuration is human-owned, and a `putnami` definition that differs was
+# written on purpose. This is best-effort because managed host policy may
+# prohibit user configuration while still allowing the CLI install. This
+# removal is deleted in the minor release that follows the one that ships it.
 claude_mcp_definition_matches() {
     local details="$1"
     local installed_binary="$2"
@@ -975,7 +979,7 @@ codex_mcp_definition_matches() {
         && codex_json_field_absent_or "$compact" disabled_tools null
 }
 
-configure_claude_code() {
+remove_claude_code_registration() {
     local installed_binary="$1"
     command -v claude >/dev/null 2>&1 || return 0
 
@@ -983,93 +987,57 @@ configure_claude_code() {
     local get_status=0
     claude mcp get putnami >"$details" 2>&1 || get_status=$?
     if claude_mcp_definition_matches "$details" "$installed_binary"; then
-        if grep -Eq '^  Status: .*Connected$' "$details"; then
-            print_success "Claude Code MCP configuration and connection verified for new sessions"
+        if claude mcp remove --scope user putnami >"$details" 2>&1; then
+            print_success "Removed the Putnami MCP server that an earlier install registered in Claude Code"
         else
-            print_success "Claude Code MCP configuration verified for new sessions"
-            print_info "MCP connection not yet verified; Claude Code will check it when a Putnami workspace opens."
+            print_warning "Could not remove the Putnami MCP server from Claude Code; the CLI installation is still usable."
+            print_hint "Claude Code may be managed by host policy. Run: claude mcp remove --scope user putnami"
         fi
         return 0
     fi
     if [[ "$get_status" -eq 0 ]] || grep -qxF 'putnami:' "$details"; then
-        print_warning "Claude Code already defines a putnami MCP server; its human configuration was preserved."
-        print_hint "Inspect the active definition with: claude mcp get putnami"
-        return 0
+        print_warning "Claude Code defines a putnami MCP server that Putnami did not register as is; it was kept."
+        print_hint "Putnami serves no MCP server any more. Remove it with: claude mcp remove putnami"
     fi
-
-    if ! claude mcp add --scope user \
-        --env 'PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.}' \
-        --transport stdio putnami -- "$installed_binary" mcp \
-        >"$details" 2>&1; then
-        print_warning "Could not register Putnami with Claude Code; the CLI installation is still usable."
-        print_hint "Claude Code may be managed by host policy. Run: claude mcp get putnami"
-        return 0
-    fi
-
-    get_status=0
-    claude mcp get putnami >"$details" 2>&1 || get_status=$?
-    if claude_mcp_definition_matches "$details" "$installed_binary"; then
-        if grep -Eq '^  Status: .*Connected$' "$details"; then
-            print_success "Claude Code MCP configuration and connection verified for new sessions"
-        else
-            print_success "Claude Code MCP configuration verified for new sessions"
-            print_info "MCP connection not yet verified; Claude Code will check it when a Putnami workspace opens."
-        fi
-        return 0
-    fi
-    print_warning "Claude Code accepted the MCP registration but did not report the expected Putnami launcher."
-    print_hint "Inspect the active definition with: claude mcp get putnami"
+    return 0
 }
 
-configure_codex() {
+remove_codex_registration() {
     local installed_binary="$1"
     command -v codex >/dev/null 2>&1 || return 0
 
     local details="${TEMP_DIR}/codex-mcp.txt"
     local json_details="${TEMP_DIR}/codex-mcp.json"
-    if codex mcp get putnami >"$details" 2>&1; then
-        if codex mcp get putnami --json >"$json_details" 2>&1 \
-            && codex_mcp_definition_matches "$details" "$json_details" "$installed_binary"; then
-            print_success "Codex MCP configuration verified for new sessions"
+    codex mcp get putnami >"$details" 2>&1 || return 0
+    if codex mcp get putnami --json >"$json_details" 2>&1 \
+        && codex_mcp_definition_matches "$details" "$json_details" "$installed_binary"; then
+        if codex mcp remove putnami >"$details" 2>&1; then
+            print_success "Removed the Putnami MCP server that an earlier install registered in Codex"
         else
-            print_warning "Codex already defines a putnami MCP server; its human TOML and launcher were preserved."
-            print_hint "Inspect the active definition with: codex mcp get putnami"
+            print_warning "Could not remove the Putnami MCP server from Codex; the CLI installation is still usable."
+            print_hint "Codex may be managed by host policy. Run: codex mcp remove putnami"
         fi
         return 0
     fi
-
-    if ! codex mcp add putnami -- "$installed_binary" mcp >"$details" 2>&1; then
-        print_warning "Could not register Putnami with Codex; the CLI installation is still usable."
-        print_hint "Codex may be managed by host policy. Run: codex mcp get putnami"
-        return 0
-    fi
-
-    if codex mcp get putnami >"$details" 2>&1 \
-        && codex mcp get putnami --json >"$json_details" 2>&1 \
-        && codex_mcp_definition_matches "$details" "$json_details" "$installed_binary"; then
-        print_success "Codex MCP configuration verified for new sessions"
-        return 0
-    fi
-    print_warning "Codex accepted the MCP registration but did not report the expected Putnami launcher."
-    print_hint "Inspect the active definition with: codex mcp get putnami"
+    print_warning "Codex defines a putnami MCP server that Putnami did not register as is; it was kept."
+    print_hint "Putnami serves no MCP server any more. Remove it with: codex mcp remove putnami"
+    return 0
 }
 
 configure_agent_hosts() {
     local installed_binary="$1"
 
     if [[ -n "$NO_AGENT_HOSTS" ]]; then
-        print_info "Skipping agent-host registration (${NO_AGENT_HOSTS_ENV}/--no-agent-hosts)."
+        print_info "Skipping agent-host cleanup (${NO_AGENT_HOSTS_ENV}/--no-agent-hosts)."
         return 0
     fi
 
-    print_step "Connecting supported agent hosts..."
-    configure_claude_code "$installed_binary"
-    configure_codex "$installed_binary"
+    remove_claude_code_registration "$installed_binary"
+    remove_codex_registration "$installed_binary"
 }
 
-# Report the installed CLI, then make it reachable, complete-able, and available
-# to supported agent hosts without storing the current repository in a global
-# host configuration.
+# Report the installed CLI, then make it reachable and complete-able, and remove
+# the agent-host registration earlier installs wrote.
 finish_install() {
     local installed_binary="$1"
 
@@ -1253,7 +1221,7 @@ print_usage() {
     echo "  --variant <go|ts>     CLI variant to install (default: go)"
     echo "  --download-url <url>  Direct URL to a binary asset (bypasses the registry)"
     echo "  --sha256 <hex>        Expected SHA-256 of that asset (required with --download-url)"
-    echo "  --no-agent-hosts      Do not register Putnami with Claude Code or Codex"
+    echo "  --no-agent-hosts      Do not touch the Claude Code or Codex configuration"
     echo "  --run <command>       Then pin the extension that provides <command> for your"
     echo "                        user and run putnami <command> in the current directory"
     echo "  --help, -h            Show this help message"

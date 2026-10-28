@@ -196,7 +196,7 @@ func TestSessionObserver_RecordsSessionStart(t *testing.T) {
 // TestNilObserver_RecordsNothing is the negative half, and the one that keeps
 // the "never send before notice" rule honest: an adapter that supplies no observer writes nothing at all, even
 // with consent granted and the notice shown. Every non-terminal adapter
-// (MCP, watch, lifecycle) passes nil, so this is the state they run in.
+// (watch, lifecycle) passes nil, so this is the state they run in.
 func TestNilObserver_RecordsNothing(t *testing.T) {
 	bufferPath := consentingTelemetryHome(t)
 
@@ -216,7 +216,7 @@ func TestNilObserver_RecordsNothing(t *testing.T) {
 
 	// A full engine run with no observer: the engine owns the lifecycle but no
 	// telemetry of its own, so nothing reaches the buffer. This is exactly the
-	// state MCP, watch, and lifecycle adapters run in.
+	// state watch and lifecycle adapters run in.
 	_ = captureStderr(t, func() {
 		_ = captureStdout(t, func() {
 			_, _ = engine.New().Run(context.Background(), engine.Request{

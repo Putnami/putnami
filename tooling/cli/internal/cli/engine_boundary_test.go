@@ -25,8 +25,8 @@ import (
 // # Why a boundary test and not depguard
 //
 // depguard is an IMPORT-path linter, and the invariant here is not about import
-// paths: internal/cli, internal/commands, internal/mcp, internal/output and
-// internal/watch all legitimately import internal/jobs/scheduler — for
+// paths: internal/cli, internal/commands, internal/output and internal/watch
+// all legitimately import internal/jobs/scheduler — for
 // scheduler.JobResult, scheduler.RawJobEvent, scheduler.ScheduledJob,
 // scheduler.ReduceRun and the event-type constants. What must not cross the
 // boundary is a SYMBOL SET: the execution entry points. depguard cannot express

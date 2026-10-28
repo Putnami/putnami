@@ -1,17 +1,12 @@
 package documents
 
 import (
-	"bufio"
-	"bytes"
-	"context"
-	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/mcp"
 )
 
 // The gates in this project read the repository itself, so every one of them
@@ -163,72 +158,4 @@ func captureStdoutStderr(t *testing.T, fn func()) string {
 		t.Fatalf("read stderr: %v", errBuf.err)
 	}
 	return string(out.data) + string(errBuf.data)
-}
-
-func runJobsArguments(t *testing.T, commands, projects []string, dryRun bool) string {
-	t.Helper()
-	arguments, err := json.Marshal(struct {
-		Commands []string `json:"commands"`
-		Projects []string `json:"projects"`
-		DryRun   bool     `json:"dryRun"`
-	}{commands, projects, dryRun})
-	if err != nil {
-		t.Fatalf("marshal run_jobs arguments: %v", err)
-	}
-	return string(arguments)
-}
-
-// callMCPRunJobs drives one full `putnami mcp` session: JSON-RPC frames in,
-// JSON-RPC frames out, and the tool result decoded into out. It also asserts the
-// transport invariant on the way past — nothing may reach the process stdout,
-// because in production that IS the frame stream.
-func callMCPRunJobs(t *testing.T, wsRoot, arguments string, out any) {
-	t.Helper()
-	srv := mcp.NewServer(mcp.Options{
-		WorkspaceRoot: wsRoot,
-		Config:        wsproto.Load(wsRoot),
-		ServerVersion: "test",
-	})
-	request := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call",` +
-		`"params":{"name":"run_jobs","arguments":` + arguments + "}}\n")
-
-	var frames bytes.Buffer
-	leaked := captureStdout(t, func() {
-		if err := srv.Serve(context.Background(), bytes.NewReader(request), &frames); err != nil {
-			t.Fatalf("mcp Serve: %v", err)
-		}
-	})
-	if leaked != "" {
-		t.Fatalf("the MCP session wrote %q to os.Stdout, which is the JSON-RPC frame stream", leaked)
-	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(frames.Bytes()))
-	scanner.Buffer(make([]byte, 0, 64*1024), 1<<20)
-	if !scanner.Scan() {
-		t.Fatal("mcp session produced no response frame")
-	}
-	var response struct {
-		Result struct {
-			Content []struct {
-				Text string `json:"text"`
-			} `json:"content"`
-			IsError bool `json:"isError"`
-		} `json:"result"`
-		Error json.RawMessage `json:"error"`
-	}
-	if err := json.Unmarshal(scanner.Bytes(), &response); err != nil {
-		t.Fatalf("decode run_jobs frame: %v\n%s", err, scanner.Bytes())
-	}
-	if len(response.Error) > 0 {
-		t.Fatalf("run_jobs returned a protocol error: %s", response.Error)
-	}
-	if response.Result.IsError {
-		t.Fatalf("run_jobs returned a tool error: %s", scanner.Bytes())
-	}
-	if len(response.Result.Content) == 0 {
-		t.Fatalf("run_jobs returned no content: %s", scanner.Bytes())
-	}
-	if err := json.Unmarshal([]byte(response.Result.Content[0].Text), out); err != nil {
-		t.Fatalf("decode run_jobs payload: %v\n%s", err, response.Result.Content[0].Text)
-	}
 }

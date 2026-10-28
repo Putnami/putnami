@@ -2,7 +2,7 @@
 // workspace-pinned CLI: when putnami.lock.json pins a CLI version and the
 // running binary is not it, the launcher resolves that version from the
 // machine-global artifact store (downloading once if needed) and re-execs into
-// it, so the CLI, putnamiw, and the MCP server all run one engine.
+// it, so the CLI and putnamiw run one engine.
 //
 // A PIN IS FAIL-CLOSED. A workspace that pins a CLI version has said "run
 // exactly this engine"; quietly running a different one is precisely the

@@ -92,7 +92,7 @@ func synchronizeWorkspaceProbe(
 // dependency installers, Cloud setup or context generation.
 //
 // Synchronize owns cross-process exclusion and snapshot-first rechecking, so a
-// CLI command racing an MCP request performs one refresh and the loser adopts
+// CLI command racing another performs one refresh and the loser adopts
 // the recorded answer without starting another provider.
 func PrepareWorkspaceGraph(
 	ctx context.Context,

@@ -82,18 +82,14 @@ func qualifiedCallOffset(t *testing.T, file, function, pkg, name string) (token.
 }
 
 // The run credential is captured before App.Run can start a process, replace
-// this one or read the workspace: enterProcess captures it before it enters
-// the agent workspace, and App.Run calls enterProcess right after the early
-// capability capture and before the package-root claim, the pinned-CLI
-// relaunch, the capability capture and the parse.
+// this one or read the workspace: enterProcess captures it, and App.Run calls
+// enterProcess right after the early capability capture and before the
+// package-root claim, the pinned-CLI relaunch, the capability capture and the
+// parse.
 func TestRunCredentialIsCapturedBeforeAnythingStarts(t *testing.T) {
 	t.Parallel()
-	capture, ok := qualifiedCallOffset(t, "app.go", "enterProcess", "runcredential", "Capture")
-	if !ok {
+	if _, ok := qualifiedCallOffset(t, "app.go", "enterProcess", "runcredential", "Capture"); !ok {
 		t.Fatal("enterProcess never calls runcredential.Capture")
-	}
-	if enter, ok := qualifiedCallOffset(t, "app.go", "enterProcess", "launch", "EnterAgentWorkspace"); !ok || enter < capture {
-		t.Error("enterProcess enters the agent workspace before runcredential.Capture (or never)")
 	}
 	calls := callOffsets(t, "app.go", "Run")
 	entry, ok := calls["enterProcess"]

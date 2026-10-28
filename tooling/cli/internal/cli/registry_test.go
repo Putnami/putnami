@@ -73,7 +73,7 @@ func TestCommandRegistryCoversStructuredCommands(t *testing.T) {
 		"extensions", "templates", "projects", "workspace", "deps",
 		"cache", "config", "context", "migrate", "sessions", "completion",
 		"install", "telemetry", "upgrade", "help", "init", "scopes",
-		"mcp", "pin", "doctor", "impact-plan", "report", "tree",
+		"pin", "doctor", "impact-plan", "report", "tree",
 		"cli",
 	}
 	for _, name := range want {

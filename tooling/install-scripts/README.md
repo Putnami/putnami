@@ -19,7 +19,7 @@ CLI's version switch and the SDK's Windows file lock.
 The module requires no CLI module, so the project has no dependency edge to the
 CLI: an edge would fold the CLI's sources into the key. The tests still prove
 checks of four CLI features (`cli/first-use-path`, `cli/windows-consumers`,
-`cli/context-mcp-discovery` and `cli/init-channel`). The CLI's spec gate reads
+`cli/context-discovery` and `cli/init-channel`). The CLI's spec gate reads
 those proofs because `featureAuthority.owner` names `cli/first-use-path`
 ([ADR 0081](../cli/doc/adr/0081-a-feature-authority-project-attests-for-the-spec-owner.md)).
 

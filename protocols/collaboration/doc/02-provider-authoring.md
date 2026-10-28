@@ -223,4 +223,4 @@ write.
   identifier, and of concurrent updates against one revision exactly one wins.
 - `tooling/cli/internal/cli/collaboration_local_provider_test.go` builds the
   local provider, binds it in a temporary workspace and calls it through the
-  command line and the MCP server against one store.
+  command line and the host RPC against one store.

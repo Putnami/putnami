@@ -73,14 +73,6 @@ import (
 //     (RefreshLockMetadataWithResult).
 //   - lifecycle → completion: upgrade refreshes shell completions once the
 //     new binary is in place (RefreshShellCompletions).
-// The list held one more edge until a later change: agentctx → sdd, for the
-// feature design summaries and contract-drift vocabulary the agent-context MCP
-// payload and the context pack embedded. It is gone because the sdd vertical is
-// gone — the SDD surface ships as @putnami/sdd now — and the symbols followed
-// their one remaining caller into agentctx (feature_design_summary.go) rather
-// than into shared, because R2's rule is about symbols 2+ verticals need and
-// only one needed these.
-//
 // agentctx → lifecycle does not exist: the graph this table describes is
 // acyclic, with lifecycle on top. The other seven verticals (cachecmd, ci,
 // completion, configcmd, doctor, extensions, migrate, sessions, versioncmd)

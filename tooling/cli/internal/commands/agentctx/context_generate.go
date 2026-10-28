@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -14,8 +13,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
-
-const maxExtensionGuidanceSize = 1024 * 1024
 
 // ContextGenerate regenerates the assistant entrypoints and the in-tree agent
 // artifacts. Run this after adding or removing extensions or editing an agent
@@ -183,50 +180,4 @@ func ensureContextExtensions(ctx context.Context, wsRoot string, cfg *wsproto.Co
 		},
 	})
 	return restoreErr
-}
-
-// ReadExtensionGuidance reads the extension-owned AI.md when it is present. It
-// is intentionally optional for backwards-compatible extensions. The MCP server
-// is its only caller: it serves those exact bytes as
-// `putnami://extension-guidance/AI.md` instead of copying them into the tree.
-func ReadExtensionGuidance(extensionRoot string) (string, error) {
-	path := filepath.Join(extensionRoot, "AI.md")
-	info, err := os.Lstat(path)
-	if os.IsNotExist(err) {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("AI.md must be a regular file")
-	}
-	if info.Size() > maxExtensionGuidanceSize {
-		return "", fmt.Errorf("AI.md exceeds %d-byte guidance limit", maxExtensionGuidanceSize)
-	}
-	root, err := os.OpenRoot(extensionRoot)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = root.Close() }()
-	file, err := root.Open("AI.md")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	openedInfo, err := file.Stat()
-	if err != nil {
-		return "", err
-	}
-	if !openedInfo.Mode().IsRegular() {
-		return "", fmt.Errorf("AI.md must be a regular file")
-	}
-	data, err := io.ReadAll(io.LimitReader(file, maxExtensionGuidanceSize+1))
-	if err != nil {
-		return "", err
-	}
-	if len(data) > maxExtensionGuidanceSize {
-		return "", fmt.Errorf("AI.md exceeds %d-byte guidance limit", maxExtensionGuidanceSize)
-	}
-	return string(data), nil
 }

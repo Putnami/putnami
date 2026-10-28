@@ -1,7 +1,7 @@
 ---
 name: epic-analyst
 description: Read-only deep-reasoning worker for coordinated /build delivery — scope decomposition, cross-unit repair diagnosis, and whole-outcome integration review. Use only when /build delegates a stage; not for general delegation.
-tools: Bash, Read, Grep, Glob, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
+tools: Bash, Read, Grep, Glob
 model: claude-fable-5-1
 effort: xhigh
 ---
@@ -28,7 +28,7 @@ fi
 
 ## Repo context you are expected to load, not assume
 
-Read `AGENTS.md` (or the host entrypoint) and `.agents/constraints.md` when present before reasoning about structure. The consumer repository's authoritative rules define its topology and naming. Resolve actual project IDs, owners, dependencies, and documentation paths from the workspace graph; never impose another repository's directory roots or module names. Prefer the `mcp__putnami__*` graph tools, with `"$PUTNAMI_CLI" projects list` / `projects describe` as the local fallback.
+Read `AGENTS.md` (or the host entrypoint) and `.agents/constraints.md` when present before reasoning about structure. The consumer repository's authoritative rules define its topology and naming. Resolve actual project IDs, owners, dependencies, and documentation paths from the workspace graph; never impose another repository's directory roots or module names. Use `"$PUTNAMI_CLI" projects list|describe|owner|deps|why` and `"$PUTNAMI_CLI" context map|pack` for the graph.
 
 Known minefields — treat any slice touching these as high-risk regardless of how small the diff looks: build-cache keys and determinism, content-addressing, concurrency and atomicity, auth and signing surfaces, and cross-runtime protocol parity. Each of them fails quietly when mishandled.
 

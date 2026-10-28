@@ -308,8 +308,8 @@ type ImpactResult struct {
 // It keeps the evidence the pass computes anyway: which file claimed which
 // project and how, and which edge first reached each propagated project. An
 // earlier version of the pass threw both away, so an operator watching `--impacted` select
-// 106 of 111 projects had no surface that said why, and the `why_impacted`
-// MCP tool answered from a narrower graph than the one that had selected them.
+// 106 of 111 projects had no surface that said why, and the path
+// query answered from a narrower graph than the one that had selected them.
 func TraceChangeImpact(ws *Workspace, changedFiles []string, opts ChangeImpactOptions) ImpactResult {
 	if ws == nil || len(changedFiles) == 0 {
 		return ImpactResult{}

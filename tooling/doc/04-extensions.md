@@ -29,7 +29,7 @@ rather than from either side's source, and a spec is prose about intent. See
 [Write a feature spec](/docs/how-to/write-a-feature-spec) for SDD.
 
 `@putnami/sdd` is **experimental** and entirely opt-in. Its four command groups
-and its four `sdd.*` MCP tools used to be compiled into the CLI; they are not
+used to be compiled into the CLI; they are not
 any more. A workspace that does not declare the extension has none of them, and
 `putnami` prints a hint naming the extension if you ask for one. Activation is
 two conditions: the files must match **and** the project must name the extension

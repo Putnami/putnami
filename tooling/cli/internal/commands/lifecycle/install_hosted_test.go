@@ -80,8 +80,8 @@ func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 	if before, after := install(""); bytes.Equal(before, after) || !slices.Equal(phases, []toolchainpins.Options{{}}) {
 		t.Fatalf("an install without the run credential left the lock unstamped (toolchain pins phases %+v):\n%s", phases, after)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); err != nil {
-		t.Errorf("an install without the run credential registered no MCP server: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Errorf("an install without the run credential wrote no assistant guidance: %v", err)
 	}
 }
 

@@ -205,7 +205,7 @@ func formatDurationMs(ms int64) string {
 // The session's ephemerality decides the ORIGIN rather than whether to write at
 // all. `latest` is a measurement pointer an adapter must stay out of, but a
 // report carries the origin field session metadata never had, so a reader
-// filters MCP runs out instead of losing them.
+// filters adapter runs out instead of losing them.
 func writeRunReport(
 	wsRoot string,
 	session *workspace_state.Session,
@@ -239,8 +239,9 @@ func writeRunReport(
 }
 
 // reportOrigin names the surface that drove the run. EphemeralSession is set by
-// exactly one caller — the MCP adapter (Request.EphemeralSession) — so it is the
-// origin signal the engine already carries.
+// exactly one caller — `cache verify` (Request.EphemeralSession) — so it is the
+// origin signal the engine already carries. The protocol names an adapter run
+// "mcp", and readers filter that origin out by default.
 func reportOrigin(req *Request) string {
 	if req.EphemeralSession {
 		return protocolcli.ReportOriginMCP

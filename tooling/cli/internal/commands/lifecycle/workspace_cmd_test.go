@@ -577,13 +577,12 @@ func TestWorkspaceInitKeepsAnExistingGitattributes(t *testing.T) {
 	}
 }
 
-// Acceptance criterion, as amended by ADR 0040: `putnami init` in an
-// empty directory writes the guidance block into AGENTS.md and CLAUDE.md and
-// registers the putnami MCP server in .mcp.json, so the first agent session
-// reaches it with no manual step.
-func TestWorkspaceInitWritesTheGuidanceBlockAndTheMCPRegistrationForAgents(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "init-writes-the-guidance-block")
-	spectest.Proves(t, "cli/context-mcp-discovery", "implicit-mcp-registration", "init-registers-the-mcp-server")
+// Acceptance criterion: `putnami init` in an empty directory writes the
+// guidance block into AGENTS.md and CLAUDE.md and registers nothing for an MCP
+// server, which Putnami does not serve.
+func TestWorkspaceInitWritesTheGuidanceBlockAndNoMCPRegistrationForAgents(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "generated-context", "init-writes-the-guidance-block")
+	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "init-and-the-first-use-install-write-no-mcp-json")
 	dir := t.TempDir()
 	stubExtensionInstall(t)
 
@@ -607,12 +606,8 @@ func TestWorkspaceInitWritesTheGuidanceBlockAndTheMCPRegistrationForAgents(t *te
 	if !strings.Contains(string(claude), "@AGENTS.md") {
 		t.Fatalf("CLAUDE.md does not import AGENTS.md:\n%s", claude)
 	}
-	registration, err := os.ReadFile(filepath.Join(dir, ".mcp.json"))
-	if err != nil {
-		t.Fatalf("putnami init registered no MCP server: %v", err)
-	}
-	if !strings.Contains(string(registration), `"putnami"`) || !strings.Contains(string(registration), `"mcp"`) {
-		t.Fatalf(".mcp.json does not register the putnami server:\n%s", registration)
+	if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); !os.IsNotExist(err) {
+		t.Fatalf("putnami init wrote .mcp.json: stat err %v", err)
 	}
 }
 

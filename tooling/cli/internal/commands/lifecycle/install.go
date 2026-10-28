@@ -28,8 +28,8 @@ import (
 )
 
 // installWritesWorkspace reports whether an install may write the workspace's
-// own files: putnami.lock.json and the assistant content (AGENTS.md,
-// .mcp.json, agent workflows). A hosted install runs from the committed files
+// own files: putnami.lock.json and the assistant content (AGENTS.md, agent
+// workflows). A hosted install runs from the committed files
 // and writes none of them (ADR 0055): its toolchain pins stay in memory
 // (toolchainpins.Options.Hosted), it refreshes no lock metadata, even a CLI
 // pin that a CLI of another version left without its protocol version, and it
@@ -255,12 +255,14 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 		if contextResult.GuidanceChanged {
 			recordAction(LifecycleAction{Kind: "assistant-context", Name: "AGENTS.md", Description: "Assistant guidance updated"})
 		}
-		// Register the putnami MCP server so the next agent session in this
-		// workspace reaches it with no manual step (ADR 0040). The first-use
-		// bootstrap is not that moment: it restores a checkout on behalf of an
-		// unrelated command, and must not change a committed file as a side effect.
-		if !shared.IsImplicitInstall(ctx) && agentctx.RegisterMCPServer(wsRoot, os.Stderr) {
-			recordAction(LifecycleAction{Kind: "assistant-context", Name: ".mcp.json", Description: "Putnami MCP server registered in .mcp.json"})
+		// Remove the .mcp.json entry earlier releases wrote for the MCP server
+		// Putnami no longer serves. The first-use bootstrap is not that moment:
+		// it restores a checkout on behalf of an unrelated command, and must not
+		// change a committed file as a side effect.
+		if !shared.IsImplicitInstall(ctx) {
+			if removal := agentctx.RemoveMCPRegistration(wsRoot, os.Stderr); removal != agentctx.MCPRemovalNone {
+				recordAction(LifecycleAction{Kind: "assistant-context", Name: ".mcp.json", Description: removal.Description()})
+			}
 		}
 		// Write the host hooks the opted-in extensions declare, and remove the
 		// ones that no longer apply (ADR 0081). Only an explicit install does:

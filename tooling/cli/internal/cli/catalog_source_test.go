@@ -98,8 +98,8 @@ func handlerRootsByFunc(t *testing.T, file *ast.File) map[string]string {
 
 // handlerDefaultSubs returns, per command root, the subcommand its handler
 // treats an empty subcommand as: the single non-empty string in a switch case
-// that also lists "". A case listing "" alone (cmdMcp) means the bare root has
-// behavior of its own and is deliberately absent from the result.
+// that also lists "". A case listing "" alone (cmdCLI) means the bare root is
+// no alias and is deliberately absent from the result.
 func handlerDefaultSubs(t *testing.T, file *ast.File, roots map[string]string) map[string]string {
 	t.Helper()
 	defaults := map[string]string{}

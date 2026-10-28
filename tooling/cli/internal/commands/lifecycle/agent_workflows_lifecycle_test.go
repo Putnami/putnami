@@ -1229,10 +1229,9 @@ func TestExtensionAgentContent_InterruptedRunConvergesOnRerun(t *testing.T) {
 }
 
 // The implicit first-run pass restores pinned content without an install, and
-// the session-start reconcile reads nothing once the record names the pin.
-func TestExtensionAgentContent_EnsureAndReconcileFollowThePin(t *testing.T) {
+// writes nothing once the record names the pin.
+func TestExtensionAgentContent_EnsureFollowsThePin(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "extension-agent-content", "the-first-run-pass-restores-pinned-extension-content")
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "session-start-reconcile", "a-record-at-the-pinned-release-writes-nothing")
 	root, _ := seededContentWorkspace(t)
 	for _, rel := range []string{".agents", ".claude", ".codex", ".putnami/agent-artifacts"} {
 		if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
@@ -1248,9 +1247,6 @@ func TestExtensionAgentContent_EnsureAndReconcileFollowThePin(t *testing.T) {
 	before := snapshotWorkspace(t, root)
 	if err := agentctx.EnsureAgentWorkflows(context.Background(), root, wsproto.Load(root)); err != nil {
 		t.Fatalf("warm ensure: %v", err)
-	}
-	if err := agentctx.ReconcileAgentWorkflows(context.Background(), root, wsproto.Load(root)); err != nil {
-		t.Fatalf("reconcile: %v", err)
 	}
 	assertUnchangedWorkspace(t, before, snapshotWorkspace(t, root))
 }

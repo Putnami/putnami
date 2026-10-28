@@ -1,7 +1,7 @@
 ---
 name: adr
 description: Record a durable architectural decision in its owning project
-allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_context, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__impacted
+allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch
 argument-hint: <decision|feature|task> [--dry-run]
 ---
 

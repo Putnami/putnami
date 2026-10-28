@@ -63,11 +63,6 @@ _putnami_subcommands_for() {
                 'validate'
             )
             ;;
-        'mcp')
-            reply=(
-                'install'
-            )
-            ;;
         'migrate')
             reply=(
                 'vnext'
@@ -76,10 +71,13 @@ _putnami_subcommands_for() {
         'projects')
             reply=(
                 'create'
+                'deps'
                 'describe'
                 'list'
+                'owner'
                 'sync'
                 'tag'
+                'why'
             )
             ;;
         'scopes')
@@ -167,17 +165,18 @@ _putnami_path_known() {
         'impact-plan') return 0 ;;
         'init') return 0 ;;
         'install') return 0 ;;
-        'mcp') return 0 ;;
-        'mcp install') return 0 ;;
         'migrate') return 0 ;;
         'migrate vnext') return 0 ;;
         'pin') return 0 ;;
         'projects') return 0 ;;
         'projects create') return 0 ;;
+        'projects deps') return 0 ;;
         'projects describe') return 0 ;;
         'projects list') return 0 ;;
+        'projects owner') return 0 ;;
         'projects sync') return 0 ;;
         'projects tag') return 0 ;;
+        'projects why') return 0 ;;
         'report') return 0 ;;
         'scopes') return 0 ;;
         'scopes list') return 0 ;;
@@ -224,7 +223,6 @@ _putnami_core_root() {
         'impact-plan') return 0 ;;
         'init') return 0 ;;
         'install') return 0 ;;
-        'mcp') return 0 ;;
         'migrate') return 0 ;;
         'pin') return 0 ;;
         'projects') return 0 ;;
@@ -379,6 +377,12 @@ _putnami_flags_for() {
                 '--template[Template to scaffold from]:template:'
             )
             ;;
+        'projects deps')
+            reply=(
+                '--dependents[List the projects that depend on the project instead of the ones it depends on]'
+                '--transitive[Follow the edges transitively instead of listing direct ones]'
+            )
+            ;;
         'projects sync')
             reply=(
                 '--dry-run[Show the changes without applying them]'
@@ -489,7 +493,6 @@ _putnami() {
         'impact-plan:Emit the impacted plan of a change for a command list'
         'init:Initialize a new workspace'
         'install:Install extensions and dependencies'
-        'mcp:Run the MCP server over stdio for AI agent harnesses'
         'migrate:Migrate Putnami workspace files forward'
         'pin:Pin the CLI version this workspace uses'
         'projects:Manage projects'

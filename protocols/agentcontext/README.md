@@ -3,7 +3,7 @@
 > **Status: adopted.** This package pins the version 2 wire contract, strict
 > parsing, semantic validation, and the fail-closed publish-safety gate for the
 > per-project agent-context document. The deterministic aggregator (`putnami
-> context pack`) and the read-only MCP `agent_context` tool have shipped; see
+> context pack`) has shipped; see
 > [Using it](#using-it).
 
 Why the document references instead of embedding, why no producer writes it to
@@ -12,7 +12,7 @@ a file, and why publication fails closed is recorded in
 
 ## Why
 
-Putnami's MCP/intelligence tools orient in a project by reading source: to find
+Putnami's agents and intelligence tools orient in a project by reading source: to find
 composition roots, capabilities, public contracts, representative code, and
 tests, an agent otherwise enumerates files by hand. This package fixes one
 deterministic, **redaction-safe** artifact — the agent-context **Document** — so
@@ -99,11 +99,6 @@ The contract in this package is consumed end to end by shipped tooling:
   deterministic aggregator. It walks committed facts, runs the fail-closed
   publish-safety gate, and prints one document per project; `--output=json`
   returns them as `data.documents`. It writes no file.
-- **The read-only MCP `agent_context` tool** — builds the same document in
-  memory per request, so an agent gets a project's
-  composition roots, contracts, representative source ranges, and tests in one
-  structured call instead of enumerating files. It complements
-  `describe_project`.
 - **`bench/`** — the orientation-reads benchmark (`bash
   protocols/agentcontext/bench/orient-bench.sh`) dogfoods `context pack` across
   Go and TypeScript samples and shows fewer orientation round-trips than manual
@@ -162,9 +157,8 @@ rewrite or to go stale.
 
 ## Producers and consumers
 
-- **Producers**: `putnami context pack` and the MCP `agent_context` tool. Both
-  aggregate committed facts by reference through the same builder and run the
-  publish-safety gate; neither writes the document to a file.
+- **Producer**: `putnami context pack` aggregates committed facts by reference
+  and runs the publish-safety gate; it writes the document to no file.
 - **Author input**: `<project>/schema/agent-context.overrides.json`, strict
   parsed and reviewed like any other source.
 - **Consumers**: an agent that reads the printed or served document, the
@@ -195,8 +189,8 @@ rewrite or to go stale.
   [`specs/aggregated-agent-context.json`](specs/aggregated-agent-context.json).
   The protocol owns the feature of its contract. The Go tests here and the
   CLI producer tests under `tooling/cli/internal/commands/agentctx` prove its
-  requirements. The CLI command and the MCP tool keep their own feature,
-  `cli/context-mcp-discovery`. The durable decisions for this module live in
+  requirements. The CLI command keeps its own feature,
+  `cli/context-discovery`. The durable decisions for this module live in
   [`doc/adr/`](doc/adr/), the form
   [`protocols/features`](../features/README.md#specs-and-durable-decisions)
   expects a spec to link to.

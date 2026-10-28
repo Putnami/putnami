@@ -86,16 +86,16 @@ const unownedRootFilesShown = 5
 
 // impactTraceSeedsShown and impactTraceEdgesShown bound the lines
 // TraceExplanation prints. The block is a notice, not the record: the full
-// trace is the `impacted` MCP tool's answer and a run's TraceRecord session
-// event, so the caps lose nothing and a hundred-project widening degrades to a
-// count.
+// trace is a run's TraceRecord session event, and `putnami projects why`
+// answers any pair, so the caps lose nothing and a hundred-project widening
+// degrades to a count.
 const (
 	impactTraceSeedsShown = 5
 	impactTraceEdgesShown = 10
 	// impactTraceViaWidth bounds one seed's `Via`. A declared-input claim names
 	// the whole pattern set, and a project such as `@putnami/cli` declares
 	// twenty patterns — one line long enough to bury the five seeds around it.
-	// The full set is in the `impacted` MCP answer.
+	// The full set is in the run's TraceRecord session event.
 	impactTraceViaWidth = 80
 )
 
@@ -180,7 +180,7 @@ func (s ImpactedSelection) TraceExplanation() []string {
 			p.ID, edge.From, edge.Kind, edgeEvidence(edge), scopeSuffix(s.Trace.ScopeOf(p.ID))))
 	}
 	if extra := edges - impactTraceEdgesShown; extra > 0 {
-		lines = append(lines, fmt.Sprintf("    … +%d more edge(s); the `impacted` MCP tool returns every reason.", extra))
+		lines = append(lines, fmt.Sprintf("    … +%d more edge(s); `putnami projects why <changed> <project>` prints the path to any project.", extra))
 	}
 	return lines
 }
@@ -286,8 +286,8 @@ func (s ImpactedSelection) TraceRecord() ImpactTraceRecord {
 }
 
 // impactTraceDigestShown bounds the contract digest one edge line prints.
-// Twelve hex digits tell two contracts apart at a glance; the record and the
-// `impacted` MCP answer carry all 64.
+// Twelve hex digits tell two contracts apart at a glance; the session record
+// carries all 64.
 const impactTraceDigestShown = 12
 
 // edgeEvidence renders the changed file an edge rests on, inside its edge
@@ -319,8 +319,7 @@ func edgeEvidence(edge ImpactEdge) string {
 
 // impactTraceScopeTasksShown bounds the tasks one edge line names. A tool
 // change scopes a consumer to every task that tool declares, which is forty
-// entries on one line; the whole list is in the record and in the `impacted`
-// MCP answer.
+// entries on one line; the whole list is in the record.
 const impactTraceScopeTasksShown = 4
 
 // scopeSuffix renders a task-scoped project's scope inside its edge line, or

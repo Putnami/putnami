@@ -53,7 +53,7 @@ internal/
 └── workspace_state/           Session recording and audit trails
 ```
 
-Principal packages only. `internal/` holds 77 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
+Principal packages only. `internal/` holds 77 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `collaboration`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
 
 ### Command verticals — `internal/commands/`
 
@@ -61,7 +61,7 @@ Principal packages only. `internal/` holds 77 production packages in all — the
 
 | Vertical | Owns |
 |----------|------|
-| `agentctx` | Agent context generation, the context pack, agent workflows, MCP config, the workspace map |
+| `agentctx` | Agent context generation, the context pack, agent workflows, the workspace map |
 | `cachecmd` | `cache` and its verification/analysis subcommands |
 | `ci` | `impact-plan` |
 | `completion` | bash/zsh/fish completion generators and structured help |

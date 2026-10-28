@@ -106,13 +106,13 @@ verification and does not rerun the gate.
 - **[Version Management](doc/14-version-management.md)** — Binary layout, upgrading, install script
 - **[Impact Plans](doc/17-impact-plans.md)** — The impacted plan of a commit range that an extension reads for the commands it names
 - **[Agent Workflows](doc/18-agent-workflows.md)** — Extension agent content materialized into `.agents`/`.claude`/`.codex`, the `init`/`install`/`upgrade` lifecycle, ownership and collision rules, and the migration from separately declared artifacts
-- **[Core Workspace Experience](doc/19-core-workspace-experience.md)** — End-to-end discovery, selection, planning, execution, MCP, diagnostics, and support/maturity guidance
+- **[Core Workspace Experience](doc/19-core-workspace-experience.md)** — End-to-end discovery, selection, planning, execution, agent access through the CLI, diagnostics, and support/maturity guidance
 - **[Release Rehearsal](doc/20-release-rehearsal.md)** — The read-only rehearsal that records an explicit GO/NO-GO for the intended public release, its plan, and its rollback points
 - **[Compatibility and Migration](doc/21-compatibility-and-migration.md)** — Supported version window per artifact format, what migrates, what is rejected, and the remedy
 - **[Installing the CLI](doc/22-installing-the-cli.md)** — What the public installer trusts and refuses, the platform matrix, every flag, `PATH` behavior, and the release smoke
 - **[Testing at Production Boundaries](doc/23-testing-at-production-boundaries.md)** — Recorded exchanges at the registry and credential boundaries, and how an incident closes with a test that fails on its pre-fix tree
 - **[Workload Qualification](../dev/doc/01-workload-qualification.md)** — `compose` and `qualify`, served by `@putnami/dev`: serving a workload with what it runs with (stable proxy URLs, per-composition databases, typed readiness, orphan reaping), the smoke contract derived from the route inventory, the sha binding, and the fail-closed verdict
-- **[Collaboration Providers](doc/25-collaboration-providers.md)** — Binding task, change-proposal and memory providers in `options.collaboration`, `putnami <contract> <operation>` and the matching MCP tools, capability discovery, and the outcomes that keep missing capabilities and uncertain writes explicit
+- **[Collaboration Providers](doc/25-collaboration-providers.md)** — Binding task, change-proposal and memory providers in `options.collaboration`, `putnami <contract> <operation>` and the extension host RPC, capability discovery, and the outcomes that keep missing capabilities and uncertain writes explicit
 
 ## Command Reference
 

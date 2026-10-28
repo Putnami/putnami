@@ -96,17 +96,14 @@ func TestCloudlessReleaseFixture_LocalDeveloperLoop(t *testing.T) {
 		t.Fatalf("configured cache without a provider contacted an endpoint %d times", got)
 	}
 
-	// MCP uses the same engine but deliberately has no remote authority. It must
-	// complete against the local fixture and local cache under the same hostile
-	// endpoint configuration.
-	var result protocolcli.MCPResult
-	callMCPRunJobs(t, wsRoot,
-		runJobsArguments(t, []string{"build"}, []string{"go-app", "ts-app"}, false), &result)
-	if result.Run == nil || result.Run.Outcome != protocolcli.RunOutcomeSuccess || result.Run.Counts.Failed != 0 {
-		t.Fatalf("cloudless MCP run_jobs result = %+v", result.Run)
+	// The machine document of a multi-project run reports the same local
+	// success under the same hostile endpoint configuration.
+	result, code := runCloudlessJSON(t, app, "build", "--projects", "go-app,ts-app", "--output=json")
+	if code != cli.ExitSuccess || result.Run == nil || result.Run.Outcome != protocolcli.RunOutcomeSuccess || result.Run.Counts.Failed != 0 {
+		t.Fatalf("cloudless build --output=json exit = %d, run = %+v", code, result.Run)
 	}
 	if got := networkRequests.Load(); got != 0 {
-		t.Fatalf("local MCP run contacted an endpoint %d times", got)
+		t.Fatalf("local build --output=json contacted an endpoint %d times", got)
 	}
 	assertCloudlessFixtureState(t, wsRoot, artifactRoot)
 }
@@ -393,6 +390,19 @@ func runCloudlessCLI(t *testing.T, app *cli.App, ctx context.Context, args ...st
 	code := cli.ExitError
 	output := captureStdoutStderr(t, func() { code = app.Run(ctx, args) })
 	return output, code
+}
+
+// runCloudlessJSON runs one command with --output=json and decodes its
+// standard output, which must hold the one result document and nothing else.
+func runCloudlessJSON(t *testing.T, app *cli.App, args ...string) (protocolcli.ResultV2, int) {
+	t.Helper()
+	code := cli.ExitError
+	stdout := captureStdout(t, func() { code = app.Run(context.Background(), args) })
+	var result protocolcli.ResultV2
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("putnami %s: stdout is not one result document: %v\n%s", strings.Join(args, " "), err, stdout)
+	}
+	return result, code
 }
 
 func runCloudlessServe(t *testing.T, app *cli.App, marker, project, wantMarker string) {

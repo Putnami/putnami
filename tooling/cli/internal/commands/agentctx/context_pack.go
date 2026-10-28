@@ -3,17 +3,17 @@
 // `putnami context pack` deterministically aggregates each targeted project's
 // already-committed facts into an agentcontext.Document (protocols/agentcontext)
 // and prints it. It writes no file: `--output=json` returns the documents as
-// data, and the MCP agent_context tool builds the same document in memory.
+// data.
 // Aggregation is strictly BY REFERENCE: capabilities, contracts, infra,
 // migrations, and the config schema travel as a path plus a sha256 content
 // digest, never as embedded content.
 //
-// Redaction is fail-closed. Every build — the command and the MCP tool alike —
-// runs agentcontext.ValidatePublishSafety before a document is returned. The
+// Redaction is fail-closed. Every build runs agentcontext.ValidatePublishSafety
+// before a document is returned. The
 // SensitivePaths set is derived from the FACTS (an infra requirements manifest
 // declaring a secret-kind requirement marks its path sensitive), independently
 // of the document's own flags, so forgetting to flag a referenced sensitive path
-// makes the gate fail and the document is never printed or served.
+// makes the gate fail and the document is never printed.
 //
 // The document emits identity, compositionRoots, capabilities/contracts/infra/
 // migrations, config.schemaRef, and provenance; plus
@@ -956,11 +956,8 @@ func contextDocumentError(label, what string, diags []diag.Diagnostic) error {
 }
 
 // buildPackedDocument builds one project's document and runs it through the
-// gates its canonical serialization applies. It is the single build+gate path
-// `context pack` and the MCP agent_context tool share, so the two can never
-// disagree about the document. A gate failure returns the same exit-2
-// classified error for every caller — no unsafe or invalid document is ever
-// returned.
+// gates its canonical serialization applies. A gate failure returns an exit-2
+// classified error — no unsafe or invalid document is ever returned.
 func buildPackedDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (*agentcontext.Document, error) {
 	doc, opts, err := BuildDocument(ws, p, languages, revision, cliVersion)
 	if err != nil {

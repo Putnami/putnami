@@ -14,23 +14,24 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/collaboration"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/mcp"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // The collaboration contracts on the command line.
 //
-// `putnami <contract> <operation> --input <json>` is the CLI entry path of the
-// operation the MCP server exposes as `<contract>.<operation>`: the same
-// request document, the same routing (mcp.CallProviderOperation), the same
-// envelope on stdout. A contract word is a command group exactly when the
-// workspace document declares options.collaboration, so a workspace that binds
-// nothing reserves no command name.
+// `putnami <contract> <operation> --input <json>` is the CLI entry path of a
+// contract operation; the extension host call collaboration.call is the other.
+// Both take the same request document, route through
+// collaboration.CallProviderOperation and answer the same envelope. A contract
+// word is a command group exactly when the workspace document declares
+// options.collaboration, so a workspace that binds nothing reserves no command
+// name.
 
 // maxCollaborationInputBytes bounds the request document read from --input,
 // --input-file or stdin.
@@ -39,7 +40,7 @@ const maxCollaborationInputBytes = collab.MaxDocumentBytes
 // addCollaborationGroups adds the contract words to the structured command
 // groups when the workspace declares options.collaboration.
 func addCollaborationGroups(groups map[string]bool, wsRoot string) map[string]bool {
-	if !mcp.CollaborationDeclared(wsRoot) {
+	if !collaboration.Declared(wsRoot) {
 		return groups
 	}
 	if groups == nil {
@@ -78,7 +79,7 @@ func printCommandGroupHelp(ctx context.Context, w io.Writer, wsRoot string, cfg 
 // isCollaborationCommand reports whether group is a contract word this
 // workspace routes.
 func isCollaborationCommand(wsRoot, group string) bool {
-	return collab.IsContract(group) && mcp.CollaborationDeclared(wsRoot)
+	return collab.IsContract(group) && collaboration.Declared(wsRoot)
 }
 
 // collaborationCommandOwners names the extensions that declare a command or a
@@ -135,7 +136,7 @@ func (a *App) runCollaborationCommand(
 	}
 	envelope := collaborationEnvelope(ctx, wsRoot, cfg, extensions, contract, parsed.Subcommand, arguments)
 
-	text, err := mcp.EnvelopeText(envelope, !output.StructuredOutput(parsed.Global.Output))
+	text, err := collaboration.EnvelopeText(envelope, !output.StructuredOutput(parsed.Global.Output))
 	if err != nil {
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 		return ExitError
@@ -156,7 +157,7 @@ func collaborationEnvelope(
 	contract, operation string, arguments json.RawMessage,
 ) collab.Envelope {
 	providers, unavailable := collaborationProviders(ctx, wsRoot, cfg, extensions)
-	return mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{
+	return collaboration.CallProviderOperation(ctx, collaboration.ProviderEnvironment{
 		WorkspaceRoot: wsRoot,
 		Extensions:    providers,
 		Unavailable:   unavailable,
@@ -164,13 +165,12 @@ func collaborationEnvelope(
 	}, contract, operation, arguments)
 }
 
-// collaborationProviders is the provider selection of the CLI entry path. It
-// is the selection the MCP server makes when it starts
+// collaborationProviders is the provider selection of both entry paths
 // (preparedExtensionSelection over lifecycle.PrepareReadOnly): a registry
 // extension serves only from the release the workspace lock pins, and one
 // whose exact release was not prepared is unavailable instead of being loaded
 // from a stale stable link. Extensions the workspace disables are unavailable
-// too, so both entry paths resolve a binding against the same set.
+// too.
 func collaborationProviders(
 	ctx context.Context, wsRoot string, cfg *wsproto.Config, discovered []*extension.ExtensionDescription,
 ) ([]*extension.ExtensionDescription, map[string]bool) {
@@ -279,7 +279,7 @@ func cliWorkspaceView(wsRoot string) func(context.Context, *extproto.ToolCallReq
 		if err != nil {
 			return fmt.Errorf("load workspace: %w", err)
 		}
-		return mcp.AttachWorkspaceView(ws, request, args, func(ws *workspace.Workspace, selection mcp.ProjectSelection) (*extproto.ToolSelection, error) {
+		return collaboration.AttachWorkspaceView(ws, request, args, func(ws *workspace.Workspace, selection collaboration.ProjectSelection) (*extproto.ToolSelection, error) {
 			resolved, err := shared.ResolveProjectSelection(ws, catalogProjectSelection(selection))
 			if err != nil {
 				return nil, err
@@ -292,7 +292,7 @@ func cliWorkspaceView(wsRoot string) func(context.Context, *extproto.ToolCallReq
 // printCollaborationContractHelp resolves one contract against the entry
 // path's provider selection and describes it.
 func printCollaborationContractHelp(w io.Writer, wsRoot, contract string, providers []*extension.ExtensionDescription, unavailable map[string]bool) {
-	printCollaborationHelp(w, contract, mcp.CollaborationCapabilities(wsRoot, contract, providers, unavailable))
+	printCollaborationHelp(w, contract, collaboration.Capabilities(wsRoot, contract, providers, unavailable))
 }
 
 // printCollaborationHelp describes one contract: its binding, its provider and
@@ -303,12 +303,10 @@ func printCollaborationHelp(w io.Writer, contract string, capabilities collab.Ca
 		contract, contract)
 	hostOnly := hostOnlyOperations(contract)
 	if len(hostOnly) > 0 {
-		iox.Fprintf(w, "The same operations are MCP tools named %s.<operation>, except the host-only %s: the host that runs an agent calls it here, and the agent never sees it as a tool.\n",
-			contract, strings.Join(hostOnly, ", "))
-		iox.Fprintln(w, "Every call prints one envelope.")
-		iox.Fprintln(w)
+		iox.Fprintf(w, "Every call prints one envelope. Only the host that runs an agent calls the host-only %s.\n\n",
+			strings.Join(hostOnly, ", "))
 	} else {
-		iox.Fprintf(w, "The same operations are MCP tools named %s.<operation>. Every call prints one envelope.\n\n", contract)
+		iox.Fprint(w, "Every call prints one envelope.\n\n")
 	}
 	switch {
 	case capabilities.Provider != nil && capabilities.Binding != nil:

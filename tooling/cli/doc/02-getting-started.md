@@ -145,7 +145,7 @@ This creates a `putnami.workspace.json` at the workspace root. It writes no lang
 
 The local developer loop does not require `@putnami/cloud`. A workspace with
 only the Go and/or TypeScript extensions can install dependencies, build, test,
-serve, use the local action cache, and use the local MCP tools without cloud
+serve, and use the local action cache without cloud
 credentials or network access. Cloud is an explicit capability boundary:
 without a cache provider extension the build cache stays local with no notice,
 because the provider owns the remote cache configuration, while publish and
@@ -164,28 +164,18 @@ putnami workspace init --project my-app --project-path apps/my-app
 
 ### Open the Workspace in Claude Code or Codex
 
-The public installer registers Putnami with installed Claude Code and Codex
-hosts. Open an existing Putnami project in either host and start working; the
-stable launcher resolves the active session's worktree and its pinned Putnami
-CLI. No workspace identifier or separate Intelligence setting is required.
+Open an existing Putnami project in your agent host and start working. The
+agent reaches the workspace through `./putnamiw` (or `putnami`), which resolves
+the worktree's pinned Putnami CLI. The installer registers nothing with the
+host, and no workspace identifier or separate Intelligence setting is required.
 Host trust and managed policy can still require their normal approval.
-If a resumed or delegated agent inherits an MCP server bound to another
-worktree, the live bootstrap detects the root mismatch and uses Putnami's local
-CLI in the active worktree for that question; reconnecting MCP is optional.
 
-For read-only analysis, Putnami prepares only registry extensions pinned by
-`putnami.lock.json`, under a short deadline. It does not run `putnami install`,
-dependency installation, Cloud setup, workspace jobs, or context generation.
-The MCP server then advertises the exact `AI.md` from each prepared extension
-and any extension-provided version-resolved documentation tools. If the exact
-artifact is unavailable offline, the read continues immediately with local
-workspace tools and reports the unavailable locked version; it never substitutes
-the latest release. Existing host configuration, human `.agents/constraints.md`,
-generated-file ownership markers, and agent-artifact receipts are preserved.
+Existing host configuration, human `.agents/constraints.md`, generated-file
+ownership markers, and agent-artifact receipts are preserved.
 
 See [Agent Workflows](18-agent-workflows.md) for the guidance and ownership
-model, and [Installing the CLI](22-installing-the-cli.md#claude-code-and-codex-registration)
-for host registration, session behavior, and qualified host versions.
+model, and [Installing the CLI](22-installing-the-cli.md#claude-code-and-codex)
+for the installer's host step.
 
 ### Explore the Workspace
 

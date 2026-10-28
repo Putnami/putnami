@@ -251,8 +251,7 @@ type Command struct {
 	// `putnami scopes list --json` worked.
 	//
 	// Empty means the bare root is NOT an alias: it either has behavior of its
-	// own (`putnami mcp` serves over stdio) or is a usage error
-	// (`putnami contracts`). internal/cli's TestCatalog_DefaultSubMatchesHandlers
+	// own or is a usage error (`putnami contracts`). internal/cli's TestCatalog_DefaultSubMatchesHandlers
 	// reads registry_commands.go and fails when this field and the handlers
 	// disagree in either direction.
 	DefaultSub string

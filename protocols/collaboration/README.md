@@ -35,7 +35,7 @@ describes every operation.
 `capabilities` is reserved in every contract: the orchestrator answers it from
 the binding and the provider's manifest, without running the provider.
 `missions.sync` is host-only: the host that runs an agent calls it through the
-CLI or the host channel, the MCP server lists no tool for it, and
+CLI or the host channel, and
 `missions.capabilities` marks it `hostOnly`.
 
 Every result carries source-qualified opaque references (`{"source":
@@ -93,7 +93,7 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   (`tasks.v1.json`, `proposals.v1.json`, `memory.v1.json`,
   `missions.v1.json`) with an `<operation>Input` and `<operation>Result`
   definition per operation.
-  `InputSchema` inlines one operation's request schema for an MCP tool.
+  `InputSchema` inlines one operation's request schema.
 - `fixtures/valid/` and `fixtures/invalid/` hold the corpus, named
   `<kind>.<…>.json`; `fixtures/expectations.json` pins the codes of every
   invalid fixture. `conformance_test.go` runs it, `drift_test.go` keeps the
@@ -119,7 +119,7 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   the memory contract with a file or a Git backend.
 
 There is no TypeScript twin: the contracts are called through the CLI and the
-MCP server, and providers written in any language speak JSON.
+extension host RPC, and providers written in any language speak JSON.
 
 Run `./putnamiw test --projects go.putnami.dev/protocol/collaboration --enforce-coverage`.
 

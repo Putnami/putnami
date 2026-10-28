@@ -19,7 +19,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
 // Host hooks: the hooks an extension declares (the manifest's `hostHooks`
@@ -51,10 +50,9 @@ var hostHookFiles = []hostHookFile{
 	{host: extproto.HostCodex, rel: ".codex/hooks.json"},
 }
 
-// hostHookMCPServer is the name the putnami MCP server is registered under,
-// which a host puts in every MCP tool name. Claude Code reads it from
-// .mcp.json. Codex reads its own config, which Putnami does not write; the
-// hooks assume the same name there.
+// hostHookMCPServer is the server name a host puts in every MCP tool name. A
+// hook entry's mcpTools field (a protocol field) is matched under it. Putnami
+// registers no MCP server of its own.
 const hostHookMCPServer = "putnami"
 
 // The guards a rendered hook command ends with. A host reads exit code 2 from
@@ -138,7 +136,7 @@ func (c HostHookChange) Description() string {
 // the calling command carries on. A nil warn discards the warnings.
 //
 // Only the explicit install, init and upgrade call it. The implicit bootstrap,
-// the first-run pass, context generate and the MCP server never do.
+// the first-run pass and context generate never do.
 func RegisterHostHooks(wsRoot string, cfg *wsproto.Config, warn io.Writer) []HostHookChange {
 	return applyHostHooks(wsRoot, cfg, warn, true)
 }
@@ -243,16 +241,8 @@ func collectHostHooks(wsRoot string, cfg *wsproto.Config, warnf func(string, ...
 	if err != nil {
 		return hostHookSet{}, err
 	}
-	base, err := mcpServerCommand(wsRoot)
+	base, err := workspaceLauncher(wsRoot)
 	if err != nil {
-		var lockErr *mcpLockError
-		if errors.As(err, &lockErr) {
-			message := lockErr.err.Error()
-			if !strings.Contains(message, lockfile.LockFilename) {
-				message = "read " + lockfile.LockFilename + ": " + message
-			}
-			err = errors.New(message)
-		}
 		return hostHookSet{}, err
 	}
 	for _, source := range sources {
@@ -277,7 +267,7 @@ func collectHostHooks(wsRoot string, cfg *wsproto.Config, warnf func(string, ...
 
 // boundCollaborationContracts returns the contracts the workspace document
 // (putnami.workspace.json) binds validly. A block that repeats options or
-// options.collaboration binds nothing, as for the MCP routing. A contract this
+// options.collaboration binds nothing, as for the collaboration routing. A contract this
 // CLI does not know is not bound.
 func boundCollaborationContracts(wsRoot string) (map[string]bool, error) {
 	data, err := os.ReadFile(wsproto.ResolveFile(wsRoot, wsproto.WorkspaceConfigFilename))
@@ -326,8 +316,8 @@ type hostHookHandlerJSON struct {
 }
 
 // renderHostHookGroup renders one declared hook for host, started with the
-// launcher the workspace's MCP server uses (base, from mcpServerCommand), with
-// the first-use install turned off.
+// workspace's launcher (base, from workspaceLauncher), with the first-use
+// install turned off.
 func renderHostHookGroup(host, base string, path []string, entry extproto.HostHookEntry) hostHookGroupJSON {
 	words := append([]string{hostHookEnvironment, hostHookLauncher(host, base)}, path...)
 	words = append(words, entry.Args...)

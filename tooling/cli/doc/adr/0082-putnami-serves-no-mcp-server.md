@@ -12,8 +12,8 @@
   `internal/cli`, `internal/commands/agentctx`, `internal/commands/lifecycle`,
   `internal/launch`, `putnamiw`, the installer scripts), features
   `cli/context-discovery`, `cli/agent-workflow-lifecycle`,
-  `cli/collaboration-providers`. Slice 1 of issue 649. The protocol vocabulary
-  that names MCP leaves in slice 2.
+  `cli/collaboration-providers`. The protocol vocabulary that names MCP stays
+  (decision 9).
 
 ## Context
 
@@ -21,7 +21,7 @@ The core CLI served a stdio MCP server (`putnami mcp`). It exposed workspace
 tools, resources, the settled decisions and a `run_jobs` tool, and it
 reconciled agent workflows when a host started it (ADR 0040).
 
-Issue 649 measured how agents use it. The sample is 509 Claude Code sessions
+A usage study measured how agents use it. The sample is 509 Claude Code sessions
 on `putnami` and `putnami-cloud` over the 30 days to 27 October 2026, and the
 607 pull requests they opened:
 
@@ -105,10 +105,10 @@ on `putnami` and `putnami-cloud` over the 30 days to 27 October 2026, and the
 8. **The settled decisions are not pushed.** The generated `AGENTS.md` block
    keeps its line that names the `decisions.json` files. The line is enough, and
    nothing else lists the decisions.
-9. **Protocol vocabulary leaves in slice 2.** Slice 1 deletes the core
+9. **The protocol vocabulary stays.** This decision deletes the core
    producers only: the `mcpResult` document producers in
    `internal/machine/documents.go` and the wire goldens that pin them. These
-   stay until slice 2 removes them with the extension tool contract:
+   stay until the extension tool contract leaves, and leave with it:
    `protocols/cli` `mcpResult`, the `MCPTool*` names and `ReportOriginMCP`;
    `hostHooks[].mcpTools`; the feature `surface` tool list; the extension
    manifest `tools` section; `tooling/extension-sdk/mcp`; the `mcptool.go`
@@ -131,7 +131,7 @@ on `putnami` and `putnami-cloud` over the 30 days to 27 October 2026, and the
   longer assume a `putnami` server in Claude Code. A matcher rendered from
   `mcpTools` names a tool only a host-registered server named `putnami` can
   provide, which Putnami does not install. The field stays in the manifest
-  until slice 2 removes it.
+  until the extension tool contract leaves.
 
 ## Consequences
 

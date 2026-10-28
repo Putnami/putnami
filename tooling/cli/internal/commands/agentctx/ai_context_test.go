@@ -22,7 +22,7 @@ const constraintsPath = ".agents/constraints.md"
 
 func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 	spectest.Proves(t, "cli/canonical-workspace-guidance", "onboarding-path", "generated-context-presents-the-workflow-path")
-	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "generated-bootstrap-routes-to-live-mcp-guidance")
+	spectest.Proves(t, "cli/canonical-workspace-guidance", "generated-agent-guidance", "generated-bootstrap-routes-discovery-to-the-cli")
 	dir := t.TempDir()
 
 	if err := WriteAgentEntrypoints(dir); err != nil {
@@ -52,8 +52,9 @@ func TestWriteAgentEntrypointsCreatesOnlyTheEntrypoints(t *testing.T) {
 		// the real document by TestGeneratedGuidanceMatchesRepositoryCIDocument.
 		"`putnami " + defaultGate() + " --impacted --enforce-coverage`",
 		"While iterating, select the projects you changed with `--projects <a>,<b>`",
-		"Use grep only for literal text, or after the tool answers stale or unavailable.",
-		"If the MCP root differs from your worktree, use the local CLI.",
+		"Discover code through the CLI, then grep: `putnami projects list|describe|owner|deps|why`",
+		"`putnami context map|pack`",
+		"`putnami <verb> --impacted --dry-run`",
 		"Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami.",
 		"Read `.agents/constraints.md` when it exists.",
 	} {
@@ -93,7 +94,7 @@ func repositoryRootForAIContext(t *testing.T) string {
 // The human constraints file is read by the guidance block and written by
 // nobody: an existing one keeps its bytes, and a missing one is not created.
 func TestWriteAgentEntrypointsNeverWritesTheConstraintsFile(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "the-human-constraints-file-is-preserved")
+	spectest.Proves(t, "cli/context-discovery", "generated-context", "the-human-constraints-file-is-preserved")
 	dir := t.TempDir()
 	const custom = "# Shared AI Constraints\n\nKeep this line.\n"
 
@@ -277,54 +278,8 @@ func readGeneratedGuidance(t *testing.T, dir string) map[string]string {
 	return result
 }
 
-func TestReadExtensionGuidanceBoundsAndRejectsSpecialFiles(t *testing.T) {
-	root := t.TempDir()
-	path := filepath.Join(root, "AI.md")
-	exact := strings.Repeat("a", maxExtensionGuidanceSize)
-	if err := os.WriteFile(path, []byte(exact), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	got, err := ReadExtensionGuidance(root)
-	if err != nil || got != exact {
-		t.Fatalf("guidance at limit: len=%d err=%v", len(got), err)
-	}
-
-	if err := os.WriteFile(path, []byte(exact+"b"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ReadExtensionGuidance(root); err == nil || !strings.Contains(err.Error(), "guidance limit") {
-		t.Fatalf("oversized guidance error = %v", err)
-	}
-
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ReadExtensionGuidance(root); err == nil || !strings.Contains(err.Error(), "regular file") {
-		t.Fatalf("directory guidance error = %v", err)
-	}
-
-	if runtime.GOOS != "windows" {
-		if err := os.Remove(path); err != nil {
-			t.Fatal(err)
-		}
-		outside := filepath.Join(t.TempDir(), "outside.md")
-		if err := os.WriteFile(outside, []byte("outside"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Symlink(outside, path); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := ReadExtensionGuidance(root); err == nil || !strings.Contains(err.Error(), "regular file") {
-			t.Fatalf("symlink guidance error = %v", err)
-		}
-	}
-}
-
 func TestWriteAgentEntrypointsForceReclaimsPreservedGuidance(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "read-preparation", "human-and-agent-artifact-ownership-files-are-preserved")
+	spectest.Proves(t, "cli/context-discovery", "read-preparation", "human-and-agent-artifact-ownership-files-are-preserved")
 	dir := t.TempDir()
 	if err := WriteAgentEntrypoints(dir); err != nil {
 		t.Fatalf("seed generated guidance: %v", err)

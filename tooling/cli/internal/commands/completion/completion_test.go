@@ -51,8 +51,8 @@ func TestCompletionBash(t *testing.T) {
 	if !strings.Contains(output, "upgrade") {
 		t.Error("expected 'upgrade' structured command")
 	}
-	if !strings.Contains(output, "'mcp') _putnami_words=(install) ;;") {
-		t.Error("expected mcp subcommands in bash completion")
+	if !strings.Contains(output, "'migrate') _putnami_words=(vnext) ;;") {
+		t.Error("expected migrate subcommands in bash completion")
 	}
 	if !strings.Contains(output, "--verbose") {
 		t.Error("expected --verbose flag")
@@ -102,8 +102,8 @@ func TestCompletionZsh(t *testing.T) {
 	}
 	// The menu description is the catalog Summary since A1b, so it is the same
 	// prose `putnami help` shows rather than a third wording.
-	if !strings.Contains(output, "'mcp:Run the MCP server over stdio for AI agent harnesses'") || !strings.Contains(output, "'install'") {
-		t.Error("expected mcp install in zsh completion")
+	if !strings.Contains(output, "'migrate:Migrate Putnami workspace files forward'") || !strings.Contains(output, "'vnext'") {
+		t.Error("expected migrate vnext in zsh completion")
 	}
 }
 
@@ -123,8 +123,8 @@ func TestCompletionFish(t *testing.T) {
 	if !strings.Contains(output, "upgrade") {
 		t.Error("expected 'upgrade' command")
 	}
-	if !strings.Contains(output, "__putnami_complete_children mcp' -a 'install'") {
-		t.Error("expected mcp install in fish completion")
+	if !strings.Contains(output, "__putnami_complete_children migrate' -a 'vnext'") {
+		t.Error("expected migrate vnext in fish completion")
 	}
 	if !strings.Contains(output, "verbose") {
 		t.Error("expected 'verbose' flag")
@@ -168,9 +168,6 @@ func TestGatherCompletionContext(t *testing.T) {
 	if !sharedtest.Contains(ctx.structured, "upgrade") {
 		t.Error("expected 'upgrade' in structured commands")
 	}
-	if !sharedtest.Contains(ctx.structured, "mcp") {
-		t.Error("expected 'mcp' in structured commands")
-	}
 
 	// Should have subcommands
 	if subs, ok := ctx.subcommands["migrate"]; !ok || len(subs) == 0 {
@@ -180,7 +177,7 @@ func TestGatherCompletionContext(t *testing.T) {
 		t.Error("expected sessions subcommands")
 	}
 	assertStringSet(t, ctx.subcommands["sessions"], []string{"export", "inspect", "list", "replay", "summary"})
-	assertStringSet(t, ctx.subcommands["mcp"], []string{"install"})
+	assertStringSet(t, ctx.subcommands["migrate"], []string{"vnext"})
 	if !containsStructuredFlag(ctx.structuredFlags["sessions export"], "--since") {
 		t.Error("expected sessions export structured flag --since")
 	}

@@ -63,8 +63,7 @@ retains detailed phase and job output; `--quiet` suppresses normal progress.
 Outside a supported terminal, installation prints its final action report
 without cursor movement or animation. An implicit installation before a JSON,
 JSONL or Cloud Logging command sends human progress to stderr so stdout remains
-the requested machine stream. MCP preparation never writes human text to its
-JSON-RPC stdout.
+the requested machine stream.
 
 ## Live Renderer
 

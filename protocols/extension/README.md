@@ -272,7 +272,7 @@ validates the staged manifest strictly and stamps it on success, so the field is
 | `tooling/cli/internal/extension`, `.../cli`, `.../engine`, `.../jobs` | Manifest loading, contract negotiation, planning and scheduling |
 | `tooling/cli/internal/commandmeta`, `.../commands`, `.../output` | Command surface, help, and rendering |
 | `tooling/cli/internal/hooks`, `.../store`, `.../workspace` | Hooks, per-extension cache roots, project discovery |
-| `tooling/cli/internal/mcp`, `.../machine`, `.../useragent` | Tool descriptors, machine output, agent provenance headers |
+| `tooling/cli/internal/collaboration`, `.../machine`, `.../useragent` | Collaboration provider calls, machine output, agent provenance headers |
 | `tooling/extension-sdk/manifest`, `.../mcp` | The authoring-side gate extension authors build against |
 | `go/extension/internal/jobs/{lint,pkg}` | Package-time validation and stamping |
 | [`protocols/job`](../job/README.md) | Job context derived from a task declaration |

@@ -18,7 +18,7 @@ Add it to `putnami.workspace.json`, then install:
 
 ```bash
 putnami extensions install
-putnami context generate   # teaches your AI assistant the five sdd.* MCP tools
+putnami context generate   # refreshes the guidance block your AI assistant reads
 ```
 
 Then name it in each project that authors a feature manifest or a spec, in that project's `putnami.json`:

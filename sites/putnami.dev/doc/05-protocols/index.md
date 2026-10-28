@@ -54,7 +54,7 @@ The chain the rest of the documentation describes in pieces is, concretely, this
 | An infrastructure need, next to the code that needs it<br>*infra requirements* | [`infra`](https://github.com/putnami/putnami/tree/main/protocols/infra) | the build aggregator, then one merged artifact per deploy target |
 | A job<br>*the job runner* | [`job`](https://github.com/putnami/putnami/tree/main/protocols/job), [`runtime`](https://github.com/putnami/putnami/tree/main/protocols/runtime) | the CLI, the language SDKs, your CI |
 | `putnami.ci.json`<br>*CI intent, reviewable in git* | [`ci`](https://github.com/putnami/putnami/tree/main/protocols/ci) | any execution plane — it reads the document, it never widens it |
-| *Nothing. It is derived.*<br>*your project's own facts* | [`capabilities`](https://github.com/putnami/putnami/tree/main/protocols/capabilities), [`contracts`](https://github.com/putnami/putnami/tree/main/protocols/contracts), [`agentcontext`](https://github.com/putnami/putnami/tree/main/protocols/agentcontext) | your agent, through `putnami context pack` and MCP |
+| *Nothing. It is derived.*<br>*your project's own facts* | [`capabilities`](https://github.com/putnami/putnami/tree/main/protocols/capabilities), [`contracts`](https://github.com/putnami/putnami/tree/main/protocols/contracts), [`agentcontext`](https://github.com/putnami/putnami/tree/main/protocols/agentcontext) | your agent, through `putnami context pack` |
 
 Read the last row again. Every other row is something a developer writes once,
 next to the code it describes. The last row is what the system derives from all
@@ -72,8 +72,7 @@ an agent-context document and prints it, writing no file: identity and dependenc
 capability / contract / infra / migration references, representative source
 *ranges*, tests, adjacent docs, and provenance. It aggregates **by reference** —
 paths, digests, and ranges, never file content — and runs a fail-closed
-publish-safety gate before anything leaves the repository. The read-only MCP
-`agent_context` tool serves it per request.
+publish-safety gate before anything leaves the repository. `putnami context pack` prints it per request.
 
 The rest of the operational surface is contracted the same way:
 
@@ -264,8 +263,8 @@ provenance, runtime correlation, incident context, rollout protection. It reads
 `http-routes` to build an allowlist, `infra` to provision, `ci` to execute,
 `telemetry` to observe. It does not get a private dialect.
 
-**Putnami Intelligence** makes the workspace queryable: agent orientation over
-MCP, a versioned workspace index, and spec-driven development — features, specs
+**Putnami Intelligence** makes the workspace queryable: agent orientation
+through the CLI, a versioned workspace index, and spec-driven development — features, specs
 and architecture recorded next to the code. The review-and-audit loop — findings
 over versioned evidence, with freshness and receipts — is where this is going.
 It is a standalone product: it delivers value with neither Putnami frameworks

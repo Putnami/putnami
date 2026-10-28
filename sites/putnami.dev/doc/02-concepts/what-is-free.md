@@ -13,7 +13,7 @@ optional offers.
   storage, and validation.
 - The protocols, with their schemas, fixtures, and conformance tests.
 - The project templates and samples.
-- The MCP server that exposes a workspace to coding agents.
+- The CLI queries that expose a workspace to coding agents.
 
 ## What you can do with it alone
 
@@ -23,7 +23,7 @@ With the repository alone, and without a Putnami Cloud account, you can:
 2. Check only the projects a change affects, with `--impacted`.
 3. Package a project as a container image and publish it to your own registry.
 4. Deploy that image anywhere you run containers.
-5. Let coding agents work on the workspace through the MCP server.
+5. Let coding agents work on the workspace through the CLI.
 
 ## The license, in plain terms
 

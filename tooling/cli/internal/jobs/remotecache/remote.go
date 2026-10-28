@@ -664,9 +664,8 @@ func (r *RemoteCache) Restore(ctx context.Context, hash string, job *jobmodel.Sc
 		// gosec's INTERPROCEDURAL taint analysis a fresh path from the file
 		// watcher into this call, without touching this file directly. The
 		// values and their provenance are unchanged. Suppressed at the site rather
-		// than added to the global gosec excludes, because MCP now accepts
-		// agent-supplied input and disabling G706 tree-wide would give up the rule
-		// exactly where it earns its keep.
+		// than added to the global gosec excludes, because disabling G706
+		// tree-wide would give up the rule exactly where it earns its keep.
 		slog.Warn("remote cache: provider materialize failed; building locally",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil

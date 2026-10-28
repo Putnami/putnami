@@ -56,7 +56,6 @@ func init() {
 	registerCommand("telemetry", cmdTelemetry)
 	registerCommand("help", cmdHelp)
 	registerCommand("upgrade", cmdUpgrade)
-	registerCommand("mcp", cmdMcp)
 	registerCommand("pin", cmdPin)
 	registerCommand("doctor", cmdDoctor)
 	registerCommand("impact-plan", cmdImpactPlan)
@@ -362,6 +361,12 @@ func cmdProjects(env *CommandEnv) error {
 		return lifecycle.ProjectsCreate(env.Ctx, env.WsRoot, env.Cfg, env.Args, lifecycleEnv(env))
 	case "describe":
 		return lifecycle.ProjectsDescribe(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, env.WorkspaceWarnings())
+	case "owner":
+		return lifecycle.ProjectsOwner(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, env.WorkspaceWarnings())
+	case "deps":
+		return lifecycle.ProjectsDeps(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, env.WorkspaceWarnings())
+	case "why":
+		return lifecycle.ProjectsWhy(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.OutputFormat, env.WorkspaceWarnings())
 	case "sync":
 		return lifecycle.ProjectsSync(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.Global.DryRun, lifecycleEnv(env))
 	case "tag":
@@ -929,25 +934,4 @@ func cmdUpgrade(env *CommandEnv) error {
 		iox.Fprintln(os.Stdout, "  No workspace here, so only the global CLI was upgraded. Run putnami upgrade inside a workspace to update extensions and dependencies.")
 	}
 	return err
-}
-
-// cmdMcp serves the MCP server over stdio (the bare form MCP clients spawn)
-// or, with the install subcommand, writes the .mcp.json registration. A
-// workspace is required since every tool operates on one.
-func cmdMcp(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	switch env.Sub {
-	case "":
-		// Serving takes over the process for the life of the agent session,
-		// speaking JSON-RPC 2.0 on stdin/stdout. It is the one `mcp` subcommand
-		// implemented in the shell rather than in internal/commands; mcp_serve.go
-		// explains why (the mcp → engine → commands cycle A4/#2643 would close).
-		return mcpServe(env.Ctx, env.WsRoot, env.Cfg, Version)
-	case "install":
-		return agentctx.MCPInstall(env.WsRoot)
-	default:
-		return usageErrorf("unknown subcommand: mcp %s\n  Available: install (bare `putnami mcp` serves over stdio)", env.Sub)
-	}
 }

@@ -347,7 +347,7 @@ func UndeclaredCommandsError(commands []string) error {
 // refuseUndeclaredCommands returns the error of a run that names a command no
 // loaded extension declares as a job, or nil. The core declares no job
 // command, so this is where every entry point that runs jobs (a terminal run,
-// impact-plan, cache verify, MCP run_jobs, compose) learns that a command does
+// impact-plan, cache verify, compose) learns that a command does
 // not exist in the workspace: once, after extension discovery and before
 // selection.
 //
@@ -420,8 +420,7 @@ func selectedCommandsWithoutJobs(commands []string, planned []*scheduler.Schedul
 
 // printPlan renders the execution plan onto the run's human-notice stream
 // (Request.stdout). It takes the writer rather than reaching for os.Stdout so
-// the MCP adapter's --plan preview cannot emit a table into its JSON-RPC frame
-// stream.
+// an adapter that owns its stdout cannot receive a table there.
 //
 // selected is the project set selection resolved, which the plan may exceed:
 // a job that declares a `^step` need pulls that step in for every unselected

@@ -46,10 +46,9 @@ records. See
 The first command installs the newest stable CLI into `~/.putnami/bin`, links it
 into a user-writable directory that `PATH` already names when there is one
 (`~/.local/bin`, `~/bin`, or a writable `/usr/local/bin`), installs shell
-completions, and registers Putnami with an
-installed Claude Code or Codex host through that host's official `mcp add`
-command. For an existing Putnami workspace, that is the whole technical setup:
-open the project in either host and ask for the work. `putnami init` remains the
+completions. It registers nothing with Claude Code or Codex. For an
+existing Putnami workspace, that is the whole technical setup: open the project
+in your agent host and ask for the work. `putnami init` remains the
 explicit step that creates a new workspace and its product intent.
 
 A pipe-to-shell child cannot change its parent shell. The second line of the
@@ -60,94 +59,23 @@ default install directory: with `--install-dir <dir>`, export that directory
 instead. Once you have a CLI, you never need the script again —
 `putnami upgrade --global` replaces it.
 
-## Claude Code and Codex registration
+## Claude Code and Codex
 
-The host registration points at the stable installed path, such as
-`~/.putnami/bin/putnami`, and passes only `mcp`. It stores neither a repository
-path nor a Cloud credential. The stable launcher enters the active session's
-directory before resolving `putnami.lock.json`, so a worktree's exact CLI pin is
-still authoritative. In a *source* workspace — one whose lock records
-`cli.source: "workspace"`, such as the `putnami` repository itself — an installed
-CLI is not authoritative and is refused; run `./putnamiw mcp` from that worktree
-instead (see [Version management](14-version-management.md#source-workspaces-building-the-cli-instead-of-pinning-one)).
+The installer registers no server with Claude Code or Codex. An earlier
+installer added a user-scoped `putnami` server to each host. When a host's
+`putnami` definition is exactly the one the installer wrote, the installer
+removes it, with `claude mcp remove --scope user putnami` or
+`codex mcp remove putnami`. A customized definition stays byte for byte, with a
+warning that tells you to remove it by hand.
 
+Pass `--no-agent-hosts`, or set `PUTNAMI_NO_AGENT_HOSTS=1`, to skip this step
+entirely. No host configuration is read or written. Use it for image builds, CI
+cache warms, and any machine whose agent hosts you configure by hand.
 
-- Claude Code receives `PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.}` in its
-  user-scoped MCP definition, and also injects `CLAUDE_PROJECT_DIR` directly
-  into every spawned stdio server. Putnami prefers the direct value, which is
-  the stable root where that Claude session launched.
-- Codex starts the user-scoped stdio server in the session working directory.
-  The definition deliberately has no `cwd`, so `codex -C`, resume, and a new
-  worktree do not inherit the directory where Putnami happened to be installed.
-
-Pass `--no-agent-hosts`, or set `PUTNAMI_NO_AGENT_HOSTS=1`, to decline this
-entirely. Nothing else about the install changes, and no host configuration is
-read or written. Use it for image builds, CI cache warms, and any machine whose
-agent hosts you configure by hand.
-
-The installer first runs the host's `mcp get putnami`. An existing definition
-that matches the launcher contract is reported as verified. The comparison is by
-meaning, not by formatting: Codex's `--json` output is a host-owned document
-that may gain a field, reorder keys, or reindent between releases, so it is
-compared after whitespace is removed and only on the fields that change
-behavior — the command, its one `mcp` argument, an enabled server, and the
-absence of a stored `cwd`, injected environment, or tool filter. A release that
-reformats its output therefore does not make Putnami mistake its own entry for
-someone else's and stop maintaining it.
-
-A customized definition remains human configuration: Putnami leaves it
-byte-for-byte untouched, reports that it was preserved, and gives the inspection
-command. This also preserves comments and unrelated tables in Codex's TOML.
-
-A missing definition is added and then read back. Codex's JSON output must
-confirm an exact command, one `mcp` argument, no environment or cwd, and no host
-tool filters before the installer reports its configuration verified. When
-Claude is installed outside a Putnami workspace, its exact definition can be
-verified even though the server cannot connect there; the installer reports
-that the connection will be checked when Claude opens a Putnami workspace and
-does not report connection readiness. Managed policy can refuse the write
-without invalidating the verified CLI installation, but the installer then
-warns and never calls the host ready.
-
-Host precedence and trust still apply. Claude local/project entries override
-the user entry, and a checked-in `.mcp.json` server requires the host's one-time
-project approval. `putnami init`, `putnami install` and `putnami upgrade` add
-the `putnami` entry to that file when it is missing, and `putnami mcp install`
-repairs a diverged one. In a source workspace whose root holds an executable
-`putnamiw`, that entry runs `./putnamiw mcp`, not the user launcher. When the
-CLI of that tree is not built yet, `./putnamiw mcp` answers the host while it
-builds, as a server that is still preparing and has no tools. When the build
-lands, it hands the session to the built server and sends
-`notifications/tools/list_changed`, and the host lists the real tools. A host
-that ignores that notification shows them after it reconnects. The session
-keeps the instructions of the preparing server: reconnect it for the server's
-own. Codex
-loads `.codex/config.toml` only after the project is trusted, and a project
-entry can replace the user launcher. Inspect a preserved
-override with `claude mcp get putnami` or `codex mcp get putnami`. A host session
-that was already open must reconnect that MCP server or start a new session;
-installing a binary cannot mutate the tool inventory already held in memory.
-
-The acceptance inventory is pinned to Claude Code `2.1.260` and Codex CLI
-`0.153.4`. Older hosts receive the same official commands and are reported as
-unverified if they cannot store or read back the contract. Likewise, a workspace
-that intentionally pins a Putnami CLI from before this integration continues to
-run that exact engine: the launcher fixes its cwd before re-exec, but does not
-invent newer tools or guidance. Move that workspace pin explicitly when the new
-capabilities are required.
-
-Claude keeps `CLAUDE_PROJECT_DIR` fixed for the lifetime of a spawned server.
-Starting Claude directly in a worktree gives Putnami that worktree root, and
-ordinary subagents share it. Entering another worktree after the MCP server has
-started does not retarget the existing process; reconnect Putnami in that root,
-including after a resume, or start a session there. A worktree-isolated subagent
-needs its own MCP connection in that root; if the host shares the parent's
-server, the agent uses the documented local fallback. This is a Claude host
-boundary rather than a workspace path Putnami can safely guess or persist.
-The MCP initialize message names its resolved root so analysis, resumed work,
-and subagents can compare it with their active cwd/worktree before using a tool.
-A mismatch skips that server immediately and uses the local Putnami CLI; a
-reconnect in the active root is optional.
+Agents reach a workspace through the CLI. In a *source* workspace — one whose
+lock records `cli.source: "workspace"`, such as the `putnami` repository itself —
+an installed CLI is not authoritative and is refused; run `./putnamiw` from that
+worktree instead (see [Version management](14-version-management.md#source-workspaces-building-the-cli-instead-of-pinning-one)).
 
 ## Run one command without a workspace
 
@@ -808,7 +736,7 @@ no channel. The argument is a channel; `init` refuses an exact version. See
 | `install` | The public installer URL installs from that channel, reports `Integrity verified`, never takes the unverified path, and invokes no `sudo`/`doas`/`pkexec`/`run0`. | The installer escalated privileges, or reported "verified" without checking. |
 | `discovery` | `command -v putnami` resolves, inside the smoke's workdir. | The installer escalated privileges, or reported "verified" without checking. |
 | `prerequisites` + `platform` + `stamp` | The actual runner has Bun v1.4.0 or later; the installed path is executable, hashes to the selected host asset, executes on that runner, and reports the resolved version. | A stale cross-compile cache hit shipped a binary with the wrong embedded version stamp. |
-| `init` | With `PUTNAMI_CHANNEL` set to the smoke's channel, the exact TypeScript command creates readable workspace/project state, extension/template locks, dependency lock/config, the assistant guidance block in `AGENTS.md`/`CLAUDE.md`, and a `.mcp.json` that registers the `putnami` MCP server. Root `.npmrc` maps `@putnami` to the public registry and contains no auth directive; no generated config/package manifest names the private cloud dependency; an installed-CLI build plan validates the generated graph. | Init reported success after a required setup step actually failed. |
+| `init` | With `PUTNAMI_CHANNEL` set to the smoke's channel, the exact TypeScript command creates readable workspace/project state, extension/template locks, dependency lock/config, the assistant guidance block in `AGENTS.md`/`CLAUDE.md`, with no `.mcp.json`. Root `.npmrc` maps `@putnami` to the public registry and contains no auth directive; no generated config/package manifest names the private cloud dependency; an installed-CLI build plan validates the generated graph. | Init reported success after a required setup step actually failed. |
 | `serve` + `http` | The exact serve command emits canonical nested v2 typed readiness on an OS-assigned port and answers one non-empty explicit 2xx HTTP response. | Init reported success after a required setup step actually failed. |
 | `shutdown` | The CLI and starter exit within the graceful budget without the hard fallback, and no process whose command line names the smoke workdir, or whose working directory is below it, still runs. A host Bun serves `./src/serve.ts`, so only its directory names the tree; it is read from `/proc` on Linux and with `lsof` on macOS. On Windows the Job Object of ADR 0052 is the guarantee and this check is a sanity check. An answer on the freed port does not fail the leg: an unrelated listener can take the port, and the page of a webapp changes on every request. The answer is reported. | The CLI or starter failed to exit within the graceful budget. |
 | `run` (only with `SMOKE_RUN_COMMAND`) | The run form installs, pins, and runs the command with exit status 0, escalates nothing, and leaves the directory it ran in untouched. | [The run scenario](#the-run-scenario) |

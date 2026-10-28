@@ -14,8 +14,8 @@ import (
 
 // workspaceSyncLockFilename is deliberately adjacent to the index it guards.
 // Synchronize holds it from the first snapshot read through the atomic publish,
-// so a CLI command and a newly started MCP server cannot both decide that the
-// same cold workspace needs probing.
+// so two CLI commands cannot both decide that the same cold workspace needs
+// probing.
 const workspaceSyncLockFilename = "workspace-index.lock"
 
 const (

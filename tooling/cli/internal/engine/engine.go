@@ -4,10 +4,10 @@
 // successful-run markers, profiling, and cleanup.
 //
 // It is the single composer named by ADR 0001 §3 (tooling/cli/doc/adr): the
-// terminal CLI, extension aliases, MCP, watch, and lifecycle jobs are adapters
-// over Engine.Run rather than five hand-assembled copies of the same lifecycle.
-// A staged migration moved the terminal path, the extension aliases, MCP, the
-// workspace lifecycle jobs, and watch onto Engine.Run one at a time — which
+// terminal CLI, extension aliases, watch, and lifecycle jobs are adapters over
+// Engine.Run rather than hand-assembled copies of the same lifecycle. A staged
+// migration moved the terminal path, the extension aliases, the workspace
+// lifecycle jobs, and watch onto Engine.Run one at a time — which
 // leaves exactly one scheduler construction and one planner call in the tree,
 // both in this package. Several stages stay exported until a later cleanup
 // privatizes them.
@@ -17,18 +17,18 @@
 //   - Observer (ADR 0001 §4) is the telemetry seam. The engine NEVER reports
 //     telemetry itself; it hands an observation to an injected observer, and only
 //     the terminal adapter supplies one. A nil observer is a total no-op, which is
-//     what keeps MCP/watch/lifecycle from silently synthesizing user sessions when
+//     what keeps watch/lifecycle from silently synthesizing user sessions when
 //     they route through the engine (the rule: never send before notice).
 //     The structural test in this package fails if internal/telemetry is ever
 //     imported here.
 //   - EventSink is the surface seam: the renderer that receives the run's task
 //     events. A nil sink makes the engine build the default renderer for
 //     Request.Global, at exactly the point the terminal path built it before.
-//   - Request.Stdout is the human-notice seam, added for MCP: every notice
-//     the engine itself prints ("No jobs matched", the plan table, the
-//     auto-selection line) goes there instead of straight to os.Stdout, because
-//     the MCP adapter's stdout is a JSON-RPC frame stream that any stray byte
-//     corrupts. seam_test.go fails if a stage reaches for os.Stdout again.
+//   - Request.Stdout is the human-notice seam: every notice the engine itself
+//     prints ("No jobs matched", the plan table, the auto-selection line) goes
+//     there instead of straight to os.Stdout, so an adapter that owns its
+//     stdout, such as `cache verify` or watch, can discard them. seam_test.go
+//     fails if a stage reaches for os.Stdout again.
 //   - Request.Preflight is the production doctor gate, added as a seam. The
 //     engine decides WHEN the gate runs (production
 //     profile, real execution, between plan and execute); the adapter supplies
@@ -77,8 +77,8 @@ const (
 )
 
 // EventSink receives the run's task events. It is exactly the scheduler's
-// renderer contract, so the adapters that already own a renderer (watch, MCP)
-// can pass theirs unchanged. A nil sink makes the engine build the default
+// renderer contract, so an adapter that already owns a renderer (watch) can
+// pass its own unchanged. A nil sink makes the engine build the default
 // renderer from Request.Global.
 type EventSink = scheduler.Renderer
 
@@ -86,8 +86,8 @@ type EventSink = scheduler.Renderer
 // telemetry SEAM required by ADR 0001 §4, not telemetry itself: the engine
 // hands the observation over and keeps no reporting code of its own.
 //
-// Only the terminal adapter supplies an observer. MCP, watch, and lifecycle
-// adapters pass nil, and a nil observer is a total no-op — no allocation, no
+// Only the terminal adapter supplies an observer. Watch and lifecycle adapters
+// pass nil, and a nil observer is a total no-op — no allocation, no
 // buffer write — so routing a new surface through the engine can never start
 // reporting sessions as a side effect. Adding an observer to a non-terminal
 // adapter requires a new ADR and an explicit consent review.
@@ -229,15 +229,11 @@ type Request struct {
 	// the `latest` rotation. Set it when the run is not the user's build.
 	//
 	// `latest` names the user's last build: `putnami sessions inspect latest`
-	// and every `--session latest` reader resolve it. The MCP adapter is the
-	// caller — an agent's `run_jobs` landing after a human's build would
-	// otherwise become the session those readers open, and session metadata has
-	// no origin field, so nobody could tell afterwards.
+	// and every `--session latest` reader resolve it. `cache verify` is the
+	// caller — its audit run landing after a human's build would otherwise
+	// become the session those readers open, and session metadata has no origin
+	// field, so nobody could tell afterwards.
 	EphemeralSession bool
-	// Agent names the agent session that launched this run, recorded as
-	// session.json's agent block. The MCP adapter is the only caller that sets
-	// it; nil records no block.
-	Agent *protocolcli.SessionAgent
 	// ExecutesUnderDryRun keeps --dry-run from short-circuiting into the engine's
 	// plan-only preview, so the jobs actually run.
 	//
@@ -452,10 +448,9 @@ type Request struct {
 	// production preflight's structured envelope. Nil means os.Stdout, which is
 	// every terminal-shaped adapter.
 	//
-	// It exists for MCP: that adapter's stdout IS the JSON-RPC frame
-	// stream, so a single "Nothing to do." line written there desynchronizes the
-	// session's framing and kills the agent connection. Job output does NOT come
-	// through here — that is the EventSink seam, which MCP also discards.
+	// It exists for an adapter that owns its stdout: `cache verify` prints its
+	// own document there, so a stray "Nothing to do." line would corrupt it.
+	// Job output does NOT come through here — that is the EventSink seam.
 	// Diagnostics on stderr are untouched: stderr is not a protocol channel for
 	// any adapter.
 	Stdout io.Writer
@@ -465,8 +460,7 @@ type Request struct {
 	// means os.Stderr, which suits an adapter that discards the returned
 	// error. An adapter that reports the returned error itself passes
 	// io.Discard, so the error reaches the user once; an adapter that
-	// propagates the error and leaves this nil reports it twice (the MCP
-	// adapter does: its stderr is a log, and the tool result is the report).
+	// propagates the error and leaves this nil reports it twice.
 	// An error Run does not return, such as a second hook failure, always
 	// goes to stderr.
 	// Every other diagnostic stays on os.Stderr. Run fills a nil value in
@@ -592,7 +586,7 @@ func New() *Engine { return &Engine{} }
 func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (SessionResult, error) {
 	ctx = sessionreporter.Capture(ctx)
 	// App.Run captures before its pre-discovery/bootstrap work. Capture again at
-	// this public engine boundary for MCP/tests/adapters that invoke it directly,
+	// this public engine boundary for tests/adapters that invoke it directly,
 	// before version discovery or repository lifecycle hooks can spawn.
 	ctx = scheduler.CaptureProcessCapabilities(ctx)
 	req := &request

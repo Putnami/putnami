@@ -233,9 +233,12 @@ putnami projects describe <name>            # Full project details
 putnami projects create                     # Scaffold a new project from a template
 putnami projects sync                       # Sync project references with workspace
 putnami projects tag <name> <tag>           # Manage project tags
+putnami projects owner <path>               # Projects that own a workspace-relative path
+putnami projects deps <project>             # Dependencies, or with --dependents the dependents
+putnami projects why <from> <to>            # Why a change to <from> impacts <to>
 ```
 
-`projects list` and `projects describe` support `--output=jsonl` for structured output.
+`projects list`, `projects describe`, `projects owner`, `projects deps` and `projects why` support `--output=jsonl` for structured output.
 
 On a workspace with no index (`.putnami/workspace-index.json`, which is not
 committed), a project without a `putnami.json` takes its name from authored
@@ -307,6 +310,30 @@ create command to run again with `--force`.
 - Configuration (options, build settings, publish channels)
 - Exports and bin entries
 
+`projects owner <path>` lists the projects that own a workspace-relative path:
+the nearest project whose directory holds it, plus every project that claims it
+as an asset. A path no project owns is reported and the command exits 0.
+`--output=jsonl` prints one `{id, name, path}` object per owner.
+
+`projects deps <project>` lists the projects the project depends on.
+`--dependents` lists the projects that depend on it instead, and `--transitive`
+follows the edges to the end of the graph instead of stopping at direct ones.
+The project itself is never listed, and the projects come out sorted by ID.
+`--output=jsonl` prints one object per project with `id`, `name`, `path`,
+`direction` (`dependencies` or `dependents`) and `transitive`.
+
+`projects why <from> <to>` answers whether a change to `<from>` impacts `<to>`.
+It walks the graph `--impacted` widens with, over the same task index, and prints
+the path (`a → b → c`), the kind of each edge (`dependency`, `contract` or
+`extension-consumer`), and the tasks `<to>` runs when the change reaches it
+task-scoped (`Tasks: all` otherwise). When `<from>` does not impact `<to>`, it
+says so and exits 0; the same project on both sides is reported as such.
+`--output=jsonl` prints one object with `from`, `to`, `impacted`, `path` (the
+projects), `edges` (`from`, `to`, `kind`) and `taskScope`.
+
+The three commands take a project by ID or by name and exit with a not-found
+error for a project the workspace does not have.
+
 ### `scopes`
 
 List workspace scopes — the path-keyed groupings declared by `putnami.json`
@@ -325,7 +352,7 @@ The core CLI has no `infra` command. `putnami infra …` exits with a usage erro
 
 These four command groups are **not part of the CLI**. They are provided by the
 first-party `@putnami/sdd` extension, which also contributes the `validate` and
-`validate-workspace` jobs and the five `sdd.*` MCP tools. A workspace that does
+`validate-workspace` jobs. A workspace that does
 not declare the extension has none of them, and a run that plans zero jobs
 prints a courtesy hint that the command moved to an extension. The hint links
 to [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli),
@@ -911,30 +938,27 @@ Manage assistant guidance.
 ```bash
 putnami context generate            # Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md
 putnami context map                 # Print the workspace orientation map as Markdown
-putnami context map --output=json   # Print the map document, the one the MCP serves
+putnami context map --output=json   # Print the map document as data
 putnami context pack                # Print each project's agent-context document
 putnami context pack --output=json  # Return the documents as data
 ```
 
 `context generate` writes the guidance block and the agent content of the
 extensions the workspace declares by path and opts into, and nothing else. It
-never writes `.mcp.json`: `init`, `install` and `upgrade` register the MCP
-server, and `putnami mcp install` repairs the registration. See [`mcp`](#mcp).
+writes no host configuration file. `install` and `upgrade` remove the `.mcp.json`
+entry that an earlier Putnami wrote.
 
 The block holds the rules and the gate line. It names the `decisions.json` files
 in one line and lists no decision. The line appears with a registry's first
 decision and goes with its last, and those two changes regenerate the block; any
-other decision change leaves both files as they were. The MCP server lists the
-root decisions in full in the `putnami://workspace/guidance` resource, and as id
-and statement, as many as fit Claude Code's 4,096-character limit, in its
-`initialize` instructions.
+other decision change leaves both files as they were. The `decisions.json`
+files hold the decisions in full.
 
 #### `context pack`
 
 `context pack` builds one deterministic agent-context document per project in
 memory and prints it. It writes no file. `--output=json` returns the documents
-as data, and `--project <selector>` narrows them to one project. The MCP
-`agent_context` tool returns the same document. The document contract is
+as data, and `--project <selector>` narrows them to one project. The document contract is
 `go.putnami.dev/protocol/agentcontext`.
 
 A project's `identity.languages` are the `language` members of the workspace
@@ -950,8 +974,7 @@ Run `putnami projects sync` to refresh the claims.
 `context map` prints the workspace orientation map: every project with its
 path, tags, dependency edges, endpoint table, config keys, and README summary,
 plus the workspace `docs/` index. It prints Markdown by default. With
-`--output=json` it returns the map document as data, the same document the MCP
-`workspace_map` tool returns. It writes no file.
+`--output=json` it returns the map document as data. It writes no file.
 
 The map is a pure projection of committed inputs, so nothing stores it and
 nothing can go stale. A build writes no map. It is byte-deterministic on an
@@ -977,15 +1000,6 @@ has none, every project would resolve from authored config alone and the map
 would render without provider-derived edges, a confident wrong answer. So in a
 workspace that declares extensions, `context map` refuses and points at
 `putnami projects sync`.
-
-##### Serving it to agents
-
-The MCP `workspace_map` tool (see [`mcp`](#mcp)) renders the same document on
-every call from the working tree. It takes `section` (`projects`,
-`dependencies`, `intercalls`, `apis`, `config-keys`, `schemas`, `docs`, `all`)
-and an optional `project`. Within one MCP session it keeps each project's
-fragment in memory and reuses it while the fragment's inputs digest is
-unchanged, so a repeat call rebuilds only the projects that changed.
 
 ### `doctor`
 
@@ -1088,7 +1102,7 @@ Three behaviors are contract, not presentation:
 
 - **`--output=json` prints the recorded document RAW** — no result envelope, and the bytes on disk rather than a re-serialization. The report *is* the contract a consumer binds to (`reportFile`, [protocols/cli doc/03-report.md](../../../protocols/cli/doc/03-report.md)), so a CI runner posts this output verbatim and a member added by a newer producer survives an older reader. Failures still use the standard envelope.
 - **No report is exit `1`**, not a usage error: the document is written at finalize, so an interrupted run records none, and "the last run was killed" is an answer about the workspace.
-- **The default lookup withholds MCP-origin reports.** An agent's background run must not answer "what did my last run do"; `--session <id>` reads any report by name, agent runs included.
+- **The default lookup withholds reports of ephemeral sessions, such as `cache verify`.** A background run must not answer "what did my last run do"; `--session <id>` reads any report by name, ephemeral runs included.
 
 Because a killed run writes nothing, the newest report can belong to an *earlier* run. A consumer that files a report against a commit verifies `git.sha` instead of trusting recency.
 
@@ -1125,151 +1139,6 @@ interactive run prints a one-time notice; automation stays silent until that
 notice has been shown on the same machine. `telemetry off` is an explicit
 opt-out and deletes the local buffer and device ID. See
 [12-profiling-and-telemetry.md](12-profiling-and-telemetry.md).
-
-### `mcp`
-
-Run the Model Context Protocol server over stdio so an AI agent harness can
-drive the workspace through typed tools instead of shelling out to the CLI.
-
-```bash
-putnami mcp                         # Spawned by an MCP client; speaks JSON-RPC 2.0 on stdin/stdout
-putnami mcp install                 # Write the putnami entry into .mcp.json at the workspace root
-```
-
-The core server exposes eleven tools: ten read-heavy workspace tools
-(`list_projects`, `describe_project`, `agent_context`, `workspace_map`, `deps`,
-`find_owner`, `why_impacted`, `topo_sort`, `impacted`, `get_diagnostics`) plus
-`run_jobs`, whose `dryRun` mode returns the planned DAG without executing
-subprocesses. `workspace_map` renders the whole
-workspace orientation map in memory on every call and takes
-`section` (`projects`, `dependencies`, `intercalls`, `apis`, `config-keys`,
-`schemas`, `docs`, `all`) plus an optional `project`, so a scoped question costs
-a few KB instead of the full map. It also exposes
-`workspace://context` as a
-read-only resource for live workspace graph/layout/channel/version context plus
-dependency-first topological project order. Three more resource families render
-on every read with the builders the tools and `context generate` use:
-`putnami://workspace/guidance` (the Putnami block body of `AGENTS.md`, then the
-settled decisions),
-`putnami://workspace/map` and `putnami://workspace/map/<section>` (the
-`workspace_map` answer), and `putnami://projects/<id>/context` (the
-`agent_context` answer, with the project id escaped as one path segment, for
-example `putnami://projects/%2Ftooling%2Fcli/context`). `initialize` answers
-with the requested protocol version when it is `2024-11-05`, `2025-03-26`,
-`2025-06-18` or `2025-11-25`, and with `2025-11-25` otherwise. The server exits
-with the session.
-
-Before it answers a tool call or a resource read, the server hashes
-`putnami.workspace.json`, `putnami.lock.json`, `putnami.ci.json`, the manifest
-and `AI.md` of each extension loaded by path, and the `decisions.json` files its
-last workspace load found. After a change, the next tool result ends with one
-more text block that names the change, for example `D-025 added` or
-`@putnami/go 0.3.1 installed`, and the resource or file to read. Each change is
-reported once. When the extensions, `includes` or `options.collaboration`
-changed, the server reloads its extension guides and tools and sends
-`notifications/tools/list_changed` and `notifications/resources/list_changed`.
-
-Before it answers the first request, the server brings the workspace's agent
-workflows to the version `putnami.lock.json` pins. A host starts the server when
-an agent session starts, so a worktree that moved to another lock serves the
-matching skills from that session on. The pass only compares the local
-ownership record with the pin when they match, copies from the local artifact
-store when they do not, and never downloads. A pin missing from the store, or a
-managed file you edited, is a warning on stderr; the server starts either way.
-See [ADR 0040](adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md).
-
-Installed extensions add their own dot-namespaced tools after the core ones.
-`@putnami/sdd` contributes the four SDD tools — `sdd.list_features`,
-`sdd.feature_context`, `sdd.list_specs`, `sdd.spec_context` — which were core
-tools under undotted names before moving into the extension. **The undotted names are gone with no
-alias and are refused with `-32602`**; see
-[@putnami/sdd MCP tools](../../sdd-extension/doc/04-mcp-tools.md).
-
-`run_jobs` refuses to EXECUTE a command whose resolved traits declare a mutation
-outside the workspace — `publish` (`sideEffects: "registry"`), `deploy`
-(`sideEffects: "cloud"`), and any extension verb declaring `sideEffects` in its
-manifest traits. Spending CPU on the workspace is reversible and local; pushing
-a release or converging a cloud environment is neither, and there is no
-confirmation step between an agent's tool call and the effect, so those stay a
-terminal decision. Planning is unaffected: `dryRun: true` still returns the DAG
-for them, exactly as it does for a command whose traits declare the `serve`
-workload, such as `serve` (which `run_jobs` also refuses to execute, because
-the engine promotes it to watch mode and one blocking tool call wedges the
-whole stdio session).
-
-`run_jobs` also refuses to execute a command whose traits declare a workload
-and that the loaded extensions carry only under `interactive` subcommands, such
-as `qualify-run`, the `once` workload behind `putnami qualify run`. Such a
-subcommand runs its workload in the terminal it shares with the user, and a
-tool call has none. The refusal names the subcommand to run in a terminal. A
-command without a workload is finite work that runs as a planned job, so it is
-unaffected even when only interactive subcommands carry it, such as
-`sdd-contracts-generate`. A command that a non-interactive subcommand or no
-subcommand carries is unaffected too, and `dryRun: true` still plans every one.
-
-Claude Code discovers the server through a `.mcp.json` file at the workspace
-root:
-
-```json
-{
-  "mcpServers": {
-    "putnami": { "command": "putnami", "args": ["mcp"] }
-  }
-}
-```
-
-Codex reads `.codex/config.toml`, Cursor reads `.cursor/mcp.json`, and VS Code
-reads `.vscode/mcp.json`. None of them sees this entry.
-
-A source workspace, whose `putnami.lock.json` records `cli.source: "workspace"`,
-refuses the global `putnami`. When its root holds a `putnamiw` file, the entry's
-`command` is `./putnamiw` instead, so the server runs the CLI built from the
-tree. Only committed content decides, never the file mode, so every platform
-writes the same entry.
-
-`putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry
-to this file when it is missing, so a new agent session finds the server with no
-manual step. The first-use install that runs before another command does not.
-The write is merge-aware and non-destructive: other servers and unknown keys in
-an existing file are preserved, a `putnami` entry that differs from the one
-this workspace registers is kept as written, and a `.mcp.json` that fails to
-parse is left untouched with a warning.
-
-`putnami mcp install` is the explicit form of the same write. It is the one
-command that rewrites a diverged `putnami` entry, which is what repairs a
-hand-edited one or a source workspace's stale `putnami` entry, and it fails on
-a file it cannot parse. See
-[ADR 0040](adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md).
-
-Agent request provenance is disabled by default. A harness can opt in and
-explicitly name its active model in the MCP server entry (the model is never
-inferred):
-
-```json
-{
-  "mcpServers": {
-    "putnami": {
-      "command": "putnami",
-      "args": ["mcp"],
-      "env": {
-        "PUTNAMI_AGENT_IDENTITY": "1",
-        "PUTNAMI_AGENT_MODEL": "claude-sonnet-4-5"
-      }
-    }
-  }
-}
-```
-
-The server captures the MCP `initialize.clientInfo` name/version for that
-session. Opted-in API requests use `putnami-mcp/<version>` provenance plus
-`Putnami-Agent-Harness` and `Putnami-Agent-Model` headers. Values containing
-control characters are rejected and every client-supplied value is limited to
-128 ASCII characters. These headers may be retained by API or proxy logs, so
-enable them only when that provenance is appropriate. Prompts, credentials,
-tokens, user identity, and session secrets are never included.
-
-See [15-mcp-server-spike.md](15-mcp-server-spike.md) for the design, the
-hand-rolled-vs-SDK decision, contract stability, and the evidence.
 
 ### `completion`
 
@@ -1569,7 +1438,7 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   of that extension also runs the runtime fails with that message.
 - **The committed files stay as they are.** With the flag, `putnami install`
   writes no `putnami.lock.json`, `bun.lock`, `.npmrc`, `go.work`, `go.mod`,
-  manifest or assistant content (`AGENTS.md`, `.mcp.json`, agent workflows).
+  manifest or assistant content (`AGENTS.md`, agent workflows).
   A configured extension or template that the committed lock does not pin
   fails the install: run `putnami install` without the flag and commit the
   lock.

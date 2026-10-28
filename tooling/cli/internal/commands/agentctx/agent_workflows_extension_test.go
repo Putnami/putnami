@@ -83,7 +83,6 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 			"upgrade":          AdoptAgentWorkflows(context.Background(), root, cfg, nil),
 			"phase":            phaseErr,
 			"ensure":           EnsureAgentWorkflows(context.Background(), root, cfg),
-			"reconcile":        ReconcileAgentWorkflows(context.Background(), root, cfg),
 			"context generate": generateErr,
 		}
 		for name, err := range passes {

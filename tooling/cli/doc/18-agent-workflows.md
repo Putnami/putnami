@@ -24,18 +24,18 @@ happens to a file that already exists, and
 the version comes from, and that an extension is the only way agent content is
 installed.
 
-## The three onboarding layers
+## The two onboarding layers
 
 | Layer | What it supplies | Ownership |
 |---|---|---|
-| The guidance block in `AGENTS.md` and `CLAUDE.md` | the workflow bootstrap: the pinned command, the selection rules, the MCP routing rule, and a pointer to `.agents/constraints.md` when the workspace writes one | Putnami owns the block; every other byte, and `.agents/constraints.md` itself, belongs to the workspace |
-| Host MCP registration and `.mcp.json` | local Putnami structural tools and lock-resolved extension tools for Claude Code and Codex | machine installer; `init`, `install` and `upgrade` add a missing `.mcp.json` entry, and `putnami mcp install` repairs one; host trust remains authoritative |
+| The guidance block in `AGENTS.md` and `CLAUDE.md` | the workflow bootstrap: the pinned command, the selection rules, the discovery rule, and a pointer to `.agents/constraints.md` when the workspace writes one | Putnami owns the block; every other byte, and `.agents/constraints.md` itself, belongs to the workspace |
 | Agent content | versioned repeatable workflow files | the extension that ships them, through its lock pin and content manifest |
 
-The layers are independent. A host without MCP uses `./putnamiw`, or `putnami`
-when no wrapper exists, plus focused file reads. The pinned command remains the
-required path for build, test, lint, validation, install, dependency, and
-generation work even on an MCP-aware host.
+The layers are independent. An agent uses `./putnamiw`, or `putnami` when no
+wrapper exists, plus focused file reads. The pinned command is the required path
+for discovery, build, test, lint, validation, install, dependency, and
+generation work. Putnami serves no protocol server and writes no host
+registration.
 
 These entrypoints apply before read-only analysis as well as before a change.
 They remain in force when a host resumes a session or delegates to a subagent;
@@ -81,7 +81,7 @@ Excluded, permanently:
 
 - host policy: `.codex/config.toml` and `.claude/settings*.json` — repository
   permissions and model policy are repository decisions, not shipped defaults,
-- local MCP credentials, `.agents/constraints.md`, `.context/**`, and any private release or
+- local host credentials, `.agents/constraints.md`, `.context/**`, and any private release or
   archive material,
 - generated caches and workspace-specific configuration.
 
@@ -277,20 +277,11 @@ ownership record. `--dry-run` reports the opt-ins and what would be retired
 without resolving or downloading anything, exactly like every other upgrade
 phase.
 
-### At agent session start
+### Reconcile moments
 
 A worktree keeps the files of the lock it was installed with until something
-materializes the new pin. So the MCP server, which a host starts when an agent
-session starts, reconciles before it answers its first request: for each
-opted-in extension whose ownership record names another release than the
-committed pin, or no record, it materializes that release's content from the
-installed extension. A record that names the pin ends the pass for that
-extension after one small read. The pass never downloads, never resolves, never
-writes the lock, and never builds a local extension's content. A collision with
-a file you edited, or any other failure, is a warning on the server's stderr,
-and the session starts with the files it had; `putnami install` finishes the
-job. See
-[ADR 0040](adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md).
+materializes the new pin. `putnami install` and `putnami upgrade` are the
+moments that reconcile them. No session start does.
 
 ### The full matrix
 
@@ -322,31 +313,12 @@ design rather than a missing feature.
 
 | Setup | Structural discovery | Workflow behavior |
 |---|---|---|
-| MCP-aware, core only | read-only Putnami MCP tools first | local plans, changes, checks, and reviews; no external account required |
-| Non-MCP, core only | pinned wrapper/CLI plus focused file reads | the same local workflows and verification contract |
-| MCP-aware with optional integrations | Putnami tools for workspace facts; host capabilities only when requested | core stays local by default; each external action requires explicit intent |
-| Non-MCP with optional integrations | wrapper/CLI for Putnami facts; separately configured integration | no source-host/tracker coupling or inferred remote writes |
+| Core only | `./putnamiw` (or `putnami`) queries plus focused file reads | local plans, changes, checks, and reviews; no external account required |
+| Optional integrations | the same queries for workspace facts; separately configured integrations only when requested | core stays local by default; each external action requires explicit intent, with no source-host/tracker coupling or inferred remote writes |
 
-The public installer registers user-scoped stdio servers for Claude Code and
-Codex when their CLIs are present. It preserves an existing `putnami` definition
-instead of repairing or replacing human JSON/TOML. Claude project registrations
-remain subject to the one-time `.mcp.json` approval; Codex project configuration
-loads only for a trusted project. A running host keeps its current inventory
-until the server is reconnected or a new session starts. The qualified host
-versions for this path are Claude Code `2.1.260` and Codex CLI `0.153.4`.
-
-The server receives the active directory per session. Claude supplies
-`CLAUDE_PROJECT_DIR`; Codex inherits the session cwd and stores no configured
-`cwd`. Putnami enters that directory before the lock-pinned launcher replaces
-the process, so a host launched directly in a worktree does not reuse the
-repository that was open during installation. Ordinary subagents share that
-session root. Claude keeps an already-spawned server's project root stable when
-the session later enters or resumes another worktree; reconnect in that root,
-or use the local fallback for an isolated subagent whose host shares the parent
-server. Before analysis, resume, or delegation, compare the root announced by
-MCP initialization with the active cwd/worktree; a mismatch skips that server
-immediately and uses local Putnami in the active root.
-An older Putnami pin is still honored and therefore cannot expose capabilities
+The queries are `putnami projects list|describe|owner|deps|why`,
+`putnami context map|pack` and `putnami <verb> --impacted --dry-run`. An older
+Putnami pin is still honored and therefore cannot expose capabilities
 introduced by a newer CLI until the workspace explicitly moves that pin.
 
 Putnami inserts one block into your `AGENTS.md` and `CLAUDE.md`; everything
@@ -365,22 +337,16 @@ independent of the ownership records described below.
 `putnami context generate --force` is the way back. It rewrites an edited block;
 it never changes a byte outside the block.
 
-Besides the block, Putnami writes one file into a workspace root: the
-`putnami` entry of `.mcp.json`. `.agents/constraints.md` is a file you write
-yourself when you have repository rules to state, and Putnami only reads it
+Putnami writes no other file into a workspace root. `.agents/constraints.md` is
+a file you write yourself when you have repository rules to state, and Putnami
+only reads it
 ([ADR 0055](adr/0055-repository-rules-live-in-agents-constraints.md)).
 
-`putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry
-to `.mcp.json` when it is missing, so a new agent session finds the server with
-no manual step. The entry runs `putnami mcp`, or `./putnamiw mcp` in a source
-workspace whose root holds a `putnamiw` file, since such a workspace refuses
-the global binary. They merge into an existing file, preserve other servers
-and unknown keys, keep a diverged `putnami` entry as written, and leave a file
-they cannot parse untouched with a warning. `putnami context generate` and the
-first-use install that runs before another command never write it.
-`putnami mcp install` is the explicit form: it also rewrites a diverged entry,
-and it refuses a file it cannot parse
-([ADR 0040](adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md)).
+An earlier Putnami wrote a `putnami` entry to `.mcp.json`. `putnami install` and
+`putnami upgrade` remove that entry when it is byte for byte the one Putnami
+wrote, and delete the file when nothing else remains. A changed entry stays as
+written, with a warning that names the file. A file they cannot parse stays
+untouched, with a warning.
 
 ## Ownership: what happens to files that already exist
 

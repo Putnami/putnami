@@ -194,6 +194,7 @@ func runSmokeOnChannel(t *testing.T, channel, registryURL, installerURL, diagnos
 	}
 	cmd.Env = append(cmd.Env, "SMOKE_TEST_HTTP_STATUS="+os.Getenv("SMOKE_TEST_HTTP_STATUS"))
 	cmd.Env = append(cmd.Env, "SMOKE_TEST_NPM_AUTH="+os.Getenv("SMOKE_TEST_NPM_AUTH"))
+	cmd.Env = append(cmd.Env, "SMOKE_TEST_MCP_JSON="+os.Getenv("SMOKE_TEST_MCP_JSON"))
 	cmd.Env = append(cmd.Env, smokeReadyShapeEnv+"="+os.Getenv(smokeReadyShapeEnv))
 	// extra comes last, so it wins over anything above (os/exec keeps the last
 	// value of a duplicated key). It lets a test that runs in parallel set what
@@ -442,9 +443,9 @@ func goldenPathFixture() map[string]string {
 	if os.Getenv("SMOKE_TEST_NPM_AUTH") == "1" {
 		npmrc += "//npm.putnami.dev/:_authToken=must-not-be-persisted\n"
 	}
-	// Putnami writes the guidance block into the entrypoints and registers its
-	// MCP server in .mcp.json (ADR 0040).
-	return map[string]string{
+	// Putnami writes the guidance block into the entrypoints and registers no
+	// MCP server (ADR 0082).
+	files := map[string]string{
 		"putnami.workspace.json": `{"name":"smoke","extensions":["@putnami/typescript"],"templates":["typescript-web"],"includes":["webapp"]}`,
 		"putnami.lock.json":      `{"version":4,"extensions":{"@putnami/typescript":{"version":"1.2.3"}},"templates":{"typescript-web":{"version":"1.2.3"}}}`,
 		"package.json":           `{"name":"smoke","private":true,"workspaces":["webapp"]}`,
@@ -452,10 +453,15 @@ func goldenPathFixture() map[string]string {
 		".npmrc":                 npmrc,
 		"CLAUDE.md":              "# CLAUDE.md\n\n@AGENTS.md\n",
 		"AGENTS.md":              "# AGENTS.md\n\nThis is a Putnami workspace.\n",
-		".mcp.json":              `{"mcpServers":{"putnami":{"command":"putnami","args":["mcp"]}}}`,
 		"webapp/putnami.json":    `{"name": "webapp","extensions":["@putnami/typescript"]}`,
 		"webapp/package.json":    `{"name":"webapp"}`,
 	}
+	// SMOKE_TEST_MCP_JSON=1 makes the stub init write the registration an
+	// earlier release wrote, which the smoke must reject.
+	if os.Getenv("SMOKE_TEST_MCP_JSON") == "1" {
+		files[".mcp.json"] = `{"mcpServers":{"putnami":{"command":"putnami","args":["mcp"]}}}`
+	}
+	return files
 }
 
 // writeFixture writes each file, with a final newline, relative to the
@@ -492,6 +498,27 @@ func TestSmokeRejectsGeneratedPackageRegistryCredentials(t *testing.T) {
 	}
 	if res.contains("must-not-be-persisted") {
 		t.Fatalf("smoke printed the rejected credential value:\n%s", res.output)
+	}
+}
+
+func TestSmokeRejectsAnInitThatWritesAnMCPRegistration(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "init-and-the-first-use-install-write-no-mcp-json")
+	requireBash(t)
+	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
+	t.Setenv("SMOKE_TEST_MCP_JSON", "1")
+	body := fullGoldenPathStub(t)
+	server := newRegistry(t, registryOptions{
+		body:      body,
+		integrity: "sha256:" + sha256Hex(body),
+		resolved:  stubVersion,
+	})
+
+	res := runSmoke(t, server.URL)
+	if res.exitCode == 0 {
+		t.Fatalf("smoke accepted an init that wrote .mcp.json:\n%s", res.output)
+	}
+	if !res.contains("::error::init leg: init wrote .mcp.json") {
+		t.Fatalf("smoke did not name the .mcp.json that init wrote:\n%s", res.output)
 	}
 }
 
@@ -559,7 +586,7 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	for _, want := range []string{
 		"curl -fsSL " + server.URL + "/install.sh | bash",
 		"putnami init --project webapp --extension ts",
-		"generated workspace, webapp, locks, extension and MCP registration verified; build plan validates",
+		"generated workspace, webapp, locks and extension verified, no .mcp.json written; build plan validates",
 		"putnami serve webapp",
 		"smoke: GET http://127.0.0.1:",
 		"no process of the smoke runs after clean stop",

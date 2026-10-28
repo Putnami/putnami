@@ -28,19 +28,6 @@ func TestCanonicalWorkspaceGuideCoversCatalogAndPolicies(t *testing.T) {
 			t.Errorf("canonical workspace guide omits catalog path %q", command.Path)
 		}
 	}
-	// The four SDD tools (list_features, feature_context, list_specs,
-	// spec_context) left this list: they are served by
-	// @putnami/sdd as sdd.<name> now, so they are no longer core MCP tools and
-	// this guide is the CORE workspace experience.
-	for _, tool := range []string{
-		"workspace_map", "list_projects", "describe_project", "agent_context",
-		"deps", "find_owner", "why_impacted", "topo_sort", "impacted",
-		"run_jobs", "get_diagnostics",
-	} {
-		if !strings.Contains(guide, "`"+tool+"`") {
-			t.Errorf("canonical workspace guide omits core MCP tool %q", tool)
-		}
-	}
 	normalizedGuide := strings.Join(strings.Fields(guide), " ")
 	for _, policy := range []string{
 		"./putnamiw",

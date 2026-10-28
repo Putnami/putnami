@@ -29,8 +29,8 @@ import (
 // The POLICY (what to collect, how to join, when a group blocks) lives in
 // internal/specgate and protocols/features; only the attachment lives here.
 // Terminal, watch, extension
-// aliases, lifecycle adapters, and MCP run_jobs all receive identical
-// behavior by going through Engine.Run.
+// aliases and lifecycle adapters all receive identical behavior by going
+// through Engine.Run.
 
 // specGateOutcome carries the collected verification record from the
 // finalizer (which runs inside the scheduler's terminal phase, before the

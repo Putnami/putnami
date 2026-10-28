@@ -1,28 +1,21 @@
 // Package nodev drives the real CLI in a workspace without a development
 // extension: its one extension declares a command that is no development verb,
-// and no vocabulary. The core declares no development verb, so help,
-// completion and MCP run_jobs show none, and every entry point refuses one.
+// and no vocabulary. The core declares no development verb, so help and
+// completion show none, and every entry point refuses one.
 // These tests swap the process streams and the working directory, so they run
 // in their own test binary.
 package nodev
 
 import (
 	"bufio"
-	"bytes"
-	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
-	"go.putnami.dev/tooling/cli/internal/mcp"
 )
 
 func TestMain(m *testing.M) {
@@ -77,10 +70,9 @@ func noDevFixture(t *testing.T) string {
 	return root
 }
 
-// TestAWorkspaceWithoutADevelopmentExtensionShowsNoVerb holds help,
-// completion and the run_jobs schema of MCP to what the workspace's extension
-// declares: its inspect command, and no development verb, alias or
-// provider-bound flag.
+// TestAWorkspaceWithoutADevelopmentExtensionShowsNoVerb holds help and
+// completion to what the workspace's extension declares: its inspect command,
+// and no development verb, alias or provider-bound flag.
 func TestAWorkspaceWithoutADevelopmentExtensionShowsNoVerb(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "no-core-development-verb", "a-workspace-without-a-development-extension-shows-no-verb-alias-or-flag")
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
@@ -121,15 +113,6 @@ func TestAWorkspaceWithoutADevelopmentExtensionShowsNoVerb(t *testing.T) {
 			t.Errorf("zsh completion offers %q, which no extension of the workspace declares", name)
 		}
 	}
-
-	// The run_jobs schema names no command: "run" is the only verb its text
-	// may hold, in the tool's name and in "run one or more workspace jobs".
-	tool := runJobsTool(t, root)
-	text := tool.Description + string(tool.InputSchema)
-	verbs := regexp.MustCompile(`\b(` + strings.Join(slices.DeleteFunc(slices.Clone(developmentVerbs), func(verb string) bool { return verb == "run" }), "|") + `)\b`)
-	if found := verbs.FindAllString(text, -1); len(found) > 0 {
-		t.Errorf("run_jobs names the development verbs %v:\n%s", found, text)
-	}
 }
 
 // TestAnUndeclaredJobCommandIsRefusedInEveryEntryPoint runs a development verb
@@ -168,12 +151,6 @@ func TestAnUndeclaredJobCommandIsRefusedInEveryEntryPoint(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "app", "calls")); !os.IsNotExist(err) {
 		t.Fatalf("a refused run executed a task: %v", err)
-	}
-
-	// MCP run_jobs returns the same usage error as the tool's error.
-	result := callRunJobs(t, root, `{"commands":["build"],"projects":["app"]}`)
-	if !result.IsError || len(result.Content) != 1 || result.Content[0].Text != refusal("build") {
-		t.Fatalf("run_jobs build = %+v, want the tool error %q", result, refusal("build"))
 	}
 
 	// Outside a workspace, the help of a job command reports what a run of it
@@ -217,68 +194,4 @@ func bashCommands(t *testing.T, script string) []string {
 	}
 	t.Fatalf("no command list in the bash completion:\n%s", script)
 	return nil
-}
-
-// rpcResponse is the part of a JSON-RPC response these tests read.
-type rpcResponse struct {
-	Result json.RawMessage `json:"result"`
-	Error  *struct {
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
-// toolCallResult is an MCP tools/call result.
-type toolCallResult struct {
-	Content []struct {
-		Text string `json:"text"`
-	} `json:"content"`
-	IsError bool `json:"isError"`
-}
-
-// serveMCP runs one MCP session in the workspace at root over request, a
-// JSON-RPC message, and returns its result.
-func serveMCP(t *testing.T, root, request string) json.RawMessage {
-	t.Helper()
-	server := mcp.NewServer(mcp.Options{WorkspaceRoot: root, Config: wsproto.Load(root), ServerVersion: "test"})
-	var out bytes.Buffer
-	if err := server.Serve(context.Background(), strings.NewReader(request+"\n"), &out); err != nil {
-		t.Fatalf("Serve: %v", err)
-	}
-	var response rpcResponse
-	if err := json.Unmarshal(out.Bytes(), &response); err != nil {
-		t.Fatalf("response %q: %v", out.String(), err)
-	}
-	if response.Error != nil {
-		t.Fatalf("%s: %s", request, response.Error.Message)
-	}
-	return response.Result
-}
-
-// runJobsTool returns the run_jobs tool MCP tools/list advertises.
-func runJobsTool(t *testing.T, root string) mcp.Tool {
-	t.Helper()
-	var listed struct {
-		Tools []mcp.Tool `json:"tools"`
-	}
-	if err := json.Unmarshal(serveMCP(t, root, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`), &listed); err != nil {
-		t.Fatal(err)
-	}
-	for _, tool := range listed.Tools {
-		if tool.Name == commandmeta.MCPToolRunJobs {
-			return tool
-		}
-	}
-	t.Fatalf("tools/list has no %s", commandmeta.MCPToolRunJobs)
-	return mcp.Tool{}
-}
-
-// callRunJobs calls MCP run_jobs with arguments, a JSON object.
-func callRunJobs(t *testing.T, root, arguments string) toolCallResult {
-	t.Helper()
-	request := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"` + commandmeta.MCPToolRunJobs + `","arguments":` + arguments + `}}`
-	var result toolCallResult
-	if err := json.Unmarshal(serveMCP(t, root, request), &result); err != nil {
-		t.Fatal(err)
-	}
-	return result
 }

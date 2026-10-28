@@ -250,31 +250,6 @@ Related Commands:
   putnami extensions install
   putnami deps install
 
-═══ mcp ═══
-putnami mcp
-
-Run the Model Context Protocol server over stdio so an AI agent harness can discover projects, context, ownership, impact, plans, and diagnostics through 11 typed core tools (list_projects, describe_project, agent_context, workspace_map, deps, find_owner, why_impacted, topo_sort, impacted, run_jobs, get_diagnostics) and resources for the workspace context, the Putnami guidance, the workspace map, and each project's agent context. All except run_jobs are read-only; run_jobs is the only mutating core tool, supports dry-run planning, and refuses long-lived or externally mutating execution. Spawned by the client; speaks JSON-RPC 2.0 on stdin/stdout and exits with the session. Before it serves, it brings the workspace's agent workflows to the version the lock pins, from the local artifact store only, and reports what it cannot reconcile as a warning on stderr. Optional request provenance is disabled by default; set PUTNAMI_AGENT_IDENTITY=1 and explicitly set PUTNAMI_AGENT_MODEL in the MCP server environment to propagate bounded harness/model headers.
-
-Usage:
-  putnami mcp [install]
-
-Examples:
-  putnami mcp
-  putnami mcp install
-
-Subcommands:
-  install  Register the MCP server in .mcp.json for Claude Code
-
-Global Options:
-  Common: --verbose, --debug, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache
-  Output: --output, --json, --quiet, --color, --no-color
-
-Related Commands:
-  putnami mcp install
-  putnami projects list
-
 ═══ migrate ═══
 putnami migrate
 
@@ -319,6 +294,9 @@ Subcommands:
   list      List canonical workspace projects (default)
   create    Create a project from template
   describe  Show project info
+  owner     Show the projects that own a path
+  deps      List the dependencies or dependents of a project
+  why       Explain why a change to one project impacts another
   sync      Sync projects from disk
   tag       Manage project tags
 
@@ -690,7 +668,7 @@ Global Options:
 ═══ context generate ═══
 putnami context generate
 
-Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md, and the agent skills the workspace declares by in-tree path. Bytes outside the block are never touched; an edited block is preserved and reported, and --force rewrites that block only. No other file is written: run `putnami mcp install` to register the MCP server
+Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md, and the agent skills the workspace declares by in-tree path. Bytes outside the block are never touched; an edited block is preserved and reported, and --force rewrites that block only. No other file is written
 
 Usage:
   putnami context generate [--force]
@@ -715,7 +693,7 @@ Related Commands:
 ═══ context map ═══
 putnami context map
 
-Print the workspace orientation map, built in memory from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree): Markdown by default, and with --output=json the map document as data, the same document the MCP workspace_map tool serves. --projects and --impacted narrow the printed projects. Byte-deterministic on an unchanged tree. It writes no file, and a build writes no map
+Print the workspace orientation map, built in memory from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree): Markdown by default, and with --output=json the map document as data. --projects and --impacted narrow the printed projects. Byte-deterministic on an unchanged tree. It writes no file, and a build writes no map
 
 Usage:
   putnami context map [--projects <list>] [--impacted] [--output <format>]
@@ -921,27 +899,6 @@ Global Options:
   Execution: --credential-fd, --no-cache
   Output: --output, --json, --quiet, --color, --no-color
 
-═══ mcp install ═══
-putnami mcp install
-
-Write the putnami entry into .mcp.json at the workspace root, where Claude Code discovers the MCP server. Codex, Cursor and VS Code read their own files and do not see this entry. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
-
-Usage:
-  putnami mcp install
-
-Examples:
-  putnami mcp install
-
-Global Options:
-  Common: --verbose, --debug, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
-  Execution: --credential-fd, --no-cache
-  Output: --output, --json, --quiet, --color, --no-color
-
-Related Commands:
-  putnami mcp
-  putnami context generate
-
 ═══ migrate vnext ═══
 putnami migrate vnext
 
@@ -1018,6 +975,8 @@ Global Options:
 
 Related Commands:
   putnami projects list
+  putnami projects deps
+  putnami projects owner
   putnami config show
 
 ═══ projects list ═══
@@ -1040,6 +999,8 @@ Global Options:
 
 Related Commands:
   putnami projects describe
+  putnami projects deps
+  putnami projects owner
   putnami projects create
   putnami workspace describe
 

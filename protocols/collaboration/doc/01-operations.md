@@ -161,7 +161,7 @@ identity, and follows the task title bound. A session is `{engine, id}`:
 is that host's own session id, `[A-Za-z0-9._:-]{1,128}`.
 
 A **host-only** operation is one the host that runs an agent calls, never the
-agent. The MCP server lists no tool for it, and `missions.capabilities` marks
+agent. `missions.capabilities` marks
 it `hostOnly: true`. `putnami missions sync` and the host channel's
 `collaboration.call` route it like any other operation. The agent sees
 `missions.ask` and `missions.reply` as tools. It takes the mission's

@@ -60,7 +60,7 @@ Each extension is defined by a `putnami.extension.json` file:
 | `extensionDependencies` | `map[string]string` | Other extensions this one needs, each with a version constraint. Installing it installs and pins each registry dependency (`@scope/name`), and a manifest that names one requires CLI contract 8 — see [Extension Dependencies](#extension-dependencies) |
 | `commands` | `map[string]Command` | User-facing job definitions |
 | `tasks` | `map[string]Task` | Atomic executable units |
-| `tools` | `map[string]Tool` | Namespaced MCP tools served by an extension-owned subprocess |
+| `tools` | `map[string]Tool` | Tool descriptors served by an extension-owned subprocess; the core serves them to no agent, and they remain the call contract of collaboration providers — see [Tools](#tools) |
 | `contracts` | `map[string]Contract` | JSON schema definitions for I/O validation |
 | `hooks` | `HooksConfig` | Lifecycle hooks |
 | `runtime` | `RuntimeDefinition` | The extension's own executable and how to prepare it — see [Lifecycle Primitives](#lifecycle-primitives) |
@@ -68,7 +68,7 @@ Each extension is defined by a `putnami.extension.json` file:
 | `agentContent` | `AgentContentContribution` | Agent instructions (skills, workers, references, helpers) shipped under the extension's own version; materialized only in a workspace that opts in with `extension:<name>` — see [Agent Workflows](18-agent-workflows.md#how-a-workspace-opts-in) |
 | `verbs` | `[]VerbDefinition` | The verb vocabulary: verbs that other extensions run, in help order, with their descriptions, aliases, default traits and related commands. Help, completion and alias resolution read it, because the core declares no verb, and a job whose command declares no traits takes its verb's. Requires CLI contract 9 — see [Well-Known Verbs](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary) |
 
-A manifest contributes at least one command, MCP tool, agent-content
+A manifest contributes at least one command, tool, agent-content
 contribution or verb vocabulary; a content-only or vocabulary-only extension
 needs no runtime.
 
@@ -268,13 +268,13 @@ A `default` that declares positionals requires contract 15, because an older
 CLI answers "unknown subcommand" for the word it takes; see
 [ADR 0013](../../../protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md).
 
-## MCP Tools
+## Tools
 
-An extension can add namespaced tools to the local `putnami mcp` server. Tool
-names must include a namespace such as `putnami.search`; bare names are
-reserved for the core workspace tools. The descriptor is read from the manifest
-when the server starts, but the extension command is not launched until an
-agent calls the tool.
+The core serves no tools to agents, so a tool in the manifest no longer reaches
+an agent. The `tools` section stays as the call contract of collaboration
+providers: a tool carries a descriptor, and the core launches its command only
+when it routes a provider operation to it. Tool names include a namespace such
+as `putnami.search`.
 
 ```json
 {
@@ -313,19 +313,9 @@ agent calls the tool.
 conventions. The CLI writes a single JSON request to stdin with the tool name,
 arguments, workspace root, and extension root; the command writes a single MCP
 tool result (`{"content":[{"type":"text","text":"…"}]}`) to stdout.
-When MCP agent provenance is enabled, the request also contains an `agent`
-object with `clientName`, `clientVersion`, `harness`, `model`, and `userAgent`.
-The same safe header values are exposed as `PUTNAMI_AGENT_HARNESS`,
-`PUTNAMI_AGENT_MODEL`, and `PUTNAMI_AGENT_USER_AGENT`; the structured request
-is the source of truth. The Go extension SDK's `mcp.Serve` helper implements
-that boundary, and `request.Agent.ApplyHTTPHeaders(outboundRequest)` applies
-the values without overwriting extension-selected headers.
-
-All four MCP safety hints and `putnami.dev/contract` metadata are required so
-agents can distinguish read-only tools from mutating tools and know whether a
-dry run exists. Core names win on collisions; if two extensions claim the same
-name, neither tool is advertised. A malformed manifest or missing executable
-is isolated to that extension, leaving the core MCP session available.
+The Go extension SDK's `mcp.Serve` helper implements that boundary. All four
+safety hints and `putnami.dev/contract` metadata are required. A malformed
+manifest or missing executable is isolated to that extension.
 
 ### Collaboration provider tools
 
@@ -335,7 +325,7 @@ operation of a collaboration contract — tasks, change proposals, memory or
 missions. It
 is never advertised under its own name. A workspace binds a provider in
 `options.collaboration` of `putnami.workspace.json`, and Putnami then exposes
-the operation as the MCP tool `tasks.find` and the command `putnami tasks find`,
+the operation as the command `putnami tasks find`,
 routes every call to the bound provider through this same subprocess boundary,
 and adds a `provider` member (contract, version, operation, binding settings) to
 the request. See [Collaboration providers](25-collaboration-providers.md).
@@ -1020,7 +1010,7 @@ so on down the graph. See
   dependency the workspace does not declare serves no credential, cache,
   runner, session-reporter, log-reporter or Cloud release-set provider.
 - **Implicit installs.** A hosted run, the restore of a new worktree, an
-  implicit install and the MCP read preparation install only the
+  implicit install and a read-only preparation install only the
   dependencies the lock pins. Each reports an unpinned one with its
   dependent and `putnami install`.
 

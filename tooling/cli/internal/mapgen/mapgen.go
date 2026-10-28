@@ -1,6 +1,6 @@
 // Package mapgen builds the workspace orientation map in memory from artifacts
 // that already exist on disk, as a MAP-REDUCE. It writes nothing: `putnami
-// context map` prints the map, and the MCP `workspace_map` tool serves it.
+// context map` prints the map.
 //
 // The map is a pure projection of committed inputs, so storing it bought
 // nothing and cost a drift class: every reader rebuilds it from the working
@@ -8,14 +8,9 @@
 //
 // The map stage produces one FRAGMENT per project, computed from PROJECT-SCOPED
 // inputs only — putnami.json, schema/openapi.json, schema/config.jsonschema.json,
-// README.md — plus the workspace-resolved identity of that project (its id,
-// path, name, type, tags, extensions, and declared dependency names). Every
-// fragment records an INPUTS DIGEST over exactly those inputs, absent files
-// included as a typed absence, so a fragment held in a FragmentCache can be
-// VALIDATED instead of trusted: a long-lived process reuses a cached fragment
-// only when its recorded digest still matches the inputs on disk, and otherwise
-// rebuilds it. That is what keeps a warm MCP call O(changed) while the output
-// stays complete.
+// README.md, and the names of the JSON files under schema/ — plus the
+// workspace-resolved identity of that project (its id, path, name, type, tags,
+// extensions, and declared dependency names).
 //
 // The reduce stage takes the LIVE project set (enumerated from the workspace
 // manifest), the fragments, and the genuinely global inputs (the workspace name
@@ -34,16 +29,16 @@
 //
 // Determinism is the point, so nothing here may leak an ambient value into the
 // bytes: no timestamps, no absolute paths, no map iteration order, and no CLI
-// version stamp. It is what makes the printed map and the MCP answer the same
-// bytes at a fixed tree. Every collection is sorted on a total key before it is
+// version stamp. It is what makes two prints of the map the same bytes at a
+// fixed tree. Every collection is sorted on a total key before it is
 // emitted.
 package mapgen
 
 // SchemaVersion is the shape version of the map document. It is a CONSTANT, not
 // a build stamp: bumping it is a deliberate format change. The document is
-// served over MCP (`workspace_map`) and printed by `putnami context map
-// --output=json`, so the version is a wire contract a consumer may branch on —
-// which is exactly why a CLI release must never move it.
+// printed by `putnami context map --output=json`, so the version is a wire
+// contract a consumer may branch on — which is exactly why a CLI release must
+// never move it.
 const SchemaVersion = 1
 
 // GeneratedBy names the producer in the document. Version-free on purpose (see
@@ -54,8 +49,7 @@ const GeneratedBy = "putnami context map"
 const Regenerate = "putnami context map"
 
 // ProjectInputFiles are the four project-scoped FILE inputs a fragment is
-// computed from, in the canonical (sorted) order the inputs digest hashes them.
-// Any change to this list changes every fragment's digest.
+// computed from.
 var ProjectInputFiles = []string{
 	"README.md",
 	"putnami.json",
@@ -65,19 +59,11 @@ var ProjectInputFiles = []string{
 
 // SchemaDir is the project-relative directory whose committed JSON artifacts a
 // fragment LISTS (ProjectEntry.Schemas). It is a fifth input of a different
-// kind: the fragment emits the file NAMES, so the digest covers the sorted name
-// list and nothing else. Content changes in a schema the fragment does not parse
-// must not move the digest — the emitted bytes do not depend on them, and a
-// digest that moves without the output moving is a cache miss for nothing.
+// kind: the fragment emits the file NAMES, never their content.
 const SchemaDir = "schema"
 
-// SchemaDirInput is the input path recorded for the SchemaDir listing. The
-// trailing slash says "this entry is a directory listing, not a file", and keeps
-// it distinct from any file path the listing could ever contain.
-const SchemaDirInput = SchemaDir + "/"
-
 // RepoMap is the reduced orientation map — the document `putnami context map`
-// prints, as JSON or Markdown, and the MCP `workspace_map` tool serves.
+// prints, as JSON or Markdown.
 type RepoMap struct {
 	// SchemaVersion is the document shape version (SchemaVersion).
 	SchemaVersion int `json:"schemaVersion"`

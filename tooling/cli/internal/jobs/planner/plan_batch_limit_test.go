@@ -13,7 +13,7 @@ import (
 const batchCapOption = "batch-max-projects"
 
 // TestPlanRefusesAnInvalidBatchProjectCap pins the wiring: a bad value fails
-// Plan itself, so every adapter (run, --plan, MCP) reports it before a task
+// Plan itself, so every adapter (run, --plan) reports it before a task
 // starts, while a valid or absent value plans normally.
 func TestPlanRefusesAnInvalidBatchProjectCap(t *testing.T) {
 	t.Parallel()

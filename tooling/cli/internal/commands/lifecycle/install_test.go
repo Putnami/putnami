@@ -139,26 +139,35 @@ func TestInstall_DefaultPrintsOnlyCompletedActions(t *testing.T) {
 	if err := Install(context.Background(), dir, wsproto.Load(dir), nil, env); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
-	want := "  ✓ Putnami MCP server registered in .mcp.json\n" +
-		"  ✓ Workspace setup completed (fixture)\n" +
+	want := "  ✓ Workspace setup completed (fixture)\n" +
 		"  ✓ Workspace lock metadata refreshed\n"
 	if got := out.String(); got != want {
 		t.Fatalf("redirected compact install output = %q, want %q", got, want)
 	}
 }
 
-// An explicit `putnami install` registers the putnami MCP server, so a new
-// agent session in the workspace reaches it with no manual step (ADR 0040).
-// The first-use bootstrap runs the same Install on behalf of an unrelated
-// command, and writes no .mcp.json.
-func TestInstall_RegistersTheMCPServerOnlyWhenExplicit(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "implicit-mcp-registration", "install-registers-and-the-first-use-bootstrap-does-not")
+// writtenMCPRegistration is the .mcp.json earlier releases created in a
+// consumer workspace.
+const writtenMCPRegistration = "{\n  \"mcpServers\": {\n    \"putnami\": {\n      \"args\": [\n        \"mcp\"\n      ],\n      \"command\": \"putnami\",\n      \"env\": {\n        \"PUTNAMI_AGENT_WORKSPACE\": \"${CLAUDE_PROJECT_DIR:-.}\"\n      }\n    }\n  }\n}\n"
+
+// An explicit `putnami install` writes no .mcp.json and removes the entry an
+// earlier release wrote for the MCP server Putnami no longer serves. The
+// first-use bootstrap runs the same Install on behalf of an unrelated command:
+// it neither writes nor removes a committed file.
+func TestInstall_RemovesTheWrittenMCPEntryOnlyWhenExplicit(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "a-putnami-written-entry-is-removed")
+	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "init-and-the-first-use-install-write-no-mcp-json")
 	hometest.Temp(t)
-	run := func(ctx context.Context) string {
+	run := func(ctx context.Context, registration string) (dir, summary string) {
 		t.Helper()
-		dir := t.TempDir()
+		dir = t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name":"install-ws"}`), 0o644); err != nil {
 			t.Fatal(err)
+		}
+		if registration != "" {
+			if err := os.WriteFile(filepath.Join(dir, ".mcp.json"), []byte(registration), 0o644); err != nil {
+				t.Fatal(err)
+			}
 		}
 		var out strings.Builder
 		if _, err := captureStdout(t, func() error {
@@ -166,30 +175,31 @@ func TestInstall_RegistersTheMCPServerOnlyWhenExplicit(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("Install: %v", err)
 		}
-		return dir
+		return dir, out.String()
 	}
 
-	explicit := run(context.Background())
-	data, err := os.ReadFile(filepath.Join(explicit, ".mcp.json"))
-	if err != nil {
-		t.Fatalf("explicit install wrote no .mcp.json: %v", err)
-	}
-	var registration struct {
-		MCPServers map[string]struct {
-			Command string   `json:"command"`
-			Args    []string `json:"args"`
-		} `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(data, &registration); err != nil {
-		t.Fatalf("parse .mcp.json: %v", err)
-	}
-	if entry, ok := registration.MCPServers["putnami"]; !ok || entry.Command != "putnami" || strings.Join(entry.Args, " ") != "mcp" {
-		t.Fatalf(".mcp.json does not register the putnami server:\n%s", data)
+	// Nothing registered: an install writes no .mcp.json, explicit or not.
+	for name, ctx := range map[string]context.Context{
+		"explicit": context.Background(),
+		"implicit": shared.WithImplicitInstall(context.Background()),
+	} {
+		dir, _ := run(ctx, "")
+		if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); !os.IsNotExist(err) {
+			t.Fatalf("the %s install wrote .mcp.json: stat err %v", name, err)
+		}
 	}
 
-	implicit := run(shared.WithImplicitInstall(context.Background()))
-	if _, err := os.Stat(filepath.Join(implicit, ".mcp.json")); !os.IsNotExist(err) {
-		t.Fatalf("the first-use bootstrap wrote .mcp.json: stat err %v", err)
+	explicit, summary := run(context.Background(), writtenMCPRegistration)
+	if _, err := os.Stat(filepath.Join(explicit, ".mcp.json")); !os.IsNotExist(err) {
+		t.Fatalf("the explicit install kept the entry it should remove: stat err %v", err)
+	}
+	if !strings.Contains(summary, ".mcp.json removed") {
+		t.Fatalf("the install summary does not record the removal:\n%s", summary)
+	}
+
+	implicit, _ := run(shared.WithImplicitInstall(context.Background()), writtenMCPRegistration)
+	if data, err := os.ReadFile(filepath.Join(implicit, ".mcp.json")); err != nil || string(data) != writtenMCPRegistration {
+		t.Fatalf("the first-use bootstrap changed .mcp.json: %q (%v)", data, err)
 	}
 }
 

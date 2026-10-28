@@ -107,31 +107,14 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 }
 
-// TestBuildFragment_ExtractsProjectScopedFacts pins what a fragment carries and
-// that its inputs record covers exactly the four declared inputs, with absent
-// ones present as a typed absence rather than omitted.
+// TestBuildFragment_ExtractsProjectScopedFacts pins what a fragment carries,
+// and that a project without the optional inputs carries none of their facts.
 func TestBuildFragment_ExtractsProjectScopedFacts(t *testing.T) {
 	ws, api, lib := fixtureWorkspace(t)
 
 	fragment, err := BuildFragment(ws.Root, api)
 	if err != nil {
 		t.Fatalf("BuildFragment: %v", err)
-	}
-
-	// The four file inputs plus the schema/ directory LISTING input.
-	if got := len(fragment.Inputs.Files); got != len(ProjectInputFiles)+1 {
-		t.Fatalf("inputs recorded %d files, want %d", got, len(ProjectInputFiles)+1)
-	}
-	for i, f := range fragment.Inputs.Files {
-		if i > 0 && fragment.Inputs.Files[i-1].Path >= f.Path {
-			t.Errorf("input files are not sorted: %v", fragment.Inputs.Files)
-		}
-		if f.Digest == "" {
-			t.Errorf("input %s has an empty digest", f.Path)
-		}
-	}
-	if fragment.Inputs.Digest == "" || fragment.Inputs.Identity == "" {
-		t.Fatalf("inputs digest/identity must be populated: %+v", fragment.Inputs)
 	}
 
 	p := fragment.Project
@@ -176,21 +159,10 @@ func TestBuildFragment_ExtractsProjectScopedFacts(t *testing.T) {
 		t.Errorf("schemas = %v, want %v", p.Schemas, wantSchemas)
 	}
 
-	// The library has none of the artifacts except putnami.json: every other
-	// input — the three files AND the schema/ listing — must be recorded as a
-	// typed absence, not dropped.
+	// The library has none of the artifacts except putnami.json.
 	libFragment, err := BuildFragment(ws.Root, lib)
 	if err != nil {
 		t.Fatalf("BuildFragment(lib): %v", err)
-	}
-	absent := 0
-	for _, f := range libFragment.Inputs.Files {
-		if f.Digest == AbsentDigest {
-			absent++
-		}
-	}
-	if absent != 4 {
-		t.Errorf("lib recorded %d absent inputs, want 4: %+v", absent, libFragment.Inputs.Files)
 	}
 	if len(libFragment.Project.Schemas) != 0 {
 		t.Errorf("lib fragment must carry no schemas: %v", libFragment.Project.Schemas)
@@ -226,11 +198,9 @@ func TestBuildFragment_ByteStable(t *testing.T) {
 }
 
 // The classification a provider derives is a fact ABOUT the project, so it must
-// reach the map entry an agent reads and it must key the fragment: the Go
-// probe derives Type from the module's sources, and a module that gains its
-// first package main flips library → application without
-// any of the four file inputs moving. A fragment that did not digest the
-// identity would keep serving the stale classification.
+// reach the map entry: the Go probe derives Type from the module's sources, and
+// a module that gains its first package main flips library → application
+// without any of the four file inputs moving.
 func TestFragment_CarriesTheProjectClassification(t *testing.T) {
 	ws, api, lib := fixtureWorkspace(t)
 
@@ -257,200 +227,50 @@ func TestFragment_CarriesTheProjectClassification(t *testing.T) {
 		}
 	}
 
-	// Reclassifying the same tree must invalidate the fragment: nothing on disk
-	// changed, so only the identity digest can carry the difference.
-	before := fragments["/svc/lib"].Inputs.Digest
+	// Reclassifying the same tree changes the fragment although nothing on disk
+	// changed.
 	promoted := *lib
 	promoted.Type = "application"
 	after, err := BuildFragment(ws.Root, &promoted)
 	if err != nil {
 		t.Fatalf("BuildFragment(promoted): %v", err)
 	}
-	if after.Inputs.Digest == before {
-		t.Error("reclassifying a project left the fragment inputs digest unchanged; a stale type would survive")
+	if after.Project.Type != "application" {
+		t.Errorf("reclassified fragment type = %q, want application", after.Project.Type)
 	}
 }
 
-// TestResolveFragment_InputsDigestInvalidatesAStaleCachedFragment is the
-// acceptance test for "drift is unrepresentable, not detected-after-the-fact":
-// a cached fragment is REUSED while its inputs are unchanged, and silently
-// rebuilt the moment any declared input — a file OR the workspace-resolved
-// identity — moves.
-func TestResolveFragment_InputsDigestInvalidatesAStaleCachedFragment(t *testing.T) {
+// TestBuildFragment_ListsTheSchemaDirectory pins the schema listing: the
+// fragment emits the sorted names of the JSON files directly under schema/,
+// follows additions and removals, and ignores every other file.
+func TestBuildFragment_ListsTheSchemaDirectory(t *testing.T) {
 	ws, api, _ := fixtureWorkspace(t)
-	cache := NewFragmentCache()
-
-	// A cold cache builds the fragment and keeps it.
-	fragment, reused, err := ResolveFragment(ws.Root, api, cache)
-	if err != nil || reused {
-		t.Fatalf("ResolveFragment on a cold cache = (reused=%v, err=%v), want built", reused, err)
-	}
-
-	// Unchanged inputs: reused.
-	got, reused, err := ResolveFragment(ws.Root, api, cache)
-	if err != nil || !reused {
-		t.Fatalf("ResolveFragment on unchanged inputs = (reused=%v, err=%v), want reused", reused, err)
-	}
-	if got != fragment {
-		t.Error("a cache hit did not return the cached fragment")
-	}
-
-	// A changed FILE input invalidates it.
-	writeFile(t, ws.Root, "svc/api/schema/openapi.json",
-		strings.Replace(fixtureOpenAPI, `"summary": "List tasks"`, `"summary": "Enumerate tasks"`, 1))
-	got, reused, err = ResolveFragment(ws.Root, api, cache)
-	if err != nil {
-		t.Fatalf("ResolveFragment after edit: %v", err)
-	}
-	if reused {
-		t.Fatal("a fragment whose openapi input changed was reused — the inputs digest is not covering it")
-	}
-	if len(got.Project.Endpoints) == 0 || got.Project.Endpoints[1].Summary != "Enumerate tasks" {
-		t.Errorf("rebuilt fragment did not pick the new summary up: %+v", got.Project.Endpoints)
-	}
-
-	// The rebuild replaced the entry, so the next call reuses it; then change
-	// only the workspace-resolved IDENTITY (no file moved): the fragment must
-	// still be invalidated.
-	if _, reused, err = ResolveFragment(ws.Root, api, cache); err != nil || !reused {
-		t.Fatalf("ResolveFragment after the rebuild = (reused=%v, err=%v), want reused", reused, err)
-	}
-	api.Dependencies = append(api.Dependencies, "example/newdep")
-	if _, reused, err = ResolveFragment(ws.Root, api, cache); err != nil {
-		t.Fatalf("ResolveFragment after identity change: %v", err)
-	} else if reused {
-		t.Fatal("a fragment whose project identity changed was reused — the identity digest is not covering it")
-	}
-}
-
-// TestResolveFragment_SchemaListingInvalidatesOnAddAndRemove is the acceptance
-// test for gap 3: the fragment EMITS the schema file names, so the
-// inputs digest must move when one is added or removed — and must NOT move when
-// an unparsed schema's CONTENT changes, because the emitted bytes do not depend
-// on it and a digest that moves for nothing is a cache miss for nothing.
-func TestResolveFragment_SchemaListingInvalidatesOnAddAndRemove(t *testing.T) {
-	ws, api, _ := fixtureWorkspace(t)
-	cache := NewFragmentCache()
-	persist := func() *Fragment {
+	schemas := func() string {
 		t.Helper()
 		fragment, err := BuildFragment(ws.Root, api)
 		if err != nil {
 			t.Fatalf("BuildFragment: %v", err)
 		}
-		cache.store(api.ID, fragment)
-		return fragment
-	}
-	reused := func() bool {
-		t.Helper()
-		_, ok, err := ResolveFragment(ws.Root, api, cache)
-		if err != nil {
-			t.Fatalf("ResolveFragment: %v", err)
-		}
-		return ok
+		return strings.Join(fragment.Project.Schemas, ",")
 	}
 
-	// The listing input is recorded as a directory entry, distinct from the files.
-	fragment := persist()
-	var listing *InputFile
-	for i, f := range fragment.Inputs.Files {
-		if f.Path == SchemaDirInput {
-			listing = &fragment.Inputs.Files[i]
-		}
-	}
-	if listing == nil {
-		t.Fatalf("inputs do not record the schema listing: %+v", fragment.Inputs.Files)
-	}
-	if listing.Digest == AbsentDigest {
-		t.Errorf("schema listing digest = %q for a project that has a schema/ directory", listing.Digest)
-	}
-	if !reused() {
-		t.Fatal("an unchanged tree did not reuse its fragment")
-	}
-
-	// A schema the fragment does not parse is ADDED: the listing changes, so the
-	// fragment must be rebuilt and must emit the new name.
 	writeFile(t, ws.Root, "svc/api/schema/capabilities.json", `{"capabilities":[]}`)
-	if reused() {
-		t.Fatal("a fragment was reused after a schema file was added — the listing digest is not covering it")
-	}
-	fragment = persist()
-	want := []string{"schema/capabilities.json", "schema/config.jsonschema.json", "schema/openapi.json"}
-	if strings.Join(fragment.Project.Schemas, ",") != strings.Join(want, ",") {
-		t.Errorf("schemas = %v, want %v (sorted, project-relative, non-recursive)", fragment.Project.Schemas, want)
+	want := "schema/capabilities.json,schema/config.jsonschema.json,schema/openapi.json"
+	if got := schemas(); got != want {
+		t.Errorf("schemas = %v, want %v (sorted, project-relative, non-recursive)", got, want)
 	}
 
-	// The same schema's CONTENT changes: only names are emitted, so the fragment
-	// stays valid.
-	writeFile(t, ws.Root, "svc/api/schema/capabilities.json", `{"capabilities":["a","b"]}`)
-	if !reused() {
-		t.Error("editing an unparsed schema's content invalidated the fragment; only the name list is an input")
-	}
-
-	// A non-JSON file is not listed and is not an input either.
 	writeFile(t, ws.Root, "svc/api/schema/notes.txt", "ignored")
-	if !reused() {
-		t.Error("a non-JSON file under schema/ moved the listing digest")
+	writeFile(t, ws.Root, "svc/api/schema/nested/inner.json", `{}`)
+	if got := schemas(); got != want {
+		t.Errorf("schemas = %v, want %v: a non-JSON file and a nested one are not listed", got, want)
 	}
 
-	// It is REMOVED: the listing changes back and the fragment is invalidated.
 	if err := os.Remove(filepath.Join(ws.Root, filepath.FromSlash("svc/api/schema/capabilities.json"))); err != nil {
 		t.Fatalf("remove schema: %v", err)
 	}
-	if reused() {
-		t.Fatal("a fragment was reused after a schema file was removed")
-	}
-
-	// An absent schema/ directory is a typed ABSENCE, not an empty listing: the
-	// two must not hash alike.
-	empty := t.TempDir()
-	writeFile(t, empty, "svc/api/putnami.json", `{"name":"example/api"}`)
-	if err := os.MkdirAll(filepath.Join(empty, "svc", "api", "schema"), 0o755); err != nil {
-		t.Fatalf("mkdir schema: %v", err)
-	}
-	emptyDir, err := BuildFragment(empty, api)
-	if err != nil {
-		t.Fatalf("BuildFragment(empty schema dir): %v", err)
-	}
-	missing := t.TempDir()
-	writeFile(t, missing, "svc/api/putnami.json", `{"name":"example/api"}`)
-	noDir, err := BuildFragment(missing, api)
-	if err != nil {
-		t.Fatalf("BuildFragment(no schema dir): %v", err)
-	}
-	if emptyDir.Inputs.Digest == noDir.Inputs.Digest {
-		t.Error("an empty schema/ directory and a missing one produced the same inputs digest")
-	}
-}
-
-// TestResolveFragment_AnEntryWithoutADigestIsAMiss pins the fail-safe
-// direction: a cached entry that records no inputs digest is never trusted, and
-// a nil cache builds every time.
-func TestResolveFragment_AnEntryWithoutADigestIsAMiss(t *testing.T) {
-	ws, api, _ := fixtureWorkspace(t)
-	fragment, err := BuildFragment(ws.Root, api)
-	if err != nil {
-		t.Fatalf("BuildFragment: %v", err)
-	}
-
-	cache := NewFragmentCache()
-	cleared := *fragment
-	cleared.Inputs.Digest = ""
-	cache.store(api.ID, &cleared)
-	got, reused, err := ResolveFragment(ws.Root, api, cache)
-	if err != nil {
-		t.Fatalf("ResolveFragment: %v", err)
-	}
-	if reused {
-		t.Fatal("an entry without a digest was reused")
-	}
-	if got == nil || got.Inputs.Digest != fragment.Inputs.Digest {
-		t.Errorf("rebuilt fragment digest = %v, want the fresh one", got)
-	}
-
-	for range 2 {
-		if _, reused, err := ResolveFragment(ws.Root, api, nil); err != nil || reused {
-			t.Fatalf("ResolveFragment with a nil cache = (reused=%v, err=%v), want built", reused, err)
-		}
+	if got, want := schemas(), "schema/config.jsonschema.json,schema/openapi.json"; got != want {
+		t.Errorf("schemas after a removal = %v, want %v", got, want)
 	}
 }
 
@@ -700,40 +520,12 @@ func TestReadmeSummary_SkipsNonProseOpeners(t *testing.T) {
 	}
 }
 
-// TestResolveFragment_CacheHitSkipsParsing pins the O(changed) warm path: a
-// digest hit must return the stored fragment WITHOUT parsing the inputs. The
-// probe is a config schema that is valid JSON bytes for digesting but invalid
-// as a schema: parsing it errors, so a warm resolve that still parses cannot
-// return (stored, true, nil).
-func TestResolveFragment_CacheHitSkipsParsing(t *testing.T) {
+// TestBuildFragment_AnUnparseableSchemaIsAnError pins that a config schema
+// that does not parse fails the build instead of yielding an empty fragment.
+func TestBuildFragment_AnUnparseableSchemaIsAnError(t *testing.T) {
 	ws, api, _ := fixtureWorkspace(t)
-
-	// Make the config schema unparseable, then record a fragment whose inputs
-	// digest matches those exact bytes — the shape a warm cache presents.
 	writeFile(t, ws.Root, "svc/api/schema/config.jsonschema.json", `{"type": ["broken"`)
-	inputs, _, _, _, err := digestFragmentInputs(ws.Root, api)
-	if err != nil {
-		t.Fatalf("digestFragmentInputs: %v", err)
-	}
-	stored := &Fragment{
-		Inputs:  inputs,
-		Project: FragmentProject{ID: api.ID, Path: filepath.ToSlash(api.Path), Summary: "from cache"},
-	}
-	cache := NewFragmentCache()
-	cache.store(api.ID, stored)
-
-	got, reused, err := ResolveFragment(ws.Root, api, cache)
-	if err != nil {
-		t.Fatalf("warm resolve parsed its inputs (err = %v), want a digest-only cache hit", err)
-	}
-	if !reused || got.Project.Summary != "from cache" {
-		t.Fatalf("warm resolve = (reused=%v, summary=%q), want the stored fragment untouched", reused, got.Project.Summary)
-	}
-
-	// A MISS over the same unparseable input must still surface the parse
-	// error — the digest gate must never swallow a real rebuild failure.
-	writeFile(t, ws.Root, "svc/api/schema/config.jsonschema.json", `{"type": ["still broken"`)
-	if _, _, err := ResolveFragment(ws.Root, api, cache); err == nil {
-		t.Fatal("a cache miss over an unparseable schema resolved without error")
+	if _, err := BuildFragment(ws.Root, api); err == nil {
+		t.Fatal("BuildFragment over an unparseable config schema succeeded")
 	}
 }

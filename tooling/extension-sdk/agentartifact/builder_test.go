@@ -124,10 +124,9 @@ func TestBuildEmitsCompleteHostBodies(t *testing.T) {
 		if !strings.Contains(claude, "allowed-tools: "+defaultClaudeTools) {
 			t.Errorf(".claude/skills/%s/SKILL.md lost the default capability line", name)
 		}
-		// The default lets a skill load and call the Putnami MCP tools its
-		// workspace guidance names as the first discovery step.
-		if !strings.Contains(claude, "\nallowed-tools: Bash, Read, Grep, Glob, ToolSearch, mcp__putnami__*\n") {
-			t.Errorf(".claude/skills/%s/SKILL.md does not grant the Putnami MCP tools: %q", name, firstLines(claude, 5))
+		// The default names no Putnami server tool: discovery goes through the CLI.
+		if !strings.Contains(claude, "\nallowed-tools: Bash, Read, Grep, Glob, ToolSearch\n") {
+			t.Errorf(".claude/skills/%s/SKILL.md lost the capability line: %q", name, firstLines(claude, 5))
 		}
 		_, body, err := splitSkillDocument(&skillSource{name: name, document: source})
 		if err != nil {

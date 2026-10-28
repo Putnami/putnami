@@ -25,11 +25,10 @@ func collabMissionsWorkspace(t *testing.T) string {
 }
 
 // TestCollaborationCommand_AHostOnlyOperationIsRoutedByTheCLIAndTheHostChannel:
-// the MCP server lists no missions.sync tool, and `putnami missions sync` and
-// the host channel's collaboration.call still route it, to the same envelope.
+// `putnami missions sync` and the host channel's collaboration.call route the
+// host-only operation, to the same envelope.
 func TestCollaborationCommand_AHostOnlyOperationIsRoutedByTheCLIAndTheHostChannel(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "a-host-only-operation-has-no-mcp-tool")
 	spectest.Proves(t, "cli/collaboration-providers", "host-only-operations", "the-cli-and-the-host-channel-route-a-host-only-operation")
 	root := collabMissionsWorkspace(t)
 	input := `{"session":{"engine":"host-b","id":"s-1"},"mission":{"repository":"putnami/putnami","key":"issue-596"},"event":"stop","state":"handed_back","observedAt":"2026-10-26T09:00:00Z"}`
@@ -52,18 +51,6 @@ func TestCollaborationCommand_AHostOnlyOperationIsRoutedByTheCLIAndTheHostChanne
 	if string(answer) != strings.TrimSpace(stdout) {
 		t.Errorf("collaboration.call and the CLI disagree:\nRPC %s\nCLI %s", answer, strings.TrimSpace(stdout))
 	}
-
-	srv := newMCPServer(root, "collaboration-test")
-	listed := map[string]bool{}
-	for _, tool := range listParityTools(t, srv) {
-		listed[tool.Name] = true
-	}
-	if listed["missions.sync"] {
-		t.Error("the MCP server lists the host-only missions.sync")
-	}
-	if !listed["missions.ask"] || !listed["missions.reply"] {
-		t.Errorf("the MCP server lacks the agent's missions tools: %v", listed)
-	}
 }
 
 // TestCollaborationCommand_HelpMarksAHostOnlyOperation: the help says which
@@ -75,7 +62,7 @@ func TestCollaborationCommand_HelpMarksAHostOnlyOperation(t *testing.T) {
 	if code != ExitSuccess {
 		t.Fatalf("putnami missions help exited %d", code)
 	}
-	if !strings.Contains(stdout, "except the host-only sync") {
+	if !strings.Contains(stdout, "calls the host-only sync") {
 		t.Errorf("the help does not name the host-only operation:\n%s", stdout)
 	}
 	for _, line := range strings.Split(stdout, "\n") {

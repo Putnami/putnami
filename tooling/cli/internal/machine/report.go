@@ -46,9 +46,10 @@ type ReportMeta struct {
 	// StartTime and EndTime bound the settled run.
 	StartTime time.Time
 	EndTime   time.Time
-	// Origin is protocolcli.ReportOriginCLI or ReportOriginMCP. It is the origin
-	// field recorded session metadata has never had, which is why an adapter run
-	// is reported rather than withheld: readers filter, they do not guess.
+	// Origin is protocolcli.ReportOriginCLI, or ReportOriginMCP for an adapter
+	// run. It is the origin field recorded session metadata has never had, which
+	// is why an adapter run is reported rather than withheld: readers filter,
+	// they do not guess.
 	Origin string
 	// EnforceCoverage records whether the run ran the enforcing cadence, so a
 	// longitudinal consumer compares like with like.

@@ -51,10 +51,9 @@ func canonicalTestJob(project, jobName, taskKind string) *ScheduledJob {
 // legacyBuckets is the six-bucket tally every renderer repeats verbatim today:
 // internal/output/json.go Finish, internal/output/jsonl.go Finish,
 // internal/output/text_finish.go Finish, internal/output/cloud_logging.go
-// Finish, internal/mcp/adapter.go summarizeRun, internal/cli/jobs_helpers.go
-// buildSessionStats and internal/watch/session_iteration.go
-// buildWatchSessionStats (deleted when the watch loop became a replan policy
-// over Engine.Run). Transcribed unchanged.
+// Finish, internal/cli/jobs_helpers.go buildSessionStats and
+// internal/watch/session_iteration.go buildWatchSessionStats (deleted when the
+// watch loop became a replan policy over Engine.Run). Transcribed unchanged.
 type legacyBuckets struct {
 	succeeded, failed, canceled, skipped, cached, coalesced int
 	total                                                   int

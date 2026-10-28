@@ -289,15 +289,10 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
-	// Place the Putnami guidance block in the assistant entrypoints, and
-	// register the putnami MCP server so the first agent session in the new
-	// workspace reaches it with no manual step (ADR 0040). Nothing else is
-	// written for agents (ADR 0055).
+	// Place the Putnami guidance block in the assistant entrypoints. Nothing
+	// else is written for agents (ADR 0055).
 	if err := agentctx.WriteAgentEntrypoints(cwd); err == nil {
 		iox.Fprintln(os.Stdout, "  ✓ Assistant guidance written (CLAUDE.md, AGENTS.md)")
-	}
-	if agentctx.RegisterMCPServer(cwd, os.Stderr) {
-		iox.Fprintln(os.Stdout, "  ✓ MCP server registered for agent sessions (.mcp.json)")
 	}
 
 	name := workspaceName(flags, cwd)
@@ -370,7 +365,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	}
 
 	// Write the host hooks the opted-in extensions declare (ADR 0081). It
-	// runs here, not beside the MCP registration, because the workspace
+	// runs here, not beside the guidance block, because the workspace
 	// config and the extensions exist only now. A new workspace binds no
 	// collaboration contract, so this writes nothing until one is bound.
 	for _, change := range agentctx.RegisterHostHooks(cwd, wsCfg, os.Stderr) {

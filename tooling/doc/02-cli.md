@@ -5,7 +5,7 @@ The Putnami CLI is the single entry point for your workspace. It abstracts the u
 New to a workspace? Follow the
 [core workspace experience](../cli/doc/19-core-workspace-experience.md) from
 workspace discovery through project and feature context, plan preview,
-verification, MCP routing, and diagnostic recall.
+verification, agent access through the CLI, and diagnostic recall.
 
 ## Installation
 
