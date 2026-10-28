@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -217,5 +218,29 @@ func TestResolveCommandDeps_StepDependency(t *testing.T) {
 	resolveCommandDeps(jobs, computeCommandLeaves(jobs))
 	if want := []string{"/app:build~describe"}; !slices.Equal(dependent.DependsOn, want) {
 		t.Fatalf("deps = %v, want %v", dependent.DependsOn, want)
+	}
+}
+
+// A step dependency never waits for a finalizer, as a bare command dependency
+// never waits for one.
+func TestResolveCommandDeps_StepDependencySkipsAFinalizer(t *testing.T) {
+	t.Parallel()
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	dependent := &jobmodel.ScheduledJob{Project: app, JobDef: &extension.JobDefinition{
+		Name: "clientgen~generate-go", CommandName: "clientgen", StepID: "generate-go",
+		CommandDependsOn: []string{"build~teardown"},
+	}}
+	teardown := &jobmodel.ScheduledJob{
+		Project: app,
+		JobDef:  &extension.JobDefinition{Name: "build~teardown", CommandName: "build", StepID: "teardown"},
+		Step: &extension.PipelineStep{
+			ID: "teardown", Task: "teardown", RunOn: extensionproto.StepRunOnFinally,
+			Finalizes: &extensionproto.FinalizesRelation{Producer: "setup", Consumers: []string{"compile"}},
+		},
+	}
+	jobs := []*jobmodel.ScheduledJob{teardown, dependent}
+	resolveCommandDeps(jobs, computeCommandLeaves(jobs))
+	if len(dependent.DependsOn) != 0 {
+		t.Fatalf("deps = %v, want none", dependent.DependsOn)
 	}
 }
