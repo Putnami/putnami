@@ -42,6 +42,10 @@
       "text": "Top-level completion offers the command groups of the loaded extensions and their subcommands, and no flat command that a group carries, which fails typed directly. Help and completion read one rule for a carried command."
     },
     {
+      "id": "completion-reads-names-literally",
+      "text": "Shell completion offers each name it lists as one literal word in bash, zsh and fish: a command, alias, project group or project name from the workspace, and a flag name from an extension manifest. A quote, a space, a newline, a bracket, a colon, a backslash or a command substitution in a name neither splits it, nor changes it, nor runs it. A backslash or a bracket in a flag description hides no flag in zsh. Bash matches the current word as the command line reads it, quotes and backslashes removed."
+    },
+    {
       "id": "extension-verb-vocabulary",
       "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },

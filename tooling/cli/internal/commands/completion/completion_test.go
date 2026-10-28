@@ -51,7 +51,7 @@ func TestCompletionBash(t *testing.T) {
 	if !strings.Contains(output, "upgrade") {
 		t.Error("expected 'upgrade' structured command")
 	}
-	if !strings.Contains(output, "'mcp') printf '%s\\n' 'install'") {
+	if !strings.Contains(output, "'mcp') _putnami_words=(install) ;;") {
 		t.Error("expected mcp subcommands in bash completion")
 	}
 	if !strings.Contains(output, "--verbose") {
@@ -283,7 +283,7 @@ func TestGatherCompletionContext_FlatJobFlagsAndAliases(t *testing.T) {
 
 	var bash bytes.Buffer
 	CompletionBash(&bash, dir, &wsproto.Config{}, nil)
-	if !strings.Contains(bash.String(), "'deploy') printf '%s\\n' '--confirm --environment'") {
+	if !strings.Contains(bash.String(), "'deploy') _putnami_words=(--confirm --environment) ;;") {
 		t.Error("expected bash completion to include deploy command flags")
 	}
 
@@ -378,10 +378,10 @@ func TestCompletionScripts_ExtensionNestedCommandGroups(t *testing.T) {
 	CompletionBash(&bash, dir, cfg, nil)
 	bashOut := bash.String()
 	for _, want := range []string{
-		"'cloud') printf '%s\\n' 'config secrets'",
-		"'cloud config') printf '%s\\n' 'list resolve show'",
-		"'cloud secrets') printf '%s\\n' 'delete list reveal set'",
-		"'cloud config show') printf '%s\\n' '--env --region --with-secrets'",
+		"'cloud') _putnami_words=(config secrets) ;;",
+		"'cloud config') _putnami_words=(list resolve show) ;;",
+		"'cloud secrets') _putnami_words=(delete list reveal set) ;;",
+		"'cloud config show') _putnami_words=(--env --region --with-secrets) ;;",
 	} {
 		if !strings.Contains(bashOut, want) {
 			t.Errorf("bash: expected %q in completion script", want)
@@ -961,7 +961,7 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 	var bash bytes.Buffer
 	CompletionBash(&bash, dir, cfg, nil)
 	bashOut := bash.String()
-	if !strings.Contains(bashOut, `local project_basenames='`) {
+	if !strings.Contains(bashOut, `local -a project_basenames=(`) {
 		t.Error("bash: missing project_basenames variable")
 	}
 	for _, want := range []string{"web-app", "api", "acme-api"} {
@@ -970,10 +970,10 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 		}
 	}
 	// The positional branch must complete the full target set, not just IDs.
-	if !strings.Contains(bashOut, `_putnami_reply "${project_targets} ${global_flags}"`) {
+	if !strings.Contains(bashOut, `_putnami_reply ${project_targets[@]+"${project_targets[@]}"} ${global_flags[@]+"${global_flags[@]}"}`) {
 		t.Error("bash: positional target should use project_targets (ids+names+basenames+aliases)")
 	}
-	if strings.Contains(bashOut, `_putnami_reply "${projects} ${project_ids}"`) {
+	if strings.Contains(bashOut, `_putnami_reply ${projects[@]+"${projects[@]}"} ${project_ids[@]+"${project_ids[@]}"}`) {
 		t.Error("bash: --exclude should not suggest project IDs")
 	}
 

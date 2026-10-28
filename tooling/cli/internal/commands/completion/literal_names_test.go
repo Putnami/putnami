@@ -12,14 +12,17 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
 // hostileNames are workspace names that a shell reads as code, or as several
 // words, or as another word, unless the script quotes them for every read. A
 // name that runs code creates a file whose name starts with "pwned-" in the
 // shell's working directory. "y:z\w" holds the colon and the backslash that
-// zsh's _describe reads.
+// zsh's _describe and _values read, and "r[s]t" the brackets that _values
+// reads. "l\nm" holds a newline.
 var hostileNames = []string{
 	"a$(touch pwned-a)",
 	"b(touch pwned-b)",
@@ -30,19 +33,23 @@ var hostileNames = []string{
 	"x';touch pwned-x;'",
 	`h"$(touch pwned-h)"`,
 	`y:z\w`,
+	"r[s]t",
+	"l\nm",
 }
 
 // hostileWorkspace is a workspace whose command aliases, project aliases,
-// groups, project names and project directories are the hostileNames, with a
-// prefix per kind. A project directory gives the project its ID and its
-// basename. The command aliases of "lint-docs" are job commands; those of
-// "projects" are core commands. A project alias also starts with "~", which
-// bash reads as a home directory.
+// groups, project names, project directories and the flags of "lint-docs" are
+// the hostileNames, with a prefix per kind. A flag's description is its name
+// followed by a backslash. A project directory gives the
+// project its ID and its basename. The command aliases of "lint-docs" are job
+// commands; those of "projects" are core commands. A project alias also starts
+// with "~", which bash reads as a home directory.
 type hostileWorkspace struct {
 	root     string
 	cfg      *wsproto.Config
 	commands []string
 	targets  []string
+	flags    []string
 }
 
 func writeHostileWorkspace(t *testing.T) hostileWorkspace {
@@ -52,13 +59,17 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 	projectAliases := map[string]string{}
 	groups := map[string]string{}
 	includes := []string{"flow"}
+	flags := map[string]extension.FlagDefinition{}
 	for i, name := range hostileNames {
+		flags["f"+name] = extension.FlagDefinition{Type: "boolean", Description: name + `\`}
+		ws.flags = append(ws.flags, "--f"+name)
 		ws.cfg.Aliases["j"+name] = "lint-docs"
 		ws.cfg.Aliases["k"+name] = "projects"
 		ws.commands = append(ws.commands, "j"+name, "k"+name)
 		projectAliases["~"+name] = "/flow"
 		groups["gr"+name] = "/flow"
-		dir := "q" + strings.ReplaceAll(name, `\`, "")
+		// An include is a glob, which reads a bracket.
+		dir := "q" + strings.NewReplacer(`\`, "", "[", "", "]", "").Replace(name)
 		if runtime.GOOS == "windows" {
 			// Windows refuses a quote or a colon in a file name.
 			dir = "q" + strconv.Itoa(i)
@@ -88,12 +99,26 @@ func writeHostileWorkspace(t *testing.T) hostileWorkspace {
 	if err := os.WriteFile(filepath.Join(root, "putnami.workspace.json"), config, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	flagsJSON, err := json.Marshal(flags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"name": "@acme/flow", "cliContract": 4, "commands": {"lint-docs": {"description": "Run.", "flags": ` +
+		string(flagsJSON) + `, "run": [{"id": "r", "task": "t"}]}}, "tasks": {"t": {"kind": "command", "command": "echo", "cache": false}}}`
+	if err := os.WriteFile(filepath.Join(root, "flow", "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ctx := gatherCompletionContext(root, ws.cfg, nil)
 	for _, target := range ws.targets {
 		if !slices.Contains(ctx.projects, target) && !slices.Contains(ctx.projectIDs, target) &&
 			!slices.Contains(ctx.projectBasenames, target) &&
 			!slices.ContainsFunc(ctx.aliases, func(a completionValue) bool { return a.Value == target }) {
 			t.Fatalf("the workspace does not load the target %q", target)
+		}
+	}
+	for _, flag := range ws.flags {
+		if !containsStructuredFlag(ctx.structuredFlags["lint-docs"], flag) {
+			t.Fatalf("the workspace does not load the flag %q", flag)
 		}
 	}
 	return ws
@@ -121,9 +146,10 @@ func assertOffersEach(t *testing.T, shell, position string, offered, names []str
 	}
 }
 
-// The bash script hands each name to compgen as one quoted word, and offers it
+// The bash script holds each name as one word of an array, and offers it
 // quoted, so the command line reads it back as the same word.
 func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "bash-offers-each-name-as-one-literal-word")
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash unavailable on this platform")
 	}
@@ -138,8 +164,13 @@ func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 		{[]string{"putnami", ""}, ws.commands},
 		{[]string{"putnami", "lint-docs", ""}, ws.targets},
 		{[]string{"putnami", "lint-docs", "--projects", ""}, ws.targets},
+		{[]string{"putnami", "lint-docs", "--"}, ws.flags},
 		{[]string{"putnami", ws.commands[0], "--"}, []string{"--projects"}},
 		{[]string{"putnami", ws.commands[1], "--"}, []string{"--projects"}},
+		// The current word as the command line holds it: quoted, escaped.
+		{[]string{"putnami", `jp\ \$`}, []string{"jp $l"}},
+		{[]string{"putnami", "'jp"}, []string{"jp $l"}},
+		{[]string{"putnami", "lint-docs", `nd\'`}, []string{"nd'e"}},
 	} {
 		dir := t.TempDir()
 		replies := bashCompletionReplies(t, dir, script.String(), c.words)
@@ -148,15 +179,16 @@ func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 	}
 }
 
-// bashCompletionReplies runs the bash script in dir to complete words and
-// returns COMPREPLY.
+// bashCompletionReplies runs the bash script in dir, with set -u, to complete
+// words and returns COMPREPLY.
 func bashCompletionReplies(t *testing.T, dir, script string, words []string) []string {
 	t.Helper()
 	quoted := make([]string, len(words))
 	for i, word := range words {
 		quoted[i] = bashQuote(word)
 	}
-	driver := `complete() { :; }
+	driver := `set -u
+complete() { :; }
 _init_completion() {
     words=("${COMP_WORDS[@]}"); cword=${COMP_CWORD}
     cur="${COMP_WORDS[COMP_CWORD]}"; prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -198,8 +230,10 @@ done
 	return strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 }
 
-// The zsh script keeps each name one word in its arrays, and escapes the colon
-// that _describe reads as the start of a description.
+// The zsh script keeps each name one word in its arrays, escapes the colon
+// that _describe reads as the start of a description, and escapes what _values
+// reads in a flag spec. The test records the specs _values receives and reads
+// them by the rules of zsh's parser; it does not run _values.
 func TestZshCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 	if _, err := exec.LookPath("zsh"); err != nil {
 		t.Skip("zsh unavailable on this platform")
@@ -216,6 +250,7 @@ func TestZshCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 		{"command", []string{""}, ws.commands},
 		{"args", []string{"lint-docs", ""}, ws.targets},
 		{"args", []string{"lint-docs", "--projects", ""}, ws.targets},
+		{"args", []string{"lint-docs", "--"}, ws.flags},
 		{"args", []string{ws.commands[0], "--"}, []string{"--projects"}},
 		{"args", []string{ws.commands[1], "--"}, []string{"--projects"}},
 	} {
@@ -228,7 +263,8 @@ func TestZshCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 
 // zshCompletionOffers runs the zsh script in dir with the completion system's
 // functions replaced by recorders, and returns the words zsh would offer:
-// the name of each _describe entry, each compadd word and each _values name.
+// the name of each _describe entry, each compadd word and the name of each
+// _values spec.
 func zshCompletionOffers(t *testing.T, dir, script, state string, words []string) []string {
 	t.Helper()
 	quoted := make([]string, len(words))
@@ -238,7 +274,7 @@ func zshCompletionOffers(t *testing.T, dir, script, state string, words []string
 	driver := `_arguments() { state=` + state + `; return 0; }
 _describe() { local entry; for entry in "${(@P)4}"; do print -rn -- "describe:${entry}"; print -n '\0'; done; }
 compadd() { local word; for word in "$@"; do print -rn -- "word:${word}"; print -n '\0'; done; }
-_values() { shift; local spec; for spec in "$@"; do print -rn -- "value:${spec%%\[*}"; print -n '\0'; done; }
+_values() { shift; local spec; for spec in "$@"; do print -rn -- "value:${spec}"; print -n '\0'; done; }
 words=(` + strings.Join(quoted, " ") + `)
 CURRENT=` + strconv.Itoa(len(words)) + `
 ` + script
@@ -253,25 +289,99 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 	var offered []string
 	for _, record := range strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00") {
 		kind, value, _ := strings.Cut(record, ":")
-		if kind == "describe" {
-			value = zshDescribedName(value)
+		switch kind {
+		case "describe":
+			value = zshReadName(value, ":")
+		case "value":
+			value = zshValuesName(value)
 		}
 		offered = append(offered, value)
 	}
 	return offered
 }
 
-// zshDescribedName returns the name _describe reads from one "name:description"
-// entry: up to the first colon that no backslash escapes, with the escapes
-// removed.
-func zshDescribedName(entry string) string {
+// Each _describe entry and array word reads back, by the rules of zsh's
+// _describe, as the name. This reads the generated text, so it runs where zsh
+// is not installed.
+func TestZshDescribeEntriesReadBackEveryNameLiterally(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "zsh-describe-entries-read-each-name-literally")
+	for _, name := range hostileNames {
+		for _, word := range []string{zshDescribeEntry(name, "Description."), zshDescribeNames([]string{name})} {
+			if got := zshReadName(shellUnquote(word), ":"); got != name {
+				t.Errorf("_describe reads the word %s as %q, not %q", word, got, name)
+			}
+		}
+	}
+}
+
+// shellUnquote returns the value of one word that bashWord or bashQuote
+// writes: a bare word, or a single-quoted word whose apostrophes bashQuote
+// escapes.
+func shellUnquote(word string) string {
+	if !strings.HasPrefix(word, "'") {
+		return word
+	}
+	return strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(word, "'"), "'"), `'\''`, "'")
+}
+
+// Each extension flag spec reads back, by the rules of zsh's _values parser, as
+// the flag's name, and its description ends where the spec says. This reads
+// the generated text, so it runs where zsh is not installed.
+func TestZshFlagSpecReadsBackEveryNameLiterally(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "zsh-flag-specs-read-each-name-literally")
+	for _, name := range hostileNames {
+		flag := "--f" + name
+		for _, valueName := range []string{"", "<value>"} {
+			spec := zshFlagSpec(flag, name+`\`, valueName, nil)
+			if got := zshValuesName(spec); got != flag {
+				t.Errorf("_values reads the spec %q as %q, not %q", spec, got, flag)
+			}
+		}
+	}
+}
+
+// zshValuesName returns the name _values reads from one spec
+// ("name[description]:..."): up to the first "[" or ":" that no backslash
+// escapes, with the escapes removed. A description runs to the first "]" that
+// no backslash escapes; _values refuses a spec whose description has no end,
+// and so does this.
+func zshValuesName(spec string) string {
+	name := zshReadName(spec, "[:")
+	rest := spec[len(zshEscapedPrefix(spec, "[:")):]
+	if !strings.HasPrefix(rest, "[") {
+		return name
+	}
+	description := rest[1:]
+	if len(zshEscapedPrefix(description, "]")) == len(description) {
+		return "unterminated description: " + spec
+	}
+	return name
+}
+
+// zshEscapedPrefix returns s up to its first stop that no backslash escapes.
+func zshEscapedPrefix(s, stops string) string {
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] == '\\' && i+1 < len(s):
+			i++
+		case strings.IndexByte(stops, s[i]) >= 0:
+			return s[:i]
+		}
+	}
+	return s
+}
+
+// zshReadName returns the name zsh reads from one _describe entry
+// ("name:description", stops ":") or _values spec (stops "[:"): up to the
+// first stop that no backslash escapes, with the escapes removed.
+func zshReadName(entry, stops string) string {
 	var name strings.Builder
 	for i := 0; i < len(entry); i++ {
 		switch {
 		case entry[i] == '\\' && i+1 < len(entry):
 			i++
 			name.WriteByte(entry[i])
-		case entry[i] == ':':
+		case strings.IndexByte(stops, entry[i]) >= 0:
 			return name.String()
 		default:
 			name.WriteByte(entry[i])
@@ -328,12 +438,32 @@ func fishRead(s string) ([]string, bool) {
 	return words, true
 }
 
+// fishLines splits a fish script into the lines fish reads: at each newline
+// outside a single-quoted string, where \' and \\ are the only escapes.
+func fishLines(script string) []string {
+	var lines []string
+	start, quoted := 0, false
+	for i := 0; i < len(script); i++ {
+		switch {
+		case quoted && script[i] == '\\' && i+1 < len(script) && (script[i+1] == '\'' || script[i+1] == '\\'):
+			i++
+		case script[i] == '\'':
+			quoted = !quoted
+		case !quoted && script[i] == '\n':
+			lines = append(lines, script[start:i])
+			start = i + 1
+		}
+	}
+	return append(lines, script[start:])
+}
+
 // fishCompletions returns, for each `complete` line of a fish script, the
 // words fish reads from its -n condition and from its -a arguments when it
-// completes: fish reads both strings a second time.
-func fishCompletions(t *testing.T, script string) (conditions, arguments [][]string) {
+// completes, since fish reads both strings a second time, and the flag name
+// of each -l, which fish reads once.
+func fishCompletions(t *testing.T, script string) (conditions, arguments [][]string, longs []string) {
 	t.Helper()
-	for _, line := range strings.Split(script, "\n") {
+	for _, line := range fishLines(script) {
 		if !strings.HasPrefix(line, "complete ") {
 			continue
 		}
@@ -343,6 +473,10 @@ func fishCompletions(t *testing.T, script string) (conditions, arguments [][]str
 			continue
 		}
 		for i := 0; i+1 < len(words); i++ {
+			if words[i] == "-l" {
+				longs = append(longs, words[i+1])
+				continue
+			}
 			if words[i] != "-n" && words[i] != "-a" {
 				continue
 			}
@@ -358,23 +492,43 @@ func fishCompletions(t *testing.T, script string) (conditions, arguments [][]str
 			}
 		}
 	}
-	return conditions, arguments
+	return conditions, arguments, longs
 }
 
 // The fish script quotes each name twice where fish reads it twice: in the
-// candidates of -a and in the condition of -n. This reads the generated text
-// as fish does, so it runs where fish is not installed.
+// candidates of -a and in the condition of -n. It quotes each -l flag name,
+// which fish reads once, and names an alias as one word in the condition of
+// its flags. This reads the generated text as fish does, so it runs where fish
+// is not installed.
 func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "fish-quotes-each-name-for-both-reads")
 	ws := writeHostileWorkspace(t)
 	var script bytes.Buffer
 	CompletionFish(&script, ws.root, ws.cfg, nil)
-	conditions, arguments := fishCompletions(t, script.String())
+	conditions, arguments, longs := fishCompletions(t, script.String())
 
 	var candidates []string
 	for _, words := range arguments {
 		candidates = append(candidates, words...)
 	}
 	assertOffersEach(t, "fish", "an -a candidate", candidates, append(slices.Clone(ws.commands), ws.targets...))
+	var flagNames []string
+	for _, flag := range ws.flags {
+		flagNames = append(flagNames, strings.TrimPrefix(flag, "--"))
+	}
+	assertOffersEach(t, "fish", "an -l flag name", longs, flagNames)
+
+	// The flags of lint-docs follow each of its aliases, named as one word.
+	var flagConditions, lintDocsAliases []string
+	for _, words := range conditions {
+		if len(words) == 2 && words[0] == "__putnami_seen_path" {
+			flagConditions = append(flagConditions, words[1])
+		}
+	}
+	for _, name := range hostileNames {
+		lintDocsAliases = append(lintDocsAliases, "j"+name)
+	}
+	assertOffersEach(t, "fish", "a flag condition", flagConditions, lintDocsAliases)
 
 	// The positional targets follow a job command, an alias of a job command
 	// included: the condition names each one as a literal word.
@@ -410,11 +564,19 @@ func TestFishCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 		{"putnami ", ws.commands},
 		{"putnami lint-docs ", ws.targets},
 		{"putnami lint-docs --projects ", ws.targets},
+		{"putnami lint-docs --", ws.flags},
 		{"putnami " + fishQuote(ws.commands[0]) + " --", []string{"--projects"}},
 		{"putnami " + fishQuote(ws.commands[1]) + " --", []string{"--projects"}},
+		{"putnami " + fishQuote("j"+hostileNames[4]) + " --", ws.flags},
 	} {
 		dir := t.TempDir()
-		cmd := exec.Command("fish", "--no-config", "-c", `source $argv[1]; complete -C $argv[2]`, scriptPath, c.line)
+		// --escape prints each candidate on one line, a newline included;
+		// string unescape reads it back.
+		cmd := exec.Command("fish", "--no-config", "-c", `source $argv[1]
+for line in (complete --escape -C $argv[2])
+    set -l candidate (string split -m1 \t -- $line)[1]
+    printf '%s\0' (string unescape -- $candidate | string collect)
+end`, scriptPath, c.line)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "HOME="+dir, "XDG_CONFIG_HOME="+dir)
 		out, err := cmd.Output()
@@ -422,11 +584,7 @@ func TestFishCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 			t.Fatalf("fish completion of %q: %v\n%s", c.line, err, out)
 		}
 		assertNoCodeRan(t, "fish", dir)
-		var offered []string
-		for _, line := range strings.Split(strings.TrimSuffix(string(out), "\n"), "\n") {
-			candidate, _, _ := strings.Cut(line, "\t")
-			offered = append(offered, candidate)
-		}
+		offered := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 		assertOffersEach(t, "fish", c.line, offered, c.want)
 	}
 }

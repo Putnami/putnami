@@ -740,6 +740,22 @@
           }
         },
         {
+          "id": "completion-reads-names-literally",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "bash-offers-each-name-as-one-literal-word",
+              "zsh-flag-specs-read-each-name-literally",
+              "zsh-describe-entries-read-each-name-literally",
+              "fish-quotes-each-name-for-both-reads"
+            ]
+          }
+        },
+        {
           "id": "extension-verb-vocabulary",
           "stage": "coded",
           "evidenceKinds": [

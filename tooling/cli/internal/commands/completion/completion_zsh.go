@@ -309,11 +309,14 @@ func zshDescribeNames(names []string) string {
 
 // zshFlagSpec renders one zsh completion spec: "--name[description]" for a
 // boolean, plus ":metavariable:" for a value flag and "(a b c)" when the value
-// has a known candidate set. The description is the catalog's — the only
-// escaping zsh needs inside the brackets is the closing "]"; bashQuote handles
-// the surrounding single quotes, including any apostrophe the prose carries.
+// has a known candidate set. _values reads a backslash as an escape, ends the
+// name at "[" or ":" and the description at "]", so the name escapes the
+// backslash, "[" and ":", and the description the backslash and "]". bashQuote
+// handles the surrounding single quotes, including any apostrophe the prose
+// carries.
 func zshFlagSpec(long, description, valueName string, values []string) string {
-	spec := long + "[" + strings.ReplaceAll(description, "]", "\\]") + "]"
+	name := strings.NewReplacer(`\`, `\\`, `[`, `\[`, `:`, `\:`).Replace(long)
+	spec := name + "[" + strings.NewReplacer(`\`, `\\`, `]`, `\]`).Replace(description) + "]"
 	if valueName == "" {
 		return spec
 	}
