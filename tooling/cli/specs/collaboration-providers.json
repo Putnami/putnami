@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "explicit-binding",
-      "text": "A workspace binds each contract in options.collaboration of putnami.workspace.json and nowhere else: one provider extension and one version. An unbound contract is unsupported (binding.missing), naming the block to add and the installed providers, none selected. A block that repeats a member is refused as binding.ambiguous. A provider that is absent, disabled or unprepared at its locked release is unavailable (binding.provider_missing) on both entry paths. No binding failure is retryable or starts the provider."
+      "text": "A workspace binds each contract in options.collaboration of putnami.workspace.json and nowhere else: one provider extension and one version. An unbound contract is unsupported (binding.missing), naming the block to add and the installed providers, none selected. A block that repeats a member is refused as binding.ambiguous. A provider that is absent, disabled or unprepared at its locked release is unavailable (binding.provider_missing) on either entry path. No failure is retryable or starts the provider."
     },
     {
       "id": "capability-discovery",
@@ -25,7 +25,7 @@
     },
     {
       "id": "one-route-two-entry-paths",
-      "text": "putnami <contract> <operation> --input and the extension host call collaboration.call share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both return the same envelope; the command prints it and exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
+      "text": "putnami <contract> <operation> --input and the host call collaboration.call share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both return the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
     },
     {
       "id": "host-only-operations",
