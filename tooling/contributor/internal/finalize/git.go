@@ -19,7 +19,6 @@ type Git interface {
 	Branch() (string, error)
 	Head() (string, error)
 	BaseRef(string) (string, error)
-	BaseTip(string) (string, error)
 	BaseSHA(string) (string, error)
 	Clean() (bool, error)
 	Staged() (bool, error)
@@ -106,7 +105,6 @@ func (g NativeGit) BaseRef(base string) (string, error) {
 	}
 	return base, nil
 }
-func (g NativeGit) BaseTip(base string) (string, error) { return g.one("rev-parse", "--verify", base) }
 func (g NativeGit) BaseSHA(base string) (string, error) { return g.one("merge-base", base, "HEAD") }
 func (g NativeGit) Clean() (bool, error) {
 	answer, err := g.run("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all")

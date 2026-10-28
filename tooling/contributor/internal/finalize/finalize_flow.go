@@ -20,7 +20,7 @@ import (
 type publicationCandidate struct {
 	opts                    Options
 	policy                  Policy
-	base, baseTip, baseSHA  string
+	base, baseSHA           string
 	originalBody            []byte
 	body, head, fingerprint string
 	proposalCaps, taskCaps  collab.Capabilities
@@ -33,7 +33,7 @@ type publicationCandidate struct {
 }
 
 func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verified, error) {
-	verified, err := f.frozen(ctx, c.opts, c.originalBody, c.head, c.fingerprint, c.base, c.baseTip, c.baseSHA)
+	verified, err := f.frozen(ctx, c.opts, c.originalBody, c.head, c.fingerprint, c.base, c.baseSHA)
 	if err != nil {
 		return verified, err
 	}
@@ -156,10 +156,6 @@ func (f Finalizer) optionsPolicy(opts Options) (Policy, error) {
 func (f Finalizer) prepareLocal(c *publicationCandidate) error {
 	var err error
 	c.base, err = f.Git.BaseRef(c.opts.Base)
-	if err != nil {
-		return err
-	}
-	c.baseTip, err = f.Git.BaseTip(c.base)
 	if err != nil {
 		return err
 	}
