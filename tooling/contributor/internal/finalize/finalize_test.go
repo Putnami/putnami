@@ -20,7 +20,7 @@ import (
 
 type finalizerGit struct {
 	branch, head, fingerprint string
-	baseTip, baseSHA          string
+	baseSHA                   string
 	clean, staged, ahead      bool
 	paths                     []string
 	commits                   []CommitMessage
@@ -31,7 +31,6 @@ type finalizerGit struct {
 func (g *finalizerGit) Branch() (string, error)                        { return g.branch, nil }
 func (g *finalizerGit) Head() (string, error)                          { return g.head, nil }
 func (g *finalizerGit) BaseRef(base string) (string, error)            { return "origin/" + base, nil }
-func (g *finalizerGit) BaseTip(string) (string, error)                 { return g.baseTip, nil }
 func (g *finalizerGit) BaseSHA(string) (string, error)                 { return g.baseSHA, nil }
 func (g *finalizerGit) Clean() (bool, error)                           { return g.clean, nil }
 func (g *finalizerGit) Staged() (bool, error)                          { return g.staged, nil }
@@ -447,7 +446,7 @@ func finalizerFixture(t *testing.T) (Finalizer, *finalizerGit, *finalizerProvide
 	if err := os.WriteFile(bodyFile, []byte("Explain the reason\nfor the change."), 0600); err != nil {
 		t.Fatal(err)
 	}
-	git := &finalizerGit{branch: "topic", head: "0123456789012345678901234567890123456789", fingerprint: "tree-fingerprint", baseTip: "base-tip", baseSHA: "base-sha", clean: true, ahead: true, paths: []string{"source.go"}}
+	git := &finalizerGit{branch: "topic", head: "0123456789012345678901234567890123456789", fingerprint: "tree-fingerprint", baseSHA: "base-sha", clean: true, ahead: true, paths: []string{"source.go"}}
 	provider := &finalizerProvider{task: collab.Task{Ref: collab.Ref{Source: "github:acme/app", ID: "42"}, Revision: "task-revision", URL: "https://github.com/acme/app/issues/42", State: collab.TaskStateInProgress}}
 	verifications := 0
 	f := Finalizer{Root: root, Git: git, Call: provider.call, Verify: func(context.Context, string, string) (Verified, error) {
@@ -827,21 +826,103 @@ func TestHostedChecksRejectProposalThatReturnsToDraft(t *testing.T) {
 	}
 }
 
-func TestChangedHeadBaseOrBodyAfterPushStopsBeforeProviderWrite(t *testing.T) {
-	for _, changed := range []string{"head", "base", "body"} {
+func TestChangedHeadMergeBaseOrBodyAfterPushStopsBeforeProviderWrite(t *testing.T) {
+	for _, changed := range []string{"head", "merge base", "body"} {
 		t.Run(changed, func(t *testing.T) {
 			f, git, provider, opts := finalizerFixture(t)
 			git.pushHook = func() {
 				if changed == "head" {
 					git.head = "another-commit"
-				} else if changed == "base" {
-					git.baseTip = "another-base-tip"
+				} else if changed == "merge base" {
+					git.baseSHA = "another-merge-base"
 				} else {
 					_ = os.WriteFile(opts.BodyFile, []byte("Changed after push"), 0600)
 				}
 			}
 			if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 0 {
 				t.Fatalf("changed %s reached provider upsert: %v", changed, err)
+			}
+		})
+	}
+}
+
+// fetchingGit is a real repository whose push stands for another worktree of
+// the same clone: it moves the shared origin/main ref while finalize runs.
+type fetchingGit struct {
+	NativeGit
+	fetch func()
+}
+
+func (g fetchingGit) Push(string) error {
+	g.fetch()
+	return nil
+}
+
+func TestABaseFetchedDuringFinalizationFailsOnlyWhenTheMergeBaseMoves(t *testing.T) {
+	for _, tc := range []struct {
+		name, from string
+		fails      bool
+	}{
+		{name: "advanced base", from: "origin/main"},
+		{name: "rewritten base", from: "origin/main~1", fails: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			git := func(args ...string) string {
+				t.Helper()
+				cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+				cmd.Env = gitEnvironment(os.Environ())
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatalf("git %v: %v: %s", args, err, output)
+				}
+				return strings.TrimSpace(string(output))
+			}
+			policy := `{"options":{"@putnami/contributor":{"version":1,"proposals":{"source":"github:acme/app"},"verification":{"language":"en"},"publication":{"bodyMaxBytes":1500}}}}`
+			git("init", "-q", "-b", "main")
+			git("config", "user.name", "Test")
+			git("config", "user.email", "test@example.com")
+			git("config", "commit.gpgsign", "false")
+			if err := os.WriteFile(filepath.Join(root, "putnami.workspace.json"), []byte(policy), 0600); err != nil {
+				t.Fatal(err)
+			}
+			git("add", "putnami.workspace.json")
+			git("commit", "-qm", "chore: workspace")
+			git("commit", "-q", "--allow-empty", "-m", "chore: second")
+			git("update-ref", "refs/remotes/origin/main", "HEAD")
+			git("switch", "-q", "-c", "topic")
+			if err := os.WriteFile(filepath.Join(root, "source.go"), []byte("package source\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			git("add", "source.go")
+			git("commit", "-qm", "fix: correct the source")
+			bodyFile := filepath.Join(t.TempDir(), "body.txt")
+			if err := os.WriteFile(bodyFile, []byte("Explain the reason for the change."), 0600); err != nil {
+				t.Fatal(err)
+			}
+			native := NativeGit{Root: root}
+			provider := &finalizerProvider{}
+			f := Finalizer{Root: root, Call: provider.call,
+				Git: fetchingGit{NativeGit: native, fetch: func() {
+					moved := git("commit-tree", "-p", tc.from, "-m", "chore: merged elsewhere", tc.from+"^{tree}")
+					git("update-ref", "refs/remotes/origin/main", moved)
+				}},
+				Verify: func(context.Context, string, string) (Verified, error) {
+					head, _ := native.Head()
+					fingerprint, _ := native.Fingerprint()
+					baseSHA, _ := native.BaseSHA("origin/main")
+					return Verified{Fingerprint: fingerprint, HeadSHA: head, BaseSHA: baseSHA, GateSession: "session-id"}, nil
+				}}
+			opts := Options{Base: "main", Branch: "topic", Title: "fix: correct the source", BodyFile: bodyFile, VerificationFile: "dossier.json"}
+			_, err := f.Run(context.Background(), opts)
+			if tc.fails {
+				if err == nil || !strings.Contains(err.Error(), "merge base moved") || provider.upserts != 0 {
+					t.Fatalf("a moved merge base reached the provider: upserts=%d err=%v", provider.upserts, err)
+				}
+				return
+			}
+			if err != nil || provider.upserts != 1 {
+				t.Fatalf("a fetched base that keeps the merge base failed finalization: upserts=%d err=%v", provider.upserts, err)
 			}
 		})
 	}

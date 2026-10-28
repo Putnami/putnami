@@ -196,7 +196,7 @@ func (f Finalizer) verify(ctx context.Context, opts Options, fingerprint, head, 
 	return result, nil
 }
 
-func (f Finalizer) frozen(ctx context.Context, opts Options, originalBody []byte, head, fingerprint, baseRef, baseTip, baseSHA string) (Verified, error) {
+func (f Finalizer) frozen(ctx context.Context, opts Options, originalBody []byte, head, fingerprint, baseRef, baseSHA string) (Verified, error) {
 	branch, err := f.Git.Branch()
 	if err != nil {
 		return Verified{}, err
@@ -210,13 +210,6 @@ func (f Finalizer) frozen(ctx context.Context, opts Options, originalBody []byte
 	}
 	if actualHead != head {
 		return Verified{}, errors.New("HEAD changed during finalization")
-	}
-	actualTip, err := f.Git.BaseTip(baseRef)
-	if err != nil {
-		return Verified{}, err
-	}
-	if actualTip != baseTip {
-		return Verified{}, errors.New("publication base moved during finalization")
 	}
 	actualBaseSHA, err := f.Git.BaseSHA(baseRef)
 	if err != nil {
