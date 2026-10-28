@@ -35,7 +35,8 @@ const (
 // 64 KiB or every 2 seconds, then an empty final marker.
 //
 // Each frame becomes one POST of its bytes to Delivery's run-log ingest under
-// the run credential. That chunk log is what `putnami cloud ci logs`, the live
+// the run credential, gzip-compressed once an answer of the ingest advertised
+// gzip, as for SessionReporter. That chunk log is what `putnami cloud ci logs`, the live
 // tail and the console read, so a run's log is the engine's own event stream
 // and no script on the runner tails a file.
 //
@@ -72,6 +73,8 @@ type logReporterSender struct {
 	// sessionID is bound by the first frame: one reporter process serves one
 	// engine session, and the run credential binds one run's log.
 	sessionID string
+	// encoder compresses a frame once the ingest advertised gzip.
+	encoder chunkEncoder
 }
 
 func (s *logReporterSender) deliver(ctx context.Context, chunk *protocolcli.SessionReportingChunk) protocolcli.SessionReportingAck {
@@ -94,28 +97,41 @@ func (s *logReporterSender) deliver(ctx context.Context, chunk *protocolcli.Sess
 		return nack(chunk, ackCodeInvalidChunk, false)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(s.cfg.ingestURL, "/")+logReporterChunkPath, bytes.NewReader(chunk.Data))
+	// The offset and the digest always describe the frame's own bytes: the
+	// ingest checks them against the decoded body.
+	url := strings.TrimRight(s.cfg.ingestURL, "/") + logReporterChunkPath
+	payload, coding := s.encoder.body(url, chunk.Data)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return nack(chunk, ackCodeNotConfigured, false)
 	}
 	req.Header.Set("Authorization", "Bearer "+s.cfg.token)
 	req.Header.Set("Content-Type", "application/octet-stream")
+	setContentEncoding(req, coding)
 	req.Header.Set(runLogSeqHeader, strconv.FormatInt(chunk.Sequence, 10))
 	req.Header.Set(runLogFinalHeader, strconv.FormatBool(chunk.Final))
 	req.Header.Set(runLogOffsetHeader, strconv.FormatInt(chunk.Offset, 10))
 	req.Header.Set(runLogSHA256Header, chunk.SHA256)
-	req.ContentLength = int64(len(chunk.Data))
+	req.ContentLength = int64(len(payload))
 
 	resp, err := s.client.Do(req) //nolint:gosec // G704: the destination is the launcher-exported ingest base, never frame content
 	if err != nil {
 		// Transport failures (dial, reset, deadline) are the class worth another
 		// bounded attempt; the receiver may never have seen the bytes.
+		s.encoder.observe(url, nil)
 		return nack(chunk, ackCodeReceiverUnavailable, true)
 	}
 	defer resp.Body.Close()
+	s.encoder.observe(url, resp.Header)
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 
 	switch {
+	case resp.StatusCode == http.StatusOK && coding != "" && !s.encoder.accepts(url):
+		// An answer that does not advertise gzip comes from an ingest that may
+		// have stored the compressed bytes as they arrived, so it is not durable
+		// acceptance of the frame. Not retryable: that ingest refuses the
+		// frame's own bytes under the same sequence.
+		return nack(chunk, ackCodeReceiverMismatch, false)
 	case resp.StatusCode == http.StatusOK:
 		var accepted struct {
 			Seq *int64 `json:"seq"`

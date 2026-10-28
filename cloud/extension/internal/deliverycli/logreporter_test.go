@@ -30,12 +30,21 @@ type fakeLogIngest struct {
 	bytes  int64
 	posts  []string
 	status int // when nonzero, every request answers this status with an empty body
+	// gzip makes it an ingest that reads gzip, as fakeIngest.gzip does: the
+	// offset and the digest are then checked against the decoded body.
+	gzip bool
+	// encodings is the Content-Encoding of every request, in order.
+	encodings []string
 }
 
 func (f *fakeLogIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.posts = append(f.posts, r.Header.Get(runLogSeqHeader)+"/"+r.Header.Get(runLogOffsetHeader)+"/"+r.Header.Get(runLogFinalHeader))
+	f.encodings = append(f.encodings, r.Header.Get(contentEncodingHeader))
+	if f.gzip {
+		w.Header().Set(acceptEncodingHeader, gzipCoding)
+	}
 	if f.status != 0 {
 		w.WriteHeader(f.status)
 		return
@@ -51,9 +60,9 @@ func (f *fakeLogIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	seq, seqErr := strconv.Atoi(r.Header.Get(runLogSeqHeader))
 	offset, offsetErr := strconv.ParseInt(r.Header.Get(runLogOffsetHeader), 10, 64)
 	final := r.Header.Get(runLogFinalHeader) == "true"
-	body, _ := io.ReadAll(r.Body)
+	body, ok := receivedChunkBody(r, f.gzip)
 	sum := sha256.Sum256(body)
-	if seqErr != nil || offsetErr != nil || hex.EncodeToString(sum[:]) != r.Header.Get(runLogSHA256Header) {
+	if !ok || seqErr != nil || offsetErr != nil || hex.EncodeToString(sum[:]) != r.Header.Get(runLogSHA256Header) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

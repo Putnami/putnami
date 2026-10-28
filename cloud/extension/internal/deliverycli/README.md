@@ -20,7 +20,9 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
   client lives in [`internal/remotecache`](internal/remotecache).
 - The `session-reporter` (`sessionreporter.go`) and `log-reporter`
   (`logreporter.go`) processes the engine starts. They post each
-  session-reporting chunk to the Delivery ingest under the run credential.
+  session-reporting chunk to the Delivery ingest under the run credential,
+  gzip-compressed once the ingest advertises it (see
+  [Compressed chunks](#compressed-chunks)).
   The session reporter also posts `plan.json` as the `plan` part and the spec
   gate's record, `spec-verification.json`, as the `spec-verification` part;
   the log reporter refuses both. A receiver that predates a part answers 400,
@@ -90,6 +92,24 @@ login, no linked workspace, or a refresh that fails, every frame gets a
 terminal `reporter_not_configured` refusal. The engine records it, and the
 session's own result does not change. The reporter reads the stored login
 only after it denied process inspection, and it never prints a token.
+
+### Compressed chunks
+
+Both reporters send a chunk with `Content-Encoding: gzip` once the receiver
+has said it reads gzip: the latest answer from the same destination (the
+ingest's `/sessions` or `/logs` route, or the local-sessions route) carried
+`Accept-Encoding: gzip`. The receiver stores the decoded bytes. The reporter
+reads the header on every answer, so the first chunk, and every chunk after
+an answer without the header or a request that got no answer, goes
+uncompressed. A receiver that does not advertise gzip gets every chunk as it
+is.
+
+An empty chunk, such as a final marker, and a chunk that gzip does not shrink
+go uncompressed. The log reporter's offset and SHA-256 headers describe the
+chunk's own bytes. A 200 answer to a compressed chunk without the header is
+refused as `receiver_mismatch`, because that receiver may have stored the
+compressed bytes. See
+[ADR 0001](../../doc/adr/0001-a-reporter-compresses-a-chunk-once-the-receiver-advertises-gzip.md).
 
 ## Cache provider
 
