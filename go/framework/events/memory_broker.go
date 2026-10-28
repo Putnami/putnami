@@ -54,7 +54,15 @@ type subscriptionWorker struct {
 	sub    *subscription
 	mu     sync.Mutex
 	active int
-	queue  []Envelope
+	queue  []queuedDelivery
+}
+
+// queuedDelivery is a delivery that waits for a concurrency slot. ctx is the
+// context of its publish: the delivery runs under it, and a drop record
+// correlates with it.
+type queuedDelivery struct {
+	ctx context.Context
+	env Envelope
 }
 
 // MemoryBroker is an in-memory event transport using goroutines and channels.
@@ -92,8 +100,7 @@ func NewMemoryBroker(config ...MemoryBrokerConfig) *MemoryBroker {
 }
 
 // Publish sends an envelope to all matching subscribers. A publish that races
-// Stop is either delivered, and Stop waits for it, or refused with
-// events.stopped.
+// Stop is either accepted, and Stop drains it, or refused with events.stopped.
 func (b *MemoryBroker) Publish(ctx context.Context, env Envelope) error {
 	b.mu.RLock()
 	if b.stopped {
@@ -161,18 +168,16 @@ func (b *MemoryBroker) Start(_ context.Context) error {
 	return nil
 }
 
-// Stop gracefully shuts down the broker, waiting for in-flight messages.
+// Stop gracefully shuts down the broker. It refuses new publishes, cancels
+// pending retries, and waits up to DrainTimeout for in-flight deliveries and for
+// the deliveries queued behind a concurrency limit. Each delivery still queued
+// at the deadline is reported dropped with reason broker_stopped.
 func (b *MemoryBroker) Stop(_ context.Context) error {
 	b.mu.Lock()
 	if !b.stopped {
 		b.stopped = true
 		if b.quit != nil {
 			close(b.quit)
-		}
-	}
-	for _, subs := range b.subscriptions {
-		for _, sub := range subs {
-			sub.worker.discardQueue()
 		}
 	}
 	b.mu.Unlock()
@@ -187,7 +192,30 @@ func (b *MemoryBroker) Stop(_ context.Context) error {
 	case <-done:
 		return nil
 	case <-time.After(b.config.DrainTimeout):
+		b.dropQueued()
 		return errors.New(CodeEventsDrainTimeout, "drain timeout", errors.Duration("timeout", b.config.DrainTimeout))
+	}
+}
+
+// dropQueued empties the queue of every handler and reports each delivery it
+// held as dropped. Stop calls it when the drain deadline passes, so a handler
+// that outlives Stop starts none of them.
+func (b *MemoryBroker) dropQueued() {
+	b.mu.RLock()
+	var dropped []queuedDelivery
+	for _, subs := range b.subscriptions {
+		for _, sub := range subs {
+			dropped = append(dropped, sub.worker.takeQueue()...)
+		}
+	}
+	b.mu.RUnlock()
+
+	for _, q := range dropped {
+		b.logs.broker.ErrorCtx(q.ctx, "message dropped", nil, eventAttr(q.env, map[string]any{
+			"reason":  dropBrokerStopped,
+			"outcome": outcomeFailure,
+		}))
+		b.observeDropped(q.env, dropBrokerStopped)
 	}
 }
 
@@ -246,7 +274,7 @@ func (b *MemoryBroker) dispatch(ctx context.Context, env Envelope, sub *subscrip
 // inFlight slot.
 func (b *MemoryBroker) runHandler(ctx context.Context, env Envelope, sub *subscription) {
 	defer b.inFlight.Done()
-	defer sub.worker.complete(ctx)
+	defer sub.worker.complete()
 	b.executeHandler(ctx, env, sub)
 }
 
@@ -268,7 +296,7 @@ func (w *subscriptionWorker) enqueue(ctx context.Context, env Envelope) error {
 		return nil
 	}
 	if opts.QueueLimit <= 0 || len(w.queue) < opts.QueueLimit {
-		w.queue = append(w.queue, env)
+		w.queue = append(w.queue, queuedDelivery{ctx: ctx, env: env})
 		return nil
 	}
 	if opts.Overflow == OverflowDrop {
@@ -290,39 +318,43 @@ func (w *subscriptionWorker) enqueue(ctx context.Context, env Envelope) error {
 	)
 }
 
-func (w *subscriptionWorker) complete(ctx context.Context) {
+// complete frees the concurrency slot of a finished delivery and dispatches
+// the next queued one. It runs on a stopped broker too, so Stop drains the
+// queue: the dispatch registers before the finished delivery releases its
+// inFlight slot.
+func (w *subscriptionWorker) complete() {
 	opts := w.sub.def.Options
 	if opts.Concurrency <= 0 {
 		return
 	}
 
-	var next *Envelope
+	var next *queuedDelivery
 	w.mu.Lock()
 	w.active--
 	if w.active < 0 {
 		w.active = 0
 	}
 	if len(w.queue) > 0 {
-		env := w.queue[0]
+		q := w.queue[0]
 		copy(w.queue, w.queue[1:])
 		w.queue = w.queue[:len(w.queue)-1]
 		w.active++
-		next = &env
+		next = &q
 	}
 	w.mu.Unlock()
 
 	if next != nil {
-		w.b.dispatch(ctx, *next, w.sub)
+		w.b.dispatch(next.ctx, next.env, w.sub)
 	}
 }
 
-// discardQueue drops the deliveries that wait for a concurrency slot. Stop
-// calls it under the broker write lock: deliver refuses every later envelope
-// until Start, so the queue stays empty and complete dispatches nothing more.
-func (w *subscriptionWorker) discardQueue() {
+// takeQueue empties the queue and returns the deliveries it held.
+func (w *subscriptionWorker) takeQueue() []queuedDelivery {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	queued := w.queue
 	w.queue = nil
+	return queued
 }
 
 // executeHandler runs the handler with timeout inside the shared per-delivery
@@ -391,8 +423,13 @@ func (b *MemoryBroker) scheduleRetry(ctx context.Context, env Envelope, sub *sub
 		case <-timer.C:
 		case <-quit:
 			// Broker is shutting down; abandon the retry instead of dispatching
-			// after Stop.
-			b.observeDropped(env, "broker_stopped")
+			// after Stop. The message is lost, so it reports a drop with the
+			// handler failure that asked for the retry.
+			b.logs.broker.ErrorCtx(ctx, "message dropped", originalErr, eventAttr(env, map[string]any{
+				"reason":  dropBrokerStopped,
+				"outcome": outcomeFailure,
+			}))
+			b.observeDropped(env, dropBrokerStopped)
 			return
 		}
 		retryEnv := env

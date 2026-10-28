@@ -362,3 +362,164 @@ func TestMemoryBroker_RestartDeliversToBoundedHandler(t *testing.T) {
 func privateLoggers() eventLoggers {
 	return eventLoggersFrom(logger.New("", logger.LevelInfo, logger.NewJSONSinkWriter(io.Discard)))
 }
+
+// queueBehindBlockedHandler subscribes a handler with one concurrency slot to
+// topic, publishes count messages, and returns once the first one holds the
+// slot, so the others wait in the queue. The first delivery runs until release
+// is closed.
+func queueBehindBlockedHandler(t *testing.T, broker *MemoryBroker, topic *Topic[int], count int, release <-chan struct{}) *atomic.Int32 {
+	t.Helper()
+	var handled atomic.Int32
+	started := make(chan struct{})
+	if err := broker.Subscribe(Handle(topic, func(_ context.Context, msg *Message[int]) error {
+		handled.Add(1)
+		if msg.Payload == 1 {
+			close(started)
+			<-release
+		}
+		return nil
+	}, WithConcurrency(1))); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if err := broker.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := Publish(context.Background(), broker, topic, 1); err != nil {
+		t.Fatalf("publish 1: %v", err)
+	}
+	<-started
+	for i := 2; i <= count; i++ {
+		if err := Publish(context.Background(), broker, topic, i); err != nil {
+			t.Fatalf("publish %d: %v", i, err)
+		}
+	}
+	return &handled
+}
+
+// A publish whose delivery waits for a concurrency slot returned nil, so Stop
+// runs that delivery before it returns.
+func TestMemoryBrokerStopDrainsQueuedDeliveries(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "shutdown", "stop-drains-queued-deliveries")
+	topic := NewTopic[int]("stop.drain.queued")
+	broker, sink := brokerWithSink()
+	release := make(chan struct{})
+	handled := queueBehindBlockedHandler(t, broker, topic, 3, release)
+
+	stopped := make(chan error, 1)
+	go func() { stopped <- broker.Stop(context.Background()) }()
+	// Release the slot only once Stop has marked the broker stopped, so the
+	// queued deliveries run during the drain.
+	deadline := time.After(5 * time.Second)
+	for !errors.Is(broker.Publish(context.Background(), Envelope{Topic: "stop.drain.probe"}), CodeEventsStopped) {
+		select {
+		case <-deadline:
+			t.Fatal("broker never stopped")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	close(release)
+
+	if err := <-stopped; err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if got := handled.Load(); got != 3 {
+		t.Fatalf("handled %d deliveries before Stop returned, want 3", got)
+	}
+	if got := len(recordsOf(sink, "events.broker", "message dropped")); got != 0 {
+		t.Errorf("a drained delivery must not report a drop, got %d%s", got, allRecords(sink))
+	}
+}
+
+// At the drain deadline, Stop discards the deliveries still queued and reports
+// each one dropped with reason broker_stopped. None of them runs afterwards.
+func TestMemoryBrokerStopReportsUndrainedQueuedDeliveriesAsDropped(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "shutdown", "stop-reports-each-abandoned-delivery-as-dropped")
+	topic := NewTopic[int]("stop.drop.queued")
+	obs := &dropReasonObserver{drops: make(chan string, 4)}
+	sink := logger.NewMemorySink()
+	broker := NewMemoryBroker(MemoryBrokerConfig{DrainTimeout: 50 * time.Millisecond, Observer: obs})
+	broker.logs = eventLoggersFrom(logger.New("", logger.LevelDebug, sink))
+	release := make(chan struct{})
+	handled := queueBehindBlockedHandler(t, broker, topic, 3, release)
+
+	if err := broker.Stop(context.Background()); !errors.Is(err, CodeEventsDrainTimeout) {
+		t.Fatalf("stop = %v, want %s", err, CodeEventsDrainTimeout)
+	}
+	for range 2 {
+		if reason := <-obs.drops; reason != dropBrokerStopped {
+			t.Errorf("Observer.Dropped reason = %q, want %q", reason, dropBrokerStopped)
+		}
+	}
+
+	// Let the blocked delivery finish, then wait for it: it must start none of
+	// the discarded deliveries.
+	close(release)
+	stopBroker(t, broker)
+	if got := handled.Load(); got != 1 {
+		t.Fatalf("handled %d deliveries, want only the one in flight at the deadline", got)
+	}
+	drops := recordsOf(sink, "events.broker", "message dropped")
+	if len(drops) != 2 {
+		t.Fatalf("expected 2 message dropped records, got %d%s", len(drops), allRecords(sink))
+	}
+	for _, entry := range drops {
+		if entry.Level != logger.LevelError {
+			t.Errorf("level = %v, want ERROR (the message is lost)", entry.Level)
+		}
+		group := eventGroupOf(t, entry)
+		if group["reason"] != dropBrokerStopped {
+			t.Errorf("reason = %v, want %q", group["reason"], dropBrokerStopped)
+		}
+		if group["attempt"] != 1 {
+			t.Errorf("attempt = %v, want 1", group["attempt"])
+		}
+		if group["outcome"] != outcomeFailure {
+			t.Errorf("outcome = %v, want failure", group["outcome"])
+		}
+	}
+}
+
+// A retry that Stop cancels is reported like every other drop: a message
+// dropped record with reason broker_stopped, carrying the handler failure.
+func TestMemoryBrokerStopReportsCanceledRetryAsDropped(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "shutdown", "stop-reports-each-abandoned-delivery-as-dropped")
+	topic := NewTopic[string]("stop.drop.retry")
+	obs := &dropReasonObserver{drops: make(chan string, 1)}
+	sink := logger.NewMemorySink()
+	broker := NewMemoryBroker(MemoryBrokerConfig{DrainTimeout: 2 * time.Second, Observer: obs})
+	broker.logs = eventLoggersFrom(logger.New("", logger.LevelDebug, sink))
+
+	handlerErr := fmt.Errorf("retry me")
+	failed := make(chan struct{}, 1)
+	if err := broker.Subscribe(Handle(topic, func(context.Context, *Message[string]) error {
+		failed <- struct{}{}
+		return handlerErr
+	}, WithMaxRetries(5), WithBaseBackoff(time.Minute), WithMaxBackoff(time.Minute))); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if err := broker.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := Publish(context.Background(), broker, topic, "boom"); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	// The failing delivery is counted, so Stop waits for it to schedule its
+	// retry, and cancels that retry.
+	<-failed
+	stopBroker(t, broker)
+
+	if reason := <-obs.drops; reason != dropBrokerStopped {
+		t.Errorf("Observer.Dropped reason = %q, want %q", reason, dropBrokerStopped)
+	}
+	entry := oneRecordOf(t, sink, "events.broker", "message dropped")
+	if entry.Level != logger.LevelError {
+		t.Errorf("level = %v, want ERROR (the message is lost)", entry.Level)
+	}
+	if group := eventGroupOf(t, entry); group["reason"] != dropBrokerStopped {
+		t.Errorf("reason = %v, want %q", group["reason"], dropBrokerStopped)
+	}
+	if entry.Error == nil || entry.Error.Message == "" {
+		t.Errorf("the drop record must carry the handler failure, got %+v", entry.Error)
+	}
+}
