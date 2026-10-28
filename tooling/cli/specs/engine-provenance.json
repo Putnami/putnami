@@ -8,8 +8,7 @@
     "The committed declaration survives every ordinary read, refresh, and write unchanged, so no unrelated command dirties it",
     "The from-source build is reused whenever the sources have not changed, and rebuilt whenever they have, without anyone remembering a flag",
     "Concurrent work in one checkout is safe: running the wrapper never invalidates an engine another run is already executing, nor the children that engine spawns",
-    "A launcher can build the engine, and prepare the provider runtimes of the workspace's own extensions with it, without running a workspace command, then start that exact binary itself as the workspace's own engine",
-    "An MCP client that starts the wrapper on a machine where the CLI is not built yet gets its initialize reply within its connect timeout, and the tools of the built engine once the build lands"
+    "A launcher can build the engine, and prepare the provider runtimes of the workspace's own extensions with it, without running a workspace command, then start that exact binary itself as the workspace's own engine"
   ],
   "nonGoals": [
     "Changing how a consumer workspace resolves, verifies, or escapes a published CLI pin",
@@ -38,15 +37,12 @@
       "text": "Before `./putnamiw --print-engine` runs `putnami extensions prepare`, whether it builds or reuses the blob, it installs the Go release the workspace lock pins under the Putnami home, unless the home holds it already, or $GOROOT/bin/go or the go on PATH runs as it in the workspace root with GOROOT unset and GOTOOLCHAIN=local. It installs that release only at the SHA-256 the lock records or go.dev publishes, and a Go it cannot install stops the mode before the command starts, with nothing on stdout."
     },
     {
-      "id": "cold-mcp-start",
-      "text": "While it downloads or builds the CLI, `./putnamiw mcp` answers initialize as a server still preparing, with no tools or resources, and queues tool calls, resource reads and notifications. The CLI then reads the client's initialize under another id, whose reply stays hidden, and the queued frames in order. The client receives both list_changed notifications, and the CLI's instructions on reconnect. The CLI replaces the wrapper process. A failed build ends the session. A warm run starts the CLI directly."
-    },
-    {
       "id": "build-toolchain-stays-in-the-build",
       "text": "The wrapper builds with the go on PATH when it satisfies go.work, whose version is the higher of its go and toolchain lines, and otherwise with the managed install under the Putnami home, installed only at the SHA-256 the lock records or go.dev publishes. The resolved Go's GOROOT, its bin directory first on PATH, and GOTOOLCHAIN=local reach the build command alone: the CLI receives the caller's GOROOT, PATH and GOTOOLCHAIN, on a run that builds and on one that reuses the blob."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0028-self-hosted-cli-source-workspace.md"
+    "tooling/cli/doc/adr/0028-self-hosted-cli-source-workspace.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

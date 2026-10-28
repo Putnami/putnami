@@ -49,10 +49,6 @@
       "text": "Doctor and run diagnostics never reveal configuration values, credentials, or private source contents."
     },
     {
-      "id": "diagnostic-recall",
-      "text": "The MCP diagnostic reader returns the complete diagnostics from the latest executed run in the same server session and never reruns work."
-    },
-    {
       "id": "terminal-outcome",
       "text": "An interactive extension subcommand that passes its deadline prints a line naming the command and exits 1, whatever code its process returned. One whose process ends from a signal exits 1 and prints the signal, except SIGINT, which exits 130 with no line."
     },
@@ -74,7 +70,7 @@
     },
     {
       "id": "recorded-run-context",
-      "text": "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable. The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not. An MCP run records the agent kind its client named and the session id its environment stated; a terminal run records no agent."
+      "text": "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable. The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not."
     },
     {
       "id": "session-summary-view",
@@ -88,6 +84,7 @@
   "decisions": [
     "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
     "tooling/cli/doc/adr/0002-cli-vnext-contracts.md",
-    "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md"
+    "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

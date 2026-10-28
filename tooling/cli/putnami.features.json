@@ -339,10 +339,10 @@
       ]
     },
     {
-      "id": "cli/context-mcp-discovery",
+      "id": "cli/context-discovery",
       "type": "feature",
-      "name": "Context and MCP discovery",
-      "outcome": "A user or agent can discover workspace structure and project context through public CLI and MCP surfaces that share one authority, and an extension can contribute a workspace-answering tool without re-deriving any of it",
+      "name": "Context discovery",
+      "outcome": "A user or script can discover workspace structure and project context, and ask who owns a path and why one project impacts another, through public CLI commands that share one authority, and an extension can contribute a workspace-answering tool to the collaboration routing without re-deriving any of it",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -366,24 +366,6 @@
           }
         },
         {
-          "id": "implicit-mcp-registration",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-missing-entry-is-added-and-everything-else-is-kept",
-              "a-diverged-entry-is-kept-byte-for-byte",
-              "an-unparseable-file-is-a-warning-and-stays-untouched",
-              "install-registers-and-the-first-use-bootstrap-does-not",
-              "init-registers-the-mcp-server",
-              "a-source-workspace-registers-its-putnamiw"
-            ]
-          }
-        },
-        {
           "id": "workspace-map",
           "stage": "coded",
           "evidenceKinds": [
@@ -393,10 +375,8 @@
             "kind": "acceptance",
             "checks": [
               "printing-the-map-writes-nothing",
-              "mcp-rebuilds-the-same-projection-in-memory",
-              "the-printed-json-is-the-mcp-document",
+              "the-printed-json-is-the-map-document",
               "a-selection-narrows-the-printed-map",
-              "mcp-reuses-a-fragment-until-its-inputs-change",
               "the-print-flag-is-unknown"
             ]
           }
@@ -431,50 +411,6 @@
           }
         },
         {
-          "id": "mcp-description",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "every-tool-advertises-description-schema-and-annotations",
-              "the-access-contract-matches-the-baseline"
-            ]
-          }
-        },
-        {
-          "id": "mcp-equivalence",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "impacted-matches-the-cli-resolution",
-              "graph-tools-answer-from-the-loaded-workspace",
-              "graph-tools-report-the-recorded-view-they-answered-from"
-            ]
-          }
-        },
-        {
-          "id": "mcp-side-effect-boundary",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "dry-run-executes-nothing",
-              "long-lived-and-externally-mutating-jobs-are-refused",
-              "a-workload-carried-only-by-an-interactive-subcommand-is-refused"
-            ]
-          }
-        },
-        {
           "id": "read-preparation",
           "stage": "coded",
           "evidenceKinds": [
@@ -492,102 +428,6 @@
           }
         },
         {
-          "id": "live-extension-guidance",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "initialize-is-self-contained-and-carries-exact-locked-guidance",
-              "versioned-resources-serve-exact-bytes-or-an-explicit-offline-status",
-              "the-cli-and-mcp-consume-the-same-lock-faithful-ai-bytes",
-              "initialize-instructions-are-bounded-across-every-extension",
-              "the-instructions-list-the-decisions-after-the-preamble-and-before-the-guides"
-            ]
-          }
-        },
-        {
-          "id": "host-session-launcher",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "installer-registers-supported-hosts-with-a-stable-session-launcher",
-              "existing-host-config-is-preserved",
-              "launcher-enters-the-host-workspace-before-pin-resolution",
-              "host-registration-can-be-declined",
-              "host-definition-recognition-survives-host-formatting",
-              "mcp-registration-is-explicit-and-merge-aware"
-            ]
-          }
-        },
-        {
-          "id": "mcp-workspace-resources",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-server-lists-each-workspace-resource-by-a-concrete-uri",
-              "the-guidance-resource-renders-the-block-body-on-every-read",
-              "a-map-or-project-resource-returns-its-tools-bytes",
-              "listing-resources-prepares-no-workspace-graph",
-              "an-unknown-or-unavailable-resource-is-invalid-params",
-              "project-resources-follow-the-current-project-set"
-            ]
-          }
-        },
-        {
-          "id": "mcp-protocol-version",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "initialize-answers-with-a-version-the-server-speaks",
-              "the-relay-answers-initialize-with-a-version-it-speaks",
-              "the-relay-and-the-server-speak-the-same-versions",
-              "server-discover-is-method-not-found"
-            ]
-          }
-        },
-        {
-          "id": "mcp-context-change-notice",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-digest-covers-each-guidance-input",
-              "the-notice-names-each-change-and-what-to-read",
-              "the-next-tool-result-reports-a-change-once",
-              "nothing-changed-adds-no-notice",
-              "a-resource-read-leaves-the-notice-for-the-next-tool-result",
-              "an-extension-set-change-reloads-and-notifies-before-the-response",
-              "the-lists-after-a-reload-follow-the-new-extension-set",
-              "the-capabilities-declare-list-changed",
-              "concurrent-requests-report-a-change-once-without-a-data-race",
-              "a-project-a-load-finds-later-joins-without-a-notice",
-              "an-includes-or-collaboration-change-reloads-and-notifies",
-              "an-edit-during-a-reload-is-loaded-by-the-next-request",
-              "a-call-to-a-tool-a-reload-removed-says-to-list-the-tools-again",
-              "nothing-is-written-after-the-session-ends",
-              "an-edit-while-the-server-starts-is-loaded"
-            ]
-          }
-        },
-        {
           "id": "settled-decisions-guidance",
           "stage": "coded",
           "evidenceKinds": [
@@ -596,23 +436,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-block-names-the-decision-files-and-lists-no-decision",
-              "the-decision-list-renders-every-root-decision-in-canonical-order",
-              "the-guidance-resource-holds-the-block-body-then-the-decisions"
-            ]
-          }
-        },
-        {
-          "id": "instructions-decision-budget",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "an-oversized-registry-renders-whole-leading-lines-and-an-omission-line",
-              "the-instruction-lines-are-compact-and-in-canonical-order"
+              "the-block-names-the-decision-files-and-lists-no-decision"
             ]
           }
         },
@@ -631,17 +455,65 @@
               "an-unclaimed-project-reports-none-whatever-its-files"
             ]
           }
+        },
+        {
+          "id": "mcp-registration-removal",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-putnami-written-entry-is-removed",
+              "the-file-goes-when-nothing-else-remains",
+              "a-changed-entry-is-kept-with-a-warning",
+              "an-unparseable-file-is-a-warning-and-stays-untouched",
+              "init-and-the-first-use-install-write-no-mcp-json"
+            ]
+          }
+        },
+        {
+          "id": "host-registration-removal",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-installer-registers-no-host-server",
+              "a-registration-the-installer-wrote-is-removed",
+              "a-customized-registration-is-kept"
+            ]
+          }
+        },
+        {
+          "id": "project-graph-queries",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "owner-names-the-projects-that-own-a-path",
+              "deps-lists-direct-and-transitive-edges-both-ways",
+              "why-prints-the-impact-path-and-task-scope",
+              "why-reports-when-no-path-exists",
+              "each-query-prints-jsonl"
+            ]
+          }
         }
       ],
       "surface": {
         "commands": [
           "context generate",
           "context map",
-          "context pack"
-        ],
-        "tools": [
-          "agent_context",
-          "workspace_map"
+          "context pack",
+          "projects deps",
+          "projects owner",
+          "projects why"
         ]
       }
     },
@@ -1939,20 +1811,6 @@
           }
         },
         {
-          "id": "diagnostic-recall",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-latest-executed-run-is-recalled-without-rerunning",
-              "a-dry-run-never-replaces-the-recall"
-            ]
-          }
-        },
-        {
           "id": "terminal-outcome",
           "stage": "coded",
           "evidenceKinds": [
@@ -2036,8 +1894,7 @@
             "kind": "acceptance",
             "checks": [
               "declared-check-failures-carry-a-code",
-              "the-declaration-digest-moves-with-declarations-only",
-              "an-mcp-run-names-its-agent-and-a-terminal-run-names-none"
+              "the-declaration-digest-moves-with-declarations-only"
             ]
           }
         },
@@ -2077,7 +1934,7 @@
       "id": "cli/canonical-workspace-guidance",
       "type": "feature",
       "name": "Canonical workspace guidance",
-      "outcome": "A new contributor can discover the supported commands, choose the correct validation gate, use MCP appropriately, and recover from failures using generated and public guidance",
+      "outcome": "A new contributor can discover the supported commands, choose the correct validation gate, find workspace facts through the CLI, and recover from failures using generated and public guidance",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -2132,8 +1989,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "generated-bootstrap-routes-to-live-mcp-guidance",
-              "stale-or-absent-context-is-reported-for-fallback"
+              "generated-bootstrap-routes-discovery-to-the-cli"
             ]
           }
         },
@@ -2289,20 +2145,6 @@
             "kind": "acceptance",
             "checks": [
               "init-force-unions-the-declaration"
-            ]
-          }
-        },
-        {
-          "id": "session-start-reconcile",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-mcp-server-reconciles-before-serving-and-starts-on-failure",
-              "a-record-at-the-pinned-release-writes-nothing"
             ]
           }
         },
@@ -2805,7 +2647,7 @@
       "id": "cli/workspace-initialization",
       "type": "feature",
       "name": "Lazy workspace initialization",
-      "outcome": "A fresh worktree provides its workspace graph to MCP without a full installation, while installation restores independent artifacts concurrently and reports completed actions compactly",
+      "outcome": "A fresh worktree provides its workspace graph without a full installation, while installation restores independent artifacts concurrently and reports completed actions compactly",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -2818,9 +2660,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "cold-mcp-prepares-the-provider-index-without-install",
               "concurrent-preparation-shares-one-index-refresh",
-              "mcp-reloads-an-index-created-after-startup"
+              "a-load-reloads-an-index-published-after-its-first-read"
             ]
           }
         },
@@ -3126,22 +2967,6 @@
           }
         },
         {
-          "id": "cold-mcp-start",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-cold-mcp-start-answers-initialize-and-hands-the-session-to-the-built-server",
-              "a-failed-cold-mcp-build-ends-the-session-with-its-error",
-              "the-built-server-receives-the-signals-the-client-sends",
-              "an-exited-server-ends-the-session"
-            ]
-          }
-        },
-        {
           "id": "build-toolchain-stays-in-the-build",
           "stage": "coded",
           "evidenceKinds": [
@@ -3162,7 +2987,7 @@
       "id": "cli/collaboration-providers",
       "type": "feature",
       "name": "Collaboration provider routing",
-      "outcome": "A workspace binds its task, change-proposal, memory and missions backends independently, and a user, a script or an agent calls the same versioned operations through the CLI or MCP without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
+      "outcome": "A workspace binds its task, change-proposal, memory and missions backends independently, and a user, a script or an extension calls the same versioned operations through the CLI or the extension host channel without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -3199,19 +3024,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-cli-and-mcp-return-the-same-envelope",
+              "the-cli-and-the-host-channel-return-the-same-envelope",
               "provider-tools-are-reachable-only-through-the-binding",
               "settings-and-selection-reach-the-provider"
             ]
-          }
-        },
-        {
-          "id": "truthful-annotations",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": ["routed-tools-carry-the-contract-access"]
           }
         },
         {
@@ -3221,7 +3037,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-host-only-operation-has-no-mcp-tool",
               "the-cli-and-the-host-channel-route-a-host-only-operation",
               "capabilities-mark-a-host-only-operation"
             ]

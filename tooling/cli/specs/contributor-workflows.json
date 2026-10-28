@@ -33,7 +33,7 @@
     },
     {
       "id": "provider-neutral-content",
-      "text": "No shipped file invokes a backend client, names a tracker label, a hosted repository address, a private memory identity or storage layout, or this repository's identity. Skills reach tasks, proposals and memory through putnami tasks, proposals or memory operations, or the matching MCP tools."
+      "text": "No shipped file invokes a backend client, names a tracker label, a hosted repository address, a private memory identity or storage layout, or this repository's identity. Skills reach tasks, proposals and memory through putnami tasks, proposals or memory operations."
     },
     {
       "id": "repository-policy",
@@ -57,6 +57,7 @@
     "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
     "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md",
     "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md",
-    "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md"
+    "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

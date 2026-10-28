@@ -3,12 +3,12 @@
   "protocolVersion": 1,
   "feature": "cli/workspace-initialization",
   "outcomes": [
-    "An agent can inspect a fresh worktree before its first build without manually creating the workspace index",
+    "A contributor can inspect a fresh worktree before its first build without manually creating the workspace index",
     "Independent preparation work overlaps without duplicate index publication or nondeterministic results",
     "Installation has a compact live view and leaves only completed actions and actionable diagnostics in the terminal"
   ],
   "nonGoals": [
-    "Running dependency installers, Cloud setup, or context generation from an MCP read",
+    "Running dependency installers, Cloud setup, or context generation from a read command",
     "Changing extension pins or parsing language manifests in core to synthesize an index",
     "Parallelizing hooks or writes whose independence has not been established",
     "Hiding errors or interpreting arbitrary extension log text as proof of a filesystem change"
@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "graph-readiness",
-      "text": "MCP prepares a missing index through the shared probe within a bounded deadline, without full installation, and reloads an index replaced after its first read. Concurrent preparation serializes publication, bounds and reports lock waiting, and rechecks freshness after acquiring ownership. An inaccessible lock warns and permits an in-memory view without publication; cancellation never bypasses an active lock. MCP preparation failure remains actionable and retryable."
+      "text": "A workspace load reloads an index replaced after its first read. Concurrent preparation serializes publication, bounds and reports lock waiting, and rechecks freshness after acquiring ownership. An inaccessible lock warns and permits an in-memory view without publication; cancellation never bypasses an active lock. A preparation failure remains actionable and retryable."
     },
     {
       "id": "parallel-probes",
@@ -36,6 +36,7 @@
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md"
+    "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

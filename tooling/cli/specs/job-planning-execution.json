@@ -5,7 +5,7 @@
   "outcomes": [
     "A user can discover the jobs installed in the current workspace and run one or several of them with one project selection",
     "A user can preview the exact dependency plan without executing subprocesses or mutating workspace state",
-    "Terminal, extension, watch, lifecycle, and MCP adapters execute through one engine and one result model"
+    "Terminal, extension, watch, and lifecycle adapters execute through one engine and one result model"
   ],
   "nonGoals": [
     "Publishing, installer distribution, release governance, or the open-source license switch",
@@ -55,11 +55,11 @@
     },
     {
       "id": "vocabulary-default-traits",
-      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary; a job of a verb no vocabulary names takes none. Declared traits replace them wholesale. The core keeps no side-effect floor: a command's side effects are the traits its loaded jobs declare, which the git requirement, the cache trust floor, the task scope and MCP run_jobs read. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from."
+      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary; a job of a verb no vocabulary names takes none. Declared traits replace them wholesale. The core keeps no side-effect floor: a command's side effects are the traits its loaded jobs declare, which the git requirement, the cache trust floor and the task scope read. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from."
     },
     {
       "id": "no-core-development-verb",
-      "text": "The core declares no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate. Help, completion, MCP run_jobs and dispatch read the loaded extensions' vocabulary and commands. Every entry point refuses once, after extension discovery, a command no loaded extension declares as a job: a usage error saying how to add an extension, or an error naming each extension that did not load. A workspace with no development extension shows none."
+      "text": "The core declares no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate. Help, completion and dispatch read the loaded extensions' vocabulary and commands. Every entry point refuses once, after extension discovery, a command no loaded extension declares as a job: a usage error saying how to add an extension, or an error naming each extension that did not load. A workspace with no development extension shows none."
     },
     {
       "id": "selection-before-plan",
@@ -79,7 +79,7 @@
     },
     {
       "id": "preview-no-effects",
-      "text": "Plan-only previews and MCP dry runs do not execute subprocesses, update successful-run markers, or write generated workspace state; a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation. For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty; neither shape claims a run, session:end, or persisted session artifact."
+      "text": "Plan-only previews do not execute subprocesses, update successful-run markers, or write generated workspace state; a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation. For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty; neither shape claims a run, session:end, or persisted session artifact."
     },
     {
       "id": "single-engine",
@@ -259,7 +259,7 @@
     },
     {
       "id": "workload-lifecycle",
-      "text": "A command whose traits declare the serve workload streams until interrupted: it, or a group invocation running it, is promoted to watch unless its own --no-watch is set; a hosted run and MCP run_jobs refuse it; a serve run, as a composition member's, streams only each selected project's terminal uncacheable step; no portable run carries it. The once workload streams once and forwards its exit code. A command declaring rewritesSources is never portable. Neither behavior follows a command's name."
+      "text": "A command whose traits declare the serve workload streams until interrupted: it, or a group invocation running it, is promoted to watch unless its own --no-watch is set; a hosted run refuses it; a serve run, as a composition member's, streams only each selected project's terminal uncacheable step; no portable run carries it. The once workload streams once and forwards its exit code. A command declaring rewritesSources is never portable. Neither behavior follows a command's name."
     },
     {
       "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
@@ -329,6 +329,7 @@
     "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
     "tooling/cli/doc/adr/0078-the-core-asks-extensions-to-expand-their-input-selectors.md",
     "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
-    "protocols/extension/doc/adr/0015-a-step-reads-the-changed-files-from-contract-16.md"
+    "protocols/extension/doc/adr/0015-a-step-reads-the-changed-files-from-contract-16.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

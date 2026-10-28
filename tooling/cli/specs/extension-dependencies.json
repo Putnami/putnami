@@ -45,7 +45,7 @@
     },
     {
       "id": "restore-follows-the-lock",
-      "text": "The bootstrap restore and the MCP read preparation restore each locked dependency of a restored extension, and never resolve one the lock does not pin: they report it with its dependent and putnami install."
+      "text": "The bootstrap restore and the read preparation restore each locked dependency of a restored extension, and never resolve one the lock does not pin: they report it with its dependent and putnami install."
     },
     {
       "id": "agent-content-may-name-a-dependency",
@@ -81,6 +81,7 @@
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md"
+    "tooling/cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

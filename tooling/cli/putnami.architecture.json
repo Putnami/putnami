@@ -690,7 +690,7 @@
         "rebuildable": true,
         "rebuild": "bootstrap"
       },
-      "justification": "The recorded workspace index (.putnami/workspace-index.json) lets read-only commands and MCP tools answer without paying a probe. It carries the declared provenance, observation time and freshness fields, and the graph surfaces act on them: an absent copy fails closed with the command that rebuilds it, and a copy past the freshness bound is answered from and marked stale."
+      "justification": "The recorded workspace index (.putnami/workspace-index.json) lets read-only commands answer without paying a probe. It carries the declared provenance, observation time and freshness fields, and the graph surfaces act on them: an absent copy fails closed with the command that rebuilds it, and a copy past the freshness bound is answered from and marked stale."
     }
   ]
 }
