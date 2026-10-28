@@ -130,8 +130,10 @@
             "checks": [
               "drain-honors-the-configured-deadline",
               "stop-cancels-pending-retries",
+              "stop-drains-queued-deliveries",
               "stop-during-publish-is-race-free",
-              "stop-rejects-new-publishes"
+              "stop-rejects-new-publishes",
+              "stop-reports-each-abandoned-delivery-as-dropped"
             ]
           }
         },

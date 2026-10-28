@@ -26,6 +26,9 @@ const (
 	dropRetryEnqueueFailed = "retry_enqueue_failed"
 	dropDLQEnqueueFailed   = "dlq_enqueue_failed"
 	dropDLQNoSubscriber    = "dlq_no_subscriber"
+	// dropBrokerStopped reports a retry that Stop cancels and a queued delivery
+	// that Stop discards at the drain deadline.
+	dropBrokerStopped = "broker_stopped"
 	// dropRetriesExhausted is log-only: the retries-exhausted branch reports the
 	// drop through the record, it has no Observer.Dropped callback (it never had).
 	dropRetriesExhausted = "retries_exhausted"

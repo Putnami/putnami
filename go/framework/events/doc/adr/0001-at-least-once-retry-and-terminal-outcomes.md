@@ -24,8 +24,15 @@ consumer accepted the message, and records drop otherwise. Managed publish
 classifies responses as permanent, retryable, or ambiguous; an ambiguous one
 returns to the caller with no fallback or shadow publication.
 
-Shutdown closes the retry signal, refuses new publication, and waits for
-counted deliveries and retry timers up to the drain deadline.
+Memory broker shutdown closes the retry signal and refuses new publication. It
+cancels each pending retry timer and reports that retry dropped with reason
+`broker_stopped`. Up to the drain deadline, it waits for in-flight deliveries
+and runs the deliveries queued behind a handler's concurrency limit: their
+publish already returned `nil`, so they are accepted messages. At the deadline,
+it discards the deliveries still queued and reports each one dropped with
+reason `broker_stopped`. A drop is both a `message dropped` record and an
+`Observer.Dropped` call. The TypeScript memory broker also drains its queue up
+to the deadline.
 
 ## Rejected alternatives
 
@@ -36,10 +43,15 @@ counted deliveries and retry timers up to the drain deadline.
   the message.
 - **Fall back after an ambiguous publish.** It can duplicate an accepted
   message.
+- **Discard queued deliveries at `Stop`.** Even reported as drops, it loses
+  messages that a graceful shutdown has time to deliver, and the TypeScript
+  memory broker drains them.
 
 ## Consequences
 
 - Handlers with external effects must be idempotent, for example by storing
   the dedupe key.
-- Queue overflow and a missing or refusing DLQ are visible data loss.
+- Queue overflow, a missing or refusing DLQ, and work that `Stop` abandons
+  are visible data loss.
+- A queued delivery can run after `Stop` was called, until the drain deadline.
 - `Stop` can return a drain-timeout error when a handler ignores cancellation.

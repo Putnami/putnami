@@ -485,8 +485,8 @@ func TestEventDeadLetterRefusedEnqueueReportsDropOnly(t *testing.T) {
 	}
 	worker := broker.subscriptions[topic.Name+".dlq"][0].worker
 	worker.mu.Lock()
-	worker.active = 1                              // the concurrency slot is taken…
-	worker.queue = []Envelope{{Topic: topic.Name}} // …and the queue is at its limit
+	worker.active = 1                                                                              // the concurrency slot is taken…
+	worker.queue = []queuedDelivery{{ctx: context.Background(), env: Envelope{Topic: topic.Name}}} // …and the queue is at its limit
 	worker.mu.Unlock()
 
 	handlerErr := stderrors.New("conformance handler failure")
@@ -545,7 +545,7 @@ func TestEventDeadLetterPartialAcceptanceReportsDeadLetterOnly(t *testing.T) {
 	refusing := broker.subscriptions[topic.Name+".dlq"][0].worker
 	refusing.mu.Lock()
 	refusing.active = 1
-	refusing.queue = []Envelope{{Topic: topic.Name}}
+	refusing.queue = []queuedDelivery{{ctx: context.Background(), env: Envelope{Topic: topic.Name}}}
 	refusing.mu.Unlock()
 
 	if err := broker.Start(context.Background()); err != nil {

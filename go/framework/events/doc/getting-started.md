@@ -230,13 +230,13 @@ if err := broker.Start(ctx); err != nil {
 
 // ... publish and handle events ...
 
-// Stop waits for in-flight messages to complete (up to DrainTimeout).
+// Stop waits for in-flight and queued deliveries (up to DrainTimeout).
 if err := broker.Stop(ctx); err != nil {
     log.Printf("drain timeout: %v", err)
 }
 ```
 
-Publishing to a stopped broker returns an `events.stopped` error. A publish that races `Stop` is either delivered before `Stop` returns or refused whole with `events.stopped`. A broker restarted with `Start` delivers again to every handler.
+Publishing to a stopped broker returns an `events.stopped` error. A publish that races `Stop` is either accepted, and `Stop` drains it, or refused whole with `events.stopped`. `Stop` cancels each pending retry and reports it dropped with reason `broker_stopped`. It runs the deliveries queued behind a concurrency limit until `DrainTimeout`, then reports each one still queued dropped with reason `broker_stopped`. A drop is a `message dropped` record and an `Observer.Dropped` call. A broker restarted with `Start` delivers again to every handler.
 
 ### Dead-Letter Queue
 
@@ -472,7 +472,7 @@ type Transport interface {
 The `MemoryBroker` is goroutine-safe. Key concurrency properties:
 
 - **Handler dispatch**: Each handler invocation runs in its own goroutine. Handler functions must be safe for concurrent execution.
-- **Graceful shutdown**: `Stop` waits for all in-flight handlers (including retries) to complete, up to the configured `DrainTimeout`.
+- **Graceful shutdown**: `Stop` waits for in-flight handlers and runs queued deliveries, up to the configured `DrainTimeout`. It cancels pending retries.
 - **Thread-safe publishing**: Multiple goroutines can publish concurrently. The broker uses `sync.RWMutex` to protect internal state.
 - **Round-robin state**: Competing distribution maintains a per-topic counter protected by a mutex.
 
