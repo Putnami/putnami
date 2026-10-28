@@ -52,7 +52,9 @@ the log reporter keeps the raw stream.
 8. The view holds byte ranges of `events.jsonl`, not records. Past 1,000,000
    held records, a shared record counted once, the owner that holds the most
    releases them at once, as a failure would, and sends live from then on
-   (D-R2). A tie goes to the owner whose first held record comes first.
+   (D-R2). A tie goes to the owner whose first held record comes first, then
+   to the smaller owner key. A record one of whose owners is live leaves
+   live.
 9. A line that is not a JSON record leaves as it is, in stream order.
 
 ### Frames and checkpoint
