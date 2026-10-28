@@ -47,7 +47,7 @@
     },
     {
       "id": "graceful-drain",
-      "text": "Stopping the broker refuses new publishes but keeps draining both in-flight and queued deliveries until they finish or the drain timeout elapses, and reports what was still pending when it timed out."
+      "text": "Stopping the broker refuses new publishes but keeps draining both in-flight and queued deliveries until they finish or the drain timeout elapses, and reports what was still pending when it timed out. Each queued delivery still waiting at the deadline and each retry that stop cancels is recorded dropped with reason `broker_stopped`."
     },
     {
       "id": "isolated-invocation",
