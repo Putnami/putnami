@@ -149,6 +149,26 @@ _putnami() {
             if [[ "${path}" == -* ]]; then
                 return 1
             fi
+            # help reads the command it describes from its next two words, and
+            # the CLI refuses a flag before either of them: the first word
+            # completes the command names, the second the subcommands of the
+            # first, and nothing else, since help takes no project target. Its
+            # flags and the value of --output complete below.
+            if [[ "${path}" == "help" && "${cur}" != -* && "${prev}" != "--output" ]]; then
+                if (( CURRENT == 2 )); then
+                    _describe -t commands 'job commands' commands
+                    _describe -t structured 'structured commands' structured_commands
+                    return
+                fi
+                if (( CURRENT == 3 )) && [[ "${words[2]}" != -* ]]; then
+                    local -a described_subcmds
+                    _putnami_subcommands_for "${words[2]}"
+                    described_subcmds=("${reply[@]}")
+                    _describe -t subcmds 'subcommand' described_subcmds
+                    return
+                fi
+                return 1
+            fi
             # A core command takes a job-only flag only as one of its own flags.
             if ! _putnami_core_root "${path}"; then
                 global_flags=("${global_flags[@]}" "${job_global_flags[@]}")

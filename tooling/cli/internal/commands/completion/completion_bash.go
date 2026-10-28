@@ -119,6 +119,22 @@ _putnami_completions() {
         COMPREPLY=()
         return
     fi
+    # help reads the command it describes from its next two words, and the CLI
+    # refuses a flag before either of them: the first word completes the
+    # command names, the second the subcommands of the first, and nothing
+    # else, since help takes no project target. Its flags and the value of
+    # --output complete below.
+    if [[ "${cmd}" == "help" && "${cur}" != -* && "${prev}" != "--output" ]]; then
+        if [[ ${cword} -eq 2 ]]; then
+            _putnami_reply ${commands[@]+"${commands[@]}"}
+        elif [[ ${cword} -eq 3 && "${words[2]}" != -* ]]; then
+            _putnami_subcommands_for "${words[2]}"
+            _putnami_reply ${_putnami_words[@]+"${_putnami_words[@]}"}
+        else
+            COMPREPLY=()
+        fi
+        return
+    fi
     # A core command takes a job-only flag only as one of its own flags.
     if ! _putnami_core_root "${cmd}"; then
         global_flags+=(${job_global_flags[@]+"${job_global_flags[@]}"})

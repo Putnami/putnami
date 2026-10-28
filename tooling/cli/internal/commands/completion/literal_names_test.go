@@ -3,6 +3,7 @@ package completion
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -197,7 +198,7 @@ _init_completion() {
 COMP_WORDS=(` + strings.Join(quoted, " ") + `)
 COMP_CWORD=` + strconv.Itoa(len(words)-1) + `
 _putnami_completions
-printf '%s\0' "${COMPREPLY[@]}"
+printf '%s\0' ${COMPREPLY[@]+"${COMPREPLY[@]}"}
 `
 	cmd := exec.Command("bash", "-c", driver)
 	cmd.Dir = dir
@@ -283,7 +284,9 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	if err != nil {
+	// A completion function returns 1 when it offers nothing.
+	var exit *exec.ExitError
+	if err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 1 && stderr.Len() == 0) {
 		t.Fatalf("zsh completion of %q: %v\n%s", words, err, stderr.String())
 	}
 	var offered []string
@@ -534,7 +537,7 @@ func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
 	// included: the condition names each one as a literal word.
 	jobCommandCondition := false
 	for _, words := range conditions {
-		if len(words) > 0 && words[0] == "__putnami_seen_from" && slices.Contains(words, "lint-docs") {
+		if len(words) > 0 && words[0] == "__putnami_job_target" && slices.Contains(words, "lint-docs") {
 			jobCommandCondition = true
 			assertOffersEach(t, "fish", "a job-command condition", words[1:], []string{"j" + hostileNames[0], "j" + hostileNames[3]})
 		}

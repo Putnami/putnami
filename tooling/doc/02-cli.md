@@ -320,7 +320,7 @@ is a usage error that names the flag. `putnami --help`, `putnami --version`,
 `putnami help --man`, `putnami help --markdown`, and flags alone, such as
 `putnami -v` or `putnami --output json`, still print help, the reference or the
 version. Shell completion offers nothing after a flag that comes before
-the command.
+the command or before a word of the command that `help` describes.
 
 ## Shell completion
 
@@ -352,6 +352,8 @@ exec zsh
 ```
 
 Completions cover commands, subcommands, project names, flags, and flag values.
+After `putnami help`, completion offers the command names, then the
+subcommands of the command you typed, and no project name.
 
 ## Dynamic command loading
 
