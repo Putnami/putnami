@@ -42,7 +42,25 @@
     },
     "sessionState": {
       "type": "string",
-      "enum": ["failed", "handed_back", "waiting", "working"]
+      "enum": ["ended", "failed", "handed_back", "waiting", "working"],
+      "description": "ended: the host closed the session or the user quit; it carries no error and no waitUntil."
+    },
+    "loopStage": {
+      "type": "string",
+      "enum": ["check", "code", "declare", "merge", "prove", "show", "talk", "validate"],
+      "description": "The stage of the contribution loop a session's change is at. The loop runs talk, declare, show, code, check, prove, validate, merge."
+    },
+    "sessionUsage": {
+      "type": "object",
+      "description": "The tokens a session used, cumulative for the whole session, its subagents included.",
+      "additionalProperties": false,
+      "required": ["inputTokens", "outputTokens", "cacheWriteTokens", "cacheReadTokens"],
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0, "maximum": 1000000000000, "description": "Input tokens read neither from nor into the prompt cache." },
+        "outputTokens": { "type": "integer", "minimum": 0, "maximum": 1000000000000 },
+        "cacheWriteTokens": { "type": "integer", "minimum": 0, "maximum": 1000000000000, "description": "Input tokens written to the prompt cache." },
+        "cacheReadTokens": { "type": "integer", "minimum": 0, "maximum": 1000000000000, "description": "Input tokens read from the prompt cache." }
+      }
     },
     "planStep": {
       "type": "object",
@@ -90,7 +108,9 @@
         "plan": { "$ref": "#/$defs/plan", "description": "Replaces the mission's plan. Absent keeps it; an empty list of steps clears it." },
         "delivered": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/id" }, "description": "Inbox messages the host gave the agent. A repeated id counts once. A provider ignores an id it does not know or that is not the caller's. Delivering an answer moves its decision to acknowledged." },
         "decisions": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/id" }, "description": "Decisions this session asked: sending them binds them to the session. A repeated id counts once. A provider ignores an id it does not know or that is not the caller's." },
-        "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/messageReply" }, "description": "One reply per message. A refused reply gets its own entry in the result and never refuses the sync." }
+        "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/messageReply" }, "description": "One reply per message. A refused reply gets its own entry in the result and never refuses the sync." },
+        "stage": { "$ref": "#/$defs/loopStage", "description": "The loop stage the session's change is at. Absent keeps the stage the provider holds." },
+        "usage": { "$ref": "#/$defs/sessionUsage", "description": "The tokens the session used so far. Replaces the usage the provider holds; absent keeps it." }
       }
     },
     "openDecision": {

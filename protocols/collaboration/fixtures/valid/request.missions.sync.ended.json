@@ -1,0 +1,9 @@
+{
+  "session": { "engine": "host-a", "id": "5b1f0c2e-8d7a-4f61-9a43-1c2d3e4f5a6b" },
+  "mission": { "repository": "putnami/putnami", "key": "issue-662" },
+  "event": "session_end",
+  "state": "ended",
+  "observedAt": "2026-10-28T18:00:00Z",
+  "stage": "prove",
+  "usage": { "inputTokens": 1200, "outputTokens": 34000, "cacheWriteTokens": 560000, "cacheReadTokens": 7800000 }
+}

@@ -165,7 +165,7 @@ func TestHostHooks_ClosedLists(t *testing.T) {
 	if got := HostHookHosts(); !reflect.DeepEqual(got, []string{HostClaudeCode, HostCodex}) {
 		t.Fatalf("hosts = %v", got)
 	}
-	if got := HostHookEvents(HostClaudeCode); !reflect.DeepEqual(got, []string{"SessionStart", "PostToolUse", "Stop", "StopFailure"}) {
+	if got := HostHookEvents(HostClaudeCode); !reflect.DeepEqual(got, []string{"SessionStart", "PostToolUse", "Stop", "StopFailure", "SessionEnd"}) {
 		t.Fatalf("claude-code events = %v", got)
 	}
 	if got := HostHookEvents(HostCodex); !reflect.DeepEqual(got, []string{"SessionStart", "PostToolUse", "Stop"}) {

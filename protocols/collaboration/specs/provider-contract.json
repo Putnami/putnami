@@ -87,6 +87,10 @@
       "text": "A missions provider keeps one decision per idempotency key: the same content, whatever the mission title, replays it with its answer, and other content is a conflict (idempotency.mismatch). A message takes one reply; another is a conflict (message.closed). A delivered answer acknowledges its decision, a delivered message leaves the inbox, unknown or repeated ids change nothing, and an older sync never overwrites a newer one. Concurrent callers on one store lose no write."
     },
     {
+      "id": "missions-session-report",
+      "text": "A missions provider keeps, for each session, the stage and the usage of the last applied sync that carried them: a sync without them keeps the stored ones, and an ended session stays ended until a later sync."
+    },
+    {
       "id": "scenarios-normalize-requests",
       "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
     },

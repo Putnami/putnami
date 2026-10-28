@@ -213,8 +213,8 @@
       "properties": {
         "event": {
           "type": "string",
-          "enum": ["SessionStart", "PostToolUse", "Stop", "StopFailure"],
-          "description": "Host event the hook runs at. Claude Code runs SessionStart, PostToolUse, Stop and StopFailure; Codex runs SessionStart, PostToolUse and Stop."
+          "enum": ["SessionStart", "PostToolUse", "Stop", "StopFailure", "SessionEnd"],
+          "description": "Host event the hook runs at. Claude Code runs SessionStart, PostToolUse, Stop, StopFailure and SessionEnd; Codex runs SessionStart, PostToolUse and Stop."
         },
         "tools": {
           "type": "array",

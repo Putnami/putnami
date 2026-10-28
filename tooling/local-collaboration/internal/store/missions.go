@@ -84,6 +84,10 @@ type Session struct {
 	LastMessage string              `json:"lastMessage,omitempty"`
 	Error       string              `json:"error,omitempty"`
 	WaitUntil   string              `json:"waitUntil,omitempty"`
+	// Stage and Usage are the last ones an applied sync carried: a sync
+	// without one keeps them.
+	Stage collab.LoopStage     `json:"stage,omitempty"`
+	Usage *collab.SessionUsage `json:"usage,omitempty"`
 }
 
 // Decision is one decision an agent asked the mission's owner.

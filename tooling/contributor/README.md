@@ -12,7 +12,7 @@ and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
 (`.agents/skills`, `.codex/agents`) under the extension's own version. It also
 declares a compiled runtime, `compiled/putnami-contributor`, which serves
 `putnami change language`, `change verify`, `change finalize`,
-`change estimate`, `agent hook` and `agent attach`
+`change estimate`, `agent hook`, `agent attach` and `agent stage`
 ([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md),
 [ADR 0005](doc/adr/0005-the-contributor-executable-serves-the-change-noun.md),
 [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)).
@@ -110,9 +110,16 @@ contract. Each hook runs `putnami agent hook`, which the executable serves:
 - Claude Code waits up to 10 minutes after a turn for the owner's next
   message; Codex waits up to 180 seconds for the answer to a decision the
   session asked.
+- When a Claude Code session ends, one sync publishes the `ended` state.
+- Every sync carries the session's token usage, counted from the host's
+  transcript: for Claude Code, the session and its subagents; for Codex, the
+  session's own thread.
 
 A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
-makes `issue-<n>` the mission of the checkout's branch. A hook never fails a
+makes `issue-<n>` the mission of the checkout's branch.
+`putnami agent stage <talk|declare|show|code|check|prove|validate|merge>`
+records the loop stage of the current session and syncs it when the session
+reports to a mission; every later sync carries it. A hook never fails a
 turn: a failure leaves one line in `hook.log` under
 `<Putnami home>/contributor/sessions`.
 

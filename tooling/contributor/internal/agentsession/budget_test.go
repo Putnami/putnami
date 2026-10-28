@@ -88,6 +88,8 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 		// republish after a message the sync answered.
 		{"stop", eventBudget(claude, hookEventStop, false), 2*gitTimeout + 2*callTimeout},
 		{"stop failure", eventBudget(claude, hookEventStopFailure, false), 2*gitTimeout + callTimeout},
+		// the identity of a session no start opened and sync.
+		{"session end", eventBudget(claude, hookEventSessionEnd, false), 2*gitTimeout + callTimeout},
 		// the identity, sync, the wait, the sync in flight at its end and
 		// the sync that publishes the working state.
 		{"codex stop", eventBudget(codex, hookEventStop, false), 2*gitTimeout + callTimeout + sessionDecisionWait + 2*callTimeout},

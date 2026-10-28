@@ -38,7 +38,10 @@ last changed, not when it was created, which is the order a backlog sorts by.
    parser refuses a member its Go type does not declare, so an older reader
    refuses every new member. From publication on, ADR 0001 decision 2 applies
    to any member: a new one is a new contract version. This is why `key` and
-   `createdAt` land before the first published module.
+   `createdAt` land before the first published module. A contract's version 1
+   is fixed from the first published module that contains it: the missions
+   contract, added after the first publication, gains `stage`, `usage` and the
+   `ended` state in version 1 because no published module contains it yet.
 
 ## Rejected alternatives
 

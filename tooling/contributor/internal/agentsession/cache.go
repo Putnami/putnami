@@ -104,6 +104,13 @@ type sessionCache struct {
 
 	LastSyncAt    time.Time `json:"last_sync_at"`
 	MinIntervalMS int64     `json:"min_interval_ms,omitempty"`
+
+	// Stage is the loop stage `agent stage` recorded last; every sync
+	// carries it.
+	Stage collab.LoopStage `json:"stage,omitempty"`
+	// Usage is the token usage read from the session's transcripts; every
+	// sync carries its totals.
+	Usage *usageState `json:"usage,omitempty"`
 }
 
 // sessionMissionState is what the cache knows about the session's mission:
@@ -144,7 +151,11 @@ type sessionFiles struct {
 // The digest keeps an engine-supplied id out of every path.
 func sessionFilesFor(dir, key string) sessionFiles {
 	sum := sha256.Sum256([]byte(key))
-	name := hex.EncodeToString(sum[:])
+	return sessionFilesNamed(dir, hex.EncodeToString(sum[:]))
+}
+
+// sessionFilesNamed names the files of the session whose key digests to name.
+func sessionFilesNamed(dir, name string) sessionFiles {
 	return sessionFiles{
 		dir:      dir,
 		cache:    filepath.Join(dir, name+".json"),

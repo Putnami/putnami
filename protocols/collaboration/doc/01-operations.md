@@ -147,7 +147,7 @@ tool must declare `workspaceSelection`.
 
 | Operation | Access | Required | Destructive | Preconditions | Host-only | Request | Result |
 |---|---|---|---|---|---|---|---|
-| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies` | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
+| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage` | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
 | `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
 | `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
 
@@ -174,15 +174,27 @@ needs no source, and an agent types it. An option id is 1 to 64 characters of
 `[A-Za-z0-9._-]`.
 
 **sync** publishes a session and reads the mission back. `state` is
-`working`, `handed_back`, `waiting` or `failed`. `waitUntil` is required with
+`working`, `handed_back`, `waiting`, `failed` or `ended`: `ended` means the
+host closed the session or the user quit. `waitUntil` is required with
 `waiting` and refused with any other state; `error` goes only with `failed`.
 `event` names the host event that caused the sync, `[a-z_]{1,32}`; a provider
 records it and never branches on it. `observedAt` is an RFC 3339 UTC time. A
-provider applies `state` and `plan` only from a sync observed later than the
-last one it applied for the session, so an older sync never overwrites a
-newer one. An absent `plan` leaves the plan unchanged; a plan with no steps
-clears it. A plan holds at most 100 steps, each `{key, status, text}`: `key`
-is a token, unique in its plan, and `status` is `todo`, `doing` or `done`.
+provider applies `state`, `stage`, `usage` and `plan` only from a sync
+observed later than the last one it applied for the session, so an older sync
+never overwrites a newer one. An absent `plan` leaves the plan unchanged; a
+plan with no steps clears it. A plan holds at most 100 steps, each `{key,
+status, text}`: `key` is a token, unique in its plan, and `status` is `todo`,
+`doing` or `done`.
+
+`stage` is the stage of the contribution loop the session's change is at:
+`talk`, `declare`, `show`, `code`, `check`, `prove`, `validate` or `merge`.
+`usage` is the tokens the session used so far, cumulative for the whole
+session, its subagents included: `{inputTokens, outputTokens,
+cacheWriteTokens, cacheReadTokens}`, each an integer from 0 to 10^12.
+`inputTokens` counts the input read neither from nor into the prompt cache.
+A provider keeps the `stage` and the `usage` of the last applied sync that
+carried them: an absent one keeps what it holds, and a present `usage`
+replaces it whole.
 
 - `delivered` (at most 100) lists the inbox messages the host gave the agent;
   they leave the inbox. Delivering an answer message moves its decision to

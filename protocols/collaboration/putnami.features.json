@@ -289,6 +289,19 @@
           }
         },
         {
+          "id": "missions-session-report",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-local-provider-keeps-the-stage-and-usage-of-a-session"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [

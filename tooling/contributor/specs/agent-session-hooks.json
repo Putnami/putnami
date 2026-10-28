@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "tooling/agent-session-hooks",
   "outcomes": [
-    "A Claude Code or Codex session publishes its state, plan, delivered messages, decisions and replies to its mission through the missions contract, from the host hooks @putnami/contributor declares",
+    "A Claude Code or Codex session publishes its state, loop stage, token usage, end, plan, delivered messages, decisions and replies to its mission through the missions contract, from the host hooks @putnami/contributor declares",
     "The agent receives its mission sheet at session start and the owner's messages and answers at the end of a turn or during a wait"
   ],
   "nonGoals": [
@@ -43,6 +43,18 @@
     {
       "id": "host-channel",
       "text": "The executable behind putnami agent hook reaches the missions and memory providers only through the host RPC channel putnami opens for the interactive launch."
+    },
+    {
+      "id": "session-end",
+      "text": "Claude Code's SessionEnd publishes the ended state, with no error and no wait end, in one sync, and ends the wait of an idle wake that runs beside it."
+    },
+    {
+      "id": "usage-report",
+      "text": "Every sync but post_tool_use's carries the session's token usage: for Claude Code, the sum of the usage of each assistant message of the session's transcript and of its subagents' transcripts, each message once, read incrementally within a per-hook byte bound; for Codex, the last cumulative count of its rollout, without its subagent threads."
+    },
+    {
+      "id": "agent-stage",
+      "text": "putnami agent stage <name> records the loop stage of the current session, the one the host names in the environment or else the last active session of the checkout and branch, and syncs it at once when the session reports to a mission; every later sync carries it. An unknown stage exits 2, and no session exits 1."
     }
   ],
   "decisions": [

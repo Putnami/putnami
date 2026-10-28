@@ -346,6 +346,15 @@ func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time
 	applied := store.Session{
 		Engine: in.Session.Engine, ID: in.Session.ID, Mission: mission, State: in.State, ObservedAt: in.ObservedAt,
 		Event: in.Event, Model: in.Model, Branch: in.Branch, LastMessage: in.LastMessage, Error: in.Error, WaitUntil: in.WaitUntil,
+		Stage: in.Stage, Usage: in.Usage,
+	}
+	if index >= 0 {
+		if applied.Stage == "" {
+			applied.Stage = m.Sessions[index].Stage
+		}
+		if applied.Usage == nil {
+			applied.Usage = m.Sessions[index].Usage
+		}
 	}
 	if index < 0 {
 		m.Sessions = append(m.Sessions, applied)

@@ -325,3 +325,41 @@ func TestAWriteThatChangesNothingLeavesTheDocument(t *testing.T) {
 		t.Fatal("a call that changed nothing replaced the missions document")
 	}
 }
+
+// TestASessionKeepsItsStageItsUsageAndItsEnd: the store holds the stage and
+// the usage of the last applied sync that carried them, a sync without them
+// keeps them, an older sync changes neither, and an ended session holds the
+// ended state.
+func TestASessionKeepsItsStageItsUsageAndItsEnd(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-session-report", "the-local-provider-keeps-the-stage-and-usage-of-a-session")
+	h := newMissionsHarness(t)
+	session := func() store.Session {
+		t.Helper()
+		sessions := h.missions().Sessions
+		if len(sessions) != 1 {
+			t.Fatalf("%d sessions, want 1", len(sessions))
+		}
+		return sessions[0]
+	}
+	h.sync(10, `,"stage":"code","usage":{"inputTokens":1,"outputTokens":2,"cacheWriteTokens":3,"cacheReadTokens":4}`)
+	want := collab.SessionUsage{InputTokens: 1, OutputTokens: 2, CacheWriteTokens: 3, CacheReadTokens: 4}
+	if held := session(); held.Stage != collab.LoopStageCode || held.Usage == nil || *held.Usage != want {
+		t.Fatalf("session %+v, want stage code and usage %+v", held, want)
+	}
+	h.sync(20, "")
+	if held := session(); held.Stage != collab.LoopStageCode || held.Usage == nil || *held.Usage != want {
+		t.Fatalf("a sync without stage and usage left %+v", held)
+	}
+	h.sync(5, `,"stage":"talk","usage":{"inputTokens":0,"outputTokens":0,"cacheWriteTokens":0,"cacheReadTokens":0}`)
+	if held := session(); held.Stage != collab.LoopStageCode || held.Usage == nil || *held.Usage != want {
+		t.Fatalf("an older sync changed the session to %+v", held)
+	}
+	var ended collab.MissionsSyncResult
+	h.ok("missions", "sync", `{"session":`+sessionArguments+`,"mission":`+missionArguments+`,"event":"session_end","state":"ended",`+
+		`"observedAt":"2026-09-24T07:00:30Z","stage":"prove","usage":{"inputTokens":5,"outputTokens":6,"cacheWriteTokens":7,"cacheReadTokens":8}}`, &ended)
+	want = collab.SessionUsage{InputTokens: 5, OutputTokens: 6, CacheWriteTokens: 7, CacheReadTokens: 8}
+	if held := session(); ended.Session.State != collab.SessionStateEnded || held.State != collab.SessionStateEnded ||
+		held.Stage != collab.LoopStageProve || held.Usage == nil || *held.Usage != want {
+		t.Fatalf("result %+v, session %+v", ended.Session, held)
+	}
+}
