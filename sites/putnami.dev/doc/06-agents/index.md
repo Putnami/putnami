@@ -128,6 +128,111 @@ yet"*.
 `--dry-run` returns the selected dependency plan without starting a subprocess.
 Pair it with `--impacted` to see what a change would run before it runs.
 
+---
+
+## Blast radius before action
+
+```bash
+putnami lint,test,build --impacted
+```
+
+`--impacted` resolves the projects affected by the current changes against a
+baseline, transitively through the dependency graph. The baseline is resolved in
+a fixed order — workspace config, nearest configured epic branch, trunk, local
+main or master, then the upstream tracking ref — and never the current branch
+itself, so it cannot quietly resolve to "nothing changed".
+
+Run it once, before declaring the change complete. It also runs every project
+that depends on the change, so while iterating, select only the projects you
+changed with `--projects <a>,<b>`. The generated `AGENTS.md` gives agents the
+same rule.
+
+When an agent needs to justify the result rather than trust it,
+`putnami projects why <from> <to>` prints the shortest path from the changed
+project to the impacted one over the same edges, with each edge's kind and the
+task scope, and `putnami projects owner <path>` maps a file path back to the
+project that owns it using the same logic.
+
+### Deliver in gated phases, not in small pull requests
+
+An `--impacted` run ends with the size of the change, split into authored code,
+tests, docs and generated files. The size is information: no line count fails
+the run. A change that updates its tests and docs is larger by design, and
+agent work, such as an epic, is often large and legitimate.
+
+What keeps a large change safe is how it lands:
+
+1. One pull request carries one intent.
+2. Work that spans several projects goes on an integration branch listed in the
+   workspace `epicBranches`, one phase per commit.
+3. Every phase passes the gate before the next one starts.
+4. The branch merges as one unit that one revert undoes.
+
+When the authored code of a change spans projects that no dependency relates,
+and the branch is not on an epic branch, the run prints a mixed-intent warning.
+The warning never changes the exit code. Both are also recorded as a
+`selection:change-shape` session event. The managed `build` workflow follows
+the same rule and preserves an allocated workspace branch. Delivery units follow observable
+value, compatibility, release and rollback boundaries. A project, worker or
+task count does not establish a separate unit or proposal. Intermediate units
+retain their parent's pending requirements and use non-closing references.
+
+---
+
+## A surface that parses the same way every time
+
+```bash
+putnami build --output=json
+putnami test  --output=jsonl
+```
+
+Exit codes, output modes, the reserved global-flag registry, and the machine
+documents are the [`cli` protocol](/docs/protocols) — versioned, and validated
+by one conformance corpus executed from both the Go and the TypeScript
+implementation. An agent that learned the shape does not have to relearn it
+because a release changed a log line.
+
+Every job also emits one JSONL event stream — logs, progress, phases,
+diagnostics, metrics, artifacts, results — so the agent watching a build and the
+human reading the log are parsing the same lines.
+
+---
+
+## Verifying the work
+
+Generating a change is the easy half. The useful half is telling whether it is
+safe.
+
+```bash
+putnami doctor --profile production
+```
+
+`doctor` is a read-only production-readiness preflight. It derives findings from
+committed manifests — incomplete capabilities, missing required config, invalid
+committed schemas, config shadowing — and grades them by deployment profile.
+Under `--profile production` a high or critical finding exits `2`; `dev` and
+`test` stay advisory. **Config values are never read or emitted**, so running it
+in a pipeline leaks nothing.
+
+Each check carries a remediation baked into the check itself, and the code
+taxonomy is frozen. Findings you have consciously accepted go into a committed
+`doctor.waivers.json` — a waiver is a reviewable decision in git, not a flag
+someone remembered to pass.
+
+Alongside it: conformance packs test declared capabilities against shared
+fixtures, and the orientation document is rebuilt on every read, so it cannot
+go stale behind the code.
+
+---
+
+## The documentation is part of the surface
+
+Stable URL prefixes per section, **Copy as Markdown** on every page, and
+[`/llms.txt`](/llms.txt) as a machine-readable index of the whole tree. The
+structure an agent reads is the structure you read.
+
+---
+
 ## What this deliberately does not do
 
 - The agent-context document is **per project**, and it references rather than

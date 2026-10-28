@@ -292,7 +292,7 @@ func TestInstallKeepsCustomizedHostDefinitions(t *testing.T) {
 	for _, want := range []string{
 		"Claude Code defines a putnami MCP server that Putnami did not register as is; it was kept.",
 		"Codex defines a putnami MCP server that Putnami did not register as is; it was kept.",
-		"claude mcp remove putnami",
+		"claude mcp remove --scope user putnami",
 		"codex mcp remove putnami",
 	} {
 		if !res.contains(want) {
