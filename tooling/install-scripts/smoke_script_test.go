@@ -501,8 +501,10 @@ func TestSmokeRejectsGeneratedPackageRegistryCredentials(t *testing.T) {
 	}
 }
 
+// The release smoke rejects an init that writes .mcp.json. The CLI tests prove
+// that init writes none; a second project proving the same check would make
+// its observation a duplicate, which the spec gate refuses.
 func TestSmokeRejectsAnInitThatWritesAnMCPRegistration(t *testing.T) {
-	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "init-and-the-first-use-install-write-no-mcp-json")
 	requireBash(t)
 	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
 	t.Setenv("SMOKE_TEST_MCP_JSON", "1")
