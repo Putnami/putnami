@@ -53,6 +53,8 @@ type completionContext struct {
 	projectPositionals map[string]bool
 	// coreAliases are the aliases whose target resolves to a core root.
 	coreAliases []string
+	// helpAliases are the aliases whose target resolves to help.
+	helpAliases []string
 }
 
 // discoverCompletionExtensions returns the extensions that load at wsRoot, the
@@ -323,8 +325,11 @@ func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.V
 	coreRoots := commandmeta.StructuredRoots()
 	for _, alias := range aliases {
 		addCompletionCommand(ctx, alias.Name, "Alias for "+alias.Command)
-		if resolvesToCoreRoot(alias.Command, workspace, coreRoots) {
+		if root := coreRootOf(alias.Command, workspace, coreRoots); root != "" {
 			ctx.coreAliases = shared.AppendUnique(ctx.coreAliases, alias.Name)
+			if root == "help" {
+				ctx.helpAliases = shared.AppendUnique(ctx.helpAliases, alias.Name)
+			}
 		}
 		if flags := ctx.structuredFlags[alias.Command]; len(flags) > 0 {
 			ctx.structuredFlags[alias.Name] = mergeStructuredCompletionFlags(ctx.structuredFlags[alias.Name], flags)
@@ -335,20 +340,21 @@ func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.V
 	}
 }
 
-// resolvesToCoreRoot reports whether command, followed through the workspace
-// aliases the way the parser resolves an alias chain, names a core root.
-func resolvesToCoreRoot(command string, workspace map[string]string, roots []commandmeta.Command) bool {
+// coreRootOf returns the core root that command names, followed through the
+// workspace aliases the way the parser resolves an alias chain, or "" when it
+// names none.
+func coreRootOf(command string, workspace map[string]string, roots []commandmeta.Command) string {
 	for range len(workspace) + 1 {
 		if slices.ContainsFunc(roots, func(root commandmeta.Command) bool { return root.Path == command }) {
-			return true
+			return command
 		}
 		next, ok := workspace[command]
 		if !ok {
-			return false
+			return ""
 		}
 		command = next
 	}
-	return false
+	return ""
 }
 
 // declaresReachableGroup reports whether a loaded extension declares a command
@@ -589,6 +595,12 @@ func (c completionContext) coreRoots() []string {
 	names = append(names, c.coreAliases...)
 	sort.Strings(names)
 	return names
+}
+
+// helpNames returns help and the aliases that resolve to it: the words whose
+// next two words name the command help describes.
+func (c completionContext) helpNames() []string {
+	return append([]string{"help"}, c.helpAliases...)
 }
 
 // offersGlobalFlag reports whether the script offers the global flag long, so

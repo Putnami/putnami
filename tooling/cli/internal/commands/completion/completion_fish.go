@@ -21,16 +21,12 @@ func CompletionFish(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings *w
 # Disable file completions by default
 complete -c putnami -f
 
+# commandline -opc lists the words before the one under the cursor.
 function __putnami_complete_children
     set -l path $argv
     set -l tokens (commandline -opc)
-    set -l current (commandline -ct)
-    set -l completed_count (count $tokens)
-    if test -n "$current"
-        set completed_count (math $completed_count - 1)
-    end
     set -l expected (math (count $path) + 1)
-    if test $completed_count -ne $expected
+    if test (count $tokens) -ne $expected
         return 1
     end
     for i in (seq (count $path))
@@ -90,15 +86,37 @@ function __putnami_job_flag
     not __putnami_leading_flag; and not __putnami_core_root
 end
 
-# help takes the command it describes, which names a job command, and never a
-# project target.
-function __putnami_job_target
+# help and its aliases read the command they describe from their next words,
+# and take no project target.
+function __putnami_is_help
     set -l tokens (commandline -opc)
-    test "$tokens[2]" != help; and __putnami_seen_from $argv
+    test (count $tokens) -ge 2; and contains -- $tokens[2] %s
+end
+
+# The first word after help completes the command names; with a command as
+# argument, the second word completes its subcommands.
+function __putnami_help_word
+    set -l tokens (commandline -opc)
+    __putnami_is_help; and test (count $tokens) -eq (math (count $argv) + 2)
+    and test (count $argv) -eq 0 -o "$tokens[3]" = "$argv[1]"
+end
+
+function __putnami_job_target
+    not __putnami_is_help; and __putnami_seen_from $argv
+end
+
+# The value of a flag follows that flag, the last word before the cursor.
+function __putnami_flag_value
+    set -l tokens (commandline -opc)
+    not __putnami_leading_flag; and test "$tokens[-1]" = "$argv[1]"
+end
+
+function __putnami_target_value
+    not __putnami_is_help; and __putnami_flag_value $argv
 end
 
 # Job commands
-`, strings.Join(fishQuoteAll(ctx.coreRoots()), " "))
+`, strings.Join(fishQuoteAll(ctx.coreRoots()), " "), strings.Join(fishQuoteAll(ctx.helpNames()), " "))
 
 	for _, cmd := range ctx.commands {
 		desc := ctx.commandDesc[cmd]
@@ -189,7 +207,7 @@ end
 	// Output format completion
 	iox.Fprintf(w, "\n# Output format values\n")
 	iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-		fishCondition("__putnami_seen_from", "--output"), fishArguments(ctx.globalFlagValues("--output")...))
+		fishCondition("__putnami_flag_value", "--output"), fishArguments(ctx.globalFlagValues("--output")...))
 
 	// --projects accepts any target form ResolveTarget understands:
 	// IDs, names, basenames, and aliases.
@@ -201,14 +219,14 @@ end
 	if len(projectTargets) > 0 {
 		iox.Fprintf(w, "\n# Project targets (for --projects flag value)\n")
 		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-			fishCondition("__putnami_seen_from", "--projects"), fishArguments(projectTargets...))
+			fishCondition("__putnami_target_value", "--projects"), fishArguments(projectTargets...))
 	}
 
 	// --exclude matches project names.
 	if len(ctx.projects) > 0 && ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, "\n# Project names (for --exclude flag value)\n")
 		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-			fishCondition("__putnami_seen_from", "--exclude"), fishArguments(ctx.projects...))
+			fishCondition("__putnami_target_value", "--exclude"), fishArguments(ctx.projects...))
 	}
 
 	// Positional project targets after job commands: IDs, names, basenames, aliases.
@@ -241,14 +259,14 @@ end
 func writeFishHelpCompletions(w io.Writer, ctx completionContext, paths []string) {
 	iox.Fprintf(w, "\n# The command help describes\n")
 	for _, name := range append(slices.Clone(ctx.commands), ctx.structured...) {
-		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n", fishCondition("__putnami_complete_children", "help"), fishArguments(name))
+		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n", fishCondition("__putnami_help_word"), fishArguments(name))
 	}
 	for _, root := range paths {
 		if !slices.Contains(ctx.commands, root) && !slices.Contains(ctx.structured, root) {
 			continue
 		}
 		for _, sub := range ctx.subcommands[root] {
-			iox.Fprintf(w, "complete -c putnami -n %s -a %s\n", fishCondition("__putnami_complete_children", "help", root), fishArguments(sub))
+			iox.Fprintf(w, "complete -c putnami -n %s -a %s\n", fishCondition("__putnami_help_word", root), fishArguments(sub))
 		}
 	}
 }

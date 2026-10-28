@@ -22,11 +22,11 @@ type helpCompletion struct {
 	not   []string
 }
 
-// help reads the command it describes from its next two words, and the CLI
-// refuses a flag before either of them. Completion follows: after help it
-// offers the command names, after `help <command>` the subcommands of that
-// command, after a flag before those words nothing, and never a project
-// target, which help does not take.
+// help, or an alias of it, reads the command it describes from its next two
+// words, and the CLI refuses a flag before either of them. Completion follows:
+// after help it offers the command names, after `help <command>` the
+// subcommands of that command, after a flag before those words nothing, and
+// never a project target, which help does not take.
 func TestCompletionAfterHelpOffersTheCommandItDescribes(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "flags-follow-the-command",
 		"completion-after-help-offers-the-command-it-describes")
@@ -35,10 +35,11 @@ func TestCompletionAfterHelpOffersTheCommandItDescribes(t *testing.T) {
 	targets := []string{"/apps/web", "/apps/list", "/flow", "flow"}
 	nothing := []string{}
 	for _, ws := range []struct {
-		root  string
-		cases []helpCompletion
+		root    string
+		aliases map[string]string
+		cases   []helpCompletion
 	}{
-		{groups, []helpCompletion{
+		{groups, nil, []helpCompletion{
 			{[]string{"help", ""}, []string{"stage", "notes", "projects", "help"}, targets},
 			{[]string{"help", "stage", ""}, []string{"list", "up"}, targets},
 			{[]string{"help", "projects", ""}, []string{"list", "describe"}, targets},
@@ -47,14 +48,24 @@ func TestCompletionAfterHelpOffersTheCommandItDescribes(t *testing.T) {
 			{[]string{"help", "projects", "-v", ""}, nothing, append([]string{"list", "describe", "--output"}, targets...)},
 			{[]string{"help", "stage", "up", ""}, nothing, append([]string{"--output"}, targets...)},
 			{[]string{"help", "--output", ""}, []string{"json"}, targets},
+			{[]string{"help", "--output", "json", ""}, nothing, append([]string{"json", "stage"}, targets...)},
+			{[]string{"help", "--projects", ""}, nothing, targets},
 			{[]string{"help", "projects", "--"}, []string{"--man", "--markdown", "--output"}, nil},
+			{[]string{"help", "pro"}, []string{"projects"}, targets},
+			{[]string{"help", "stage", "u"}, []string{"up"}, []string{"upgrade"}},
 		}},
-		{jobs, []helpCompletion{
+		{jobs, map[string]string{"h": "help"}, []helpCompletion{
 			{[]string{"help", ""}, []string{"lint-docs", "projects"}, targets},
 			{[]string{"help", "lint-docs", ""}, nothing, targets},
+			{[]string{"h", ""}, []string{"lint-docs", "projects"}, targets},
+			{[]string{"h", "projects", ""}, []string{"list", "describe"}, targets},
+			{[]string{"h", "-v", ""}, nothing, append([]string{"projects", "--output"}, targets...)},
+			{[]string{"h", "projects", "-v", ""}, nothing, append([]string{"list", "--output"}, targets...)},
+			// A job command still takes a project target after a flag value.
+			{[]string{"lint-docs", "--output", "json", ""}, []string{"/flow"}, []string{"json"}},
 		}},
 	} {
-		cfg := &wsproto.Config{}
+		cfg := &wsproto.Config{Aliases: ws.aliases}
 		var bash, zsh, fish bytes.Buffer
 		CompletionBash(&bash, ws.root, cfg, nil)
 		CompletionZsh(&zsh, ws.root, cfg, nil)

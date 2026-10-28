@@ -50,6 +50,17 @@ _putnami_core_root() {
     esac
 }
 
+# help and its aliases read the command they describe from their next words.
+_putnami_is_help() {
+    case "$1" in
+`)
+	for _, name := range ctx.helpNames() {
+		iox.Fprintf(w, "        %s) return 0 ;;\n", bashQuote(name))
+	}
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami_takes_project() {
     case "$1" in
 `)
@@ -149,12 +160,13 @@ _putnami() {
             if [[ "${path}" == -* ]]; then
                 return 1
             fi
-            # help reads the command it describes from its next two words, and
-            # the CLI refuses a flag before either of them: the first word
-            # completes the command names, the second the subcommands of the
-            # first, and nothing else, since help takes no project target. Its
-            # flags and the value of --output complete below.
-            if [[ "${path}" == "help" && "${cur}" != -* && "${prev}" != "--output" ]]; then
+            # help, or an alias of it, reads the command it describes from its
+            # next two words, and the CLI refuses a flag before either of them:
+            # the first word completes the command names, the second the
+            # subcommands of the first, and nothing else, since help takes no
+            # project target. Its flags and the value of --output complete
+            # below.
+            if _putnami_is_help "${path}" && [[ "${cur}" != -* && "${prev}" != "--output" ]]; then
                 if (( CURRENT == 2 )); then
                     _describe -t commands 'job commands' commands
                     _describe -t structured 'structured commands' structured_commands
