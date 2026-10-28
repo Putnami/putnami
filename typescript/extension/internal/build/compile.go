@@ -129,15 +129,20 @@ func resolveCompileOutputFile(outputPath, entrypoint, target string) string {
 	return outputFile
 }
 
-// buildCompileArgs builds the bun build --compile args.
-func buildCompileArgs(entrypoint, outputFile, target string) []string {
-	return []string{
-		"build",
+// buildCompileArgs builds the bun build --compile args. A non-empty config
+// names the bunfig.toml that bun reads instead of the one in its working
+// directory.
+func buildCompileArgs(config, entrypoint, outputFile, target string) []string {
+	args := []string{"build"}
+	if config != "" {
+		args = append(args, "--config="+config)
+	}
+	return append(args,
 		"--compile",
 		entrypoint,
 		"--outfile", outputFile,
 		"--target", target,
-	}
+	)
 }
 
 // RunCompile invokes bun build --compile once per resolved target.
@@ -145,20 +150,51 @@ func buildCompileArgs(entrypoint, outputFile, target string) []string {
 // The target set is a PARAMETER, never a decision made here: the caller
 // resolves it from plan-time inputs (ResolveCompileTargets) so the set that
 // produced a cache entry is the set its key was computed from.
+//
+// Bun runs from a directory of its own under outputPath, never from the
+// project. bun build --compile writes each executable to a temporary
+// ".<hash>-<n>.bun-build" file in its working directory, and extracts each
+// cross-compilation runtime to a ".<hash>-<n>.tmp" directory there. In the
+// project, git lists them as untracked files while the compile runs, so a
+// source binding computed at that moment covers files no commit holds. Under
+// outputPath, the final rename stays on one filesystem.
+//
+// The working directory decides two inputs, and both stay bound to the
+// project: the entrypoint resolves against projectPath, and the project's
+// bunfig.toml, which bun reads only from its working directory, is passed
+// with --config.
 func RunCompile(bunBin, projectPath, outputPath string, entrypoint string, targets []string) ([]string, []string, error) {
-	// Ensure output directory
-	os.MkdirAll(outputPath, 0755)
+	outputPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve compile output %s: %w", outputPath, err)
+	}
+	if err := os.MkdirAll(outputPath, 0755); err != nil {
+		return nil, nil, fmt.Errorf("create compile output %s: %w", outputPath, err)
+	}
+	workDir, err := os.MkdirTemp(outputPath, ".bun-compile-")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create compile working directory: %w", err)
+	}
+	defer os.RemoveAll(workDir)
+
+	entry := entrypoint
+	if !filepath.IsAbs(entry) {
+		entry = filepath.Join(projectPath, entry)
+	}
+	config := filepath.Join(projectPath, "bunfig.toml")
+	if info, statErr := os.Stat(config); statErr != nil || info.IsDir() {
+		config = ""
+	}
 
 	var files []string
 	var errors []string
 
 	for _, target := range targets {
 		outputFile := resolveCompileOutputFile(outputPath, entrypoint, target)
-		os.MkdirAll(filepath.Dir(outputFile), 0755)
 
-		args := buildCompileArgs(entrypoint, outputFile, target)
+		args := buildCompileArgs(config, entry, outputFile, target)
 
-		result, err := execRunFunc(bunBin, args, exec.Dir(projectPath), exec.Timeout(5*time.Minute))
+		result, err := execRunFunc(bunBin, args, exec.Dir(workDir), exec.Timeout(5*time.Minute))
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Compile failed for %s [%s]: %v", entrypoint, target, err))
 			continue

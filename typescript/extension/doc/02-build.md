@@ -400,6 +400,12 @@ the phase's cache key.
 
 Output is written to `output/compile/`.
 
+Bun runs from a temporary directory under `output/compile/`, not from the
+project. Bun writes each executable to a temporary file in its working
+directory before it renames the file, so the project source tree never holds
+that file. The entrypoint still resolves against the project, and Bun reads the
+project's `bunfig.toml` through `--config`.
+
 ### Phase 5: Infra (workloads only)
 
 Emits the workload's deployability manifest at `<project>/.gen/requirements.json`:
