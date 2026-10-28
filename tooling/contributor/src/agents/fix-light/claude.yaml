@@ -1,5 +1,0 @@
-name: fix-light
-description: Implementation worker for the /build skill, light tier — mechanical changes fully prescribed in a delivery unit (docs, config values, renames, test-only, log wording). Use only when /build delegates a unit; not for general delegation.
-tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch
-model: sonnet
-effort: medium
