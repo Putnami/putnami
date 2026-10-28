@@ -3,6 +3,7 @@ package agentsession
 import (
 	"bytes"
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -103,5 +104,26 @@ func TestAgentStageRefusesAnUnknownStageAndAMissingSession(t *testing.T) {
 	}
 	if len(h.provider.recordedSyncs()) != 0 {
 		t.Errorf("syncs %+v", h.provider.recordedSyncs())
+	}
+}
+
+func TestAgentStagePrintsTheTokensSpentSoFar(t *testing.T) {
+	spectest.Proves(t, sessionFeature, stageRequirement, "agent-stage-prints-the-tokens-so-far")
+	h := newHarness(t)
+	dir := t.TempDir()
+	main := filepath.Join(dir, claudeSession+".jsonl")
+	appendLines(t, main, assistantLine("msg_1", 10, 5, 100, 1000)+"\n")
+	appendLines(t, filepath.Join(dir, claudeSession, "subagents", "agent-a1.jsonl"), assistantLine("msg_2", 20, 0, 0, 0)+"\n")
+	h.hook(claude, "session-start", claudeSession, withTranscript(main))
+	h.environ["CLAUDE_CODE_SESSION_ID"] = claudeSession
+	// The stage reads what the transcript added since the last hook.
+	appendLines(t, main, assistantLine("msg_3", 1, 2, 3, 4)+"\n")
+	code, stdout, stderr := h.stage("code")
+	want := "The session is at stage code, and its mission " + sessionBranchKey + " knows it.\nIt has spent 1145 tokens so far.\n"
+	if code != 0 || stderr != "" || stdout != want {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if got, want := usageOf(t, h.provider.lastSync(t)), (collab.SessionUsage{InputTokens: 31, OutputTokens: 7, CacheWriteTokens: 103, CacheReadTokens: 1004}); got != want {
+		t.Errorf("the stage sync carries usage %+v, want %+v", got, want)
 	}
 }

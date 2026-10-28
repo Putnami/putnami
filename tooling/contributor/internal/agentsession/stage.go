@@ -40,9 +40,10 @@ var sessionCacheName = regexp.MustCompile(`^[0-9a-f]{64}\.json$`)
 // session's change in the session cache, so every later sync carries it, and
 // syncs at once when the session reports to a mission. The current session is
 // the one the host names in the environment, else the session of this
-// checkout and branch that was active last. A usage error exits 2; no
-// session, or a sync that fails, exits 1, and a stage it recorded still goes
-// with the next sync.
+// checkout and branch that was active last. It prints the tokens the session
+// spent so far, when its transcript was read: the count change estimate
+// sizes. A usage error exits 2; no session, or a sync that fails, exits 1,
+// and a stage it recorded still goes with the next sync.
 func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer) int {
 	stage, err := parseStageArgs(args)
 	if err != nil {
@@ -56,6 +57,7 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 	}
 	now := e.Now()
 	mission, publishable := "", false
+	var usage *collab.SessionUsage
 	dir := e.sessionsDir()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
@@ -71,6 +73,11 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 		}
 		refreshMissionKey(cache, dir)
 		mission, publishable = cache.Mission.Key, sessionPublishable(cache)
+		refreshUsage(cache)
+		if cache.Usage != nil {
+			totals := cache.Usage.Totals
+			usage = &totals
+		}
 		return cache, nil
 	}); err != nil {
 		_, _ = fmt.Fprintf(stderr, "agent stage: %v\n", err)
@@ -78,6 +85,7 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 	}
 	if !publishable {
 		_, _ = fmt.Fprintf(stdout, "The session is at stage %s. It reports to no mission yet; its first sync carries the stage.\n", stage)
+		printSpentTokens(stdout, usage)
 		return 0
 	}
 	ctx, cancel := context.WithTimeout(ctx, hookTimeout-launcherMargin)
@@ -87,7 +95,19 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "The session is at stage %s, and its mission %s knows it.\n", stage, mission)
+	printSpentTokens(stdout, usage)
 	return 0
+}
+
+// printSpentTokens prints the tokens the session spent so far: input, cache
+// write, cache read and output, subagents included, the count change
+// estimate sizes. A session whose transcript was never read prints nothing.
+func printSpentTokens(stdout io.Writer, usage *collab.SessionUsage) {
+	if usage == nil {
+		return
+	}
+	spent := usage.InputTokens + usage.CacheWriteTokens + usage.CacheReadTokens + usage.OutputTokens
+	_, _ = fmt.Fprintf(stdout, "It has spent %d tokens so far.\n", spent)
 }
 
 // parseStageArgs reads the one stage name.
