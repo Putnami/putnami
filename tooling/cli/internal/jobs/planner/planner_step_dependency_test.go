@@ -18,7 +18,8 @@ import (
 // TypeScript build without a describe step.
 
 // stepDependencyGoBuild is a Go-like build. Its describe step runs only for a
-// project that is not a library, as the Go extension's activation gate does.
+// project that is not a library. The condition stands in for the Go
+// extension's activation gate, which reads the project's go.mod.
 func stepDependencyGoBuild(name string) *extension.ExtensionDescription {
 	return &extension.ExtensionDescription{
 		Name: name,

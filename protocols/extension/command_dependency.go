@@ -79,8 +79,7 @@ func validateManifestCommandDependencies(m *Manifest) []diag.Diagnostic {
 // validateCommandDependency refuses a command dependency that is not
 // `command`, `command~step` or `!command`: a pipeline-step reference (a `^`,
 // `/` or `*` prefix), an empty command or step, a second separator, and a
-// session barrier on one step. The planner would plan nothing for such an
-// entry, and the dependent would run without waiting.
+// session barrier on one step.
 func validateCommandDependency(field, dependency string) []diag.Diagnostic {
 	parsed := ParseCommandDependency(dependency)
 	refuse := func(format string, args ...any) []diag.Diagnostic {

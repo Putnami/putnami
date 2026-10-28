@@ -1629,11 +1629,12 @@ func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]strin
 // commandStepJobs indexes the key of every planned job by its project, its
 // command and its step id. The step id is the one the manifest declares, so a
 // step that several extensions contribute to one command, each under its own
-// namespaced plan name, is indexed under one entry.
+// namespaced plan name, is indexed under one entry. A finalizer is left out,
+// as computeCommandLeaves leaves it out: no dependent waits for a cleanup.
 func commandStepJobs(jobs []*jobmodel.ScheduledJob) map[string][]string {
 	index := make(map[string][]string)
 	for _, job := range jobs {
-		if job.Project == nil || job.JobDef == nil || job.StepID() == "" {
+		if job.Project == nil || job.JobDef == nil || job.StepID() == "" || jobmodel.IsFinalizerJob(job) {
 			continue
 		}
 		key := commandStepKey(job.Project.ID, job.CommandName(), job.StepID())
