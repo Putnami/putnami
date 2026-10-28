@@ -2,8 +2,8 @@
 
 Declare turns the accepted solution into a task, a plan and an estimate. Keep
 the run's files in `.putnami/<issue>/`, outside Git: the plan, notes, review
-reports and screenshots. An intention without a task uses the branch name in
-place of the issue.
+reports and screenshots. An intention without a task uses the branch name, with
+each `/` replaced by `-`, in place of the issue.
 
 ## The task
 
@@ -20,8 +20,8 @@ place of the issue.
 - An intention stays an intention unless the owner asks for a task; then
   create it with `tasks create`, with the type, priority and topic the owner
   gave. Never search, rank or claim backlog items.
-- With a task ID, run `"$PUTNAMI_CLI" agent attach --issue <id>` so the
-  session reports to its mission. When memory is bound, read the mission and
+- With an issue number, run `"$PUTNAMI_CLI" agent attach --issue <number>`
+  so the session reports to its mission. When memory is bound, read the mission and
   the affected projects' context first
   ([collaboration contracts](collaboration.md)).
 
@@ -44,9 +44,11 @@ affected scope owners before fixing the decomposition ([scopes](scopes.md)).
 
 ## The plan
 
-Write `.putnami/<issue>/plan.json` in the format `change estimate` reads: the
-slices in the order they run, and for each its projects, file count,
-endpoints, screens and sensitive zones. A slice is one step the owner can
+Write `.putnami/<issue>/plan.json` in the format `change estimate` reads:
+`protocolVersion` 1, the `issue` id the run's directory carries, and the
+slices in the order they run, each with its `key`, `title`, projects, file
+count, endpoints, screens and sensitive zones. The estimate names any member
+that is missing. A slice is one step the owner can
 validate on its own, about three hours or less, and ends with a push. In the
 run notes, give each slice its goal, its done criteria tied to specs or
 tests, its proof command and its effort.
@@ -61,7 +63,8 @@ infrastructure, and mark a one-way door: a change hard to undo once released.
 
 ## The estimate
 
-Run `"$PUTNAMI_CLI" change estimate --issue <id>` and apply the launch rule of
+Run `"$PUTNAMI_CLI" change estimate --issue <issue>`, with the same id as
+the plan, and apply the launch rule of
 the skill core. When the owner must approve, give them the study, the plan,
 the estimate and the envelope, and wait. Record the estimate of each slice: the
 slice report compares it with the tokens spent.

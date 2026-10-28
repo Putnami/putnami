@@ -47,6 +47,6 @@ with material migration/strategic cost; keep independent tasks moving.
 
 Local notes and hashes establish recorded context and declared authorship only.
 Shared filesystem permissions do not stop forgery or deletion, and do not prove
-that the scope owner understood every constraint. The pilot enforces evidence
+that the scope owner understood every constraint. The verifier enforces evidence
 consistency; separate writer permissions and hosted signed attribution remain
 open runtime decisions, not prerequisites silently added to this skill update.

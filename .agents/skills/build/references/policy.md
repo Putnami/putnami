@@ -48,7 +48,7 @@ value is an object:
 
 | Member | Default | Meaning |
 |---|---|---|
-| `runs` | `main`, and `agent` for `review` | `main` runs the stage in the main session; `agent` runs it in a separate agent. |
+| `runs` | `main`, and `agent` for `review` | `main` runs the stage in the main session; `agent` runs it in a separate agent. Review always runs in a separate agent. |
 | `agent` | `reviewer` for `review`, `fix-standard` for `code` | Worker profile of the separate agent. A code slice whose contract names a heavy risk goes to `fix-heavy`. |
 | `model` | the worker's metadata | Host model the separate agent runs on. |
 | `effort` | the worker's metadata | Host reasoning effort of the separate agent. |

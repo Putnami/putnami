@@ -182,5 +182,5 @@ Metadata not carried by those records (such as test-name filters), required-scop
 completeness, semantic review quality, author identity, historical immutability
 and authorization of exceptions remain reviewed conventions. A hash identifies
 bytes, not a trusted author. Shared writers can rewrite the index or verifier.
-These limits must remain visible in pilot results; do not activate an automatic
+These limits must remain visible in the end report; do not activate an automatic
 merge policy from this local stamp alone.

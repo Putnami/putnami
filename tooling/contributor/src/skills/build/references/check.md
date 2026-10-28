@@ -15,7 +15,9 @@ Nobody edits the tree while it is reviewed.
 ## Review
 
 Launch one fresh reviewer, the worker the profile names for review
-(`reviewer` by default), with the [review](../../review/SKILL.md) method. Its
+(`reviewer` by default), with the [review](../../review/SKILL.md) method.
+Review always runs in a separate agent with an empty context, even when the
+profile sets `runs` to `main` for it. Its
 brief: the objective, the base, head and fingerprint, the diff, the slice
 contracts and the impact, the specs, architecture and ADRs of the touched
 projects, and the gate records. Never the expected verdict or your private
