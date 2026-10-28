@@ -70,12 +70,11 @@ coding agent can act on.
   framework, and the TypeScript framework are tested against the same fixtures,
   so the languages cannot drift apart silently. The protocols live in
   [`protocols/`](protocols).
-- **Built for coding agents.** Every workspace ships an MCP server, which
-  exposes the workspace to an agent as typed tools. An agent can list projects,
-  compute what a change affects and why, find the owner of a file, run lint,
+- **Built for coding agents.** An agent reaches a workspace through the CLI.
+  It can list projects, find the owner of a file, list dependency edges, learn
+  what a change affects and why, preview a job with `--dry-run`, run lint,
   test, and build, and read each failure as `file:line:col` with a severity and
-  a code. One tool changes anything, it supports a dry run, and it refuses jobs
-  that reach external systems. The lint refuses a skipped test that has no
+  a code. The lint refuses a skipped test that has no
   stated reason, so an agent cannot fix a test by turning it off. See
   [Agents](https://putnami.dev/docs/agents).
 - **Polyglot by design.** A language is an extension, built with the

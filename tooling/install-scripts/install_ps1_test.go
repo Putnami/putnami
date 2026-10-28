@@ -2039,27 +2039,29 @@ func TestInstallPS1ReportsAShadowingPutnami(t *testing.T) {
 	}
 }
 
-func TestInstallPS1RegistersAgentHostsLikeInstallSh(t *testing.T) {
+func TestInstallPS1RemovesTheRegistrationItWroteLikeInstallSh(t *testing.T) {
 	t.Parallel()
 	registry, _, _ := defaultPS1Registry(t)
 	e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
 	binary := filepath.Join(e.binDir(), "putnami.exe")
 	claude := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", false)
 	codex := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "codex", false)
+	claude.seedInstallerWritten(t, binary, true)
+	codex.seedInstallerWritten(t, binary, true)
 
 	first := e.run(t)
 	if first.exitCode != 0 {
 		t.Fatalf("install failed (exit %d):\n%s", first.exitCode, first.output())
 	}
-	if calls := readHostCalls(t, claude); !strings.Contains(calls, "mcp add --scope user --env PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.} --transport stdio putnami -- "+binary+" mcp") {
-		t.Fatalf("Claude registration differs from install.sh:\n%s", calls)
+	if calls := readHostCalls(t, claude); !strings.Contains(calls, "mcp remove --scope user putnami") {
+		t.Fatalf("Claude removal differs from install.sh:\n%s", calls)
 	}
-	if calls := readHostCalls(t, codex); !strings.Contains(calls, "mcp add putnami -- "+binary+" mcp") {
-		t.Fatalf("Codex registration differs from install.sh:\n%s", calls)
+	if calls := readHostCalls(t, codex); !strings.Contains(calls, "mcp remove putnami") {
+		t.Fatalf("Codex removal differs from install.sh:\n%s", calls)
 	}
 	for _, want := range []string{
-		"Claude Code MCP configuration and connection verified for new sessions",
-		"Codex MCP configuration verified for new sessions",
+		"Removed the Putnami MCP server that an earlier install registered in Claude Code",
+		"Removed the Putnami MCP server that an earlier install registered in Codex",
 	} {
 		if !first.contains(want) {
 			t.Fatalf("output does not contain %q:\n%s", want, first.output())
@@ -2071,8 +2073,65 @@ func TestInstallPS1RegistersAgentHostsLikeInstallSh(t *testing.T) {
 		t.Fatalf("repeat install failed (exit %d):\n%s", second.exitCode, second.output())
 	}
 	for _, host := range []fakeAgentHost{claude, codex} {
-		if got := strings.Count(readHostCalls(t, host), "mcp add "); got != 1 {
-			t.Fatalf("%s registration count = %d across two installs, want 1", host.name, got)
+		calls := readHostCalls(t, host)
+		if got := strings.Count(calls, "mcp remove "); got != 1 {
+			t.Fatalf("%s removal count = %d across two installs, want 1", host.name, got)
+		}
+		if strings.Contains(calls, "mcp add") {
+			t.Fatalf("the installer registered a server with %s:\n%s", host.name, calls)
+		}
+	}
+}
+
+// A project's own putnami entry shadows the user-scope one in `claude mcp get`
+// when it runs in the project. install.ps1 run from such a project must still
+// remove the registration it wrote.
+func TestInstallPS1RemovesTheRegistrationFromInsideAProject(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-discovery", "host-registration-removal", "a-registration-the-installer-wrote-is-removed")
+	registry, _, _ := defaultPS1Registry(t)
+	e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
+	binary := filepath.Join(e.binDir(), "putnami.exe")
+	claude := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", false)
+	claude.seedInstallerWritten(t, binary, true)
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".mcp.json"), []byte(`{"mcpServers":{"putnami":{"command":"putnami","args":["mcp"]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.workDir = project
+
+	res := e.run(t)
+	if res.exitCode != 0 {
+		t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output())
+	}
+	if calls := readHostCalls(t, claude); !strings.Contains(calls, "mcp remove --scope user putnami") {
+		t.Fatalf("Claude Code was not asked to remove the user-scope server:\n%s", calls)
+	}
+	if hostHasDefinition(claude) {
+		t.Fatal("the user-scope definition survived an install run inside a project")
+	}
+	if res.contains("it was kept") {
+		t.Fatalf("the installer reported a customized definition:\n%s", res.output())
+	}
+}
+
+func TestInstallPS1RegistersNoAgentHostServer(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/context-discovery", "host-registration-removal", "the-installer-registers-no-host-server")
+	registry, _, _ := defaultPS1Registry(t)
+	e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
+	binary := filepath.Join(e.binDir(), "putnami.exe")
+	claude := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", false)
+	codex := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "codex", false)
+
+	res := e.run(t)
+	if res.exitCode != 0 {
+		t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output())
+	}
+	for _, host := range []fakeAgentHost{claude, codex} {
+		calls := readHostCalls(t, host)
+		if strings.Contains(calls, "mcp add") || strings.Contains(calls, "mcp remove") {
+			t.Fatalf("the installer changed the %s configuration:\n%s", host.name, calls)
 		}
 	}
 }
@@ -2081,7 +2140,7 @@ func TestInstallPS1RespectsExistingAgentHostDefinitions(t *testing.T) {
 	t.Parallel()
 	registry, _, _ := defaultPS1Registry(t)
 
-	t.Run("human definitions are preserved", func(t *testing.T) {
+	t.Run("customized definitions are kept", func(t *testing.T) {
 		t.Parallel()
 		e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
 		binary := filepath.Join(e.binDir(), "putnami.exe")
@@ -2100,11 +2159,17 @@ func TestInstallPS1RespectsExistingAgentHostDefinitions(t *testing.T) {
 			t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output())
 		}
 		for _, host := range []fakeAgentHost{claude, codex} {
-			if strings.Contains(readHostCalls(t, host), "mcp add ") {
-				t.Fatalf("installer replaced the existing %s definition", host.name)
+			if strings.Contains(readHostCalls(t, host), "mcp remove") {
+				t.Fatalf("installer removed the customized %s definition", host.name)
+			}
+			if !hostHasDefinition(host) {
+				t.Fatalf("the customized %s definition is gone", host.name)
 			}
 		}
-		for _, want := range []string{"human configuration was preserved", "human TOML and launcher were preserved"} {
+		for _, want := range []string{
+			"Claude Code defines a putnami MCP server that Putnami did not register as is; it was kept.",
+			"Codex defines a putnami MCP server that Putnami did not register as is; it was kept.",
+		} {
 			if !res.contains(want) {
 				t.Fatalf("output does not contain %q:\n%s", want, res.output())
 			}
@@ -2127,12 +2192,12 @@ func TestInstallPS1RespectsExistingAgentHostDefinitions(t *testing.T) {
 		if res.exitCode != 0 {
 			t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output())
 		}
-		if !res.contains("Codex MCP configuration verified for new sessions") {
+		if !res.contains("Removed the Putnami MCP server that an earlier install registered in Codex") {
 			t.Fatalf("a reformatted Putnami definition was not recognized:\n%s", res.output())
 		}
 	})
 
-	t.Run("a lookalike Codex definition is not verified", func(t *testing.T) {
+	t.Run("a lookalike Codex definition is kept", func(t *testing.T) {
 		t.Parallel()
 		e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
 		binary := filepath.Join(e.binDir(), "putnami.exe")
@@ -2148,7 +2213,7 @@ func TestInstallPS1RespectsExistingAgentHostDefinitions(t *testing.T) {
 		if res.exitCode != 0 {
 			t.Fatalf("install failed (exit %d):\n%s", res.exitCode, res.output())
 		}
-		if res.contains("Codex MCP configuration verified") || !res.contains("human TOML and launcher were preserved") {
+		if res.contains("Removed the Putnami MCP server") || !res.contains("did not register as is") || !hostHasDefinition(codex) {
 			t.Fatalf("a lookalike definition was treated as the installer's own:\n%s", res.output())
 		}
 	})
@@ -2157,14 +2222,16 @@ func TestInstallPS1RespectsExistingAgentHostDefinitions(t *testing.T) {
 		t.Parallel()
 		e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
 		binary := filepath.Join(e.binDir(), "putnami.exe")
-		writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", true)
-		writeFakeAgentHost(t, e.state, e.fakeBin, binary, "codex", true)
+		claude := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", true)
+		codex := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "codex", true)
+		claude.seedInstallerWritten(t, binary, true)
+		codex.seedInstallerWritten(t, binary, true)
 		res := e.run(t)
 		if res.exitCode != 0 {
 			t.Fatalf("a host refusal failed the install (exit %d):\n%s", res.exitCode, res.output())
 		}
 		for _, host := range []string{"Claude Code", "Codex"} {
-			if !res.contains("Could not register Putnami with " + host) {
+			if !res.contains("Could not remove the Putnami MCP server from " + host) {
 				t.Fatalf("missing the %s policy warning:\n%s", host, res.output())
 			}
 		}
@@ -2183,15 +2250,19 @@ func TestInstallPS1SkipsAgentHostsWhenDeclined(t *testing.T) {
 			e := newPSEnv(t).set("PUTNAMI_REGISTRY_URL", registry.URL)
 			binary := filepath.Join(e.binDir(), "putnami.exe")
 			claude := writeFakeAgentHost(t, e.state, e.fakeBin, binary, "claude", false)
+			claude.seedInstallerWritten(t, binary, true)
 			res := decline(e)
 			if res.exitCode != 0 {
 				t.Fatalf("declined install failed (exit %d):\n%s", res.exitCode, res.output())
 			}
-			if !res.contains("Skipping agent-host registration (PUTNAMI_NO_AGENT_HOSTS/--no-agent-hosts).") {
-				t.Fatalf("the declined registration was not reported:\n%s", res.output())
+			if !res.contains("Skipping agent-host cleanup (PUTNAMI_NO_AGENT_HOSTS/--no-agent-hosts).") {
+				t.Fatalf("the declined step was not reported:\n%s", res.output())
 			}
 			if data, err := os.ReadFile(claude.log); err == nil && len(data) != 0 {
 				t.Fatalf("declined install still called claude: %s", data)
+			}
+			if !hostHasDefinition(claude) {
+				t.Fatal("declined install removed the claude definition")
 			}
 		})
 	}

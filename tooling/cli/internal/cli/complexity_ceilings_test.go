@@ -109,7 +109,7 @@ var complexityCeilings = []complexityCeiling{
 			"which selects the session's remote cache and records it on the request, so executeSession " +
 			"stays within its line limit. They add no stage, flag or store; " +
 			"files stay at 24. " +
-			"LOWERED 25/186→24/183 (cli/context-mcp-discovery, build-writes-no-workspace-map): " +
+			"LOWERED 25/186→24/183 (cli/context-discovery, build-writes-no-workspace-map): " +
 			"context_map.go — the finalizer that refreshed the workspace map after a build session, its " +
 			"two stderr notices and the build-name check that gated it — is deleted. A build writes no " +
 			"map; resultsSucceeded, which the spec gate also uses, moves to spec_gate.go. " +
@@ -246,7 +246,7 @@ var complexityCeilings = []complexityCeiling{
 			"the ONE place a run is assembled: selection, planning, preflight, cache lifetime, the " +
 			"session file, run markers and the canonical result (ADR 0001 §3). The epic collapsed " +
 			"five run loops into it, so this package is where every adapter's special case wants to " +
-			"land — the MCP one, the watch one, the lifecycle one. Growth here is usually a caller's " +
+			"land — the watch one, the lifecycle one. Growth here is usually a caller's " +
 			"policy migrating INTO the engine as a flag, which is the shape that made the five loops " +
 			"diverge in the first place. A new stage is a real decision; raise this and name it. " +
 			"RAISED ONCE, from 13/65: workspace_probe.go adds the " +
@@ -735,7 +735,7 @@ var complexityCeilings = []complexityCeiling{
 			"of what a cache key sees. Exporting the one already here makes cache-key " +
 			"COMPLETENESS assertable from outside the package, which is the invariant the ceiling " +
 			"protects, not one it trades away. ADR 0024 raises 91→92 for PrepareWorkspaceGraph, " +
-			"the shared minimal graph-preparation entrypoint used by MCP cold startup. It composes " +
+			"the shared minimal graph-preparation entrypoint. It composes " +
 			"the existing provider binding and workspace synchronization paths and adds no Engine.Run " +
 			"stage or second graph-preparation engine. RAISED A FOURTH TIME, from 25/227: " +
 			"task_failure.go is the negative (failure) entry — the record that says \"this " +

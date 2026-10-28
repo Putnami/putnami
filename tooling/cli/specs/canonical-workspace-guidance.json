@@ -4,7 +4,7 @@
   "feature": "cli/canonical-workspace-guidance",
   "outcomes": [
     "A new contributor can move from workspace discovery to an exact validation command and then to focused diagnostics using only public guidance",
-    "Generated assistant guidance and public CLI documentation describe the same commands, selection rules, MCP routing, support promise, and failure workflow",
+    "Generated assistant guidance and public CLI documentation describe the same commands, selection rules, discovery routing, support promise, and failure workflow",
     "Repository contributors use the workspace wrapper for build, test, lint, dependency, and generation workflows"
   ],
   "nonGoals": [
@@ -27,7 +27,7 @@
     },
     {
       "id": "generated-agent-guidance",
-      "text": "Generated context routes structural discovery to live lock-resolved MCP instructions and resources, names the CLI gate for verification, and states the bounded local fallback when MCP data is unavailable or stale."
+      "text": "Generated context routes workspace discovery to the CLI commands that print it, names the CLI gate for verification, and names no tool a workspace does not serve."
     },
     {
       "id": "support-maturity-separation",
@@ -44,6 +44,7 @@
   ],
   "decisions": [
     "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
-    "tooling/cli/doc/adr/0006-cli-model-and-command-verticals.md"
+    "tooling/cli/doc/adr/0006-cli-model-and-command-verticals.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

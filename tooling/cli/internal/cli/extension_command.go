@@ -173,8 +173,8 @@ func (a *App) runExtensionStructuredCommand(
 		// `runtime.executable_missing` until an unrelated command — install,
 		// projects sync, a planned job — happens to prepare it.
 		//
-		// This is the same repair internal/mcp made for extension-contributed
-		// tools (extension_tool_workspace.go), and it is written the same way: a
+		// This is the same repair internal/collaboration makes for provider
+		// tools (invoke.go), and it is written the same way: a
 		// no-op when the executable is already resolved, so a caller that
 		// supplied one is untouched, and silent when the extension declares no
 		// runtime at all, because that case has its own named failure downstream.

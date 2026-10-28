@@ -127,7 +127,6 @@ ceilings drop **counted** rather than lost.
 | Producer | Surface |
 |----------|---------|
 | `tooling/cli/internal/output`, `.../machine` | `--output=json`, `--output=jsonl`, session and plan files, `report.json` |
-| `tooling/cli/internal/mcp` | The MCP `run_jobs` / `plan_jobs` results |
 | `tooling/cli/internal/telemetry`, `.../watch`, `.../engine`, `.../jobs` | Run summaries, task records and stream records |
 | `go/extension/internal/jobs/test`, `typescript/extension/cmd/putnami-ts`, `python/extension/internal/jobs` | The bounded `TestCase` list a test task hands the CLI, which the CLI writes as `test:case` records |
 | `tooling/cli/internal/commandmeta` | The CLI's command surface, committed as `tooling/cli/command-surface.json` |

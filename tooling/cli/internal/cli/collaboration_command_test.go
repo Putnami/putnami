@@ -22,8 +22,9 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// The CLI entry path of the collaboration contracts, measured against the MCP
-// entry path on the same workspace. The provider is this test binary
+// The CLI entry path of the collaboration contracts, measured against the
+// extension host channel (collaboration.call) on the same workspace. The
+// provider is this test binary
 // re-executed; the fixture declares it by absolute path, so discovery finds it
 // exactly as it finds any path-declared extension.
 
@@ -230,11 +231,11 @@ func decodeCollabEnvelope(t *testing.T, text string) collab.Envelope {
 	return *envelope
 }
 
-func TestCollaborationCommand_TheCLIAndMCPReturnTheSameEnvelope(t *testing.T) {
+func TestCollaborationCommand_TheCLIAndTheHostChannelReturnTheSameEnvelope(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-mcp-return-the-same-envelope")
+	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-the-host-channel-return-the-same-envelope")
 	root := collabCommandWorkspace(t, collabCommandBindings, nil)
-	srv := newMCPServer(root, "collaboration-test")
+	channel := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root), extensions: collabCommandExtensions(t, root)})
 	cases := []struct {
 		contract, operation, input string
 		outcome                    collab.Outcome
@@ -268,18 +269,12 @@ func TestCollaborationCommand_TheCLIAndMCPReturnTheSameEnvelope(t *testing.T) {
 			if arguments == "" {
 				arguments = "{}"
 			}
-			blocks, isError := callParityTool(t, srv, tc.contract+"."+tc.operation, arguments)
-			if len(blocks) != 1 {
-				t.Fatalf("MCP answered %d blocks", len(blocks))
+			answer, err := channel.CallCollaboration(t.Context(), tc.contract, tc.operation, json.RawMessage(arguments))
+			if err != nil {
+				t.Fatalf("collaboration.call %s %s = %v", tc.contract, tc.operation, err)
 			}
-			mcp := decodeCollabEnvelope(t, blocks[0])
-			if isError != (mcp.Outcome != collab.OutcomeOK) {
-				t.Errorf("MCP isError %v disagrees with outcome %s", isError, mcp.Outcome)
-			}
-			cliJSON, _ := json.Marshal(cli)
-			mcpJSON, _ := json.Marshal(mcp)
-			if !bytes.Equal(cliJSON, mcpJSON) {
-				t.Errorf("the entry paths disagree:\nCLI %s\nMCP %s", cliJSON, mcpJSON)
+			if string(answer) != strings.TrimSpace(stdout) {
+				t.Errorf("the entry paths disagree:\nCLI %s\nRPC %s", strings.TrimSpace(stdout), answer)
 			}
 		})
 	}
@@ -312,12 +307,14 @@ func collabUnpreparedProviderWorkspace(t *testing.T) string {
 func TestCollaborationCommand_AnUnpreparedLockedProviderIsUnavailableOnBothEntryPaths(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/collaboration-providers", "explicit-binding", "a-missing-or-disabled-provider-is-unavailable")
-	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-mcp-return-the-same-envelope")
+	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-the-host-channel-return-the-same-envelope")
+	spectest.Proves(t, "cli/context-discovery", "read-preparation", "failed-exact-preparation-never-exposes-an-ambient-extension")
 	root := collabUnpreparedProviderWorkspace(t)
-	if exts := collabCommandExtensions(t, root); len(exts) != 1 || exts[0].Version != "0.0.1" {
+	exts := collabCommandExtensions(t, root)
+	if len(exts) != 1 || exts[0].Version != "0.0.1" {
 		t.Fatalf("discovery = %+v, want the stale 0.0.1 behind the stable link", exts)
 	}
-	srv := newMCPServer(root, "collaboration-test")
+	channel := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root), extensions: exts})
 	for _, tc := range []struct{ contract, operation, input string }{
 		{"tasks", "find", `{}`},
 		{"tasks", "create", `{"title":"t","idempotencyKey":"k1"}`},
@@ -332,20 +329,17 @@ func TestCollaborationCommand_AnUnpreparedLockedProviderIsUnavailableOnBothEntry
 			if code != ExitError {
 				t.Errorf("exit code = %d, want %d", code, ExitError)
 			}
-			blocks, isError := callParityTool(t, srv, tc.contract+"."+tc.operation, tc.input)
-			if len(blocks) != 1 || !isError {
-				t.Fatalf("MCP answered %d blocks, isError %v", len(blocks), isError)
+			answer, err := channel.CallCollaboration(t.Context(), tc.contract, tc.operation, json.RawMessage(tc.input))
+			if err != nil {
+				t.Fatalf("collaboration.call %s %s = %v", tc.contract, tc.operation, err)
 			}
-			cliJSON, _ := json.Marshal(cli)
-			mcpJSON, _ := json.Marshal(decodeCollabEnvelope(t, blocks[0]))
-			if !bytes.Equal(cliJSON, mcpJSON) {
-				t.Errorf("the entry paths disagree:\nCLI %s\nMCP %s", cliJSON, mcpJSON)
+			if string(answer) != strings.TrimSpace(stdout) {
+				t.Errorf("the entry paths disagree:\nCLI %s\nRPC %s", strings.TrimSpace(stdout), answer)
 			}
 		})
 	}
 
 	var help bytes.Buffer
-	exts := collabCommandExtensions(t, root)
 	printCommandGroupHelp(context.Background(), &help, root, wsproto.Load(root), exts, "tasks", "", "")
 	if !strings.Contains(help.String(), "was not prepared from the workspace lock") {
 		t.Errorf("help does not report the unprepared provider:\n%s", help.String())
@@ -404,8 +398,8 @@ func TestCollaborationCommand_UsageErrors(t *testing.T) {
 	if code != ExitError || decodeCollabEnvelope(t, stdout).Outcome != collab.OutcomeInvalid {
 		t.Fatalf("code %d, %s", code, stdout)
 	}
-	// An optional operation the provider lacks has no MCP tool, and on the
-	// command line it answers unsupported rather than pretending to run.
+	// An optional operation the provider lacks answers unsupported rather than
+	// pretending to run.
 	stdout, _, code = runCollabCommand(t, root, "", "tasks", "claim", "--input", `{"ref":{"source":"local:cli","id":"T-1"},"holder":"me"}`)
 	if envelope := decodeCollabEnvelope(t, stdout); code != ExitError || envelope.Outcome != collab.OutcomeUnsupported ||
 		envelope.Error.Reason != collab.ReasonOperationUnsupported {

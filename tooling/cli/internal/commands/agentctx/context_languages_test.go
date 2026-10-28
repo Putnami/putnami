@@ -93,7 +93,7 @@ func documentLanguages(t *testing.T, ws *workspace.Workspace, path string) []str
 
 // A project claimed by a provider whose manifest declares go reports go.
 func TestContextPackLanguages_ClaimedProjectReportsTheDeclaredLanguage(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "agent-context-languages", "a-claimed-project-reports-the-declared-language")
+	spectest.Proves(t, "cli/context-discovery", "agent-context-languages", "a-claimed-project-reports-the-declared-language")
 	ws := writeLanguagesWorkspace(t, []languageProvider{
 		{name: "@local/go", language: "go", claims: []string{"svc/a"}},
 	}, nil)
@@ -106,7 +106,7 @@ func TestContextPackLanguages_ClaimedProjectReportsTheDeclaredLanguage(t *testin
 // A project that two providers claim reports both languages, sorted, whatever
 // order the providers are recorded in.
 func TestContextPackLanguages_TwoProvidersReportBothSorted(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "agent-context-languages", "a-project-claimed-by-two-providers-reports-both-sorted")
+	spectest.Proves(t, "cli/context-discovery", "agent-context-languages", "a-project-claimed-by-two-providers-reports-both-sorted")
 	ws := writeLanguagesWorkspace(t, []languageProvider{
 		{name: "@local/ts", language: "typescript", claims: []string{"svc/b"}},
 		{name: "@local/go", language: "go", claims: []string{"svc/b"}},
@@ -120,7 +120,7 @@ func TestContextPackLanguages_TwoProvidersReportBothSorted(t *testing.T) {
 // A provider that declares no language adds none, and it does not change what
 // another provider declares for its own projects.
 func TestContextPackLanguages_ProviderWithoutLanguageReportsNone(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "agent-context-languages", "a-provider-that-declares-no-language-adds-none")
+	spectest.Proves(t, "cli/context-discovery", "agent-context-languages", "a-provider-that-declares-no-language-adds-none")
 	ws := writeLanguagesWorkspace(t, []languageProvider{
 		{name: "@local/silent", claims: []string{"svc/a"}},
 		{name: "@local/go", language: "go", claims: []string{"svc/b"}},
@@ -137,7 +137,7 @@ func TestContextPackLanguages_ProviderWithoutLanguageReportsNone(t *testing.T) {
 // A directory with a go.mod that no provider claims reports no language: the
 // pack reads no file name.
 func TestContextPackLanguages_UnclaimedProjectReportsNone(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "agent-context-languages", "an-unclaimed-project-reports-none-whatever-its-files")
+	spectest.Proves(t, "cli/context-discovery", "agent-context-languages", "an-unclaimed-project-reports-none-whatever-its-files")
 	ws := writeLanguagesWorkspace(t, []languageProvider{
 		{name: "@local/go", language: "go", claims: []string{"svc/a"}},
 	}, nil)

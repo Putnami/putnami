@@ -809,7 +809,7 @@ func TestRunSaysARetiredCommandIsRetired(t *testing.T) {
 	}
 }
 
-// Declining agent-host registration is independent of running a command.
+// Declining the agent-host step is independent of running a command.
 func TestRunHonorsNoAgentHosts(t *testing.T) {
 	t.Parallel()
 	site := newRunSite(t, runSiteOptions{commandMap: commandMap("deploy @acme/deploy")})
@@ -834,7 +834,7 @@ func TestRunHonorsNoAgentHosts(t *testing.T) {
 			if out.exitCode != 0 {
 				t.Fatalf("run failed (exit %d):\n%s", out.exitCode, out.transcript())
 			}
-			if !strings.Contains(out.stderr, "Skipping agent-host registration") {
+			if !strings.Contains(out.stderr, "Skipping agent-host cleanup") {
 				t.Fatalf("the declined registration was not reported:\n%s", out.transcript())
 			}
 			for _, host := range []fakeAgentHost{claude, codex} {

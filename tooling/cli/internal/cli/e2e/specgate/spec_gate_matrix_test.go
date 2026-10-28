@@ -27,10 +27,9 @@ import (
 // real CLI (App.Run → Engine.Run → scheduler → finalizer → reducer), so what
 // is proven is the exit code a user sees and the record a session keeps.
 //
-// Watch iterations and MCP run_jobs replan through the same Engine.Run these
-// runs take (engine/watch.go binds watch.RunIteration; internal/mcp's
-// run_jobs is an adapter over Engine.Run), so the tri-state
-// proven here is theirs by construction; the finalizer's own attachment
+// Watch iterations replan through the same Engine.Run these runs take
+// (engine/watch.go binds watch.RunIteration), so the tri-state proven here is
+// theirs by construction; the finalizer's own attachment
 // conditions are pinned unit-side in engine/spec_gate_test.go.
 
 // gateMatrixFixture writes the synthetic workspace: two spec-owning projects

@@ -545,21 +545,6 @@
       "positionals": []
     },
     {
-      "path": "mcp",
-      "flags": [],
-      "positionals": [
-        {
-          "name": "install",
-          "required": false
-        }
-      ]
-    },
-    {
-      "path": "mcp install",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "migrate",
       "flags": [],
       "positionals": []
@@ -626,6 +611,25 @@
       ]
     },
     {
+      "path": "projects deps",
+      "flags": [
+        {
+          "long": "--dependents",
+          "type": "bool"
+        },
+        {
+          "long": "--transitive",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "project",
+          "required": true
+        }
+      ]
+    },
+    {
       "path": "projects describe",
       "flags": [],
       "positionals": [
@@ -639,6 +643,16 @@
       "path": "projects list",
       "flags": [],
       "positionals": []
+    },
+    {
+      "path": "projects owner",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "path",
+          "required": true
+        }
+      ]
     },
     {
       "path": "projects sync",
@@ -677,6 +691,20 @@
         },
         {
           "name": "tag",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "projects why",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "from",
+          "required": true
+        },
+        {
+          "name": "to",
           "required": true
         }
       ]

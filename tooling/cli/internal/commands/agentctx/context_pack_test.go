@@ -399,7 +399,7 @@ func printedPackIDs(t *testing.T, out string) []string {
 // narrows it to one, the default prints the document itself, an unknown
 // selector prints nothing, and no run writes a file.
 func TestContextPackCommand_PrintsTheDocumentsAndWritesNothing(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "context-pack-prints-the-documents-and-writes-nothing")
+	spectest.Proves(t, "cli/context-discovery", "generated-context", "context-pack-prints-the-documents-and-writes-nothing")
 	spectest.Proves(t, "agent-context/aggregated-agent-context", "a-producer-emits-a-valid-document-and-writes-nothing", "go-cli-context-pack-prints-the-documents-and-writes-nothing")
 	root := makeLoadableFixture(t)
 	before := treeOutsideState(t, root)
@@ -946,4 +946,28 @@ func TestBuildDocument_OverridesMalformedFailsClosed(t *testing.T) {
 	if code := protocolcli.ExitCodeForError(err); code != protocolcli.ExitUsage {
 		t.Fatalf("exit code = %d, want %d", code, protocolcli.ExitUsage)
 	}
+}
+
+// makeLoadableFixture augments the in-memory buildFixtureWorkspace layout with
+// the workspace/project config files workspace.Load needs, so a command that
+// loads the workspace from disk resolves the same two projects. It returns the
+// workspace root.
+func makeLoadableFixture(t *testing.T) string {
+	t.Helper()
+	ws, _ := buildFixtureWorkspace(t)
+	write := func(rel, content string) {
+		t.Helper()
+		abs := filepath.Join(ws.Root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", rel, err)
+		}
+		if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", rel, err)
+		}
+	}
+	write("putnami.workspace.json", `{"name":"fixture","includes":["svc/app","svc/lib"]}`)
+	write("svc/app/putnami.json", `{"name":"example/app","type":"application","tags":["go","e2e"],"main":"main.go","dependencies":["example/lib"]}`)
+	write("svc/lib/putnami.json", `{"name":"example/lib"}`)
+	workspace.InvalidateLoadCache(ws.Root)
+	return ws.Root
 }

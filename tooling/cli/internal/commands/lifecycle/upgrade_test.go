@@ -945,11 +945,12 @@ func TestWorkspaceCLIPinUpgradeWarningReportsASourceWorkspace(t *testing.T) {
 	}
 }
 
-// `putnami upgrade` registers the putnami MCP server like init and install do
-// (ADR 0040), keeps a registration someone diverged on purpose, and its dry run
-// writes nothing.
-func TestUpgrade_RegistersTheMCPServerAndKeepsADivergedEntry(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "implicit-mcp-registration", "a-diverged-entry-is-kept-byte-for-byte")
+// `putnami upgrade` removes the .mcp.json entry an earlier release wrote for
+// the MCP server Putnami no longer serves, keeps an entry someone changed on
+// purpose, and writes nothing in a dry run.
+func TestUpgrade_RemovesTheWrittenMCPEntryAndKeepsAChangedOne(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "a-putnami-written-entry-is-removed")
+	spectest.Proves(t, "cli/context-discovery", "mcp-registration-removal", "a-changed-entry-is-kept-with-a-warning")
 	hometest.Temp(t)
 	upgrade := func(dir string, dryRun bool) string {
 		t.Helper()
@@ -963,34 +964,49 @@ func TestUpgrade_RegistersTheMCPServerAndKeepsADivergedEntry(t *testing.T) {
 		return out
 	}
 	const registration = ".mcp.json"
+	written := func(dir string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, registration), []byte(writtenMCPRegistration), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	dry := writeUpgradeWorkspace(t)
-	if out := upgrade(dry, true); !strings.Contains(out, "Would register the putnami MCP server") {
-		t.Fatalf("dry run did not describe the registration:\n%s", out)
+	written(dry)
+	if out := upgrade(dry, true); !strings.Contains(out, "Would remove the putnami MCP server entry from .mcp.json") {
+		t.Fatalf("dry run did not describe the removal:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(dry, registration)); !os.IsNotExist(err) {
-		t.Fatalf("a dry-run upgrade wrote .mcp.json: stat err %v", err)
+	if got, err := os.ReadFile(filepath.Join(dry, registration)); err != nil || string(got) != writtenMCPRegistration {
+		t.Fatalf("a dry-run upgrade changed .mcp.json: %q (%v)", got, err)
 	}
 
 	fresh := writeUpgradeWorkspace(t)
-	if out := upgrade(fresh, false); !strings.Contains(out, "putnami MCP server registered in .mcp.json") {
-		t.Fatalf("upgrade did not report the registration:\n%s", out)
+	if out := upgrade(fresh, false); strings.Contains(out, "MCP") {
+		t.Fatalf("upgrade mentioned MCP in a workspace with no .mcp.json:\n%s", out)
 	}
-	data, err := os.ReadFile(filepath.Join(fresh, registration))
-	if err != nil || !strings.Contains(string(data), `"putnami"`) {
-		t.Fatalf("upgrade registered no putnami server: %s (%v)", data, err)
+	if _, err := os.Stat(filepath.Join(fresh, registration)); !os.IsNotExist(err) {
+		t.Fatalf("upgrade wrote .mcp.json: stat err %v", err)
 	}
 
-	diverged := writeUpgradeWorkspace(t)
+	registered := writeUpgradeWorkspace(t)
+	written(registered)
+	if out := upgrade(registered, false); !strings.Contains(out, ".mcp.json removed") {
+		t.Fatalf("upgrade did not report the removal:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(registered, registration)); !os.IsNotExist(err) {
+		t.Fatalf("upgrade kept the entry it should remove: stat err %v", err)
+	}
+
+	changed := writeUpgradeWorkspace(t)
 	custom := `{"mcpServers":{"putnami":{"command":"./putnamiw","args":["mcp"]}}}` + "\n"
-	if err := os.WriteFile(filepath.Join(diverged, registration), []byte(custom), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(changed, registration), []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out := upgrade(diverged, false); strings.Contains(out, "registered in .mcp.json") {
-		t.Fatalf("upgrade reported a registration over a diverged entry:\n%s", out)
+	if out := upgrade(changed, false); strings.Contains(out, "removed") && strings.Contains(out, ".mcp.json") {
+		t.Fatalf("upgrade reported a removal over a changed entry:\n%s", out)
 	}
-	if got, err := os.ReadFile(filepath.Join(diverged, registration)); err != nil || string(got) != custom {
-		t.Fatalf("upgrade rewrote a diverged entry:\n%s\n(%v)", got, err)
+	if got, err := os.ReadFile(filepath.Join(changed, registration)); err != nil || string(got) != custom {
+		t.Fatalf("upgrade rewrote a changed entry:\n%s\n(%v)", got, err)
 	}
 }
 

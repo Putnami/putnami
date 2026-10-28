@@ -211,7 +211,7 @@ func authoredCLIDomain() *arch.Builder {
 					Rebuildable:     true,
 					Rebuild:         archproto.RebuildBootstrap,
 				}),
-				arch.Justification("The recorded workspace index (.putnami/workspace-index.json) lets read-only commands and MCP tools answer without paying a probe. It carries the declared provenance, observation time and freshness fields, and the graph surfaces act on them: an absent copy fails closed with the command that rebuilds it, and a copy past the freshness bound is answered from and marked stale."),
+				arch.Justification("The recorded workspace index (.putnami/workspace-index.json) lets read-only commands answer without paying a probe. It carries the declared provenance, observation time and freshness fields, and the graph surfaces act on them: an absent copy fails closed with the command that rebuilds it, and a copy past the freshness bound is answered from and marked stale."),
 			),
 			arch.Command("cli.usage-telemetry.v1", 1, arch.From("observability", "observability.usage-ingest.v1"), arch.Carried(archproto.TransportEvent, "putnami.cli-usage.otlp-logs.v1", archproto.StatusActive),
 				arch.As("cli.usage-telemetry"),

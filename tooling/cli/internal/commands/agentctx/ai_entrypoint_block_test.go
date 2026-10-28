@@ -52,7 +52,7 @@ func TestGuidanceBlockRoundTrips(t *testing.T) {
 		"This is a Putnami workspace.",
 		"`putnami lint,test --impacted --enforce-coverage` once",
 		"While iterating, select the projects you changed with `--projects <a>,<b>`",
-		"If the MCP root differs from your worktree, use the local CLI.",
+		"Discover code through the CLI, then grep:",
 		"Skills and agents that an extension's agent content installs",
 		"Read `.agents/constraints.md` when it exists.",
 	} {
@@ -134,7 +134,7 @@ func TestUpsertGuidanceBlockPreservesEveryOtherByte(t *testing.T) {
 // A user's own 40-line AGENTS.md gains the block after its heading and keeps
 // every other byte; the next run changes nothing.
 func TestWriteAgentEntrypointsInsertsTheBlockIntoAUserAgentsFile(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "an-existing-entrypoint-keeps-every-byte-outside-the-block")
+	spectest.Proves(t, "cli/context-discovery", "generated-context", "an-existing-entrypoint-keeps-every-byte-outside-the-block")
 	dir := t.TempDir()
 	var user strings.Builder
 	user.WriteString("# Team agents guide\n\n")
@@ -205,7 +205,7 @@ func TestWriteAgentEntrypointsClaudeEntrypointForms(t *testing.T) {
 
 // An edited block is preserved and reported; nothing is written.
 func TestWriteAgentEntrypointsPreservesAnEditedBlock(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "an-edited-block-is-preserved")
+	spectest.Proves(t, "cli/context-discovery", "generated-context", "an-edited-block-is-preserved")
 	dir := t.TempDir()
 	if _, err := writeAgentEntrypoints(dir, false); err != nil {
 		t.Fatal(err)

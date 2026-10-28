@@ -37,7 +37,7 @@ type ReadPreparationIssue struct {
 	Reason  string
 }
 
-// ReadPreparationReport is the bounded result used by CLI and MCP reads.
+// ReadPreparationReport is the bounded result used by CLI reads.
 type ReadPreparationReport struct {
 	Extensions []ReadPreparedExtension
 	Issues     []ReadPreparationIssue

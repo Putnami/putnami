@@ -323,28 +323,6 @@ func (r Run) SessionEnd(at time.Time, durationMs int64) protocolcli.SessionStrea
 	}
 }
 
-// MCPRun is the run_jobs result document.
-func (r Run) MCPRun(commands []string) *protocolcli.MCPResult {
-	run := r.Summary(millis(r.duration()))
-	return &protocolcli.MCPResult{
-		ProtocolVersion: protocolcli.ResultProtocolVersion,
-		Tool:            protocolcli.MCPToolRunJobs,
-		Commands:        commandList(commands),
-		Run:             &run,
-	}
-}
-
-// MCPPlan is the plan_jobs result document.
-func MCPPlan(commands []string, planned []*jobs.ScheduledJob) *protocolcli.MCPResult {
-	plan := PlanSummary(planned)
-	return &protocolcli.MCPResult{
-		ProtocolVersion: protocolcli.ResultProtocolVersion,
-		Tool:            protocolcli.MCPToolPlanJobs,
-		Commands:        commandList(commands),
-		Plan:            &plan,
-	}
-}
-
 // PlanSummary projects a scheduled plan onto the v2 plan document.
 func PlanSummary(planned []*jobs.ScheduledJob) protocolcli.PlanSummary {
 	metrics := jobs.ComputePlanMetrics(planned)

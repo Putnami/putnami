@@ -92,26 +92,3 @@ func TestLoadExtension_PositionalDefaultBelowItsContractIsSkipped(t *testing.T) 
 		}
 	}
 }
-
-// A command that interactive subcommands alone carry, nested ones included,
-// reports the path to type; one that a non-interactive subcommand also carries,
-// or that no subcommand carries, does not.
-func TestInteractiveOnlyCarrier(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary",
-		"a-workload-carried-only-by-an-interactive-subcommand-is-refused")
-	extensions := loadGroupInvocationFixture(t)
-	for command, want := range map[string]string{
-		"stage-up":     "stage up",
-		"stage-list":   "stage list",
-		"notes-add":    "notes add",
-		"notes-draft":  "notes add draft",
-		"notes-show":   "",
-		"stage-status": "",
-		"deploy":       "",
-	} {
-		path, ok := InteractiveOnlyCarrier(extensions, command)
-		if ok != (want != "") || path != want {
-			t.Errorf("InteractiveOnlyCarrier(%s) = %q, %v; want %q", command, path, ok, want)
-		}
-	}
-}

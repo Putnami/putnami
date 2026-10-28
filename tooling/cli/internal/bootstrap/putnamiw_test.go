@@ -527,12 +527,9 @@ func TestPutnamiwBunCache_FollowsTheBunOfTheMachine(t *testing.T) {
 // tree, with sources both inside and outside tooling/cli, and a stub `go` that
 // logs its invocations. It returns the repo, the shared PUTNAMI_HOME, and the
 // env slice. GO_BUILD_FAIL names a file whose existence makes the stub's `build`
-// fail; it does not exist until a test creates it. When GO_BUILD_GATE is set,
-// the stub's `build` waits until the file it names exists. The CLI the stub
-// builds fails when SENTINEL_FAIL exists, or when SENTINEL_NEEDS names no
-// executable file. Run as `mcp` with SENTINEL_MCP_LOG set, it appends every
-// frame it reads to that file and answers each request with its own id and
-// method, from "built".
+// fail; it does not exist until a test creates it. The CLI the stub builds
+// fails when SENTINEL_FAIL exists, or when SENTINEL_NEEDS names no executable
+// file.
 func gitSourceRepo(t *testing.T) (repo, home string, env []string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -558,25 +555,11 @@ case "$1" in
   version) echo "go version go1.26.1 host";;
   build) printf '%s\n' "$PWD" >> "$GO_LOG.cwd"; shift; out=""
          while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; *) shift;; esac; done
-         while [ -n "${GO_BUILD_GATE:-}" ] && [ ! -f "$GO_BUILD_GATE" ]; do sleep 0.05; done
          if [ -f "$GO_BUILD_FAIL" ]; then echo "stub go: build refused" >&2; exit 1; fi
          [ -n "$out" ] && { cat > "$out" <<'SENTINEL'
 #!/usr/bin/env bash
 if [ -f "$SENTINEL_FAIL" ]; then echo "sentinel: $* refused" >&2; exit 7; fi
 if [ -n "${SENTINEL_NEEDS:-}" ] && [ ! -x "$SENTINEL_NEEDS" ]; then echo "sentinel: $SENTINEL_NEEDS is missing" >&2; exit 8; fi
-if [ "$*" = "mcp" ] && [ -n "${SENTINEL_MCP_LOG:-}" ]; then
-  id_re='.*"id":("[^"]*"|[0-9]+)'
-  method_re='"method":"([^"]*)"'
-  while IFS= read -r line; do
-    printf '%s\n' "$line" >> "$SENTINEL_MCP_LOG"
-    [[ $line =~ $id_re ]] || continue
-    id="${BASH_REMATCH[1]}"
-    method=""
-    if [[ $line =~ $method_re ]]; then method="${BASH_REMATCH[1]}"; fi
-    printf '{"jsonrpc":"2.0","id":%s,"result":{"from":"built","method":"%s"}}\n' "$id" "$method"
-  done
-  exit 0
-fi
 echo RAN_BUILT
 echo "ARGS=$*"
 echo "CWD=$PWD"

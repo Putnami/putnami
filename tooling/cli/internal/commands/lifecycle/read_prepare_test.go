@@ -24,9 +24,9 @@ import (
 )
 
 func TestPrepareReadOnlyColdWarmAndNewWorktreePreserveOwnedFiles(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "read-preparation", "cold-and-warm-reads-use-the-exact-lock-without-full-install")
-	spectest.Proves(t, "cli/context-mcp-discovery", "read-preparation", "automatic-reads-never-invoke-cloud-credential-minting")
-	spectest.Proves(t, "cli/context-mcp-discovery", "read-preparation", "human-and-agent-artifact-ownership-files-are-preserved")
+	spectest.Proves(t, "cli/context-discovery", "read-preparation", "cold-and-warm-reads-use-the-exact-lock-without-full-install")
+	spectest.Proves(t, "cli/context-discovery", "read-preparation", "automatic-reads-never-invoke-cloud-credential-minting")
+	spectest.Proves(t, "cli/context-discovery", "read-preparation", "human-and-agent-artifact-ownership-files-are-preserved")
 	const (
 		name     = "@putnami/cloud"
 		version  = "0.1.0-locked"
@@ -135,7 +135,7 @@ func TestPrepareReadOnlyColdWarmAndNewWorktreePreserveOwnedFiles(t *testing.T) {
 }
 
 func TestPrepareReadOnlyMissingLockAndOfflineArtifactAreExplicit(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "read-preparation", "offline-missing-artifacts-degrade-explicitly-without-latest")
+	spectest.Proves(t, "cli/context-discovery", "read-preparation", "offline-missing-artifacts-degrade-explicitly-without-latest")
 	const name = "@putnami/cloud"
 	cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: map[string]string{name: "latest"}}}
 

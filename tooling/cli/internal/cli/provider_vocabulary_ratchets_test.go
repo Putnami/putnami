@@ -333,9 +333,7 @@ func TestProviderVocabularyAllowlistOnlyShrinks(t *testing.T) {
 //
 // internal/engine is the package every adapter routes through. Its single
 // import of internal/commands — the production doctor gate — was enough to
-// force `putnami mcp`'s spawn point out of internal/commands (see
-// internal/cli/mcp_serve.go) and to make commands.WorkspaceJobRunner an
-// injected callback rather than a call. This program inverted it: the gate is
+// make commands.WorkspaceJobRunner an injected callback rather than a call. This program inverted it: the gate is
 // engine.Request.Preflight, supplied by each adapter.
 //
 // Restoring the import would restore all of that, silently. Test files are not
@@ -362,9 +360,8 @@ func TestEngineHoldsNoCommandEdge(t *testing.T) {
 		t.Errorf("internal/engine imports internal/commands again (%d site(s)):\n%s\n"+
 			"  This program inverted that edge — the production doctor gate is injected as "+
 			"engine.Request.Preflight, so the engine depends on the workspace model, the job layer "+
-			"and the protocols and nothing else. Reinstating the import re-closes "+
-			"mcp → engine → commands → mcp and turns commands' injected seams back into "+
-			"consequences of a cycle. Inject what you need instead.",
+			"and the protocols and nothing else. Reinstating the import turns commands' "+
+			"injected seams back into consequences of a cycle. Inject what you need instead.",
 			count, indentSites(sites))
 	}
 }

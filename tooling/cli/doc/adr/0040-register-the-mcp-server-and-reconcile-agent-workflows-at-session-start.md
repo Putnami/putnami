@@ -1,6 +1,9 @@
 # ADR 0040 — Install registers the MCP server, and a session start reconciles agent workflows
 
-- **Status**: accepted
+- **Status**: superseded by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): the core serves no MCP
+  server, writes no `.mcp.json`, and reconciles agent workflows in `install`
+  and `upgrade` only
 - **Amended**: 2026-10-21, with [ADR 0047](0047-extension-owned-agent-content.md):
   an installed npm package is no longer a source of agent content, so the
   session-start pass reconciles only the extensions the committed lock pins.

@@ -18,8 +18,8 @@ const ReportsDirName = "reports"
 
 // The newest-first lookup (Latest) deliberately carries NO scan cap. Its
 // origin filter only learns whether a file matches by reading it, so any fixed
-// window can be filled by a burst of non-matching reports — a busy agent's MCP
-// runs — and turn "no run report recorded" into a wrong answer while the
+// window can be filled by a burst of non-matching reports — adapter runs, of
+// origin "mcp" — and turn "no run report recorded" into a wrong answer while the
 // matching report sits just past it. The store's size is bounded where it
 // belongs, by Prune: steady state is the count cap plus the cadence-exempt
 // tail, and the only unbounded residue is whatever landed inside the prune's
@@ -148,8 +148,8 @@ func (rs *ReportStore) Prune() {
 		}
 		// The exemption is for the USER's validation history — the figure the
 		// replay display and a longitudinal consumer file under a commit. An
-		// agent's MCP-origin run is neither, so it is count-pruned like the rest
-		// rather than accumulating exempt for a year.
+		// adapter run (origin "mcp") is neither, so it is count-pruned like the
+		// rest rather than accumulating exempt for a year.
 		if recorded, err := readRecordedReport(path); err == nil &&
 			recorded.Report.EnforceCoverage &&
 			recorded.Report.Origin == cli.ReportOriginCLI &&
@@ -215,10 +215,10 @@ func (rs *ReportStore) Read(sessionID string) (*RecordedReport, error) {
 // Latest returns the newest recorded report a USER's run produced, or nil when
 // the store holds none.
 //
-// Origin filters MCP runs out — an
-// agent's run is not the user's build, and `putnami report` with no argument
-// answers "what did my last run do" — a question an agent's background run must
-// not answer. Asking for that report by --session still reads it.
+// Origin filters adapter runs (origin "mcp") out — such a run is not the user's
+// build, and `putnami report` with no argument answers "what did my last run
+// do" — a question a background run must not answer. Asking for that report by
+// --session still reads it.
 //
 // A report nothing can parse is skipped rather than fatal: it sorts by name
 // like any other, and one unreadable document must not hide the run behind it.

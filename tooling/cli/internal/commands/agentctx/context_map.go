@@ -6,9 +6,8 @@
 // set contributes nothing, so deletions and renames need no diffing logic.
 //
 // The command prints the map and writes nothing: Markdown by default, and with
-// `--output=json` the map document as the result data — the same document the
-// MCP `workspace_map` tool serves. `--projects` and `--impacted` narrow the
-// printed projects; the reduce still runs over the whole live set, so every
+// `--output=json` the map document as the result data. `--projects` and
+// `--impacted` narrow the printed projects; the reduce still runs over the whole live set, so every
 // printed entry carries its complete edges. A build writes no map.
 package agentctx
 
@@ -54,11 +53,11 @@ func ContextMapCommand(wsRoot string, opts ContextMapOptions) error {
 	if err != nil {
 		return err
 	}
-	resolved, err := mapgen.ResolveMap(ws, nil)
+	full, err := mapgen.ResolveMap(ws)
 	if err != nil {
 		return err
 	}
-	printed := scopeWorkspaceMap(resolved.Map, MapSectionAll, keep)
+	printed := scopeWorkspaceMap(full, keep)
 
 	if protocolcli.OutputMode(opts.OutputFormat).IsStructured() {
 		_, err := protocolcli.WriteResultV2(iox.Stdout(), protocolcli.OutputJSONL,

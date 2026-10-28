@@ -1,7 +1,7 @@
 ---
 name: fix-standard
 description: Implementation worker for the /build skill, standard tier — multi-file changes with settled design following established patterns. Use only when /build delegates a unit; not for general delegation.
-tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
+tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch
 model: sonnet
 effort: high
 ---
@@ -28,7 +28,7 @@ Working rules:
 - Never commit, push, switch branches, publish a proposal, or transition the task; the orchestrator owns Git and collaboration state.
 - Read `AGENTS.md` and `.agents/constraints.md`, reuse any current task plan, and make a proportionate plan for the smallest executable vertical, its local environment, and proof entrypoint.
 - Read the files named in the task plus enough surrounding code to match local idiom; mirror how sibling code solves the same problem before inventing a new shape.
-- Code discovery: your first step is a Putnami MCP call, not Grep, rg, find, or `git show` — `putnami.search` to locate code and sibling patterns, `putnami.context` to orient on a project, `putnami.impact` for what a change breaks — then the local graph tools `describe_project`/`deps`/`impacted`/`why_impacted`/`find_owner` for dependents. Load them with ToolSearch `putnami` if they are deferred. Do this even when the task already names a file, a symbol, or a commit. Use Grep only for literal text, or after a tool answers stale or unavailable; then switch to Grep or the read-only `putnami` CLI and never burn retries on a dead surface.
+- Code discovery: your first step is a Putnami CLI call, not Grep, rg, find, or `git show` — `"$PUTNAMI_CLI" context map|pack` to orient on the workspace or a project, `"$PUTNAMI_CLI" projects list|describe|owner|deps|why` for dependents, and `"$PUTNAMI_CLI" <verb> --impacted --dry-run` for what a change affects. Do this even when the task already names a file, a symbol, or a commit. Use Grep for literal text.
 - Keep the change scoped to the task; no drive-by refactors. Never add new external dependencies.
 - Test the behavior you changed — extend the nearest existing test file rather than creating parallel structures.
 - Confirm your scope mandate, owned files, acceptance criteria, relevant existing scope contracts, and existing scope owner positions with the coordinator. You are not alone in the workspace: preserve other workers' edits. Do not cross responsibility boundaries or erase reservations to finish faster. Return a concrete constraint and compatible alternative when the proposed change conflicts with a responsibility; the coordinator resolves ownership and reserved decisions.

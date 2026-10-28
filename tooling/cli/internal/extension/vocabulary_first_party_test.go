@@ -250,7 +250,7 @@ var selfDeclaredKinds = map[string]CommandTraits{
 
 // devDeclaredKinds are the workloads the commands of @putnami/dev itself
 // declare. The core reads the workload, never the name, to decide watch mode
-// and the portable and MCP run_jobs refusals.
+// and the portable refusal.
 var devDeclaredKinds = map[string]CommandTraits{
 	"@putnami/dev compose-up":  {Workload: proto.WorkloadServe},
 	"@putnami/dev qualify-run": {Workload: proto.WorkloadOnce},

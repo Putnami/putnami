@@ -946,11 +946,15 @@ function Find-HostCommand([string]$Name) {
     return [string]$command.Path
 }
 
-# Register Putnami's stable installed path with agent hosts through each host's
-# supported CLI, as install.sh does. Host configuration is human-owned: an
-# existing `putnami` definition is inspected and preserved, even when it points
-# at a different command. Registration is best effort, because managed host
+# Putnami serves no MCP server, so the installer registers none. Earlier
+# releases registered a user-scoped `putnami` server in Claude Code and Codex
+# through each host's supported CLI; this release removes that registration
+# when it is exactly the one the installer wrote, as install.sh does, and keeps
+# any other: host configuration is human-owned, and a `putnami` definition that
+# differs was written on purpose. This is best effort, because managed host
 # policy may prohibit user configuration while still allowing the CLI install.
+# This removal is deleted in the minor release that follows the one that ships
+# it.
 function Test-ClaudeDefinition([string[]]$Lines, [string]$InstalledBinary) {
     $environmentLines = @($Lines | Where-Object { $_ -cmatch '^    [^ ]' })
     return ($Lines -ccontains "  Command: $InstalledBinary") -and
@@ -959,41 +963,34 @@ function Test-ClaudeDefinition([string[]]$Lines, [string]$InstalledBinary) {
         ($environmentLines.Count -eq 1)
 }
 
-function Write-ClaudeVerified([string[]]$Lines) {
-    if (@($Lines | Where-Object { $_ -cmatch '^  Status: .*Connected$' }).Count -gt 0) {
-        Write-Success 'Claude Code MCP configuration and connection verified for new sessions'
-    } else {
-        Write-Success 'Claude Code MCP configuration verified for new sessions'
-        Write-Info 'MCP connection not yet verified; Claude Code will check it when a Putnami workspace opens.'
+# Run a host command from the temp directory, not the caller's: a project's own
+# .mcp.json or local-scope entry named putnami would otherwise shadow the
+# user-scope entry the installer wrote.
+function Invoke-HostCapture([string]$FilePath, [string[]]$ArgumentList) {
+    Push-Location -LiteralPath ([IO.Path]::GetTempPath())
+    try {
+        return Invoke-NativeCapture -FilePath $FilePath -ArgumentList $ArgumentList -MergeError
+    } finally {
+        Pop-Location
     }
 }
 
-function Register-ClaudeCode([string]$Claude, [string]$InstalledBinary) {
-    $get = Invoke-NativeCapture -FilePath $Claude -ArgumentList @('mcp', 'get', 'putnami') -MergeError
+function Remove-ClaudeCodeRegistration([string]$Claude, [string]$InstalledBinary) {
+    $get = Invoke-HostCapture -FilePath $Claude -ArgumentList @('mcp', 'get', 'putnami')
     if (Test-ClaudeDefinition $get.Lines $InstalledBinary) {
-        Write-ClaudeVerified $get.Lines
+        $remove = Invoke-HostCapture -FilePath $Claude -ArgumentList @('mcp', 'remove', '--scope', 'user', 'putnami')
+        if ($remove.ExitCode -eq 0) {
+            Write-Success 'Removed the Putnami MCP server that an earlier install registered in Claude Code'
+        } else {
+            Write-InstallWarning 'Could not remove the Putnami MCP server from Claude Code; the CLI installation is still usable.'
+            Write-Hint 'Claude Code may be managed by host policy. Run: claude mcp remove --scope user putnami'
+        }
         return
     }
     if (($get.ExitCode -eq 0) -or ($get.Lines -ccontains 'putnami:')) {
-        Write-InstallWarning 'Claude Code already defines a putnami MCP server; its human configuration was preserved.'
-        Write-Hint 'Inspect the active definition with: claude mcp get putnami'
-        return
+        Write-InstallWarning 'Claude Code defines a putnami MCP server that Putnami did not register as is; it was kept.'
+        Write-Hint 'Putnami serves no MCP server any more. Remove it with: claude mcp remove --scope user putnami'
     }
-
-    $add = Invoke-NativeCapture -FilePath $Claude -ArgumentList @('mcp', 'add', '--scope', 'user', '--env', 'PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.}', '--transport', 'stdio', 'putnami', '--', $InstalledBinary, 'mcp') -MergeError
-    if ($add.ExitCode -ne 0) {
-        Write-InstallWarning 'Could not register Putnami with Claude Code; the CLI installation is still usable.'
-        Write-Hint 'Claude Code may be managed by host policy. Run: claude mcp get putnami'
-        return
-    }
-
-    $get = Invoke-NativeCapture -FilePath $Claude -ArgumentList @('mcp', 'get', 'putnami') -MergeError
-    if (Test-ClaudeDefinition $get.Lines $InstalledBinary) {
-        Write-ClaudeVerified $get.Lines
-        return
-    }
-    Write-InstallWarning 'Claude Code accepted the MCP registration but did not report the expected Putnami launcher.'
-    Write-Hint 'Inspect the active definition with: claude mcp get putnami'
 }
 
 # A field of Codex's JSON definition, at the top level or inside "transport",
@@ -1052,66 +1049,55 @@ function Test-CodexDefinition([string[]]$Lines, [string[]]$JsonLines, [string]$I
 }
 
 function Test-CodexRegistration([string]$Codex, [string]$InstalledBinary) {
-    $get = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami') -MergeError
+    $get = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami')
     if ($get.ExitCode -ne 0) { return $false }
-    $json = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami', '--json') -MergeError
+    $json = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami', '--json')
     if ($json.ExitCode -ne 0) { return $false }
     return Test-CodexDefinition $get.Lines $json.Lines $InstalledBinary
 }
 
-function Register-Codex([string]$Codex, [string]$InstalledBinary) {
-    $get = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami') -MergeError
-    if ($get.ExitCode -eq 0) {
-        if (Test-CodexRegistration $Codex $InstalledBinary) {
-            Write-Success 'Codex MCP configuration verified for new sessions'
+function Remove-CodexRegistration([string]$Codex, [string]$InstalledBinary) {
+    $get = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'get', 'putnami')
+    if ($get.ExitCode -ne 0) { return }
+    if (Test-CodexRegistration $Codex $InstalledBinary) {
+        $remove = Invoke-HostCapture -FilePath $Codex -ArgumentList @('mcp', 'remove', 'putnami')
+        if ($remove.ExitCode -eq 0) {
+            Write-Success 'Removed the Putnami MCP server that an earlier install registered in Codex'
         } else {
-            Write-InstallWarning 'Codex already defines a putnami MCP server; its human TOML and launcher were preserved.'
-            Write-Hint 'Inspect the active definition with: codex mcp get putnami'
+            Write-InstallWarning 'Could not remove the Putnami MCP server from Codex; the CLI installation is still usable.'
+            Write-Hint 'Codex may be managed by host policy. Run: codex mcp remove putnami'
         }
         return
     }
-
-    $add = Invoke-NativeCapture -FilePath $Codex -ArgumentList @('mcp', 'add', 'putnami', '--', $InstalledBinary, 'mcp') -MergeError
-    if ($add.ExitCode -ne 0) {
-        Write-InstallWarning 'Could not register Putnami with Codex; the CLI installation is still usable.'
-        Write-Hint 'Codex may be managed by host policy. Run: codex mcp get putnami'
-        return
-    }
-
-    if (Test-CodexRegistration $Codex $InstalledBinary) {
-        Write-Success 'Codex MCP configuration verified for new sessions'
-        return
-    }
-    Write-InstallWarning 'Codex accepted the MCP registration but did not report the expected Putnami launcher.'
-    Write-Hint 'Inspect the active definition with: codex mcp get putnami'
+    Write-InstallWarning 'Codex defines a putnami MCP server that Putnami did not register as is; it was kept.'
+    Write-Hint 'Putnami serves no MCP server any more. Remove it with: codex mcp remove putnami'
 }
 
-function Register-AgentHosts([string]$InstalledBinary, [string]$NoAgentHosts) {
+function Remove-AgentHostRegistrations([string]$InstalledBinary, [string]$NoAgentHosts) {
     if ($NoAgentHosts) {
-        Write-Info "Skipping agent-host registration (${NoAgentHostsEnv}/--no-agent-hosts)."
+        Write-Info "Skipping agent-host cleanup (${NoAgentHostsEnv}/--no-agent-hosts)."
         return
     }
-    Write-Step 'Connecting supported agent hosts...'
     $claude = Find-HostCommand 'claude'
     if ($claude) {
         try {
-            Register-ClaudeCode $claude $InstalledBinary
+            Remove-ClaudeCodeRegistration $claude $InstalledBinary
         } catch {
-            Write-InstallWarning "Could not register Putnami with Claude Code; the CLI installation is still usable. ($($_.Exception.Message))"
+            Write-InstallWarning "Could not check Claude Code for the Putnami MCP server; the CLI installation is still usable. ($($_.Exception.Message))"
         }
     }
     $codex = Find-HostCommand 'codex'
     if ($codex) {
         try {
-            Register-Codex $codex $InstalledBinary
+            Remove-CodexRegistration $codex $InstalledBinary
         } catch {
-            Write-InstallWarning "Could not register Putnami with Codex; the CLI installation is still usable. ($($_.Exception.Message))"
+            Write-InstallWarning "Could not check Codex for the Putnami MCP server; the CLI installation is still usable. ($($_.Exception.Message))"
         }
     }
 }
 
-# Report the installed CLI, then make it reachable and available to supported
-# agent hosts. The CLI has no PowerShell completion, so none is installed.
+# Report the installed CLI, then make it reachable and remove the agent-host
+# registration earlier installs wrote. The CLI has no PowerShell completion, so none is installed.
 function Complete-PutnamiInstall([string]$InstalledBinary, [string]$NoAgentHosts) {
     Write-Step 'Checking the installed CLI...'
 
@@ -1129,7 +1115,7 @@ function Complete-PutnamiInstall([string]$InstalledBinary, [string]$NoAgentHosts
 
     Add-PutnamiToPath (Split-Path -Parent $InstalledBinary)
     Write-CommandResolution $InstalledBinary
-    Register-AgentHosts $InstalledBinary $NoAgentHosts
+    Remove-AgentHostRegistrations $InstalledBinary $NoAgentHosts
 }
 
 # Return the extension that provides Command, as the command map text names it.
@@ -1318,7 +1304,7 @@ function Write-Usage {
     Write-OutLine '  --variant <go|ts>     CLI variant to install (default: go)' ''
     Write-OutLine '  --download-url <url>  Direct URL to a binary asset (bypasses the registry)' ''
     Write-OutLine '  --sha256 <hex>        Expected SHA-256 of that asset (required with --download-url)' ''
-    Write-OutLine '  --no-agent-hosts      Do not register Putnami with Claude Code or Codex' ''
+    Write-OutLine '  --no-agent-hosts      Do not touch the Claude Code or Codex configuration' ''
     Write-OutLine '  --run <command>       Then pin the extension that provides <command> for your' ''
     Write-OutLine '                        user and run putnami <command> in the current directory' ''
     Write-OutLine '  --help, -h            Show this help message' ''

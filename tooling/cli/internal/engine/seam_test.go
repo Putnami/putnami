@@ -15,7 +15,7 @@ import (
 // The telemetry seam is an ACCEPTANCE CRITERION, recorded
 // as binding in ADR 0001 §4: the engine owns an injected observer, never
 // telemetry. If a later slice moves reporting into the engine body, every
-// adapter that routes through Engine.Run (MCP, watch, lifecycle) starts
+// adapter that routes through Engine.Run (watch, lifecycle) starts
 // synthesizing user sessions — a consent incident against the rule "never
 // send before notice". These tests fail before that ships, not after.
 
@@ -125,7 +125,7 @@ func TestEngineNeverImportsTelemetry(t *testing.T) {
 
 // TestOnlyTheTerminalAdapterSuppliesAnObserver pins the other half: exactly one
 // production site in the module injects an Observer, and it is the terminal
-// adapter. MCP, watch, and lifecycle adapters must keep passing nil; adding a
+// adapter. Watch and lifecycle adapters must keep passing nil; adding a
 // second site requires a new ADR and a consent review, never a refactor slice.
 func TestOnlyTheTerminalAdapterSuppliesAnObserver(t *testing.T) {
 	t.Parallel()

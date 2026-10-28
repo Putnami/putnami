@@ -66,7 +66,7 @@ func coverageReport(sessionID string, pct float64, enforced bool, origin string)
 
 // TestReportStore_ReadsTheNewestUserReport: `putnami report` with no argument
 // answers "what did my last run do", so the newest lookup passes over an
-// agent's MCP-driven run — which an exact --session read still returns.
+// adapter run (origin "mcp") — which an exact --session read still returns.
 func TestReportStore_ReadsTheNewestUserReport(t *testing.T) {
 	root := t.TempDir()
 	store := NewReportStore(root)

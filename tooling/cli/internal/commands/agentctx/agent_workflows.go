@@ -3,7 +3,6 @@ package agentctx
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -699,69 +698,6 @@ func EnsureAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config)
 		return nil
 	}
 	return commitAgentArtifacts(wsRoot, prepared, retiredAgentArtifacts{}, nil)
-}
-
-// ReconcileAgentWorkflows is the pass an agent session start runs (ADR 0040).
-// It brings the agent content of every opted-in extension to the release the
-// COMMITTED lock pins, so a worktree that
-// moved to another lock stops serving the instructions of the lock it was
-// installed with. The content is read from the extension release the worktree
-// already installed, so it never needs a download.
-//
-// It is the ensure pass with two differences, each chosen so that a session
-// start is never slowed down or blocked by it:
-//
-//   - the trigger is the ownership record alone. A record that names exactly
-//     the pinned version and digests ends the pass for that contribution: no
-//     file is hashed and nothing is written;
-//   - every failure is returned for the caller to print as a warning. The
-//     contributions that did not fail are still reconciled.
-//
-// Everything else is the ensure pass unchanged: it never resolves, never
-// writes the lock, never builds a local extension's content, never retires an
-// undeclared owner, and a file the user edited is a collision that aborts the
-// write before it starts and is named, with its reason, in the returned error.
-func ReconcileAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config) error {
-	refs, err := DeclaredAgentArtifacts(wsRoot, cfg)
-	if err != nil || len(refs) == 0 {
-		return err
-	}
-	lf, err := lockfile.ReadLockFile(wsRoot)
-	if err != nil {
-		return err
-	}
-	var problems []error
-	prepared := make([]preparedAgentArtifact, 0, len(refs))
-	for _, ref := range refs {
-		resolution, pinned, err := pinnedExtensionAgentContent(wsRoot, cfg, lf, ref)
-		if err != nil {
-			problems = append(problems, err)
-			continue
-		}
-		if !pinned {
-			continue
-		}
-		state, err := agentartifacts.LoadState(wsRoot, ref.Name)
-		if err != nil {
-			problems = append(problems, agentArtifactFailure(ref.Name, nil, err))
-			continue
-		}
-		if stateNamesPin(state, resolution.Entry) {
-			continue
-		}
-		artifact, plan, err := planResolvedAgentArtifact(wsRoot, ref.Name, resolution)
-		if err != nil {
-			problems = append(problems, agentArtifactFailure(ref.Name, nil, err))
-			continue
-		}
-		prepared = append(prepared, preparedAgentArtifact{ref: ref, artifact: artifact, plan: plan})
-	}
-	if len(prepared) > 0 {
-		if err := commitAgentArtifacts(wsRoot, prepared, retiredAgentArtifacts{}, nil); err != nil {
-			problems = append(problems, err)
-		}
-	}
-	return errors.Join(problems...)
 }
 
 // stateNamesPin reports whether an ownership record names exactly the pinned

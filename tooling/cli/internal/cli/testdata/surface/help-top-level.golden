@@ -14,6 +14,9 @@ Projects:
   projects list                List canonical workspace projects
   projects create              Create a project from template
   projects describe            Show project info
+  projects owner               Show the projects that own a path
+  projects deps                List the dependencies or dependents of a project
+  projects why                 Explain why a change to one project impacts another
   projects sync                Sync projects from disk
   projects tag                 Manage project tags
   scopes list                  List workspace scopes (projects, groups, tags)
@@ -66,10 +69,6 @@ Diagnostics:
 
 Migration:
   migrate vnext                Migrate putnami.lock.json to the current format
-
-Agents:
-  mcp                          Run the MCP server over stdio for AI agent harnesses
-  mcp install                  Register the MCP server in .mcp.json for Claude Code
 
 Other:
   telemetry on|off|status|show Manage anonymous telemetry

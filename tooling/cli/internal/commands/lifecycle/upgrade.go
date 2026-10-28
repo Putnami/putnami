@@ -417,12 +417,12 @@ func upgradeArtifactPhases(ctx context.Context, wsRoot string, cfg *wsproto.Conf
 	} else {
 		iox.Fprintln(os.Stdout, "  Would regenerate AI context")
 	}
-	// The putnami MCP server is registered whatever the extension update
-	// did: an agent session reaches the local tools either way (ADR 0040).
+	// The .mcp.json entry earlier releases wrote for the MCP server Putnami
+	// no longer serves is removed whatever the extension update did.
 	if flags.DryRun {
-		iox.Fprintln(os.Stdout, "  Would register the putnami MCP server in .mcp.json unless an entry exists")
-	} else if agentctx.RegisterMCPServer(wsRoot, os.Stderr) {
-		iox.Fprintln(os.Stdout, "  ✓ putnami MCP server registered in .mcp.json")
+		iox.Fprintln(os.Stdout, "  Would remove the putnami MCP server entry from .mcp.json when Putnami wrote it")
+	} else if removal := agentctx.RemoveMCPRegistration(wsRoot, os.Stderr); removal != agentctx.MCPRemovalNone {
+		iox.Fprintf(os.Stdout, "  ✓ %s\n", removal.Description())
 	}
 	// The host hooks follow the extensions the upgrade resolved: a hook a
 	// new release declares is written, one it dropped is removed (ADR 0081).

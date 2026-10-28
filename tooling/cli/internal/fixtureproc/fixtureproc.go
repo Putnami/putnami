@@ -294,7 +294,7 @@ func Binary(t testing.TB, path string) string {
 // place puts a copy of the executable source at target. A hard link would be
 // cheaper, but neither platform keeps one honest. macOS SIGKILLs some of the
 // programs parallel tests start from links to one binary while they place more
-// links to it; the mcp tests lost 4 runs in 12 that way and none with copies.
+// links to it.
 // Windows refuses to delete any name of a running image, so a link to this
 // test binary would outlive the test's cleanup there.
 func place(t testing.TB, source, target string) {

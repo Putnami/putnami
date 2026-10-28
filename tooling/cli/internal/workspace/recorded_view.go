@@ -10,8 +10,8 @@ import (
 //
 // `.putnami/workspace-index.json` is a PROJECTION: the provider extensions own
 // project identity and dependency edges, and this file is the CLI's local copy
-// of the answers they gave. Every read-only surface — `projects list`, `deps`,
-// the MCP graph tools — answers from that copy without paying for a probe, and
+// of the answers they gave. Every read-only surface — `projects list`, `deps`
+// — answers from that copy without paying for a probe, and
 // that fast path is deliberate.
 //
 // What was missing was the copy's honesty. A projection has to say

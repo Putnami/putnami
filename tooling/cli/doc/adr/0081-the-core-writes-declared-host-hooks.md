@@ -1,6 +1,9 @@
 # ADR 0081 — The core writes the host hooks an extension declares
 
 - **Status**: accepted
+- **Amended**: 2026-10-28, by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): hooks no longer share a
+  launcher with an MCP server, which the core no longer serves
 - **Date**: 2026-10-26
 - **Amends**: [ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md)
   and [ADR 0047](0047-extension-owned-agent-content.md)

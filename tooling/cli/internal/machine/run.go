@@ -61,7 +61,7 @@ func RunOf(
 }
 
 // RunFrom pairs an already-reduced session with its tasks, for the consumers
-// the engine hands both (the MCP adapter and the session writer). Reducing a
+// the engine hands both (the session writer). Reducing a
 // second time would be the duplicate tally ADR 0001 §2 forbids.
 func RunFrom(
 	session *jobs.SessionResult,

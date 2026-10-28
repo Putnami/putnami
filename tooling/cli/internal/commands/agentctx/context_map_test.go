@@ -153,8 +153,8 @@ func printedProjectIDs(document mapgen.RepoMap) []string {
 // command prints the map, Markdown by default and the document under
 // --output=json, and not one byte reaches the disk.
 func TestContextMapCommand_PrintsAndWritesNothing(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "printing-the-map-writes-nothing")
-	spectest.Proves(t, "cli/context-mcp-discovery", "build-writes-no-workspace-map", "context-map-writes-no-file")
+	spectest.Proves(t, "cli/context-discovery", "workspace-map", "printing-the-map-writes-nothing")
+	spectest.Proves(t, "cli/context-discovery", "build-writes-no-workspace-map", "context-map-writes-no-file")
 	root := mapCommandWorkspace(t)
 	before := treeOutsideState(t, root)
 
@@ -181,43 +181,51 @@ func TestContextMapCommand_PrintsAndWritesNothing(t *testing.T) {
 	}
 }
 
-// TestContextMapCommand_JSONDataIsTheMCPDocument keeps the two surfaces honest
-// against each other: the data `--output=json` prints is exactly the document
-// the MCP workspace_map tool serves, byte for byte once compacted.
-func TestContextMapCommand_JSONDataIsTheMCPDocument(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "the-printed-json-is-the-mcp-document")
+// resolvedMapDocument builds the map document in memory the way the command
+// does, narrowed to the projects whose id keep holds (nil keeps every one).
+func resolvedMapDocument(t *testing.T, root string, keep map[string]bool) *mapgen.RepoMap {
+	t.Helper()
+	ws, err := workspace.Load(root)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	full, err := mapgen.ResolveMap(ws)
+	if err != nil {
+		t.Fatalf("resolve the map: %v", err)
+	}
+	return scopeWorkspaceMap(full, keep)
+}
+
+// TestContextMapCommand_JSONDataIsTheMapDocument pins that the data
+// `--output=json` prints is exactly the map document, byte for byte once
+// compacted, and that the Markdown is its rendering.
+func TestContextMapCommand_JSONDataIsTheMapDocument(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "workspace-map", "the-printed-json-is-the-map-document")
 	root := mapCommandWorkspace(t)
 
 	_, data := printedMapDocument(t, printContextMap(t, root, ContextMapOptions{OutputFormat: "jsonl"}))
-	served, err := BuildWorkspaceMapResult(root, "", "", nil)
+	document := resolvedMapDocument(t, root, nil)
+	want, err := json.Marshal(document)
 	if err != nil {
-		t.Fatalf("workspace_map: %v", err)
-	}
-	want, err := json.Marshal(served.Document)
-	if err != nil {
-		t.Fatalf("encode the served document: %v", err)
+		t.Fatalf("encode the map document: %v", err)
 	}
 	if string(data) != string(want) {
-		t.Errorf("the printed data and the MCP document disagree:\n--- printed:\n%s\n--- served:\n%s", data, want)
+		t.Errorf("the printed data and the map document disagree:\n--- printed:\n%s\n--- document:\n%s", data, want)
 	}
 
-	// The same holds for one project: the CLI selection and the MCP project
-	// argument narrow through the same scope.
+	// The same holds for one project: the selection narrows through the scope.
 	_, narrowed := printedMapDocument(t, printContextMap(t, root, ContextMapOptions{Projects: "example/api", OutputFormat: "jsonl"}))
-	servedOne, err := BuildWorkspaceMapResult(root, "", "example/api", nil)
-	if err != nil {
-		t.Fatalf("workspace_map example/api: %v", err)
-	}
-	if want, err = json.Marshal(servedOne.Document); err != nil {
-		t.Fatalf("encode the served document: %v", err)
+	one := resolvedMapDocument(t, root, map[string]bool{"/svc/api": true})
+	if want, err = json.Marshal(one); err != nil {
+		t.Fatalf("encode the map document: %v", err)
 	}
 	if string(narrowed) != string(want) {
-		t.Errorf("the narrowed printed data and the MCP project answer disagree:\n--- printed:\n%s\n--- served:\n%s", narrowed, want)
+		t.Errorf("the narrowed printed data and the project's document disagree:\n--- printed:\n%s\n--- document:\n%s", narrowed, want)
 	}
 
 	markdown := printContextMap(t, root, ContextMapOptions{})
-	if markdown != string(mapgen.RenderMarkdown(served.Document)) {
-		t.Error("the printed Markdown is not the rendering of the MCP document")
+	if markdown != string(mapgen.RenderMarkdown(document)) {
+		t.Error("the printed Markdown is not the rendering of the map document")
 	}
 }
 
@@ -225,7 +233,7 @@ func TestContextMapCommand_JSONDataIsTheMCPDocument(t *testing.T) {
 // map keeps only the selected projects, each entry keeps its complete edges
 // because the reduce still covers the live set, and the docs index stays.
 func TestContextMapCommand_ProjectsNarrowThePrintedMap(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "a-selection-narrows-the-printed-map")
+	spectest.Proves(t, "cli/context-discovery", "workspace-map", "a-selection-narrows-the-printed-map")
 	root := mapCommandWorkspace(t)
 	writeMapFixtureFile(t, root, "docs/guide.md", "# Guide\n")
 
@@ -250,7 +258,7 @@ func TestContextMapCommand_ProjectsNarrowThePrintedMap(t *testing.T) {
 // to one project prints only the projects it impacts, and an empty impacted set
 // prints a map with no project rather than failing.
 func TestContextMapCommand_ImpactedNarrowsThePrintedMap(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "a-selection-narrows-the-printed-map")
+	spectest.Proves(t, "cli/context-discovery", "workspace-map", "a-selection-narrows-the-printed-map")
 	root := mapCommandWorkspace(t)
 	runGit := func(args ...string) {
 		t.Helper()
@@ -293,7 +301,7 @@ func writeMapFixtureFile(t *testing.T, root, rel, content string) {
 }
 
 // TestContextMapCommand_RefusesADegradedIdentity pins the guard that keeps the
-// command and the MCP tool from disagreeing: a workspace that declares
+// command from printing a degraded map: a workspace that declares
 // extensions but has adopted no provider view resolves every project from
 // authored config alone (no provider-derived dependency edges), so the map would
 // render without edges an agent would then trust.

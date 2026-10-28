@@ -4,7 +4,7 @@
   "feature": "cli/collaboration-providers",
   "outcomes": [
     "A workspace chooses its task, change-proposal, memory and missions providers independently, in one place, and changing one never changes another",
-    "An agent and a script call the same operation with the same request and read the same envelope, whether through MCP or the command line",
+    "A user and a script call the same operation with the same request and read the same envelope, whether they type the command or call it over the extension host channel",
     "A contract nobody bound and a capability the provider lacks are refused before anything runs, never reported as done"
   ],
   "nonGoals": [
@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "explicit-binding",
-      "text": "A workspace binds each contract in options.collaboration of putnami.workspace.json and nowhere else: one provider extension and one version. An unbound contract is unsupported (binding.missing), naming the block to add and the installed providers, none selected. A block that repeats a member is refused as binding.ambiguous. A provider that is absent, disabled or unprepared at its locked release is unavailable (binding.provider_missing) on CLI and MCP. No binding failure is retryable or starts the provider."
+      "text": "A workspace binds each contract in options.collaboration of putnami.workspace.json and nowhere else: one provider extension and one version. An unbound contract is unsupported (binding.missing), naming the block to add and the installed providers, none selected. A block that repeats a member is refused as binding.ambiguous. A provider that is absent, disabled or unprepared at its locked release is unavailable (binding.provider_missing) on either entry path. No failure is retryable or starts the provider."
     },
     {
       "id": "capability-discovery",
@@ -25,15 +25,11 @@
     },
     {
       "id": "one-route-two-entry-paths",
-      "text": "putnami <contract> <operation> --input and the MCP tool <contract>.<operation> share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both print the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
-    },
-    {
-      "id": "truthful-annotations",
-      "text": "Every routed MCP tool carries readOnlyHint true exactly for a read operation, destructiveHint true for an operation that may modify existing state, and contract metadata whose access agrees."
+      "text": "putnami <contract> <operation> --input and the host call collaboration.call share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both return the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
     },
     {
       "id": "host-only-operations",
-      "text": "An operation the catalog marks host-only is one the host that runs an agent calls, never the agent. The MCP server lists no tool for it, while putnami <contract> <operation> and the host channel's collaboration.call route it like any other operation, to the same envelope, and <contract>.capabilities marks it hostOnly."
+      "text": "An operation the catalog marks host-only is one the host that runs an agent calls, never the agent. putnami <contract> <operation> and the host channel's collaboration.call route it like any other operation, to the same envelope, and <contract>.capabilities marks it hostOnly."
     },
     {
       "id": "contract-names-never-shadow-commands",
@@ -42,6 +38,7 @@
   ],
   "decisions": [
     "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
-    "protocols/collaboration/doc/adr/0003-missions-contract.md"
+    "protocols/collaboration/doc/adr/0003-missions-contract.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

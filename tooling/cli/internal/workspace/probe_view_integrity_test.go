@@ -300,8 +300,8 @@ func TestSynchronize_NoBindingsReportsThatTheRecordedAnswersWereKept(t *testing.
 }
 
 // A workspace with no index at all is a legitimate state, but a silent one: the
-// read-only surfaces that serve it (`projects list`, `deps`, the MCP graph
-// tools, `--impacted`) would report a graph with zero provider-derived edges and
+// read-only surfaces that serve it (`projects list`, `deps`, `--impacted`)
+// would report a graph with zero provider-derived edges and
 // no indication that anything is missing.
 func TestLoad_WarnsWhenMembersHaveNoProviderView(t *testing.T) {
 	ws := syncFixture(t) // web/package.json and svc/go.mod, neither with a putnami.json

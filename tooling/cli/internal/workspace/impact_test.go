@@ -123,7 +123,7 @@ func TestImpactedSelection_TraceExplanation_CapsSeedsAndEdges(t *testing.T) {
 	if got[1+impactTraceSeedsShown] != "    … +2 more seed(s)" {
 		t.Errorf("seed overflow line = %q", got[1+impactTraceSeedsShown])
 	}
-	if last := got[len(got)-1]; last != "    … +3 more edge(s); the `impacted` MCP tool returns every reason." {
+	if last := got[len(got)-1]; last != "    … +3 more edge(s); `putnami projects why <changed> <project>` prints the path to any project." {
 		t.Errorf("edge overflow line = %q", last)
 	}
 	for _, line := range got {
@@ -227,7 +227,7 @@ func TestImpactedSelection_TraceRecord_KeepsEverySeedAndEdgeInTheBlockOrder(t *t
 
 // A declaring project can name twenty patterns. The line stays a notice: the
 // evidence is cut at a pattern boundary, never mid-pattern, and the full set
-// stays in the `impacted` MCP answer.
+// stays in the session record.
 func TestImpactedSelection_TraceExplanation_ElidesALongPatternSet(t *testing.T) {
 	long := "doc/** internal/cli/testdata/** scripts/** ../../**/putnami.json ../../decisions.json ../../.agents/skills/**"
 	s := ImpactedSelection{

@@ -103,9 +103,9 @@ func runRunStubPutnami(log string, args []string) int {
 }
 
 // runFakeHostExe behaves like the shell fakes in agent_hosts_test.go. It keeps
-// its definition in PUTNAMI_TEST_HOST_STATE and stores the launcher that
-// follows `--` in `mcp add`, so the definition shows exactly which arguments
-// PowerShell passed.
+// its definition in PUTNAMI_TEST_HOST_STATE, where a test seeds the one an
+// earlier installer registered, and `mcp remove` deletes it, so the call log
+// shows exactly which arguments PowerShell passed.
 func runFakeHostExe(name string, args []string) int {
 	stateDir := os.Getenv("PUTNAMI_TEST_HOST_STATE")
 	appendLine(filepath.Join(stateDir, name+"-calls.log"), strings.Join(args, " "))
@@ -123,23 +123,27 @@ func runFakeHostExe(name string, args []string) int {
 		_, _ = os.Stdout.Write(data)
 		return 0
 	}
-	if len(args) >= 2 && args[0] == "mcp" && args[1] == "add" {
-		launcher := ""
-		for i, arg := range args {
-			if arg == "--" && i+1 < len(args) {
-				launcher = args[i+1]
-			}
-		}
-		if name == "claude" {
-			_ = os.WriteFile(state, []byte("putnami:\n  Status: \u2714 Connected\n  Command: "+launcher+"\n  Args: mcp\n  Environment:\n    PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.}\n"), 0o644)
-			return 0
-		}
-		_ = os.WriteFile(state, []byte("putnami\n  enabled: true\n  transport: stdio\n  command: "+launcher+"\n  args: mcp\n  cwd: -\n  env: -\n"), 0o644)
-		quoted := strings.ReplaceAll(launcher, `\`, `\\`)
-		_ = os.WriteFile(jsonState, []byte(`{"name":"putnami","enabled":true,"transport":{"type":"stdio","command":"`+quoted+`","args":["mcp"],"env":null,"env_vars":[],"cwd":null},"enabled_tools":null,"disabled_tools":null}`+"\n"), 0o644)
+	if len(args) >= 2 && args[0] == "mcp" && args[1] == "remove" {
+		_ = os.Remove(state)
+		_ = os.Remove(jsonState)
 		return 0
 	}
 	return 2
+}
+
+// seedInstallerWrittenHosts stores, for both fake hosts, the definition an
+// earlier installer registered with the launcher at binary.
+func (h *windowsHost) seedInstallerWrittenHosts(t *testing.T, binary string) {
+	t.Helper()
+	write := func(name, content string) {
+		if err := os.WriteFile(filepath.Join(h.state, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("claude-mcp-state.txt", "putnami:\n  Status: \u2714 Connected\n  Command: "+binary+"\n  Args: mcp\n  Environment:\n    PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.}\n")
+	write("codex-mcp-state.txt", "putnami\n  enabled: true\n  transport: stdio\n  command: "+binary+"\n  args: mcp\n  cwd: -\n  env: -\n")
+	quoted := strings.ReplaceAll(binary, `\`, `\\`)
+	write("codex-mcp-state.json", `{"name":"putnami","enabled":true,"transport":{"type":"stdio","command":"`+quoted+`","args":["mcp"],"env":null,"env_vars":[],"cwd":null},"enabled_tools":null,"disabled_tools":null}`+"\n")
 }
 
 func appendLine(path, line string) {
@@ -343,14 +347,16 @@ func windowsRegistryWithMap(t *testing.T, executable []byte, commandMap string) 
 }
 
 // The acceptance path: install.ps1 run by Windows PowerShell installs the
-// versioned layout, puts the directory first in the user's Path, registers the
-// agent hosts, and the installed putnami.exe answers --version.
+// versioned layout, puts the directory first in the user's Path, removes the
+// agent-host registration an earlier install wrote, and the installed
+// putnami.exe answers --version.
 func TestWindowsInstallPS1InstallsThroughWindowsPowerShell(t *testing.T) {
 	h := newWindowsHost(t)
 	server := windowsRegistry(t, h.binary)
 	h.set("PUTNAMI_REGISTRY_URL", server.URL)
 	h.addFakeHost(t, "claude")
 	h.addFakeHost(t, "codex")
+	h.seedInstallerWrittenHosts(t, filepath.Join(h.binDir(), "putnami.exe"))
 
 	res := h.install(t)
 	if res.exitCode != 0 {
@@ -363,8 +369,8 @@ func TestWindowsInstallPS1InstallsThroughWindowsPowerShell(t *testing.T) {
 		"Installed to " + filepath.Join(h.binDir(), "putnami-go-latest.exe"),
 		"Active: putnami.exe (a copy of putnami-go-latest.exe)",
 		"Added " + h.binDir() + " to your user PATH (HKCU\\Environment) for new terminals",
-		"Claude Code MCP configuration and connection verified for new sessions",
-		"Codex MCP configuration verified for new sessions",
+		"Removed the Putnami MCP server that an earlier install registered in Claude Code",
+		"Removed the Putnami MCP server that an earlier install registered in Codex",
 	} {
 		if !res.contains(want) {
 			t.Fatalf("output does not contain %q:\n%s", want, res.output())
@@ -389,14 +395,19 @@ func TestWindowsInstallPS1InstallsThroughWindowsPowerShell(t *testing.T) {
 		t.Fatalf("the stamp check ran with %q, want relaunch disabled", stubRuns[0])
 	}
 
-	// PowerShell 5.1 passed every argument, `--` included, to the hosts.
+	// PowerShell 5.1 passed every argument to the hosts.
 	claudeCalls := string(readFile(t, filepath.Join(h.state, "claude-calls.log")))
-	if want := "mcp add --scope user --env PUTNAMI_AGENT_WORKSPACE=${CLAUDE_PROJECT_DIR:-.} --transport stdio putnami -- " + installed + " mcp"; !strings.Contains(claudeCalls, want) {
-		t.Fatalf("Claude registration differs from install.sh; want %q in:\n%s", want, claudeCalls)
+	if want := "mcp remove --scope user putnami"; !strings.Contains(claudeCalls, want) {
+		t.Fatalf("Claude removal differs from install.sh; want %q in:\n%s", want, claudeCalls)
 	}
 	codexCalls := string(readFile(t, filepath.Join(h.state, "codex-calls.log")))
-	if want := "mcp add putnami -- " + installed + " mcp"; !strings.Contains(codexCalls, want) {
-		t.Fatalf("Codex registration differs from install.sh; want %q in:\n%s", want, codexCalls)
+	if want := "mcp remove putnami"; !strings.Contains(codexCalls, want) {
+		t.Fatalf("Codex removal differs from install.sh; want %q in:\n%s", want, codexCalls)
+	}
+	for _, calls := range []string{claudeCalls, codexCalls} {
+		if strings.Contains(calls, "mcp add") {
+			t.Fatalf("the installer registered a server:\n%s", calls)
+		}
 	}
 
 	// The acceptance check a user runs next.

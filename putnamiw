@@ -16,10 +16,6 @@
 #   ./putnamiw --download build --all  # consumer workspaces only: fetch a
 #                                      # pre-built binary instead of compiling.
 #                                      # Refused where tooling/cli is present.
-#   ./putnamiw mcp                     # serve MCP; on a cold machine the
-#                                      # wrapper answers the client while it
-#                                      # prepares the CLI (see "MCP server
-#                                      # start while the CLI is prepared")
 #   ./putnamiw --print-engine          # build or reuse the from-source CLI, run
 #                                      # only `putnami extensions prepare` with
 #                                      # it, and print one JSON line:
@@ -159,10 +155,10 @@ DIM='\033[2m'
 NC='\033[0m'
 
 # Progress chatter goes to STDERR, never stdout. ./putnamiw is now the only
-# supported entrypoint in this repository, which includes serving
-# the MCP server over stdio and piping `--output=json` into a parser: a
-# "Building putnami CLI..." line on stdout would corrupt the very first cold
-# run of either. stdout belongs to the CLI this script exec's into.
+# supported entrypoint in this repository, which includes piping
+# `--output=json` into a parser: a "Building putnami CLI..." line on stdout
+# would corrupt the very first cold run. stdout belongs to the CLI this script
+# exec's into.
 info()    { echo -e "${CYAN}>${NC} $1" >&2; }
 success() { echo -e "${GREEN}✓${NC} $1" >&2; }
 warn()    { echo -e "${YELLOW}!${NC} $1" >&2; }
@@ -181,9 +177,6 @@ _CLEANUP_PATHS=()
 register_cleanup() { _CLEANUP_PATHS+=("$1"); }
 cleanup() {
   local p
-  if [ -n "${MCP_RELAY_PID:-}" ]; then
-    kill "$MCP_RELAY_PID" 2>/dev/null || true
-  fi
   if [ "${#_CLEANUP_PATHS[@]}" -gt 0 ]; then
     for p in "${_CLEANUP_PATHS[@]}"; do
       [ -n "$p" ] && rm -rf "$p" 2>/dev/null
@@ -1278,189 +1271,5 @@ run_prepared_cli() {
   run_cli "$CLI_BINARY" "${PASSTHROUGH_ARGS[@]}"
 }
 
-# --- MCP server start while the CLI is prepared ---
-#
-# `./putnamiw mcp`, on a run that must download or build the CLI, answers the
-# client itself until the CLI is ready, then hands the session to the CLI's own
-# server:
-#
-#   - `initialize` gets the reply of a server that is still preparing: no tools,
-#     no resources, both lists announced as changing, and instructions that say
-#     a reconnect brings the server's own instructions.
-#   - `ping`, `tools/list` and `resources/list` get their empty answers.
-#   - `tools/call`, `resources/read`, every notification and every frame without
-#     a top-level method are queued for the CLI.
-#   - Any other request gets the JSON-RPC "method not found" error the CLI's
-#     server gives it.
-#
-# The queue is a FIFO that the CLI reads as its stdin. It holds what a pipe
-# buffer holds, and the relay waits while it is full. Its first frame is the
-# client's `initialize`, unchanged except for its id, "putnamiw-prepare". The
-# CLI answers frames in order, so its first reply answers that frame, and the
-# client receives `notifications/tools/list_changed` and
-# `notifications/resources/list_changed` in its place. The session directory
-# exists until the CLI is ready; once it is gone, the relay copies every frame
-# to the CLI unread. The CLI replaces the wrapper process, so the signals the
-# client sends reach it. When the CLI's stdout closes, the relay ends, so the
-# client's stdout and stderr close with the CLI. A failed preparation ends the
-# session with its error on stderr.
-
-MCP_PREPARE_ID='"putnamiw-prepare"'
-
-# MCP_FRAME_AWK reads one JSON-RPC frame and prints four lines: its top-level
-# method, its raw top-level id, for an `initialize` the frame with that id
-# replaced by the awk variable replay_id, and ".". A value it does not find
-# prints as an empty line.
-MCP_FRAME_AWK='
-{
-  s = $0; n = length(s); d = 0; key = ""; method = ""; id = ""; idfrom = 0; idto = 0; i = 1
-  while (i <= n) {
-    c = substr(s, i, 1)
-    if (c == "\"") {
-      j = i + 1
-      while (j <= n) {
-        ch = substr(s, j, 1)
-        if (ch == "\\") j += 2
-        else if (ch == "\"") break
-        else j++
-      }
-      tok = substr(s, i, j - i + 1); start = i; i = j + 1
-      if (d != 1) continue
-      k = i
-      while (k <= n && index(" \t\r", substr(s, k, 1)) > 0) k++
-      if (substr(s, k, 1) == ":") { key = substr(tok, 2, length(tok) - 2); i = k + 1; continue }
-      if (key == "method") method = substr(tok, 2, length(tok) - 2)
-      if (key == "id") { id = tok; idfrom = start; idto = j }
-      key = ""
-      continue
-    }
-    if (d == 1 && key != "" && index("-0123456789tfn", c) > 0) {
-      j = i
-      while (j <= n && index("-+.0123456789eEtruefalsn", substr(s, j, 1)) > 0) j++
-      if (key == "id") { id = substr(s, i, j - i); idfrom = i; idto = j - 1 }
-      key = ""; i = j
-      continue
-    }
-    if (c == "{" || c == "[") { d++; if (d == 2) key = "" }
-    else if (c == "}" || c == "]") d--
-    i++
-  }
-  print method
-  print id
-  if (method == "initialize" && idto > 0) print substr(s, 1, idfrom - 1) replay_id substr(s, idto + 1)
-  else print ""
-  print "."
-}'
-
-# mcp_frame_fields sets MCP_METHOD, MCP_ID and MCP_REPLAY to the three values
-# MCP_FRAME_AWK prints for the frame $1.
-mcp_frame_fields() {
-  local fields
-  MCP_METHOD=""
-  MCP_ID=""
-  MCP_REPLAY=""
-  fields="$(printf '%s\n' "$1" | LC_ALL=C awk -v replay_id="$MCP_PREPARE_ID" "$MCP_FRAME_AWK")" || return 0
-  {
-    IFS= read -r MCP_METHOD || true
-    IFS= read -r MCP_ID || true
-    IFS= read -r MCP_REPLAY || true
-  } <<EOF
-$fields
-EOF
-  return 0
-}
-
-# mcp_reply writes the JSON-RPC result $2 for the request id $1 to stdout.
-mcp_reply() {
-  printf '{"jsonrpc":"2.0","id":%s,"result":%s}\n' "$1" "$2"
-}
-
-# mcp_relay_while_preparing reads the client's frames from stdin, answers them
-# while the directory $1 exists, and writes the frames the CLI must see to fd 4.
-# Once $1 is gone it copies the rest of stdin to fd 4 unread.
-mcp_relay_while_preparing() {
-  local dir="$1" line version replayed="false"
-  local version_re='"protocolVersion"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
-  local instructions="Putnami is building its CLI from the sources of this workspace. Its tools and resources appear when the build finishes, announced by notifications/tools/list_changed and notifications/resources/list_changed. Reconnect this server after that for its own instructions."
-  while IFS= read -r line || [ -n "$line" ]; do
-    if [ ! -d "$dir" ]; then
-      printf '%s\n' "$line" >&4
-      exec cat >&4 4>&-
-    fi
-    mcp_frame_fields "$line"
-    case "$MCP_METHOD" in
-      initialize)
-        # The versions the CLI's MCP server speaks (internal/mcp/protocol.go).
-        # A requested version outside the list, or none, gets the newest one;
-        # the relay never echoes a version it does not speak.
-        version="2025-11-25"
-        if [[ $line =~ $version_re ]]; then
-          case "${BASH_REMATCH[1]}" in
-            2024-11-05 | 2025-03-26 | 2025-06-18 | 2025-11-25) version="${BASH_REMATCH[1]}" ;;
-          esac
-        fi
-        if [ -n "$MCP_ID" ]; then
-          mcp_reply "$MCP_ID" "{\"protocolVersion\":\"$version\",\"capabilities\":{\"tools\":{\"listChanged\":true},\"resources\":{\"subscribe\":false,\"listChanged\":true}},\"serverInfo\":{\"name\":\"putnami\",\"version\":\"preparing\"},\"instructions\":\"$instructions\"}"
-        fi
-        if [ "$replayed" = "false" ] && [ -n "$MCP_REPLAY" ]; then
-          printf '%s\n' "$MCP_REPLAY" >&4
-          replayed="true"
-        fi
-        ;;
-      ping) [ -z "$MCP_ID" ] || mcp_reply "$MCP_ID" '{}' ;;
-      tools/list) [ -z "$MCP_ID" ] || mcp_reply "$MCP_ID" '{"tools":[]}' ;;
-      resources/list) [ -z "$MCP_ID" ] || mcp_reply "$MCP_ID" '{"resources":[]}' ;;
-      tools/call | resources/read | "") printf '%s\n' "$line" >&4 ;;
-      *)
-        if [ -n "$MCP_ID" ]; then
-          printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32601,"message":"method not found: %s"}}\n' "$MCP_ID" "$MCP_METHOD"
-        else
-          printf '%s\n' "$line" >&4
-        fi
-        ;;
-    esac
-  done
-}
-
-# mcp_announce_ready copies the CLI's stdout to the client. When its first frame
-# is the reply to the replayed initialize, it writes the two list_changed
-# notifications in its place. When the CLI's stdout closes, it ends the relay
-# whose process id is $1.
-mcp_announce_ready() {
-  local relay="$1" line
-  if IFS= read -r line || [ -n "$line" ]; then
-    case "$line" in
-      *"\"id\":$MCP_PREPARE_ID"*)
-        printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}' \
-          '{"jsonrpc":"2.0","method":"notifications/resources/list_changed"}'
-        ;;
-      *) printf '%s\n' "$line" ;;
-    esac
-  fi
-  cat || true
-  kill "$relay" 2>/dev/null || true
-}
-
-# serve_mcp_while_preparing prepares the CLI and serves the MCP session as the
-# section above states. It never returns.
-serve_mcp_while_preparing() {
-  local dir relay
-  dir="$(mktemp -d "${TMPDIR:-/tmp}/putnamiw-mcp.XXXXXX")" || fail "Cannot create a directory for the MCP session"
-  register_cleanup "$dir"
-  mkfifo "$dir/frames" || fail "Cannot create the MCP frame queue at $dir/frames"
-  mcp_relay_while_preparing "$dir" <&0 4>"$dir/frames" &
-  MCP_RELAY_PID=$!
-  relay="$MCP_RELAY_PID"
-  exec <"$dir/frames"
-  prepare_cli </dev/null >&2
-  rm -rf "$dir"
-  MCP_RELAY_PID=""
-  exec > >(mcp_announce_ready "$relay")
-  run_prepared_cli
-}
-
-if [ "${#PASSTHROUGH_ARGS[@]}" -eq 1 ] && [ "${PASSTHROUGH_ARGS[0]}" = "mcp" ]; then
-  serve_mcp_while_preparing
-fi
 prepare_cli
 run_prepared_cli

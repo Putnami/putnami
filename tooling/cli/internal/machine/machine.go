@@ -1,5 +1,5 @@
 // Package machine emits the machine contract — the versioned envelope, the
-// session stream, the MCP result and the recorded session files
+// session stream and the recorded session files
 // (protocols/cli, doc/02-result-v2.md).
 //
 // # There is one contract
@@ -24,13 +24,12 @@
 // # What this package is
 //
 // Everything here is a pure projection of the canonical reduction
-// (jobs.ReduceRun / jobs.SessionResult) onto the contract's documents. The four
+// (jobs.ReduceRun / jobs.SessionResult) onto the contract's documents. The
 // surfaces read ONE reduction, which is what makes "the stream and the
 // aggregated envelope cannot disagree about a verdict" structural rather than
 // tested:
 //
 //	internal/output/renderer.go   --output=json and --output=jsonl
-//	internal/mcp/adapter.go       run_jobs / plan_jobs
 //	internal/engine/execute.go    session.json and plan.json
 //
 // # Session readers

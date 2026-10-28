@@ -69,7 +69,7 @@ func localProviderWorkspace(t *testing.T) string {
 
 func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-mcp-return-the-same-envelope")
+	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "the-cli-and-the-host-channel-return-the-same-envelope")
 	root := localProviderWorkspace(t)
 
 	// The CLI records a task and a proposal.
@@ -91,45 +91,42 @@ func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 		t.Fatalf("proposals upsert: %s", stdout)
 	}
 
-	// MCP reads the same store, through the same binding.
-	srv := newMCPServer(root, "collaboration-test")
-	tools := map[string]bool{}
-	for _, tool := range listParityTools(t, srv) {
-		tools[tool.Name] = true
-	}
-	for _, want := range []string{"tasks.capabilities", "tasks.create", "tasks.find", "proposals.status", "proposals.review"} {
-		if !tools[want] {
-			t.Errorf("tools/list lacks %s", want)
+	// The host channel reads the same store, through the same binding.
+	channel := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root), extensions: collabCommandExtensions(t, root)})
+	call := func(contract, operation, input string) collab.Envelope {
+		t.Helper()
+		answer, err := channel.CallCollaboration(t.Context(), contract, operation, json.RawMessage(input))
+		if err != nil {
+			t.Fatalf("collaboration.call %s %s = %v", contract, operation, err)
 		}
+		return decodeCollabEnvelope(t, string(answer))
 	}
-	for _, absent := range []string{"proposals.comments", "proposals.merge", "tasks.claim", "memory.context", "local-collaboration.tasks.find"} {
-		if tools[absent] {
-			t.Errorf("tools/list advertises %s", absent)
-		}
-	}
-	ref, _ := json.Marshal(created.Task.Ref)
-	blocks, isError := callParityTool(t, srv, "tasks.get", `{"ref":`+string(ref)+`}`)
-	got := decodeCollabEnvelope(t, blocks[0])
+	got := call("tasks", "get", `{"ref":`+mustMarshal(t, created.Task.Ref)+`}`)
 	var task collab.TaskResult
-	if err := json.Unmarshal(got.Result, &task); err != nil || isError || task.Task.Title != "Route the collaboration contracts" ||
+	if err := json.Unmarshal(got.Result, &task); err != nil || got.Outcome != collab.OutcomeOK || task.Task.Title != "Route the collaboration contracts" ||
 		got.Provider == nil || got.Provider.Name != "@putnami/local-collaboration" {
-		t.Fatalf("MCP tasks.get: %s", blocks[0])
+		t.Fatalf("collaboration.call tasks get: %+v", got)
 	}
-	blocks, _ = callParityTool(t, srv, "proposals.status", `{"ref":`+mustMarshal(t, proposal.Proposal.Ref)+`}`)
+	got = call("proposals", "status", `{"ref":`+mustMarshal(t, proposal.Proposal.Ref)+`}`)
 	var status collab.ProposalStatusResult
-	if err := json.Unmarshal(decodeCollabEnvelope(t, blocks[0]).Result, &status); err != nil ||
+	if err := json.Unmarshal(got.Result, &status); err != nil ||
 		status.Checks.State != collab.ChecksStateUnsupported || status.Proposal.Ref != proposal.Proposal.Ref {
-		t.Fatalf("MCP proposals.status: %s", blocks[0])
+		t.Fatalf("collaboration.call proposals status: %+v", got)
 	}
 
-	// A retried upsert through MCP finds the CLI's proposal instead of
-	// creating a second one.
-	blocks, _ = callParityTool(t, srv, "proposals.upsert",
+	// A retried upsert through the host channel finds the CLI's proposal
+	// instead of creating a second one.
+	got = call("proposals", "upsert",
 		`{"change":{"repository":"acme/app","base":"main","head":"fix-issue-42"},"title":"feat: collaboration providers"}`)
 	var again collab.ProposalUpsertResult
-	if err := json.Unmarshal(decodeCollabEnvelope(t, blocks[0]).Result, &again); err != nil || again.Created ||
+	if err := json.Unmarshal(got.Result, &again); err != nil || again.Created ||
 		again.Proposal.Ref != proposal.Proposal.Ref {
-		t.Fatalf("MCP proposals.upsert: %s", blocks[0])
+		t.Fatalf("collaboration.call proposals upsert: %+v", got)
+	}
+
+	// An optional operation the local provider lacks answers unsupported.
+	if got = call("tasks", "claim", `{"ref":`+mustMarshal(t, created.Task.Ref)+`,"holder":"me"}`); got.Outcome != collab.OutcomeUnsupported {
+		t.Errorf("collaboration.call tasks claim = %+v, want unsupported", got)
 	}
 
 	// Discovery says what the local provider cannot do.
@@ -150,6 +147,23 @@ func TestTheLocalProviderAnswersBothEntryPaths(t *testing.T) {
 	if err := json.Unmarshal(decodeCollabEnvelope(t, stdout).Result, &capabilities); err != nil || capabilities.Status != collab.BindingStatusUnbound {
 		t.Fatalf("memory capabilities: %s", stdout)
 	}
+}
+
+func mustJSONString(t *testing.T, value string) string {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("encode %q: %v", value, err)
+	}
+	return string(encoded)
+}
+
+// jsonStringContent is value encoded for use inside a JSON string literal,
+// without the surrounding quotes, so a Windows path substituted into a manifest
+// keeps its backslashes as escapes instead of breaking the document.
+func jsonStringContent(t *testing.T, value string) string {
+	t.Helper()
+	return strings.TrimSuffix(strings.TrimPrefix(mustJSONString(t, value), `"`), `"`)
 }
 
 func mustMarshal(t *testing.T, value any) string {

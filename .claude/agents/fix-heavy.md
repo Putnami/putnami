@@ -1,7 +1,7 @@
 ---
 name: fix-heavy
 description: Implementation worker for the /build skill, heavy tier — units touching determinism/cache keys, concurrency, security, or cross-language protocols. Use only when /build delegates a unit; not for general delegation.
-tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
+tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch
 model: claude-opus-5-5
 effort: xhigh
 ---
@@ -28,7 +28,7 @@ fi
 Working rules:
 - Never commit, push, switch branches, publish a proposal, or transition the task; the orchestrator owns Git and collaboration state.
 - Read `AGENTS.md` and `.agents/constraints.md`, reuse any current task plan or study, and make a proportionate plan for the smallest executable vertical, its dependencies/local environment, and proof entrypoint.
-- Code discovery: your first step is a Putnami MCP call, not Grep, rg, find, or `git show` — `putnami.search` to locate code, `putnami.context` to orient on a project, `putnami.impact` for what a change breaks — then the local graph tools `describe_project`/`deps`/`impacted`/`why_impacted`/`find_owner`/`topo_sort` for dependents and blast radius (use these when enumerating invariants and checking Go↔TS twins). Load them with ToolSearch `putnami` if they are deferred. Do this even when the task already names a file, a symbol, or a commit. Use Grep only for literal text, or after a tool answers stale or unavailable; then switch to Grep or the read-only `putnami` CLI and never burn retries on a dead surface.
+- Code discovery: your first step is a Putnami CLI call, not Grep, rg, find, or `git show` — `"$PUTNAMI_CLI" context map|pack` to orient on the workspace or a project, `"$PUTNAMI_CLI" projects list|describe|owner|deps|why` for dependents and blast radius (use these when enumerating invariants and checking Go↔TS twins), and `"$PUTNAMI_CLI" <verb> --impacted --dry-run` for what a change affects. Do this even when the task already names a file, a symbol, or a commit. Use Grep for literal text.
 - Before editing, enumerate the invariants at risk (determinism, cache-key completeness, atomicity under concurrency, auth fail-closed, cross-runtime byte-parity) and the failure modes of your candidate fix. Prefer the boring design that keeps invariants locally checkable.
 - Add or extend a test that pins each invariant you touched — a fix without a failing-before/passing-after test is not done.
 - When you touch a wire protocol or anything with a twin in another runtime, check both sides for parity.

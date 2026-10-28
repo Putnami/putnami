@@ -1,9 +1,6 @@
 package commandmeta
 
 import (
-	"fmt"
-	"strings"
-
 	cache "go.putnami.dev/protocol/cache"
 	registry "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
@@ -67,7 +64,7 @@ var catalog = []Command{
 			"putnami projects list",
 			"putnami projects list --output=jsonl",
 		},
-		Related:          []string{"projects describe", "projects create", "workspace describe"},
+		Related:          []string{"projects describe", "projects deps", "projects owner", "projects create", "workspace describe"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},
@@ -105,7 +102,63 @@ var catalog = []Command{
 			"putnami projects describe my-app",
 			"putnami projects describe my-app --output=jsonl",
 		},
-		Related:          []string{"projects list", "config show"},
+		Related:          []string{"projects list", "projects deps", "projects owner", "config show"},
+		StructuredOutput: true,
+		Workspace:        requiredWorkspace(),
+	},
+	{
+		Path:        "projects owner",
+		Kind:        KindStructured,
+		Category:    "Projects",
+		Summary:     "Show the projects that own a path",
+		Description: "List the projects that own a workspace-relative path: the nearest project whose directory holds it, plus every project that claims it as an asset",
+		Usage:       "putnami projects owner <path> [--output <format>]",
+		Positionals: []Positional{{Name: "path", Required: true}},
+		Examples: []string{
+			"putnami projects owner packages/api/src/main.go",
+			"putnami projects owner packages/api/src/main.go --output=jsonl",
+		},
+		Related:          []string{"projects describe", "projects why"},
+		StructuredOutput: true,
+		Workspace:        requiredWorkspace(),
+	},
+	{
+		Path:        "projects deps",
+		Kind:        KindStructured,
+		Category:    "Projects",
+		Summary:     "List the dependencies or dependents of a project",
+		Description: "List the projects a project depends on, or with --dependents the projects that depend on it; --transitive follows the edges to the end of the graph",
+		Usage:       "putnami projects deps <project> [--dependents] [--transitive] [--output <format>]",
+		Flags: []Flag{
+			{Long: "--dependents", Description: "List the projects that depend on the project instead of the ones it depends on"},
+			{Long: "--transitive", Description: "Follow the edges transitively instead of listing direct ones"},
+		},
+		Positionals: []Positional{{Name: "project", Required: true}},
+		Examples: []string{
+			"putnami projects deps my-app",
+			"putnami projects deps my-lib --dependents --transitive",
+			"putnami projects deps my-app --output=jsonl",
+		},
+		Related:          []string{"projects describe", "projects why"},
+		StructuredOutput: true,
+		Workspace:        requiredWorkspace(),
+	},
+	{
+		Path:        "projects why",
+		Kind:        KindStructured,
+		Category:    "Projects",
+		Summary:     "Explain why a change to one project impacts another",
+		Description: "Print the path from one project to another that --impacted follows, the kind of each edge (dependency, contract, extension-consumer), and the tasks the second project runs when the change reaches it task-scoped; say so when the first project does not impact the second",
+		Usage:       "putnami projects why <from> <to> [--output <format>]",
+		Positionals: []Positional{
+			{Name: "from", Required: true},
+			{Name: "to", Required: true},
+		},
+		Examples: []string{
+			"putnami projects why my-lib my-app",
+			"putnami projects why my-lib my-app --output=jsonl",
+		},
+		Related:          []string{"projects deps", "projects describe"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},
@@ -812,7 +865,7 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Configuration",
 		Summary:     "Regenerate AI context",
-		Description: "Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md, and the agent skills the workspace declares by in-tree path. Bytes outside the block are never touched; an edited block is preserved and reported, and --force rewrites that block only. No other file is written: run `putnami mcp install` to register the MCP server",
+		Description: "Regenerate the Putnami guidance block in CLAUDE.md and AGENTS.md, and the agent skills the workspace declares by in-tree path. Bytes outside the block are never touched; an edited block is preserved and reported, and --force rewrites that block only. No other file is written",
 		Usage:       "putnami context generate [--force]",
 		Flags: []Flag{
 			{Long: "--force", Description: "Rewrite a guidance block that was edited or written by an older release"},
@@ -829,7 +882,7 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Configuration",
 		Summary:     "Print the workspace orientation map",
-		Description: "Print the workspace orientation map, built in memory from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree): Markdown by default, and with --output=json the map document as data, the same document the MCP workspace_map tool serves. --projects and --impacted narrow the printed projects. Byte-deterministic on an unchanged tree. It writes no file, and a build writes no map",
+		Description: "Print the workspace orientation map, built in memory from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree): Markdown by default, and with --output=json the map document as data. --projects and --impacted narrow the printed projects. Byte-deterministic on an unchanged tree. It writes no file, and a build writes no map",
 		Usage:       "putnami context map [--projects <list>] [--impacted] [--output <format>]",
 		Examples: []string{
 			"putnami context map",
@@ -846,7 +899,7 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Configuration",
 		Summary:     "Print each project's agent-context document",
-		Description: "Print one deterministic agent-context document per project: its identity and graph, composition roots, commands, config and contracts. --output=json returns the documents as data, and --project narrows them to one project. It writes no file. The MCP agent_context tool builds the same document in memory",
+		Description: "Print one deterministic agent-context document per project: its identity and graph, composition roots, commands, config and contracts. --output=json returns the documents as data, and --project narrows them to one project. It writes no file",
 		Usage:       "putnami context pack [--project <selector>] [--output <format>]",
 		Flags: []Flag{
 			{Long: "--project", Type: FlagValue, ValueName: "<selector>", Description: "Project ID, path, or name; default is every workspace project"},
@@ -856,7 +909,7 @@ var catalog = []Command{
 			"putnami context pack --project <project-id>",
 			"putnami context pack --output=json",
 		},
-		Related:          []string{"context map", "mcp"},
+		Related:          []string{"context map"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},
@@ -1064,36 +1117,6 @@ var catalog = []Command{
 		Workspace: WorkspaceNeed{
 			Note: "cmdMigrate falls back to os.Getwd(): vnext migrates the lock file found at the workspace root or the current directory",
 		},
-	},
-
-	// ── Agents ───────────────────────────────────────────────────────────
-	{
-		Path:        "mcp",
-		Kind:        KindStructured,
-		Category:    "Agents",
-		Summary:     "Run the MCP server over stdio for AI agent harnesses",
-		Description: fmt.Sprintf("Run the Model Context Protocol server over stdio so an AI agent harness can discover projects, context, ownership, impact, plans, and diagnostics through %d typed core tools (%s) and resources for the workspace context, the Putnami guidance, the workspace map, and each project's agent context. All except run_jobs are read-only; run_jobs is the only mutating core tool, supports dry-run planning, and refuses long-lived or externally mutating execution. Spawned by the client; speaks JSON-RPC 2.0 on stdin/stdout and exits with the session. Before it serves, it brings the workspace's agent workflows to the version the lock pins, from the local artifact store only, and reports what it cannot reconcile as a warning on stderr. Optional request provenance is disabled by default; set PUTNAMI_AGENT_IDENTITY=1 and explicitly set PUTNAMI_AGENT_MODEL in the MCP server environment to propagate bounded harness/model headers.", len(CoreMCPToolNames()), strings.Join(CoreMCPToolNames(), ", ")),
-		Usage:       "putnami mcp [install]",
-		Positionals: []Positional{{Name: "install"}},
-		Examples: []string{
-			"putnami mcp",
-			"putnami mcp install",
-		},
-		Related:   []string{"mcp install", "projects list"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:        "mcp install",
-		Kind:        KindStructured,
-		Category:    "Agents",
-		Summary:     "Register the MCP server in .mcp.json for Claude Code",
-		Description: "Write the putnami entry into .mcp.json at the workspace root, where Claude Code discovers the MCP server. Codex, Cursor and VS Code read their own files and do not see this entry. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.",
-		Usage:       "putnami mcp install",
-		Examples: []string{
-			"putnami mcp install",
-		},
-		Related:   []string{"mcp", "context generate"},
-		Workspace: requiredWorkspace(),
 	},
 
 	// ── Other ────────────────────────────────────────────────────────────

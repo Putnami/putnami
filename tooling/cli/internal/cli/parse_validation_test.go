@@ -118,8 +118,8 @@ func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 // --check` and every spelling of `context map --print` are unknown flags,
 // while the global selection and output flags stay accepted.
 func TestValidateStructuredFlags_RejectsTheDeletedContextFlags(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "generated-context", "the-check-flag-is-unknown")
-	spectest.Proves(t, "cli/context-mcp-discovery", "workspace-map", "the-print-flag-is-unknown")
+	spectest.Proves(t, "cli/context-discovery", "generated-context", "the-check-flag-is-unknown")
+	spectest.Proves(t, "cli/context-discovery", "workspace-map", "the-print-flag-is-unknown")
 	t.Parallel()
 	for _, tc := range []struct {
 		sub  string

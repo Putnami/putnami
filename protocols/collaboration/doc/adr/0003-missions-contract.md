@@ -38,10 +38,9 @@ cheap to repeat and must never show the agent a tool it should not call.
    `sync.decisions`, and claims a message through `sync.delivered` and
    `sync.replies`.
 2. **Host-only operations.** `OperationSpec.HostOnly` marks an operation the
-   host that runs an agent calls, never the agent. The MCP server lists no
-   tool for it. `putnami <contract> <operation>` and the host channel's
+   host that runs an agent calls, never the agent. `putnami <contract> <operation>` and the host channel's
    `collaboration.call` route it like any other operation, through the same
-   `mcp.CallProviderOperation`, to the same envelope. Only `missions.sync` is
+   `collaboration.CallProviderOperation`, to the same envelope. Only `missions.sync` is
    host-only. Only a mutation can be: a read has no reason to hide from an
    agent. This amends ADR 0001 decision 5, under which every operation the
    binding serves was an MCP tool.

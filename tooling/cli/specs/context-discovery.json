@@ -1,0 +1,70 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/context-discovery",
+  "outcomes": [
+    "A contributor can discover workspace structure and project context without enumerating the repository by hand",
+    "A script receives the project, context, and workspace-map facts as JSON documents built by the same code that renders the text",
+    "A contributor can ask which project owns a path, what a project depends on or is depended on by, and why a change to one project impacts another, without reading the graph by hand",
+    "An extension can contribute a workspace-answering tool to the collaboration routing without re-deriving membership, selection, or impact",
+    "Reading a fresh or resumed workspace prepares exact locked read surfaces within a fixed budget without a manual context-generation step",
+    "A workspace an earlier release registered a Putnami server in loses that registration without losing any entry a person wrote"
+  ],
+  "nonGoals": [
+    "Making guidance, the workspace map, or project context a second source of workspace truth beside the committed workspace",
+    "Serving a long-running protocol endpoint or registering one in an agent host: the CLI is the surface",
+    "Owning the specification-driven surface: features, specs, architecture, and contracts belong to the @putnami/sdd extension, and the CLI carries no copy of them",
+    "Running workspace installation, dependency installation, Cloud setup, subscription, or activation as a side effect of analysis"
+  ],
+  "requirements": [
+    {
+      "id": "generated-context",
+      "text": "Context generation writes deterministic shared guidance, owns exactly one delimited block inside AGENTS.md and CLAUDE.md, inserts it into existing files without altering any other byte, preserves an edited block, and writes nothing else into the workspace root. It never creates, rewrites, or removes a .mcp.json, and the human-maintained .agents/constraints.md is only ever read. context pack prints each project's agent-context document and writes no file."
+    },
+    {
+      "id": "workspace-map",
+      "text": "The workspace map is a deterministic projection of committed inputs. putnami context map prints it and writes nothing: Markdown by default, and with --output=json the map document as data. --projects and --impacted narrow the printed projects."
+    },
+    {
+      "id": "build-writes-no-workspace-map",
+      "text": "A build session writes no workspace map and reads no variable that controls one. The map comes on demand from putnami context map, which prints it and writes no file."
+    },
+    {
+      "id": "extension-tool-workspace-facts",
+      "text": "A collaboration provider tool that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact; a tool that does not declare it receives neither."
+    },
+    {
+      "id": "read-preparation",
+      "text": "Analysis prepares exact locked registry extensions through the verified shared cache within a bounded deadline, falls back locally without ambient replacements, and never runs the full install lifecycle. Human files, sessions, locks and agent-artifact ownership receipts remain unchanged unless regeneration is explicitly forced."
+    },
+    {
+      "id": "settled-decisions-guidance",
+      "text": "The generated block names the decisions.json files in one line and lists no decision: only a registry's first decision, or removal of its last, changes it."
+    },
+    {
+      "id": "agent-context-languages",
+      "text": "A project's languages in an agent-context document come from the workspace providers, not from file names. Each language that a loaded extension's manifest declares counts for every project the workspace index records that extension's probe as claiming. The languages are sorted and listed once. A project no declaring provider claims reports none."
+    },
+    {
+      "id": "mcp-registration-removal",
+      "text": "init and the first-use install write no .mcp.json. An explicit install or upgrade deletes the putnami entry under mcpServers when it equals, as canonical JSON, the entry earlier releases wrote with command putnami or ./putnamiw, keeps other servers and keys, and deletes the file when nothing else remains. A changed entry stays byte for byte with a warning; an unparseable file stays untouched with a warning. This removal is deleted in the next minor release."
+    },
+    {
+      "id": "host-registration-removal",
+      "text": "The CLI installers register no server in Claude Code or Codex. A user-scoped putnami registration that matches, by meaning, the definition earlier installers wrote is removed through the host's CLI, read from a neutral directory so a project entry cannot shadow it. A customized registration stays, with a warning. PUTNAMI_NO_AGENT_HOSTS skips the step. This removal is deleted in the next minor release."
+    },
+    {
+      "id": "project-graph-queries",
+      "text": "projects owner <path> prints the projects that own a path. projects deps <project> prints direct dependencies, or dependents with --dependents, and the closure with --transitive, sorted and without the project itself. projects why <from> <to> prints the impact path from <from> to <to> with edge kinds and task scope, or says there is none. Selectors take an id or a name. Each query is read-only and prints JSON Lines with --output jsonl."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
+    "tooling/cli/doc/adr/0013-sdd-as-a-standalone-extension.md",
+    "tooling/cli/doc/adr/0022-analysis-prepares-only-locked-read-surfaces.md",
+    "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md",
+    "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
+    "tooling/cli/doc/adr/0055-repository-rules-live-in-agents-constraints.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
+  ]
+}

@@ -59,8 +59,8 @@ func TestLoad_Memoizes(t *testing.T) {
 	}
 }
 
-func TestLoadReloadsAnIndexCreatedAfterSessionStart(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-initialization", "graph-readiness", "mcp-reloads-an-index-created-after-startup")
+func TestLoadReloadsAnIndexPublishedAfterItsFirstRead(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-initialization", "graph-readiness", "a-load-reloads-an-index-published-after-its-first-read")
 	root := t.TempDir()
 	writeFileAt(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{"includes":["app"]}`)
 	writeFileAt(t, filepath.Join(root, "app", "package.json"), `{"name":"@acme/app"}`)
@@ -77,7 +77,7 @@ func TestLoadReloadsAnIndexCreatedAfterSessionStart(t *testing.T) {
 
 	// Build the value an external CLI process would publish without touching
 	// this process's cached pointer. The cache must notice the atomic snapshot
-	// appearance by itself on the next MCP-shaped Load.
+	// appearance by itself on the next Load.
 	writer, err := loadUncached(root)
 	if err != nil {
 		t.Fatal(err)

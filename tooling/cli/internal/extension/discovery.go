@@ -496,56 +496,6 @@ func GroupCarriedCommands(groups map[string]CommandGroupDefinition) map[string]b
 	return carried
 }
 
-// InteractiveOnlyCarrier returns the command path, `<group> <subcommand>`,
-// that a user types to run command, when every subcommand of extensions that
-// carries command (GroupCarriedCommands) dispatches interactive: such a command
-// needs the terminal's streams and the host channel that interactive dispatch
-// opens. A nested subcommand dispatches under the Interactive flag of its
-// top-level subcommand. Of several carriers it returns the first path in
-// sorted order. ok is false when no subcommand carries command, or one that
-// carries it is not interactive.
-func InteractiveOnlyCarrier(extensions []*ExtensionDescription, command string) (path string, ok bool) {
-	var paths []string
-	for _, ext := range extensions {
-		for group, groupDef := range ext.CommandGroups {
-			for name, sub := range groupDef.Subcommands {
-				carrier, carried := carrierPath(sub, group+" "+name, command)
-				if !carried {
-					continue
-				}
-				if !sub.Interactive {
-					return "", false
-				}
-				paths = append(paths, carrier)
-			}
-		}
-	}
-	if len(paths) == 0 {
-		return "", false
-	}
-	sort.Strings(paths)
-	return paths[0], true
-}
-
-// carrierPath returns the path of the first subcommand, in sorted order, at or
-// below sub (whose own path is path) that names command.
-func carrierPath(sub SubcommandDefinition, path, command string) (string, bool) {
-	if sub.Command == command {
-		return path, true
-	}
-	names := make([]string, 0, len(sub.Subcommands))
-	for name := range sub.Subcommands {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		if carrier, ok := carrierPath(sub.Subcommands[name], path+" "+name, command); ok {
-			return carrier, true
-		}
-	}
-	return "", false
-}
-
 // CommandSubcommandOwners returns, sorted, the names of every extension with
 // an executable definition for the given command-group subcommand. Multiple
 // owners make dispatch first-match-wins across independently released
@@ -730,7 +680,7 @@ func ListSubcommands(extensions []*ExtensionDescription, group string) []string 
 const installedRemediation = model.InstalledRemediation
 
 // warnedOnce dedupes discovery warnings per process: discovery runs from many
-// call sites (help, completion, planning, MCP), so a skipped or adapted
+// call sites (help, completion, planning), so a skipped or adapted
 // extension would otherwise warn ~5× per invocation. Keyed by manifest path +
 // reason.
 var warnedOnce sync.Map

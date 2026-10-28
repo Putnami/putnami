@@ -504,7 +504,7 @@ input selectors it lists in `runtime.inputSelectors`.
 | `tooling/cli/internal/watch` | Watched-file invalidation |
 | `tooling/cli/internal/jobs/inputresolve` | Input-resolve requests, answers and basis digests for the input selectors a task names |
 | `tooling/cli/internal/store` | Store tuning from workspace config |
-| `tooling/cli/internal/mcp`, `.../features`, `.../mapgen`, `.../hooks`, `.../cli` | Project identity, hooks, and generated views |
+| `tooling/cli/internal/collaboration`, `.../features`, `.../mapgen`, `.../hooks`, `.../cli` | Project identity, hooks, and generated views |
 
 **Authored producers** — every `putnami.workspace.json`, `putnami.json` and
 `putnami.lock.json` in this repository, including the workspace root's own.

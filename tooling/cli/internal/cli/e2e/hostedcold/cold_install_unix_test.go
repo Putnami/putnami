@@ -438,8 +438,8 @@ func newWorkspace(t *testing.T, registryURL string, lf *lockfile.LockFile) strin
 	if err := lockfile.WriteLockFile(ws, lf); err != nil {
 		t.Fatal(err)
 	}
-	// No AGENTS.md and no .mcp.json: an install without the run credential
-	// writes both, and the empty git status proves a hosted one does not.
+	// No AGENTS.md: an install without the run credential writes it, and the
+	// empty git status proves a hosted one does not.
 
 	hooks := t.TempDir()
 	clitest.RunGit(t, ws, "init", "--quiet")

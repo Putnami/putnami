@@ -130,7 +130,6 @@ func recordedSessionDocument(
 	document := run.SessionFile(req.Commands, scheduler, cache)
 	document.ParentSessionID = protocolcli.ParentSessionFromEnv(sessionID)
 	document.Selection = machine.SessionSelection(req.selection)
-	document.Agent = req.Agent
 	requested := req.Global.Where
 	if requested == "" {
 		requested = "local"
@@ -386,7 +385,7 @@ func (e *Engine) executeSession(
 
 	// The surface seam: an adapter that owns a renderer passes it, everyone else
 	// gets the one the resolved flags ask for. Session attachment happens after
-	// plan recording so every real renderer — terminal, machine, cloud, or MCP —
+	// plan recording so every real renderer — terminal, machine, or cloud —
 	// feeds the same complete sanitized events.jsonl artifact. A machine renderer
 	// shares that recorder with its bounded live selector; other renderers are
 	// wrapped without changing their display behavior.
@@ -537,8 +536,8 @@ func (e *Engine) executeSession(
 		finishSessionReporting(reporter, session.ID, finalizeErr)
 		// `latest` names the user's last build, and every `--session latest`
 		// reader resolves it. An adapter whose runs are not the user's build must
-		// therefore stay OUT of the rotation, or an agent tool call landing after
-		// a human's build silently becomes the session those readers open — and
+		// therefore stay OUT of the rotation, or an audit run landing after a
+		// human's build silently becomes the session those readers open — and
 		// session metadata carries no origin field, so nobody can tell
 		// afterwards. The session itself is still written and still listed by
 		// `putnami sessions`; only the pointer is withheld.

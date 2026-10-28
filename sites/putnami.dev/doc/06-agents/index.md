@@ -20,8 +20,7 @@ see [Develop with AI assistants](/docs/how-to/develop-with-ai).
 ## Orientation: read the system, not the files
 
 When you run `putnami init`, the workspace gets one short Putnami block in
-`AGENTS.md` (which a new `CLAUDE.md` imports), and a `.mcp.json` entry that
-registers the Putnami MCP server. That is the whole of what Putnami writes. Your own
+`AGENTS.md` (which a new `CLAUDE.md` imports). That is the whole of what Putnami writes. Your own
 durable rules go in `.agents/constraints.md`, a file you create yourself. The
 block tells an assistant to read it when it exists, and Putnami never writes it.
 Agent skills come only when you run `putnami extensions install @putnami/contributor`
@@ -44,8 +43,8 @@ the docs tree. It answers "which project owns X", "what depends on Y", "where
 are the APIs, the config keys, the docs" without shell exploration.
 
 It is byte-deterministic on an unchanged tree, and nothing writes it: neither
-the command nor a build stores a copy. `putnami context map` prints it, and the
-MCP `workspace_map` tool returns the same document, rebuilt on every call.
+the command nor a build stores a copy. `putnami context map` prints it, rebuilt
+on every call.
 `--projects` and `--impacted` narrow the printed projects.
 
 ### `putnami context pack` — how one project is composed
@@ -100,106 +99,34 @@ document lie.
 
 ---
 
-## The MCP server
+## Through the CLI
 
-```bash
-putnami mcp install   # writes or repairs the putnami entry in .mcp.json, merge-aware
-putnami mcp           # run the server over stdio (your client spawns this)
-```
+An agent reaches the workspace with the commands a person runs. Add
+`--output=jsonl` to a query for structured output.
 
-`putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry
-to `.mcp.json` when it is missing. Other servers and unknown keys in an existing
-file are preserved, a `putnami` entry you changed is kept, and a file that does
-not parse is left untouched with a warning. `mcp install` writes the same entry
-on request, and is the one command that rewrites a diverged one. Claude Code
-reads `.mcp.json`; Codex, Cursor and VS Code read their own configuration
-files, which Putnami commands do not write.
-
-The entry runs `putnami mcp`. A workspace that builds its own CLI from source
-(`cli.source: "workspace"` in `putnami.lock.json`) refuses the global binary, so
-when its root holds a `putnamiw` file, the entry runs `./putnamiw mcp`.
-
-The server speaks JSON-RPC 2.0 on stdin/stdout, exits with the session, and
-exposes the workspace as typed tools instead of shell exploration:
-
-| | Tools | What they answer |
+| | Commands | What they answer |
 | --- | --- | --- |
-| **Orient** | `list_projects` · `describe_project` · `agent_context` · `workspace_map` | What is in this workspace, how is this project composed, where should I read first, which project owns X |
-| **Blast radius** | `impacted` · `why_impacted` · `deps` · `find_owner` · `topo_sort` | What does my change affect, and by what path |
-| **Intent** | `sdd.list_features` · `sdd.feature_context` · `sdd.list_specs` · `sdd.spec_context` | What was this built for, what were the non-goals, what did the team agree to |
-| **Execute** | `run_jobs` · `get_diagnostics` | Run lint / test / build, then read every failure as `file:line:col` with severity and code |
+| **Orient** | `putnami projects list` · `putnami projects describe` · `putnami context pack` · `putnami context map` | What is in this workspace, how is this project composed, where should I read first |
+| **Blast radius** | `putnami projects owner` · `putnami projects deps` · `putnami projects why` · `putnami <verb> --impacted --dry-run` | Which project owns this path, what depends on what, what does my change affect, and by what path |
+| **Intent** | `putnami features` · `putnami specs` (from `@putnami/sdd`) | What was this built for, what were the non-goals, what did the team agree to |
+| **Execute** | `putnami lint` · `putnami test` · `putnami build` | Run the jobs, then read every failure as `file:line:col` with severity and code |
 
-Plus resources, so a client that prefers resources over tool calls gets the same
-facts: `workspace://context`, `putnami://workspace/guidance` (the rules block of
-`AGENTS.md`, then the settled decisions), `putnami://workspace/map` and `putnami://workspace/map/<section>`
-(what `workspace_map` returns), and `putnami://projects/<id>/context` (what
-`agent_context` returns for one project).
+Putnami serves no protocol server and writes no agent-host registration. An
+earlier Putnami wrote a `putnami` entry to `.mcp.json`; `putnami install` and
+`putnami upgrade` remove it when it is the entry Putnami wrote.
 
-When the guidance changes during a session, for example a decision is added or
-an extension is installed, the next Putnami tool result ends with a short
-notice that names the change and the resource or file to read. When the
-extensions change, the server announces that its tool list changed, and Claude
-Code fetches the new list without a reconnect.
-
-### Every graph answer says what it was derived from
+### Graph answers read the recorded workspace view
 
 Project identity and dependency edges belong to the language extensions. The CLI
-keeps a local copy in `.putnami/workspace-index.json` so a read-only tool answers
-without paying for a probe — and since that copy can be missing or old, every
-graph answer carries a `workspaceView` block saying which:
+keeps a local copy in `.putnami/workspace-index.json`. When the copy is missing,
+the graph commands say so and point at `putnami projects sync`, because an empty
+graph would read as *"there is nothing here"* rather than *"nobody has told me
+yet"*.
 
-```json
-"workspaceView": {
-  "freshnessState": "fresh",
-  "observedAt": "2026-09-01T09:12:44Z",
-  "probeDigest": "sha256:…",
-  "ageSeconds": 3420,
-  "message": "the recorded workspace view (workspace-index.json) was observed 57m ago"
-}
-```
+### A preview before a run
 
-Three states, and the tool behaves differently in each:
-
-| `freshnessState` | What the tool does |
-| --- | --- |
-| `fresh` | Answers normally. |
-| `stale` | Answers anyway, and the block says the copy is past its bound. |
-| `absent` | Returns an **error result** carrying the partial answer and the block, whose message names `putnami projects sync`. |
-
-The last row is the important one. A workspace nobody has probed used to answer
-an empty-but-well-formed graph, which reads as *"there is nothing here"* rather
-than *"nobody has told me yet"*. It is now a refusal an agent can act on.
-
-This is the consumer half of a declared architecture contract
-(`cli.workspace-probe-view.v1` in `tooling/cli/putnami.architecture.json`): the
-freshness bound, the fail-closed-on-missing behavior and the field names above
-are declared there and joined to the code by a conformance test.
-
-### Every tool declares its own contract
-
-Each tool carries a `putnami.dev/contract` block in its metadata: an `access`
-value (`read` or `mutating`), a `readOnly` flag, whether it `supportsDryRun`,
-and — when it mutates — a `mutates` list naming exactly what it touches.
-
-**`run_jobs` is the only mutating tool.** Everything else is read-only. It runs
-jobs through the same planner and engine as the CLI, declares that it mutates
-the workspace and the cache, supports `dryRun` to return the selected dependency
-plan without starting a subprocess, and refuses long-lived serve mode and any
-job declared to mutate external systems.
-
-An agent doesn't have to guess which call is safe. The tool says so.
-
-### Optional request provenance
-
-Off by default. Set `PUTNAMI_AGENT_IDENTITY=1` and explicitly set
-`PUTNAMI_AGENT_MODEL` in the MCP server environment, and requests carry bounded
-harness and model headers — so what an agent did is attributable after the fact,
-by the same principle that makes every other action in Putnami reviewable.
-
-A `run_jobs` session also records which agent session ran it: the client name
-from `initialize`, and the session id from `PUTNAMI_AGENT_SESSION_ID` or the
-`CLAUDE_CODE_SESSION_ID` that Claude Code exports. This record stays in the
-local `session.json`. A terminal run records no agent.
+`--dry-run` returns the selected dependency plan without starting a subprocess.
+Pair it with `--impacted` to see what a change would run before it runs.
 
 ---
 
@@ -220,12 +147,11 @@ that depends on the change, so while iterating, select only the projects you
 changed with `--projects <a>,<b>`. The generated `AGENTS.md` gives agents the
 same rule.
 
-When an agent needs to justify the result rather than trust it, `impacted`
-returns a reason per project (the changed file that claimed it, or the edge
-that reached it), `why_impacted` returns the shortest path from the changed
-project to the impacted one over the same edges with each edge's kind, and
-`find_owner` maps a file path back to the project that owns it using the same
-logic.
+When an agent needs to justify the result rather than trust it,
+`putnami projects why <from> <to>` prints the shortest path from the changed
+project to the impacted one over the same edges, with each edge's kind and the
+task scope, and `putnami projects owner <path>` maps a file path back to the
+project that owns it using the same logic.
 
 ### Deliver in gated phases, not in small pull requests
 
@@ -293,10 +219,9 @@ taxonomy is frozen. Findings you have consciously accepted go into a committed
 `doctor.waivers.json` — a waiver is a reviewable decision in git, not a flag
 someone remembered to pass.
 
-Alongside it: `get_diagnostics` re-reads the complete failure set from the last
-executed run without rerunning the work, conformance packs test declared
-capabilities against shared fixtures, and the orientation document is rebuilt
-on every read, so it cannot go stale behind the code.
+Alongside it: conformance packs test declared capabilities against shared
+fixtures, and the orientation document is rebuilt on every read, so it cannot
+go stale behind the code.
 
 ---
 
@@ -313,8 +238,6 @@ structure an agent reads is the structure you read.
 - The agent-context document is **per project**, and it references rather than
   embeds. It is an orientation artifact, not an index of your repository — an
   agent still reads the files it decides to read.
-- The MCP server runs **workspace jobs**. It does not deploy, does not reach
-  external systems, and refuses jobs declared to do so.
 - Author overrides are narrow on purpose. If you could rewrite identity or
   capabilities, the document could lie, and every guarantee above would be
   worth nothing.

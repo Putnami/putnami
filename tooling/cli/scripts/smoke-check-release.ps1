@@ -987,7 +987,7 @@ function Invoke-Smoke {
         Stop-Smoke 'init leg: published CLI failed the exact public TypeScript init command' $initLog
     }
     foreach ($path in @('putnami.workspace.json', 'putnami.lock.json', 'package.json', 'bun.lock', '.npmrc',
-            'CLAUDE.md', 'AGENTS.md', '.mcp.json', '.gitattributes', 'webapp/putnami.json', 'webapp/package.json')) {
+            'CLAUDE.md', 'AGENTS.md', '.gitattributes', 'webapp/putnami.json', 'webapp/package.json')) {
         $file = Join-Path $Workspace $path
         if (-not ((Test-Path -LiteralPath $file -PathType Leaf) -and ((Get-Item -LiteralPath $file).Length -gt 0))) {
             Stop-Smoke "init leg: generated workspace is missing non-empty $path" $initLog
@@ -1002,7 +1002,6 @@ function Invoke-Smoke {
             @('webapp/putnami.json', '"name": "webapp"'),
             @('webapp/putnami.json', '"@putnami/typescript"'),
             @('AGENTS.md', 'This is a Putnami workspace.'),
-            @('.mcp.json', '"putnami"'),
             @('.gitattributes', '* text=auto eol=lf'))) {
         $path = $required[0]
         $text = $required[1]
@@ -1011,6 +1010,10 @@ function Invoke-Smoke {
             foreach ($line in @(Get-TextLines (Read-SharedText (Join-Path $Workspace $path))) | Select-Object -First 200) { Write-Smoke $line }
             throw $SmokeFailed
         }
+    }
+    # Putnami serves no MCP server, so init registers none.
+    if (Test-Path -LiteralPath (Join-Path $Workspace '.mcp.json')) {
+        Stop-Smoke 'init leg: init wrote .mcp.json, but Putnami serves no MCP server' $initLog
     }
     $npmrc = Read-SharedText (Join-Path $Workspace '.npmrc')
     foreach ($line in (Get-TextLines $npmrc)) {
@@ -1042,7 +1045,7 @@ function Invoke-Smoke {
     if (-not (Read-SharedText $inspectLog).Contains('@putnami/typescript')) {
         Stop-Smoke 'init leg: machine-readable inspection did not report @putnami/typescript' $inspectLog
     }
-    Write-Smoke 'smoke: generated workspace, webapp, locks, extension and MCP registration verified; build plan validates'
+    Write-Smoke 'smoke: generated workspace, webapp, locks and extension verified, no .mcp.json written; build plan validates'
 
     # -- Leg 6: serve, typed readiness, a real HTTP response, a clean stop --
     #

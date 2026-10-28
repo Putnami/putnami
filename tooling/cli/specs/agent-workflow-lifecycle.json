@@ -20,7 +20,7 @@
     "Installing agent workflows as an artifact outside an extension",
     "Converting a lock older than format version 5 as a side effect",
     "Downloading anything during putnami upgrade --dry-run",
-    "Writing host hooks during the first-use bootstrap, context generate or the MCP server start"
+    "Writing host hooks during the first-use bootstrap or context generate"
   ],
   "requirements": [
     {
@@ -56,10 +56,6 @@
       "text": "putnami init --force unions the starter's opt-in with the declarations already at that path, merged by what each entry names with the existing entry winning, so re-initializing never un-declares installed content."
     },
     {
-      "id": "session-start-reconcile",
-      "text": "When the MCP server starts, the agent content of each opted-in extension the committed lock pins is brought to that release from the installed extension, under the ordinary ownership rules; a record naming the pinned release ends the pass. The pass never downloads, resolves, writes the lock or builds a local extension, and every failure is a stderr warning: the server starts regardless."
-    },
-    {
       "id": "undeclared-artifact-retired",
       "text": "An adopting command retires an owner the clone recorded but the workspace no longer opts into: it removes the files that record still manages and that are unchanged, keeps and reports any the user edited without managing them further, then drops its lock pin, when there is one, and finally the record. Every opted-in contribution is verified and planned before the first removal, so one that cannot be verified, or that collides on a path retirement does not free, fails the run with nothing removed."
     },
@@ -85,7 +81,7 @@
     },
     {
       "id": "host-hooks-written-on-explicit-lifecycle",
-      "text": "An explicit install, init or upgrade writes an extension's declared hostHooks into .claude/settings.json and .codex/hooks.json when the workspace opts into its agent content, binds the contract the hooks require, and has it installed. A repeated run changes nothing. The implicit bootstrap, the first-run pass, context generate and the MCP server never write them. A change to .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
+      "text": "An explicit install, init or upgrade writes an extension's declared hostHooks into .claude/settings.json and .codex/hooks.json when the workspace opts into its agent content, binds the contract the hooks require, and has it installed. A repeated run changes nothing. The implicit bootstrap, the first-run pass and context generate never write them. A change to .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
     },
     {
       "id": "host-hooks-ownership-by-command",
@@ -98,9 +94,9 @@
   ],
   "decisions": [
     "tooling/cli/doc/adr/0004-agent-artifact-ownership.md",
-    "tooling/cli/doc/adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md",
     "tooling/cli/doc/adr/0047-extension-owned-agent-content.md",
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
-    "tooling/cli/doc/adr/0081-the-core-writes-declared-host-hooks.md"
+    "tooling/cli/doc/adr/0081-the-core-writes-declared-host-hooks.md",
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

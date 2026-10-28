@@ -144,8 +144,8 @@ optional there too: every domain, in any language, authors its manifest with
 
 An agent inside a Putnami workspace meets this system three times:
 
-- **Before writing** — the read-only MCP tools (`sdd.list_features`,
-  `sdd.feature_context`, `sdd.list_specs`, `sdd.spec_context`) answer "what is
+- **Before writing** — the read-only `putnami features` and `putnami specs`
+  commands answer "what is
   this for, what were the non-goals, what did the team agree to" from declared
   data instead of the agent's guess.
 - **While writing** — creating a spec is deliberately a terminal command
@@ -164,7 +164,7 @@ checked by a job an agent cannot argue with.
 - [Write a feature spec](/docs/how-to/write-a-feature-spec) — the authoring
   walkthrough.
 - [Spec-driven development reference](/docs/spec-driven-development) — jobs,
-  commands, MCP tools.
-- [Agents](/docs/agents) — the full agent surface: context, blast radius, MCP
-  contract.
+  commands.
+- [Agents](/docs/agents) — the full agent surface: context and blast radius
+  through the CLI.
 - [Protocols](/docs/protocols) — the wire formats all of this rests on.

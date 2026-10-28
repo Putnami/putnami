@@ -613,9 +613,15 @@ require_generated_text() {
 
 for path in \
   putnami.workspace.json putnami.lock.json package.json bun.lock .npmrc \
-  CLAUDE.md AGENTS.md .mcp.json webapp/putnami.json webapp/package.json; do
+  CLAUDE.md AGENTS.md webapp/putnami.json webapp/package.json; do
   require_generated_file "$path"
 done
+# Putnami serves no MCP server, so init registers none.
+if [ -e "$workspace/.mcp.json" ]; then
+  echo "::error::init leg: init wrote .mcp.json, but Putnami serves no MCP server"
+  sed -n '1,200p' "$workspace/.mcp.json" || true
+  exit 1
+fi
 require_generated_text putnami.workspace.json '"@putnami/typescript"'
 require_generated_text putnami.workspace.json '"typescript-web"'
 require_generated_text putnami.workspace.json '"webapp"'
@@ -624,7 +630,6 @@ require_generated_text putnami.lock.json '"typescript-web"'
 require_generated_text webapp/putnami.json '"name": "webapp"'
 require_generated_text webapp/putnami.json '"@putnami/typescript"'
 require_generated_text AGENTS.md 'This is a Putnami workspace.'
-require_generated_text .mcp.json '"putnami"'
 npm_auth_key="$(awk -F= '
   {
     key = $1
@@ -666,7 +671,7 @@ if ! grep -Fq '@putnami/typescript' "$inspect_log"; then
   tail -n 200 "$inspect_log" || true
   exit 1
 fi
-echo "smoke: generated workspace, webapp, locks, extension and MCP registration verified; build plan validates"
+echo "smoke: generated workspace, webapp, locks and extension verified, no .mcp.json written; build plan validates"
 
 serve_log="$workdir/serve.jsonl"
 # Create the log before the server starts: the redirection below opens it only

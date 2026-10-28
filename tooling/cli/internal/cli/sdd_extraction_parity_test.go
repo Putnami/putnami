@@ -787,14 +787,11 @@ func TestRecordedParityAnswersCoverEveryCaseAndNothingElse(t *testing.T) {
 	for _, args := range parityHumanCases() {
 		expected[filepath.Join("human", paritySlug(strings.Join(args, " "))+".txt")] = true
 	}
-	for _, tool := range mcpParityCases() {
-		expected[filepath.Join("mcp", paritySlug(tool.name)+".txt")] = true
-	}
 	for _, rel := range parityContractArtifacts {
 		expected[filepath.Join("contracts", recordedContractName(rel))] = true
 	}
 
-	if want := len(parityCases()) + len(parityHumanCases()) + len(mcpParityCases()) + len(parityContractArtifacts); len(expected) != want {
+	if want := len(parityCases()) + len(parityHumanCases()) + len(parityContractArtifacts); len(expected) != want {
 		t.Fatalf("the tables name %d recordings but only %d distinct files: paritySlug collided", want, len(expected))
 	}
 

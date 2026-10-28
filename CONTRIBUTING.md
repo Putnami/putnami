@@ -191,7 +191,7 @@ changing what really works fails the build.
 |---|---|
 | `lint`, `test`, `build`, `serve` | Work, with identical results |
 | Build cache | Local only. If a remote cache is configured with no provider, the CLI prints one notice and builds locally |
-| Hosted Intelligence tools | Unavailable, which is the designed fail-closed answer. The local MCP workspace tools still work |
+| Hosted Intelligence tools | Unavailable, which is the designed fail-closed answer. The local workspace queries still work |
 | `publish`, `deploy` | Fail with a message naming the extension that is missing. Maintainers run these; a contribution never needs them |
 
 ### Maintainer CI

@@ -21,8 +21,8 @@ import (
 // discovery; without this cache the cost is paid twice on every command.
 //
 // The workspace index is different from ordinary source input: another
-// Putnami process may publish it while a long-lived MCP session is already
-// running. Every entry therefore carries the atomic snapshot file's identity.
+// Putnami process may publish it while a long-lived process that already read
+// it is still running. Every entry therefore carries the atomic snapshot file's identity.
 // The warm path is one stat; when WriteSnapshot replaces the file, os.SameFile
 // changes even if size and timestamps happen to match, and the next Load
 // rebuilds from the new provider view.
@@ -176,8 +176,8 @@ func loadUncached(root string) (*Workspace, error) {
 	//
 	// This costs one file read and NO extension process, which is the whole
 	// point: every command that only READS the workspace — `projects list`,
-	// `deps`, the MCP graph tools — gets the same identity a probing run
-	// resolves, without paying for a probe. A run that plans or executes over
+	// `deps` — gets the same identity a probing run resolves, without paying
+	// for a probe. A run that plans or executes over
 	// the graph re-validates the snapshot and re-probes what moved
 	// (Synchronize), then adopts again; adoption is idempotent, so the second
 	// application either reproduces the first exactly or replaces it wholesale.
@@ -222,7 +222,7 @@ func loadUncached(root string) (*Workspace, error) {
 	// is a legitimate state (a workspace with no adapter-declaring extension is
 	// exactly this), but it is indistinguishable — from the outside — from a
 	// workspace whose index is simply missing, and the read-only surfaces that
-	// serve it (`projects list`, `deps`, the MCP graph tools, `--impacted`) would
+	// serve it (`projects list`, `deps`, `--impacted`) would
 	// silently under-report every provider-derived edge.
 	//
 	// The cheap, precise signal that this workspace EXPECTS a provider view is a

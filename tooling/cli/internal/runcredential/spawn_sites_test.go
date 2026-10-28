@@ -63,6 +63,8 @@ type spawnSite struct {
 // unsure, mark it: that fails closed.
 var spawnSites = map[string]spawnSite{
 	// Repository code, recorded before the spawn.
+	"collaboration/invoke.go:invokeExtensionTool": {spawns: 1, verdict: marked, by: "collaboration/invoke.go:invokeExtensionTool",
+		why: "an extension tool runs in the workspace"},
 	"commands/cachecmd/cache_verify.go:addDetachedWorktree": {spawns: 1, verdict: marked, by: "commands/cachecmd/cache_verify.go:addDetachedWorktree",
 		why: "the checkout runs the post-checkout hook and smudge filters"},
 	"commands/completion/completion_install.go:writeCompletionFromBinary": {spawns: 1, verdict: marked, by: "commands/completion/completion_install.go:writeCompletionFromBinary",
@@ -95,8 +97,6 @@ var spawnSites = map[string]spawnSite{
 		why: "putnami cloud release-set, a CLI without the run credential that loads the workspace's extensions"},
 	"jobs/scheduler/runner.go:(*jobInvocation).execCommand": {spawns: 1, verdict: marked, by: "jobs/scheduler/runner.go:(*jobInvocation).startJob",
 		why: "a job; a job that receives the credential starts as a holder in the same function"},
-	"mcp/extension_tools.go:invokeExtensionTool": {spawns: 1, verdict: marked, by: "mcp/extension_tools.go:invokeExtensionTool",
-		why: "an extension tool runs in the workspace"},
 	"runnerprovider/session.go:Spawn": {spawns: 1, verdict: marked, by: "runnerprovider/launch.go:LaunchSpecFor",
 		why: "the runner provider of an extension not installed from the artifact store"},
 	"workspace/probe_exec.go:(*ExecProbeProvider).exchange": {spawns: 1, verdict: marked, by: "workspace/probe_exec.go:(*ExecProbeProvider).exchange",

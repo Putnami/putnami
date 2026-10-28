@@ -1380,12 +1380,12 @@ func TestRun_SelectionReceivesTheResolvedExtensions(t *testing.T) {
 
 // TestRun_ABuildSessionWritesNoWorkspaceMap runs a real, successful build
 // session and checks that nothing appears under .putnami/context-map/. The map
-// comes live from the MCP workspace_map tool or is printed by `putnami context
-// map`; nothing writes it, and a build refreshes nothing. The environment is set to what once made a
+// is printed by `putnami context map`; nothing writes it, and a build refreshes
+// nothing. The environment is set to what once made a
 // build write the map (outside CI, with the retired override at "write"), so
 // the assertion holds against that history.
 func TestRun_ABuildSessionWritesNoWorkspaceMap(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "build-writes-no-workspace-map", "a-build-session-writes-nothing-under-the-map-directory")
+	spectest.Proves(t, "cli/context-discovery", "build-writes-no-workspace-map", "a-build-session-writes-nothing-under-the-map-directory")
 	t.Setenv("CI", "")
 	t.Setenv("PUTNAMI_CONTEXT_MAP", "write")
 	root := t.TempDir()

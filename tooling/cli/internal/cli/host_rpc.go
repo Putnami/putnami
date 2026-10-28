@@ -14,12 +14,12 @@ import (
 	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/collaboration"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/mcp"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -90,7 +90,7 @@ func (b hostRPCBinding) collaborationCall(ctx context.Context, call hostrpcproto
 	case b.root == "":
 		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
 			Message: "this command runs outside any workspace, so no collaboration contract is bound"}
-	case !mcp.CollaborationDeclared(b.root):
+	case !collaboration.Declared(b.root):
 		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
 			Message: "this workspace declares no options.collaboration in putnami.workspace.json, so no collaboration contract is bound"}
 	}
@@ -99,7 +99,7 @@ func (b hostRPCBinding) collaborationCall(ctx context.Context, call hostrpcproto
 			Message: fmt.Sprintf("%s is a collaboration contract of this workspace and a command of %s", call.Contract, strings.Join(owners, ", "))}
 	}
 	envelope := collaborationEnvelope(ctx, b.root, b.config, b.extensions, call.Contract, call.Operation, call.Input)
-	text, err := mcp.EnvelopeText(envelope, false)
+	text, err := collaboration.EnvelopeText(envelope, false)
 	if err != nil {
 		return nil, err
 	}

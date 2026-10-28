@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	featureproto "go.putnami.dev/protocol/features"
@@ -18,30 +17,21 @@ const decisionsPlaceholder = "{{DECISIONS}}"
 // Settled decisions reach an agent where they bind.
 //
 // A workspace keeps one decisions.json at its root for the decisions every
-// project follows, and one per project directory for that project's own. Three
-// surfaces carry them:
+// project follows, and one per project directory for that project's own. The
+// generated block names the decisions.json files in one line and lists no
+// decision. The line appears with a registry's first decision and goes with its
+// last, so those two changes regenerate AGENTS.md and CLAUDE.md; every other
+// decision change leaves them as they were. An agent reads the decisions in the
+// files the line names.
 //
-//   - The generated block names the decisions.json files in one line and lists
-//     no decision. The line appears with a registry's first decision and goes
-//     with its last, so those two changes regenerate AGENTS.md and CLAUDE.md;
-//     every other decision change leaves them as they were.
-//   - The MCP server lists the root decisions in the putnami://workspace/guidance
-//     resource (SettledDecisions), and as id and statement in its initialize
-//     instructions, as many as fit the client's limit (SettledDecisionLines).
-//     Both read the one registry.
-//   - A project's decisions are returned by `putnami.context` for that project,
-//     so an agent orienting on it reads them and an agent working elsewhere
-//     does not pay for them. The list only names where each project registry
-//     is.
-//
-// Both derivations read committed documents and fall back silently to nothing
+// The derivation reads committed documents and falls back silently to nothing
 // when one is absent or unusable. The guidance block is written into files a
 // workspace owns, so a malformed registry must leave the block exactly as it
 // was rather than fail a `putnami context generate`. `decisions-validate` is
-// where a bad registry is reported; these derivations only quote good ones.
+// where a bad registry is reported; this derivation only quotes good ones.
 
-// ProjectDecisions is the settled decisions of one project, as agent_context
-// returns them.
+// ProjectDecisions is the settled decisions of one project, from the
+// decisions.json in its directory.
 type ProjectDecisions struct {
 	// Registry is the workspace-relative registry that holds them; a change
 	// to one of them is an edit to this file.
@@ -96,64 +86,7 @@ func decisionsGuidanceForWorkspace(wsRoot string) string {
 		return ""
 	}
 	return "- Settled decisions are recorded in `" + featureproto.DecisionsFilename +
-		"` files: the root one binds every project, a project's own binds that project. The Putnami MCP server lists the root ones. Read the file before you change a settled choice, and never re-decide one: to change a settled value, change the decision in its file in the same pull request.\n"
-}
-
-// SettledDecisions renders the root registry's decisions, then the location of
-// every project registry, as a Markdown list: the text the MCP initialize
-// instructions and the putnami://workspace/guidance resource carry. It returns
-// "" when no registry carries a decision.
-//
-// Nothing is truncated: the protocol bounds a registry, and hiding a settled
-// decision behind an ellipsis would be the silent re-decision the registry
-// exists to prevent.
-//
-// It drops the workspace load memo first, as the other MCP builders do, so the
-// project index of a long-lived server follows the current project set.
-func SettledDecisions(wsRoot string) string {
-	workspace.InvalidateLoadCache(wsRoot)
-	return settledDecisionList(wsRoot)
-}
-
-// SettledDecisionLines renders the root registry's decisions as one compact
-// line each, "- D-001 — statement", in canonical order. The MCP initialize
-// instructions use them, because the client cuts the instructions at a fixed
-// length: the date and the enforcement of each decision stay in the resource
-// SettledDecisions renders. It returns nil when the root registry is absent,
-// unusable or empty.
-func SettledDecisionLines(wsRoot string) []string {
-	root := readDecisionRegistry(wsRoot, "")
-	if root == nil {
-		return nil
-	}
-	lines := make([]string, 0, len(root.Decisions))
-	for _, decision := range root.Decisions {
-		lines = append(lines, "- "+decision.ID+" — "+decision.Statement)
-	}
-	return lines
-}
-
-func settledDecisionList(wsRoot string) string {
-	var out strings.Builder
-	if root := readDecisionRegistry(wsRoot, ""); root != nil {
-		for _, decision := range root.Decisions {
-			enforcement := "`validate` enforces it"
-			if decision.IsReviewOnly() {
-				enforcement = "review-only, held by a human reviewer"
-			}
-			out.WriteString("- " + decision.ID + " — " + decision.Statement +
-				" (settled " + decision.Settled + ", " + enforcement + ")\n")
-		}
-	}
-	if projects := projectDecisionIndex(wsRoot); len(projects) > 0 {
-		entries := make([]string, 0, len(projects))
-		for _, project := range projects {
-			entries = append(entries, "`"+project.registry+"` ("+strconv.Itoa(project.count)+")")
-		}
-		out.WriteString("- Project decisions, returned by `putnami.context` with their project: " +
-			strings.Join(entries, ", ") + ".\n")
-	}
-	return out.String()
+		"` files: the root one binds every project, a project's own binds that project. Read the file before you change a settled choice, and never re-decide one: to change a settled value, change the decision in its file in the same pull request.\n"
 }
 
 type projectDecisionEntry struct {

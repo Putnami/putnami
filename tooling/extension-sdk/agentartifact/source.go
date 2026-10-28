@@ -16,10 +16,9 @@ import (
 const (
 	// defaultClaudeTools is the capability line written when a skill declares
 	// no Claude metadata of its own. An agent artifact is only ever
-	// materialized into a Putnami workspace, whose guidance makes a Putnami MCP
-	// call the first discovery step, so a skill can load those tools
-	// (ToolSearch) and call them (mcp__putnami__*) without a permission prompt.
-	defaultClaudeTools = "Bash, Read, Grep, Glob, ToolSearch, mcp__putnami__*"
+	// materialized into a Putnami workspace, where discovery goes through the
+	// CLI (Bash), so the line names no Putnami server tool.
+	defaultClaudeTools = "Bash, Read, Grep, Glob, ToolSearch"
 	// explicitOpenAILine and explicitClaudeLine are the two host spellings of
 	// the same decision: the skill runs only when a user invokes it.
 	explicitOpenAIKey = "allow_implicit_invocation"

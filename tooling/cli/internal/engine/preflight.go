@@ -20,12 +20,9 @@ import (
 // a later change made. The doctor evaluator lives in
 // internal/commands next to the `putnami doctor` command that also renders it,
 // and the single call from here was the ONLY reason the engine — the package
-// every adapter routes through — reached into the command subtree. That one
-// edge forced structural workarounds elsewhere: `putnami mcp` is hosted in
-// internal/cli rather than internal/commands purely to keep
-// mcp → engine → commands → mcp from closing (see internal/cli/mcp_serve.go).
-// Inverting it leaves the engine depending on nothing but the workspace model,
-// the job layer and the protocols.
+// every adapter routes through — reached into the command subtree. Inverting
+// it leaves the engine depending on nothing but the workspace model, the job
+// layer and the protocols.
 //
 // A nil gate FAILS CLOSED under the production profile (see
 // runProductionPreflight): an adapter that forgets to wire it gets a loud,

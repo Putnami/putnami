@@ -34,11 +34,10 @@ bounded worker count. Their results are merged in stable order; hooks and shared
 metadata writes keep their sequencing. Workspace installers already use the job
 scheduler and overlap when their dependencies and resource declarations permit.
 
-MCP uses a smaller preparation path: restore exact read surfaces and prepare the
-provider index if absent, without running dependency installers, Cloud setup or
-context generation. Concurrent index preparation for one worktree reconciles
-under a shared lock and rechecks the index before probing. A running MCP process
-reloads an index created or replaced by another CLI process.
+A read-only command uses a smaller preparation path: restore exact read surfaces
+and prepare the provider index if absent, without running dependency installers,
+Cloud setup or context generation. Concurrent index preparation for one worktree
+reconciles under a shared lock and rechecks the index before probing.
 Lock waiting reports contention after one second and stops after 60 seconds,
 or earlier if the caller cancels or its deadline expires. If filesystem access
 prevents opening the lock, CLI synchronization warns and keeps the resolved
@@ -245,7 +244,7 @@ name) for declared ones. Graph construction translates both to IDs.
 | --------- | --------- | ----------- |
 | `DependenciesOf(id)` | Direct lookup | Projects that `id` depends on |
 | `DependentsOf(id)` | Direct lookup | Projects that depend on `id` — the ordering family, implicit include→scope-self edges included |
-| `ImpactDependentsOf(id)` | Direct lookup | `DependentsOf(id)` minus the implicit include→scope-self edges of activated scopes; what a change to `id` reaches through one declared or provider-derived edge. `--impacted` and `why_impacted` walk this family |
+| `ImpactDependentsOf(id)` | Direct lookup | `DependentsOf(id)` minus the implicit include→scope-self edges of activated scopes; what a change to `id` reaches through one declared or provider-derived edge. `--impacted` and `putnami projects why` walk this family |
 | `TransitiveDependentsOf(ids)` | BFS | All projects transitively downstream of `ids` in the ordering family |
 | `TopologicalSort()` | Kahn's algorithm | Deterministic ordered list respecting dependencies; detects cycles |
 
@@ -456,7 +455,7 @@ A workspace root Git does not manage has no history to compare: no `git` program
 - **No resolvable baseline** — Falls back to all projects with an explanation on stderr, or fails with a clear error when `--impacted-strict` is set.
 - **File outside any project** — Ignored (does not trigger any project rebuild).
 - **File inside a nested project** — Owned by the nested project only; the enclosing project is selected through a declared dependency on the nested project or a declared file input (`options.<layer>.filePatterns` covering the subtree). A project at the workspace root is the owner of last resort: it owns what no deeper project claims.
-- **Changed file at the workspace root** — Belongs to no project by path, so core consults workspace-root entries from providers' per-project `watchedFiles` answers. An exact match selects only the projects that claimed the file, then applies normal transitive-dependent propagation. If no provider claims the root entry, it selects nothing on its own; the run names that path, and the `impacted` MCP tool returns it in `unownedRootFiles`, so a non-empty diff is distinguishable from no changes. Providers own the filename vocabulary and project mapping; core does not infer dependency manifests or lockfiles. Reusing `watchedFiles` keeps the v1 answer readable by strict older consumers.
+- **Changed file at the workspace root** — Belongs to no project by path, so core consults workspace-root entries from providers' per-project `watchedFiles` answers. An exact match selects only the projects that claimed the file, then applies normal transitive-dependent propagation. If no provider claims the root entry, it selects nothing on its own; the run names that path, so a non-empty diff is distinguishable from no changes. Providers own the filename vocabulary and project mapping; core does not infer dependency manifests or lockfiles. Reusing `watchedFiles` keeps the v1 answer readable by strict older consumers.
 - **New untracked files** — Included in the diff via `git ls-files --others`.
 - **Staged but uncommitted** — Included via `git diff --cached`.
 
@@ -485,7 +484,7 @@ Deleted and renamed paths still select their readers under `--impacted`.
 
 An exclusion applies inside the layer that declares it, and no further. A cache key concatenates only the layers that apply to its own job — `options.<cmd>`, `options.<ext>` and `options.<ext>:<cmd>` — so `options.lint` excluding a path says nothing about what a `test` job reads, and one layer matching is enough to select. Selection is therefore at least as wide as every key it stands in for.
 
-A declared input is not ownership — the `find_owner` MCP tool still answers with the nearest project whose directory holds the file (plus any asset claimant), because reading a file and owning it are different relations.
+A declared input is not ownership — `putnami projects owner` still answers with the nearest project whose directory holds the file (plus any asset claimant), because reading a file and owning it are different relations.
 
 A scope's `putnami.json` is an input of the same kind for every project below it, without a declaration: the scope chain merges its `tags`, `extensions` and publish name pattern into each include, so a change to that file selects every project that inherits from it, whether or not the scope is activated, and for each scope of a nested chain. An activated scope-self is selected on top, as the file's directory owner. A child could not declare this itself — a `filePatterns` entry cannot name a file above the project's own directory without repeating the scope layout in every include.
 
@@ -504,7 +503,7 @@ or `--debug`, before the plan table when `--plan` is set:
     /typescript/extension ← /tooling/extension-sdk  [dependency; tasks build~compile, build~describe, build~generate, test~test (+3)]
     /clients/catalog-ts ← /services/catalog  [contract services/catalog/schema/openapi.json sha256:5f1c0a9e3b72; tasks build~generate, build~transpile]
     /apps/web ← /go/extension  [extension-consumer runtime input tooling/extension-sdk/sdk.go; tasks /go/extension#build~compile, /go/extension#build~config-merge, /go/extension#build~describe, /go/extension#build~generate (+46)]
-    … +91 more edge(s); the `impacted` MCP tool returns every reason.
+    … +91 more edge(s); `putnami projects why <from> <to>` names the path for one pair.
 ```
 
 Each seed line is one changed file's claim on one project, with the kind of
@@ -550,7 +549,7 @@ directly, as its own path owner.
 
 When the edge fires, its line names the contract that changed and the first 12
 hex digits of its sha256 in the tree the selection read; the `selection:impacted`
-record and the `impacted` MCP answer carry the whole digest. `why_impacted`
+record carries the whole digest. `projects why`
 answers for a change to the provider as a whole, which includes its contract, so
 it still names the contract hop. See
 [ADR 0054](adr/0054-the-contract-edge-fires-on-the-committed-contract.md).
@@ -576,11 +575,11 @@ wait for the provider's steps of the same name, and every client job waits for
 the provider jobs that can write the client's directory. See
 [Generated-Client Ordering](04-job-execution.md#generated-client-ordering).
 
-The block is capped at 5 seeds and 10 edges. The full record is the `impacted`
-MCP tool's `reasons` list, one entry per selected project, each with its
-`taskScope` when it has one; `why_impacted` answers with the same edges for one
-pair and the same `taskScope` for the target. Both read one propagation, so
-they cannot disagree on a project or on its scope.
+The block is capped at 5 seeds and 10 edges. The full record is the
+`selection:impacted` event below, one entry per selected project, each with
+its `taskScope` when it has one; `putnami projects why` answers with the same
+edges for one pair and the same `taskScope` for the target. Both read one
+propagation, so they cannot disagree on a project or on its scope.
 
 Every run that executes an `--impacted` selection also records the whole
 trace, uncapped, as one `selection:impacted` session event: on the live
@@ -689,6 +688,11 @@ putnami projects list
 putnami projects describe /typescript/frameworks/web
 putnami projects describe @putnami/web
 putnami projects describe /typescript/frameworks/web --output=jsonl
+
+# Which projects own a path, what a project depends on, why a change reaches another
+putnami projects owner typescript/frameworks/web/src/index.ts
+putnami projects deps @putnami/web --dependents --transitive
+putnami projects why @putnami/web /typescript/apps/site
 
 # Workspace overview
 putnami workspace describe

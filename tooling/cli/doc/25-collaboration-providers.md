@@ -67,23 +67,20 @@ Human output indents it; `--output=json` prints it on one line. The command
 exits `0` only when the outcome is `ok`, `1` for every other outcome, and `2`
 for a usage error (an unknown flag, both `--input` and `--input-file`, or a
 project-selection flag: an operation that takes `projects`, `impacted` or
-`baseline` takes them inside its request document, exactly as the MCP tool
-does).
+`baseline` takes them inside its request document).
 
-The MCP server exposes the same operations as `<contract>.<operation>` tools,
-plus `<contract>.capabilities`. Both entry paths run one routing function
+Two entry paths reach the providers: the command line, and the extension host
+RPC `collaboration.call`. Both run one routing function
 against the same provider selection, so they return the same envelope for the
 same request. A registry provider serves only from the release
 `putnami.lock.json` pins: when that exact release cannot be prepared, both
 paths answer `unavailable` (`binding.provider_missing`) and never run an
 earlier release left behind the stable link. An operation the bound provider
-does not offer has no MCP tool; on the command line it answers
-`unsupported`.
+does not offer answers `unsupported`.
 
-A host-only operation, such as `missions.sync`, has no MCP tool either. The
-host that runs an agent calls it with `putnami missions sync` or through the
-host channel's `collaboration.call`, and gets the same envelope; the agent
-never sees it as a tool. `putnami missions` marks it `host-only`, and the
+A host-only operation, such as `missions.sync`, is for the host that runs an
+agent. The host calls it with `putnami missions sync` or through the host
+channel's `collaboration.call`, and gets the same envelope. `putnami missions` marks it `host-only`, and the
 capabilities document marks it `hostOnly: true`.
 
 ## Outcomes

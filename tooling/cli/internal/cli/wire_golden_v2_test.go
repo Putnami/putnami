@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -199,26 +198,6 @@ func TestWireGoldenV2_SessionFiles(t *testing.T) {
 		normalizeMachineV2SessionJSON(t, recorded, run.startTime))
 }
 
-// TestWireGoldenV2_MCPResult pins the fourth surface. The MCP document has no
-// v1 golden to sit beside — run_jobs was never captured here — so this is both
-// its first pin and the proof that the run summary is ONE type across all four
-// surfaces: these counts are byte-identical to the envelope's.
-func TestWireGoldenV2_MCPResult(t *testing.T) {
-	spectest.Proves(t, "cli/machine-contract", "the-cli-emits-conforming-documents", "the-cli-machine-surfaces-validate-and-match-their-goldens")
-	t.Parallel()
-	run := loadWireRun(t, "mixed")
-	view := machine.RunFrom(
-		jobs.ReduceRun(run.planned, run.results, run.outcome), run.planned, run.results)
-
-	document := marshalIndentedV2(t, view.MCPRun(run.fixture.Commands))
-	assertValidV2Document(t, protocolcli.DocumentMCPResult, document)
-	assertWireGoldenV2(t, "mixed.v2.mcp.json", document)
-
-	plan := marshalIndentedV2(t, machine.MCPPlan(run.fixture.Commands, run.planned))
-	assertValidV2Document(t, protocolcli.DocumentMCPResult, plan)
-	assertWireGoldenV2(t, "mixed.v2.mcp-plan.json", plan)
-}
-
 // TestWireGoldenV2_EncodesTheSettledSemantics is the semantic half of the
 // corpus: the goldens above pin the BYTES, this pins the two decisions those
 // bytes are supposed to encode (protocols/cli doc/02-result-v2.md). Both are
@@ -331,15 +310,6 @@ func renderWireRun(t *testing.T, run *wireRun, format string) []byte {
 		t.Fatalf("live artifact session id occurs %d times, want exactly once", count)
 	}
 	return bytes.Replace(got, []byte(session.ID), []byte(run.fixture.SessionID), 1)
-}
-
-func marshalIndentedV2(t *testing.T, document any) []byte {
-	t.Helper()
-	data, err := json.MarshalIndent(document, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal v2 document: %v", err)
-	}
-	return append(data, '\n')
 }
 
 // assertValidV2Document runs the contract's own validator over the RAW bytes,

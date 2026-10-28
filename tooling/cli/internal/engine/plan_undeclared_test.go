@@ -32,6 +32,7 @@ func TestRefuseUndeclaredCommands(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/impact-plan", "named-commands", "an-undeclared-command-is-refused")
 	spectest.Proves(t, "cli/job-planning-execution", "no-core-development-verb", "an-undeclared-job-command-is-refused-once-in-every-entry-point")
+	spectest.Proves(t, "cli/job-planning-execution", "dependency-plan", "a-missing-selected-command-is-rejected")
 
 	err := refuseUndeclaredCommands(&Request{Commands: []string{"build", "lint", "bundle", "build"}}, declaringDiscovery("lint"))
 	const want = "no extension of this workspace declares build, bundle; name a language extension in putnami.workspace.json, then run: putnami extensions install"

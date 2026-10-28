@@ -19,7 +19,7 @@ document fails the build.
 | Format | Where it lives | Read window | Outside the window |
 |---|---|---|---|
 | Lock file | `putnami.lock.json` | 2 – 4 | Older: migrate. Newer: upgrade the CLI. |
-| Machine result envelope | `--output=json` / `--output=jsonl`, session files, MCP results | 2 emitted, 1 readable | No downgrade. Pin a pre-removal CLI build. |
+| Machine result envelope | `--output=json` / `--output=jsonl`, session files | 2 emitted, 1 readable | No downgrade. Pin a pre-removal CLI build. |
 | Extension contract stamp | `cliContract` in `putnami.extension.json` | 4 – 5, at least what the manifest's vocabulary requires (5 for agent content) | Re-package the extension, or upgrade the CLI. |
 | Support catalog | `putnami.support.json` | exactly 1 | Author the file at version 1. |
 | Pre-release version suffix | Published npm/Go versions, image tags, locks, release sets | `<sha>[-<dirty>]` (prior releases) and `<commitTime>-<sha>[-<dirty>]` (current) both read | Nothing to migrate: every reader treats the suffix as an opaque semver identifier; only native `@latest` ordering needs the current shape. |

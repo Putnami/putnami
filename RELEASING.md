@@ -105,7 +105,7 @@ satisfied is either fixed or waived through the
    host created for the run and deleted after it, before promotion, retaining
    `SMOKE_DIAGNOSTICS_DIR` on failure. Each fetches its public installer
    (`install.sh`, or `install.ps1` on Windows), executes the exact TypeScript
-   init/serve path, verifies generated locks/config/MCP state, and requires
+   init/serve path, verifies generated locks/config state, and requires
    typed readiness, a real HTTP response, and graceful shutdown. Each hands
    `<channel>` to `init` as `PUTNAMI_CHANNEL`, so the extensions, the template
    and the starter's dependencies come from the candidate's release set, not

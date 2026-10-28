@@ -308,7 +308,7 @@ against isolated home/config/cache/store/workspace state with credentials
 cleared. It exports `PUTNAMI_CHANNEL=<channel>` for `init`, so the workspace
 is resolved from the release set of the channel under test rather than from
 `latest`. It verifies the selected executable and stamp, generated workspace,
-locks, extension and MCP registration, typed readiness, a real successful HTTP
+locks, extension state, typed readiness, a real successful HTTP
 response, and graceful shutdown. After the stop, no process whose command line
 names the smoke workdir, or whose working directory is below it, may still run
 (a host Bun serves `./src/serve.ts`, so only its directory names the tree). The
@@ -345,7 +345,7 @@ putnami cli use go-1.2.0 --global    # switch the global active binary
 
 ## Pinning the CLI per workspace
 
-A workspace can pin the exact CLI version everyone uses, so the global `putnami`, `./putnamiw`, and the `putnami mcp` server all run **one engine** — no drift between a contributor's installed CLI and what CI runs. A workspace that *produces* the CLI declares a source sentinel instead; see [Source workspaces](#source-workspaces-building-the-cli-instead-of-pinning-one).
+A workspace can pin the exact CLI version everyone uses, so the global `putnami`, and `./putnamiw` all run **one engine** — no drift between a contributor's installed CLI and what CI runs. A workspace that *produces* the CLI declares a source sentinel instead; see [Source workspaces](#source-workspaces-building-the-cli-instead-of-pinning-one).
 
 ```bash
 putnami pin 1.2.3     # Pin the CLI to 1.2.3 for this workspace
@@ -382,7 +382,7 @@ version in `data.version`.
 
 ### How it resolves
 
-When a pin is present, the global `putnami` launcher — on every invocation in that workspace — resolves the pinned version from the machine-global store (downloading and **verifying it SHA-256 fail-closed** if it isn't already cached), then re-execs into it. So `putnami <anything>` runs the pinned engine, including `putnami mcp` (an agent's MCP server runs the same version as the CLI). A binary that is already the pinned one is detected and run directly, with no re-exec.
+When a pin is present, the global `putnami` launcher — on every invocation in that workspace — resolves the pinned version from the machine-global store (downloading and **verifying it SHA-256 fail-closed** if it isn't already cached), then re-execs into it. So `putnami <anything>` runs the pinned engine, including the commands an agent runs. A binary that is already the pinned one is detected and run directly, with no re-exec.
 
 Resolution is **fail-closed**. A pin says "run exactly this engine", so quietly running a different one is the stale-binary drift the pin exists to prevent — and it is invisible, because the wrong engine produces wrong results rather than an error. When a pin is present and this process cannot become it, the command stops with a message naming what broke and the exact command that recovers:
 

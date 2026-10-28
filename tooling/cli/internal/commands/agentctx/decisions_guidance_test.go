@@ -3,7 +3,6 @@ package agentctx
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -45,58 +44,11 @@ func writeDecisions(t *testing.T, dir, contents string) {
 	}
 }
 
-// TestSettledDecisionsRendersEveryDecision covers contract point 4 plus the
-// reason the checked half is rendered too: an agent that can see a check
-// exists does not spend a cycle proposing a change the gate will reject.
-func TestSettledDecisionsRendersEveryDecision(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "settled-decisions-guidance", "the-decision-list-renders-every-root-decision-in-canonical-order")
-	dir := t.TempDir()
-	writeDecisions(t, dir, seededDecisions)
-
-	rendered := SettledDecisions(dir)
-	for _, want := range []string{
-		"- D-001 — serverless workloads scale to zero (settled 2026-09-03, `validate` enforces it)\n",
-		"- D-002 — every pull request names what it deletes (settled 2026-09-03, review-only, held by a human reviewer)\n",
-	} {
-		if !strings.Contains(rendered, want) {
-			t.Errorf("rendered decisions are missing %q:\n%s", want, rendered)
-		}
-	}
-	// Canonical order, not authored order: the same registry always renders the
-	// same bytes.
-	if strings.Index(rendered, "D-001") > strings.Index(rendered, "D-002") {
-		t.Fatalf("decisions are not rendered in canonical id order:\n%s", rendered)
-	}
-	if !strings.HasSuffix(rendered, "\n") {
-		t.Fatalf("rendered decisions do not end with a newline:\n%q", rendered)
-	}
-}
-
-// TestSettledDecisionLinesAreCompactAndCanonical pins the instructions half:
-// one "- id — statement" line per root decision, in canonical order, with no
-// date or enforcement and no project registry, and nothing without a usable
-// registry.
-func TestSettledDecisionLinesAreCompactAndCanonical(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "instructions-decision-budget", "the-instruction-lines-are-compact-and-in-canonical-order")
-	dir := t.TempDir()
-	if lines := SettledDecisionLines(dir); lines != nil {
-		t.Fatalf("a workspace without a registry got %q", lines)
-	}
-	writeDecisions(t, dir, seededDecisions)
-	want := []string{
-		"- D-001 — serverless workloads scale to zero",
-		"- D-002 — every pull request names what it deletes",
-	}
-	if got := SettledDecisionLines(dir); !reflect.DeepEqual(got, want) {
-		t.Fatalf("SettledDecisionLines = %q, want %q", got, want)
-	}
-}
-
 // TestBlockNamesTheDecisionFilesAndListsNoDecision pins the block half of the
 // decision guidance: one line names the decisions.json files, and no decision
 // statement or id enters the block, so a new decision regenerates nothing.
 func TestBlockNamesTheDecisionFilesAndListsNoDecision(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "settled-decisions-guidance", "the-block-names-the-decision-files-and-lists-no-decision")
+	spectest.Proves(t, "cli/context-discovery", "settled-decisions-guidance", "the-block-names-the-decision-files-and-lists-no-decision")
 	dir := t.TempDir()
 	writeDecisions(t, dir, seededDecisions)
 
@@ -139,12 +91,6 @@ func TestDecisionsGuidanceRendersNothingWithoutAUsableRegistry(t *testing.T) {
 			if rendered := decisionsGuidanceForWorkspace(dir); rendered != "" {
 				t.Fatalf("rendered %q, want nothing", rendered)
 			}
-			if rendered := SettledDecisions(dir); rendered != "" {
-				t.Fatalf("listed %q, want nothing", rendered)
-			}
-			if body := WorkspaceGuidanceBody(dir); strings.Contains(body, settledDecisionsHeading) {
-				t.Fatalf("the guidance resource has an empty decisions section:\n%s", body)
-			}
 			if got, want := guidanceBlock("lint", ""), guidanceBlock("lint", decisionsGuidanceForWorkspace(dir)); got != want {
 				t.Fatalf("the block is not byte-identical to a registry-less one:\n%s\n%s", got, want)
 			}
@@ -177,9 +123,6 @@ func TestWriteAgentEntrypointsNamesTheDecisionFiles(t *testing.T) {
 	// the entrypoint.
 	writeDecisions(t, dir, strings.Replace(seededDecisions, `"decisions": [`, `"decisions": [
     {"id": "D-003", "statement": "a third decision", "settled": "2026-09-04", "settledBy": "fdumay", "reviewOnly": true},`, 1))
-	if lines := SettledDecisionLines(dir); len(lines) != 3 {
-		t.Fatalf("the registry holds %d decisions, want 3", len(lines))
-	}
 	before := agent
 	if err := WriteAgentEntrypoints(dir); err != nil {
 		t.Fatalf("second WriteAgentEntrypoints: %v", err)
@@ -211,111 +154,47 @@ func TestWriteAgentEntrypointsNamesTheDecisionFiles(t *testing.T) {
 const projectDecisionsRegistry = `{"protocolVersion":1,"decisions":[
 	{"id":"APP-1","statement":"the app never listens on a fixed port","settled":"2026-09-20","settledBy":"fdumay","reviewOnly":true}]}`
 
-// TestSettledDecisionsNameProjectRegistries keeps a project's decisions out
-// of the list every agent reads: the list names where the project registry is
-// and how many decisions it holds, never their statements.
-func TestSettledDecisionsNameProjectRegistries(t *testing.T) {
+// TestBlockLineKeepsProjectRegistriesOut keeps a project's decisions out of
+// the line every agent reads: the line names the decisions.json files and
+// never a project registry, and a workspace whose only registry is a
+// project's still gets it.
+func TestBlockLineKeepsProjectRegistriesOut(t *testing.T) {
 	root := makeLoadableFixture(t)
 	writeDecisions(t, root, seededDecisions)
 	writeDecisions(t, filepath.Join(root, "svc", "app"), projectDecisionsRegistry)
 
-	rendered := SettledDecisions(root)
-	if !strings.Contains(rendered, "D-001 — serverless workloads scale to zero") {
-		t.Fatalf("the root decisions are missing:\n%s", rendered)
+	line := decisionsGuidanceForWorkspace(root)
+	if !strings.HasPrefix(line, "- Settled decisions are recorded in") {
+		t.Fatalf("the block line is missing:\n%s", line)
 	}
-	if !strings.HasSuffix(rendered, "- Project decisions, returned by `putnami.context` with their project: `svc/app/decisions.json` (1).\n") {
-		t.Fatalf("the project registry is not named:\n%s", rendered)
-	}
-	if strings.Contains(rendered, "APP-1") {
-		t.Fatalf("a project decision leaked into the workspace list:\n%s", rendered)
-	}
-	if strings.Contains(decisionsGuidanceForWorkspace(root), "svc/app") {
-		t.Fatalf("the block line names a project registry:\n%s", decisionsGuidanceForWorkspace(root))
+	if strings.Contains(line, "svc/app") || strings.Contains(line, "APP-1") {
+		t.Fatalf("the block line names a project registry:\n%s", line)
 	}
 
-	// A workspace whose only registry is a project's still gets the pointer and
-	// the block line.
 	if err := os.Remove(filepath.Join(root, featureproto.DecisionsFilename)); err != nil {
 		t.Fatal(err)
-	}
-	rendered = SettledDecisions(root)
-	if !strings.HasPrefix(rendered, "- Project decisions, returned by") || !strings.Contains(rendered, "`svc/app/decisions.json` (1)") {
-		t.Fatalf("a project-only workspace lost the pointer:\n%s", rendered)
 	}
 	if !strings.HasPrefix(decisionsGuidanceForWorkspace(root), "- Settled decisions are recorded in") {
 		t.Fatalf("a project-only workspace lost the block line")
 	}
 }
 
-// TestWorkspaceGuidanceBodyHoldsTheBlockAndTheDecisions pins the guidance
-// resource: the block body exactly as `context generate` writes it, then the
-// settled decisions under their own heading, so a notice "D-xxx added" points
-// at a resource that shows the decision.
-func TestWorkspaceGuidanceBodyHoldsTheBlockAndTheDecisions(t *testing.T) {
-	spectest.Proves(t, "cli/context-mcp-discovery", "settled-decisions-guidance", "the-guidance-resource-holds-the-block-body-then-the-decisions")
-	root := makeLoadableFixture(t)
-	writeDecisions(t, root, seededDecisions)
-
-	body := WorkspaceGuidanceBody(root)
-	block := guidanceBody(gateTasksForWorkspace(root), decisionsGuidanceForWorkspace(root))
-	if !strings.HasPrefix(body, block+"\n"+settledDecisionsHeading+"\n\n") {
-		t.Fatalf("the resource does not start with the block body and the heading:\n%s", body)
-	}
-	if got, want := strings.TrimPrefix(body, block+"\n"+settledDecisionsHeading+"\n\n"), SettledDecisions(root); got != want {
-		t.Fatalf("the decision section = %q, want %q", got, want)
-	}
-}
-
-// TestWorkspaceGuidanceBodyFollowsTheCurrentProjectSet pins the long-lived MCP
-// reader: a project added to the workspace after the first render, with the
-// workspace load memo still warm, is named by the next render. Editing the
-// decisions of a project the memo already holds would pass without the memo
-// being dropped, so the test adds a new project to includes.
-func TestWorkspaceGuidanceBodyFollowsTheCurrentProjectSet(t *testing.T) {
-	root := makeLoadableFixture(t)
-	writeDecisions(t, root, seededDecisions)
-	if first := WorkspaceGuidanceBody(root); strings.Contains(first, "Project decisions") {
-		t.Fatalf("no project registry exists yet:\n%s", first)
-	}
-
-	write := func(rel, content string) {
-		t.Helper()
-		path := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("putnami.workspace.json", `{"name":"fixture","includes":["svc/app","svc/lib","svc/extra"]}`)
-	write("svc/extra/putnami.json", `{"name":"example/extra"}`)
-	writeDecisions(t, filepath.Join(root, "svc", "extra"), projectDecisionsRegistry)
-	if second := WorkspaceGuidanceBody(root); !strings.Contains(second, "`svc/extra/decisions.json` (1)") {
-		t.Fatalf("the project added after the first render is not named:\n%s", second)
-	}
-}
-
-// TestAgentContextReturnsTheProjectDecisions is the other half: the agent
-// orienting on a project receives that project's decisions, and only those.
-func TestAgentContextReturnsTheProjectDecisions(t *testing.T) {
+// TestProjectDecisionsAreThoseOfTheProjectRegistry: a project's decisions are
+// those of the registry in its own directory, and only those.
+func TestProjectDecisionsAreThoseOfTheProjectRegistry(t *testing.T) {
 	root := makeLoadableFixture(t)
 	writeDecisions(t, root, seededDecisions)
 	writeDecisions(t, filepath.Join(root, "svc", "app"), projectDecisionsRegistry)
 
-	app, err := BuildAgentContextResult(root, fixtureVersion, "/svc/app")
-	if err != nil {
-		t.Fatalf("BuildAgentContextResult: %v", err)
+	app := projectDecisions(root, "svc/app")
+	if app == nil || app.Registry != "svc/app/decisions.json" ||
+		len(app.Decisions) != 1 || app.Decisions[0].ID != "APP-1" {
+		t.Fatalf("app decisions = %+v, want APP-1 from svc/app/decisions.json", app)
 	}
-	if app.Decisions == nil || app.Decisions.Registry != "svc/app/decisions.json" ||
-		len(app.Decisions.Decisions) != 1 || app.Decisions.Decisions[0].ID != "APP-1" {
-		t.Fatalf("app decisions = %+v, want APP-1 from svc/app/decisions.json", app.Decisions)
+	if lib := projectDecisions(root, "svc/lib"); lib != nil {
+		t.Fatalf("a project without a registry received decisions: %+v", lib)
 	}
-	lib, err := BuildAgentContextResult(root, fixtureVersion, "/svc/lib")
-	if err != nil {
-		t.Fatalf("BuildAgentContextResult: %v", err)
-	}
-	if lib.Decisions != nil {
-		t.Fatalf("a project without a registry received decisions: %+v", lib.Decisions)
+	if rootScope := projectDecisions(root, ""); rootScope != nil {
+		t.Fatalf("the workspace root is not a project scope: %+v", rootScope)
 	}
 }

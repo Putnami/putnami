@@ -1,4 +1,4 @@
 name: design
 description: Resolve a technical design against native scope and architecture contracts
-allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_context, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__impacted, mcp__putnami__why_impacted
+allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch
 argument-hint: <intention|spec|task> [--dry-run]
