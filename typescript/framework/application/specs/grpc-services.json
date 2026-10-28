@@ -53,5 +53,7 @@
       "text": "The proto plugin writes api.proto to schema/api.proto in the project by default, to .gen/schema/api.proto when output is false, and to the path output names otherwise, and publishes it as the build asset schema/api.proto. The default package name derives from the npm package name, so @putnami/application becomes putnami.application.v1, and a missing name becomes api.v1."
     }
   ],
-  "decisions": ["typescript/framework/application/doc/adr/0004-connect-carries-the-first-party-error-as-a-typed-detail.md"]
+  "decisions": [
+    "typescript/framework/application/doc/adr/0004-connect-carries-the-first-party-error-as-a-typed-detail.md"
+  ]
 }

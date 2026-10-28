@@ -1230,10 +1230,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "buckets-render-as-otlp-metrics",
-              "no-bucket-renders-an-empty-request"
-            ]
+            "checks": ["buckets-render-as-otlp-metrics", "no-bucket-renders-an-empty-request"]
           }
         },
         {
@@ -1255,10 +1252,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "a-log-record-maps-to-an-otlp-record",
-              "log-context-flattens-to-dotted-attributes"
-            ]
+            "checks": ["a-log-record-maps-to-an-otlp-record", "log-context-flattens-to-dotted-attributes"]
           }
         },
         {
@@ -1293,10 +1287,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "a-span-continues-the-caller-trace",
-              "malformed-or-unbounded-remote-context-is-refused"
-            ]
+            "checks": ["a-span-continues-the-caller-trace", "malformed-or-unbounded-remote-context-is-refused"]
           }
         }
       ]
