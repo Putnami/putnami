@@ -20,7 +20,8 @@ const (
 
 // MemoryBrokerConfig configures the in-memory broker.
 type MemoryBrokerConfig struct {
-	// DrainTimeout is the maximum time to wait for in-flight messages during shutdown.
+	// DrainTimeout is the maximum time Stop waits for in-flight deliveries and
+	// runs queued ones during shutdown.
 	DrainTimeout time.Duration
 	// Observer receives broker lifecycle callbacks for metrics/logging bridges.
 	Observer Observer
@@ -124,10 +125,10 @@ func (b *MemoryBroker) Publish(ctx context.Context, env Envelope) error {
 
 // deliver hands env to every target in one step that Stop cannot split. It
 // holds the broker read lock while it checks that the broker runs and
-// registers each dispatch. Stop marks the broker stopped under the write lock
-// before it drains. So either every dispatch of env is registered before Stop
-// drains, and Stop waits for it, or deliver sees the broker stopped and
-// refuses env with events.stopped.
+// registers or queues each dispatch. Stop marks the broker stopped under the
+// write lock before it drains. So either every dispatch of env is registered or
+// queued before Stop drains, and Stop drains it, or deliver sees the broker
+// stopped and refuses env with events.stopped.
 func (b *MemoryBroker) deliver(ctx context.Context, env Envelope, targets ...*subscription) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -180,6 +181,7 @@ func (b *MemoryBroker) Stop(_ context.Context) error {
 			close(b.quit)
 		}
 	}
+	quit := b.quit
 	b.mu.Unlock()
 
 	done := make(chan struct{})
@@ -192,16 +194,22 @@ func (b *MemoryBroker) Stop(_ context.Context) error {
 	case <-done:
 		return nil
 	case <-time.After(b.config.DrainTimeout):
-		b.dropQueued()
+		b.dropQueued(quit)
 		return errors.New(CodeEventsDrainTimeout, "drain timeout", errors.Duration("timeout", b.config.DrainTimeout))
 	}
 }
 
 // dropQueued empties the queue of every handler and reports each delivery it
 // held as dropped. Stop calls it when the drain deadline passes, so a handler
-// that outlives Stop starts none of them.
-func (b *MemoryBroker) dropQueued() {
+// that outlives Stop starts none of them. quit is the signal that Stop closed:
+// when Start has replaced it, the queues hold deliveries the restarted broker
+// accepted, and dropQueued leaves them.
+func (b *MemoryBroker) dropQueued(quit chan struct{}) {
 	b.mu.RLock()
+	if b.quit != quit {
+		b.mu.RUnlock()
+		return
+	}
 	var dropped []queuedDelivery
 	for _, subs := range b.subscriptions {
 		for _, sub := range subs {

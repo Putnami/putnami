@@ -455,6 +455,7 @@ func TestMemoryBrokerStopReportsUndrainedQueuedDeliveriesAsDropped(t *testing.T)
 	// Let the blocked delivery finish, then wait for it: it must start none of
 	// the discarded deliveries.
 	close(release)
+	broker.config.DrainTimeout = 5 * time.Second
 	stopBroker(t, broker)
 	if got := handled.Load(); got != 1 {
 		t.Fatalf("handled %d deliveries, want only the one in flight at the deadline", got)
@@ -521,5 +522,53 @@ func TestMemoryBrokerStopReportsCanceledRetryAsDropped(t *testing.T) {
 	}
 	if entry.Error == nil || entry.Error.Message == "" {
 		t.Errorf("the drop record must carry the handler failure, got %+v", entry.Error)
+	}
+}
+
+// A broker restarted while a Stop waits keeps the deliveries it accepts: that
+// Stop's deadline drops nothing.
+func TestMemoryBrokerRestartDuringStopKeepsQueuedDeliveries(t *testing.T) {
+	topic := NewTopic[int]("stop.restart.queued")
+	obs := &dropReasonObserver{drops: make(chan string, 4)}
+	broker := NewMemoryBroker(MemoryBrokerConfig{DrainTimeout: 50 * time.Millisecond, Observer: obs})
+	broker.logs = privateLoggers()
+	release := make(chan struct{})
+	handled := queueBehindBlockedHandler(t, broker, topic, 1, release)
+
+	stopped := make(chan error, 1)
+	go func() { stopped <- broker.Stop(context.Background()) }()
+	deadline := time.After(5 * time.Second)
+	for !errors.Is(broker.Publish(context.Background(), Envelope{Topic: "stop.restart.probe"}), CodeEventsStopped) {
+		select {
+		case <-deadline:
+			t.Fatal("broker never stopped")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	if err := broker.Start(context.Background()); err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	for i := 2; i <= 3; i++ {
+		if err := Publish(context.Background(), broker, topic, i); err != nil {
+			t.Fatalf("publish %d: %v", i, err)
+		}
+	}
+	if err := <-stopped; !errors.Is(err, CodeEventsDrainTimeout) {
+		t.Fatalf("stop = %v, want %s", err, CodeEventsDrainTimeout)
+	}
+
+	close(release)
+	broker.config.DrainTimeout = 5 * time.Second
+	if err := broker.Stop(context.Background()); err != nil {
+		t.Fatalf("final stop: %v", err)
+	}
+	if got := handled.Load(); got != 3 {
+		t.Fatalf("handled %d deliveries, want 3", got)
+	}
+	select {
+	case reason := <-obs.drops:
+		t.Fatalf("restarted broker dropped a delivery: %s", reason)
+	default:
 	}
 }
