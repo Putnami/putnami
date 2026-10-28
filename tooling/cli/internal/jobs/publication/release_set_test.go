@@ -2082,7 +2082,7 @@ func TestReleaseSetProvenanceReadsGitRevision(t *testing.T) {
 	root := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := exec.Command(putnamigit.Executable(), append([]string{"-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
 		cmd.Dir = root
 		out, err := cmd.CombinedOutput()
 		if err != nil {

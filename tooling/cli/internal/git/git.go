@@ -867,7 +867,7 @@ func runCaptureEnv(repoRoot string, env []string, args ...string) (string, strin
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, Executable(), args...)
 	cmd.Dir = repoRoot
 	if env == nil {
 		env = os.Environ()

@@ -32,6 +32,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -578,7 +579,7 @@ func assertUnchanged(t *testing.T, ws, home string, before map[string]string) {
 			t.Errorf("%s changed: sha256 %s, was %s", name, digest, before[name])
 		}
 	}
-	cmd := exec.Command("git", "status", "--porcelain", "--untracked-files=all")
+	cmd := exec.Command(git.Executable(), "status", "--porcelain", "--untracked-files=all")
 	cmd.Dir = ws
 	cmd.Env = append(baseEnv(home), "GIT_CONFIG_NOSYSTEM=1")
 	out, err := cmd.CombinedOutput()
@@ -586,7 +587,7 @@ func assertUnchanged(t *testing.T, ws, home string, before map[string]string) {
 		t.Fatalf("git status: %v\n%s", err, out)
 	}
 	if len(out) != 0 {
-		diff := exec.Command("git", "diff")
+		diff := exec.Command(git.Executable(), "diff")
 		diff.Dir = ws
 		diff.Env = cmd.Env
 		patch, _ := diff.CombinedOutput()

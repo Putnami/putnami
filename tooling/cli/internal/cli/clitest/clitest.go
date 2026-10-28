@@ -32,6 +32,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
@@ -174,7 +175,7 @@ func InitGitRepo(t *testing.T, dir string) {
 // RunGit runs git in dir with a fixed identity and fails the test on error.
 func RunGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(git.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
@@ -188,7 +189,7 @@ func RunGit(t *testing.T, dir string, args ...string) {
 // GitOutput runs git in dir and returns its stdout.
 func GitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(git.Executable(), args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {

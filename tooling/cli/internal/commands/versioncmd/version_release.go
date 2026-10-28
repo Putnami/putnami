@@ -127,7 +127,7 @@ func majorOf(version string) int {
 }
 
 func gitOutput(ctx context.Context, repoRoot string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", repoRoot}, args...)...)
+	cmd := exec.CommandContext(ctx, git.Executable(), append([]string{"-C", repoRoot}, args...)...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

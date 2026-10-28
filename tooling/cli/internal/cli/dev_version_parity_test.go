@@ -19,6 +19,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // The acceptance of moving `putnami version get` and `putnami version tag`
@@ -442,7 +443,7 @@ func devVersionCommit(t *testing.T, root, date string, message ...string) {
 // with env added, and returns its output without trailing newlines.
 func devVersionGit(t *testing.T, dir string, env []string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(git.Executable(), args...)
 	cmd.Dir = dir
 	cmd.Env = append(append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "LC_ALL=C"), env...)
 	out, err := cmd.CombinedOutput()

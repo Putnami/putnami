@@ -31,7 +31,7 @@ func treeTestRepo(t *testing.T) string {
 		{"config", "user.name", "Test"},
 		{"config", "commit.gpgsign", "false"},
 	} {
-		command := exec.Command("git", args...)
+		command := exec.Command(gitpkg.Executable(), args...)
 		command.Dir = dir
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -41,7 +41,7 @@ func treeTestRepo(t *testing.T) string {
 		t.Fatalf("write README: %v", err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "initial"}} {
-		command := exec.Command("git", args...)
+		command := exec.Command(gitpkg.Executable(), args...)
 		command.Dir = dir
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)

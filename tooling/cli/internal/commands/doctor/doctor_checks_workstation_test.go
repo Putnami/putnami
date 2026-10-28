@@ -11,6 +11,7 @@ import (
 
 	doctor "go.putnami.dev/protocol/doctor"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // fakeWorkstation is a probe whose every answer is fixed: a clean Windows host
@@ -250,7 +251,7 @@ func TestSystemWorkstationProbe_ReportsACRLFCheckout(t *testing.T) {
 	root := t.TempDir()
 	gitIn := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = root
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)

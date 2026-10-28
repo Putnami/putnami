@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // Snapshot retains content identity separately from Git and index context.
@@ -116,7 +117,7 @@ func sourceGit(ctx context.Context, repo string, args ...string) ([]byte, error)
 // Other exits remain failures, without rendering stderr that may contain a
 // credential-bearing URL from local configuration.
 func sourceGitOptional(ctx context.Context, repo string, args ...string) ([]byte, bool, error) {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", repo, "-c", "core.fsmonitor=false"}, args...)...)
+	cmd := exec.CommandContext(ctx, git.Executable(), append([]string{"-C", repo, "-c", "core.fsmonitor=false"}, args...)...)
 	var output boundedGitOutput
 	cmd.Stdout = &output
 	if err := cmd.Run(); err != nil {
@@ -185,7 +186,7 @@ func IgnoredPaths(ctx context.Context, repo string, paths []string) (map[string]
 		stdin.WriteString(name)
 		stdin.WriteByte(0)
 	}
-	cmd := exec.CommandContext(ctx, "git", "-C", repo, "-c", "core.fsmonitor=false", "check-ignore", "-z", "--stdin")
+	cmd := exec.CommandContext(ctx, git.Executable(), "-C", repo, "-c", "core.fsmonitor=false", "check-ignore", "-z", "--stdin")
 	cmd.Stdin = &stdin
 	var output boundedGitOutput
 	cmd.Stdout = &output

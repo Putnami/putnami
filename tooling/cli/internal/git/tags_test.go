@@ -170,7 +170,7 @@ func commitAt(t *testing.T, dir, relPath, subject, date string) string {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", subject}} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(Executable(), args...)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+date, "GIT_AUTHOR_DATE="+date)
 		if out, err := cmd.CombinedOutput(); err != nil {

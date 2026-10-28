@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -286,7 +287,7 @@ func gitSelectionWorkspace(t *testing.T) *workspace.Workspace {
 	ws := selectionWorkspace(t)
 	run := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = ws.Root
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",

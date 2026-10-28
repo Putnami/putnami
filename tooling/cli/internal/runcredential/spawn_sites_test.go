@@ -145,6 +145,8 @@ var spawnSites = map[string]spawnSite{
 		why: "git ls-files"},
 	"git/fingerprint.go:FingerprintTree": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through treefingerprint.Compute: rev-parse, status, ls-files"},
+	"git/executable.go:developerGit": {spawns: 1, verdict: noRepositoryCode,
+		why: "/usr/bin/xcrun --find git, a fixed program"},
 	"git/git.go:GetVersionInfo": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
 	"git/git.go:runCaptureEnv": {spawns: 1, verdict: noRepositoryCode,

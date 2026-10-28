@@ -20,6 +20,7 @@ import (
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // The extraction acceptance: for every one of the
@@ -907,7 +908,7 @@ func commitParityWorkspace(t *testing.T, root string) {
 		{"add", "-A"},
 		{"commit", "-m", "sdd parity fixture"},
 	} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(),
 			"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",

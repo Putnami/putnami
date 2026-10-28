@@ -9,6 +9,7 @@ import (
 	"time"
 
 	workspace "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 )
 
@@ -114,7 +115,7 @@ func TestResolveStoreRoot_WorktreesShareStore(t *testing.T) {
 
 	repo := initStoreGitRepo(t)
 	wt := filepath.Join(t.TempDir(), "linked")
-	run := exec.Command("git", "worktree", "add", "-b", "wt", wt)
+	run := exec.Command(git.Executable(), "worktree", "add", "-b", "wt", wt)
 	run.Dir = repo
 	if out, err := run.CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
@@ -268,7 +269,7 @@ func initStoreGitRepo(t *testing.T) string {
 		{"config", "commit.gpgsign", "false"},
 		{"checkout", "-b", "main"},
 	} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -278,7 +279,7 @@ func initStoreGitRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "init"}} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)

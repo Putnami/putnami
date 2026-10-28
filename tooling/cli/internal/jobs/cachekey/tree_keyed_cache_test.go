@@ -5,13 +5,15 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // treeKeyedGit runs git in dir with a fixed identity and fixed dates, and
 // returns its trimmed output.
 func treeKeyedGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{
+	cmd := exec.Command(git.Executable(), append([]string{
 		"-c", "user.name=T", "-c", "user.email=t@t.com",
 		"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
 	}, args...)...)

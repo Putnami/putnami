@@ -10,6 +10,7 @@ import (
 
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -77,7 +78,7 @@ func versionGraphRepo(t *testing.T, withCatalog bool) string {
 		{"config", "commit.gpgsign", "false"}, {"checkout", "-b", "main"},
 		{"add", "-A"}, {"commit", "-m", "feat: the workspace"},
 	} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command(git.Executable(), args...)
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)

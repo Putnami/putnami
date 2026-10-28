@@ -326,7 +326,7 @@ func writeImpactPlanFile(t *testing.T, path, contents string) {
 
 func runImpactPlanGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	command := exec.Command("git", args...)
+	command := exec.Command(git.Executable(), args...)
 	command.Dir = dir
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
@@ -335,7 +335,7 @@ func runImpactPlanGit(t *testing.T, dir string, args ...string) {
 
 func impactPlanGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	command := exec.Command("git", args...)
+	command := exec.Command(git.Executable(), args...)
 	command.Dir = dir
 	output, err := command.Output()
 	if err != nil {

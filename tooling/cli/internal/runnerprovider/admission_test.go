@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	runner "go.putnami.dev/protocol/runner"
+	gitexec "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runnersource"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -22,7 +23,7 @@ func admissionRepo(t *testing.T) string {
 	root := t.TempDir()
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := exec.Command(gitexec.Executable(), append([]string{"-C", root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v: %s", args, err, out)
 		}
@@ -204,7 +205,7 @@ func TestListedInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T) {
 			writeAdmissionFile(t, root, "app/embed.go", "package app\n")
 			writeAdmissionFile(t, root, "app/"+test.listed, "SELECT 1;\n")
 			if test.tracked {
-				cmd := exec.Command("git", "-C", root, "add", "-f", "app/"+test.listed)
+				cmd := exec.Command(gitexec.Executable(), "-C", root, "add", "-f", "app/"+test.listed)
 				if out, err := cmd.CombinedOutput(); err != nil {
 					t.Fatalf("track lifecycle input: %v: %s", err, out)
 				}
@@ -242,7 +243,7 @@ func TestListedLinkUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing.T)
 	if _, err := AdmitInputs(context.Background(), root, inputs); !errors.Is(err, ErrInadmissible) || !strings.Contains(err.Error(), "app/.gen/source.go") {
 		t.Fatalf("ignored lifecycle link was admitted: %v", err)
 	}
-	cmd := exec.Command("git", "-C", root, "add", "-f", "app/.gen/source.go")
+	cmd := exec.Command(gitexec.Executable(), "-C", root, "add", "-f", "app/.gen/source.go")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("track the link: %v: %s", err, out)
 	}

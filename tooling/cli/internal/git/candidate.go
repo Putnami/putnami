@@ -18,7 +18,7 @@ import (
 // a slash path relative to root, matched literally, as a file or a directory.
 func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 	args := append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}, literalPathspecs(prefixes)...)
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command(Executable(), args...)
 	cmd.Dir = root
 	data, err := cmd.Output()
 	if err != nil {

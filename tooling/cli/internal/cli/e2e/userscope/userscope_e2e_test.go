@@ -33,6 +33,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -443,7 +444,7 @@ func TestAppRun_UserScope_LeavesAGitCallerDirClean(t *testing.T) {
 		t.Fatal(err)
 	}
 	porcelain := func() string {
-		cmd := exec.Command("git", "status", "--porcelain", "--untracked-files=all", "--ignored")
+		cmd := exec.Command(git.Executable(), "status", "--porcelain", "--untracked-files=all", "--ignored")
 		cmd.Dir = repo
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -451,7 +452,7 @@ func TestAppRun_UserScope_LeavesAGitCallerDirClean(t *testing.T) {
 		}
 		return string(out)
 	}
-	gitInit := exec.Command("git", "init", "--quiet")
+	gitInit := exec.Command(git.Executable(), "init", "--quiet")
 	gitInit.Dir = repo
 	if out, err := gitInit.CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)

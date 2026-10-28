@@ -16,7 +16,7 @@ func TestReadIndexModes(t *testing.T) {
 	repo := indexExecutableRepo(t)
 	write(t, filepath.Join(repo, "conflict.md"), "# conflict\n")
 	blob := strings.TrimSpace(runGit(t, repo, "hash-object", "-w", "conflict.md"))
-	stages := exec.Command("git", "update-index", "--index-info")
+	stages := exec.Command(Executable(), "update-index", "--index-info")
 	stages.Dir = repo
 	stages.Stdin = strings.NewReader("100644 " + blob + " 1\tconflict.md\n100644 " + blob + " 2\tconflict.md\n")
 	if out, err := stages.CombinedOutput(); err != nil {

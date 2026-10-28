@@ -14,6 +14,7 @@ import (
 	ciproto "go.putnami.dev/protocol/ci"
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // writeCIDocument writes a minimal valid version 3 document declaring the given
@@ -427,7 +428,7 @@ func repositoryGuidanceBytes(root, path string) ([]byte, error) {
 		return nil, fmt.Errorf("inspect repository metadata: %w", err)
 	}
 
-	committed, err := exec.Command("git", "-C", root, "show", "HEAD:"+filepath.ToSlash(path)).Output()
+	committed, err := exec.Command(git.Executable(), "-C", root, "show", "HEAD:"+filepath.ToSlash(path)).Output()
 	if err == nil {
 		return committed, nil
 	}
@@ -449,7 +450,7 @@ func TestRepositoryGuidanceBytesUsesTheRightSourceOfTruth(t *testing.T) {
 	runGit := func(args ...string) {
 		t.Helper()
 		commandArgs := append([]string{"-C", repo}, args...)
-		if output, err := exec.Command("git", commandArgs...).CombinedOutput(); err != nil {
+		if output, err := exec.Command(git.Executable(), commandArgs...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
