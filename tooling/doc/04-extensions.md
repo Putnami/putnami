@@ -815,7 +815,14 @@ putnami extensions install --platform linux/amd64 --dest ./.gen/warm-artifacts
 - Pipeline DAG is acyclic
 - Activation file patterns are valid globs
 - Contract schema references are valid
-- No command, command group or subcommand declares a flag that the core parses as its own global flag, by name or by short alias. The command would never receive it: `--plan`, `--retry` or `-w` on a flag other than `--watch` fail. The core hands `--dry-run`, `--watch`, `--all`, `--projects`, `--baseline`, `--max-parallel` and `--no-cache` to a command that declares them, so these names stay allowed.
+- No command, command group or subcommand declares a flag that the core parses as its own global flag, by name, by short alias or, for a boolean, by its `--no-` negation, where the command never receives it. `--plan`, `--retry`, or `-w` on a flag other than `--watch`, always fail. Some global names stay allowed where the core hands the flag over:
+
+  | Global flag | Commands that receive it |
+  |---|---|
+  | `--max-parallel`, `--no-cache` | every command |
+  | `--dry-run` | every command; the core previews the plan of a command it cannot hand the flag to, and runs nothing |
+  | `--watch` | a serve workload, or a command whose own traits declare no workload |
+  | `--projects`, `--all`, `--baseline` | an interactive subcommand |
 
 ```bash
 putnami extensions validate ./my-extension

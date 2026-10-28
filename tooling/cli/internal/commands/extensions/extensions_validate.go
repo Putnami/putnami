@@ -85,14 +85,22 @@ func ExtensionsValidate(args []string) error {
 }
 
 // coreGlobalFlagShadows reports each manifest flag, by name or short alias,
-// that the core parses as its own global flag before the command runs, so the
-// command never receives it (commandmeta.ExtensionFlagShadow).
+// that the core parses as its own global flag before the command runs, in at
+// least one invocation that receives the flag, so that the command never
+// receives it there (commandmeta.ExtensionFlagShadow).
 func coreGlobalFlagShadows(manifest *proto.Manifest) []diag.Diagnostic {
 	var diags []diag.Diagnostic
-	proto.VisitFlagDefinitions(manifest, func(field, name string, def proto.FlagDefinition) {
-		if global, taken := commandmeta.ExtensionFlagShadow(name); taken {
+	proto.VisitFlagDefinitions(manifest, func(field, name string, def proto.FlagDefinition, reach []proto.FlagReach) {
+		boolean := def.Type == "" || def.Type == "boolean"
+		for _, r := range reach {
+			global, taken := commandmeta.ExtensionFlagShadow(name, boolean, extensionInvocation(manifest, r))
+			if !taken {
+				continue
+			}
 			diags = append(diags, diag.Errorf("core-global-flag", field+"."+name,
-				"the core parses %s as its own global flag (%s), so the command never receives it; rename the flag", global.Long, global.Description))
+				"the core parses %s as its own global flag (%s), so %s never receives it; rename the flag",
+				global.Long, global.Description, invocationName(r)))
+			break
 		}
 		if global, taken := commandmeta.ExtensionShortShadow(name, def.Short); taken {
 			diags = append(diags, diag.Errorf("core-global-flag", field+"."+name+".short",
@@ -100,6 +108,23 @@ func coreGlobalFlagShadows(manifest *proto.Manifest) []diag.Diagnostic {
 		}
 	})
 	return diags
+}
+
+// extensionInvocation describes r with the workload its command's own traits
+// declare in manifest.
+func extensionInvocation(manifest *proto.Manifest, r proto.FlagReach) commandmeta.ExtensionInvocation {
+	invocation := commandmeta.ExtensionInvocation{Interactive: r.Interactive}
+	if command, ok := manifest.Commands[r.Command]; ok && command.Traits != nil {
+		invocation.Workload = command.Traits.Workload
+	}
+	return invocation
+}
+
+func invocationName(r proto.FlagReach) string {
+	if r.Interactive {
+		return fmt.Sprintf("the interactive subcommand that runs %s", r.Command)
+	}
+	return fmt.Sprintf("the planned command %s", r.Command)
 }
 
 // printDiagnostics renders protocol diagnostics to stdout.

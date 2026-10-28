@@ -385,39 +385,59 @@ func TestExtensionsValidate_MissingPath(t *testing.T) {
 	}
 }
 
-// flagShadowManifest declares the flags in commandFlags on a command and those
-// in subcommandFlags on a command group's subcommand.
-func flagShadowManifest(commandFlags, subcommandFlags string) string {
+// flagShadowManifest declares the given flags on four invocations: the planned
+// command estimate, whose workload is once; the serve workload serve; the
+// group change, whose subcommands run estimate and, interactively, report;
+// and change's interactive subcommand report and its nested subcommand show.
+func flagShadowManifest(estimate, serve, group, report, show string) string {
 	return `{
   "name": "@putnami/test-ext",
   "version": "1.0.0",
-  "cliContract": 4,
+  "cliContract": 17,
   "commands": {
     "estimate": {
-      "flags": {` + commandFlags + `},
-      "run": [{"id": "estimate", "task": "estimate-exec"}]
-    }
+      "traits": {"workload": "once"},
+      "flags": {` + estimate + `},
+      "run": [{"id": "estimate", "task": "exec"}]
+    },
+    "serve": {
+      "traits": {"workload": "serve"},
+      "flags": {` + serve + `},
+      "run": [{"id": "serve", "task": "exec"}]
+    },
+    "report": {"run": [{"id": "report", "task": "exec"}]}
   },
   "commandGroups": {
     "change": {
+      "flags": {` + group + `},
       "subcommands": {
-        "estimate": {"command": "estimate", "flags": {` + subcommandFlags + `}}
+        "estimate": {"command": "estimate"},
+        "report": {
+          "command": "report",
+          "interactive": true,
+          "flags": {` + report + `},
+          "subcommands": {"show": {"interactive": true, "flags": {` + show + `}}}
+        }
       }
     }
   },
-  "tasks": {"estimate-exec": {"kind": "command", "command": "echo", "cache": false}}
+  "tasks": {"exec": {"kind": "command", "command": "echo", "cache": false}}
 }`
 }
 
 // `putnami extensions validate` refuses a flag the core parses as its own
-// global flag, by name or by short alias, on a command and on a subcommand,
-// and names each field and the global flag that takes it.
+// global flag, by name, by short alias or by its negation, wherever an
+// invocation that receives the flag never gets it, and names each field and
+// the global flag that takes it.
 func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-refuses-a-flag-a-core-global-flag-takes")
 	dir := t.TempDir()
 	manifest := flagShadowManifest(
-		`"plan": {"type": "string"}, "workspace": {"type": "string", "short": "w"}`,
-		`"markdown": {"type": "boolean"}, "retry": {"type": "string"}`,
+		`"plan": {"type": "string"}, "workspace": {"type": "string", "short": "w"}, "watch": {"type": "boolean"}, "projects": {"type": "string"}, "w": {"type": "string"}, "cache-projects": {"type": "boolean"}`,
+		`"retry": {"type": "string"}`,
+		`"exclude": {"type": "string"}, "all": {"type": "boolean"}`,
+		`"watch": {"type": "boolean"}`,
+		`"markdown": {"type": "boolean"}`,
 	)
 	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
@@ -427,12 +447,19 @@ func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
 		t.Fatalf("a manifest whose flags the core takes validated:\n%s", out)
 	}
 	for _, want := range []string{
-		"[core-global-flag] commands.estimate.flags.plan: the core parses --plan as its own global flag",
-		"[core-global-flag] commands.estimate.flags.workspace.short: the core parses -w as --watch",
-		"[core-global-flag] commandGroups.change.subcommands.estimate.flags.markdown: the core parses --markdown",
-		"[core-global-flag] commandGroups.change.subcommands.estimate.flags.retry: the core parses --retry",
+		"commands.estimate.flags.plan: the core parses --plan as its own global flag",
+		"commands.estimate.flags.workspace.short: the core parses -w as --watch",
+		"commands.estimate.flags.watch: the core parses --watch",
+		"commands.estimate.flags.projects: the core parses --projects",
+		"commands.estimate.flags.w: the core parses --watch",
+		"commands.estimate.flags.cache-projects: the core parses --no-cache-projects",
+		"commands.serve.flags.retry: the core parses --retry",
+		"commandGroups.change.flags.exclude: the core parses --exclude",
+		"commandGroups.change.flags.all: the core parses --all as its own global flag (All projects), so the planned command estimate never receives it",
+		"commandGroups.change.subcommands.report.flags.watch: the core parses --watch",
+		"commandGroups.change.subcommands.report.subcommands.show.flags.markdown: the core parses --markdown",
 	} {
-		if !strings.Contains(out, want) {
+		if !strings.Contains(out, "[core-global-flag] "+want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
 	}
@@ -441,14 +468,19 @@ func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
 	}
 }
 
-// `putnami extensions validate` accepts a flag named like a global flag the
-// core hands to the commands that declare it, with its own short alias.
+// `putnami extensions validate` accepts a flag named like a global flag on an
+// invocation the core hands that flag to: --dry-run, --max-parallel and
+// --no-cache everywhere, --watch on a serve workload, and --projects, --all
+// and --baseline on an interactive subcommand.
 func TestExtensionsValidate_AcceptsAFlagTheCoreHandsToTheCommand(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-accepts-a-flag-the-core-hands-to-the-command")
 	dir := t.TempDir()
 	manifest := flagShadowManifest(
-		`"dry-run": {"type": "boolean"}, "watch": {"type": "boolean", "short": "w"}, "all": {"type": "boolean"}, "no-cache": {"type": "boolean"}`,
-		`"projects": {"type": "string"}, "baseline": {"type": "string"}, "max-parallel": {"type": "string"}, "plan-file": {"type": "string"}`,
+		`"dry-run": {"type": "boolean"}, "max-parallel": {"type": "string"}, "no-cache": {"type": "boolean"}, "cache": {"type": "boolean"}, "plan-file": {"type": "string"}`,
+		`"watch": {"type": "boolean", "short": "w"}`,
+		`"dry-run": {"type": "boolean"}`,
+		`"projects": {"type": "string"}, "all": {"type": "boolean"}`,
+		`"baseline": {"type": "string"}`,
 	)
 	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)

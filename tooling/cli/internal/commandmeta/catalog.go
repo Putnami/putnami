@@ -135,22 +135,73 @@ type GlobalFlag struct {
 	// extensions accept it. The full Markdown reference lists it always.
 	// False means a core command reads the flag, or help must always list it.
 	JobOnly bool
-	// Forwarded marks a flag the core hands to an extension command that
-	// declares a flag of the same name, or applies for it with the meaning the
-	// command declares (internal/cli's buildExtensionCommandParams and
-	// interactive launch, engine.execute's overlay). An extension may declare
-	// it. The parser takes every other global flag before the command runs, so
-	// ExtensionFlagShadow refuses a manifest flag of its name.
-	Forwarded bool
+	// Delivery states which extension commands that declare a flag of the same
+	// name receive the global flag from the core. The zero value, Undelivered,
+	// means the parser takes the flag and no extension command receives it,
+	// so `putnami extensions validate` refuses a manifest flag of its name.
+	Delivery Delivery
+}
+
+// Delivery is the set of extension commands that receive a global flag they
+// declare under its name (GlobalFlag.Delivery).
+type Delivery int
+
+const (
+	// Undelivered: no extension command receives the flag.
+	Undelivered Delivery = iota
+	// DeliveredToEvery: every command receives it, or, for --dry-run, the core
+	// previews the plan of a command it cannot hand the flag to and runs
+	// nothing (internal/cli's buildExtensionCommandParams and
+	// applyPublishDryRun, engine.execute's overlay).
+	DeliveredToEvery
+	// DeliveredToServeWorkload: a planned command whose workload is serve,
+	// which the core watches and whose `watch` flag reads --no-watch
+	// (internal/cli's ownsWatchFlag, engine's forcesServeWatch).
+	DeliveredToServeWorkload
+	// DeliveredToInteractive: an interactive subcommand of a command group,
+	// whose launch hands it the flags its resolved selection cannot carry
+	// (internal/cli's runExtensionStructuredCommand).
+	DeliveredToInteractive
+)
+
+// ExtensionInvocation is one way an extension command runs, as far as one
+// manifest states it.
+type ExtensionInvocation struct {
+	// Interactive reports a command group's interactive subcommand.
+	Interactive bool
+	// Workload is the workload the command's own traits declare, or "" when
+	// they declare none and the verb vocabulary may supply one.
+	Workload string
+}
+
+// receives reports whether invocation receives a global of this delivery. A
+// planned command that declares no workload may take serve from its verb, so
+// it receives a serve workload's flag.
+func (d Delivery) receives(invocation ExtensionInvocation) bool {
+	switch d {
+	case DeliveredToEvery:
+		return true
+	case DeliveredToServeWorkload:
+		return !invocation.Interactive && (invocation.Workload == "" || invocation.Workload == "serve")
+	case DeliveredToInteractive:
+		return invocation.Interactive
+	default:
+		return false
+	}
 }
 
 // ExtensionFlagShadow returns the global flag the parser takes in place of an
-// extension command's flag called name: a global or help render flag of that
-// long name, unless the global is Forwarded. The command never receives such
-// a flag, so `putnami extensions validate` refuses the declaration.
-func ExtensionFlagShadow(name string) (GlobalFlag, bool) {
+// extension command's flag called name in invocation, so that the command
+// never receives it, and `putnami extensions validate` refuses the
+// declaration. It checks the long name against the global and help render
+// flags, a one-letter name against the global short aliases, and, for a
+// boolean flag, its --no-<name> negation against a value-taking global.
+func ExtensionFlagShadow(name string, boolean bool, invocation ExtensionInvocation) (GlobalFlag, bool) {
 	for _, flag := range append(GlobalFlags(), HelpRenderFlags()...) {
-		if flag.Long == "--"+name && !flag.Forwarded {
+		switch {
+		case flag.Long == "--"+name && !flag.Delivery.receives(invocation),
+			len(name) == 1 && flag.Short == "-"+name,
+			boolean && flag.Long == "--no-"+name && flag.Type == FlagValue:
 			return flag, true
 		}
 	}

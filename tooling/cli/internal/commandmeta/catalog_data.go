@@ -1280,41 +1280,41 @@ func HelpRenderFlags() []GlobalFlag {
 //     fields as code. A flag added to the parser and not here is unparseable,
 //     and one added here with no binding is accepted and dropped — which is what
 //     internal/cli's TestGlobalFlags_CoverTheParser reads flags.go to catch.
-//   - Forwarded marks the globals an extension command may declare, because
-//     the core hands them over (see GlobalFlag.Forwarded). Mark a flag only
-//     with the code that delivers it: `putnami extensions validate` refuses a
-//     manifest flag named like any other global.
+//   - Delivery names the extension commands that receive a global they declare
+//     under its name (see GlobalFlag.Delivery). Set it only with the code that
+//     delivers the flag: `putnami extensions validate` refuses a manifest flag
+//     named like a global its command does not receive.
 var globalFlags = []GlobalFlag{
 	{Long: "--verbose", Short: "-v", Description: "Show job results and diagnostics", Category: "Common"},
 	{Long: "--debug", Short: "-d", Description: "Stream all events in real-time", Category: "Common"},
-	{Long: "--watch", Short: "-w", Description: "Re-run on file changes", Category: "Common", JobOnly: true, Forwarded: true},
+	{Long: "--watch", Short: "-w", Description: "Re-run on file changes", Category: "Common", JobOnly: true, Delivery: DeliveredToServeWorkload},
 	{Long: "--plan", Description: "Show execution plan without running", Category: "Common", JobOnly: true},
 	{Long: "--help", Short: "-h", Description: "Show help", Category: "Common"},
 
-	{Long: "--all", Description: "All projects", Category: "Project Selection", Forwarded: true},
+	{Long: "--all", Description: "All projects", Category: "Project Selection", Delivery: DeliveredToInteractive},
 	{Long: "--impacted", Description: "Projects affected by git changes", Category: "Project Selection"},
-	{Long: "--projects", Type: FlagValue, ValueName: "<list>", Description: "Comma-separated project names", Category: "Project Selection", Forwarded: true},
+	{Long: "--projects", Type: FlagValue, ValueName: "<list>", Description: "Comma-separated project names", Category: "Project Selection", Delivery: DeliveredToInteractive},
 	{Long: "--tag", Type: FlagValue, ValueName: "<tags>", Description: "Filter by tags", Category: "Project Selection"},
 	{Long: "--exclude-tag", Type: FlagValue, ValueName: "<tags>", Description: "Exclude by tags", Category: "Project Selection"},
 	{Long: "--exclude", Type: FlagValue, ValueName: "<names>", Description: "Exclude by name", Category: "Project Selection", JobOnly: true},
-	{Long: "--baseline", Type: FlagValue, ValueName: "<branch>", Description: "Custom git baseline for --impacted; a job command with no target or --all implies --impacted", Category: "Project Selection", Forwarded: true},
+	{Long: "--baseline", Type: FlagValue, ValueName: "<branch>", Description: "Custom git baseline for --impacted; a job command with no target or --all implies --impacted", Category: "Project Selection", Delivery: DeliveredToInteractive},
 	{Long: "--impacted-strict", Description: "Fail when baseline can't be resolved", Category: "Project Selection", JobOnly: true},
 
 	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}, Providers: []string{runner.ProviderCommandName}, JobOnly: true},
 	{Long: "--providers", Type: FlagValue, ValueName: "<list>", Description: "Credentials to ask the credential provider for: install, publish (comma list)", Category: "Execution", Values: []string{"install", "publish"}, Providers: []string{registry.CredentialProviderCommand}},
 	{Long: runcredential.Flag, Type: FlagValue, ValueName: "<n>", Description: runcredential.FlagDescription, Category: "Execution"},
-	{Long: "--no-cache", Description: "Force re-execution (skip cache)", Category: "Execution", Forwarded: true},
+	{Long: "--no-cache", Description: "Force re-execution (skip cache)", Category: "Execution", Delivery: DeliveredToEvery},
 	{Long: "--no-cache-projects", Type: FlagValue, ValueName: "<list>", Description: "Force re-execution of these projects only", Category: "Execution", JobOnly: true},
 	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}, Providers: []string{cache.ProviderCommandName}, JobOnly: true},
 	{Long: "--continue-on-error", Description: "Don't abort on first failure", Category: "Execution", JobOnly: true},
-	{Long: "--max-parallel", Type: FlagValue, ValueName: "<mode|n>", Description: "Parallelism: auto | eco | max | number", Category: "Execution", Values: []string{"auto", "eco", "max"}, JobOnly: true, Forwarded: true},
+	{Long: "--max-parallel", Type: FlagValue, ValueName: "<mode|n>", Description: "Parallelism: auto | eco | max | number", Category: "Execution", Values: []string{"auto", "eco", "max"}, JobOnly: true, Delivery: DeliveredToEvery},
 	{Long: "--resource", Type: FlagValue, ValueName: "<name=units>", Description: "Budget for a named shared resource (repeatable)", Category: "Execution", JobOnly: true},
 	{Long: "--cpu-policy", Type: FlagValue, ValueName: "<policy>", Description: "CPU ceiling policy: critical-path | measured", Category: "Execution", Values: []string{"critical-path", "measured"}, JobOnly: true},
 	{Long: "--retry", Type: FlagValue, ValueName: "<n>", Description: "Retry transient failures", Category: "Execution", JobOnly: true},
 	{Long: "--retry-failed", Description: "Re-run tasks whose identical failure is cached", Category: "Execution", JobOnly: true},
 	{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile: dev | test | production", Category: "Execution", Values: []string{"dev", "test", "production"}, JobOnly: true},
 	{Long: "--serve-env", Type: FlagValue, ValueName: "<->", Description: "Read the serve steps' process environment from stdin: one JSON object of string variables", Category: "Execution", Values: []string{"-"}, JobOnly: true},
-	{Long: "--dry-run", Description: "Show changes without applying", Category: "Execution", JobOnly: true, Forwarded: true},
+	{Long: "--dry-run", Description: "Show changes without applying", Category: "Execution", JobOnly: true, Delivery: DeliveredToEvery},
 
 	{Long: "--output", Type: FlagValue, ValueName: "<format>", Description: "Output format: text | json | jsonl | cloud-logging", Category: "Output", Values: []string{"text", "json", "jsonl", "cloud-logging"}},
 	{Long: "--json", Description: "Shorthand for --output=json", Category: "Output"},
