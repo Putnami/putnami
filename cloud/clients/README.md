@@ -23,7 +23,7 @@ oci-server, put-server, runtime-api and source-api.
 | --- | --- |
 | Put package | `cloud/doc-contents-cloud-cli-schema` |
 | Channel | `canary` |
-| Version | `0.0.0-20261028100106-b20c9e210`, published on 2026-10-28, archive digest `sha256:9bd92f1ee276c4db4a74c1daf982a39447eccd1b0cc2a426d0c256b8580edfce` |
+| Version | `0.0.0-20261028150609-db578822b`, published on 2026-10-28, archive digest `sha256:90e2a8caef626020d1616d72cb0acb95ea708bc97cd3dded62a29bec40faae44` |
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
