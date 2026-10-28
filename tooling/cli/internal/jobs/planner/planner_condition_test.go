@@ -135,6 +135,9 @@ func TestPlan_GoInfraOnlyOrdersAfterCompile(t *testing.T) {
 	// The order-only edge keeps compile's files only when infra's key reads a
 	// file compile writes. Compile writes its binary under the command-output
 	// root, which no project input reads.
+	if ws == nil {
+		t.Fatal("key movement needs the workspace; without it every edge counts and this check proves nothing")
+	}
 	movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws}, planned)
 	if writers := movement.Writers[infra.Key()]; slices.Contains(writers, compile.Key()) {
 		t.Errorf("key movement names compile among infra's writers %v: the executable would keep its files", writers)
