@@ -102,6 +102,7 @@ var Commands = []string{
 	"agent-attach",
 	"agent-hook",
 	"cache-provider",
+	"change-estimate",
 	"change-finalize",
 	"change-language",
 	"change-verify",

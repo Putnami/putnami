@@ -11,8 +11,8 @@ The manifest declares an `agentContent` contribution, which the CLI builds
 and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
 (`.agents/skills`, `.codex/agents`) under the extension's own version. It also
 declares a compiled runtime, `compiled/putnami-contributor`, which serves
-`putnami change language`, `change verify`, `change finalize`, `agent hook`
-and `agent attach`
+`putnami change language`, `change verify`, `change finalize`,
+`change estimate`, `agent hook` and `agent attach`
 ([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md),
 [ADR 0005](doc/adr/0005-the-contributor-executable-serves-the-change-noun.md),
 [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)).
@@ -80,6 +80,10 @@ core's `putnami doctor --machine` reports load for hosted-gate admission, and
 Host session limits remain the host runtime's responsibility.
 The active audit integration retains `check/scripts/english-only.sh` as a
 thin relay to the native language command; it carries no separate evaluator.
+
+`putnami change estimate` reads a change plan, `.putnami/<issue>/plan.json`
+by default, checks it against the plan format, and sizes it S, M or L with a
+token and a duration range ([Estimate a change plan](doc/07-change-estimate.md)).
 
 The build skill's dossier and workflow checker is `putnami change verify`,
 which this extension's executable serves. Its standalone `--workflow` validates a local progress
@@ -150,6 +154,7 @@ session:
 - [Entry-point migration and evidence limits](doc/03-entry-point-migration.md)
 - [Workflow records and handoffs](doc/04-workflow-contract.md)
 - [Publish a proposal](doc/06-change-finalize.md)
+- [Estimate a change plan](doc/07-change-estimate.md)
 - [ADR 0001](doc/adr/0001-one-contributor-extension.md)
 - [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
 - [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)

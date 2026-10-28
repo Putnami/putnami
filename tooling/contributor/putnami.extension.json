@@ -121,6 +121,21 @@
             }
           ]
         },
+        "estimate": {
+          "description": "Size a change plan: S, M or L, with a token and a duration range.",
+          "command": "change-estimate",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami change estimate --issue 42",
+              "description": "Estimate the plan in .putnami/42/plan.json"
+            },
+            {
+              "command": "putnami change estimate --plan-file plan.json --output=json",
+              "description": "Print the estimate of a plan file as JSON"
+            }
+          ]
+        },
         "finalize": {
           "description": "Publish a draft, or a committed change with current proof, as a proposal.",
           "command": "change-finalize",
@@ -309,6 +324,28 @@
         }
       ]
     },
+    "change-estimate": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Read a change plan, check it against the plan format, and size it: S, M or L, with a range of tokens and of minutes for the plan and for each slice. The plan is .putnami/<issue>/plan.json under the workspace root, or the file --plan-file names. The coefficients are the contributor's default table, with the members options[\"@putnami/contributor\"].estimate sets. The same plan and table always give the same estimate. --output=json prints the result document; otherwise it prints one line for the plan and one per slice. A usage error exits 2, and a plan or a policy it refuses exits 1 with the path of the first value it refuses.",
+      "flags": {
+        "issue": {
+          "type": "string",
+          "description": "Issue id: read .putnami/<issue>/plan.json, and check that the plan names that issue."
+        },
+        "plan-file": {
+          "type": "string",
+          "description": "Plan file to read instead of .putnami/<issue>/plan.json."
+        }
+      },
+      "run": [
+        {
+          "id": "estimate",
+          "task": "change-estimate"
+        }
+      ]
+    },
     "agent-hook": {
       "activationFiles": [
         "putnami.extension.json"
@@ -382,6 +419,17 @@
       "cache": false,
       "description": "Publish a draft, or a committed change with current proof, as a proposal.",
       "timeoutMs": 5400000
+    },
+    "change-estimate": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "estimate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Size a change plan.",
+      "timeoutMs": 60000
     },
     "agent-hook": {
       "kind": "command",

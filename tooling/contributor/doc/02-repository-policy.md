@@ -18,7 +18,7 @@ The block holds conventions only:
 A workspace without the block gets the defaults: claimed and delivered state
 `in_progress`, the shipped worker profiles, no language rule,
 no hosted gate, proposals ready at finalization, no body limit beyond the
-contract's, no task reference line, no integration.
+contract's, no task reference line, no integration, the default estimate table.
 
 ## Reference: this repository's configuration
 
@@ -120,6 +120,9 @@ How the pieces combine for one delivery:
   a proposal comment instead of appending it.
 - Every authorized proposal opens as a draft when work starts (`putnami change finalize --draft`).
   Putnami CI holds runs on a draft, so checkpoint pushes cost no runner time.
+- The block sets no `estimate`, so `putnami change estimate` sizes plans with
+  the contributor's default table
+  ([Estimate a change plan](07-change-estimate.md)).
 - `verification.ciGate` names `Putnami CI` as the hosted check that stands for
   the gate. When the machine's load ratio exceeds `0.7`, build selects
   `change finalize --gate ci` instead of running a local impacted gate;
