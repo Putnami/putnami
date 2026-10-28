@@ -80,6 +80,18 @@ _putnami_flags_for() {
 	iox.Fprintf(w, `    esac
 }
 
+# _putnami_global_flag_values sets _putnami_words to the values of the global
+# flag $1 and succeeds when $1 takes a value that is neither a project target
+# nor a project name. A flag whose value is free sets no word.
+_putnami_global_flag_values() {
+    _putnami_words=()
+    case "$1" in
+`)
+	writeBashGlobalFlagValueCases(w, ctx)
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 # _putnami_reply offers each argument that compgen matches with the current
 # word, which compgen reads as the shell does, quotes and backslashes removed.
 # compgen reads one argument at a time, single-quoted, and only its exit status
@@ -245,8 +257,8 @@ _putnami_completions() {
     # words, and the CLI refuses a flag before either of them: the first word
     # completes the command names, the second the subcommands of the first, and
     # nothing else, since help takes no project target. Its flags and the value
-    # of --output complete below.
-    if _putnami_is_help "${cmd}" && [[ "${cur}" != -* && "${prev}" != "--output" ]]; then
+    # of a flag whose values are listed, such as --output, complete below.
+    if _putnami_is_help "${cmd}" && [[ "${cur}" != -* ]] && ! _putnami_global_flag_values "${prev}"; then
         if [[ ${cword} -eq 2 ]]; then
             _putnami_reply ${commands[@]+"${commands[@]}"}
         elif [[ ${cword} -eq 3 && "${words[2]}" != -* ]]; then
@@ -298,31 +310,27 @@ _putnami_completions() {
 		bashWords(aliasNames(ctx.aliases)))
 
 	iox.Fprintf(w, `
-    # Flags and project names
+    # Flags and project names. The word after a flag of the command that takes
+    # a value is a value slot: it offers the values of that flag, which may be none.
     local -a structured_values=()
+    local value_slot=0
     case "${path} ${prev}" in
 `)
 
-	valueKeys := make([]string, 0, len(ctx.structuredFlagValues))
-	for key := range ctx.structuredFlagValues {
-		valueKeys = append(valueKeys, key)
-	}
-	sort.Strings(valueKeys)
-
-	for _, key := range valueKeys {
-		values := ctx.structuredFlagValues[key]
+	for _, key := range ctx.commandValueFlagKeys() {
 		var names []string
-		for _, value := range values {
+		for _, value := range ctx.structuredFlagValues[key] {
 			names = append(names, value.Value)
 		}
 		iox.Fprintf(w, "        %s)\n", bashQuote(key))
 		iox.Fprintf(w, "            structured_values=(%s)\n", bashWords(names))
+		iox.Fprintf(w, "            value_slot=1\n")
 		iox.Fprintf(w, "            ;;\n")
 	}
 
 	iox.Fprintf(w, `    esac
 
-    if [[ ${#structured_values[@]} -gt 0 ]]; then
+    if [[ ${value_slot} -eq 1 ]]; then
         _putnami_reply ${structured_values[@]+"${structured_values[@]}"}
     elif [[ "${cur}" == -* ]]; then
         _putnami_flags_for "${path}"
@@ -336,11 +344,9 @@ _putnami_completions() {
         _putnami_reply ${projects[@]+"${projects[@]}"}
 `)
 	}
-	iox.Fprintf(w, `    elif [[ "${prev}" == "--output" ]]; then
-        _putnami_reply %s
-    elif [[ "${prev}" == "--tag" || "${prev}" == "--exclude-tag" ]]; then
-        # Tags are dynamic — no static completion
-        :
+	iox.Fprintf(w, `    elif _putnami_global_flag_values "${prev}"; then
+        # The values the catalog lists for the flag, or none when they are free.
+        _putnami_reply ${_putnami_words[@]+"${_putnami_words[@]}"}
     else
         # Positional project target: IDs, names, basenames, and aliases
         _putnami_reply ${project_targets[@]+"${project_targets[@]}"} ${global_flags[@]+"${global_flags[@]}"}
@@ -348,7 +354,13 @@ _putnami_completions() {
 }
 
 complete -F _putnami_completions putnami
-`, bashWords(ctx.globalFlagValues("--output")))
+`)
+}
+
+func writeBashGlobalFlagValueCases(w io.Writer, ctx completionContext) {
+	for _, flag := range ctx.valueGlobalFlags() {
+		iox.Fprintf(w, "        %s) _putnami_words=(%s); return 0 ;;\n", bashQuote(flag.Long), bashWords(flag.Values))
+	}
 }
 
 func writeBashSubcommandCases(w io.Writer, ctx completionContext) {

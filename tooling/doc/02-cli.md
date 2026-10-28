@@ -354,6 +354,10 @@ exec zsh
 Completions cover commands, subcommands, project names, flags, and flag values.
 After `putnami help`, completion offers the command names, then the
 subcommands of the command you typed, and no project name.
+After a flag that takes a value, completion offers that flag's values only:
+project targets after `--projects`, project names after `--exclude`, the listed
+values of a flag such as `--output`, and nothing for a free value such as
+`--baseline`.
 
 ## Dynamic command loading
 

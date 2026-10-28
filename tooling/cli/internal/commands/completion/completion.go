@@ -278,6 +278,12 @@ func addCatalogCompletions(ctx *completionContext) {
 				ctx.structuredFlags[command.Path],
 				structuredFlagInfos(detail.Flags),
 			)
+			for _, flag := range detail.Flags {
+				key := command.Path + " " + flag.Long
+				for _, value := range flag.Values {
+					ctx.structuredFlagValues[key] = appendUniqueCompletionValue(ctx.structuredFlagValues[key], completionValue{Value: value})
+				}
+			}
 		}
 	}
 }
@@ -609,15 +615,41 @@ func (c completionContext) offersGlobalFlag(long string) bool {
 	return slices.ContainsFunc(c.globalFlags, func(flag commandmeta.GlobalFlag) bool { return flag.Long == long })
 }
 
-// globalFlagValues returns the candidate values a global flag accepts, so a
-// shell that completes them inline does not retype the vocabulary.
-func (c completionContext) globalFlagValues(long string) []string {
-	for _, flag := range c.globalFlags {
-		if flag.Long == long {
-			return flag.Values
+// commandValueFlagKeys returns the "path --flag" keys of the flags of a command
+// that take a value, sorted: the word after one is that flag's value slot. The
+// values of a key are in structuredFlagValues, which holds none for a flag
+// whose value is free.
+func (c completionContext) commandValueFlagKeys() []string {
+	seen := map[string]bool{}
+	for path, flags := range c.structuredFlags {
+		for _, flag := range flags {
+			if flag.ValueName != "" {
+				seen[path+" "+flag.Long] = true
+			}
 		}
 	}
-	return nil
+	for key := range c.structuredFlagValues {
+		seen[key] = true
+	}
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// valueGlobalFlags returns the global flags that take a value and complete
+// neither project targets (--projects) nor project names (--exclude): each
+// completes the values the catalog lists for it, or none.
+func (c completionContext) valueGlobalFlags() []commandmeta.GlobalFlag {
+	var flags []commandmeta.GlobalFlag
+	for _, flag := range c.globalFlags {
+		if flag.Type == commandmeta.FlagValue && flag.Long != "--projects" && flag.Long != "--exclude" {
+			flags = append(flags, flag)
+		}
+	}
+	return flags
 }
 
 // plainWord reports whether bash, zsh and fish all read value as itself and as

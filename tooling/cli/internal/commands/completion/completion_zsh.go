@@ -79,6 +79,18 @@ _putnami_flags_for() {
 	iox.Fprintf(w, `    esac
 }
 
+# _putnami_global_flag_values sets reply to the values of the global flag $1
+# and succeeds when $1 takes a value that is neither a project target nor a
+# project name. A flag whose value is free sets no word.
+_putnami_global_flag_values() {
+    reply=()
+    case "$1" in
+`)
+	writeZshGlobalFlagValueCases(w, ctx)
+	iox.Fprintf(w, `        *) return 1 ;;
+    esac
+}
+
 _putnami() {
     local -a commands structured_commands global_flags job_global_flags projects project_basenames
 
@@ -166,9 +178,9 @@ _putnami() {
             # next two words, and the CLI refuses a flag before either of them:
             # the first word completes the command names, the second the
             # subcommands of the first, and nothing else, since help takes no
-            # project target. Its flags and the value of --output complete
-            # below.
-            if _putnami_is_help "${path}" && [[ "${cur}" != -* && "${prev}" != "--output" ]]; then
+            # project target. Its flags and the value of a flag whose values
+            # are listed, such as --output, complete below.
+            if _putnami_is_help "${path}" && [[ "${cur}" != -* ]] && ! _putnami_global_flag_values "${prev}"; then
                 if (( CURRENT == 2 )); then
                     _describe -t commands 'job commands' commands
                     _describe -t structured 'structured commands' structured_commands
@@ -211,14 +223,19 @@ _putnami() {
                     _describe -t project-ids 'project ID' project_ids
                 fi
             else
+                # The word after a flag of the command that takes a value is a
+                # value slot: it offers the values of that flag, which may be none.
                 local -a cmd_values
+                local value_slot=0
                 case "${path} ${prev}" in
 `)
 	writeZshValueCases(w, ctx)
 	iox.Fprintf(w, `                esac
 
-                if (( ${#cmd_values} > 0 )); then
-                    _describe -t values 'value' cmd_values
+                if (( value_slot )); then
+                    if (( ${#cmd_values} > 0 )); then
+                        _describe -t values 'value' cmd_values
+                    fi
                 elif [[ "${prev}" == "--projects" ]]; then
                         _describe -t project-ids 'project ID' project_ids
                         _describe -t project-names 'project name' projects
@@ -232,8 +249,12 @@ _putnami() {
                         _describe -t project-names 'project name' projects
 `)
 	}
-	iox.Fprintf(w, `                    elif [[ "${prev}" == "--output" ]]; then
-                        compadd -- %s
+	iox.Fprintf(w, `                    elif _putnami_global_flag_values "${prev}"; then
+                        # The values the catalog lists for the flag, or none
+                        # when they are free.
+                        if (( ${#reply} > 0 )); then
+                            compadd -- "${reply[@]}"
+                        fi
                     elif [[ "${cur}" == -* ]]; then
                         local -a cmd_flags
                         _putnami_flags_for "${path}"
@@ -243,7 +264,7 @@ _putnami() {
                         _describe -t project-ids 'project ID' project_ids
                         _describe -t project-names 'project name' projects
                         _describe -t project-names 'project name' project_basenames
-`, bashWords(ctx.globalFlagValues("--output")))
+`)
 	if len(ctx.aliases) > 0 {
 		iox.Fprintf(w, "                        _describe -t aliases 'project alias' project_aliases\n")
 	}
@@ -361,20 +382,17 @@ func zshFlagSpec(long, description, valueName string, values []string) string {
 	return spec
 }
 
-func writeZshValueCases(w io.Writer, ctx completionContext) {
-	valueKeys := make([]string, 0, len(ctx.structuredFlagValues))
-	for key := range ctx.structuredFlagValues {
-		valueKeys = append(valueKeys, key)
+func writeZshGlobalFlagValueCases(w io.Writer, ctx completionContext) {
+	for _, flag := range ctx.valueGlobalFlags() {
+		iox.Fprintf(w, "        %s) reply=(%s); return 0 ;;\n", bashQuote(flag.Long), bashWords(flag.Values))
 	}
-	sort.Strings(valueKeys)
-	for _, key := range valueKeys {
-		values := ctx.structuredFlagValues[key]
-		if len(values) == 0 {
-			continue
-		}
+}
+
+func writeZshValueCases(w io.Writer, ctx completionContext) {
+	for _, key := range ctx.commandValueFlagKeys() {
 		iox.Fprintf(w, "                    %s)\n", bashQuote(key))
 		iox.Fprintf(w, "                        cmd_values=(\n")
-		for _, value := range values {
+		for _, value := range ctx.structuredFlagValues[key] {
 			entry := zshDescribeName(value.Value)
 			if value.Description != "" {
 				entry += ":" + value.Description
@@ -382,6 +400,7 @@ func writeZshValueCases(w io.Writer, ctx completionContext) {
 			iox.Fprintf(w, "                            %s\n", bashQuote(entry))
 		}
 		iox.Fprintf(w, "                        )\n")
+		iox.Fprintf(w, "                        value_slot=1\n")
 		iox.Fprintf(w, "                        ;;\n")
 	}
 }

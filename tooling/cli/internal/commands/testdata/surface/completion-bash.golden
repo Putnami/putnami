@@ -190,6 +190,21 @@ _putnami_flags_for() {
     esac
 }
 
+# _putnami_global_flag_values sets _putnami_words to the values of the global
+# flag $1 and succeeds when $1 takes a value that is neither a project target
+# nor a project name. A flag whose value is free sets no word.
+_putnami_global_flag_values() {
+    _putnami_words=()
+    case "$1" in
+        '--tag') _putnami_words=(); return 0 ;;
+        '--exclude-tag') _putnami_words=(); return 0 ;;
+        '--baseline') _putnami_words=(); return 0 ;;
+        '--credential-fd') _putnami_words=(); return 0 ;;
+        '--output') _putnami_words=(text json jsonl cloud-logging); return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # _putnami_reply offers each argument that compgen matches with the current
 # word, which compgen reads as the shell does, quotes and backslashes removed.
 # compgen reads one argument at a time, single-quoted, and only its exit status
@@ -355,8 +370,8 @@ _putnami_completions() {
     # words, and the CLI refuses a flag before either of them: the first word
     # completes the command names, the second the subcommands of the first, and
     # nothing else, since help takes no project target. Its flags and the value
-    # of --output complete below.
-    if _putnami_is_help "${cmd}" && [[ "${cur}" != -* && "${prev}" != "--output" ]]; then
+    # of a flag whose values are listed, such as --output, complete below.
+    if _putnami_is_help "${cmd}" && [[ "${cur}" != -* ]] && ! _putnami_global_flag_values "${prev}"; then
         if [[ ${cword} -eq 2 ]]; then
             _putnami_reply ${commands[@]+"${commands[@]}"}
         elif [[ ${cword} -eq 3 && "${words[2]}" != -* ]]; then
@@ -399,26 +414,175 @@ _putnami_completions() {
         return
     fi
 
-    # Flags and project names
+    # Flags and project names. The word after a flag of the command that takes
+    # a value is a value slot: it offers the values of that flag, which may be none.
     local -a structured_values=()
+    local value_slot=0
     case "${path} ${prev}" in
+        'cache verify --cpu-policy')
+            structured_values=(critical-path measured)
+            value_slot=1
+            ;;
+        'cache verify --exclude')
+            structured_values=()
+            value_slot=1
+            ;;
+        'cache verify --profile')
+            structured_values=(dev production test)
+            value_slot=1
+            ;;
+        'cache verify --retry')
+            structured_values=()
+            value_slot=1
+            ;;
+        'cache verify --trace-profile')
+            structured_values=()
+            value_slot=1
+            ;;
+        'context pack --project')
+            structured_values=()
+            value_slot=1
+            ;;
+        'doctor --profile')
+            structured_values=()
+            value_slot=1
+            ;;
+        'doctor --project')
+            structured_values=()
+            value_slot=1
+            ;;
+        'extensions install --dest')
+            structured_values=()
+            value_slot=1
+            ;;
+        'extensions install --platform')
+            structured_values=()
+            value_slot=1
+            ;;
+        'impact-plan --base')
+            structured_values=()
+            value_slot=1
+            ;;
+        'impact-plan --head')
+            structured_values=()
+            value_slot=1
+            ;;
+        'init --channel')
+            structured_values=()
+            value_slot=1
+            ;;
+        'init --extension')
+            structured_values=()
+            value_slot=1
+            ;;
+        'init --project')
+            structured_values=()
+            value_slot=1
+            ;;
+        'init --project-path')
+            structured_values=()
+            value_slot=1
+            ;;
+        'init --workspace')
+            structured_values=()
+            value_slot=1
+            ;;
+        'projects create --channel')
+            structured_values=()
+            value_slot=1
+            ;;
+        'projects create --path')
+            structured_values=()
+            value_slot=1
+            ;;
+        'projects create --template')
+            structured_values=()
+            value_slot=1
+            ;;
+        'report --session')
+            structured_values=()
+            value_slot=1
+            ;;
+        'sessions export --since')
+            structured_values=()
+            value_slot=1
+            ;;
+        'sessions inspect --run')
+            structured_values=()
+            value_slot=1
+            ;;
+        'sessions list --revision')
+            structured_values=()
+            value_slot=1
+            ;;
+        'sessions replay --session')
+            structured_values=()
+            value_slot=1
+            ;;
+        'sessions summary --command')
+            structured_values=()
+            value_slot=1
+            ;;
+        'sessions summary --since')
+            structured_values=()
+            value_slot=1
+            ;;
+        'templates package --version')
+            structured_values=()
+            value_slot=1
+            ;;
+        'templates test --channel')
+            structured_values=()
+            value_slot=1
+            ;;
+        'upgrade --channel')
+            structured_values=(canary stable)
+            value_slot=1
+            ;;
+        'upgrade --namespace')
+            structured_values=()
+            value_slot=1
+            ;;
+        'upgrade --release')
+            structured_values=()
+            value_slot=1
+            ;;
+        'upgrade --version')
+            structured_values=()
+            value_slot=1
+            ;;
+        'workspace init --channel')
+            structured_values=()
+            value_slot=1
+            ;;
         'workspace init --extension')
             structured_values=(go py ts)
+            value_slot=1
+            ;;
+        'workspace init --project')
+            structured_values=()
+            value_slot=1
+            ;;
+        'workspace init --project-path')
+            structured_values=()
+            value_slot=1
+            ;;
+        'workspace init --workspace')
+            structured_values=()
+            value_slot=1
             ;;
     esac
 
-    if [[ ${#structured_values[@]} -gt 0 ]]; then
+    if [[ ${value_slot} -eq 1 ]]; then
         _putnami_reply ${structured_values[@]+"${structured_values[@]}"}
     elif [[ "${cur}" == -* ]]; then
         _putnami_flags_for "${path}"
         _putnami_reply ${_putnami_words[@]+"${_putnami_words[@]}"} ${global_flags[@]+"${global_flags[@]}"}
     elif [[ "${prev}" == "--projects" ]]; then
         _putnami_reply ${project_targets[@]+"${project_targets[@]}"}
-    elif [[ "${prev}" == "--output" ]]; then
-        _putnami_reply text json jsonl cloud-logging
-    elif [[ "${prev}" == "--tag" || "${prev}" == "--exclude-tag" ]]; then
-        # Tags are dynamic — no static completion
-        :
+    elif _putnami_global_flag_values "${prev}"; then
+        # The values the catalog lists for the flag, or none when they are free.
+        _putnami_reply ${_putnami_words[@]+"${_putnami_words[@]}"}
     else
         # Positional project target: IDs, names, basenames, and aliases
         _putnami_reply ${project_targets[@]+"${project_targets[@]}"} ${global_flags[@]+"${global_flags[@]}"}
