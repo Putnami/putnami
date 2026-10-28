@@ -82,7 +82,6 @@ func TestMain(m *testing.M) {
 	}
 	code := m.Run()
 	fixtureproc.Remove()
-	removeDevRuntime()
 	if dir != nil {
 		_ = dir.Remove()
 	}
