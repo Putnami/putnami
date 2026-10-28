@@ -107,6 +107,18 @@ git config core.hooksPath tooling/hooks
 The hook is opt-in only — nothing activates it for you, and contributors who do
 not enable it are unaffected.
 
+On macOS, add each app that runs these commands to System Settings > Privacy &
+Security > Developer Tools: your terminal, your editor and any agent host. Some
+Go tests of this repository run their own freshly built test binary again under
+other names, such as a fake `go` or `gzip`. The system policy daemon
+(`syspolicyd`) scans each of these launches for malware. Under heavy load the
+scan fails, and the daemon kills the process before its code runs. The test then
+fails with a job error such as `go work edit failed while dropping stale
+go.putnami.dev replaces`, and it passes on retry. Apple exempts the processes a
+Developer Tools app starts from that scan. `spctl developer-mode
+enable-terminal` adds Terminal to the list; add other apps with the + button.
+Hosted Linux CI runs no such scan.
+
 ### 4. Commit and Open a PR
 
 Write clear commit messages. PR titles follow [Conventional Commits](https://www.conventionalcommits.org/):
