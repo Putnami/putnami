@@ -2,6 +2,7 @@ package completion
 
 import (
 	"io"
+	"slices"
 	"sort"
 	"strings"
 
@@ -150,7 +151,14 @@ end
 	sort.Strings(keys)
 	for _, key := range keys {
 		flags := ctx.structuredFlags[key]
-		condition := fishCondition("__putnami_seen_path", strings.Fields(key)...)
+		// A key is a command path, its words joined by spaces, or a top-level
+		// command, an alias included, which is one word even when it holds a
+		// space.
+		path := strings.Fields(key)
+		if slices.Contains(ctx.commands, key) {
+			path = []string{key}
+		}
+		condition := fishCondition("__putnami_seen_path", path...)
 		valueKeyPrefix := key + " "
 		for _, flag := range flags {
 			shortFlag := strings.TrimPrefix(flag.Long, "--")

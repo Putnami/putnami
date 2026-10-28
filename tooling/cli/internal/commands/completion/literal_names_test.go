@@ -496,8 +496,10 @@ func fishCompletions(t *testing.T, script string) (conditions, arguments [][]str
 }
 
 // The fish script quotes each name twice where fish reads it twice: in the
-// candidates of -a and in the condition of -n. This reads the generated text
-// as fish does, so it runs where fish is not installed.
+// candidates of -a and in the condition of -n. It quotes each -l flag name,
+// which fish reads once, and names an alias as one word in the condition of
+// its flags. This reads the generated text as fish does, so it runs where fish
+// is not installed.
 func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "fish-quotes-each-name-for-both-reads")
 	ws := writeHostileWorkspace(t)
@@ -515,6 +517,18 @@ func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
 		flagNames = append(flagNames, strings.TrimPrefix(flag, "--"))
 	}
 	assertOffersEach(t, "fish", "an -l flag name", longs, flagNames)
+
+	// The flags of lint-docs follow each of its aliases, named as one word.
+	var flagConditions, lintDocsAliases []string
+	for _, words := range conditions {
+		if len(words) == 2 && words[0] == "__putnami_seen_path" {
+			flagConditions = append(flagConditions, words[1])
+		}
+	}
+	for _, name := range hostileNames {
+		lintDocsAliases = append(lintDocsAliases, "j"+name)
+	}
+	assertOffersEach(t, "fish", "a flag condition", flagConditions, lintDocsAliases)
 
 	// The positional targets follow a job command, an alias of a job command
 	// included: the condition names each one as a literal word.
@@ -553,6 +567,7 @@ func TestFishCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 		{"putnami lint-docs --", ws.flags},
 		{"putnami " + fishQuote(ws.commands[0]) + " --", []string{"--projects"}},
 		{"putnami " + fishQuote(ws.commands[1]) + " --", []string{"--projects"}},
+		{"putnami " + fishQuote("j"+hostileNames[4]) + " --", ws.flags},
 	} {
 		dir := t.TempDir()
 		// --escape prints each candidate on one line, a newline included;
