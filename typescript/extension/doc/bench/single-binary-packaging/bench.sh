@@ -45,11 +45,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 SAMPLE_DIR="${BENCH_SAMPLE:-$REPO_ROOT/typescript/samples/08-real-time}"
 WORK="${BENCH_WORK:-${TMPDIR:-/tmp}/putnami-single-binary-bench}"
+# Absolute, because the compiles name the sample's files and write their
+# outputs from another directory.
+case "$SAMPLE_DIR" in /*) ;; *) SAMPLE_DIR="$PWD/$SAMPLE_DIR" ;; esac
+case "$WORK" in /*) ;; *) WORK="$PWD/$WORK" ;; esac
 BASE_PORT="${BENCH_BASE_PORT:-45080}"
 COLD_STARTS="${BENCH_COLD_STARTS:-10}"
 DOCKER_COLD_STARTS="${BENCH_DOCKER_COLD_STARTS:-5}"
 ENTRYPOINT=".gen/src/serve.bundled.ts"
 ASSET_DIR=".gen/public"
+# Bun writes each executable to a temporary `.<hash>-<n>.bun-build` file in its
+# working directory before it renames it, so every compile runs from COMPILE_DIR
+# and names its inputs by absolute path. From the sample, that file would join
+# the sample's source binding while it exists. The embedded asset path is the
+# same: `--asset` keeps the directory name, not the path that leads to it.
+COMPILE_DIR="$WORK/compile"
+COMPILE_ENTRYPOINT="$SAMPLE_DIR/$ENTRYPOINT"
+COMPILE_ASSET_DIR="$SAMPLE_DIR/$ASSET_DIR"
 # Where `--asset .gen/public` lands inside the compiled executable's virtual FS.
 EMBEDDED_ASSETS='/$bunfs/root/public'
 
@@ -131,7 +143,7 @@ build_variant() {
   for _ in 1 2 3; do
     rm -f "$outfile"
     start="$(now_ms)"
-    (cd "$SAMPLE_DIR" && "$BENCH_BUN" "$@" >/dev/null)
+    (cd "$COMPILE_DIR" && "$BENCH_BUN" "$@" >/dev/null)
     end="$(now_ms)"
     elapsed=$((end - start))
     if [ -z "$best" ] || [ "$elapsed" -lt "$best" ]; then best="$elapsed"; fi
@@ -148,7 +160,7 @@ cmd_build() {
 
   # Baseline: the JS bundle `bun run` executes on oven/bun:1.4-slim.
   build_variant "bun-bundle" "$ARTIFACTS/server.js" \
-    build --target=bun --outfile "$ARTIFACTS/server.js" "$ENTRYPOINT"
+    build --target=bun --outfile "$ARTIFACTS/server.js" "$COMPILE_ENTRYPOINT"
 
   # Floor: a dependency-free script compiled the same way. Everything above this
   # size is the embedded bun runtime, not the application. Every --compile below
@@ -158,33 +170,33 @@ cmd_build() {
     --outfile "$ARTIFACTS/srv-runtime-floor" "$SCRIPT_DIR/native-routes-probe.ts"
 
   build_variant "binary" "$ARTIFACTS/srv-binary" \
-    build --compile --target "$BENCH_TARGET" --outfile "$ARTIFACTS/srv-binary" "$ENTRYPOINT"
+    build --compile --target "$BENCH_TARGET" --outfile "$ARTIFACTS/srv-binary" "$COMPILE_ENTRYPOINT"
 
   build_variant "binary-bytecode" "$ARTIFACTS/srv-binary-bytecode" \
     build --compile --target "$BENCH_TARGET" --bytecode --format=esm \
-    --outfile "$ARTIFACTS/srv-binary-bytecode" "$ENTRYPOINT"
+    --outfile "$ARTIFACTS/srv-binary-bytecode" "$COMPILE_ENTRYPOINT"
 
   build_variant "binary-asset" "$ARTIFACTS/srv-binary-asset" \
-    build --compile --target "$BENCH_TARGET" --asset "$ASSET_DIR" \
-    --outfile "$ARTIFACTS/srv-binary-asset" "$ENTRYPOINT"
+    build --compile --target "$BENCH_TARGET" --asset "$COMPILE_ASSET_DIR" \
+    --outfile "$ARTIFACTS/srv-binary-asset" "$COMPILE_ENTRYPOINT"
 
   build_variant "binary-asset-bytecode" "$ARTIFACTS/srv-binary-asset-bytecode" \
-    build --compile --target "$BENCH_TARGET" --asset "$ASSET_DIR" --bytecode --format=esm \
-    --outfile "$ARTIFACTS/srv-binary-asset-bytecode" "$ENTRYPOINT"
+    build --compile --target "$BENCH_TARGET" --asset "$COMPILE_ASSET_DIR" --bytecode --format=esm \
+    --outfile "$ARTIFACTS/srv-binary-asset-bytecode" "$COMPILE_ENTRYPOINT"
 
   build_variant "binary-asset-bytecode-smol" "$ARTIFACTS/srv-binary-asset-bytecode-smol" \
-    build --compile --target "$BENCH_TARGET" --asset "$ASSET_DIR" --bytecode --format=esm \
+    build --compile --target "$BENCH_TARGET" --asset "$COMPILE_ASSET_DIR" --bytecode --format=esm \
     --compile-exec-argv=--smol \
-    --outfile "$ARTIFACTS/srv-binary-asset-bytecode-smol" "$ENTRYPOINT"
+    --outfile "$ARTIFACTS/srv-binary-asset-bytecode-smol" "$COMPILE_ENTRYPOINT"
 
   build_variant "binary-asset-sourcemap" "$ARTIFACTS/srv-binary-asset-sourcemap" \
-    build --compile --target "$BENCH_TARGET" --asset "$ASSET_DIR" --sourcemap=inline \
-    --outfile "$ARTIFACTS/srv-binary-asset-sourcemap" "$ENTRYPOINT"
+    build --compile --target "$BENCH_TARGET" --asset "$COMPILE_ASSET_DIR" --sourcemap=inline \
+    --outfile "$ARTIFACTS/srv-binary-asset-sourcemap" "$COMPILE_ENTRYPOINT"
 
   build_variant "binary-asset-bytecode-sourcemap" "$ARTIFACTS/srv-binary-asset-bytecode-sourcemap" \
-    build --compile --target "$BENCH_TARGET" --asset "$ASSET_DIR" --bytecode --format=esm \
+    build --compile --target "$BENCH_TARGET" --asset "$COMPILE_ASSET_DIR" --bytecode --format=esm \
     --sourcemap=inline \
-    --outfile "$ARTIFACTS/srv-binary-asset-bytecode-sourcemap" "$ENTRYPOINT"
+    --outfile "$ARTIFACTS/srv-binary-asset-bytecode-sourcemap" "$COMPILE_ENTRYPOINT"
 
   # Runtime layouts: assets on disk (what `putnami package --docker` ships today)
   # versus assets embedded in the executable (what --asset buys).
@@ -209,10 +221,10 @@ determinism_case() {
   rm -rf "$WORK/det/a" "$WORK/det/b"
   mkdir -p "$WORK/det/a" "$WORK/det/b"
   # ${1+"$@"}: macOS's bash 3.2 treats an empty "$@" as unbound under set -u.
-  (cd "$SAMPLE_DIR" && "$BENCH_BUN" build --compile --target "$BENCH_TARGET" ${1+"$@"} \
-    --outfile "$WORK/det/a/srv" "$ENTRYPOINT" >/dev/null)
-  (cd "$SAMPLE_DIR" && "$BENCH_BUN" build --compile --target "$BENCH_TARGET" ${1+"$@"} \
-    --outfile "$WORK/det/b/srv" "$ENTRYPOINT" >/dev/null)
+  (cd "$COMPILE_DIR" && "$BENCH_BUN" build --compile --target "$BENCH_TARGET" ${1+"$@"} \
+    --outfile "$WORK/det/a/srv" "$COMPILE_ENTRYPOINT" >/dev/null)
+  (cd "$COMPILE_DIR" && "$BENCH_BUN" build --compile --target "$BENCH_TARGET" ${1+"$@"} \
+    --outfile "$WORK/det/b/srv" "$COMPILE_ENTRYPOINT" >/dev/null)
   first="$(sha256_of "$WORK/det/a/srv")"
   second="$(sha256_of "$WORK/det/b/srv")"
   local differing=0
@@ -230,10 +242,10 @@ cmd_determinism() {
   require_inputs
   : >"$WORK/determinism.tsv"
   determinism_case "--compile"
-  determinism_case "--compile --asset .gen/public" --asset "$ASSET_DIR"
+  determinism_case "--compile --asset .gen/public" --asset "$COMPILE_ASSET_DIR"
   determinism_case "--compile --sourcemap=inline" --sourcemap=inline
   determinism_case "--compile --bytecode --format=esm" --bytecode --format=esm
-  determinism_case "--compile --asset --bytecode --format=esm" --asset "$ASSET_DIR" --bytecode --format=esm
+  determinism_case "--compile --asset --bytecode --format=esm" --asset "$COMPILE_ASSET_DIR" --bytecode --format=esm
   rm -rf "$WORK/det"
 }
 
@@ -451,7 +463,7 @@ cmd_all() {
   cmd_report
 }
 
-mkdir -p "$WORK"
+mkdir -p "$WORK" "$COMPILE_DIR"
 case "${1:-all}" in
   build) cmd_build ;;
   determinism) cmd_determinism ;;

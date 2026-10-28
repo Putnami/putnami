@@ -4,9 +4,6 @@
 dist
 tmp
 .cache
-# The executable `bun build --compile` writes in its working directory, a
-# project root, before it renames it to the output file.
-*.bun-build
 
 # dependencies
 node_modules
