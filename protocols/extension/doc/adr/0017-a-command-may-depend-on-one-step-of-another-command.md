@@ -49,7 +49,8 @@ names a command.
    a `^`, `/` or `*` prefix, as it does for a command name.
 4. **`clientgen` depends on `build~generate` and `build~describe`.** A Go app
    waits for `describe`, which writes `.gen/schema` and `.gen/clientgen`. A Go
-   library or a TypeScript provider, which has no `describe` step, waits for
+   project whose `go.mod` does not name `go.putnami.dev/app` runs no
+   `describe` step, and neither does a TypeScript provider: each waits for
    `generate`. The command still plans the whole `build`, so a `clientgen` run
    plans the same tasks as before.
 
