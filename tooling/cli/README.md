@@ -80,7 +80,7 @@ putnami build --impacted --plan
 ```
 
 The `@putnami/contributor` extension supplies the `build`, `spec`, `design`,
-`prototype`, `review`, `adr`, and `check` workflows, plus the explicit
+`review`, and `check` workflows, plus the explicit
 `content-bump` utility. Its `putnami change language` checks repository
 prose and task records; the core's `putnami doctor --machine` reports local check
 capacity. Its `putnami change verify --workflow FILE` checks a separately

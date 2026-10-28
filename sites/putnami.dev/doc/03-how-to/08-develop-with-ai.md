@@ -50,8 +50,8 @@ The workflow frames the outcome, plans observable delivery units, prototypes
 a material uncertainty when useful, obtains independent artifact challenge,
 implements, reviews, repairs and checks through one loop. A small settled
 correction reuses existing intent and design. Focused `spec`, `design`,
-`prototype`, `review`, `adr` and `check` entries remain available for direct
-interventions. `content-bump` remains an explicit-only utility.
+`review` and `check` entries remain available for direct interventions;
+`design` covers a prototype and an ADR. `content-bump` remains an explicit-only utility.
 
 The default progress view shows the promised outcome, demonstrated results,
 each unit's required delivery stage, blockers, unresolved decisions and next

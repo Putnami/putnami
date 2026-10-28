@@ -42,17 +42,15 @@ state the repository's conventions in its [policy](doc/02-repository-policy.md).
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| `build` | Coordinate an authorized outcome through one implementation, review, evidence and delivery loop | implicit |
+| `build` | Deliver an authorized outcome through the contribution loop, from talk to merge | implicit |
 | `spec` | Define outcome and acceptance in native feature/spec sources | implicit |
-| `design` | Resolve a material technical choice against native contracts | implicit |
-| `prototype` | Run one bounded inspectable experiment | implicit |
+| `design` | Resolve a material technical choice, with a bounded prototype or an ADR when it needs one | implicit |
 | `review` | Independently challenge a material artifact or frozen candidate | implicit |
-| `adr` | Record a durable choice in its owning project | implicit |
 | `check` | Run the gate, applicable local proof, the documentation audit and the language rule | implicit |
 | `content-bump` | Refresh a pinned-content lock the policy declares | explicit only |
 
-The former `plan`, `execute`, `fix`, `epic`, `code-review`, four `putnami-*`
-aliases and `fix-loop` entries are removed. This intentional breaking change
+The former `plan`, `execute`, `fix`, `epic`, `code-review`, `adr`,
+`prototype`, four `putnami-*` aliases and `fix-loop` entries are removed. This intentional breaking change
 is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
 it does not select backlog work. It publishes its own proposal by default
@@ -61,8 +59,10 @@ it does not select backlog work. It publishes its own proposal by default
 checkpoint holds the declarations only
 ([ADR 0008](doc/adr/0008-build-pushes-its-intent-before-its-code.md)).
 
-Worker profiles: `fix-light`, `fix-standard`, `fix-heavy` and `epic-analyst`,
-each one body for both hosts with host metadata beside it.
+Workers: `fix-standard`, `fix-heavy` and `reviewer`, each one body for both
+hosts with host metadata beside it. A workflow profile in the repository
+policy says which stage each one runs; the default profile runs only review in
+`reviewer`.
 
 The portable helpers are commands, not scripts. `putnami change finalize`,
 which this extension's executable serves, publishes a draft or a verified
@@ -119,7 +119,8 @@ A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
 makes `issue-<n>` the mission of the checkout's branch.
 `putnami agent stage <talk|declare|show|code|check|prove|validate|merge>`
 records the loop stage of the current session and syncs it when the session
-reports to a mission; every later sync carries it. A hook never fails a
+reports to a mission; every later sync carries it. Once it read the
+transcript, it also prints the tokens the session spent so far. A hook never fails a
 turn: a failure leaves one line in `hook.log` under
 `<Putnami home>/contributor/sessions`.
 

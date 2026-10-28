@@ -1,8 +1,8 @@
 # Workflow records and handoffs
 
-`build` coordinates an authorized outcome. `spec`, `design`, `prototype`,
-`review`, `adr` and `check` are focused interventions within its one execution
-loop. The workflow source is in `src/skills/`; both hosts receive the same
+`build` coordinates an authorized outcome. `spec`, `design`, `review` and
+`check` are focused interventions within its one contribution loop; `design`
+covers a prototype and an ADR. The workflow source is in `src/skills/`; both hosts receive the same
 content through the contributor extension. The exact v1 field contract is
 [workflow.md](../src/skills/build/references/workflow.md), and the native CLI
 command is described in the [CLI commands](../../cli/doc/03-commands.md).

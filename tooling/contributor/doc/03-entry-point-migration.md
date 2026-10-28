@@ -2,14 +2,16 @@
 
 ## Entry points
 
-The extension now installs `build`, `spec`, `design`, `prototype`, `review`,
-`adr` and `check`. `build` owns the single shared implementation and evidence
+The extension now installs `build`, `spec`, `design`, `review` and `check`. `build` owns the single shared implementation and evidence
 loop. `content-bump` remains a separately configured explicit-only utility.
 This is an owner-authorized breaking change in the current pre-1.0 line.
 
 | Before | Now | Status |
 |---|---|---|
-| `build`, `spec`, `design`, `prototype`, `review`, `adr`, `check` | Same names, from `@putnami/contributor` | Installed |
+| `build`, `spec`, `design`, `review`, `check` | Same names, from `@putnami/contributor` | Installed |
+| `prototype`, `adr` | `design`, for a bounded prototype or a durable decision | Removed |
+| `fix-light` worker | `fix-standard`, which takes mechanical changes too | Removed |
+| `epic-analyst` worker | `reviewer` for the independent review; decomposition stays in `build` | Removed |
 | `execute` | `build` for the one implementation, review and evidence loop | Removed; no inherited external authority |
 | `plan` | `build` for outcome mapping and a precise next cycle | Removed; no implicit task creation |
 | `fix` | `build <named-task>` under an explicit task mandate | Removed; no implicit backlog selection or claim |
@@ -29,7 +31,7 @@ local.
 
 Removed skill-specific flags have no direct replacement. `build` takes an
 intention, named task or proposal reference, `--resume <record>`,
-`--tier light|standard|heavy`, `--base <ref>` and `--dry-run` under its own
+`--profile <name>`, `--base <ref>` and `--dry-run` under its own
 mandate. `review` accepts an exact proposal reference, branch or current
 candidate. Re-express a former `plan --scope` or label filter as explicit
 native project scope and acceptance, rather than relying on a removed skill
