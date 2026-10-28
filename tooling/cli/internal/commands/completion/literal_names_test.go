@@ -181,22 +181,44 @@ func TestBashCompletionReadsEveryNameAsOneLiteralWord(t *testing.T) {
 }
 
 // bashCompletionReplies runs the bash script in dir, with set -u, to complete
-// words and returns COMPREPLY.
+// words and returns COMPREPLY. It fills COMP_WORDS as bash 4 and later do,
+// which split a typed word at each colon that no quote or backslash protects,
+// and joins the pieces back the way bash-completion's _init_completion -n :
+// does.
 func bashCompletionReplies(t *testing.T, dir, script string, words []string) []string {
 	t.Helper()
-	quoted := make([]string, len(words))
+	var compWords, glue []string
+	cword := 0
 	for i, word := range words {
-		quoted[i] = bashQuote(word)
+		pieces := bashColonPieces(word)
+		if i == len(words)-1 {
+			cword = len(compWords) + len(pieces) - 1
+		}
+		for j, piece := range pieces {
+			compWords = append(compWords, bashQuote(piece))
+			glue = append(glue, strconv.Itoa(min(j, 1)))
+		}
 	}
 	driver := `set -u
 complete() { :; }
 _init_completion() {
-    words=("${COMP_WORDS[@]}"); cword=${COMP_CWORD}
-    cur="${COMP_WORDS[COMP_CWORD]}"; prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local i n=-1
+    words=()
+    for ((i = 0; i < ${#COMP_WORDS[@]}; i++)); do
+        if [[ "${1-} ${2-}" == "-n "*:* && ${GLUE[i]} -eq 1 ]]; then
+            words[n]+="${COMP_WORDS[i]}"
+        else
+            n=$((n + 1))
+            words[n]="${COMP_WORDS[i]}"
+        fi
+        if [[ ${i} -eq ${COMP_CWORD} ]]; then cword=${n}; fi
+    done
+    cur="${words[cword]}"; prev="${words[cword-1]}"
 }
 ` + script + `
-COMP_WORDS=(` + strings.Join(quoted, " ") + `)
-COMP_CWORD=` + strconv.Itoa(len(words)-1) + `
+COMP_WORDS=(` + strings.Join(compWords, " ") + `)
+GLUE=(` + strings.Join(glue, " ") + `)
+COMP_CWORD=` + strconv.Itoa(cword) + `
 _putnami_completions
 printf '%s\0' ${COMPREPLY[@]+"${COMPREPLY[@]}"}
 `
@@ -209,6 +231,50 @@ printf '%s\0' ${COMPREPLY[@]+"${COMPREPLY[@]}"}
 		t.Fatalf("bash completion of %q: %v\n%s", words, err, stderr.String())
 	}
 	return strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+}
+
+// bashColonPieces splits a typed word as bash 4 and later split a completion
+// word: before and after each run of colons that no quote or backslash
+// protects. The run is a piece of its own.
+func bashColonPieces(word string) []string {
+	var pieces []string
+	start := 0
+	quote := "" // the opening quote: ', ", $' or none
+	for i := 0; i < len(word); i++ {
+		c := word[i]
+		switch {
+		case quote == "'":
+			if c == '\'' {
+				quote = ""
+			}
+		case c == '\\':
+			i++
+		case quote != "":
+			if c == quote[len(quote)-1] {
+				quote = ""
+			}
+		case c == '\'' || c == '"':
+			quote = string(c)
+		case strings.HasPrefix(word[i:], "$'"):
+			quote = "$'"
+			i++
+		case c == ':':
+			end := i
+			for end < len(word) && word[end] == ':' {
+				end++
+			}
+			if i > start {
+				pieces = append(pieces, word[start:i])
+			}
+			pieces = append(pieces, word[i:end])
+			start = end
+			i = end - 1
+		}
+	}
+	if start < len(word) || len(pieces) == 0 {
+		pieces = append(pieces, word[start:])
+	}
+	return pieces
 }
 
 // bashReadBack returns the words bash reads from each reply once the reply is
@@ -389,6 +455,84 @@ func bashPrintfQ(t *testing.T, name string) string {
 		t.Fatalf("bash printf %%q of %q: %v", name, err)
 	}
 	return string(out)
+}
+
+// Bash 4 and later split a completion word at each colon that no quote or
+// backslash protects. The script joins the pieces back, so a command alias
+// that holds a colon takes the flags of its command, and a current word that
+// holds one completes in place: the command line replaces only the text after
+// that colon, and the reply holds only that text.
+func TestBashCompletionKeepsAColonInsideItsWord(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-keeps-a-colon-in-its-word", "bash-reads-a-colon-word-as-one-word")
+	// The pieces GNU bash 5.3 puts in COMP_WORDS for each typed word.
+	for typed, want := range map[string][]string{
+		"build:prod": {"build", ":", "prod"},
+		"bu:":        {"bu", ":"},
+		"'a:b'":      {"'a:b'"},
+		`"a:b"`:      {`"a:b"`},
+		`a\:b`:       {`a\:b`},
+		"":           {""},
+	} {
+		if got := bashColonPieces(typed); !slices.Equal(got, want) {
+			t.Errorf("bash splits %q into %q, not %q", typed, want, got)
+		}
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash unavailable on this platform")
+	}
+	ws := writeHostileWorkspace(t)
+	ws.cfg.Aliases["build:prod"] = "lint-docs"
+	ws.cfg.Aliases["core:list"] = "projects"
+	var script bytes.Buffer
+	CompletionBash(&script, ws.root, ws.cfg, nil)
+	jobOnly := hiddenJobFlags()
+
+	for _, c := range []struct {
+		alias string
+		want  []string
+		job   bool
+	}{
+		{"build:prod", append([]string{"--projects"}, ws.flags...), true},
+		{"jy:z\\w", append([]string{"--projects"}, ws.flags...), true},
+		{"core:list", []string{"--projects"}, false},
+		{"ky:z\\w", []string{"--projects"}, false},
+	} {
+		for _, typed := range append(typedForms(c.alias), bashPrintfQ(t, c.alias)) {
+			dir := t.TempDir()
+			offered := bashReadBack(t, bashCompletionReplies(t, dir, script.String(), []string{"putnami", typed, "--"}))
+			assertOffersEach(t, "bash", typed+" --", offered, c.want)
+			if c.job {
+				continue
+			}
+			for _, flag := range jobOnly {
+				if slices.Contains(offered, flag) {
+					t.Errorf("bash offers the job-only flag %s after the core alias %s", flag, typed)
+				}
+			}
+		}
+	}
+
+	// The current word ends after its colon, or one character later.
+	for _, c := range []struct {
+		before []string
+		name   string
+	}{
+		{nil, "build:prod"},
+		{nil, "jy:z\\w"},
+		{[]string{"lint-docs"}, "~y:z\\w"},
+		{[]string{"lint-docs"}, "--fy:z\\w"},
+	} {
+		escaped := typedForms(c.name)[2]
+		colon := strings.LastIndex(escaped, ":") + 1
+		for _, typed := range []string{escaped[:colon], escaped[:colon+1]} {
+			words := append(append([]string{"putnami"}, c.before...), typed)
+			var lines []string
+			for _, reply := range bashCompletionReplies(t, t.TempDir(), script.String(), words) {
+				lines = append(lines, typed[:colon]+reply)
+			}
+			assertOffersEach(t, "bash", strings.Join(words, " "), bashReadBack(t, lines), []string{c.name})
+		}
+	}
 }
 
 // typedForms returns the ways a user types name as one word: single-quoted,

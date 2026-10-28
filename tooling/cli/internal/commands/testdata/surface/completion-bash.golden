@@ -196,12 +196,19 @@ _putnami_flags_for() {
 # counts, so each argument stays one word, a newline included. Each reply is
 # quoted, so the command line reads it back as the same word. Bash 3.2 leaves a
 # leading "~" bare, which the command line would expand to a home directory.
+# When COMP_WORDBREAKS holds a colon, the command line replaces only the text
+# after the last colon of the current word that no quote or backslash
+# protects, so each reply leaves out the name up to that colon.
 _putnami_reply() {
     COMPREPLY=()
-    local word quoted q="'\\''"
+    local word quoted prefix="" q="'\\''"
+    if [[ "${COMP_WORDBREAKS-}" == *:* ]]; then
+        _putnami_dequote "${cur}"
+        prefix="${_putnami_word:0:${_putnami_colon}}"
+    fi
     for word in "$@"; do
         compgen -W "'${word//\'/${q}}'" -- "${cur}" >/dev/null || continue
-        printf -v quoted '%q' "${word}"
+        printf -v quoted '%q' "${word#"${prefix}"}"
         if [[ "${quoted}" == \~* ]]; then
             quoted="\\${quoted}"
         fi
@@ -211,13 +218,16 @@ _putnami_reply() {
 
 # _putnami_dequote sets _putnami_word to the word $1 as the shell reads it,
 # without its single quotes, double quotes, backslashes and $'...' quoting:
-# completion receives each word as the user typed it. It expands nothing and
-# uses no eval, because a typed word can hold a command substitution. Inside
+# completion receives each word as the user typed it. It sets _putnami_colon to
+# the length of that word up to its last colon that no quote or backslash
+# protects, or 0. It expands nothing and uses no eval, because a typed word
+# can hold a command substitution. Inside
 # $'...', it decodes the escapes that printf %q writes: a letter such as \n or
 # \E, an octal \NNN and a hex \xHH. It keeps the backslash of an escape it
 # does not decode, such as \cX.
 _putnami_dequote() {
     _putnami_word=""
+    _putnami_colon=0
     local rest="$1" c quote=""
     while [[ -n "${rest}" ]]; do
         c="${rest:0:1}"
@@ -293,6 +303,10 @@ _putnami_dequote() {
                         *) _putnami_word+="${c}" ;;
                     esac
                     ;;
+                ':')
+                    _putnami_word+="${c}"
+                    _putnami_colon=${#_putnami_word}
+                    ;;
                 *) _putnami_word+="${c}" ;;
             esac
             ;;
@@ -302,12 +316,14 @@ _putnami_dequote() {
 
 _putnami_completions() {
     local cur prev words cword
-    _init_completion || return
+    # Bash 4 and later split a word at each character of COMP_WORDBREAKS, a
+    # colon included; -n : joins the pieces of a word back.
+    _init_completion -n : || return
 
     # An array expands as ${name[@]+"${name[@]}"}: bash before 4.4 refuses
     # "${name[@]}" for an empty array under set -u.
     local -a _putnami_words
-    local _putnami_word
+    local _putnami_word _putnami_colon
     local -a commands=(cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
     local -a structured=(cache cli completion config context deps doctor extensions help impact-plan init install mcp migrate pin projects report scopes sessions telemetry templates tree upgrade workspace)
     local -a global_flags=(--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --credential-fd --no-cache --output --json --quiet --color --no-color --version)
