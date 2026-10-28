@@ -300,6 +300,30 @@ CURRENT=` + strconv.Itoa(len(words)) + `
 	return offered
 }
 
+// Each _describe entry and array word reads back, by the rules of zsh's
+// _describe, as the name. This reads the generated text, so it runs where zsh
+// is not installed.
+func TestZshDescribeEntriesReadBackEveryNameLiterally(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "completion-reads-names-literally", "zsh-describe-entries-read-each-name-literally")
+	for _, name := range hostileNames {
+		for _, word := range []string{zshDescribeEntry(name, "Description."), zshDescribeNames([]string{name})} {
+			if got := zshReadName(shellUnquote(word), ":"); got != name {
+				t.Errorf("_describe reads the word %s as %q, not %q", word, got, name)
+			}
+		}
+	}
+}
+
+// shellUnquote returns the value of one word that bashWord or bashQuote
+// writes: a bare word, or a single-quoted word whose apostrophes bashQuote
+// escapes.
+func shellUnquote(word string) string {
+	if !strings.HasPrefix(word, "'") {
+		return word
+	}
+	return strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(word, "'"), "'"), `'\''`, "'")
+}
+
 // Each extension flag spec reads back, by the rules of zsh's _values parser, as
 // the flag's name, and its description ends where the spec says. This reads
 // the generated text, so it runs where zsh is not installed.
@@ -435,8 +459,9 @@ func fishLines(script string) []string {
 
 // fishCompletions returns, for each `complete` line of a fish script, the
 // words fish reads from its -n condition and from its -a arguments when it
-// completes: fish reads both strings a second time.
-func fishCompletions(t *testing.T, script string) (conditions, arguments [][]string) {
+// completes, since fish reads both strings a second time, and the flag name
+// of each -l, which fish reads once.
+func fishCompletions(t *testing.T, script string) (conditions, arguments [][]string, longs []string) {
 	t.Helper()
 	for _, line := range fishLines(script) {
 		if !strings.HasPrefix(line, "complete ") {
@@ -448,6 +473,10 @@ func fishCompletions(t *testing.T, script string) (conditions, arguments [][]str
 			continue
 		}
 		for i := 0; i+1 < len(words); i++ {
+			if words[i] == "-l" {
+				longs = append(longs, words[i+1])
+				continue
+			}
 			if words[i] != "-n" && words[i] != "-a" {
 				continue
 			}
@@ -463,7 +492,7 @@ func fishCompletions(t *testing.T, script string) (conditions, arguments [][]str
 			}
 		}
 	}
-	return conditions, arguments
+	return conditions, arguments, longs
 }
 
 // The fish script quotes each name twice where fish reads it twice: in the
@@ -474,13 +503,18 @@ func TestFishCompletionTextQuotesEveryNameForBothReads(t *testing.T) {
 	ws := writeHostileWorkspace(t)
 	var script bytes.Buffer
 	CompletionFish(&script, ws.root, ws.cfg, nil)
-	conditions, arguments := fishCompletions(t, script.String())
+	conditions, arguments, longs := fishCompletions(t, script.String())
 
 	var candidates []string
 	for _, words := range arguments {
 		candidates = append(candidates, words...)
 	}
 	assertOffersEach(t, "fish", "an -a candidate", candidates, append(slices.Clone(ws.commands), ws.targets...))
+	var flagNames []string
+	for _, flag := range ws.flags {
+		flagNames = append(flagNames, strings.TrimPrefix(flag, "--"))
+	}
+	assertOffersEach(t, "fish", "an -l flag name", longs, flagNames)
 
 	// The positional targets follow a job command, an alias of a job command
 	// included: the condition names each one as a literal word.
