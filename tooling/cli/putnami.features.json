@@ -847,7 +847,8 @@
               "the-dag-is-deterministic",
               "write-serialization-stays-separate-from-functional-deps",
               "a-missing-selected-command-is-rejected",
-              "runner-publication-functional-gates"
+              "runner-publication-functional-gates",
+              "a-step-dependency-waits-for-that-step-alone"
             ]
           }
         },
