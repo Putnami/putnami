@@ -384,3 +384,80 @@ func TestExtensionsValidate_MissingPath(t *testing.T) {
 		t.Fatalf("err = %v, want path not found", err)
 	}
 }
+
+// flagShadowManifest declares the flags in commandFlags on a command and those
+// in subcommandFlags on a command group's subcommand.
+func flagShadowManifest(commandFlags, subcommandFlags string) string {
+	return `{
+  "name": "@putnami/test-ext",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {
+    "estimate": {
+      "flags": {` + commandFlags + `},
+      "run": [{"id": "estimate", "task": "estimate-exec"}]
+    }
+  },
+  "commandGroups": {
+    "change": {
+      "subcommands": {
+        "estimate": {"command": "estimate", "flags": {` + subcommandFlags + `}}
+      }
+    }
+  },
+  "tasks": {"estimate-exec": {"kind": "command", "command": "echo", "cache": false}}
+}`
+}
+
+// `putnami extensions validate` refuses a flag the core parses as its own
+// global flag, by name or by short alias, on a command and on a subcommand,
+// and names each field and the global flag that takes it.
+func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-refuses-a-flag-a-core-global-flag-takes")
+	dir := t.TempDir()
+	manifest := flagShadowManifest(
+		`"plan": {"type": "string"}, "workspace": {"type": "string", "short": "w"}`,
+		`"markdown": {"type": "boolean"}, "retry": {"type": "string"}`,
+	)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("a manifest whose flags the core takes validated:\n%s", out)
+	}
+	for _, want := range []string{
+		"[core-global-flag] commands.estimate.flags.plan: the core parses --plan as its own global flag",
+		"[core-global-flag] commands.estimate.flags.workspace.short: the core parses -w as --watch",
+		"[core-global-flag] commandGroups.change.subcommands.estimate.flags.markdown: the core parses --markdown",
+		"[core-global-flag] commandGroups.change.subcommands.estimate.flags.retry: the core parses --retry",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "flags.workspace: ") {
+		t.Errorf("the flag name workspace is no global flag, only its short alias is taken:\n%s", out)
+	}
+}
+
+// `putnami extensions validate` accepts a flag named like a global flag the
+// core hands to the commands that declare it, with its own short alias.
+func TestExtensionsValidate_AcceptsAFlagTheCoreHandsToTheCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-accepts-a-flag-the-core-hands-to-the-command")
+	dir := t.TempDir()
+	manifest := flagShadowManifest(
+		`"dry-run": {"type": "boolean"}, "watch": {"type": "boolean", "short": "w"}, "all": {"type": "boolean"}, "no-cache": {"type": "boolean"}`,
+		`"projects": {"type": "string"}, "baseline": {"type": "string"}, "max-parallel": {"type": "string"}, "plan-file": {"type": "string"}`,
+	)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err != nil {
+		t.Fatalf("a manifest whose flags reach their command was refused: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Every flag reaches its command") {
+		t.Errorf("output missing the flag check:\n%s", out)
+	}
+}

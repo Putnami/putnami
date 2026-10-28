@@ -67,16 +67,6 @@ type flagParseOptions struct {
 	ownWatch bool
 }
 
-// reservedGlobalFlags are consumed alongside any command but deliberately kept
-// out of the catalog's global-flag table, because they are cataloged as flags of
-// the `help` command instead (`putnami help --man`): listing them as globals
-// would offer them after every command. catalog_source_test.go's
-// parserFlagsExemptFromCatalog records the same pair from the other side.
-var reservedGlobalFlags = []commandmeta.GlobalFlag{
-	{Long: "--man", Description: "Render the full reference as a man page"},
-	{Long: "--markdown", Description: "Render the full reference as Markdown"},
-}
-
 // globalFlagSpec resolves a token to the global flag it spells, by long form or
 // single-dash alias.
 func globalFlagSpec(arg string) (commandmeta.GlobalFlag, bool) {
@@ -85,7 +75,7 @@ func globalFlagSpec(arg string) (commandmeta.GlobalFlag, bool) {
 			return flag, true
 		}
 	}
-	for _, flag := range reservedGlobalFlags {
+	for _, flag := range commandmeta.HelpRenderFlags() {
 		if arg == flag.Long {
 			return flag, true
 		}

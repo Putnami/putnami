@@ -7,6 +7,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/iox"
 
 	proto "go.putnami.dev/protocol/extension"
@@ -57,6 +58,13 @@ func ExtensionsValidate(args []string) error {
 
 	iox.Fprintf(os.Stdout, "  ✓ Structural validation passed\n")
 
+	if shadows := coreGlobalFlagShadows(manifest); len(shadows) > 0 {
+		iox.Fprintf(os.Stdout, "  ✗ Flags a core global flag takes:\n")
+		printDiagnostics(shadows)
+		return cmderr.Classify(fmt.Errorf("%d flag(s) never reach their command", len(shadows)), cmderr.ErrInvalidConfig)
+	}
+	iox.Fprintf(os.Stdout, "  ✓ Every flag reaches its command\n")
+
 	// Contract validation (requires CLI-level resolved extension description).
 	proto.NormalizeManifest(manifest)
 	extPath := filepath.Dir(path)
@@ -74,6 +82,24 @@ func ExtensionsValidate(args []string) error {
 
 	iox.Fprintf(os.Stdout, "\n  Extension is valid.\n")
 	return nil
+}
+
+// coreGlobalFlagShadows reports each manifest flag, by name or short alias,
+// that the core parses as its own global flag before the command runs, so the
+// command never receives it (commandmeta.ExtensionFlagShadow).
+func coreGlobalFlagShadows(manifest *proto.Manifest) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	proto.VisitFlagDefinitions(manifest, func(field, name string, def proto.FlagDefinition) {
+		if global, taken := commandmeta.ExtensionFlagShadow(name); taken {
+			diags = append(diags, diag.Errorf("core-global-flag", field+"."+name,
+				"the core parses %s as its own global flag (%s), so the command never receives it; rename the flag", global.Long, global.Description))
+		}
+		if global, taken := commandmeta.ExtensionShortShadow(name, def.Short); taken {
+			diags = append(diags, diag.Errorf("core-global-flag", field+"."+name+".short",
+				"the core parses %s as %s, so the command never receives it; choose another short alias", global.Short, global.Long))
+		}
+	})
+	return diags
 }
 
 // printDiagnostics renders protocol diagnostics to stdout.

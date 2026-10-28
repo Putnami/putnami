@@ -135,6 +135,44 @@ type GlobalFlag struct {
 	// extensions accept it. The full Markdown reference lists it always.
 	// False means a core command reads the flag, or help must always list it.
 	JobOnly bool
+	// Forwarded marks a flag the core hands to an extension command that
+	// declares a flag of the same name, or applies for it with the meaning the
+	// command declares (internal/cli's buildExtensionCommandParams and
+	// interactive launch, engine.execute's overlay). An extension may declare
+	// it. The parser takes every other global flag before the command runs, so
+	// ExtensionFlagShadow refuses a manifest flag of its name.
+	Forwarded bool
+}
+
+// ExtensionFlagShadow returns the global flag the parser takes in place of an
+// extension command's flag called name: a global or help render flag of that
+// long name, unless the global is Forwarded. The command never receives such
+// a flag, so `putnami extensions validate` refuses the declaration.
+func ExtensionFlagShadow(name string) (GlobalFlag, bool) {
+	for _, flag := range append(GlobalFlags(), HelpRenderFlags()...) {
+		if flag.Long == "--"+name && !flag.Forwarded {
+			return flag, true
+		}
+	}
+	return GlobalFlag{}, false
+}
+
+// ExtensionShortShadow returns the global flag the parser takes in place of
+// the short alias, written with or without its dash, of an extension command's
+// flag called name: a global flag with that alias and another long name.
+func ExtensionShortShadow(name, short string) (GlobalFlag, bool) {
+	if short == "" {
+		return GlobalFlag{}, false
+	}
+	if !strings.HasPrefix(short, "-") {
+		short = "-" + short
+	}
+	for _, flag := range GlobalFlags() {
+		if flag.Short == short && flag.Long != "--"+name {
+			return flag, true
+		}
+	}
+	return GlobalFlag{}, false
 }
 
 // GlobalFlagCategory is one group of help's categorized global-flag listing.

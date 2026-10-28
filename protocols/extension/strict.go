@@ -666,26 +666,52 @@ func isNamespacedToolName(name string) bool {
 // ValidateManifest so normal extension loading can enforce the reserved-name
 // contract without rejecting older manifests for unrelated structural issues.
 func ValidateNoReservedFlagShadows(m *Manifest) []diag.Diagnostic {
-	if m == nil {
-		return nil
-	}
 	var diags []diag.Diagnostic
+	VisitFlagDefinitions(m, func(field, name string, def FlagDefinition) {
+		if err := protocolcli.ValidateNoReservedShadow(name); err != nil {
+			diags = append(diags, diag.Errorf("reserved-global-flag", fmt.Sprintf("%s.%s", field, name), "%v", err))
+		}
+		if def.Short != "" {
+			if err := protocolcli.ValidateNoReservedShadow(def.Short); err != nil {
+				diags = append(diags, diag.Errorf("reserved-global-flag", fmt.Sprintf("%s.%s.short", field, name), "%v", err))
+			}
+		}
+	})
+	return diags
+}
 
-	cmdNames := sortedKeys(m.Commands)
-	for _, name := range cmdNames {
-		cmd := m.Commands[name]
-		diags = append(diags, validateFlagDefinitions(fmt.Sprintf("commands.%s.flags", name), cmd.Flags)...)
+// VisitFlagDefinitions calls visit once for each flag the manifest declares on
+// a command, a command group or a subcommand at any depth, in sorted order.
+// field is the flag map's manifest path, such as "commands.build.flags" or
+// "commandGroups.cloud.subcommands.deploy.flags", and name is the flag's key.
+func VisitFlagDefinitions(m *Manifest, visit func(field, name string, def FlagDefinition)) {
+	if m == nil {
+		return
 	}
-
-	groupNames := sortedKeys(m.CommandGroups)
-	for _, groupName := range groupNames {
+	for _, name := range sortedKeys(m.Commands) {
+		visitFlags(fmt.Sprintf("commands.%s.flags", name), m.Commands[name].Flags, visit)
+	}
+	for _, groupName := range sortedKeys(m.CommandGroups) {
 		group := m.CommandGroups[groupName]
 		groupField := fmt.Sprintf("commandGroups.%s", groupName)
-		diags = append(diags, validateFlagDefinitions(groupField+".flags", group.Flags)...)
-		diags = append(diags, validateSubcommandFlagDefinitions(group.Subcommands, groupField+".subcommands")...)
+		visitFlags(groupField+".flags", group.Flags, visit)
+		visitSubcommandFlags(group.Subcommands, groupField+".subcommands", visit)
 	}
+}
 
-	return diags
+func visitFlags(field string, flags map[string]FlagDefinition, visit func(field, name string, def FlagDefinition)) {
+	for _, name := range sortedKeys(flags) {
+		visit(field, name, flags[name])
+	}
+}
+
+func visitSubcommandFlags(subs map[string]SubcommandDefinition, field string, visit func(field, name string, def FlagDefinition)) {
+	for _, subName := range sortedKeys(subs) {
+		sub := subs[subName]
+		subField := fmt.Sprintf("%s.%s", field, subName)
+		visitFlags(subField+".flags", sub.Flags, visit)
+		visitSubcommandFlags(sub.Subcommands, subField+".subcommands", visit)
+	}
 }
 
 // validateResourceRefs checks that each write/read resource declares a
@@ -807,23 +833,6 @@ func canonicalParamName(name string) string {
 	return strings.Join(parts, "")
 }
 
-func validateFlagDefinitions(field string, flags map[string]FlagDefinition) []diag.Diagnostic {
-	var diags []diag.Diagnostic
-	flagNames := sortedKeys(flags)
-	for _, name := range flagNames {
-		def := flags[name]
-		if err := protocolcli.ValidateNoReservedShadow(name); err != nil {
-			diags = append(diags, diag.Errorf("reserved-global-flag", fmt.Sprintf("%s.%s", field, name), "%v", err))
-		}
-		if def.Short != "" {
-			if err := protocolcli.ValidateNoReservedShadow(def.Short); err != nil {
-				diags = append(diags, diag.Errorf("reserved-global-flag", fmt.Sprintf("%s.%s.short", field, name), "%v", err))
-			}
-		}
-	}
-	return diags
-}
-
 func validateSubcommands(m *Manifest, subs map[string]SubcommandDefinition, field, inheritedCommand string) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	subNames := sortedKeys(subs)
@@ -866,20 +875,6 @@ func validateSubcommands(m *Manifest, subs map[string]SubcommandDefinition, fiel
 		}
 		if len(sub.Subcommands) > 0 {
 			diags = append(diags, validateSubcommands(m, sub.Subcommands, subField+".subcommands", commandName)...)
-		}
-	}
-	return diags
-}
-
-func validateSubcommandFlagDefinitions(subs map[string]SubcommandDefinition, field string) []diag.Diagnostic {
-	var diags []diag.Diagnostic
-	subNames := sortedKeys(subs)
-	for _, subName := range subNames {
-		sub := subs[subName]
-		subField := fmt.Sprintf("%s.%s", field, subName)
-		diags = append(diags, validateFlagDefinitions(subField+".flags", sub.Flags)...)
-		if len(sub.Subcommands) > 0 {
-			diags = append(diags, validateSubcommandFlagDefinitions(sub.Subcommands, subField+".subcommands")...)
 		}
 	}
 	return diags

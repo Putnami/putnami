@@ -183,7 +183,7 @@ A command group can declare shared `flags` once instead of repeating them on eve
 }
 ```
 
-Each subcommand's effective flags merge three layers in increasing precedence: the flat command target's flags, then the group's shared flags, then the subcommand's own flags. The more specific declaration wins on a name collision, so `deploy` above overrides the inherited `env` default while `status` keeps it. The merged set drives `--help`, shell completion, and the flag defaults folded into `params`. A flag whose name collides with a Putnami global (such as `--output` or `--dry-run`) is consumed by the CLI before the extension runs, so use extension-owned names for group flags.
+Each subcommand's effective flags merge three layers in increasing precedence: the flat command target's flags, then the group's shared flags, then the subcommand's own flags. The more specific declaration wins on a name collision, so `deploy` above overrides the inherited `env` default while `status` keeps it. The merged set drives `--help`, shell completion, and the flag defaults folded into `params`. The CLI parses its global flags before the extension runs. A flag named like a reserved global, such as `--output`, fails to load. A flag named like another global, by name or short alias, such as `--plan` or `-w`, never reaches the command, and `putnami extensions validate` refuses it. The CLI hands `--dry-run`, `--watch`, `--all`, `--projects`, `--baseline`, `--max-parallel` and `--no-cache` to a command that declares them. Use extension-owned names for every other flag.
 
 Command groups may also describe nested verbs that are parsed inside the
 extension binary. The top-level group subcommand still names the flat command
