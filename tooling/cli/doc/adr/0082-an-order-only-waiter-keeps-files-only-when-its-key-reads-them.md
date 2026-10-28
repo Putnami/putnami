@@ -36,12 +36,15 @@ to restore and executed.
 1. **An order-only edge counts only when the waiter reads the bytes.** A task
    keeps its files for a waiter that depends on it functionally, as before.
    A waiter that only serializes after it keeps them only when key movement
-   names the task as a writer of a file the waiter's key reads, or when the
-   task declares an output `readByDependents`. When key movement cannot be
-   computed, every serialization edge counts.
-2. **Infra does not wait for compile.** The Go `build` command's `infra` step
+   names the task as a writer of a file the waiter's key reads, when the task
+   declares an output `readByDependents`, when both belong to one shared
+   execution (a follower captures what its leader wrote), or when the task is
+   not planned. When key movement cannot be computed, every serialization edge
+   counts.
+2. **Infra does not depend on compile.** The Go `build` command's `infra` step
    depends on `generate` and `describe` only. Its key stops folding the
-   compile key, and it runs when the compile fails.
+   compile key, and it runs when the compile fails. Write serialization of
+   `.gen` still orders it after the compile, as an order-only edge.
 3. **A hosted session is `minimal`.** The Cloud provider resolves the mode
    from core's intent, then the configured mode, then `minimal` for a hosted
    launch and `full` otherwise. An explicit `PUTNAMI_CACHE_MODE` or
@@ -59,7 +62,16 @@ to restore and executed.
   executable.
 - Every hosted leaf (lint, validate, infra) moves no bytes on a hit.
 - A task that reads a predecessor's bytes without hashing them was already
-  unsound, so the narrower rule loses no read a key relied on. A tool outside
-  Putnami that reads outputs after a hosted run needs `PUTNAMI_CACHE_MODE`.
-- A developer machine in `full` still builds an executable whose entry lacks
-  it, as before.
+  unsound, so the narrower rule loses no read a key relied on. A job that
+  declares no input reads its whole project directory, so it keeps every
+  predecessor that writes there. A tool outside Putnami that reads outputs
+  after a hosted run needs `PUTNAMI_CACHE_MODE`.
+- A contract client kept outside its provider's directory reads the client
+  its provider commits, not the bytes the provider's describe writes; drift
+  policing of that committed client keeps it current.
+- A hosted run no longer executes a compile it serves from its result, so it
+  no longer completes an entry that lacks the executable. A client in `full`
+  that negotiates such an entry builds the executable. A server that deletes
+  an entry whose files a `full` client finds missing makes the next hosted run
+  build it again; a server that left those files out on purpose answers a miss
+  and keeps the entry.
