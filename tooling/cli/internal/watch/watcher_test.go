@@ -1,13 +1,14 @@
 package watch
 
 import (
-	"go.putnami.dev/tooling/cli/internal/git"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
+
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestNewWatcher_Defaults(t *testing.T) {

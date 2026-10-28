@@ -1,11 +1,12 @@
 package cachekey
 
 import (
-	"go.putnami.dev/tooling/cli/internal/git"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 // treeKeyedGit runs git in dir with a fixed identity and fixed dates, and

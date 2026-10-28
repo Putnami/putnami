@@ -46,7 +46,10 @@ func resolveExecutable(cache *sync.Map, goos string, lookPath func(string) (stri
 		return "git"
 	}
 	value, _ := cache.LoadOrStore(developerDir, &developerGitEntry{})
-	entry := value.(*developerGitEntry)
+	entry, ok := value.(*developerGitEntry)
+	if !ok {
+		return "git"
+	}
 	entry.once.Do(func() { entry.path = find() })
 	if entry.path == "" {
 		return "git"
