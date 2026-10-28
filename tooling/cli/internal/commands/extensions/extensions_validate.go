@@ -92,8 +92,9 @@ func coreGlobalFlagShadows(manifest *proto.Manifest) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	proto.VisitFlagDefinitions(manifest, func(field, name string, def proto.FlagDefinition, reach []proto.FlagReach) {
 		boolean := def.Type == "" || def.Type == "boolean"
+		flag := commandmeta.ExtensionFlag{Boolean: boolean, DefaultOn: boolean && def.Default == true}
 		for _, r := range reach {
-			global, taken := commandmeta.ExtensionFlagShadow(name, boolean, extensionInvocation(manifest, r))
+			global, taken := commandmeta.ExtensionFlagShadow(name, flag, extensionInvocation(manifest, r))
 			if !taken {
 				continue
 			}
@@ -113,7 +114,7 @@ func coreGlobalFlagShadows(manifest *proto.Manifest) []diag.Diagnostic {
 // extensionInvocation describes r with the workload its command's own traits
 // declare in manifest.
 func extensionInvocation(manifest *proto.Manifest, r proto.FlagReach) commandmeta.ExtensionInvocation {
-	invocation := commandmeta.ExtensionInvocation{Interactive: r.Interactive}
+	invocation := commandmeta.ExtensionInvocation{Interactive: r.Interactive, Nested: r.Nested}
 	if command, ok := manifest.Commands[r.Command]; ok && command.Traits != nil {
 		invocation.Workload = command.Traits.Workload
 	}
@@ -121,6 +122,9 @@ func extensionInvocation(manifest *proto.Manifest, r proto.FlagReach) commandmet
 }
 
 func invocationName(r proto.FlagReach) string {
+	if r.Nested {
+		return fmt.Sprintf("the nested subcommand that runs %s, whose flags the CLI does not resolve,", r.Command)
+	}
 	if r.Interactive {
 		return fmt.Sprintf("the interactive subcommand that runs %s", r.Command)
 	}

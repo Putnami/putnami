@@ -681,11 +681,14 @@ func ValidateNoReservedFlagShadows(m *Manifest) []diag.Diagnostic {
 }
 
 // FlagReach is one invocation that receives a declared flag: the flat command
-// it runs, and whether a command group's subcommand runs that command
-// interactively, outside the scheduler.
+// it runs, whether a command group's subcommand runs that command
+// interactively, outside the scheduler, and whether the flag is declared on a
+// nested subcommand, below the command, group and top-level subcommand whose
+// flags the CLI resolves for the invocation.
 type FlagReach struct {
 	Command     string
 	Interactive bool
+	Nested      bool
 }
 
 // VisitFlagDefinitions calls visit once for each flag the manifest declares on
@@ -696,14 +699,15 @@ type FlagReach struct {
 // each of its subcommands, a subcommand's flag reaches that subcommand, and a
 // command's flag reaches each subcommand that runs it, or the command itself
 // when no subcommand does, because a group's flat command is not typed
-// directly.
+// directly. A nested subcommand runs under the Interactive field of its
+// top-level subcommand.
 func VisitFlagDefinitions(m *Manifest, visit func(field, name string, def FlagDefinition, reach []FlagReach)) {
 	if m == nil {
 		return
 	}
 	carriers := map[string][]FlagReach{}
 	for _, groupName := range sortedKeys(m.CommandGroups) {
-		for _, r := range subcommandReach(m.CommandGroups[groupName].Subcommands, "") {
+		for _, r := range groupReach(m.CommandGroups[groupName].Subcommands) {
 			carriers[r.Command] = append(carriers[r.Command], r)
 		}
 	}
@@ -717,29 +721,53 @@ func VisitFlagDefinitions(m *Manifest, visit func(field, name string, def FlagDe
 	for _, groupName := range sortedKeys(m.CommandGroups) {
 		group := m.CommandGroups[groupName]
 		groupField := fmt.Sprintf("commandGroups.%s", groupName)
-		visitFlags(groupField+".flags", group.Flags, subcommandReach(group.Subcommands, ""), visit)
-		visitSubcommandFlags(group.Subcommands, groupField+".subcommands", "", visit)
+		visitFlags(groupField+".flags", group.Flags, groupReach(group.Subcommands), visit)
+		for _, subName := range sortedKeys(group.Subcommands) {
+			sub := group.Subcommands[subName]
+			subField := fmt.Sprintf("%s.subcommands.%s", groupField, subName)
+			top := FlagReach{Command: sub.Command, Interactive: sub.Interactive}
+			visitFlags(subField+".flags", sub.Flags, []FlagReach{top}, visit)
+			visitNestedFlags(sub.Subcommands, subField+".subcommands", top, visit)
+		}
 	}
 }
 
-// subcommandReach returns the invocation of each subcommand in subs at any
-// depth. A subcommand without a command runs inherited, its parent's.
-func subcommandReach(subs map[string]SubcommandDefinition, inherited string) []FlagReach {
+// groupReach returns the invocation of each subcommand in subs at any depth.
+// A command's flags reach every one, so none is nested.
+func groupReach(subs map[string]SubcommandDefinition) []FlagReach {
 	reach := make([]FlagReach, 0, len(subs))
 	for _, subName := range sortedKeys(subs) {
 		sub := subs[subName]
-		command := subcommandCommand(sub, inherited)
-		reach = append(reach, FlagReach{Command: command, Interactive: sub.Interactive})
-		reach = append(reach, subcommandReach(sub.Subcommands, command)...)
+		top := FlagReach{Command: sub.Command, Interactive: sub.Interactive}
+		reach = append(reach, top)
+		for _, nested := range nestedReach(sub.Subcommands, top) {
+			nested.Nested = false
+			reach = append(reach, nested)
+		}
 	}
 	return reach
 }
 
-func subcommandCommand(sub SubcommandDefinition, inherited string) string {
-	if sub.Command != "" {
-		return sub.Command
+// nestedReach returns the invocation of each subcommand in subs at any depth
+// below a top-level subcommand whose invocation is parent. A nested
+// subcommand without a command runs its parent's.
+func nestedReach(subs map[string]SubcommandDefinition, parent FlagReach) []FlagReach {
+	reach := make([]FlagReach, 0, len(subs))
+	for _, subName := range sortedKeys(subs) {
+		sub := subs[subName]
+		r := nestedInvocation(sub, parent)
+		reach = append(reach, r)
+		reach = append(reach, nestedReach(sub.Subcommands, r)...)
 	}
-	return inherited
+	return reach
+}
+
+func nestedInvocation(sub SubcommandDefinition, parent FlagReach) FlagReach {
+	r := FlagReach{Command: parent.Command, Interactive: parent.Interactive, Nested: true}
+	if sub.Command != "" {
+		r.Command = sub.Command
+	}
+	return r
 }
 
 func visitFlags(field string, flags map[string]FlagDefinition, reach []FlagReach, visit func(field, name string, def FlagDefinition, reach []FlagReach)) {
@@ -748,13 +776,13 @@ func visitFlags(field string, flags map[string]FlagDefinition, reach []FlagReach
 	}
 }
 
-func visitSubcommandFlags(subs map[string]SubcommandDefinition, field, inherited string, visit func(field, name string, def FlagDefinition, reach []FlagReach)) {
+func visitNestedFlags(subs map[string]SubcommandDefinition, field string, parent FlagReach, visit func(field, name string, def FlagDefinition, reach []FlagReach)) {
 	for _, subName := range sortedKeys(subs) {
 		sub := subs[subName]
 		subField := fmt.Sprintf("%s.%s", field, subName)
-		command := subcommandCommand(sub, inherited)
-		visitFlags(subField+".flags", sub.Flags, []FlagReach{{Command: command, Interactive: sub.Interactive}}, visit)
-		visitSubcommandFlags(sub.Subcommands, subField+".subcommands", command, visit)
+		r := nestedInvocation(sub, parent)
+		visitFlags(subField+".flags", sub.Flags, []FlagReach{r}, visit)
+		visitNestedFlags(sub.Subcommands, subField+".subcommands", r, visit)
 	}
 }
 

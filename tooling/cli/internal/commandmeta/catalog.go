@@ -149,14 +149,21 @@ type Delivery int
 const (
 	// Undelivered: no extension command receives the flag.
 	Undelivered Delivery = iota
-	// DeliveredToEvery: every command receives it, or, for --dry-run, the core
-	// previews the plan of a command it cannot hand the flag to and runs
-	// nothing (internal/cli's buildExtensionCommandParams and
-	// applyPublishDryRun, engine.execute's overlay).
+	// DeliveredToEvery: every command receives it (internal/cli's
+	// runExtensionStructuredCommand, engine.execute's overlay).
 	DeliveredToEvery
-	// DeliveredToServeWorkload: a planned command whose workload is serve,
-	// which the core watches and whose `watch` flag reads --no-watch
-	// (internal/cli's ownsWatchFlag, engine's forcesServeWatch).
+	// DeliveredToResolvedFlags: a command receives it when the flags the CLI
+	// resolves for it declare it, those of the command, its group and its
+	// top-level subcommand; the core previews the plan of a planned command it
+	// cannot hand the flag to and runs nothing (internal/cli's
+	// buildExtensionCommandParams and applyPublishDryRun). A flag declared
+	// only on a nested subcommand is not resolved.
+	DeliveredToResolvedFlags
+	// DeliveredToServeWorkload: a serve workload, which the core watches when
+	// planned and whose `watch` flag reads --no-watch (internal/cli's
+	// ownsWatchFlag, engine's forcesServeWatch). An interactive launch never
+	// watches, so its `watch` flag must default to true for --watch to change
+	// nothing.
 	DeliveredToServeWorkload
 	// DeliveredToInteractive: an interactive subcommand of a command group,
 	// whose launch hands it the flags its resolved selection cannot carry
@@ -169,20 +176,35 @@ const (
 type ExtensionInvocation struct {
 	// Interactive reports a command group's interactive subcommand.
 	Interactive bool
+	// Nested reports a flag declared on a nested subcommand, outside the
+	// flags the CLI resolves for the invocation.
+	Nested bool
 	// Workload is the workload the command's own traits declare, or "" when
 	// they declare none and the verb vocabulary may supply one.
 	Workload string
 }
 
-// receives reports whether invocation receives a global of this delivery. A
-// planned command that declares no workload may take serve from its verb, so
-// it receives a serve workload's flag.
-func (d Delivery) receives(invocation ExtensionInvocation) bool {
+// ExtensionFlag is the shape of an extension command's flag that decides
+// whether a global flag of its name, or of its negation, reaches it.
+type ExtensionFlag struct {
+	// Boolean reports a boolean flag, which reads --no-<name>.
+	Boolean bool
+	// DefaultOn reports a boolean flag whose default is true.
+	DefaultOn bool
+}
+
+// receives reports whether invocation receives a global of this delivery
+// through flag. A planned command that declares no workload may take serve
+// from its verb, so it receives a serve workload's flag.
+func (d Delivery) receives(invocation ExtensionInvocation, flag ExtensionFlag) bool {
 	switch d {
 	case DeliveredToEvery:
 		return true
+	case DeliveredToResolvedFlags:
+		return !invocation.Nested
 	case DeliveredToServeWorkload:
-		return !invocation.Interactive && (invocation.Workload == "" || invocation.Workload == "serve")
+		serve := invocation.Workload == "" || invocation.Workload == "serve"
+		return serve && (!invocation.Interactive || flag.DefaultOn)
 	case DeliveredToInteractive:
 		return invocation.Interactive
 	default:
@@ -196,13 +218,13 @@ func (d Delivery) receives(invocation ExtensionInvocation) bool {
 // declaration. It checks the long name against the global and help render
 // flags, a one-letter name against the global short aliases, and, for a
 // boolean flag, its --no-<name> negation against a value-taking global.
-func ExtensionFlagShadow(name string, boolean bool, invocation ExtensionInvocation) (GlobalFlag, bool) {
-	for _, flag := range append(GlobalFlags(), HelpRenderFlags()...) {
+func ExtensionFlagShadow(name string, flag ExtensionFlag, invocation ExtensionInvocation) (GlobalFlag, bool) {
+	for _, global := range append(GlobalFlags(), HelpRenderFlags()...) {
 		switch {
-		case flag.Long == "--"+name && !flag.Delivery.receives(invocation),
-			len(name) == 1 && flag.Short == "-"+name,
-			boolean && flag.Long == "--no-"+name && flag.Type == FlagValue:
-			return flag, true
+		case global.Long == "--"+name && !global.Delivery.receives(invocation, flag),
+			len(name) == 1 && global.Short == "-"+name,
+			flag.Boolean && global.Long == "--no-"+name && global.Type == FlagValue:
+			return global, true
 		}
 	}
 	return GlobalFlag{}, false

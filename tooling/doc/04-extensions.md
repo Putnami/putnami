@@ -820,9 +820,9 @@ putnami extensions install --platform linux/amd64 --dest ./.gen/warm-artifacts
   | Global flag | Commands that receive it |
   |---|---|
   | `--max-parallel`, `--no-cache` | every command |
-  | `--dry-run` | every command; the core previews the plan of a command it cannot hand the flag to, and runs nothing |
-  | `--watch` | a serve workload, or a command whose own traits declare no workload |
-  | `--projects`, `--all`, `--baseline` | an interactive subcommand |
+  | `--dry-run` | a command whose command, group or top-level subcommand declares it; the core previews the plan of another planned command and runs nothing. A nested subcommand cannot declare it alone |
+  | `--watch` | a planned serve workload, an interactive one whose `watch` defaults to `true`, or a command whose own traits declare no workload |
+  | `--projects`, `--all`, `--baseline` | an interactive subcommand, nested ones included |
 
 ```bash
 putnami extensions validate ./my-extension

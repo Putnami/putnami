@@ -993,8 +993,9 @@ func TestValidateManifest_ReservedGlobalFlagShadows(t *testing.T) {
 
 // VisitFlagDefinitions visits every flag at any depth and reports the
 // invocations that receive it: a group flag reaches each subcommand, a nested
-// subcommand inherits its parent's command, and a command a subcommand runs
-// is reached only through that subcommand.
+// subcommand inherits its parent's command and runs under its top-level
+// subcommand's interactive field, a flag declared on it is nested, and a
+// command a subcommand runs is reached only through that subcommand.
 func TestVisitFlagDefinitions_ReportsTheInvocationsThatReceiveEachFlag(t *testing.T) {
 	m := &Manifest{
 		Commands: map[string]CommandDefinition{
@@ -1022,11 +1023,11 @@ func TestVisitFlagDefinitions_ReportsTheInvocationsThatReceiveEachFlag(t *testin
 		got[field+"."+name] = reach
 	})
 	interactive := FlagReach{Command: "status", Interactive: true}
-	nested := FlagReach{Command: "status"}
+	nested := FlagReach{Command: "status", Interactive: true, Nested: true}
 	want := map[string][]FlagReach{
 		"commands.build.flags.target":                                       {{Command: "build"}},
-		"commands.status.flags.wait":                                        {interactive, nested},
-		"commandGroups.cloud.flags.env":                                     {interactive, nested},
+		"commands.status.flags.wait":                                        {interactive, interactive},
+		"commandGroups.cloud.flags.env":                                     {interactive, interactive},
 		"commandGroups.cloud.subcommands.status.flags.follow":               {interactive},
 		"commandGroups.cloud.subcommands.status.subcommands.show.flags.raw": {nested},
 	}

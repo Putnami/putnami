@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
+	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
@@ -388,7 +390,8 @@ func TestExtensionsValidate_MissingPath(t *testing.T) {
 // flagShadowManifest declares the given flags on four invocations: the planned
 // command estimate, whose workload is once; the serve workload serve; the
 // group change, whose subcommands run estimate and, interactively, report;
-// and change's interactive subcommand report and its nested subcommand show.
+// and change's interactive subcommand report and its nested subcommand show,
+// which runs interactive too.
 func flagShadowManifest(estimate, serve, group, report, show string) string {
 	return `{
   "name": "@putnami/test-ext",
@@ -416,7 +419,7 @@ func flagShadowManifest(estimate, serve, group, report, show string) string {
           "command": "report",
           "interactive": true,
           "flags": {` + report + `},
-          "subcommands": {"show": {"interactive": true, "flags": {` + show + `}}}
+          "subcommands": {"show": {"flags": {` + show + `}}}
         }
       }
     }
@@ -437,7 +440,7 @@ func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
 		`"retry": {"type": "string"}`,
 		`"exclude": {"type": "string"}, "all": {"type": "boolean"}`,
 		`"watch": {"type": "boolean"}`,
-		`"markdown": {"type": "boolean"}`,
+		`"markdown": {"type": "boolean"}, "dry-run": {"type": "boolean"}`,
 	)
 	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
@@ -458,6 +461,7 @@ func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
 		"commandGroups.change.flags.all: the core parses --all as its own global flag (All projects), so the planned command estimate never receives it",
 		"commandGroups.change.subcommands.report.flags.watch: the core parses --watch",
 		"commandGroups.change.subcommands.report.subcommands.show.flags.markdown: the core parses --markdown",
+		"commandGroups.change.subcommands.report.subcommands.show.flags.dry-run: the core parses --dry-run as its own global flag (Show changes without applying), so the nested subcommand that runs report",
 	} {
 		if !strings.Contains(out, "[core-global-flag] "+want) {
 			t.Errorf("output missing %q:\n%s", want, out)
@@ -469,9 +473,10 @@ func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
 }
 
 // `putnami extensions validate` accepts a flag named like a global flag on an
-// invocation the core hands that flag to: --dry-run, --max-parallel and
-// --no-cache everywhere, --watch on a serve workload, and --projects, --all
-// and --baseline on an interactive subcommand.
+// invocation the core hands that flag to: --max-parallel and --no-cache
+// everywhere, --dry-run outside a nested subcommand, --watch on a serve
+// workload, interactive when its flag defaults to true, and --projects, --all
+// and --baseline on an interactive subcommand, nested ones included.
 func TestExtensionsValidate_AcceptsAFlagTheCoreHandsToTheCommand(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-accepts-a-flag-the-core-hands-to-the-command")
 	dir := t.TempDir()
@@ -479,7 +484,7 @@ func TestExtensionsValidate_AcceptsAFlagTheCoreHandsToTheCommand(t *testing.T) {
 		`"dry-run": {"type": "boolean"}, "max-parallel": {"type": "string"}, "no-cache": {"type": "boolean"}, "cache": {"type": "boolean"}, "plan-file": {"type": "string"}`,
 		`"watch": {"type": "boolean", "short": "w"}`,
 		`"dry-run": {"type": "boolean"}`,
-		`"projects": {"type": "string"}, "all": {"type": "boolean"}`,
+		`"projects": {"type": "string"}, "all": {"type": "boolean"}, "watch": {"type": "boolean", "default": true}`,
 		`"baseline": {"type": "string"}`,
 	)
 	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
@@ -491,5 +496,37 @@ func TestExtensionsValidate_AcceptsAFlagTheCoreHandsToTheCommand(t *testing.T) {
 	}
 	if !strings.Contains(out, "Every flag reaches its command") {
 		t.Errorf("output missing the flag check:\n%s", out)
+	}
+}
+
+// Every extension manifest under this project's test data declares only flags
+// its commands receive: the shapes the CLI's own tests run stay valid.
+func TestExtensionsValidate_TestDataManifestsDeclareNoTakenFlag(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-accepts-a-flag-the-core-hands-to-the-command")
+	root := filepath.Join("..", "..", "..")
+	var checked int
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || entry.Name() != "putnami.extension.json" || !strings.Contains(path, "testdata") {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		manifest, diags := proto.ParseManifest(data)
+		if diag.HasErrors(diags) {
+			return nil
+		}
+		checked++
+		for _, shadow := range coreGlobalFlagShadows(manifest) {
+			t.Errorf("%s: %s: %s", path, shadow.Field, shadow.Message)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked == 0 {
+		t.Fatal("no test data manifest was checked")
 	}
 }
