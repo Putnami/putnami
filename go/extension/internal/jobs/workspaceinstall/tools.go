@@ -185,7 +185,7 @@ func (w *install) buildTool(tool, installSpec, expected, dest string) error {
 	}
 	if !installed {
 		// withCredential reported why it could not write the credential.
-		return errors.New("no credential for the module download")
+		return errors.New("the registry credential could not be written")
 	}
 	binary := filepath.Join(gopath.Path(), "bin", toolFileName(tool))
 	if !workspacejob.IsExecutable(binary) {
@@ -193,7 +193,7 @@ func (w *install) buildTool(tool, installSpec, expected, dest string) error {
 	}
 	matched, output, err := w.askToolVersion(tool, binary, expected)
 	if err != nil {
-		return fmt.Errorf("the built %s does not run: %w", tool, err)
+		return fmt.Errorf("the built %s does not run: %s", tool, failureCause(strings.TrimSpace(output), err))
 	}
 	if !matched {
 		return fmt.Errorf("the built %s does not report %s: %s", tool, expected, strings.TrimSpace(output))
