@@ -808,6 +808,68 @@ exit 9
 	}
 }
 
+// TestAppRun_ExtensionStructuredCommand_UndeclaredDryRunPreviewsThePlan pins
+// the other half of the alias's --dry-run contract: a subcommand whose
+// resolved flags (command ⊕ group ⊕ subcommand) do not declare `dry-run` never
+// receives the param, so the job cannot know it is a dry run. The core previews
+// the plan and runs nothing. A `dry-run` declared only on a nested subcommand
+// is not in that surface either.
+func TestAppRun_ExtensionStructuredCommand_UndeclaredDryRunPreviewsThePlan(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	const commandFlags = `"flags": {
+        "dry-run": { "type": "boolean", "default": false, "description": "Preview without changes" }
+      },`
+	cases := map[string]string{
+		"no declaration": `"deploy": { "command": "deploy" }`,
+		"nested declaration only": `"deploy": { "command": "deploy", "subcommands": {
+          "preview": { "command": "deploy", "flags": { "dry-run": { "type": "boolean" } } }
+        } }`,
+	}
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "an-undeclared-dry-run-previews-the-plan")
+	for name, deploySubcommand := range cases {
+		t.Run(name, func(t *testing.T) {
+			wsRoot := t.TempDir()
+			writeWorkspaceAliasFixture(t, wsRoot)
+			manifestPath := filepath.Join(wsRoot, "demo-extension", "putnami.extension.json")
+			manifest, err := os.ReadFile(manifestPath)
+			if err != nil {
+				t.Fatalf("read extension manifest: %v", err)
+			}
+			undeclared := strings.Replace(string(manifest), commandFlags, "", 1)
+			undeclared = strings.Replace(undeclared, `"deploy": { "command": "deploy" }`, deploySubcommand, 1)
+			if undeclared == string(manifest) || strings.Contains(undeclared, commandFlags) {
+				t.Fatalf("fixture manifest no longer matches the expected shape:\n%s", manifest)
+			}
+			if err := os.WriteFile(manifestPath, []byte(undeclared), 0o644); err != nil {
+				t.Fatalf("write extension manifest: %v", err)
+			}
+			ran := filepath.Join(t.TempDir(), "ran")
+			writeAliasFixtureScript(t, wsRoot, fmt.Sprintf("#!/bin/sh\n: > %q\n", ran))
+
+			var code int
+			out := captureStdoutStderr(t, func() {
+				app, err := NewApp()
+				if err != nil {
+					t.Fatalf("NewApp: %v", err)
+				}
+				t.Chdir(wsRoot)
+				code = app.Run(context.Background(), []string{"demo", "deploy", "app", "--dry-run"})
+			})
+			if code != ExitSuccess {
+				t.Fatalf("demo deploy --dry-run exit = %d, want %d\n%s", code, ExitSuccess, out)
+			}
+			if _, err := os.Stat(ran); err == nil {
+				t.Fatalf("--dry-run ran a job that never received the dry-run param:\n%s", out)
+			}
+			if !strings.Contains(out, "showing plan only") {
+				t.Fatalf("--dry-run on an undeclaring subcommand must preview the plan:\n%s", out)
+			}
+		})
+	}
+}
+
 func TestBuildExtensionCommandParams_DryRunRequiresDeclaredFlag(t *testing.T) {
 	t.Parallel()
 	parsed := &ParsedArgs{Global: GlobalFlags{DryRun: true}}

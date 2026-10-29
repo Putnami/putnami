@@ -569,9 +569,13 @@ func runPlannedExtensionAlias(
 		// Planning against the whole discovered set would schedule every other
 		// extension's job of the same flat name.
 		PlanExtension: extensionAliasPlanSelection(resolved),
-		// The alias has always executed under --dry-run, forwarding it to the
-		// extension as a job param; --plan is its plan-only preview.
-		ExecutesUnderDryRun: true,
+		// The alias executes under --dry-run only when it forwards the flag
+		// to the extension as a job param, which buildExtensionCommandParams
+		// does only for a subcommand whose effective flags declare it. Any
+		// other subcommand would never learn it is a dry run, so the engine
+		// previews its plan and runs nothing. --plan is the plan-only preview
+		// on both paths.
+		ExecutesUnderDryRun: commandParams["dry-run"] == true,
 		// Lifecycle hooks run for the alias exactly as they do for the flat
 		// command it dispatches: the hook keys are the command names in
 		// Request.Commands, and this run really does execute that command.
