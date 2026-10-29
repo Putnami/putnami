@@ -263,8 +263,8 @@
     },
     {
       "id": "D-034",
-      "statement": "a workflow profile becomes the default for an issue type only after paired runs, five to start, show lower cost with no more P1 or P2 findings and no more rework",
-      "settled": "2026-10-28",
+      "statement": "a workflow profile becomes the default for an issue type only after five paired runs on the same base show a lower total cost, a lower cost in at least four of the five pairs, no more P1 or P2 findings and no more rework",
+      "settled": "2026-10-29",
       "settledBy": "fdumay",
       "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
       "reviewOnly": true
