@@ -60,7 +60,7 @@ Each extension is defined by a `putnami.extension.json` file:
 | `extensionDependencies` | `map[string]string` | Other extensions this one needs, each with a version constraint. Installing it installs and pins each registry dependency (`@scope/name`), and a manifest that names one requires CLI contract 8 — see [Extension Dependencies](#extension-dependencies) |
 | `commands` | `map[string]Command` | User-facing job definitions |
 | `tasks` | `map[string]Task` | Atomic executable units |
-| `providers` | `map[string]ProviderDeclaration` | Collaboration providers, keyed by contract name: the contract version, the subprocess every operation runs, and the operations. Requires CLI contract 18 — see [Collaboration Providers](#collaboration-providers) |
+| `providers` | `map[string]ProviderDeclaration` | Collaboration providers, keyed by contract name: the contract version, the subprocess every operation runs, and the operations. Requires CLI contract 19 — see [Collaboration Providers](#collaboration-providers) |
 | `contracts` | `map[string]Contract` | JSON schema definitions for I/O validation |
 | `hooks` | `HooksConfig` | Lifecycle hooks |
 | `runtime` | `RuntimeDefinition` | The extension's own executable and how to prepare it — see [Lifecycle Primitives](#lifecycle-primitives) |
@@ -273,13 +273,13 @@ CLI answers "unknown subcommand" for the word it takes; see
 A provider implements the operations of one collaboration contract — tasks,
 change proposals, memory or missions — in an extension subprocess. The
 `providers` member declares one entry per contract, keyed by the contract
-name. A manifest that declares it carries `cliContract` 18; a CLI that
+name. A manifest that declares it carries `cliContract` 19; a CLI that
 predates the member refuses the manifest instead of loading it without its
 providers.
 
 ```json
 {
-  "cliContract": 18,
+  "cliContract": 19,
   "providers": {
     "tasks": {
       "version": 1,

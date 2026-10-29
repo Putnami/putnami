@@ -87,7 +87,7 @@ validated, tested, cached on, and reasoned about by tooling in any language.
   declaration against the catalog (`ReadProviderOffer`) and the routing belong
   to [`protocols/collaboration`](../collaboration/README.md). This package does
   not import it. A provider is a subprocess and gets no host RPC channel.
-  Declaring the section requires CLI contract 18. A manifest that still
+  Declaring the section requires CLI contract 19. A manifest that still
   carries the deleted `tools` section loads leniently with no provider, and
   strict validation refuses it.
 

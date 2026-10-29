@@ -43,7 +43,7 @@ The smallest valid extension manifest has a single command with at least one pip
 | `hooks` | no | Lifecycle hooks (e.g., `preBuild`, `onInstall`) |
 | `contracts` | no | Input/output schemas for task validation |
 | `optionNamespaces` | no | Bare `options.<name>` blocks of a project config this extension reads — see below |
-| `providers` | one of `commands`, `providers`, `agentContent`, `verbs` | The collaboration providers the extension implements, keyed by contract. Requires CLI contract 18 — see below |
+| `providers` | one of `commands`, `providers`, `agentContent`, `verbs` | The collaboration providers the extension implements, keyed by contract. Requires CLI contract 19 — see below |
 | `agentContent` | one of `commands`, `providers`, `agentContent`, `verbs` | Agent instructions the extension ships under its own version — see below |
 | `verbs` | one of `commands`, `providers`, `agentContent`, `verbs` | The verb vocabulary: verbs other extensions run, with their descriptions, aliases, default traits and related commands. Requires CLI contract 9 — see [verbs](06-verbs.md#declaring-a-verb-vocabulary) |
 
@@ -102,7 +102,7 @@ the workspace view, and both documents belong to
 [`protocols/collaboration`](../../collaboration/README.md), whose
 `ReadProviderOffer` checks a declaration against the catalog.
 
-Declaring `providers` requires `cliContract` 18 (`ProviderContract`), wherever
+Declaring `providers` requires `cliContract` 19 (`ProviderContract`), wherever
 the manifest loads from: a CLI below 18 refuses the manifest instead of loading
 the extension with no provider. There is no `tools` section: a manifest that
 still carries one loads leniently with no provider, and strict validation

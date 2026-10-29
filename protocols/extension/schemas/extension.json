@@ -94,7 +94,7 @@
     },
     "providers": {
       "type": "object",
-      "description": "The collaboration providers this extension implements, keyed by contract (tasks, proposals, memory, missions). Every operation of a contract runs in the extension-owned subprocess its entry declares. Requires cliContract 18.",
+      "description": "The collaboration providers this extension implements, keyed by contract (tasks, proposals, memory, missions). Every operation of a contract runs in the extension-owned subprocess its entry declares. Requires cliContract 19.",
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9-]{0,63}$"
       },
@@ -854,7 +854,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Commands that must run before this command. A bare name is a same-project prerequisite: the root steps of this command wait for its leaf steps. command~step plans the whole command for the project and makes the root steps wait for that one step; a step the plan does not hold adds no edge. Requires cliContract 18. A name prefixed with ! is a session barrier across the current project selection, and names a whole command. Pipeline-step references prefixed with ^, /, or * are invalid here."
+          "description": "Commands that must run before this command. A bare name is a same-project prerequisite: the root steps of this command wait for its leaf steps. command~step plans the whole command for the project and makes the root steps wait for that one step; a step the plan does not hold adds no edge. Requires cliContract 19. A name prefixed with ! is a session barrier across the current project selection, and names a whole command. Pipeline-step references prefixed with ^, /, or * are invalid here."
         },
         "sessionPrerequisites": {
           "type": "array",

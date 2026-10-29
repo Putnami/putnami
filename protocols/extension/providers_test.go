@@ -12,7 +12,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// providersFixture is a manifest stamped 18 that declares a memory provider.
+// providersFixture is a manifest stamped 19 that declares a memory provider.
 var providersFixture = filepath.Join("testdata", "providers", ManifestFilename)
 
 // readProvidersFixture parses and validates the fixture without negotiating
@@ -30,7 +30,7 @@ func readProvidersFixture(t *testing.T) *Manifest {
 	return m
 }
 
-// A providers section requires rung 18 from every origin, it is a contract
+// A providers section requires rung 19 from every origin, it is a contract
 // surface on its own, and the stamped fixture loads with every operation.
 func TestProvidersRequireTheirContract(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
@@ -52,7 +52,7 @@ func TestProvidersRequireTheirContract(t *testing.T) {
 	}
 	loaded, err := LoadManifest(providersFixture)
 	if err != nil {
-		t.Fatalf("a manifest stamped 18 must load: %v", err)
+		t.Fatalf("a manifest stamped 19 must load: %v", err)
 	}
 	memory := loaded.Providers["memory"]
 	if memory.Version != 1 || memory.Command != "{extensionRuntime}" || !slices.Equal(memory.Args, []string{"provider"}) {
@@ -69,7 +69,7 @@ func TestProvidersRequireTheirContract(t *testing.T) {
 	}
 }
 
-// Stamped below 18, a provider manifest is refused for its providers, with the
+// Stamped below 19, a provider manifest is refused for its providers, with the
 // remedy that moves it.
 func TestProvidersBelowTheirContractAreRefused(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "a-manifest-below-its-rung-does-not-load")
@@ -80,7 +80,7 @@ func TestProvidersBelowTheirContractAreRefused(t *testing.T) {
 		if err == nil || loaded != nil {
 			t.Fatalf("stamp %d loaded a manifest that declares providers", stamp)
 		}
-		for _, want := range []string{"requires 18 for its providers", "putnami extensions update"} {
+		for _, want := range []string{"requires 19 for its providers", "putnami extensions update"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("stamp %d: error %q does not say %q", stamp, err, want)
 			}
@@ -176,7 +176,7 @@ func TestValidateProviders_RefusesMalformedDeclarations(t *testing.T) {
 func TestTheToolsSectionIsNotAProvider(t *testing.T) {
 	data := []byte(`{
   "name": "@test/x",
-  "cliContract": 18,
+  "cliContract": 19,
   "commands": {"deploy": {"run": [{"id": "d", "task": "t"}]}},
   "tasks": {"t": {"kind": "command", "command": "echo"}},
   "tools": {"tasks.find": {"description": "Find tasks.", "command": "{extensionRuntime}"}}

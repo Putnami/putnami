@@ -261,7 +261,7 @@ see [RELEASE.md](../../RELEASE.md).
 An extension implements a collaboration contract (`tasks`, `proposals`,
 `memory` or `missions`) by declaring it under `providers` in
 `putnami.extension.json`, keyed by contract. A manifest with `providers`
-requires CLI contract 18; `manifest.Builder.Provider` adds a declaration and
+requires CLI contract 19; `manifest.Builder.Provider` adds a declaration and
 `Build` stamps the contract. The CLI starts the declared command for each
 call: the process reads one `ProviderRequest` on stdin and writes one
 `Response` on stdout. Both documents, and `Serve`, which answers one call

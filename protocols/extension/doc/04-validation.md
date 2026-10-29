@@ -279,7 +279,7 @@ provider, or agent-content surface, and to a verb vocabulary. A non-conforming m
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 and 18 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, input selectors, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content and nothing else requires

@@ -15,7 +15,7 @@ file store. The excerpts below come from it.
 
 One entry per contract, keyed by the contract name. The command, arguments,
 working directory, environment and timeout are shared by every operation of
-the contract; the manifest carries `cliContract` 18. Putnami exposes each
+the contract; the manifest carries `cliContract` 19. Putnami exposes each
 operation under the contract's name.
 
 ```json

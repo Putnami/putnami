@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/github-collaboration",
-  "cliContract": 18,
+  "cliContract": 19,
   "runtime": {
     "executable": "compiled/putnami-github-collaboration",
     "toolchains": {

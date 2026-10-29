@@ -1,6 +1,6 @@
 {
   "name": "@acme/memory",
-  "cliContract": 18,
+  "cliContract": 19,
   "runtime": {
     "executable": "bin/acme-memory"
   },

@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/memory-store",
-  "cliContract": 18,
+  "cliContract": 19,
   "runtime": {
     "executable": "compiled/putnami-memory-store",
     "toolchains": {
