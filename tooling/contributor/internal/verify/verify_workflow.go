@@ -1058,8 +1058,8 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		proofTree = r.fingerprint()
 		proof, session = r.workflowProof(w.get("proof"), proofTree)
 	}
-	// Only a local producer session proves a requirement; a ready projection
-	// without one names that run before any unit reports its pending checks.
+	// A ready projection needs a local producer session: without one, no
+	// requirement is proven.
 	require(!final || proof != nil,
 		"workflow ready needs native producer proof: set proof to the session of a local run on this tree and its spec-verification.json")
 	verdicts := r.workflowVerdicts(proof, session, sources)

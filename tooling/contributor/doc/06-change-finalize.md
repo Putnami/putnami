@@ -66,20 +66,22 @@ title, the body and every nonempty branch commit must hold no closing
 directive.
 
 `--gate ci` with a task needs `--workflow-file <workflow.json>`, an immutable
-workflow record. Without `--partial-delivery`, it publishes only when that
-record makes the outcome eligible. Eligibility needs, among other rules, every
-current unit at `candidate`, no later requirement, and a `proof` that names a
-local producer session on the same tree and its sibling
-`spec-verification.json`. The `--projects` gate of the
-last edit is such a session when it covers the project of each current
-requirement's spec. Otherwise the command stops before any write and names
-the blocker, for example `workflow ready needs native producer proof`. With
-`--partial-delivery`, the record must
-be valid. Each current unit at `candidate` whose native checks pass becomes
-ready, and the result carries its receipt. When no unit is eligible, for
-example a unit still at `building`, the proposal still publishes with the
-non-closing task reference, with no ready unit and no receipt. The hosted
-checks never stand for a unit's native proof.
+workflow record. The hosted checks never stand for a unit's native proof.
+
+Without `--partial-delivery`, the command publishes only when that record
+makes the outcome eligible. Each current unit must be at `candidate`, or at a
+later stage with its receipt, and no requirement may be `later`. The record's
+`proof` must name a local producer session on the same tree and its sibling
+`spec-verification.json`, which shows each current requirement `verified`. A
+`--projects` gate run on the committed tree, after the last commit, gives that
+session. Otherwise the command stops before any write and names the blocker,
+for example `workflow ready needs native producer proof`.
+
+With `--partial-delivery`, the record must be valid. Each current unit at
+`candidate` whose native checks pass becomes ready, and the result carries its
+receipt. When no unit is eligible, for example a unit still at `building`, the
+proposal still publishes with the non-closing task reference, with no ready
+unit and no receipt.
 
 A partial delivery needs no workflow record when every changed path belongs to
 projects that declare `featureAuthority.none` and author no feature, both on
