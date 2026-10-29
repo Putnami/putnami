@@ -150,7 +150,7 @@ operation must declare `workspaceSelection`.
 | `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage` | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
 | `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
 | `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
-| `status` | read | no | no | — | no | `mission` | `mission`, `sessions` |
+| `status` | read | no | no | — | no | `mission`, `page` | `mission`, `sessions`, `page` |
 
 A mission is named by `{repository, key, title}`. `repository` and `key` are
 the memory identity's `repository` and `mission`, and both are required.
@@ -261,20 +261,25 @@ not answer is `denied` with reason `message.denied`. The result is `message:
 {id, state: "replied"}`. `reply` takes no session: a session claims a message
 through `sync.delivered` and `sync.replies`.
 
-**status** reads a mission's view and its sessions. It is optional: a
-provider that does not offer it is refused before it starts, as
+**status** reads a mission's view and a page of its sessions. It is
+optional: a provider that does not offer it is refused before it starts, as
 `unsupported` with reason `operation.unsupported`, and a caller then reports
 stage and usage as unavailable. The request names the mission,
-`{repository, key}`; a `title` changes nothing. The result's `mission` is the
-view `sync` answers. `sessions` lists, at most 50 and each once, the sessions
-whose last applied sync named this mission, in every state, `ended`
-included: `{session, state, observedAt, stage, usage, branch}`, as that sync
-left them. `stage`, `usage` and `branch` are absent when the provider holds
-none. `observedAt` is in UTC. The list runs newest `observedAt` first, then
-by engine and id. A session whose last sync named another mission is not
-listed. A provider that does not hold the mission answers its empty view and
+`{repository, key}`, and takes a `page`; a `title` changes nothing. The
+result's `mission` is the view `sync` answers. `sessions` lists, each once,
+the sessions whose last applied sync named this mission, in every state,
+`ended` included: `{session, state, observedAt, stage, usage, branch, error,
+waitUntil}`, as that sync left them. `stage`, `usage` and `branch` are absent
+when the provider holds none; `error` goes only with `failed`, and
+`waitUntil` with `waiting` and always with it. `observedAt` is in UTC. The
+list runs newest `observedAt` first, then by engine and id, a page at a time
+with `page.next`. A traversal lists once every session that does not sync
+during it; a session that syncs moves to the front and shows on the next
+first page. A session whose last sync named another mission is not listed. A
+provider that does not hold the mission answers its empty view and
 `sessions: []`. The CLI answers an ok status for another mission
-`unavailable` with reason `provider.identity_mismatch`.
+`unavailable` with reason `provider.identity_mismatch`, and a page above the
+requested size `unavailable` too.
 
 A rate limit is `unavailable` and retryable. An unresolved `sync`, `ask` or
 `reply` is reconciled by repeating the same document.
