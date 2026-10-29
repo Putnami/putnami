@@ -37,7 +37,10 @@ core CLI runs a job when the project's extension declares it.**
 - `deps-edit` takes `action` (`add`, `remove` or `prune`) and `edits`, one
   `{project, path, modules}` entry per module. It edits every module with the
   go arguments the core used, tidies each as the workspace build resolves it,
-  and treats the edits of one run as one transaction.
+  and treats the edits of one run as one transaction. A go.work directive that
+  pins every version of a module to a release applies to the tidy only for
+  the versions no proxy serves, so a requirement a proxy serves keeps the
+  version go.mod states.
 - A Go template renders each framework requirement at `v0.0.0`, and
   `project-setup` rewrites it after the render. The template no longer needs
   a variable that only the core could compute.
