@@ -51,7 +51,7 @@
     },
     {
       "id": "completion-offers-a-flag-value-in-its-slot",
-      "text": "After a flag that takes a value, global or the command's own, shell completion offers that flag's values and nothing else, in bash, zsh and fish: the project targets after --projects, the project names after --exclude, the values the catalog or the extension lists for the flag, such as --output, and no word after a flag whose value is free, such as --baseline. Help takes no project target, so it offers nothing after --projects. The word after the value completes as the word before the flag."
+      "text": "After a flag that takes a value, global or the command's own, shell completion offers that flag's values and nothing else, in bash, zsh and fish: the project targets after --projects, the project names after --exclude, the values the catalog or the extension lists for the flag, such as --output, and no word after a flag whose value is free, such as --baseline, except the files fish offers after a path. The same holds after --flag=, after a flag's short spelling and after a command alias. A job-only flag on a core command offers nothing. Help takes no project target, so it offers nothing after --projects. The word after the value completes as the word before the flag."
     },
     {
       "id": "extension-verb-vocabulary",
