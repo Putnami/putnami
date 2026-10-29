@@ -54,6 +54,14 @@ only their entries and keeps the others.
 | `acknowledged` | The last position the subscriber acknowledged. |
 | `lost` | `stream.records` minus `acknowledged.records`: the records never acknowledged within the subscriber's budget. |
 
+The session reporter at `reporting.json` version 2 sends a trimmed view of the
+stream
+([ADR 0083](../../../tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md)).
+It acknowledges the raw stream only up to the first record that a task still
+holds. Its `lost` counts every record after that point, so it is an upper
+bound: it also counts the records that left live after a held record, and
+that the receiver acknowledged.
+
 | Evidence | Rule |
 | --- | --- |
 | `delivered` | The subscriber acknowledged the final marker; `acknowledged` equals `stream`. |

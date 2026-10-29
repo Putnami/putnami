@@ -6,9 +6,10 @@ Select an installed extension implementing `session-reporter`:
 PUTNAMI_SESSION_REPORTER=@example/reporter putnami lint,test,build
 ```
 
-The engine reports the recorded plan and persisted events while the graph
-runs, then the terminal session, including failed and canceled work, and last
-the spec gate's record. Local and
+The engine reports the recorded plan and a trimmed view of the persisted
+events while the graph runs (see [Trimmed events](#trimmed-events)), then the
+terminal session, including failed and canceled work, and last the spec gate's
+record. Local and
 hosted execution use the same capability. A trusted launcher may supply
 `PUTNAMI_SESSION_REPORTER_TOKEN`; the authoritative CLI captures it before
 workspace setup/hooks/tasks and passes it only to the selected provider
@@ -25,8 +26,8 @@ bounded pending checkpoint alongside the ordinary artifacts.
 
 The reporter is a declared subscriber of the session's event stream
 (`events.jsonl`) and never slows a task. While the graph runs it batches: an
-events chunk leaves once a full 64 KiB frame is committed, or 10 seconds after the
-previous events chunk. The first events chunk waits 10 seconds from the reporter's start.
+events chunk leaves once a full 64 KiB frame of the view is ready, or 10 seconds
+after the previous events chunk. The first events chunk waits 10 seconds from the reporter's start.
 A long run therefore sends a number of chunks bounded by its duration, not one per
 record. When the graph ends, the reporter sends the rest at once. When it stops, `.putnami/sessions/<id>/subscribers.json` records its evidence:
 `delivered`, `partial` or `lost`, the last acknowledged position, and how many
@@ -34,6 +35,50 @@ records it never acknowledged. `putnami sessions inspect <id>` prints it. A repl
 rewrites only the entries of the reporters it replays. See the
 [evidence contract](../../../protocols/cli/doc/05-session-subscribers.md) and
 [ADR 0033](adr/0033-native-session-reporting.md).
+
+## Trimmed events
+
+The session reporter's `events.jsonl` frames carry a trimmed view of the
+stream, not its bytes
+([ADR 0083](adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md)).
+`events.jsonl` on disk stays complete, and the
+[log reporter](#log-reporter) receives it raw. The view:
+
+1. Drops every `progress` event.
+2. Holds every `task:event` of a task from its first `debug` log line to its
+   `task:end`. At `task:end`, the held records leave in stream order, just
+   before it. A `success` or `skipped` end drops the held `debug` lines and
+   sends the others; any other end sends them all.
+3. Sends a batch line that `batchProjectId` or `batchProjectIds` attributes
+   to several members once, at the first member end that keeps it. A shared
+   `debug` line is dropped when every member passes.
+4. Sends what is still held at `session:end` and at the stream's final
+   marker, then a torn last line, as it is.
+5. Past 1,000,000 held records, sends the records of the task that holds the
+   most, and sends that task live from then on. A tie goes to the task whose
+   first held record comes first, then to the task whose `identity.key` sorts
+   first. A record that names a task sent live leaves live.
+
+Every `task:start`, `task:end`, `test:case` and `session:end` record leaves,
+and a line that is not a JSON record leaves as it is. A task that logs `debug`
+lines sends its `info`, `warn` and diagnostic events at its end, not live.
+Held records do not fill a frame: the batching rule counts only the view bytes
+that are ready.
+
+The offsets and sequences of the session reporter's `events.jsonl` chunks are
+view offsets: they count the bytes the view sent, not the bytes of the file.
+The log reporter's are raw offsets. `reporting.json` is at version 2: its
+`events` cursor is the view cursor, and `eventsRaw` is the raw offset of
+`events.jsonl` that `subscribers.json` acknowledges. Once the receiver
+acknowledges the view's final marker, `subscribers.json` reads `delivered`.
+After an engine restart or a replay, the CLI rebuilds the view from the start
+of `events.jsonl`, so a resent sequence keeps its bytes.
+
+A session whose `reporting.json` is at version 1 and already sent an
+`events.jsonl` chunk keeps raw framing to its end; one that sent none moves to
+version 2. A CLI that predates version 2 refuses a version 2 checkpoint:
+replay such a session with this CLI or a later one. The log reporter's
+`log-reporting.json` stays at version 1.
 
 ## Recorded plan
 
@@ -107,8 +152,9 @@ live event stream:
 PUTNAMI_LOG_REPORTER=@example/logs putnami lint,test,build
 ```
 
-The log reporter receives `events.jsonl` through the same wire and never
-receives `plan.json`, `session.json` or `spec-verification.json`. A live chunk leaves once a full 64 KiB frame is
+The log reporter receives the raw `events.jsonl`, at raw offsets, through the
+same wire, never the trimmed view, and never receives `plan.json`,
+`session.json` or `spec-verification.json`. A live chunk leaves once a full 64 KiB frame is
 committed, or 2 seconds after the previous events chunk. When the graph ends, it
 sends the rest at once and closes the stream. `PUTNAMI_LOG_REPORTER_TOKEN` is
 its optional credential. The CLI captures it like the session reporter's token

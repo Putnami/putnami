@@ -4,6 +4,7 @@
   "feature": "cli/native-session-reporting",
   "outcomes": [
     "Execution facts leave the native engine while work runs, followed by the original persisted terminal session",
+    "The session reporter uploads what explains a run: every verdict-bearing record and the transcript of each task that does not pass, about half the bytes of the recorded stream",
     "A failed or canceled graph retains its actual verdict while a reporting outage leaves replayable state",
     "A log reporter receives the same live event stream through its own selector and credential, independently of the session reporter"
   ],
@@ -18,7 +19,8 @@
     { "id": "credential-boundary", "text": "The authoritative CLI captures and removes every capability's selection and token before extension setup, hooks and repository tasks. Only the capability's own provider process receives its token: never a task, a hook or the other capability's provider. A hosted run passes none; the protocol carries the run credential. Provider stderr and arbitrary error payloads are not echoed. Selection does not establish trust in a repository manifest/runtime, nor prevent same-UID, file, metadata or network access." },
     { "id": "bounded-transport", "text": "Limit chunks to 64 KiB, response lines to 96 KiB, RPCs to 5 s and 3 attempts. Live chunks wait for a full frame or 10 s (session reporter) or 2 s (log reporter). Each drain/replay stops 30 s after the last ACK or 5 min after it starts, naming the limit; cancellation caps it to 2 s, verdict unchanged. Checkpoint reads stop at 192 KiB; replayed session.json and sent plan.json at 16 MiB. Pending records lead sessions.keep; the oldest inactive expire with a diagnostic. Active locks permit temporary excess." },
     { "id": "spec-verification-record", "text": "The session reporter sends spec-verification.json last, once the events final marker is acknowledged; the engine writes it before reporting ends. Its frames stop at 8 MiB. When it is absent, too large, unreadable or refused, the reporter quit, or the limits end, the worker omits it, records why, restarts no reporter, and keeps the delivery complete: no diagnostic, verdict or exit code changes. A checkpoint that completed without it stays complete." },
+    { "id": "trimmed-upload", "text": "The session reporter sends a view of events.jsonl without progress events or the debug lines of a task that passes; the file and the log reporter keep every byte. From a task's first debug line, its task:event records are held as byte ranges until its task:end, a shared batch line until its first failing member, at most 1,000,000 of them (ADR 0083). Each decision reads only earlier records, so a retry, a restart or a replay resends the same bytes. Checkpoint version 2 adds the raw acknowledged offset." },
     { "id": "unavailable-provider", "text": "A selected capability whose provider the engine cannot prepare warns once, retains the session for replay, and changes no other delivery and no verdict. When the selector names an extension the workspace does not load, or one that serves no such command there, the warning names the selector or the extension. It echoes no other cause: one may carry provider output." }
   ],
-  "decisions": ["tooling/cli/doc/adr/0033-native-session-reporting.md"]
+  "decisions": ["tooling/cli/doc/adr/0033-native-session-reporting.md", "tooling/cli/doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md"]
 }

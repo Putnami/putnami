@@ -79,7 +79,7 @@ func newPlanHarness(t *testing.T, plan []byte, events ...[]byte) *planHarness {
 		dir:        dir, events: sub, ctx: ctx, graphCtx: context.Background(), cancel: cancel,
 		finish: make(chan struct{}), done: make(chan struct{}), opTimeout: time.Minute,
 		clock: systemClock{}, batchInterval: time.Hour,
-		state: state{Version: 1, Provider: "@test/provider", SessionID: batchSessionID},
+		state: state{Version: SessionReporter.checkpointVersion(), Provider: "@test/provider", SessionID: batchSessionID},
 	}
 	t.Cleanup(func() {
 		cancel()
@@ -647,6 +647,10 @@ const (
 	// planExitReporter exits without an answer whenever it reads a plan.json
 	// frame, and acknowledges every other chunk.
 	planExitReporter = "exit-on-plan"
+	// planCrashOnceReporter exits without an answer the first time any of its
+	// processes reads the second events.jsonl frame, and acknowledges every
+	// other chunk.
+	planCrashOnceReporter = "crash-once-on-events"
 )
 
 // TestPlanReporterHelperProcess is a session reporter subprocess. It appends
@@ -676,6 +680,12 @@ func TestPlanReporterHelperProcess(t *testing.T) {
 		_ = f.Close()
 		if chunk.Artifact == planFile && os.Getenv(planReporterModeEnv) == planExitReporter {
 			os.Exit(22)
+		}
+		if chunk.Artifact == sessionstream.EventsFile && chunk.Sequence == 1 && os.Getenv(planReporterModeEnv) == planCrashOnceReporter {
+			if marker, err := os.OpenFile(path+".crashed", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600); err == nil {
+				_ = marker.Close()
+				os.Exit(23)
+			}
 		}
 		_ = json.NewEncoder(os.Stdout).Encode(chunk.Ack())
 		if chunk.Final && chunk.Artifact == sessionstream.EventsFile {

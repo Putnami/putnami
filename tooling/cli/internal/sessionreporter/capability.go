@@ -51,18 +51,22 @@ type Capability struct {
 	// StateFile and LockFile are its checkpoint and its advisory lock beside the
 	// session. Session retention knows both names.
 	StateFile, LockFile string
+	// View: its events.jsonl frames carry the trimmed view of the stream, not
+	// its raw bytes, from checkpoint version 2 on (ADR 0083).
+	View bool
 }
 
-// SessionReporter delivers the recorded plan, the event stream, the finalized
-// session and the spec gate's record.
+// SessionReporter delivers the recorded plan, the trimmed view of the event
+// stream, the finalized session and the spec gate's record.
 var SessionReporter = Capability{
 	Name: protocolcli.SessionReporterCommand, Label: "session reporter", Activity: "session reporting",
 	SelectorEnv: protocolcli.SessionReporterEnv, TokenEnv: protocolcli.SessionReporterTokenEnv,
 	Artifacts:     protocolcli.SessionReportingArtifacts(protocolcli.SessionReporterCommand),
 	BatchInterval: EventsBatchInterval, StateFile: StateFile, LockFile: "reporting.lock",
+	View: true,
 }
 
-// LogReporter delivers the event stream only.
+// LogReporter delivers the raw event stream only.
 var LogReporter = Capability{
 	Name: protocolcli.LogReporterCommand, Label: "log reporter", Activity: "log reporting",
 	SelectorEnv: protocolcli.LogReporterEnv, TokenEnv: protocolcli.LogReporterTokenEnv,
@@ -83,4 +87,21 @@ func Capabilities() []Capability {
 // spec-verification.json frames it once that marker is acknowledged.
 func (c Capability) sends(artifact string) bool {
 	return slices.Contains(c.Artifacts, artifact)
+}
+
+// The checkpoint versions. rawCheckpointVersion frames events.jsonl from its
+// raw bytes; viewCheckpointVersion, for a View capability only, from the view,
+// and records beside the view cursor the raw offset the subscription
+// acknowledges. A CLI that predates the view refuses version 2.
+const (
+	rawCheckpointVersion  = 1
+	viewCheckpointVersion = 2
+)
+
+// checkpointVersion is the version of a new checkpoint of the capability.
+func (c Capability) checkpointVersion() int {
+	if c.View {
+		return viewCheckpointVersion
+	}
+	return rawCheckpointVersion
 }

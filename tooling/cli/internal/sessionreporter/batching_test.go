@@ -104,7 +104,7 @@ func newCapabilityHarness(t *testing.T, capability Capability) *batchHarness {
 		dir:        dir, events: sub, process: p, ctx: ctx, graphCtx: context.Background(), cancel: cancel,
 		finish: make(chan struct{}), done: make(chan struct{}), opTimeout: time.Minute,
 		clock: h.clock, batchInterval: eventsBatchInterval(context.Background(), capability),
-		state: state{Version: 1, Provider: "@test/provider", SessionID: batchSessionID},
+		state: state{Version: capability.checkpointVersion(), Provider: "@test/provider", SessionID: batchSessionID},
 	}
 	go func() {
 		scanner := bufio.NewScanner(remote)
