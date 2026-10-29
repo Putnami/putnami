@@ -3,6 +3,9 @@ package extension
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -987,6 +990,62 @@ func TestValidateManifest_ReservedGlobalFlagShadows(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("expected reserved-global-flag diagnostic for %s, got %v", field, diags)
+		}
+	}
+}
+
+// A plan name joins a command and a step with ~, so strict validation refuses
+// a ~ in a command name and in a step id, at the field that holds it, and the
+// schema states both.
+func TestValidateManifest_StepSeparatorInANameIsRefused(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "a-step-separator-in-a-name-is-refused")
+	for fixture, want := range map[string]string{
+		"command-name-step-separator.json": "invalid-command-name commands.a~b",
+		"step-id-step-separator.json":      "invalid-step-id commands.build.run[0].id",
+	} {
+		t.Run(fixture, func(t *testing.T) {
+			diags := FullValidateManifest(loadFixtureManifest(t, filepath.Join("fixtures/invalid", fixture)))
+			if len(diags) != 1 || diags[0].Code+" "+diags[0].Field != want {
+				t.Fatalf("diagnostics = %v, want exactly %s", diags, want)
+			}
+		})
+	}
+
+	data, err := os.ReadFile("schemas/extension.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Properties struct {
+			Commands struct {
+				PropertyNames struct {
+					Pattern string `json:"pattern"`
+				} `json:"propertyNames"`
+			} `json:"commands"`
+		} `json:"properties"`
+		Defs struct {
+			PipelineStep struct {
+				Properties struct {
+					ID struct {
+						Pattern string `json:"pattern"`
+					} `json:"id"`
+				} `json:"properties"`
+			} `json:"pipelineStep"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	for field, pattern := range map[string]string{
+		"commands.propertyNames.pattern":           schema.Properties.Commands.PropertyNames.Pattern,
+		"$defs.pipelineStep.properties.id.pattern": schema.Defs.PipelineStep.Properties.ID.Pattern,
+	} {
+		re, err := regexp.Compile(pattern)
+		if err != nil || pattern == "" {
+			t.Fatalf("schema %s = %q: %v", field, pattern, err)
+		}
+		if re.MatchString("a~b") || !re.MatchString("build-exec") {
+			t.Errorf("schema %s = %q must refuse a~b and accept build-exec", field, pattern)
 		}
 	}
 }

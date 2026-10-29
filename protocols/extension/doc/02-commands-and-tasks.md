@@ -134,7 +134,7 @@ bindings also cannot overwrite a literal `run[].with` value.
 
 Multiple extensions may declare the same command name. Putnami composes all active contributors for the selected project into one execution plan, so extension authors should attach common workflows to canonical root commands such as `publish` and `deploy` instead of requiring users to remember extension-specific commands.
 
-Step IDs only need to be unique inside one extension command. When two active contributors use the same step ID, the CLI namespaces scheduler keys by extension identity internally while keeping displayed names as `{command}~{step}`.
+Step IDs only need to be unique inside one extension command. When two active contributors use the same step ID, the CLI namespaces scheduler keys by extension identity internally while keeping displayed names as `{command}~{step}`. A command name and a step ID therefore hold no `~` ([Validation](04-validation.md#command-names-and-step-ids)).
 
 Flags with the same name across active contributors must have identical definitions. Identical shared flags are accepted; conflicting definitions fail validation before execution. Unique extension-specific flags remain available in `params`.
 

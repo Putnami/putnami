@@ -70,6 +70,10 @@
       "type": "object",
       "description": "Public entrypoints exposed to users (`putnami <command>`).",
       "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[^~]+$",
+        "description": "A command name holds no ~: a plan name joins a command and a step with it."
+      },
       "additionalProperties": {
         "$ref": "#/$defs/commandDefinition"
       }
@@ -1025,7 +1029,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Step id used by downstream bindings."
+          "pattern": "^[^~]+$",
+          "description": "Step id used by downstream bindings. It holds no ~: a plan name joins a command and a step with it."
         },
         "task": {
           "type": "string",

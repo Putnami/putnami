@@ -160,6 +160,31 @@ func TestExtensionsValidate_ReservedGlobalFlagFailure(t *testing.T) {
 	}
 }
 
+// `putnami extensions validate` refuses a ~ in a command name and in a step
+// id, since a plan name joins a command and a step with it, and names the
+// field that holds it.
+func TestExtensionsValidate_AStepSeparatorInANameIsRefused(t *testing.T) {
+	for name, tc := range map[string]struct{ from, to, want string }{
+		"command name": {`"build": {`, `"a~b": {`, "[invalid-command-name] commands.a~b: "},
+		"step id":      {`"id": "build"`, `"id": "x~y"`, "[invalid-step-id] commands.build.run[0].id: "},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := strings.Replace(validExtensionManifest, tc.from, tc.to, 1)
+			if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+			if err == nil {
+				t.Fatalf("a manifest with a ~ in a %s validated:\n%s", name, out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("output missing %q:\n%s", tc.want, out)
+			}
+		})
+	}
+}
+
 // `putnami extensions validate` refuses a command kind, a workload or a batch
 // phase outside its closed vocabulary, and names each offending field, so a
 // manifest that uses one never earns a contract 11 stamp.

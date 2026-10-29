@@ -19,7 +19,7 @@
     },
     {
       "id": "strict-manifests-and-a-fixture-corpus",
-      "text": "The strict parser refuses invalid JSON and an unknown field. Every valid fixture passes the parser, ValidateManifest and FullValidateManifest, and every invalid fixture draws a diagnostic from one of them. Each task contract and lifecycle counter-example reports exactly the codes a consumer keys on, and every diagnostic of the task contract harness also comes out of ValidateManifest."
+      "text": "The strict parser refuses invalid JSON and an unknown field. Every valid fixture passes the parser, ValidateManifest and FullValidateManifest; every invalid fixture draws a diagnostic from one of them. Each task contract and lifecycle counter-example reports exactly the codes a consumer keys on, and every task contract harness diagnostic also comes out of ValidateManifest. ValidateManifest refuses a `~`, the plan-name step separator, in a command name or a step id."
     },
     {
       "id": "a-contract-matches-or-the-manifest-does-not-load",

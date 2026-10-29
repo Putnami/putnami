@@ -88,6 +88,24 @@ such as `-v` are reserved for the framework CLI contract.
 }
 ```
 
+### Command Names and Step IDs
+
+A plan name joins a command and a step with `~` (`build~compile`), so a command
+name and a pipeline step id hold no `~`. Strict validation refuses one with
+`invalid-command-name` at `commands.<name>` or `invalid-step-id` at
+`commands.<name>.run[<i>].id`, and the schema states both with a pattern. The
+load path does not apply the rule.
+
+```json
+// INVALID: "a~b" reads as step b of command a, and so does step "x~y"
+{
+  "commands": {
+    "a~b": { "run": [{ "id": "build", "task": "build-exec" }] },
+    "build": { "run": [{ "id": "x~y", "task": "build-exec" }] }
+  }
+}
+```
+
 ### Activation Pattern Validity
 `activationFiles` patterns must be valid glob expressions.
 
