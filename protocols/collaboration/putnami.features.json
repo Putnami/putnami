@@ -302,6 +302,23 @@
           }
         },
         {
+          "id": "missions-status",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-missions-status-scenario-passes-against-a-correct-provider",
+              "the-local-provider-passes-the-missions-status-scenario",
+              "the-cli-reads-a-session-stage-and-usage-with-missions-status",
+              "the-cli-answers-unsupported-for-a-provider-without-missions-status",
+              "the-cli-makes-a-missions-status-answer-for-another-mission-unavailable"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [
