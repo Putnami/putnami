@@ -550,6 +550,30 @@ func TestAppRun_UserScope_RefusesAnUnhonoredPreview(t *testing.T) {
 	}
 }
 
+// TestAppRun_UserScope_DeclaredDryRunReachesTheCommand pins that a user-scope
+// subcommand that declares `dry-run` runs under --dry-run and reads it from its
+// job context.
+func TestAppRun_UserScope_DeclaredDryRunReachesTheCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-subcommand-refuses-a-preview-it-cannot-honor", "a-declaring-interactive-subcommand-gets-dry-run")
+	userRoot, _ := userScopeTestEnv(t)
+	pinUserScopeExtension(t, userRoot, "user-scope")
+	manifest := userScopeExtensionManifest(userScopeExtensionName, "1.0.0")
+	declared := strings.Replace(manifest, `"run":   {"command": "audit-run",`,
+		`"run":   {"command": "audit-run", "flags": {"dry-run": {"type": "boolean"}},`, 1)
+	if declared == manifest {
+		t.Fatalf("fixture manifest no longer matches the expected shape:\n%s", manifest)
+	}
+	writeTestFile(t, filepath.Join(layout.StableDir(userRoot, layout.Extensions, userScopeExtensionName), "putnami.extension.json"), declared, 0o644)
+
+	code, output := runApp(t, "audit", "run", "--dry-run")
+	if code != cli.ExitSuccess {
+		t.Fatalf("audit run --dry-run exit = %d, want %d:\n%s", code, cli.ExitSuccess, output)
+	}
+	if !strings.Contains(string(parseUserScopeRun(t, output).context), `"dry-run":true`) {
+		t.Fatalf("the declaring user-scope subcommand did not receive dry-run:\n%s", output)
+	}
+}
+
 // TestAppRun_UserScope_GroupDefaultSubcommand pins the group default: a bare
 // `putnami audit` runs the declared default, and `putnami audit --help` still
 // prints the group help without running anything.
