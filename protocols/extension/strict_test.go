@@ -1000,6 +1000,7 @@ func TestVisitFlagDefinitions_ReportsTheInvocationsThatReceiveEachFlag(t *testin
 	m := &Manifest{
 		Commands: map[string]CommandDefinition{
 			"build":  {Flags: map[string]FlagDefinition{"target": {}}},
+			"draft":  {Flags: map[string]FlagDefinition{"level": {}}},
 			"status": {Flags: map[string]FlagDefinition{"wait": {}}},
 		},
 		CommandGroups: map[string]CommandGroupDefinition{
@@ -1012,6 +1013,7 @@ func TestVisitFlagDefinitions_ReportsTheInvocationsThatReceiveEachFlag(t *testin
 						Flags:       map[string]FlagDefinition{"follow": {}},
 						Subcommands: map[string]SubcommandDefinition{
 							"show": {Flags: map[string]FlagDefinition{"raw": {}}},
+							"note": {Command: "draft"},
 						},
 					},
 				},
@@ -1026,8 +1028,9 @@ func TestVisitFlagDefinitions_ReportsTheInvocationsThatReceiveEachFlag(t *testin
 	nested := FlagReach{Command: "status", Interactive: true, Nested: true}
 	want := map[string][]FlagReach{
 		"commands.build.flags.target":                                       {{Command: "build"}},
-		"commands.status.flags.wait":                                        {interactive, interactive},
-		"commandGroups.cloud.flags.env":                                     {interactive, interactive},
+		"commands.draft.flags.level":                                        {nested},
+		"commands.status.flags.wait":                                        {interactive},
+		"commandGroups.cloud.flags.env":                                     {interactive},
 		"commandGroups.cloud.subcommands.status.flags.follow":               {interactive},
 		"commandGroups.cloud.subcommands.status.subcommands.show.flags.raw": {nested},
 	}
