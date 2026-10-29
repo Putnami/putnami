@@ -77,7 +77,8 @@ decisions with `missions ask`, and reply to your messages with
 `missions reply`. `missions status` reads a mission's view and a page of its
 sessions: each session's state, loop stage, token usage and branch, and its
 error or `waitUntil` when it failed or waits, newest first. Its cursor names
-the last session of a page, so a sync between two pages loses none.
+the last session of a page, so a sync between two pages repeats no session
+and skips none that did not sync.
 Decision ids are `D-<n>`, message ids `M-<n>`.
 
 You answer a decision and write a message as **files in the store
