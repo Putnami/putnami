@@ -343,7 +343,7 @@ func namesRegistryDependency(raw map[string]any) bool {
 	return false
 }
 
-// surfaceNeedsGate reports whether a raw command, command-group, or tool value
+// surfaceNeedsGate reports whether a raw command, command-group, or provider value
 // requires the contract gate. A missing key (nil) and an empty JSON object are
 // hook-only and skip the gate; a non-empty object — or any non-object type —
 // must be gated.

@@ -100,11 +100,12 @@ type ProjectRef struct {
 
 // Selection is the resolved project selection of one provider call.
 //
-// It marshals BYTE-IDENTICALLY to protocols/job's Selection, which marshals
-// byte-identically to the CLI's own ResolvedSelection: one resolver answers
-// the planned jobs, the interactive commands and the providers, so the
-// surfaces cannot disagree about what a narrowing meant. The equality is
-// pinned by a drift test.
+// Each of its members marshals byte-identically to the member of the same
+// name in protocols/job's Selection, which marshals byte-identically to the
+// CLI's own ResolvedSelection: one resolver answers the planned jobs, the
+// interactive commands and the providers, so the surfaces cannot disagree
+// about what a narrowing meant. A provider reads no reuse or release-set
+// member, so this type carries none. A drift test pins the shared members.
 type Selection struct {
 	// Mode is how the projection was chosen: one of SelectionModes.
 	Mode string `json:"mode"`
