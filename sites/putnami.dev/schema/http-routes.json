@@ -2255,21 +2255,6 @@
     },
     {
       "match": "exact",
-      "path": "/docs/spec-driven-development/mcp-tools",
-      "methods": [
-        "GET",
-        "HEAD"
-      ],
-      "publicEdge": true,
-      "provenance": {
-        "project": "putnami.dev",
-        "package": "@putnami/web",
-        "sourceKind": "file-route",
-        "evidencePath": "src/app/docs/[...page]/page.tsx"
-      }
-    },
-    {
-      "match": "exact",
       "path": "/docs/spec-driven-development/parity",
       "methods": [
         "GET",
