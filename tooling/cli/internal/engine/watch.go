@@ -157,9 +157,10 @@ func watchIterationRequest(
 		// same command produced outside watch.
 		CommandParams:  req.CommandParams,
 		PlanExtensions: planExtensions,
-		// An extension alias forwards --dry-run to the extension as a job param and
-		// still executes; dropping this would silently turn every iteration of
-		// `putnami <group> serve --dry-run --watch` into a plan preview.
+		// An extension alias forwards --dry-run to a subcommand that declares it
+		// as a job param and still executes; dropping this would silently turn
+		// every iteration of `putnami <group> serve --dry-run --watch` into a
+		// plan preview.
 		ExecutesUnderDryRun: req.ExecutesUnderDryRun,
 		ServeProcessEnv:     req.ServeProcessEnv,
 		watchIteration:      true,

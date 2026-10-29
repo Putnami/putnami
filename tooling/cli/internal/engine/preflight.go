@@ -50,8 +50,8 @@ var errNoPreflightGate = protocolcli.InvalidConfigf(
 // untouched (an explicit acceptance criterion of the slice). It is likewise a
 // no-op when --dry-run previews the plan rather than executing — which is why it
 // reads previewsOnly and not Global.DryRun: the extension-alias adapter forwards
-// --dry-run to the extension as a job param and still runs the job, so that run
-// is gated like any other execution.
+// --dry-run to a subcommand that declares it as a job param and still runs the
+// job, so that run is gated like any other execution.
 //
 // The gate reuses the exported engine invocation the deploy tooling calls
 // (commands.DoctorPreflight, injected as Request.Preflight), so a build and a

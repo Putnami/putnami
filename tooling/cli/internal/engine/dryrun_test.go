@@ -166,12 +166,12 @@ func TestDropUndryableSideEffectJobs_InertOutsideExecutingDryRun(t *testing.T) {
 		t.Fatal("an ordinary run must not be filtered")
 	}
 
-	// The alias shape without --dry-run: ExecutesUnderDryRun is always true
-	// there, but no dry-run param was synthesized — the job must run.
-	alias := &Request{ExecutesUnderDryRun: true}
-	alias.Global.Quiet = true
-	if kept := dropUndryableSideEffectJobs(alias, []*scheduler.ScheduledJob{undeclared}); len(kept) != 1 {
-		t.Fatal("an alias run without --dry-run must not be filtered")
+	// A run that executes under dry-run with no synthesized dry-run param has
+	// nothing to protect: the job must run.
+	unsynthesized := &Request{ExecutesUnderDryRun: true}
+	unsynthesized.Global.Quiet = true
+	if kept := dropUndryableSideEffectJobs(unsynthesized, []*scheduler.ScheduledJob{undeclared}); len(kept) != 1 {
+		t.Fatal("an executing run without a dry-run param must not be filtered")
 	}
 
 	// The alias shape WITH --dry-run: the param is gated on the command's own
