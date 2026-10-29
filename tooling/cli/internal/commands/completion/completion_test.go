@@ -94,7 +94,7 @@ func TestCompletionZsh(t *testing.T) {
 	if !strings.Contains(output, "'--path[Workspace-relative project path]:path:'") {
 		t.Error("expected projects create flag in zsh completion")
 	}
-	if !strings.Contains(output, "'ts:TypeScript'") {
+	if !strings.Contains(output, "                            'ts'\n") {
 		t.Error("expected workspace init extension values in zsh completion")
 	}
 	if !strings.Contains(output, "'upgrade:Upgrade CLI, extensions, and dependencies'") {

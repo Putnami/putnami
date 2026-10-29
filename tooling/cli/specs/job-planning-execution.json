@@ -50,6 +50,10 @@
       "text": "In bash 4 and later, which split a completion word at each colon, completion keeps a colon inside its word: a command alias such as build:prod takes the flags of its command, and a name that holds a colon completes in place."
     },
     {
+      "id": "completion-offers-a-flag-value-in-its-slot",
+      "text": "After a flag that takes a value, completion offers only its values in bash, zsh and fish: project targets after --projects, project names after --exclude, the values the catalog or extension lists, and nothing for a free value, except files in fish after a path. This holds after --flag=, a short spelling and a command alias. A job-only flag on a core command offers nothing, and help nothing after --projects. The word after the value completes as the word before the flag."
+    },
+    {
       "id": "extension-verb-vocabulary",
       "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },

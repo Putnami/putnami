@@ -344,7 +344,7 @@ func zshCompletionOffers(t *testing.T, dir, script, state string, words []string
 	}
 	driver := `_arguments() { state=` + state + `; return 0; }
 _describe() { local entry; for entry in "${(@P)4}"; do print -rn -- "describe:${entry}"; print -n '\0'; done; }
-compadd() { local word; for word in "$@"; do print -rn -- "word:${word}"; print -n '\0'; done; }
+compadd() { [[ "$1" == -- ]] && shift; local word; for word in "$@"; do print -rn -- "word:${word}"; print -n '\0'; done; }
 _values() { shift; local spec; for spec in "$@"; do print -rn -- "value:${spec}"; print -n '\0'; done; }
 words=(` + strings.Join(quoted, " ") + `)
 CURRENT=` + strconv.Itoa(len(words)) + `

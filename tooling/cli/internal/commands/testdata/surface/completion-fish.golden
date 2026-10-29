@@ -88,14 +88,9 @@ function __putnami_job_target
     not __putnami_is_help; and __putnami_seen_from $argv
 end
 
-# The value of a flag follows that flag, the last word before the cursor.
-function __putnami_flag_value
-    set -l tokens (commandline -opc)
-    not __putnami_leading_flag; and test "$tokens[-1]" = "$argv[1]"
-end
-
-function __putnami_target_value
-    not __putnami_is_help; and __putnami_flag_value $argv
+# --projects takes a project target on every command but help.
+function __putnami_target_flag
+    not __putnami_leading_flag; and not __putnami_is_help
 end
 
 # Job commands
@@ -264,13 +259,13 @@ complete -c putnami -n '__putnami_no_leading_flag' -l 'debug' -d 'Stream all eve
 complete -c putnami -n '__putnami_no_leading_flag' -l 'help' -d 'Show help'
 complete -c putnami -n '__putnami_no_leading_flag' -l 'all' -d 'All projects'
 complete -c putnami -n '__putnami_no_leading_flag' -l 'impacted' -d 'Projects affected by git changes'
-complete -c putnami -n '__putnami_no_leading_flag' -l 'projects' -d 'Comma-separated project names'
-complete -c putnami -n '__putnami_no_leading_flag' -l 'tag' -d 'Filter by tags'
-complete -c putnami -n '__putnami_no_leading_flag' -l 'exclude-tag' -d 'Exclude by tags'
-complete -c putnami -n '__putnami_no_leading_flag' -l 'baseline' -d 'Custom git baseline for --impacted; a job command with no target or --all implies --impacted'
-complete -c putnami -n '__putnami_no_leading_flag' -l 'credential-fd' -d 'Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'projects' -d 'Comma-separated project names' -x
+complete -c putnami -n '__putnami_no_leading_flag' -l 'tag' -d 'Filter by tags' -x
+complete -c putnami -n '__putnami_no_leading_flag' -l 'exclude-tag' -d 'Exclude by tags' -x
+complete -c putnami -n '__putnami_no_leading_flag' -l 'baseline' -d 'Custom git baseline for --impacted; a job command with no target or --all implies --impacted' -x
+complete -c putnami -n '__putnami_no_leading_flag' -l 'credential-fd' -d 'Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2' -x
 complete -c putnami -n '__putnami_no_leading_flag' -l 'no-cache' -d 'Force re-execution (skip cache)'
-complete -c putnami -n '__putnami_no_leading_flag' -l 'output' -d 'Output format: text | json | jsonl | cloud-logging'
+complete -c putnami -n '__putnami_no_leading_flag' -l 'output' -d 'Output format: text | json | jsonl | cloud-logging' -x -a 'text json jsonl cloud-logging'
 complete -c putnami -n '__putnami_no_leading_flag' -l 'json' -d 'Shorthand for --output=json'
 complete -c putnami -n '__putnami_no_leading_flag' -l 'quiet' -d 'Suppress non-error output'
 complete -c putnami -n '__putnami_no_leading_flag' -l 'color' -d 'Force color output'
@@ -279,47 +274,47 @@ complete -c putnami -n '__putnami_no_leading_flag' -l 'version' -d 'Show version
 
 # Structured command flags
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'continue-on-error' -d 'Don\'t abort a verified run on the first failure'
-complete -c putnami -n '__putnami_seen_path cache verify' -l 'cpu-policy' -d 'CPU ceiling policy: critical-path | measured' -r
-complete -c putnami -n '__putnami_seen_path cache verify' -l 'exclude' -d 'Leave these projects out of the verified runs' -r
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'cpu-policy' -d 'CPU ceiling policy: critical-path | measured' -a 'critical-path measured' -x
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'exclude' -d 'Leave these projects out of the verified runs' -x
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'impacted-strict' -d 'Fail when the --impacted baseline can\'t be resolved'
-complete -c putnami -n '__putnami_seen_path cache verify' -l 'profile' -d 'Deployment profile the verified runs use: dev | test | production' -r
-complete -c putnami -n '__putnami_seen_path cache verify' -l 'retry' -d 'Retry transient failures in the verified runs' -r
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'profile' -d 'Deployment profile the verified runs use: dev | test | production' -a 'dev production test' -x
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'retry' -d 'Retry transient failures in the verified runs' -x
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'trace-profile' -d 'Write the trace events of the last verified run (Chrome trace format)' -r
 complete -c putnami -n '__putnami_seen_path cli list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path cli use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
-complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Project ID, path, or name; default is every workspace project' -r
+complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Project ID, path, or name; default is every workspace project' -x
 complete -c putnami -n '__putnami_seen_path deps add' -l 'dry-run' -d 'Print the planned edit and change nothing'
 complete -c putnami -n '__putnami_seen_path deps prune' -l 'dry-run' -d 'List the edges to remove and change nothing'
 complete -c putnami -n '__putnami_seen_path deps remove' -l 'dry-run' -d 'Print the planned edit and change nothing'
 complete -c putnami -n '__putnami_seen_path deps rm' -l 'dry-run' -d 'Print the planned edit and change nothing'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
-complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r
-complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -r
+complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -x
+complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -x
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'dest' -d 'Materialize into this artifact-store root instead of the machine-global one' -r
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
-complete -c putnami -n '__putnami_seen_path extensions install' -l 'platform' -d 'Materialize artifacts for another platform (skips install hooks and the lock write)' -r
+complete -c putnami -n '__putnami_seen_path extensions install' -l 'platform' -d 'Materialize artifacts for another platform (skips install hooks and the lock write)' -x
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'user' -d 'Pin one registry extension in the user scope (~/.putnami/user) so its commands run outside any workspace'
 complete -c putnami -n '__putnami_seen_path extensions list' -l 'user' -d 'List the extensions pinned in the user scope (~/.putnami/user) instead of the workspace'
 complete -c putnami -n '__putnami_seen_path extensions remove' -l 'user' -d 'Remove the extension from the user scope (~/.putnami/user) instead of the workspace'
 complete -c putnami -n '__putnami_seen_path help' -l 'man' -d 'Render the full reference as a man page'
 complete -c putnami -n '__putnami_seen_path help' -l 'markdown' -d 'Render the full reference as Markdown'
-complete -c putnami -n '__putnami_seen_path impact-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -r
-complete -c putnami -n '__putnami_seen_path impact-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -r
-complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
-complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -r
+complete -c putnami -n '__putnami_seen_path impact-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -x
+complete -c putnami -n '__putnami_seen_path impact-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'
-complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project' -r
+complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
-complete -c putnami -n '__putnami_seen_path init' -l 'workspace' -d 'Workspace name override' -r
+complete -c putnami -n '__putnami_seen_path init' -l 'workspace' -d 'Workspace name override' -x
 complete -c putnami -n '__putnami_seen_path install' -l 'latest' -d 'Ignore the lock file and resolve the latest extension and template versions'
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'apply' -d 'Perform the migration, atomically and idempotently'
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'check' -d 'Report the pending migration without writing (default); exits non-zero when a migration is needed'
 complete -c putnami -n '__putnami_seen_path pin' -l 'remove' -d 'Remove the CLI version pin'
-complete -c putnami -n '__putnami_seen_path projects create' -l 'channel' -d 'Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
+complete -c putnami -n '__putnami_seen_path projects create' -l 'channel' -d 'Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
 complete -c putnami -n '__putnami_seen_path projects create' -l 'force' -d 'Overwrite an existing project directory'
 complete -c putnami -n '__putnami_seen_path projects create' -l 'path' -d 'Workspace-relative project path' -r
-complete -c putnami -n '__putnami_seen_path projects create' -l 'template' -d 'Template to scaffold from' -r
+complete -c putnami -n '__putnami_seen_path projects create' -l 'template' -d 'Template to scaffold from' -x
 complete -c putnami -n '__putnami_seen_path projects deps' -l 'dependents' -d 'List the projects that depend on the project instead of the ones it depends on'
 complete -c putnami -n '__putnami_seen_path projects deps' -l 'transitive' -d 'Follow the edges transitively instead of listing direct ones'
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'dry-run' -d 'Show the changes without applying them'
@@ -327,21 +322,21 @@ complete -c putnami -n '__putnami_seen_path projects sync' -l 'prune' -d 'Drop c
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'skip-install' -d 'Do not run dependency installation after syncing'
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'remove' -d 'Remove the given tags from the project'
 complete -c putnami -n '__putnami_seen_path projects tag' -l 'set' -d 'Replace the project\'s tags with the given list'
-complete -c putnami -n '__putnami_seen_path report' -l 'session' -d 'Report to read, by session ID (default: the newest CLI-driven run\'s)' -r
-complete -c putnami -n '__putnami_seen_path sessions export' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not emitted' -r
-complete -c putnami -n '__putnami_seen_path sessions inspect' -l 'run' -d 'Inspect the session of a remote attempt by its attempt reference or submission key, resuming the attempt first when it was never imported' -r
-complete -c putnami -n '__putnami_seen_path sessions list' -l 'revision' -d 'Keep only sessions whose recorded tree sat on this commit; a lowercase hex prefix of the commit id, never a ref name' -r
-complete -c putnami -n '__putnami_seen_path sessions replay' -l 'session' -d 'Exact retained session id; latest is not accepted' -r
+complete -c putnami -n '__putnami_seen_path report' -l 'session' -d 'Report to read, by session ID (default: the newest CLI-driven run\'s)' -x
+complete -c putnami -n '__putnami_seen_path sessions export' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not emitted' -x
+complete -c putnami -n '__putnami_seen_path sessions inspect' -l 'run' -d 'Inspect the session of a remote attempt by its attempt reference or submission key, resuming the attempt first when it was never imported' -x
+complete -c putnami -n '__putnami_seen_path sessions list' -l 'revision' -d 'Keep only sessions whose recorded tree sat on this commit; a lowercase hex prefix of the commit id, never a ref name' -x
+complete -c putnami -n '__putnami_seen_path sessions replay' -l 'session' -d 'Exact retained session id; latest is not accepted' -x
 complete -c putnami -n '__putnami_seen_path sessions summary' -l 'by-digest' -d 'Group the selected sessions\' task records by input digest: records per digest, and how many executed, reused or failed'
-complete -c putnami -n '__putnami_seen_path sessions summary' -l 'command' -d 'Keep only top-level sessions whose recorded command set is exactly this comma-separated list, in any order; a nested run never matches' -r
-complete -c putnami -n '__putnami_seen_path sessions summary' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not listed' -r
+complete -c putnami -n '__putnami_seen_path sessions summary' -l 'command' -d 'Keep only top-level sessions whose recorded command set is exactly this comma-separated list, in any order; a nested run never matches' -x
+complete -c putnami -n '__putnami_seen_path sessions summary' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not listed' -x
 complete -c putnami -n '__putnami_seen_path templates install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
 complete -c putnami -n '__putnami_seen_path templates package' -l 'stable' -d 'Publish under a stable version instead of a prerelease'
-complete -c putnami -n '__putnami_seen_path templates package' -l 'version' -d 'Version to stamp on the produced archive' -r
-complete -c putnami -n '__putnami_seen_path templates test' -l 'channel' -d 'Install the template\'s extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
+complete -c putnami -n '__putnami_seen_path templates package' -l 'version' -d 'Version to stamp on the produced archive' -x
+complete -c putnami -n '__putnami_seen_path templates test' -l 'channel' -d 'Install the template\'s extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
 complete -c putnami -n '__putnami_seen_path templates test' -l 'keep' -d 'Keep the rendered temporary workspace for inspection'
 complete -c putnami -n '__putnami_seen_path templates test' -l 'skip-build' -d 'Render the template without running build and test on it'
-complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -a 'canary stable' -x
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'cli' -d 'Only upgrade the CLI binary'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'continue-on-error' -d 'Run the remaining upgrade phases after one fails'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'deps' -d 'Only upgrade framework dependencies'
@@ -349,15 +344,12 @@ complete -c putnami -n '__putnami_seen_path upgrade' -l 'dry-run' -d 'Resolve an
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'extensions' -d 'Only upgrade extensions and templates'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'from-source' -d 'Build the CLI from this workspace\'s source and install it as the active binary, bypassing the download channel (self-host escape hatch; combine with --global to replace the global CLI)'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'global' -d 'Upgrade the global CLI in ~/.putnami/bin instead of the workspace pin; inside a workspace the other phases still run, outside one only the CLI is upgraded (alias: -g)'
-complete -c putnami -n '__putnami_seen_path upgrade' -l 'namespace' -d 'Release-set namespace that published the --release id; accepted only with --release' -r
-complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)' -r
-complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -r
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -r
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'namespace' -d 'Release-set namespace that published the --release id; accepted only with --release' -x
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)' -x
+complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -x
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project' -r
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -r
-
-# Output format values
-complete -c putnami -n '__putnami_flag_value --output' -a 'text json jsonl cloud-logging'
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -x

@@ -644,6 +644,19 @@
           }
         },
         {
+          "id": "completion-offers-a-flag-value-in-its-slot",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "completion-offers-only-the-values-of-the-flag-before-the-cursor"
+            ]
+          }
+        },
+        {
           "id": "extension-verb-vocabulary",
           "stage": "coded",
           "evidenceKinds": [

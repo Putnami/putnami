@@ -95,15 +95,9 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings *works
 		knownSubcommandPaths: map[string]bool{},
 		structuredFlags:      map[string][]StructuredFlagInfo{},
 		projectPositionals:   map[string]bool{},
-		structuredFlagValues: map[string][]completionValue{
-			"workspace init --extension": {
-				{Value: "ts", Description: "TypeScript"},
-				{Value: "go", Description: "Go"},
-				{Value: "py", Description: "Python"},
-			},
-		},
-		globalFlags: commandmeta.GlobalFlags(),
-		commandDesc: map[string]string{},
+		structuredFlagValues: map[string][]completionValue{},
+		globalFlags:          commandmeta.GlobalFlags(),
+		commandDesc:          map[string]string{},
 	}
 	addCatalogCompletions(&ctx)
 
@@ -208,6 +202,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings *works
 					ctx.structuredFlags[name],
 					manifestFlagsToStructured(flags),
 				)
+				ctx.addManifestFlagValues(name, flags)
 			}
 		}
 		addExtensionCommandGroupCompletions(&ctx, extensions)
@@ -278,6 +273,12 @@ func addCatalogCompletions(ctx *completionContext) {
 				ctx.structuredFlags[command.Path],
 				structuredFlagInfos(detail.Flags),
 			)
+			for _, flag := range detail.Flags {
+				key := command.Path + " " + flag.Long
+				for _, value := range flag.Values {
+					ctx.structuredFlagValues[key] = appendUniqueCompletionValue(ctx.structuredFlagValues[key], completionValue{Value: value})
+				}
+			}
 		}
 	}
 }
@@ -333,6 +334,7 @@ func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.V
 		}
 		if flags := ctx.structuredFlags[alias.Command]; len(flags) > 0 {
 			ctx.structuredFlags[alias.Name] = mergeStructuredCompletionFlags(ctx.structuredFlags[alias.Name], flags)
+			ctx.copyFlagValues(alias.Command, alias.Name)
 		}
 		if ctx.knownSubcommandPaths[alias.Command] {
 			ctx.knownSubcommandPaths[alias.Name] = true
@@ -404,6 +406,7 @@ func addPositionalDefaultCompletions(ctx *completionContext, extensions []*exten
 		}
 		if flags := ctx.structuredFlags[group+" "+def.Subcommand]; len(flags) > 0 {
 			ctx.structuredFlags[group] = mergeStructuredCompletionFlags(ctx.structuredFlags[group], flags)
+			ctx.copyFlagValues(group+" "+def.Subcommand, group)
 		}
 	}
 }
@@ -437,6 +440,7 @@ func addExtensionSubcommandCompletions(
 				ctx.structuredFlags[childPath],
 				manifestFlagsToStructured(effectiveFlags),
 			)
+			ctx.addManifestFlagValues(childPath, effectiveFlags)
 		}
 
 		if len(sub.Subcommands) > 0 {
@@ -488,6 +492,7 @@ func manifestFlagsToStructured(flags map[string]extension.FlagDefinition) []Stru
 		flag := flags[name]
 		info := StructuredFlagInfo{
 			Long:        "--" + name,
+			Short:       manifestShort(flag.Short),
 			Description: flag.Description,
 		}
 		if flag.Type != "" && flag.Type != "boolean" {
@@ -496,6 +501,15 @@ func manifestFlagsToStructured(flags map[string]extension.FlagDefinition) []Stru
 		out = append(out, info)
 	}
 	return out
+}
+
+// manifestShort returns the short spelling of a manifest flag with its dash: a
+// manifest may write it as "m" or "-m", and the parser reads both as "-m".
+func manifestShort(short string) string {
+	if short == "" || strings.HasPrefix(short, "-") {
+		return short
+	}
+	return "-" + short
 }
 
 func mergeStructuredCompletionFlags(first, second []StructuredFlagInfo) []StructuredFlagInfo {
@@ -609,15 +623,76 @@ func (c completionContext) offersGlobalFlag(long string) bool {
 	return slices.ContainsFunc(c.globalFlags, func(flag commandmeta.GlobalFlag) bool { return flag.Long == long })
 }
 
-// globalFlagValues returns the candidate values a global flag accepts, so a
-// shell that completes them inline does not retype the vocabulary.
-func (c completionContext) globalFlagValues(long string) []string {
-	for _, flag := range c.globalFlags {
-		if flag.Long == long {
-			return flag.Values
+// valueSlot is the word after a flag of a command that takes a value: Key is
+// "path --flag", or "path -f" for the flag's short spelling, and Values are the
+// words the slot offers, none when the value is free.
+type valueSlot struct {
+	Key    string
+	Values []completionValue
+}
+
+// commandValueSlots returns the value slots of the flags of a command, sorted
+// by key. The values of a flag are in structuredFlagValues under its long
+// spelling, which its short spelling shares.
+func (c completionContext) commandValueSlots() []valueSlot {
+	slots := map[string][]completionValue{}
+	for path, flags := range c.structuredFlags {
+		for _, flag := range flags {
+			if flag.ValueName == "" {
+				continue
+			}
+			values := c.structuredFlagValues[path+" "+flag.Long]
+			slots[path+" "+flag.Long] = values
+			if flag.Short != "" {
+				slots[path+" "+flag.Short] = values
+			}
 		}
 	}
-	return nil
+	for key, values := range c.structuredFlagValues {
+		slots[key] = values
+	}
+	out := make([]valueSlot, 0, len(slots))
+	for key, values := range slots {
+		out = append(out, valueSlot{Key: key, Values: values})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
+}
+
+// copyFlagValues gives the command to the flag values of the command from, so
+// an alias or a group default completes the values of its target.
+func (c completionContext) copyFlagValues(from, to string) {
+	copied := map[string][]completionValue{}
+	for key, values := range c.structuredFlagValues {
+		if flag, ok := strings.CutPrefix(key, from+" -"); ok {
+			copied[to+" -"+flag] = slices.Clone(values)
+		}
+	}
+	maps.Copy(c.structuredFlagValues, copied)
+}
+
+// addManifestFlagValues records the choices an extension lists for the flags
+// of the command path.
+func (c completionContext) addManifestFlagValues(path string, flags map[string]extension.FlagDefinition) {
+	for name, flag := range flags {
+		for _, choice := range flag.Choices {
+			key := path + " --" + name
+			c.structuredFlagValues[key] = appendUniqueCompletionValue(c.structuredFlagValues[key], completionValue{Value: choice})
+		}
+	}
+}
+
+// valueGlobalFlags returns the global flags that take a value and complete
+// neither project targets (--projects) nor project names (--exclude): each
+// completes the values the catalog lists for it, or none.
+func (c completionContext) valueGlobalFlags() []commandmeta.GlobalFlag {
+	var flags []commandmeta.GlobalFlag
+	for _, flag := range c.globalFlags {
+		if flag.Type == commandmeta.FlagValue && flag.Long != "--projects" && flag.Long != "--exclude" {
+			flags = append(flags, flag)
+		}
+	}
+	return flags
 }
 
 // plainWord reports whether bash, zsh and fish all read value as itself and as

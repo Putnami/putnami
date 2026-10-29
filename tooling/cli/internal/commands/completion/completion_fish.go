@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -105,14 +106,9 @@ function __putnami_job_target
     not __putnami_is_help; and __putnami_seen_from $argv
 end
 
-# The value of a flag follows that flag, the last word before the cursor.
-function __putnami_flag_value
-    set -l tokens (commandline -opc)
-    not __putnami_leading_flag; and test "$tokens[-1]" = "$argv[1]"
-end
-
-function __putnami_target_value
-    not __putnami_is_help; and __putnami_flag_value $argv
+# --projects takes a project target on every command but help.
+function __putnami_target_flag
+    not __putnami_leading_flag; and not __putnami_is_help
 end
 
 # Job commands
@@ -161,14 +157,7 @@ end
 
 	iox.Fprintf(w, "\n# Global flags\n")
 
-	for _, flag := range ctx.globalFlags {
-		condition := fishCondition("__putnami_no_leading_flag")
-		if flag.JobOnly {
-			condition = fishCondition("__putnami_job_flag")
-		}
-		iox.Fprintf(w, "complete -c putnami -n %s -l %s -d %s\n",
-			condition, fishQuote(strings.TrimPrefix(flag.Long, "--")), fishQuote(flag.Description))
-	}
+	writeFishGlobalFlags(w, ctx)
 
 	iox.Fprintf(w, "\n# Structured command flags\n")
 	keys := make([]string, 0, len(ctx.structuredFlags))
@@ -198,35 +187,13 @@ end
 				option += " -a " + fishArguments(names...)
 			}
 			if flag.ValueName != "" {
-				option += " -r"
+				option += fishValueOption(flag.ValueName)
+				if short := fishShort(flag.Short); short != "" {
+					option += " -s " + short
+				}
 			}
 			iox.Fprintln(w, option)
 		}
-	}
-
-	// Output format completion
-	iox.Fprintf(w, "\n# Output format values\n")
-	iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-		fishCondition("__putnami_flag_value", "--output"), fishArguments(ctx.globalFlagValues("--output")...))
-
-	// --projects accepts any target form ResolveTarget understands:
-	// IDs, names, basenames, and aliases.
-	projectTargets := make([]string, 0, len(ctx.projectIDs)+len(ctx.projects)+len(ctx.projectBasenames)+len(ctx.aliases))
-	projectTargets = append(projectTargets, ctx.projectIDs...)
-	projectTargets = append(projectTargets, ctx.projects...)
-	projectTargets = append(projectTargets, ctx.projectBasenames...)
-	projectTargets = append(projectTargets, aliasNames(ctx.aliases)...)
-	if len(projectTargets) > 0 {
-		iox.Fprintf(w, "\n# Project targets (for --projects flag value)\n")
-		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-			fishCondition("__putnami_target_value", "--projects"), fishArguments(projectTargets...))
-	}
-
-	// --exclude matches project names.
-	if len(ctx.projects) > 0 && ctx.offersGlobalFlag("--exclude") {
-		iox.Fprintf(w, "\n# Project names (for --exclude flag value)\n")
-		iox.Fprintf(w, "complete -c putnami -n %s -a %s\n",
-			fishCondition("__putnami_target_value", "--exclude"), fishArguments(ctx.projects...))
 	}
 
 	// Positional project targets after job commands: IDs, names, basenames, aliases.
@@ -252,6 +219,47 @@ end
 	}
 }
 
+// writeFishGlobalFlags declares the global flags.
+func writeFishGlobalFlags(w io.Writer, ctx completionContext) {
+	// A flag that takes a value is declared required (-r) and, unless its value
+	// is a path, exclusive (-x: no file), so the word after it offers that
+	// flag's arguments and nothing else: the values the catalog lists, the
+	// project targets for --projects, the project names for --exclude, and none
+	// for a flag whose value is free. Several entries for one flag merge their
+	// arguments where their conditions hold.
+	projectTargets := make([]string, 0, len(ctx.projectIDs)+len(ctx.projects)+len(ctx.projectBasenames)+len(ctx.aliases))
+	projectTargets = append(projectTargets, ctx.projectIDs...)
+	projectTargets = append(projectTargets, ctx.projects...)
+	projectTargets = append(projectTargets, ctx.projectBasenames...)
+	projectTargets = append(projectTargets, aliasNames(ctx.aliases)...)
+	for _, flag := range ctx.globalFlags {
+		condition := fishCondition("__putnami_no_leading_flag")
+		if flag.JobOnly {
+			condition = fishCondition("__putnami_job_flag")
+		}
+		name := fishQuote(strings.TrimPrefix(flag.Long, "--"))
+		option := "complete -c putnami -n " + condition + " -l " + name + " -d " + fishQuote(flag.Description)
+		if flag.Type == commandmeta.FlagValue {
+			option += fishValueOption(flag.ValueName)
+		}
+		switch {
+		case flag.Long == "--exclude" && len(ctx.projects) > 0:
+			// --exclude matches project names. It is job-only, which excludes
+			// help, a core root.
+			option += " -a " + fishArguments(ctx.projects...)
+		case flag.Type == commandmeta.FlagValue && flag.Long != "--projects" && len(flag.Values) > 0:
+			option += " -a " + fishArguments(flag.Values...)
+		}
+		iox.Fprintln(w, option)
+		if flag.Long == "--projects" && len(projectTargets) > 0 {
+			// --projects accepts any target form ResolveTarget understands:
+			// IDs, names, basenames, and aliases. Help takes no project target.
+			iox.Fprintf(w, "complete -c putnami -n %s -l %s -d %s -x -a %s\n",
+				fishCondition("__putnami_target_flag"), name, fishQuote(flag.Description), fishArguments(projectTargets...))
+		}
+	}
+}
+
 // writeFishHelpCompletions completes the command help describes, which help
 // reads from its next two words: the command names, then the subcommands of
 // the first word. paths are the sorted keys of ctx.subcommands. A flag before
@@ -269,6 +277,26 @@ func writeFishHelpCompletions(w io.Writer, ctx completionContext, paths []string
 			iox.Fprintf(w, "complete -c putnami -n %s -a %s\n", fishCondition("__putnami_help_word", root), fishArguments(sub))
 		}
 	}
+}
+
+// fishValueOption returns the option that makes the word after a flag its
+// value: -x for a value that no file completes, -r for a path or a directory,
+// which fish completes with the files of the current directory.
+func fishValueOption(valueName string) string {
+	if valueName == "<path>" || valueName == "<dir>" {
+		return " -r"
+	}
+	return " -x"
+}
+
+// fishShort returns the argument of `complete -s` for a short spelling such as
+// "-m", or "" when the spelling is not one dash and one character.
+func fishShort(short string) string {
+	letter, ok := strings.CutPrefix(short, "-")
+	if !ok || len([]rune(letter)) != 1 || letter == "-" {
+		return ""
+	}
+	return fishQuote(letter)
 }
 
 // fishQuote single-quotes a value as one fish word, read once: a description

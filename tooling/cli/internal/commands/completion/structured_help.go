@@ -13,6 +13,7 @@ type StructuredCommandInfo struct {
 // StructuredFlagInfo describes a structured-command flag for help and completion.
 type StructuredFlagInfo struct {
 	Long        string
+	Short       string
 	Description string
 	ValueName   string
 }
@@ -50,6 +51,7 @@ func structuredFlagInfos(flags []commandmeta.Flag) []StructuredFlagInfo {
 	for _, flag := range flags {
 		out = append(out, StructuredFlagInfo{
 			Long:        flag.Long,
+			Short:       flag.Short,
 			Description: flag.Description,
 			ValueName:   flag.ValueName,
 		})

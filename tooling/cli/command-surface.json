@@ -513,7 +513,12 @@
         },
         {
           "long": "--extension",
-          "type": "value"
+          "type": "value",
+          "values": [
+            "go",
+            "py",
+            "ts"
+          ]
         },
         {
           "long": "--force",
@@ -998,7 +1003,12 @@
         },
         {
           "long": "--extension",
-          "type": "value"
+          "type": "value",
+          "values": [
+            "go",
+            "py",
+            "ts"
+          ]
         },
         {
           "long": "--force",
