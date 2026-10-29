@@ -19,7 +19,7 @@
   "requirements": [
     {
       "id": "spec-mediated-generation",
-      "text": "Generation reads the provider's already-built contract: the project command waits for the build step that writes the contract, describe for a Go app and generate otherwise, so the document exists before either emitter runs and the compile's files are never read, and no task invokes another language's extension or the CLI."
+      "text": "Generation reads the provider's already-built contract: the project command runs after the build and reads only the step that writes the contract, describe for a Go app and generate otherwise, so the document exists before either emitter runs and the compile's files are never read, and no task invokes another language's extension or the CLI."
     },
     {
       "id": "protocol-conformant-manifest",

@@ -33,9 +33,14 @@ names a command.
 1. **A command's `dependsOn` may name one step of another command.** The form
    is `<command>~<step>`, the separator a plan name already uses. It is a
    same-project prerequisite: the planner plans the whole command, as for
-   `<command>`, and makes every root step of the dependent command wait for
-   that step alone. The `!` session barrier keeps naming whole commands;
-   `!<command>~<step>` is invalid.
+   `<command>`. Every root step of the dependent command depends on the named
+   step, and reads its files. It is also ordered after every other leaf step
+   of the command, by an order-only edge (`SerializeAfter`), so it runs where
+   a dependency on `<command>` runs it. Under
+   [ADR 0082 of `@putnami/cli`](../../../../tooling/cli/doc/adr/0082-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md),
+   an order-only edge keeps a leaf's files only when the dependent's key reads
+   a file the leaf writes. The `!` session barrier keeps naming whole
+   commands; `!<command>~<step>` is invalid.
 2. **A named step the plan does not hold adds no edge.** A step that the
    prerequisite command does not declare for the project, or that an `if`, an
    activation gate or `disable` removes, is not waited for, as a prerequisite
@@ -67,6 +72,12 @@ names a command.
 - **Wait for the named step's own dependencies when the step is removed.** A
   removed step is not on the path the dependent reads; naming the candidate
   steps states what the dependent reads.
+- **Wait for the named step alone.** The other leaves of the command order
+  the dependent against the jobs that read the files it writes. Without them,
+  a Go test could compile a generated client while `clientgen` rewrites it.
+- **Name `build~infra` in the `clientgen` manifest.** It orders `clientgen`
+  after the whole build, but each manifest that uses the form would have to
+  find its command's last step, and `infra`'s files would stay needed.
 
 ## Consequences
 
@@ -74,6 +85,7 @@ names a command.
   "requires a newer putnami".
 - In a `minimal` session, `compile` of a provider that runs `clientgen` serves
   from a result-only entry when nothing else reads its files.
-- `clientgen` still runs after the step that writes the contract it reads.
+- `clientgen` still runs after the whole `build`, as it did with a dependency
+  on `build`, and reads only the files of the step that writes its contract.
 - Impact analysis and toolchain preparation read `<command>~<step>` as the
   command it names.
