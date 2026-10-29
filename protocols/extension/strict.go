@@ -81,6 +81,12 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	cmdNames := sortedKeys(m.Commands)
 	for _, name := range cmdNames {
 		cmd := m.Commands[name]
+		// A plan name joins a command and a step with ~ (build~compile), so a
+		// ~ inside either name makes that join ambiguous.
+		if strings.Contains(name, "~") {
+			diags = append(diags, diag.Errorf("invalid-command-name", "commands."+name,
+				"command name %q must not contain ~, which joins a command and a step in a plan name", name))
+		}
 		for i, dep := range cmd.DependsOn {
 			target := strings.TrimPrefix(dep, "!")
 			if isExternalRef(target) {
@@ -183,6 +189,9 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 			field := fmt.Sprintf("commands.%s.run[%d]", name, i)
 			if step.ID == "" {
 				diags = append(diags, diag.Errorf("required-field", field+".id", "pipeline step id is required"))
+			} else if strings.Contains(step.ID, "~") {
+				diags = append(diags, diag.Errorf("invalid-step-id", field+".id",
+					"pipeline step id %q must not contain ~, which joins a command and a step in a plan name", step.ID))
 			}
 			if step.Task == "" {
 				diags = append(diags, diag.Errorf("required-field", field+".task", "pipeline step task is required"))

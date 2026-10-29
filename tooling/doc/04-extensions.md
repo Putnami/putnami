@@ -813,6 +813,7 @@ putnami extensions install --platform linux/amd64 --dest ./.gen/warm-artifacts
 - JSON Schema conformance
 - All pipeline steps reference defined tasks
 - Pipeline DAG is acyclic
+- No command name or pipeline step id holds a `~`, which joins a command and a step in a plan name (`build~compile`)
 - Activation file patterns are valid globs
 - Contract schema references are valid
 - No command, command group or subcommand declares a flag that the core parses as its own global flag, by name, by short alias or, for a boolean, by its `--no-` negation, where the command never receives it. `--plan`, `--retry`, or `-w` on a flag other than `--watch`, always fail. Some global names stay allowed where the core hands the flag over:
