@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "one-closed-catalog",
-      "text": "Each contract speaks only version 1, and an unknown contract none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers comments and merge; memory requires checkpoint, context and mission and offers search; missions requires ask, reply and sync. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey. Only missions.sync is host-only, and only a mutation can be."
+      "text": "Each contract speaks only version 1, an unknown one none. tasks requires find, get, create, update and transition and offers assign, claim and link; proposals requires find, review, status and upsert and offers comments and merge; memory requires checkpoint, context and mission and offers search; missions requires ask, reply and sync and offers status. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey. Only missions.sync is host-only, and only a mutation can be."
     },
     {
       "id": "well-formed-operations",
@@ -91,6 +91,10 @@
       "text": "A missions provider keeps, for each session, the stage and the usage of the last applied sync that carried them: a sync without them keeps the stored ones, and an ended session stays ended until a later sync."
     },
     {
+      "id": "missions-status",
+      "text": "missions.status, an optional read an agent may call, answers the named mission's view and its sessions, newest observation first, at most 50, each once: session, state, observedAt and, when held, stage, usage and branch of the last sync applied for it. A session whose last sync named another mission is not listed; an unknown mission has its empty view and no session. A provider without it is unsupported with operation.unsupported; an answer for another mission is provider.identity_mismatch."
+    },
+    {
       "id": "scenarios-normalize-requests",
       "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
     },
@@ -128,6 +132,7 @@
     "protocols/collaboration/doc/adr/0002-the-contracts-are-published-as-preview.md",
     "protocols/collaboration/doc/adr/0003-missions-contract.md",
     "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md",
-    "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md"
+    "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
+    "protocols/collaboration/doc/adr/0005-missions-status-reads-a-missions-sessions.md"
   ]
 }
