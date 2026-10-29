@@ -85,6 +85,9 @@ func (v Verifier) CheckHostedWorkflow(ctx context.Context, request HostedWorkflo
 	if ready != nil {
 		result.WouldCompleteAfterReady = strictEqual(ready.get("outcomeComplete"), true)
 		result.ReadyUnits = hostedReadyUnits(workflow, ready)
+		if !result.WouldCompleteAfterReady {
+			result.IncompleteReason = hostedOutcomeBlocker(ready)
+		}
 	}
 	if request.Status != nil {
 		hostedWorkflowStatus(request, request.Status)
@@ -117,6 +120,21 @@ func (r *verifyRun) hostedReadyProjection(workflow any, baseSHA string) (ready *
 		}
 	}()
 	return r.verifyWorkflow(workflow, true, baseSHA), ""
+}
+
+// hostedOutcomeBlocker names why a valid ready projection still leaves the
+// outcome incomplete: later requirements, or a unit short of its required stage.
+func hostedOutcomeBlocker(projection *jsObject) string {
+	if later, _ := projection.get("laterRequirements").(float64); later > 0 {
+		return fmt.Sprintf("workflow outcome has later requirements (%d)", int(later))
+	}
+	for _, item := range workflowList(projection.get("units"), "workflow unit projections") {
+		if blockers := workflowList(at(item, "blockers"), "workflow unit blockers"); len(blockers) > 0 {
+			return "workflow unit " + workflowText(at(item, "id"), "workflow unit ID") + ": " +
+				workflowText(blockers[0], "workflow unit blocker")
+		}
+	}
+	return "workflow outcome is incomplete"
 }
 
 func hostedReadyUnits(workflow any, projection *jsObject) []string {

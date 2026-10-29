@@ -70,6 +70,6 @@ func HostedWorkflowVerify(root string, recoverReport RecoverReport) HostedWorkfl
 		}
 		return HostedWorkflowResult{WorkflowSHA256: projection.WorkflowSHA256,
 			WouldCompleteAfterReady: projection.WouldCompleteAfterReady, OutcomeComplete: projection.OutcomeComplete,
-			ReadyUnits: projection.ReadyUnits}, nil
+			ReadyUnits: projection.ReadyUnits, IncompleteReason: projection.IncompleteReason}, nil
 	}
 }

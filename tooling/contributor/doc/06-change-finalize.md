@@ -67,7 +67,14 @@ directive.
 
 `--gate ci` with a task needs `--workflow-file <workflow.json>`, an immutable
 workflow record. Without `--partial-delivery`, it publishes only when that
-record makes the outcome eligible. With `--partial-delivery`, the record must
+record makes the outcome eligible. Eligibility needs, among other rules, every
+current unit at `candidate`, no later requirement, and a `proof` that names a
+local producer session on the same tree and its sibling
+`spec-verification.json`. The `--projects` gate of the
+last edit is such a session when it covers the project of each current
+requirement's spec. Otherwise the command stops before any write and names
+the blocker, for example `workflow ready needs native producer proof`. With
+`--partial-delivery`, the record must
 be valid. Each current unit at `candidate` whose native checks pass becomes
 ready, and the result carries its receipt. When no unit is eligible, for
 example a unit still at `building`, the proposal still publishes with the

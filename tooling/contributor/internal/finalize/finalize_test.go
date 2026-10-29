@@ -626,11 +626,17 @@ func TestHostedParentRequiresNativeWorkflowEligibilityAndStatus(t *testing.T) {
 				t.Fatalf("provider status was not bound to the proposal: %+v", request)
 			}
 		}
+		reason := ""
+		if !eligible {
+			reason = "workflow ready needs native producer proof"
+		}
 		return HostedWorkflowResult{WorkflowSHA256: "workflow-sha", WouldCompleteAfterReady: eligible,
-			OutcomeComplete: eligible && request.Status != nil, ReadyUnits: readyUnits}, nil
+			OutcomeComplete: eligible && request.Status != nil, ReadyUnits: readyUnits, IncompleteReason: reason}, nil
 	}
-	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 {
-		t.Fatalf("incomplete parent reached publication: %v", err)
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 ||
+		!strings.Contains(err.Error(), "cannot complete the parent: workflow ready needs native producer proof;") ||
+		!strings.Contains(err.Error(), "--partial-delivery") {
+		t.Fatalf("incomplete parent reached publication or hid its native blocker: %v", err)
 	}
 	eligible = true
 	result, err := f.Run(context.Background(), opts)

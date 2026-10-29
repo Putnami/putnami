@@ -180,7 +180,7 @@ func TestHostedChecksNeverStandForNativeProofOfABuildingUnit(t *testing.T) {
 	request.SHA256 = digest
 	preflight, err := f.checkHostedWorkflow(request)
 	if err != nil || preflight.WouldCompleteAfterReady || len(preflight.ReadyUnits) != 0 ||
-		!strings.Contains(preflight.IncompleteReason, "lacks passing native checks: first") {
+		!strings.Contains(preflight.IncompleteReason, "needs native producer proof") {
 		t.Fatalf("building unit preflight = %+v, %v; want a valid workflow with no ready unit", preflight, err)
 	}
 	request.Status = hostedPassingStatus(request.HeadSHA)
@@ -254,7 +254,8 @@ func TestHostedWorkflowPreservesLaterOutcomeScope(t *testing.T) {
 	request.SHA256 = digest
 	preflight, err := f.checkHostedWorkflow(request)
 	if err != nil || preflight.WouldCompleteAfterReady || preflight.OutcomeComplete ||
-		len(preflight.ReadyUnits) != 1 || preflight.ReadyUnits[0] != "first" {
+		len(preflight.ReadyUnits) != 1 || preflight.ReadyUnits[0] != "first" ||
+		preflight.IncompleteReason != "workflow outcome has later requirements (1)" {
 		t.Fatalf("later outcome preflight = %+v, %v", preflight, err)
 	}
 	request.Status = hostedPassingStatus(request.HeadSHA)
