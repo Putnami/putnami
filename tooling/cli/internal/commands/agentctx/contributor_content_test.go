@@ -480,7 +480,8 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 
 // TestContributorBuildLoopChecksDeclarationsBeforeThePush pins the local
 // check of a declarations commit: test and validate on the impacted projects
-// run before the push, and only a missing proof lets the push go on.
+// run before each declarations push, and only an error the code resolves lets
+// the push go on.
 func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "intent-first-validation", "the-build-loop-checks-declarations-before-it-pushes-them")
@@ -493,8 +494,13 @@ func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
 		t.Errorf("the Intent first section of show.md does not check the declarations commit before it pushes it: %q", section)
 	}
 	for _, want := range []string{
-		"except the missing proof of a requirement the commit declares (`features.unresolved_requirement`)",
+		"except an error the code resolves",
+		"the missing proof of a requirement the commit declares (`features.unresolved_requirement`)",
+		"whose check reads a file the code changes (`features.decision_violated`)",
+		"(`architecture.declared_binding_unobserved`, `architecture.declared_without_evidence`)",
+		"Name each tolerated error in the push body.",
 		"Push nothing while another error remains.",
+		"since the approval. Run the same check as step 1 before you push it.",
 	} {
 		if !strings.Contains(section, want) {
 			t.Errorf("the Intent first section of show.md lacks %q", want)

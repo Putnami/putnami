@@ -12,7 +12,7 @@ description = "GPT-6 Sol implementation worker for high-risk fixes involving inv
 config_file = "agents/fix-heavy.toml"
 
 [agents."fix-standard"]
-description = "GPT-6 Sol implementation worker for settled slices, mechanical changes included, following established repository patterns."
+description = "GPT-6 Luna implementation worker for settled slices, mechanical changes included, following established repository patterns."
 config_file = "agents/fix-standard.toml"
 
 [agents."reviewer"]
