@@ -157,6 +157,25 @@ func maximalSyncResult() *MissionsSyncResult {
 	return result
 }
 
+// maximalStatusResult fills the view and the sessions to their bounds.
+func maximalStatusResult() *MissionsStatusResult {
+	result := &MissionsStatusResult{
+		Mission:  MissionView{Key: fill(MaxTokenLength), Title: fill(MaxTitleLength), URL: maximalURL(0), Plan: maximalPlan(), OpenDecisions: []OpenDecision{}},
+		Sessions: []MissionSession{},
+	}
+	for i := range MaxOpenDecisions {
+		result.Mission.OpenDecisions = append(result.Mission.OpenDecisions, OpenDecision{ID: maximalID(i), Question: fill(MaxQuestionLength)})
+	}
+	for i := range MaxStatusSessions {
+		result.Sessions = append(result.Sessions, MissionSession{
+			Session: SessionRef{Engine: strings.Repeat("e", 32), ID: strings.Repeat("s", 128-len(strconv.Itoa(i))) + strconv.Itoa(i)}, State: SessionStateHandedBack,
+			ObservedAt: maximalUTC, Stage: LoopStageValidate, Branch: fill(MaxBranchLength),
+			Usage: &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
+		})
+	}
+	return result
+}
+
 func maximalSyncInput() *MissionsSyncInput {
 	plan := maximalPlan()
 	input := &MissionsSyncInput{
@@ -212,6 +231,7 @@ func TestMaxDocumentBytesHoldsEveryMaximalDocument(t *testing.T) {
 		"memory.checkpoint":  &MemoryCheckpointResult{Record: record, Replayed: true},
 		"memory.context":     &MemoryListResult{Items: []MemoryRecord{record}, Page: Page{Next: cursor}},
 		"missions.sync":      maximalSyncResult(),
+		"missions.status":    maximalStatusResult(),
 		"missions.ask": &MissionsAskResult{Decision: MissionDecision{
 			ID: maximalID(0), State: DecisionStateAnswered, URL: maximalURL(0), Answer: fill(MaxInboxTextLength), Option: maximalID(0),
 		}, Replayed: true},

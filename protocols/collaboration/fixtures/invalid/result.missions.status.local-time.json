@@ -1,0 +1,6 @@
+{
+  "mission": { "key": "issue-701", "title": "", "plan": { "steps": [] }, "openDecisions": [] },
+  "sessions": [
+    { "session": { "engine": "codex", "id": "s-1" }, "state": "working", "observedAt": "2026-10-29T10:00:00+01:00", "stage": "code" }
+  ]
+}

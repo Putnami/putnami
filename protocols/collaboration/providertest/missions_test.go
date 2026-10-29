@@ -37,8 +37,13 @@ type missionsMission struct {
 }
 
 type missionsSession struct {
+	ref      collab.SessionRef
+	mission  string
 	state    collab.SessionState
 	observed time.Time
+	stage    collab.LoopStage
+	usage    *collab.SessionUsage
+	branch   string
 }
 
 type missionsMessage struct {
@@ -76,9 +81,10 @@ func (s *missionsStore) handlers() map[collab.OperationKey]collab.Handler {
 		return collab.OperationKey{Contract: collab.ContractMissions, Version: 1, Operation: operation}
 	}
 	return map[collab.OperationKey]collab.Handler{
-		key(collab.OperationSync):  s.sync,
-		key(collab.OperationAsk):   s.ask,
-		key(collab.OperationReply): s.reply,
+		key(collab.OperationSync):   s.sync,
+		key(collab.OperationAsk):    s.ask,
+		key(collab.OperationReply):  s.reply,
+		key(collab.OperationStatus): s.status,
 	}
 }
 
@@ -144,11 +150,18 @@ func (s *missionsStore) sync(_ context.Context, call collab.Call) (any, *collab.
 	defer s.mu.Unlock()
 	session := s.sessions[in.Session.Engine+"/"+in.Session.ID]
 	if session == nil {
-		session = &missionsSession{}
+		session = &missionsSession{ref: in.Session}
 		s.sessions[in.Session.Engine+"/"+in.Session.ID] = session
 	}
 	if session.observed.IsZero() || observed.After(session.observed) {
-		session.state, session.observed = in.State, observed
+		session.state, session.observed, session.mission, session.branch = in.State, observed, mission, in.Branch
+		if in.Stage != "" {
+			session.stage = in.Stage
+		}
+		if in.Usage != nil {
+			usage := *in.Usage
+			session.usage = &usage
+		}
 		held := s.missions[mission]
 		if held == nil {
 			held = &missionsMission{}
@@ -247,6 +260,47 @@ func (s *missionsStore) reply(_ context.Context, call collab.Call) (any, *collab
 	return &collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: in.Message, State: collab.ReplyStateReplied}, Replayed: replayed}, nil
 }
 
+// status answers the named mission's view and the sessions whose last
+// applied sync named it, newest first.
+func (s *missionsStore) status(_ context.Context, call collab.Call) (any, *collab.Failure) {
+	in := call.Input.(*collab.MissionsStatusInput)
+	mission := missionKey(in.Mission)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := &collab.MissionsStatusResult{
+		Mission:  collab.MissionView{Key: in.Mission.Key, Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}},
+		Sessions: []collab.MissionSession{},
+	}
+	if held := s.missions[mission]; held != nil {
+		result.Mission.Title, result.Mission.Plan.Steps = held.title, append(result.Mission.Plan.Steps, held.plan...)
+	}
+	for id, decision := range s.decisions {
+		if decision.mission == mission && decision.state == collab.DecisionStateOpen {
+			result.Mission.OpenDecisions = append(result.Mission.OpenDecisions, collab.OpenDecision{ID: id, Question: decision.question})
+		}
+	}
+	slices.SortFunc(result.Mission.OpenDecisions, func(a, b collab.OpenDecision) int { return strings.Compare(a.ID, b.ID) })
+	var held []*missionsSession
+	for _, session := range s.sessions {
+		if session.mission == mission {
+			held = append(held, session)
+		}
+	}
+	slices.SortFunc(held, func(a, b *missionsSession) int {
+		if order := b.observed.Compare(a.observed); order != 0 {
+			return order
+		}
+		return strings.Compare(a.ref.Engine+"/"+a.ref.ID, b.ref.Engine+"/"+b.ref.ID)
+	})
+	for _, session := range held[:min(len(held), collab.MaxStatusSessions)] {
+		result.Sessions = append(result.Sessions, collab.MissionSession{
+			Session: session.ref, State: session.state, ObservedAt: session.observed.UTC().Format(time.RFC3339Nano),
+			Stage: session.stage, Usage: session.usage, Branch: session.branch,
+		})
+	}
+	return result, nil
+}
+
 func missionsTarget(t *testing.T, store *missionsStore) Target {
 	return Target{Handlers: store.handlers(), WorkspaceRoot: t.TempDir(), Post: store.post, Answer: store.answer}
 }
@@ -254,4 +308,30 @@ func missionsTarget(t *testing.T, store *missionsStore) Target {
 func TestTheMissionsScenariosPassAgainstACorrectProvider(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-missions-scenarios-pass-against-a-correct-provider")
 	RunMissions(t, func(t *testing.T) Target { return missionsTarget(t, newMissionsStore()) })
+}
+
+// TestTheMissionsStatusScenarioPassesAgainstACorrectProvider: the status
+// scenario passes against a provider that answers status, and is skipped for
+// one that does not offer it, whose other scenarios still run.
+func TestTheMissionsStatusScenarioPassesAgainstACorrectProvider(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-missions-status-scenario-passes-against-a-correct-provider")
+	const scenario = "status_lists_the_sessions_of_a_mission,_newest_first"
+	for _, offered := range []bool{true, false} {
+		ran := false
+		t.Run(fmt.Sprintf("offered %v", offered), func(t *testing.T) {
+			RunMissions(t, func(t *testing.T) Target {
+				target := missionsTarget(t, newMissionsStore())
+				if !offered {
+					delete(target.Handlers, collab.OperationKey{Contract: collab.ContractMissions, Version: 1, Operation: collab.OperationStatus})
+				}
+				if strings.HasSuffix(t.Name(), scenario) {
+					t.Cleanup(func() { ran = !t.Skipped() })
+				}
+				return target
+			})
+		})
+		if ran != offered {
+			t.Errorf("offered %v: the status scenario ran %v", offered, ran)
+		}
+	}
 }

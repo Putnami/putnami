@@ -173,6 +173,7 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 		{"DecisionRecommendation", missions.Defs["askInput"].Properties["recommendation"], DecisionRecommendation{}},
 		{"MissionDecision", missions.Defs["askResult"].Properties["decision"], MissionDecision{}},
 		{"RepliedMessage", missions.Defs["replyResult"].Properties["message"], RepliedMessage{}},
+		{"MissionSession", missions.Defs["missionSession"], MissionSession{}},
 	}
 	for _, tc := range cases {
 		if tc.node == nil {
@@ -305,6 +306,8 @@ func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
 		{"syncResult.decisions maxItems", result["decisions"].MaxItems, MaxSyncDecisions},
 		{"syncResult.replies maxItems", result["replies"].MaxItems, MaxSyncReplies},
 		{"missionView.openDecisions maxItems", defs["missionView"].Properties["openDecisions"].MaxItems, MaxOpenDecisions},
+		{"statusResult.sessions maxItems", defs["statusResult"].Properties["sessions"].MaxItems, MaxStatusSessions},
+		{"missionSession.branch maxLength", defs["missionSession"].Properties["branch"].MaxLength, MaxBranchLength},
 		{"plan.steps maxItems", defs["plan"].Properties["steps"].MaxItems, MaxListMembers},
 		{"syncInput.delivered maxItems", input["delivered"].MaxItems, MaxListMembers},
 		{"syncInput.decisions maxItems", input["decisions"].MaxItems, MaxSyncDecisions},
@@ -319,6 +322,13 @@ func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
 	}
 	if ref := input["stage"]; ref == nil || ref.Ref != "#/$defs/loopStage" {
 		t.Errorf("syncInput.stage does not reference #/$defs/loopStage")
+	}
+	session := defs["missionSession"].Properties
+	if ref := session["usage"]; ref == nil || ref.Ref != "#/$defs/sessionUsage" {
+		t.Errorf("missionSession.usage does not reference #/$defs/sessionUsage")
+	}
+	if ref := session["stage"]; ref == nil || ref.Ref != "#/$defs/loopStage" {
+		t.Errorf("missionSession.stage does not reference #/$defs/loopStage")
 	}
 	usage := defs["sessionUsage"].Properties
 	for _, field := range []string{"inputTokens", "outputTokens", "cacheWriteTokens", "cacheReadTokens"} {

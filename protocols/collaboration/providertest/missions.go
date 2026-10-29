@@ -13,7 +13,8 @@ import (
 // in a mission of its own. A missions target can Post an inbox message and
 // Answer a decision. Every scenario calls as one caller, so none covers an id
 // that is another caller's or a reply refused as message.denied: a provider
-// with more than one caller tests those itself.
+// with more than one caller tests those itself. The status scenario runs
+// only when the target answers missions.status.
 func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 	t.Helper()
 	scenarios := []struct {
@@ -38,6 +39,7 @@ func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"an older sync describes the mission it names", missionsOlderSyncNamesItsMission},
 		{"a sync without a plan keeps it and an empty plan clears it", missionsPlan},
 		{"a session reports its stage, its usage and its end", missionsEnded},
+		{"status lists the sessions of a mission, newest first", missionsStatus},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -482,5 +484,69 @@ func missionsPlan(t *testing.T, m *missionRun) {
 	cleared := m.sync(2*time.Second, func(in *collab.MissionsSyncInput) { in.Plan = &collab.MissionPlan{Steps: []collab.PlanStep{}} })
 	if len(cleared.Mission.Plan.Steps) != 0 {
 		t.Fatalf("a sync with an empty plan answered plan %+v", cleared.Mission.Plan.Steps)
+	}
+}
+
+// status reads a mission's view and sessions, and checks that the answer
+// describes the mission it names.
+func (m *missionRun) status(mission collab.MissionName) collab.MissionsStatusResult {
+	m.t.Helper()
+	var result collab.MissionsStatusResult
+	m.OK(collab.ContractMissions, collab.OperationStatus, encode(collab.MissionsStatusInput{Mission: mission}), &result)
+	if result.Mission.Key != mission.Key {
+		m.t.Fatalf("a status of mission %q answered mission %q", mission.Key, result.Mission.Key)
+	}
+	return result
+}
+
+// sameInstant reports whether an RFC 3339 timestamp names the instant at.
+func sameInstant(value string, at time.Time) bool {
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	return err == nil && parsed.Equal(at)
+}
+
+// missionsStatus: two sessions synced to the mission are listed with their
+// state, stage, usage and branch, newest first; a session whose last sync
+// named another mission is not listed; and a mission the provider does not
+// hold answers its empty view and no session. A provider that does not offer
+// status skips it.
+func missionsStatus(t *testing.T, m *missionRun) {
+	if !m.offers(collab.ContractMissions, collab.OperationStatus) {
+		t.Skip("the provider does not offer missions.status")
+	}
+	plan := collab.MissionPlan{Steps: []collab.PlanStep{{Key: "a", Status: collab.PlanStepDoing, Text: "Status scenario"}}}
+	usage := collab.SessionUsage{InputTokens: 1, OutputTokens: 2, CacheWriteTokens: 3, CacheReadTokens: 4}
+	branch := "pt-branch-" + m.run
+	m.sync(time.Minute, func(in *collab.MissionsSyncInput) {
+		in.Stage, in.Usage, in.Branch, in.Plan = collab.LoopStageCode, &usage, branch, &plan
+	})
+	second := collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-second"}
+	m.sync(2*time.Minute, func(in *collab.MissionsSyncInput) {
+		in.Session, in.State, in.Stage = second, collab.SessionStateHandedBack, collab.LoopStageCheck
+	})
+	moved := collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-moved"}
+	m.sync(30*time.Second, func(in *collab.MissionsSyncInput) { in.Session = moved })
+	m.sync(3*time.Minute, func(in *collab.MissionsSyncInput) { in.Session, in.Mission = moved, m.other("next") })
+
+	status := m.status(m.mission)
+	if !slices.Equal(status.Mission.Plan.Steps, plan.Steps) {
+		t.Fatalf("status answered plan %+v; want %+v", status.Mission.Plan.Steps, plan.Steps)
+	}
+	if len(status.Sessions) != 2 || status.Sessions[0].Session != second || status.Sessions[1].Session != m.session {
+		t.Fatalf("status answered sessions %+v; want %s then %s, without %s", status.Sessions, second.ID, m.session.ID, moved.ID)
+	}
+	newest, oldest := status.Sessions[0], status.Sessions[1]
+	if newest.State != collab.SessionStateHandedBack || newest.Stage != collab.LoopStageCheck || newest.Usage != nil ||
+		newest.Branch != "" || !sameInstant(newest.ObservedAt, m.start.Add(2*time.Minute)) {
+		t.Fatalf("status answered %+v for the session that synced last", newest)
+	}
+	if oldest.State != collab.SessionStateWorking || oldest.Stage != collab.LoopStageCode || oldest.Usage == nil ||
+		*oldest.Usage != usage || oldest.Branch != branch || !sameInstant(oldest.ObservedAt, m.start.Add(time.Minute)) {
+		t.Fatalf("status answered %+v for the session that synced first", oldest)
+	}
+
+	empty := m.status(m.other("unknown"))
+	if len(empty.Mission.Plan.Steps) != 0 || len(empty.Mission.OpenDecisions) != 0 || len(empty.Sessions) != 0 {
+		t.Fatalf("status of a mission no sync named answered %+v; want its empty view and no session", empty)
 	}
 }

@@ -36,8 +36,8 @@ const (
 	// checkpoint against an expected revision.
 	ContractMemory = "memory"
 	// ContractMissions publishes an agent session's state to its mission,
-	// reads the messages waiting for it, asks the mission's owner a decision
-	// and replies to a message.
+	// reads the messages waiting for it, asks the mission's owner a decision,
+	// replies to a message and reads a mission's sessions.
 	ContractMissions = "missions"
 )
 
@@ -290,6 +290,13 @@ var catalog = []ContractSpec{
 					"in the session sheet that the session hook prints. A message takes one reply: the same reply again " +
 					"changes nothing, and another reply is a conflict.",
 				newInput: alloc[MissionsReplyInput](), newResult: alloc[MissionsReplyResult](),
+			},
+			{
+				Name: OperationStatus, Access: AccessRead,
+				Summary: "Read a mission's view and its sessions: each session's state, loop stage, token usage and " +
+					"branch, as its last sync reported them, newest first. Take the mission's repository and key from " +
+					"the session sheet, or name another mission to follow its sessions. Optional capability.",
+				newInput: alloc[MissionsStatusInput](), newResult: alloc[MissionsStatusResult](),
 			},
 			{
 				Name: OperationSync, Access: AccessMutating, Required: true, Destructive: true, HostOnly: true,
