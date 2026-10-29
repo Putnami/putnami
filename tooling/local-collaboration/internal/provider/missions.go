@@ -26,9 +26,10 @@ import (
 //
 // The owner answers a decision and writes a message outside the contract, as
 // files of the store directory (store.AnswersDir, store.MessagesDir). Every
-// missions operation first takes the owner files it has not taken yet, under
-// the store lock and in the same write as the operation, so two provider
-// processes never take one file twice.
+// missions write (sync, ask, reply) first takes the owner files it has not
+// taken yet, under the store lock and in the same write as the operation, so
+// two provider processes never take one file twice. status, a read, takes
+// none: it answers the store as the last write left it.
 //
 // The provider never changes or removes an owner file. Beside a file it does
 // not take, it writes a note, <name>.refused, that says why, and it removes
@@ -544,4 +545,57 @@ func (p *Provider) replyToMessage(_ context.Context, call collab.Call) (any, *co
 		return nil, failure
 	}
 	return result, nil
+}
+
+// missionStatus answers the named mission's view and the sessions whose last
+// applied sync named it. It reads the store without its lock and takes no
+// owner file.
+func (p *Provider) missionStatus(_ context.Context, call collab.Call) (any, *collab.Failure) {
+	in, failure := inputOf[*collab.MissionsStatusInput](call)
+	if failure != nil {
+		return nil, failure
+	}
+	s, _, failure := storeOf(call)
+	if failure != nil {
+		return nil, failure
+	}
+	m, err := s.ReadMissions()
+	if err != nil {
+		return nil, collab.Fail(collab.OutcomeUnavailable, "store.unreadable", "%v", err)
+	}
+	mission := keyOf(in.Mission)
+	return &collab.MissionsStatusResult{Mission: missionView(m, mission), Sessions: missionSessions(m, mission)}, nil
+}
+
+// missionSessions lists the sessions whose last applied sync named the
+// mission, newest observation first, then by engine and id, up to the
+// contract's bound.
+func missionSessions(m *store.Missions, mission store.MissionKey) []collab.MissionSession {
+	var held []store.Session
+	for _, session := range m.Sessions {
+		if session.Mission == mission {
+			held = append(held, session)
+		}
+	}
+	observed := func(session store.Session) time.Time {
+		at, _ := time.Parse(time.RFC3339Nano, session.ObservedAt)
+		return at
+	}
+	slices.SortFunc(held, func(a, b store.Session) int {
+		if order := observed(b).Compare(observed(a)); order != 0 {
+			return order
+		}
+		if order := strings.Compare(a.Engine, b.Engine); order != 0 {
+			return order
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	sessions := make([]collab.MissionSession, 0, min(len(held), collab.MaxStatusSessions))
+	for _, session := range held[:min(len(held), collab.MaxStatusSessions)] {
+		sessions = append(sessions, collab.MissionSession{
+			Session: collab.SessionRef{Engine: session.Engine, ID: session.ID}, State: session.State, ObservedAt: session.ObservedAt,
+			Stage: session.Stage, Usage: session.Usage, Branch: session.Branch,
+		})
+	}
+	return sessions
 }

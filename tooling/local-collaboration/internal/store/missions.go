@@ -172,6 +172,14 @@ func (s *Store) readMissions() (*Missions, error) {
 	return missions, nil
 }
 
+// ReadMissions returns the missions document as the last write left it,
+// without the store lock: a write replaces it by atomic rename, so a reader
+// sees one whole document. A store whose missions were never written has
+// none.
+func (s *Store) ReadMissions() (*Missions, error) {
+	return s.readMissions()
+}
+
 // UpdateMissions applies change to the missions document under the store's
 // exclusive lock, the lock Update takes, and writes the result by atomic
 // rename. When change returns an error nothing is written and that error is

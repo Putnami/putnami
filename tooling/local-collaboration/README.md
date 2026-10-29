@@ -45,7 +45,7 @@ extension runtime).
 |---|---|---|
 | tasks v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
 | proposals v1 | `find`, `upsert`, `status`, `review` | `comments`, `merge` |
-| missions v1 | `sync` (host-only), `ask`, `reply` | — |
+| missions v1 | `sync` (host-only), `ask`, `reply`, `status` | — |
 
 - It runs **no hosted checks**: `proposals status` always reports
   `checks.state: unsupported`, with a detail that says so. Run the workspace
@@ -74,13 +74,17 @@ extension runtime).
 A local mission has one owner: you, the person who works in the workspace.
 Agent sessions publish their state and plan with `missions sync`, ask you
 decisions with `missions ask`, and reply to your messages with
-`missions reply`. Decision ids are `D-<n>`, message ids `M-<n>`.
+`missions reply`. `missions status` reads a mission's view and its sessions:
+each session's state, loop stage, token usage and branch, newest first.
+Decision ids are `D-<n>`, message ids `M-<n>`.
 
 You answer a decision and write a message as **files in the store
 directory** (`.putnami/collaboration/local` by default). The provider never
-changes or removes them. Every missions call first takes the files it has not
-taken yet, under the store lock and in the same write as the call, so two
-processes never take one file twice.
+changes or removes them. Every missions write (`sync`, `ask`, `reply`) first
+takes the files it has not taken yet, under the store lock and in the same
+write as the call, so two processes never take one file twice. `status` is a
+read: it answers the store as the last write left it and takes no file, so
+an answer you wrote since shows once the next write takes it.
 
 A file the provider does not take stays as it is, and gets a note beside it:
 `answers/D-3.json.refused` says why `answers/D-3.json` is not taken. Fix or
@@ -144,6 +148,6 @@ It includes the shared contract scenarios of
 [`providertest`](../../protocols/collaboration/providertest/providertest.go),
 which the GitHub provider runs too, the missions scenarios against a store on
 disk, and two processes that sync, ask and reply on one store at once. The
-end-to-end proof of tasks and proposals through the command line is
-`tooling/cli/internal/cli/collaboration_local_provider_test.go`. No test runs
-missions through the CLI yet.
+end-to-end proof through the command line is
+`tooling/cli/internal/cli/collaboration_local_provider_test.go`: tasks,
+proposals, and a session's stage and usage read back with `missions status`.

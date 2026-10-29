@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -361,5 +362,50 @@ func TestASessionKeepsItsStageItsUsageAndItsEnd(t *testing.T) {
 	if held := session(); ended.Session.State != collab.SessionStateEnded || held.State != collab.SessionStateEnded ||
 		held.Stage != collab.LoopStageProve || held.Usage == nil || *held.Usage != want {
 		t.Fatalf("result %+v, session %+v", ended.Session, held)
+	}
+}
+
+// TestStatusReadsTheStoreWithoutTakingOwnerFiles: status answers the mission
+// the request names, lists at most 50 sessions, newest first and then by
+// engine and id, leaves an owner file untaken, and is unavailable on a store
+// it cannot read.
+func TestStatusReadsTheStoreWithoutTakingOwnerFiles(t *testing.T) {
+	h := newMissionsHarness(t)
+	var empty collab.MissionsStatusResult
+	h.ok("missions", "status", `{"mission":`+missionArguments+`}`, &empty)
+	if empty.Mission.Key != "issue-7" || len(empty.Sessions) != 0 || len(empty.Mission.Plan.Steps) != 0 {
+		t.Fatalf("status of a store with no missions answered %+v", empty)
+	}
+
+	for i := range collab.MaxStatusSessions + 1 {
+		id := fmt.Sprintf("s-%02d", i)
+		h.ok("missions", "sync", `{"session":{"engine":"host-b","id":"`+id+`"},"mission":`+missionArguments+
+			`,"event":"post_tool_use","state":"working","observedAt":"2026-09-24T07:00:00Z","branch":"topic"}`, &collab.MissionsSyncResult{})
+	}
+	h.sync(10, `,"stage":"check"`)
+	writeOwnerFile(t, h.store, store.MessagesDir, "later.json",
+		ownerMessage{Mission: store.MissionKey{Repository: "acme/app", Key: "issue-7"}, Text: "Not taken by a read."})
+
+	var status collab.MissionsStatusResult
+	h.ok("missions", "status", `{"mission":{"repository":"acme/app","key":"issue-7"}}`, &status)
+	if len(status.Sessions) != collab.MaxStatusSessions {
+		t.Fatalf("status listed %d sessions, want %d", len(status.Sessions), collab.MaxStatusSessions)
+	}
+	first, second, last := status.Sessions[0], status.Sessions[1], status.Sessions[collab.MaxStatusSessions-1]
+	if first.Session.ID != "s-1" || first.Stage != collab.LoopStageCheck || first.ObservedAt != "2026-09-24T07:00:10Z" {
+		t.Fatalf("the newest session is %+v", first)
+	}
+	if second.Session != (collab.SessionRef{Engine: "host-b", ID: "s-00"}) || second.Branch != "topic" || last.Session.ID != "s-48" {
+		t.Fatalf("the sessions observed at one instant run from %+v to %+v; want s-00 to s-48 by id", second, last)
+	}
+	if messages := h.missions().Messages; len(messages) != 0 {
+		t.Fatalf("status took an owner file: %+v", messages)
+	}
+
+	if err := os.WriteFile(filepath.Join(h.store.Root(), "missions.json"), []byte(`{"version":2}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if failure := h.fails("missions", "status", `{"mission":`+missionArguments+`}`, collab.OutcomeUnavailable); failure.Reason != "store.unreadable" {
+		t.Fatalf("failure %+v", failure)
 	}
 }
