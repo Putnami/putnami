@@ -12,7 +12,7 @@ The session reporter sends `events.jsonl` byte for byte. A no-cache run of
 about 1,700 tasks writes about 85 MB, and its upload does not finish. On a
 recorded 1,610-task session (68.9 MB), `task:event` log lines are 68% of the
 bytes, and 99% of them are `debug` lines of tasks that pass. Gzip per chunk
-(#669) shrinks the transfer but not what the receiver stores.
+shrinks the transfer but not what the receiver stores.
 
 The reporter cannot trim. It acknowledges each frame before the engine sends
 the next one, and a task's outcome arrives with its `task:end`, often several
