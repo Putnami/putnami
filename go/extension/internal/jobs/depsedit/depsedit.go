@@ -138,8 +138,11 @@ func run(j *workspacejob.Job, params map[string]json.RawMessage, contextFile str
 	restore := func() error { return snapshot.Restore(nil, nil) }
 	// A SIGINT or a SIGTERM puts the files back too, then ends the job.
 	j.Trap().Arm(func() { _ = restore() })
+	var pins []string
 	for _, e := range edits {
-		if _, err := apply(j, action, e, false); err != nil {
+		lines, err := apply(j, action, e, false)
+		pins = append(pins, lines...)
+		if err != nil {
 			message := err.Error() + "; every file the command edited is back as it was"
 			if restoreErr := restore(); restoreErr != nil {
 				message = err.Error() + "\n" + restoreErr.Error()
@@ -150,6 +153,10 @@ func run(j *workspacejob.Job, params map[string]json.RawMessage, contextFile str
 		}
 	}
 	j.Trap().Disarm()
+	// Each go.work pin a tidy read is a summary the CLI always prints.
+	if len(pins) > 0 {
+		j.Emit.SummaryWithData(strings.Join(pins, "\n"), map[string]any{"visibility": "always"})
+	}
 	return statusOK
 }
 
@@ -205,8 +212,10 @@ func refuseDropOnAdd(edits []edit) string {
 // that only go.work satisfies, then fails the very add or remove that would
 // fix it.
 //
-// A dry run makes the same edit and the same tidy on a copy of go.mod and
-// go.sum (planEdit), logs what would change in them, and returns those lines.
+// A run returns one line per go.work pin the tidy read for a version no proxy
+// serves (tidyModule). A dry run makes the same edit and the same tidy on a
+// copy of go.mod and go.sum (planEdit), logs what would change in them and
+// those pins, and returns those lines.
 func apply(j *workspacejob.Job, action string, e edit, dryRun bool) ([]string, error) {
 	dir := filepath.Join(j.WorkspaceRoot, e.Path)
 	modules := e.Modules
@@ -249,11 +258,15 @@ func apply(j *workspacejob.Job, action string, e edit, dryRun bool) ([]string, e
 	if err := editModule(j, dir, "", editArgs); err != nil {
 		return nil, err
 	}
-	if err := tidyModule(j, dir, filepath.Join(dir, "go.mod")); err != nil {
-		return nil, fmt.Errorf("go mod tidy: %w", err)
+	pins, err := tidyModule(j, dir, filepath.Join(dir, "go.mod"))
+	if err != nil {
+		return nil, err
+	}
+	for _, pin := range pins {
+		j.Emit.Log("info", pin)
 	}
 	j.Emit.Log("info", "✓ updated "+filepath.ToSlash(filepath.Join(e.Path, "go.mod")))
-	return nil, nil
+	return pins, nil
 }
 
 // editModule runs `go mod edit` with editArgs on the go.mod of the module in
@@ -272,7 +285,8 @@ func editModule(j *workspacejob.Job, dir, modFile string, editArgs []string) err
 // planEdit makes the edit of e, editArgs, and the tidy on a copy of the
 // go.mod and go.sum of the module in dir, then reports each requirement and
 // replace directive the edit adds, drops or changes in go.mod, and the lines
-// it changes in go.sum (planLines). It writes no file of the workspace.
+// it changes in go.sum (planLines), then each go.work pin the tidy read for a
+// version no proxy serves. It writes no file of the workspace.
 func planEdit(j *workspacejob.Job, dir string, e edit, editArgs []string) ([]string, error) {
 	scratch, err := os.MkdirTemp("", "putnami-deps-plan-")
 	if err != nil {
@@ -299,8 +313,9 @@ func planEdit(j *workspacejob.Job, dir string, e edit, editArgs []string) ([]str
 	if err := editModule(j, dir, copyMod, editArgs); err != nil {
 		return nil, err
 	}
-	if err := tidyModule(j, dir, copyMod); err != nil {
-		return nil, fmt.Errorf("go mod tidy: %w", err)
+	pins, err := tidyModule(j, dir, copyMod)
+	if err != nil {
+		return nil, err
 	}
 	after, err := os.ReadFile(copyMod)
 	if err != nil {
@@ -310,7 +325,11 @@ func planEdit(j *workspacejob.Job, dir string, e edit, editArgs []string) ([]str
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	return planLines(filepath.ToSlash(e.Path)+"/go.mod", before, after, sumBefore, sumAfter)
+	lines, err := planLines(filepath.ToSlash(e.Path)+"/go.mod", before, after, sumBefore, sumAfter)
+	if err != nil {
+		return nil, err
+	}
+	return append(lines, pins...), nil
 }
 
 // planLines states the changes from before to after, the go.mod at goMod:

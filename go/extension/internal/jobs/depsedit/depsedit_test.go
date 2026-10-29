@@ -611,6 +611,97 @@ func TestDepsEditAddKeepsEachServedRequirementAGoWorkPinWouldRaise(t *testing.T)
 	}
 }
 
+// A go.work pin is stated for a placeholder no proxy serves, and the run names
+// it. gen, a member apps/api replaces by its directory, requires
+// example.com/client at the v0.0.1 placeholder, which go.work pins to v0.9.3,
+// whose go.mod requires example.com/feat v1.1.0. The tidy reads that release
+// for the placeholder and raises feat, and both the plan and the run name the
+// pin. The served example.com/dep v1.0.0 stays: its pin is not stated.
+func TestDepsEditNamesAGoWorkPinStatedForAnUnservedPlaceholder(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/deps-edit", "deps-tidy-resolves-as-the-workspace-does",
+		"tidy-keeps-a-served-requirement-a-go-work-pin-would-raise")
+	jobtest.RequireGo(t)
+	module := func(path, version, requires string) jobtest.ProxyModule {
+		name := filepath.Base(path)
+		return jobtest.ProxyModule{
+			Path:    path,
+			Version: version,
+			GoMod:   "module " + path + "\n\ngo 1.22\n" + requires,
+			Source:  "package " + name + "\n\nconst Name = \"" + name + "\"\n",
+		}
+	}
+	proxy := jobtest.FileURL(jobtest.WriteModuleProxy(t,
+		module("example.com/dep", "v1.0.0", ""),
+		module("example.com/dep", "v1.1.0", "\nrequire example.com/extra v1.1.0\n"),
+		module("example.com/extra", "v1.1.0", ""),
+		module("example.com/client", "v0.9.3", "\nrequire example.com/feat v1.1.0\n"),
+		module("example.com/feat", "v1.0.0", ""),
+		module("example.com/feat", "v1.1.0", ""),
+	))
+	ws := jobtest.RealTempDir(t)
+	jobtest.WriteFile(t, ws, "go.work", "go 1.22\n\nuse (\n\t./api\n\t./gen\n)\n\nreplace (\n"+
+		"\texample.com/client => example.com/client v0.9.3\n"+
+		"\texample.com/dep => example.com/dep v1.1.0\n)\n")
+	jobtest.WriteFile(t, ws, "gen/go.mod", "module example.com/gen\n\ngo 1.22\n\nrequire example.com/client v0.0.1\n")
+	jobtest.WriteFile(t, ws, "gen/gen.go", "package gen\n\nimport \"example.com/client\"\n\nconst Name = client.Name\n")
+	jobtest.WriteFile(t, ws, "api/main.go", "package main\n\nimport (\n\t\"example.com/dep\"\n\t\"example.com/feat\"\n\t\"example.com/gen\"\n)\n\n"+
+		"func main() { _, _, _ = dep.Name, feat.Name, gen.Name }\n")
+	goMod := jobtest.WriteFile(t, ws, "api/go.mod", "module example.com/api\n\ngo 1.22\n\nrequire (\n"+
+		"\texample.com/dep v1.0.0\n\texample.com/gen v0.0.0\n)\n\nreplace example.com/gen => ../gen\n")
+	add := edit{Project: "api", Path: "api", Modules: []string{"example.com/feat@v1.0.0"}}
+	pin := "go.work pins example.com/client to example.com/client v0.9.3: the tidy reads that release for example.com/client v0.0.1"
+
+	dryRun, err := json.Marshal(map[string]any{"action": actionAdd, "dry-run": true, "edits": []edit{add}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, params := range []string{string(dryRun), editParams(t, actionAdd, add)} {
+		run := runEdit(t, ws, params, proxy)
+		run.requireStatus(t, statusOK)
+		var summary string
+		for _, event := range run.rec.Events() {
+			if data, _ := event.Value.(map[string]any); event.Kind == "summary" && data["visibility"] == "always" {
+				summary += event.Message
+			}
+		}
+		if !strings.Contains(summary, pin) {
+			t.Errorf("the always-visible summary does not name the pin %q:\n%s", pin, summary)
+		}
+		if strings.Contains(summary, "pins example.com/dep") {
+			t.Errorf("the run states the pin of the served example.com/dep v1.0.0:\n%s", summary)
+		}
+	}
+	for module, want := range map[string]string{"example.com/dep": "v1.0.0", "example.com/feat": "v1.1.0", "example.com/extra": ""} {
+		if got := requires(t, goMod, module); got != want {
+			t.Errorf("go.mod requires %s %q, want %q:\n%s", module, got, want, jobtest.ReadFile(t, goMod))
+		}
+	}
+}
+
+// A lookup that fails for another reason than a missing version cannot tell
+// whether a proxy serves it, so the edit fails and puts go.mod back, rather
+// than stating the pin and raising the requirement. GOPROXY=off answers every
+// lookup with "module lookup disabled".
+func TestDepsEditFailsWhenAGoWorkPinLookupCannotTell(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/deps-edit", "deps-tidy-resolves-as-the-workspace-does",
+		"tidy-keeps-a-served-requirement-a-go-work-pin-would-raise")
+	jobtest.RequireGo(t)
+	ws := jobtest.RealTempDir(t)
+	jobtest.WriteFile(t, ws, "go.work", "go 1.22\n\nuse ./api\n\nreplace example.com/dep => example.com/dep v1.1.0\n")
+	jobtest.WriteFile(t, ws, "api/main.go", "package main\n\nfunc main() {}\n")
+	unchanged := "module example.com/api\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n"
+	goMod := jobtest.WriteFile(t, ws, "api/go.mod", unchanged)
+
+	run := runEdit(t, ws, editParams(t, actionRemove, edit{Project: "api", Path: "api", Modules: []string{"example.com/other"}}), "off")
+	run.requireStatus(t, statusFailed)
+	run.requireTranscript(t, "cannot tell whether a proxy serves example.com/dep@v1.0.0", "every file the command edited is back as it was")
+	if got := jobtest.ReadFile(t, goMod); got != unchanged {
+		t.Errorf("the failed edit left go.mod changed:\n%s", got)
+	}
+}
+
 // The edits of one run are one transaction: a go step that fails puts every
 // go.mod and go.sum the run edited back as it was, those of the modules it
 // already tidied included. Here no go.work directive supplies the generated

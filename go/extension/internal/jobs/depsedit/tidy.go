@@ -34,61 +34,62 @@ func goWorkEnv(dir string) []string {
 // therefore runs with -modfile on a copy of go.mod that also states the
 // go.work replace directives the module does not replace itself
 // (withGoWorkReplaces). go.mod and go.sum take the tidied copy, without those
-// directives, only when tidy succeeds.
-func tidyModule(j *workspacejob.Job, dir, goModPath string) error {
+// directives, only when tidy succeeds. It returns one line per go.work pin
+// the tidy read for a version no proxy serves, which the job reports.
+func tidyModule(j *workspacejob.Job, dir, goModPath string) ([]string, error) {
 	goSumPath := filepath.Join(filepath.Dir(goModPath), "go.sum")
 	goMod, err := os.ReadFile(goModPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	unserved := func(candidates []module.Version) ([]module.Version, error) {
 		return unservedVersions(j, dir, candidates)
 	}
-	copied, added, err := withGoWorkReplaces(dir, goModPath, goMod, toolchain.FindGoWork(dir), unserved)
+	copied, added, pins, err := withGoWorkReplaces(dir, goModPath, goMod, toolchain.FindGoWork(dir), unserved)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("state the go.work replace directives: %w", err)
 	}
 
 	scratch, err := os.MkdirTemp("", "putnami-tidy-")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = os.RemoveAll(scratch) }()
 	copyMod := filepath.Join(scratch, "go.mod")
 	copySum := filepath.Join(scratch, "go.sum")
 	if err := os.WriteFile(copyMod, copied, 0o600); err != nil {
-		return err
+		return nil, err
 	}
 	if sum, err := os.ReadFile(goSumPath); err == nil {
 		if err := os.WriteFile(copySum, sum, 0o600); err != nil {
-			return err
+			return nil, err
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return nil, err
 	}
 
 	if out, err := j.Combined(goWorkEnv(dir), j.GoBinary, "-C", dir, "mod", "tidy", "-modfile="+copyMod); err != nil {
-		return fmt.Errorf("%w%s", err, workspacejob.OutputExcerpt(out))
+		return nil, fmt.Errorf("go mod tidy: %w%s", err, workspacejob.OutputExcerpt(out))
 	}
 
 	tidied, err := os.ReadFile(copyMod)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if tidied, err = withoutReplaces(copyMod, tidied, added); err != nil {
-		return err
+		return nil, err
 	}
 	if err := writeFileKeepingMode(goModPath, tidied); err != nil {
-		return err
+		return nil, err
 	}
 	sum, err := os.ReadFile(copySum)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil
+		return pins, nil
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return writeFileKeepingMode(goSumPath, sum)
+	return pins, writeFileKeepingMode(goSumPath, sum)
 }
 
 // withGoWorkReplaces returns goMod, the go.mod of the module in dir read from
@@ -99,32 +100,30 @@ func tidyModule(j *workspacejob.Job, dir, goModPath string) error {
 // absolute path.
 //
 // A directive that pins every version of a module to a module version, such as
-// `go.putnami.dev/app => go.putnami.dev/app v0.4.0`, makes tidy read the
-// go.mod of that version for every version of the module, which raises each
-// requirement to what that version requires. Such a pin is stated only for the
+// `go.putnami.dev/app => go.putnami.dev/app v0.4.0`, is stated only for the
 // versions of its module a workspace go.mod requires (requiredVersions) and
-// unserved reports no proxy serves, one directive per version. Every other
-// directive is stated as written.
+// unserved reports no proxy serves, one directive per version; pins names each
+// of them. Every other directive is stated as written.
 //
 // When go.work states no replace directive, or when go.work or goMod is a file
 // this parser does not read, goMod is returned as it is and tidy runs on it
 // unchanged.
 func withGoWorkReplaces(dir, goModPath string, goMod []byte, goWorkPath string,
-	unserved func([]module.Version) ([]module.Version, error)) ([]byte, []module.Version, error) {
+	unserved func([]module.Version) ([]module.Version, error)) ([]byte, []module.Version, []string, error) {
 	if goWorkPath == "" {
-		return goMod, nil, nil
+		return goMod, nil, nil, nil
 	}
 	workData, err := os.ReadFile(goWorkPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	work, err := modfile.ParseWork(goWorkPath, workData, nil)
 	if err != nil || len(work.Replace) == 0 {
-		return goMod, nil, nil
+		return goMod, nil, nil, nil
 	}
 	file, err := modfile.Parse(goModPath, goMod, nil)
 	if err != nil {
-		return goMod, nil, nil
+		return goMod, nil, nil, nil
 	}
 	var added []module.Version
 	state := func(old module.Version, replace *modfile.Replace) error {
@@ -148,32 +147,36 @@ func withGoWorkReplaces(dir, goModPath string, goMod []byte, goWorkPath string,
 			continue
 		}
 		if err := state(replace.Old, replace); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
+	var stated []string
 	if len(pins) > 0 {
 		candidates := requiredVersions(dir, file, goWorkPath, work, pins)
 		var pinned []module.Version
 		if len(candidates) > 0 {
 			if pinned, err = unserved(candidates); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
 		for _, old := range pinned {
-			if err := state(old, pins[old.Path]); err != nil {
-				return nil, nil, err
+			pin := pins[old.Path]
+			if err := state(old, pin); err != nil {
+				return nil, nil, nil, err
 			}
+			stated = append(stated, fmt.Sprintf("go.work pins %s to %s %s: the tidy reads that release for %s %s, which no proxy serves, and applies its requirements",
+				old.Path, pin.New.Path, pin.New.Version, old.Path, old.Version))
 		}
 	}
 	if len(added) == 0 {
-		return goMod, nil, nil
+		return goMod, nil, nil, nil
 	}
 	file.Cleanup()
 	formatted, err := file.Format()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return formatted, added, nil
+	return formatted, added, stated, nil
 }
 
 // requiredVersions returns, sorted, each version of a module of pins that a
@@ -226,9 +229,11 @@ func requiredVersions(dir string, file *modfile.File, goWorkPath string, work *m
 
 // unservedVersions returns the module versions of candidates no proxy serves,
 // from one `go list -m -e` in dir, which reports each version it cannot fetch
-// in its Error member. GOWORK=off and -mod=readonly keep the query out of the
-// workspace build list and keep go list from writing go.mod or go.sum, as in
-// resolveModules.
+// in its Error member. A version is unserved only when the answer is that it
+// does not exist (notFound); any other lookup error, such as GOPROXY=off or an
+// unreachable proxy, fails with the module version and the go error.
+// GOWORK=off and -mod=readonly keep the query out of the workspace build list
+// and keep go list from writing go.mod or go.sum, as in resolveModules.
 func unservedVersions(j *workspacejob.Job, dir string, candidates []module.Version) ([]module.Version, error) {
 	args := make([]string, 0, 7+len(candidates))
 	args = append(args, "-C", dir, "list", "-m", "-e", "-json", "-mod=readonly")
@@ -249,11 +254,28 @@ func unservedVersions(j *workspacejob.Job, dir string, candidates []module.Versi
 		if err := decoder.Decode(&listed); err != nil {
 			return nil, fmt.Errorf("go list -m: read the go list output: %w", err)
 		}
-		if listed.Error != nil {
-			unserved = append(unserved, module.Version{Path: listed.Path, Version: listed.Version})
+		if listed.Error == nil {
+			continue
 		}
+		if !notFound(listed.Error.Err) {
+			return nil, fmt.Errorf("go list -m: cannot tell whether a proxy serves %s@%s: %s", listed.Path, listed.Version, listed.Error.Err)
+		}
+		unserved = append(unserved, module.Version{Path: listed.Path, Version: listed.Version})
 	}
 	return unserved, nil
+}
+
+// notFound reports whether a go module lookup error says the version does not
+// exist: a 404 or 410 answer of a proxy, a missing file of a file:// proxy, or
+// an unknown revision of a direct fetch.
+func notFound(message string) bool {
+	message = strings.ToLower(message)
+	for _, answer := range []string{"404 not found", "410 gone", "no such file or directory", "unknown revision"} {
+		if strings.Contains(message, answer) {
+			return true
+		}
+	}
+	return false
 }
 
 // replacesVersion reports whether a directive of replaces covers some version
