@@ -489,12 +489,15 @@ func missionsPlan(t *testing.T, m *missionRun) {
 
 // status reads a mission's view and sessions, and checks that the answer
 // describes the mission it names.
-func (m *missionRun) status(mission collab.MissionName) collab.MissionsStatusResult {
+func (m *missionRun) status(mission collab.MissionName, page *collab.PageRequest) collab.MissionsStatusResult {
 	m.t.Helper()
 	var result collab.MissionsStatusResult
-	m.OK(collab.ContractMissions, collab.OperationStatus, encode(collab.MissionsStatusInput{Mission: mission}), &result)
+	m.OK(collab.ContractMissions, collab.OperationStatus, encode(collab.MissionsStatusInput{Mission: mission, Page: page}), &result)
 	if result.Mission.Key != mission.Key {
 		m.t.Fatalf("a status of mission %q answered mission %q", mission.Key, result.Mission.Key)
+	}
+	if page != nil && page.Size > 0 && len(result.Sessions) > page.Size {
+		m.t.Fatalf("a status page of %d answered %d sessions", page.Size, len(result.Sessions))
 	}
 	return result
 }
@@ -505,11 +508,12 @@ func sameInstant(value string, at time.Time) bool {
 	return err == nil && parsed.Equal(at)
 }
 
-// missionsStatus: two sessions synced to the mission are listed with their
-// state, stage, usage and branch, newest first; a session whose last sync
-// named another mission is not listed; and a mission the provider does not
-// hold answers its empty view and no session. A provider that does not offer
-// status skips it.
+// missionsStatus: sessions synced to the mission are listed with their state,
+// stage, usage, branch, error and waitUntil, newest first, then by engine and
+// id; a traversal one session per page lists each once, though a new session
+// syncs between two pages; a session whose last sync named another mission
+// is not listed; and a mission the provider does not hold answers its empty
+// view and no session. A provider that does not offer status skips it.
 func missionsStatus(t *testing.T, m *missionRun) {
 	if !m.offers(collab.ContractMissions, collab.OperationStatus) {
 		t.Skip("the provider does not offer missions.status")
@@ -527,15 +531,32 @@ func missionsStatus(t *testing.T, m *missionRun) {
 	moved := collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-moved"}
 	m.sync(30*time.Second, func(in *collab.MissionsSyncInput) { in.Session = moved })
 	m.sync(3*time.Minute, func(in *collab.MissionsSyncInput) { in.Session, in.Mission = moved, m.other("next") })
+	// Two engines at one instant: the engine orders them, before the id.
+	failed := collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-tie"}
+	waiting := collab.SessionRef{Engine: m.session.Engine + "-b", ID: m.session.ID + "-tie"}
+	failure, waitUntil := "pt-error-"+m.run, m.start.Add(time.Hour)
+	m.sync(4*time.Minute, func(in *collab.MissionsSyncInput) {
+		in.Session, in.State, in.WaitUntil = waiting, collab.SessionStateWaiting, waitUntil.Format(time.RFC3339Nano)
+	})
+	m.sync(4*time.Minute, func(in *collab.MissionsSyncInput) {
+		in.Session, in.State, in.Error = failed, collab.SessionStateFailed, failure
+	})
 
-	status := m.status(m.mission)
+	status := m.status(m.mission, nil)
 	if !slices.Equal(status.Mission.Plan.Steps, plan.Steps) {
 		t.Fatalf("status answered plan %+v; want %+v", status.Mission.Plan.Steps, plan.Steps)
 	}
-	if len(status.Sessions) != 2 || status.Sessions[0].Session != second || status.Sessions[1].Session != m.session {
-		t.Fatalf("status answered sessions %+v; want %s then %s, without %s", status.Sessions, second.ID, m.session.ID, moved.ID)
+	want := []collab.SessionRef{failed, waiting, second, m.session}
+	if got := statusSessions(status.Sessions); !slices.Equal(got, want) || status.Page.Next != "" {
+		t.Fatalf("status answered sessions %v and next %q; want %v on one page, without %s", got, status.Page.Next, want, moved.ID)
 	}
-	newest, oldest := status.Sessions[0], status.Sessions[1]
+	first, tied, newest, oldest := status.Sessions[0], status.Sessions[1], status.Sessions[2], status.Sessions[3]
+	if first.State != collab.SessionStateFailed || first.Error != failure || first.WaitUntil != "" {
+		t.Fatalf("status answered %+v for the failed session", first)
+	}
+	if tied.State != collab.SessionStateWaiting || tied.Error != "" || !sameInstant(tied.WaitUntil, waitUntil) {
+		t.Fatalf("status answered %+v for the waiting session", tied)
+	}
 	if newest.State != collab.SessionStateHandedBack || newest.Stage != collab.LoopStageCheck || newest.Usage != nil ||
 		newest.Branch != "" || !sameInstant(newest.ObservedAt, m.start.Add(2*time.Minute)) {
 		t.Fatalf("status answered %+v for the session that synced last", newest)
@@ -545,8 +566,41 @@ func missionsStatus(t *testing.T, m *missionRun) {
 		t.Fatalf("status answered %+v for the session that synced first", oldest)
 	}
 
-	empty := m.status(m.other("unknown"))
-	if len(empty.Mission.Plan.Steps) != 0 || len(empty.Mission.OpenDecisions) != 0 || len(empty.Sessions) != 0 {
+	// One session per page, with a new session synced after the first page:
+	// the cursor still leads to every session the traversal had not listed.
+	late := collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-late"}
+	var listed []collab.SessionRef
+	page := &collab.PageRequest{Size: 1}
+	for pages := 0; ; pages++ {
+		if pages > len(want)+1 {
+			t.Fatalf("the traversal did not end after %d pages: %v", pages, listed)
+		}
+		answer := m.status(m.mission, page)
+		listed = append(listed, statusSessions(answer.Sessions)...)
+		if pages == 0 {
+			m.sync(5*time.Minute, func(in *collab.MissionsSyncInput) { in.Session = late })
+		}
+		if answer.Page.Next == "" {
+			break
+		}
+		page = &collab.PageRequest{Size: 1, Cursor: answer.Page.Next}
+	}
+	if got := slices.DeleteFunc(slices.Clone(listed), func(ref collab.SessionRef) bool { return ref == late }); !slices.Equal(got, want) ||
+		len(listed)-len(got) > 1 {
+		t.Fatalf("a traversal one session per page listed %v; want %v, each once", listed, want)
+	}
+
+	empty := m.status(m.other("unknown"), nil)
+	if len(empty.Mission.Plan.Steps) != 0 || len(empty.Mission.OpenDecisions) != 0 || len(empty.Sessions) != 0 || empty.Page.Next != "" {
 		t.Fatalf("status of a mission no sync named answered %+v; want its empty view and no session", empty)
 	}
+}
+
+// statusSessions lists the sessions of a status page, in order.
+func statusSessions(sessions []collab.MissionSession) []collab.SessionRef {
+	refs := make([]collab.SessionRef, 0, len(sessions))
+	for _, session := range sessions {
+		refs = append(refs, session.Session)
+	}
+	return refs
 }

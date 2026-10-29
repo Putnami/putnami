@@ -1162,11 +1162,14 @@ type MissionsReplyResult struct {
 	Replayed bool `json:"replayed"`
 }
 
-// MissionsStatusInput is the missions.status request: the mission to read.
-// Mission.Title is for display and changes nothing.
+// MissionsStatusInput is the missions.status request: the mission to read
+// and the page of its sessions. Mission.Title is for display and changes
+// nothing.
 type MissionsStatusInput struct {
 	// Mission is the mission whose view and sessions to read.
 	Mission MissionName `json:"mission"`
+	// Page selects the page of sessions.
+	Page *PageRequest `json:"page,omitempty"`
 }
 
 // MissionSession is one session of a mission, as the last sync the provider
@@ -1187,6 +1190,12 @@ type MissionSession struct {
 	Usage *SessionUsage `json:"usage,omitempty"`
 	// Branch is the branch the session works on, when known.
 	Branch string `json:"branch,omitempty"`
+	// Error is the error that stopped a failed session; only a failed
+	// session carries one.
+	Error string `json:"error,omitempty"`
+	// WaitUntil is when a waiting session stops waiting, in RFC 3339. A
+	// waiting session always carries it, and no other session does.
+	WaitUntil string `json:"waitUntil,omitempty"`
 }
 
 // MissionsStatusResult is the missions.status result.
@@ -1194,10 +1203,12 @@ type MissionsStatusResult struct {
 	// Mission is the mission the request named. A provider that does not
 	// hold it answers its empty view.
 	Mission MissionView `json:"mission"`
-	// Sessions are the sessions whose last applied sync named the mission,
-	// newest observation first, then by engine and id, at most
-	// MaxStatusSessions, each once.
+	// Sessions are a page of the sessions whose last applied sync named the
+	// mission, newest observation first, then by engine and id, each once. A
+	// traversal lists once every session that does not sync during it.
 	Sessions []MissionSession `json:"sessions"`
+	// Page carries the cursor of the next page of sessions.
+	Page Page `json:"page"`
 }
 
 // CapabilitiesInput is the capabilities request. It takes no member.
