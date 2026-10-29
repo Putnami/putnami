@@ -274,7 +274,7 @@ func notFound(message string) bool {
 	if notFoundStatus.MatchString(message) {
 		return true
 	}
-	for _, answer := range []string{"no such file or directory", "cannot find the file specified", "unknown revision"} {
+	for _, answer := range []string{"no such file or directory", "cannot find the file specified", "cannot find the path specified", "unknown revision"} {
 		if strings.Contains(message, answer) {
 			return true
 		}
@@ -282,9 +282,10 @@ func notFound(message string) bool {
 	return false
 }
 
-// notFoundStatus matches the HTTP status a go lookup error states after
-// `reading <url>: ` when it is 404 or 410.
-var notFoundStatus = regexp.MustCompile(`: (404|410)(\s|$)`)
+// notFoundStatus matches the HTTP status a go lookup error states right after
+// `reading <url>: ` when it is 404 or 410, not a status a server response
+// quotes later.
+var notFoundStatus = regexp.MustCompile(`reading \S+: (404|410)(\s|$)`)
 
 // replacesVersion reports whether a directive of replaces covers some version
 // old covers: a directive for every version of old's module, a directive for

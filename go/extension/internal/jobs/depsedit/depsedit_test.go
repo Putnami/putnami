@@ -717,6 +717,8 @@ func TestNotFoundReadsTheStatusOfAGoLookupError(t *testing.T) {
 		"example.com/x@v0.0.1: reading https://proxy.example/example.com/x/@v/v0.0.1.info: 410 Gone":                                            true,
 		"example.com/x@v0.0.1: reading file:///proxy/example.com/x/@v/v0.0.1.info: no such file or directory":                                   true,
 		"example.com/x@v0.0.1: reading file:///C:/proxy/example.com/x/@v/v0.0.1.info: The system cannot find the file specified.":               true,
+		"example.com/x@v0.0.1: reading file:///C:/proxy/example.com/x/@v/list: The system cannot find the path specified.":                      true,
+		"example.com/x@v0.0.1: reading https://proxy.example/example.com/x/@v/v0.0.1.info: 502 Bad Gateway\n\tserver response: upstream: 404":   false,
 		"example.com/x@v0.0.1: invalid version: unknown revision v0.0.1":                                                                        true,
 		"example.com/x@v0.0.1: reading https://proxy.example/example.com/x/@v/v0.0.1.info: 500 Internal Server Error":                           false,
 		"example.com/x@v0.0.1: module lookup disabled by GOPROXY=off":                                                                           false,
