@@ -31,14 +31,14 @@ type flagValueCompletion struct {
 
 // writeValueFlagWorkspace writes a workspace whose @acme/flow extension declares
 // the job command lint-docs with the value flags --mode (short -m) and --level
-// (choices), and a command group whose subcommand flag lists choices.
+// (choices, short written without its dash), and a command group whose subcommand flag lists choices.
 func writeValueFlagWorkspace(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
 		"putnami.workspace.json": `{"name": "value-flag-ws", "includes": ["flow"]}`,
 		"flow/putnami.json":      `{"name": "@acme/flow"}`,
-		"flow/putnami.extension.json": `{"name": "@acme/flow", "cliContract": 4, "commands": {"flow-run": {"description": "Run.", "run": [{"id": "r", "task": "t"}]}, "lint-docs": {"description": "Run.", "flags": {"mode": {"type": "string", "short": "-m", "description": "Mode"}, "level": {"type": "string", "choices": ["low", "high"], "description": "Level"}, "strict": {"type": "boolean", "description": "Strict"}}, "run": [{"id": "r", "task": "t"}]}}, ` +
+		"flow/putnami.extension.json": `{"name": "@acme/flow", "cliContract": 4, "commands": {"flow-run": {"description": "Run.", "run": [{"id": "r", "task": "t"}]}, "lint-docs": {"description": "Run.", "flags": {"mode": {"type": "string", "short": "-m", "description": "Mode"}, "level": {"type": "string", "short": "l", "choices": ["low", "high"], "description": "Level"}, "strict": {"type": "boolean", "description": "Strict"}}, "run": [{"id": "r", "task": "t"}]}}, ` +
 			`"commandGroups": {"flowg": {"description": "Group.", "subcommands": {"run": {"description": "Run.", "command": "flow-run", "flags": {"kind": {"type": "string", "choices": ["a", "b"], "description": "Kind"}}}}}}, ` +
 			`"tasks": {"t": {"kind": "command", "command": "echo", "cache": false}}}`,
 	}
@@ -109,6 +109,7 @@ func TestCompletionOffersOnlyTheValuesOfTheFlagBeforeTheCursor(t *testing.T) {
 		{words: []string{"lint-docs", "--mode", ""}, want: nothing, exact: true},
 		{words: []string{"lint-docs", "-m", ""}, want: nothing, exact: true},
 		{words: []string{"lint-docs", "--level", ""}, want: []string{"low", "high"}, exact: true},
+		{words: []string{"lint-docs", "-l", ""}, want: []string{"low", "high"}, exact: true},
 		{words: []string{"flowg", "run", "--kind", ""}, want: []string{"a", "b"}, exact: true},
 		{words: []string{"lint-docs", "--strict", ""}, want: []string{"/flow"}, not: []string{"--mode"}},
 		// A core command's flag offers the values the catalog lists for it, or

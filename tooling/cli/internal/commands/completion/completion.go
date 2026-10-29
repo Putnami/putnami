@@ -492,7 +492,7 @@ func manifestFlagsToStructured(flags map[string]extension.FlagDefinition) []Stru
 		flag := flags[name]
 		info := StructuredFlagInfo{
 			Long:        "--" + name,
-			Short:       flag.Short,
+			Short:       manifestShort(flag.Short),
 			Description: flag.Description,
 		}
 		if flag.Type != "" && flag.Type != "boolean" {
@@ -501,6 +501,15 @@ func manifestFlagsToStructured(flags map[string]extension.FlagDefinition) []Stru
 		out = append(out, info)
 	}
 	return out
+}
+
+// manifestShort returns the short spelling of a manifest flag with its dash: a
+// manifest may write it as "m" or "-m", and the parser reads both as "-m".
+func manifestShort(short string) string {
+	if short == "" || strings.HasPrefix(short, "-") {
+		return short
+	}
+	return "-" + short
 }
 
 func mergeStructuredCompletionFlags(first, second []StructuredFlagInfo) []StructuredFlagInfo {

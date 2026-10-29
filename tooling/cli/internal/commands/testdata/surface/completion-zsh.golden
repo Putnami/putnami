@@ -258,10 +258,10 @@ _putnami_flags_for() {
         'cache verify')
             reply=(
                 '--continue-on-error[Don'\''t abort a verified run on the first failure]'
-                '--cpu-policy[CPU ceiling policy: critical-path | measured]:policy:'
+                '--cpu-policy[CPU ceiling policy: critical-path | measured]:policy:(critical-path measured)'
                 '--exclude[Leave these projects out of the verified runs]:names:'
                 '--impacted-strict[Fail when the --impacted baseline can'\''t be resolved]'
-                '--profile[Deployment profile the verified runs use: dev | test | production]:profile:'
+                '--profile[Deployment profile the verified runs use: dev | test | production]:profile:(dev production test)'
                 '--retry[Retry transient failures in the verified runs]:n:'
                 '--trace-profile[Write the trace events of the last verified run (Chrome trace format)]:path:'
             )
@@ -346,7 +346,7 @@ _putnami_flags_for() {
         'init')
             reply=(
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
-                '--extension[Default extension to install]:ts|go|py:'
+                '--extension[Default extension to install]:ts|go|py:(go py ts)'
                 '--force[Reinitialize an existing workspace]'
                 '--project[Create an initial project]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'
@@ -448,7 +448,7 @@ _putnami_flags_for() {
             ;;
         'upgrade')
             reply=(
-                '--channel[Resolve a release channel (stable by default; canary for latest prerelease)]:channel:'
+                '--channel[Resolve a release channel (stable by default; canary for latest prerelease)]:channel:(canary stable)'
                 '--cli[Only upgrade the CLI binary]'
                 '--continue-on-error[Run the remaining upgrade phases after one fails]'
                 '--deps[Only upgrade framework dependencies]'
@@ -464,7 +464,7 @@ _putnami_flags_for() {
         'workspace init')
             reply=(
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
-                '--extension[Default extension to install]:ts|go|py:'
+                '--extension[Default extension to install]:ts|go|py:(go py ts)'
                 '--force[Reinitialize an existing workspace]'
                 '--project[Create an initial project]:name:'
                 '--project-path[Workspace-relative path for the initial project]:path:'

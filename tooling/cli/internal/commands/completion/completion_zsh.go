@@ -334,7 +334,7 @@ func writeZshFlagCases(w io.Writer, ctx completionContext) {
 		iox.Fprintf(w, "        %s)\n", bashQuote(key))
 		iox.Fprintf(w, "            reply=(\n")
 		for _, flag := range flags {
-			iox.Fprintf(w, "                %s\n", bashQuote(zshFlagSpec(flag.Long, flag.Description, flag.ValueName, nil)))
+			iox.Fprintf(w, "                %s\n", bashQuote(zshFlagSpec(flag.Long, flag.Description, flag.ValueName, zshSpecValues(ctx.structuredFlagValues[key+" "+flag.Long]))))
 		}
 		iox.Fprintf(w, "            )\n")
 		iox.Fprintf(w, "            ;;\n")
@@ -378,6 +378,20 @@ func zshDescribeNames(names []string) string {
 // backslash, "[" and ":", and the description the backslash and "]". bashQuote
 // handles the surrounding single quotes, including any apostrophe the prose
 // carries.
+// zshSpecValues returns the values a flag spec lists for --flag=, so _values
+// completes them after the "=". A value that is not a plain word is left out:
+// the spec's "(a b)" action splits on spaces. The word after the flag still
+// offers every value (writeZshValueCases).
+func zshSpecValues(values []completionValue) []string {
+	var words []string
+	for _, value := range values {
+		if plainWord(value.Value) {
+			words = append(words, value.Value)
+		}
+	}
+	return words
+}
+
 func zshFlagSpec(long, description, valueName string, values []string) string {
 	name := strings.NewReplacer(`\`, `\\`, `[`, `\[`, `:`, `\:`).Replace(long)
 	spec := name + "[" + strings.NewReplacer(`\`, `\\`, `]`, `\]`).Replace(description) + "]"
