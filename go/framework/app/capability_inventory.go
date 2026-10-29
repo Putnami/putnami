@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/errors"
 	"go.putnami.dev/migration"
 	protocaps "go.putnami.dev/protocol/capabilities"
 	protocfg "go.putnami.dev/protocol/config"
@@ -594,7 +595,21 @@ func (a *Application) collectCapabilityDiscoverers(inv *capabilityInventory) ([]
 	return discoverers, nil
 }
 
-func (a *Application) collectCapabilityInfraSidecars(outputDir string, inv *capabilityInventory) ([]protocaps.InfraRequirementV2, error) {
+// configSecretsSidecar is the infra sidecar the Go build writes from the
+// sensitive fields of the workload's config schema. Describe does not read it:
+// each config secret comes from the module's ConfigContributors.
+const configSecretsSidecar = "secrets"
+
+// configSecretsSource labels the config-derived secrets among the sources of
+// infra declarations.
+const configSecretsSource = "config"
+
+// collectCapabilityInfraRequirements records the infra requirements the
+// describers' sidecars under outputDir declare, or the migration databases
+// when no sidecar declares any, then one secret per sensitive config field of
+// the module's ConfigContributors. The result depends only on the module and
+// on what this describe run wrote.
+func (a *Application) collectCapabilityInfraRequirements(outputDir string, inv *capabilityInventory) ([]protocaps.InfraRequirementV2, error) {
 	paths, err := filepath.Glob(filepath.Join(outputDir, protoinfra.PerProjectManifestDir, "*.json"))
 	if err != nil {
 		return nil, fmt.Errorf("discover capability infra sidecars: %w", err)
@@ -690,7 +705,7 @@ func (a *Application) collectCapabilityInfraSidecars(outputDir string, inv *capa
 					return nil
 				}
 			}
-			return fmt.Errorf("infra contribution %s has ambiguous declarations in sidecars %q and %q", capabilityIdentityLabel(identity), seenContainer[identity], container)
+			return fmt.Errorf("infra contribution %s has ambiguous declarations in %q and %q", capabilityIdentityLabel(identity), seenContainer[identity], container)
 		}
 		seen[identity], seenContainer[identity] = provenance, container
 		requirements = append(requirements, protocaps.InfraRequirementV2{Identity: identity, Name: name, Kind: kind, Provenance: provenance})
@@ -706,6 +721,9 @@ func (a *Application) collectCapabilityInfraSidecars(outputDir string, inv *capa
 			continue
 		}
 		slug := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		if slug == configSecretsSidecar {
+			continue
+		}
 		var producer any = describers[slug]
 		method := "Describe"
 		data, readErr := os.ReadFile(path) //nolint:gosec // path comes from the framework-owned output directory glob
@@ -766,15 +784,7 @@ func (a *Application) collectCapabilityInfraSidecars(outputDir string, inv *capa
 			}
 		}
 		for _, secret := range manifest.Secrets {
-			value, valueMethod := producer, method
-			if slug == "secrets" {
-				resolved, resolveErr := uniqueCapabilityProducer(secretProducers[secret], "secret", secret)
-				if resolveErr != nil {
-					return nil, resolveErr
-				}
-				value, valueMethod = resolved, "ConfigDefinitions"
-			}
-			if err := appendRequirement(slug, secret, protocaps.InfraKindSecret, value, valueMethod); err != nil {
+			if err := appendRequirement(slug, secret, protocaps.InfraKindSecret, producer, method); err != nil {
 				return nil, err
 			}
 		}
@@ -782,6 +792,27 @@ func (a *Application) collectCapabilityInfraSidecars(outputDir string, inv *capa
 			if err := appendRequirement(slug, job.Name, protocaps.InfraKindScheduledJob, producer, method); err != nil {
 				return nil, err
 			}
+		}
+	}
+	if len(requirements) == 0 {
+		fallback, err := a.collectCapabilityInfra(inv)
+		if err != nil {
+			return nil, errors.Wrapf(err, CodeConfigure, "collect capability infra requirements")
+		}
+		requirements = fallback
+	}
+	secrets := make([]string, 0, len(secretProducers))
+	for secret := range secretProducers {
+		secrets = append(secrets, secret)
+	}
+	sort.Strings(secrets)
+	for _, secret := range secrets {
+		producer, err := uniqueCapabilityProducer(secretProducers[secret], "secret", secret)
+		if err != nil {
+			return nil, err
+		}
+		if err := appendRequirement(configSecretsSource, secret, protocaps.InfraKindSecret, producer, "ConfigDefinitions"); err != nil {
+			return nil, err
 		}
 	}
 	return requirements, nil

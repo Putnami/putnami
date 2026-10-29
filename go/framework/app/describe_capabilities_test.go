@@ -774,9 +774,6 @@ func TestAdapterDeclarationSkipsMigrationProducerResolution(t *testing.T) {
 func TestInfraSidecarsResolveConfigAndDescribeOnlyProducers(t *testing.T) {
 	out := t.TempDir()
 	writeVersionStamp(t, out)
-	if err := protoinfra.WriteSidecarIn(out, "secrets", protoinfra.PerProjectManifest{Secrets: []string{"database.default.password"}}); err != nil {
-		t.Fatal(err)
-	}
 	a := New("sidecars")
 	a.Use(&capConfigPlugin{name: "config", defs: []config.Descriptor{config.Config[capDBOptions]("database.default").Descriptor()}})
 	a.UseForDescribe(&describeOnlyStorage{})
@@ -805,6 +802,89 @@ func TestInfraSidecarsResolveConfigAndDescribeOnlyProducers(t *testing.T) {
 		if !found {
 			t.Errorf("missing infra requirement %s", key)
 		}
+	}
+}
+
+// TestConfigSecretsIgnoreTheBuildSecretsSidecar pins that describe derives
+// config secrets from the module alone: no secrets sidecar, the sidecar a
+// later build step writes, and a stale one naming a dropped secret give the
+// same manifest bytes.
+func TestConfigSecretsIgnoreTheBuildSecretsSidecar(t *testing.T) {
+	spectest.Proves(t, "capabilities/manifest-contract", "v2-emission-drops-volatile-state", "the-go-framework-ignores-a-left-secrets-sidecar")
+	describe := func(sidecar []string) []byte {
+		t.Helper()
+		out := t.TempDir()
+		writeVersionStamp(t, out)
+		if sidecar != nil {
+			if err := protoinfra.WriteSidecarIn(out, "secrets", protoinfra.PerProjectManifest{Secrets: sidecar}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		a := New("config-secrets")
+		a.Use(&capConfigPlugin{name: "config", defs: []config.Descriptor{config.Config[capDBOptions]("database.default").Descriptor()}})
+		if err := a.Describe(out, nil); err != nil {
+			t.Fatalf("Describe with sidecar %v: %v", sidecar, err)
+		}
+		data, err := os.ReadFile(filepath.Join(out, "schema", protocaps.ManifestFilename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	want := describe(nil)
+	document, diags := protocaps.ParseAndValidateManifestDocument(want)
+	if document == nil || document.V2 == nil || len(diags) != 0 {
+		t.Fatalf("manifest: %#v %v", document, diags)
+	}
+	var secrets []string
+	for _, requirement := range document.V2.InfraRequirements {
+		if requirement.Kind == protocaps.InfraKindSecret {
+			secrets = append(secrets, requirement.Name)
+		}
+	}
+	if len(secrets) != 1 || secrets[0] != "database.default.password" {
+		t.Fatalf("secrets without a sidecar = %v, want [database.default.password]", secrets)
+	}
+	for _, sidecar := range [][]string{{"database.default.password"}, {"database.default.password", "removed.token"}} {
+		if got := describe(sidecar); !bytes.Equal(got, want) {
+			t.Errorf("manifest with secrets sidecar %v differs from the manifest without one:\n%s\nwant:\n%s", sidecar, got, want)
+		}
+	}
+}
+
+// TestMigrationFallbackCoexistsWithConfigSecrets pins that the migration
+// databases stand in for absent sidecars even when config secrets exist: a
+// capabilities-only describe writes no sidecar, and records both the database
+// from MigrationSources and the secret from ConfigDefinitions.
+func TestMigrationFallbackCoexistsWithConfigSecrets(t *testing.T) {
+	out := t.TempDir()
+	writeVersionStamp(t, out)
+	a := New("fallback-and-secrets")
+	a.Use(&capMigrationPlugin{src: capMigrationSource{namespace: "iam", database: "default"}})
+	a.Use(&capConfigPlugin{name: "config", defs: []config.Descriptor{config.Config[capDBOptions]("database.default").Descriptor()}})
+	if err := a.Describe(out, []string{describerNameCapabilities}); err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	if paths, _ := filepath.Glob(filepath.Join(out, protoinfra.PerProjectManifestDir, "*.json")); len(paths) != 0 {
+		t.Fatalf("capabilities-only describe wrote sidecars %v", paths)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "schema", protocaps.ManifestFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, diags := protocaps.ParseAndValidateManifestDocument(data)
+	if document == nil || document.V2 == nil || len(diags) != 0 {
+		t.Fatalf("manifest: %#v %v", document, diags)
+	}
+	got := map[string]string{}
+	for _, requirement := range document.V2.InfraRequirements {
+		got[string(requirement.Kind)+":"+requirement.Name] = requirement.Provenance.Declaration.Symbol
+	}
+	if symbol := got["database:default"]; !strings.HasSuffix(symbol, ".MigrationSources") {
+		t.Errorf("database:default declared by %q, want a MigrationSources declaration; requirements %v", symbol, got)
+	}
+	if symbol := got["secret:database.default.password"]; !strings.HasSuffix(symbol, ".ConfigDefinitions") {
+		t.Errorf("secret:database.default.password declared by %q, want a ConfigDefinitions declaration; requirements %v", symbol, got)
 	}
 }
 

@@ -111,17 +111,10 @@ func (a *Application) describeCapabilities(dctx *DescribeContext) error {
 	if err != nil {
 		return errors.Wrapf(err, CodeConfigure, "collect capability migrations")
 	}
-	infraRequirements, err := a.collectCapabilityInfraSidecars(dctx.OutputDir, inventory)
+	m.InfraRequirements, err = a.collectCapabilityInfraRequirements(dctx.OutputDir, inventory)
 	if err != nil {
 		return err
 	}
-	if len(infraRequirements) == 0 {
-		infraRequirements, err = a.collectCapabilityInfra(inventory)
-		if err != nil {
-			return errors.Wrapf(err, CodeConfigure, "collect capability infra requirements")
-		}
-	}
-	m.InfraRequirements = infraRequirements
 	m.HealthContributors, err = a.collectCapabilityHealth(inventory)
 	if err != nil {
 		return errors.Wrapf(err, CodeConfigure, "collect capability health contributors")
@@ -535,9 +528,9 @@ func capabilityProvenanceLabel(p protocaps.ProvenanceV2) string {
 
 // collectCapabilityInfra projects the databases the migration registry declares
 // (the authoritative source for the schemas each database owns) into infra
-// requirements. Other infra kinds (events, storage, secret, scheduledJob) come
-// from their own framework sidecars, which the app package does not collect, so
-// only database requirements are emitted here.
+// requirements. Events, storage and scheduled jobs come from describer
+// sidecars and secrets from ConfigContributors, so only database requirements
+// are emitted here.
 func (a *Application) collectCapabilityInfra(inventory *capabilityInventory) ([]protocaps.InfraRequirementV2, error) {
 	if a.migrationRegistry == nil {
 		return nil, nil
