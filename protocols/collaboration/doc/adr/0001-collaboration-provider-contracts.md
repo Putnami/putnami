@@ -1,6 +1,10 @@
 # 0001: Collaboration provider contracts
 
-- **Status**: accepted
+- **Status**: accepted, superseded in part by
+  [ADR 0004](0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  decision 3, the transport half of decision 5 and the last sentence of
+  decision 1. A provider is declared under `providers`, not on tools, and the
+  route calls it without the extension tool transport or an MCP server.
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`),
   its providers, and the CLI route that calls them
 

@@ -34,7 +34,7 @@
     },
     {
       "id": "one-run-verdict-on-every-surface",
-      "text": "A task identity derives its key from its parts. RunSummary derives one verdict: a reused failure fails the run, and an aborted run never succeeds, whatever its counts, and keeps the failures it accumulated visible. The JSON envelope, the session end record, the MCP result and the session file report that same run summary type."
+      "text": "A task identity derives its key from its parts. RunSummary derives one verdict: a reused failure fails the run, and an aborted run never succeeds, whatever its counts, and keeps the failures it accumulated visible. The JSON envelope, the session end record and the session file report that same run summary type."
     },
     {
       "id": "session-members-are-additive",
@@ -70,7 +70,7 @@
     },
     {
       "id": "the-cli-emits-conforming-documents",
-      "text": "The CLI's --output=json envelope, its bounded JSONL stream, its two recorded session files and its MCP result each pass ValidateDocument as version 2 and match a committed golden. No value of the retired selection variable makes the CLI write another contract, and the goldens encode the strict verdict and abort precedence."
+      "text": "The CLI's --output=json envelope, its bounded JSONL stream and its two recorded session files each pass ValidateDocument as version 2 and match a committed golden. No value of the retired selection variable makes the CLI write another contract, and the goldens encode the strict verdict and abort precedence."
     }
   ],
   "decisions": [

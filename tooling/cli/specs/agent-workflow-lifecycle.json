@@ -89,7 +89,7 @@
     },
     {
       "id": "host-hooks-exit-guard",
-      "text": "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never installs. No CLI exit code reaches the host as is: an ordinary hook ends with || true, and a Claude Code wake hook exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are A|B and Codex matchers ^(A|B)$; a Putnami MCP tool is mcp__putnami__<tool> with its dots as underscores. A source workspace runs \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
+      "text": "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never installs. No CLI exit code reaches the host as is: an ordinary hook ends with || true, and a Claude Code wake hook exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are A|B and Codex matchers ^(A|B)$. A source workspace runs \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
     }
   ],
   "decisions": [

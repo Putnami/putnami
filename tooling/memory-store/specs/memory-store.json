@@ -51,7 +51,7 @@
     },
     {
       "id": "truthful-manifest",
-      "text": "The manifest passes the extension protocol's strict validation and offers memory version 1 with context, mission, checkpoint and search, checkpoint declaring atomic preconditions, context and search taking the resolved selection, every tool routed to the runtime bridge and marked as possibly reaching outside the machine, as the Git backend with a remote does."
+      "text": "The manifest passes the extension protocol's strict validation and offers memory version 1 with context, mission, checkpoint and search, checkpoint declaring atomic preconditions, context and search taking the resolved selection, every operation served by the provider command and marked as possibly reaching outside the machine, as the Git backend with a remote does."
     },
     {
       "id": "portable-git-writes",

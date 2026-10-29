@@ -223,7 +223,7 @@
     },
     {
       "id": "extension-command-host-rpc",
-      "text": "An interactive extension subcommand launch opens one host RPC channel: a fresh Unix socket in a directory only the user can open, named by PUTNAMI_HOST_RPC, with 32 random bytes hex-encoded in PUTNAMI_HOST_RPC_TOKEN. The channel closes and its directory is removed when the process exits, whatever its exit. A planned job, a provider tool and a hosted run receive neither variable, and a process drops the pair it inherited."
+      "text": "An interactive extension subcommand launch opens one host RPC channel: a fresh Unix socket in a directory only the user can open, named by PUTNAMI_HOST_RPC, with 32 random bytes hex-encoded in PUTNAMI_HOST_RPC_TOKEN. The channel closes and its directory is removed when the process exits, whatever its exit. A planned job, a provider call and a hosted run receive neither variable, and a process drops the pair it inherited."
     },
     {
       "id": "host-rpc-core-calls",

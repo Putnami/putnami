@@ -10,7 +10,7 @@
   "nonGoals": [
     "Deciding what a language builds, tests or publishes: each extension owns its commands and tasks",
     "The host RPC channel of an interactive subcommand: the hostrpc subpackage documents that wire on its own",
-    "The collaboration contracts a tool may implement: protocols/collaboration owns them and their routing"
+    "The collaboration contracts a provider may implement: protocols/collaboration owns them, their wire and their routing"
   ],
   "requirements": [
     {
@@ -23,11 +23,11 @@
     },
     {
       "id": "a-contract-matches-or-the-manifest-does-not-load",
-      "text": "LoadManifest refuses a cliContract above the latest contract the CLI reads with an error asking for a newer putnami, and one below the contract the manifest's vocabulary requires, absent included, with an error naming that contract, a re-package and putnami extensions update. A manifest with no command, command group, tool or other contract surface is outside the ladder. A released manifest below the contract stays refused, and no function adapts an older manifest."
+      "text": "LoadManifest refuses a cliContract above the latest contract the CLI reads with an error asking for a newer putnami, and one below the contract the manifest's vocabulary requires, absent included, with an error naming that contract, a re-package and putnami extensions update. A manifest with no command, command group, provider or other contract surface is outside the ladder. A released manifest below the contract stays refused, and no function adapts an older manifest."
     },
     {
       "id": "an-additive-vocabulary-raises-the-contract-floor",
-      "text": "Agent content, a verb vocabulary, command kinds, publish channels, a provisioned toolchain, a group default that takes positionals, input selectors, a source-bound task, a git or release baseline input and a command dependency on one step of another command each raise the contract a manifest requires, only when the manifest uses them. RequiredCLIContract takes the highest rung across the manifest, and a manifest stamped below the rung its vocabulary requires does not load."
+      "text": "Agent content, a verb vocabulary, command kinds, publish channels, a provisioned toolchain, a group default that takes positionals, input selectors, a source-bound task, a git or release baseline input, a command dependency on one step of another command and a providers section (contract 19) each raise the contract a manifest requires, only when the manifest uses them. RequiredCLIContract takes the highest rung across the manifest, and a manifest stamped below the rung its vocabulary requires does not load."
     },
     {
       "id": "a-registry-extension-dependency-requires-rung-8",
@@ -97,6 +97,7 @@
     "protocols/extension/doc/adr/0011-a-publish-task-declares-the-channels-it-serves.md",
     "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",
     "protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md",
-    "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md"
+    "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
+    "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md"
   ]
 }

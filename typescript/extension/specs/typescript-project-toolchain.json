@@ -152,10 +152,6 @@
       "text": "The upgrade table shows, for every resolved version, the source revision carried by its suffix."
     },
     {
-      "id": "resolved-dependency-documentation",
-      "text": "The putnami.typescript_docs MCP tool returns AI.md only from the exact npm package found by the requested project's nearest-node_modules resolution, with the installed package name, version, source kind, path and content digest. Resolution is bounded, offline and read-only; missing installed bytes, missing docs, ambiguous projects and escaping symlinks produce an explicit unavailable result rather than consulting a registry or substituting extension-carried documentation."
-    },
-    {
       "id": "committed-client-drift",
       "text": "The generated TypeScript client build-generate emits into the project tree is committed, and build-generate is its first writer in a session; its declared client output carries drift: fail, so the engine compares what the task writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift when they differ, leaving the regenerated client in the worktree to commit. Build-time generation under .gen carries no policy."
     },

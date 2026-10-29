@@ -81,7 +81,7 @@
             "checks": [
               "a-landed-write-whose-sync-failed-is-unresolved",
               "a-repeated-key-replays-the-write",
-              "a-write-answers-before-the-tool-timeout",
+              "a-write-answers-before-the-provider-timeout",
               "an-uncertain-push-is-reconciled",
               "an-unreconcilable-push-is-unresolved"
             ]

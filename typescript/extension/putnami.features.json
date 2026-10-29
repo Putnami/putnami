@@ -542,22 +542,6 @@
           }
         },
         {
-          "id": "resolved-dependency-documentation",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-nearest-project-package-supplies-exact-documentation",
-              "workspace-package-links-retain-their-source-identity",
-              "missing-dependencies-and-documentation-are-explicit",
-              "unsafe-documentation-paths-are-unavailable"
-            ]
-          }
-        },
-        {
           "id": "committed-client-drift",
           "stage": "coded",
           "evidenceKinds": [

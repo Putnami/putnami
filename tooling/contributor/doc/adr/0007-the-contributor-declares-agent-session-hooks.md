@@ -1,6 +1,10 @@
 # ADR 0007 — The contributor declares agent session hooks
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0004 of the collaboration contracts](../../../../protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  `PostToolUse` no longer matches `missions.ask` and `missions.reply`. The
+  commands `agent ask` and `agent reply` call them and record the decision and
+  the reply for the session.
 - **Scope**: `@putnami/contributor` (`tooling/contributor`): its manifest, its
   runtime and the host files the core writes for it
 - **Follows**: [ADR 0006](0006-the-contributor-executable-serves-change-finalize.md),

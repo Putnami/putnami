@@ -769,22 +769,6 @@
           }
         },
         {
-          "id": "resolved-dependency-documentation",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "exact-selected-module-documentation-is-returned",
-              "documentation-resolution-is-offline-and-read-only",
-              "extension-carried-documentation-is-never-mislabeled",
-              "unsafe-documentation-paths-are-unavailable"
-            ]
-          }
-        },
-        {
           "id": "reproducible-archives",
           "stage": "coded",
           "evidenceKinds": [

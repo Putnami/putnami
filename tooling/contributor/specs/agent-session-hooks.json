@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "tooling/agent-session-hooks",
   "outcomes": [
-    "A Claude Code or Codex session publishes its state, loop stage, token usage, end, plan, delivered messages, decisions and replies to its mission through the missions contract, from the host hooks @putnami/contributor declares",
+    "A Claude Code or Codex session publishes its state, loop stage, token usage, end, plan, delivered messages, decisions and replies to its mission through the missions contract, from the host hooks @putnami/contributor declares and its agent ask and agent reply commands",
     "The agent receives its mission sheet at session start and the owner's messages and answers at the end of a turn or during a wait"
   ],
   "nonGoals": [
@@ -18,7 +18,11 @@
     },
     {
       "id": "tool-use-capture",
-      "text": "PostToolUse records a TodoWrite, TaskCreate, TaskUpdate or update_plan plan change, the id of a decision missions.ask opened, and a marker for a reply missions.reply recorded or found closed. It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock. A recorded reply wins over an ack line for the same message."
+      "text": "PostToolUse records a TodoWrite, TaskCreate, TaskUpdate or update_plan plan change. It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock."
+    },
+    {
+      "id": "decision-commands",
+      "text": "putnami agent ask and putnami agent reply call missions.ask and missions.reply through the host channel for the current session and record the outcome themselves: the id of an asked decision rides the session's next sync, and a reply recorded or found closed leaves a marker. A recorded reply wins over an ack line for the same message."
     },
     {
       "id": "stop-publication",
