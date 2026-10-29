@@ -702,6 +702,33 @@ func TestDepsEditFailsWhenAGoWorkPinLookupCannotTell(t *testing.T) {
 	}
 }
 
+// A lookup error says a version does not exist by its HTTP status, whatever
+// reason phrase follows, by a missing file of a file:// proxy, or by an unknown
+// revision; every other error cannot tell.
+func TestNotFoundReadsTheStatusOfAGoLookupError(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/deps-edit", "deps-tidy-resolves-as-the-workspace-does",
+		"tidy-keeps-a-served-requirement-a-go-work-pin-would-raise")
+	for message, want := range map[string]bool{
+		"example.com/x@v0.0.1: reading https://proxy.example/example.com/x/@v/v0.0.1.info: 404 Not Found":                                       true,
+		"example.com/x@v0.0.1: reading http://127.0.0.1:8080/example.com/x/@v/v0.0.1.info: 404\n\tserver response: not found":                   true,
+		"example.com/x@v0.0.1: reading http://127.0.0.1:8080/example.com/x/@v/v0.0.1.info: 404":                                                 true,
+		"example.com/x@v0.0.1: reading http://127.0.0.1:8080/example.com/x/@v/v0.0.1.info: 404 File not found":                                  true,
+		"example.com/x@v0.0.1: reading https://proxy.example/example.com/x/@v/v0.0.1.info: 410 Gone":                                            true,
+		"example.com/x@v0.0.1: reading file:///proxy/example.com/x/@v/v0.0.1.info: no such file or directory":                                   true,
+		"example.com/x@v0.0.1: reading file:///C:/proxy/example.com/x/@v/v0.0.1.info: The system cannot find the file specified.":               true,
+		"example.com/x@v0.0.1: invalid version: unknown revision v0.0.1":                                                                        true,
+		"example.com/x@v0.0.1: reading https://proxy.example/example.com/x/@v/v0.0.1.info: 500 Internal Server Error":                           false,
+		"example.com/x@v0.0.1: module lookup disabled by GOPROXY=off":                                                                           false,
+		"example.com/x@v0.0.1: Get \"https://proxy.example/example.com/x/@v/v0.0.1.info\": dial tcp 127.0.0.1:443: connect: connection refused": false,
+		"example.com/x@v0.0.1: Get \"https://proxy.example/example.com/x/@v/v0.0.1.info\": dial tcp: lookup proxy.example: no such host":        false,
+	} {
+		if got := notFound(message); got != want {
+			t.Errorf("notFound(%q) = %v, want %v", message, got, want)
+		}
+	}
+}
+
 // The edits of one run are one transaction: a go step that fails puts every
 // go.mod and go.sum the run edited back as it was, those of the modules it
 // already tidied included. Here no go.work directive supplies the generated

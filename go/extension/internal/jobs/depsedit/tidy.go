@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/mod/modfile"
@@ -266,17 +267,24 @@ func unservedVersions(j *workspacejob.Job, dir string, candidates []module.Versi
 }
 
 // notFound reports whether a go module lookup error says the version does not
-// exist: a 404 or 410 answer of a proxy, a missing file of a file:// proxy, or
-// an unknown revision of a direct fetch.
+// exist: a 404 or 410 status of a proxy, whatever reason phrase follows it, a
+// missing file of a file:// proxy, or an unknown revision of a direct fetch.
 func notFound(message string) bool {
 	message = strings.ToLower(message)
-	for _, answer := range []string{"404 not found", "410 gone", "no such file or directory", "unknown revision"} {
+	if notFoundStatus.MatchString(message) {
+		return true
+	}
+	for _, answer := range []string{"no such file or directory", "cannot find the file specified", "unknown revision"} {
 		if strings.Contains(message, answer) {
 			return true
 		}
 	}
 	return false
 }
+
+// notFoundStatus matches the HTTP status a go lookup error states after
+// `reading <url>: ` when it is 404 or 410.
+var notFoundStatus = regexp.MustCompile(`: (404|410)(\s|$)`)
 
 // replacesVersion reports whether a directive of replaces covers some version
 // old covers: a directive for every version of old's module, a directive for
