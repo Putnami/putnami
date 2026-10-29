@@ -456,7 +456,14 @@ steps in this extension, as two lifecycle jobs
 - `deps-edit` adds a module with `go list -m` and `go mod edit -require`, and
   removes one with `go mod edit -droprequire`. It never runs `go get`, so it
   edits a `go.mod` that requires a version no proxy serves. It then tidies each
-  module with the `replace` directives of `go.work`. When a step fails, every
+  module with the `replace` directives of `go.work`. A directive that pins
+  every version of a module, such as
+  `go.putnami.dev/app => go.putnami.dev/app v0.4.0`, applies only to the
+  versions a proxy answers do not exist, such as the `v0.0.1` placeholder a
+  generated client requires. A requirement a proxy serves keeps its version,
+  unless the pinned release read for a placeholder requires a newer one; the
+  command names each pin it applies. A lookup that fails for another reason,
+  such as `GOPROXY=off`, fails the edit. When a step fails, every
   `go.mod` and `go.sum` the run edited is put back. With `--dry-run`, it makes
   the edit and the tidy on a copy of `go.mod` and `go.sum`, prints each
   requirement and `replace` directive that would be added, dropped or changed,

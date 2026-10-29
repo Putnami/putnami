@@ -1142,6 +1142,7 @@
             "checks": [
               "a-failed-go-step-leaves-every-file-as-it-was",
               "a-rollback-replaces-each-file-through-a-rename",
+              "tidy-keeps-a-served-requirement-a-go-work-pin-would-raise",
               "tidy-reads-the-go-work-replace-directives",
               "tidy-states-a-go-work-directory-replace-from-the-module"
             ]
