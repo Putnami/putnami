@@ -63,8 +63,8 @@ type spawnSite struct {
 // unsure, mark it: that fails closed.
 var spawnSites = map[string]spawnSite{
 	// Repository code, recorded before the spawn.
-	"collaboration/invoke.go:invokeExtensionTool": {spawns: 1, verdict: marked, by: "collaboration/invoke.go:invokeExtensionTool",
-		why: "an extension tool runs in the workspace"},
+	"collaboration/invoke.go:invokeProvider": {spawns: 1, verdict: marked, by: "collaboration/invoke.go:invokeProvider",
+		why: "a collaboration provider runs in the workspace"},
 	"commands/cachecmd/cache_verify.go:addDetachedWorktree": {spawns: 1, verdict: marked, by: "commands/cachecmd/cache_verify.go:addDetachedWorktree",
 		why: "the checkout runs the post-checkout hook and smudge filters"},
 	"commands/completion/completion_install.go:writeCompletionFromBinary": {spawns: 1, verdict: marked, by: "commands/completion/completion_install.go:writeCompletionFromBinary",

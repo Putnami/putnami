@@ -602,7 +602,9 @@ func TestCollaboration_BindingFailuresAreExplicit(t *testing.T) {
 		{"a disabled provider", `{"tasks":{"provider":"@test/collab","version":1}}`,
 			nil, true, collab.OutcomeUnavailable, collab.ReasonBindingProviderMissing},
 		{"a provider missing a required operation", `{"tasks":{"provider":"@test/collab","version":1}}`,
-			func(providers map[string]proto.ProviderDeclaration) { delete(providers["tasks"].Operations, "transition") },
+			func(providers map[string]proto.ProviderDeclaration) {
+				delete(providers["tasks"].Operations, "transition")
+			},
 			false, collab.OutcomeUnsupported, collab.ReasonBindingIncomplete},
 		{"a provider lacking an operation the binding requires", `{"tasks":{"provider":"@test/collab","version":1,"require":["claim"]}}`,
 			nil, false, collab.OutcomeUnsupported, collab.ReasonBindingIncomplete},

@@ -107,8 +107,8 @@ func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	if got := slices.Sorted(maps.Keys(manifest.CommandGroups)); !slices.Equal(got, []string{"compose", "qualify", "version"}) {
 		t.Errorf("command groups %v, want only compose, qualify and version", got)
 	}
-	if len(manifest.Tools) != 0 || manifest.AgentContent != nil || manifest.Hooks != nil {
-		t.Errorf("the manifest declares tools %v, agent content %+v or hooks %+v", manifest.Tools, manifest.AgentContent, manifest.Hooks)
+	if len(manifest.Providers) != 0 || manifest.AgentContent != nil || manifest.Hooks != nil {
+		t.Errorf("the manifest declares providers %v, agent content %+v or hooks %+v", manifest.Providers, manifest.AgentContent, manifest.Hooks)
 	}
 	if len(manifest.ExtensionDeps.List) != 0 {
 		t.Errorf("the manifest names extension dependencies %v", manifest.ExtensionDeps.List)

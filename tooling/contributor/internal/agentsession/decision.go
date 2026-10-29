@@ -166,7 +166,7 @@ func readAskRequest(args []string, cmd CommandIO) (collab.MissionsAskInput, erro
 	if path == "" {
 		return request, errors.New("give the decision as --input <file|->: a missions.ask document without its mission")
 	}
-	var reader io.Reader = cmd.Stdin
+	reader := cmd.Stdin
 	if path != "-" {
 		if cmd.ResolvePath != nil {
 			path = cmd.ResolvePath(path)
