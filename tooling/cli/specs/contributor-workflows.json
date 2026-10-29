@@ -5,9 +5,9 @@
   "outcomes": [
     "One contributor offering distributes canonical skills and worker profiles; publication, language evaluation, load sampling and tree verification use native Go CLI commands",
     "Contributor workflows reach tasks, proposals and memory through the providers the workspace binds, so a backend changes without a skill edit",
-    "A repository states its labels, states, worker profiles, language rule and publication defaults once, in its own configuration",
-    "Only build, spec, design, prototype, review, adr and check remain as workflow entries, alongside the configured explicit-only content-bump utility; legacy aliases and duplicated orchestration are removed",
-    "Build coordinates a requested intention, multi-task issue or epic from observable delivery units through its mandated stage, making demonstrated results, blockers and next actions visible",
+    "A repository states its labels, states, workflow profiles, language rule and publication defaults once, in its own configuration",
+    "Only build, spec, design, review and check remain as workflow entries, alongside the configured explicit-only content-bump utility; legacy aliases and duplicated orchestration are removed",
+    "Build carries a requested intention, task or proposal through the contribution loop in slices, up to its mandated stage, making demonstrated results, blockers and next actions visible",
     "Material specs, designs, prototypes, ADRs and delivery boundaries receive independent challenge before adoption, with original findings and supported resolutions preserved",
     "Versioned local records carry exact native artifact, handoff and producer references across sessions without creating another requirement registry or controller"
   ],
@@ -21,7 +21,7 @@
   "requirements": [
     {
       "id": "one-contributor-extension",
-      "text": "One @putnami/contributor extension ships build, spec, design, prototype, review, adr and check, the explicit content-bump utility, four worker profiles and shared references for both hosts. Build owns one planning/implementation/review/repair/check loop and continues until the requested outcome, concrete blocker or mandate boundary. A workspace opts in with extension:@putnami/contributor."
+      "text": "One @putnami/contributor extension ships build, spec, design, review and check, the explicit content-bump utility, three worker profiles (fix-standard, fix-heavy and reviewer) and shared references for both hosts. Build owns one loop and continues until the requested outcome, concrete blocker or mandate boundary. A workspace opts in with extension:@putnami/contributor."
     },
     {
       "id": "explicit-only-invocation",
@@ -29,7 +29,7 @@
     },
     {
       "id": "canonical-entry-points",
-      "text": "Only canonical workflow entries and active configured utilities are materialized. Removed plan, execute, fix, epic, code-review, fix-loop and putnami-* entries have no metadata, resource directories or duplicate implementations. Unchanged owned legacy files are removed during upgrade; edited files remain protected and their collision is explicit."
+      "text": "Only canonical workflow entries and active configured utilities are materialized. Removed plan, execute, fix, epic, code-review, fix-loop, adr, prototype and putnami-* entries and the fix-light and epic-analyst workers have no metadata, resource directories or duplicate implementations. Unchanged owned legacy files are removed during upgrade; edited files remain protected and their collision is explicit."
     },
     {
       "id": "provider-neutral-content",
@@ -37,7 +37,7 @@
     },
     {
       "id": "repository-policy",
-      "text": "Instructions name worker profiles, never models; host metadata supplies the model mapping."
+      "text": "Instructions name worker profiles, never models; a worker profile's host metadata supplies its model, and a workflow profile may name another one for the stage it runs in a separate agent."
     },
     {
       "id": "intent-first-publication",
@@ -50,6 +50,18 @@
     {
       "id": "canonical-consumer-migration",
       "text": "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection. Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator. Workflow records require advertised native support. Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
+    },
+    {
+      "id": "one-contribution-loop",
+      "text": "Build runs the loop talk, declare, show, code, check, prove, validate, merge from a core under 2,000 tokens and one reference per stage, read only at that stage. It reports each stage with putnami agent stage and sizes its plan with putnami change estimate before code. Code starts without the owner unless the plan spans several slices with important design or spec decisions or touches a sensitive zone; the owner then approves the study and a cost envelope first."
+    },
+    {
+      "id": "workflow-profiles",
+      "text": "A workflow profile in the contributor policy states, for each loop stage and for review, whether it runs in the main session or in a separate agent, and the worker profile, model and effort of that agent. --profile, then the task label the policy names, selects it, else the default profile, which runs only review in a separate agent. The tier labels and tier workers are gone."
+    },
+    {
+      "id": "review-cycle",
+      "text": "A fresh reviewer agent reviews the frozen candidate. P1 and P2 findings block, P3 findings are listed in the proposal, and a contradiction with an ADR blocks. The main session fixes, a fresh reviewer checks only the P1 and P2 fixes, and after two rounds a disagreement goes to the owner with both positions."
     }
   ],
   "decisions": [

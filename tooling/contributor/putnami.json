@@ -63,9 +63,7 @@
         "build",
         "spec",
         "design",
-        "prototype",
         "review",
-        "adr",
         "check",
         "content-bump"
       ]

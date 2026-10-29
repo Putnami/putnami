@@ -5,7 +5,7 @@ consumer is the consumer workspace's `putnami change verify --workflow FILE`.
 First check that `"$PUTNAMI_CLI" change verify --help` advertises `--workflow`;
 an older CLI may accept a v2 dossier while ignoring its optional workflow
 member. An absent capability is a missing validator, never progress proof.
-Save records under the ignored `.context/execute/<run>/` directory. Give a v2
+Save records under the ignored `.putnami/<issue>/` directory. Give a v2
 dossier an optional `workflow: {path, sha256}` exact reference. Keep the
 original v2 snapshot, candidate review, gate, qualification and acceptance
 checks: a workflow reference adds completeness constraints and cannot waive

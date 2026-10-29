@@ -16,7 +16,7 @@ The block holds conventions only:
   configuration (`.claude/settings.json`, `.codex/config.toml`).
 
 A workspace without the block gets the defaults: claimed and delivered state
-`in_progress`, the shipped worker profiles, no language rule,
+`in_progress`, the shipped default workflow profile, no language rule,
 no hosted gate, proposals ready at finalization, no body limit beyond the
 contract's, no task reference line, no integration, the default estimate table.
 
@@ -58,16 +58,13 @@ repositories.
       "version": 1,
       "tasks": {
         "source": "github:putnami/putnami",
-        "tiers": { "light": "tier/light", "standard": "tier/standard", "heavy": "tier/heavy" },
+        "profileLabel": "workflow/{profile}",
         "claimAssignees": ["@me"]
       },
       "proposals": { "source": "github:putnami/putnami" },
       "states": { "claimed": "in_progress", "delivered": "blocked" },
-      "workers": {
-        "light": "fix-light",
-        "standard": "fix-standard",
-        "heavy": "fix-heavy",
-        "analyst": "epic-analyst"
+      "profiles": {
+        "default": { "review": { "runs": "agent", "agent": "reviewer" } }
       },
       "verification": {
         "language": "en",
@@ -153,10 +150,16 @@ language needs only the binding:
 The local provider has no hosted checks and no merge: the workflows report
 checks as unsupported and leave merging to the repository.
 
-## Worker profiles and models
+## Workflow profiles and models
 
-The shipped profiles carry a reference host model mapping in their host
-metadata. To run other models, add the repository's own profiles
-(`.claude/agents/<name>.md` and `.codex/agents/<name>.toml`, registered in the
-host configuration where the host requires it) and name them under `workers`.
-The instructions follow the policy; they never name a model.
+A workflow profile says who runs each loop stage: the main session, or a
+named agent with its model and effort. The `default` profile runs every stage
+in the main session and only review in the `reviewer` agent. The shipped
+agents (`fix-standard`, `fix-heavy` and `reviewer`) carry a reference host
+model mapping in their host metadata. To run other models, add the
+repository's own agents (`.claude/agents/<name>.md` and
+`.codex/agents/<name>.toml`, registered in the host configuration where the
+host requires it) and name them in a profile under `profiles`. Build selects a
+profile from `--profile`, then from the task label that `tasks.profileLabel`
+matches, then `default`. The instructions follow the policy; they never name a
+model.

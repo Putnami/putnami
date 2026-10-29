@@ -3,7 +3,7 @@
 This is an ignored local index, not a new public review protocol,
 controller or storage service. It references existing producer records and
 attributed Markdown notes. Keep snapshots and original outputs under
-`.context/execute/<run>/`; append revisions instead of editing another author's
+`.putnami/<issue>/`; append revisions instead of editing another author's
 report. The current dossier is a projection, not a separately maintained plan.
 
 Cloud's existing `ReviewReportV1` stays unchanged: its hosted revision, reviewer,
@@ -32,9 +32,9 @@ PUTNAMI_CLI=putnami
 if [ -x ./putnamiw ]; then
   PUTNAMI_CLI=./putnamiw
 fi
-"$PUTNAMI_CLI" change verify --snapshot --base origin/main > .context/execute/run/candidate.json
-"$PUTNAMI_CLI" change verify --ref .context/execute/run/review-1.md
-"$PUTNAMI_CLI" change verify --record .context/execute/run/candidate.json
+"$PUTNAMI_CLI" change verify --snapshot --base origin/main > .putnami/42/candidate.json
+"$PUTNAMI_CLI" change verify --ref .putnami/42/review-1.md
+"$PUTNAMI_CLI" change verify --record .putnami/42/candidate.json
 "$PUTNAMI_CLI" change verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json --base origin/main
 ```
 
@@ -182,5 +182,5 @@ Metadata not carried by those records (such as test-name filters), required-scop
 completeness, semantic review quality, author identity, historical immutability
 and authorization of exceptions remain reviewed conventions. A hash identifies
 bytes, not a trusted author. Shared writers can rewrite the index or verifier.
-These limits must remain visible in pilot results; do not activate an automatic
+These limits must remain visible in the end report; do not activate an automatic
 merge policy from this local stamp alone.

@@ -1,0 +1,5 @@
+name: reviewer
+description: Independent read-only reviewer of a frozen build candidate — the diff, its declarations and its records, with P1 to P3 findings. Use only when /build delegates its review; not for general delegation.
+tools: Bash, Read, Grep, Glob, Write
+model: claude-fable-5-1
+effort: xhigh

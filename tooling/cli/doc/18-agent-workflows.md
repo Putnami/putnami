@@ -54,7 +54,7 @@ An extension's agent content (`agentContent` in its manifest; see the
 is skills, worker profiles, references and helpers, written for every supported
 host: `.agents/skills/**`, `.claude/skills/**`, `.claude/agents/**` and
 `.codex/agents/**`. `@putnami/contributor` ships the daily `build` entry,
-focused `spec`, `design`, `prototype`, `review`, `adr` and `check` interventions,
+focused `spec`, `design`, `review` and `check` interventions,
 and the explicit-only `content-bump` utility with its workers;
 see its [contributor journey](../../contributor/doc/01-contributor-journey.md).
 

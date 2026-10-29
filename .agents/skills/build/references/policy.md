@@ -18,12 +18,11 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `version` | `1` | all | Policy format. Another value stops the workflow with a clear message. |
 | `tasks.source` | none | build | The task provider's source for an explicitly named task ID; otherwise pass the full `{source,id}` reference. |
 | `proposals.source` | none | review | The proposal provider's source for an explicitly named proposal ID; otherwise pass its full reference. |
-| `tasks.tiers` | `{}` | build | Keys `light`, `standard` and `heavy`, each naming a label: a named task carrying the label declares that tier. |
+| `tasks.profileLabel` | none | build | Label pattern with `{profile}`: a named task carrying a matching label selects that workflow profile. |
 | `tasks.claimAssignees` | `[]` | build | Assignees set for a named task claim when the mandate authorizes claim and the provider offers `assign`. |
 | `states.claimed` | `in_progress` | build | Semantic state an explicitly authorized task claim moves to. |
 | `states.delivered` | `in_progress` | change finalize | Semantic state a task moves to once its complete-outcome proposal is published. |
-| `workers.light`, `workers.standard`, `workers.heavy` | `fix-light`, `fix-standard`, `fix-heavy` | build | Worker profile delegated for each tier. |
-| `workers.analyst` | `epic-analyst` | build | Read-only analyst profile for coordinated work. |
+| `profiles` | `{"default": {"review": {"runs": "agent", "agent": "reviewer"}}}` | build | Workflow profiles, by name; see below. |
 | `verification.language` | none | check, change finalize | `en` runs the English-only detector on everything a change publishes; absent, no language rule is enforced. |
 | `verification.documentation` | `[]` | check | Documentation roots a user-facing change must update, besides each project's `doc/`. |
 | `verification.ciGate.checks` | `[]` | build, change finalize | Names of the hosted checks that stand for the gate. Empty, build runs the gate locally before finalization. |
@@ -41,14 +40,45 @@ values do not cause `build` to select backlog work or create tasks. They may
 remain in older workspace policy until its owner removes them; this extension
 does not consume them.
 
+## Workflow profiles
+
+A workflow profile says where each stage of the loop runs. Its keys are the
+loop stages, `talk` to `merge`, and `review`, the review within check. Each
+value is an object:
+
+| Member | Default | Meaning |
+|---|---|---|
+| `runs` | `main`, and `agent` for `review` | `main` runs the stage in the main session; `agent` runs it in a separate agent. Review always runs in a separate agent. |
+| `agent` | `reviewer` for `review`, `fix-standard` for `code` | Worker profile of the separate agent. A code slice whose contract names a heavy risk goes to `fix-heavy`. |
+| `model` | the worker's metadata | Host model the separate agent runs on. |
+| `effort` | the worker's metadata | Host reasoning effort of the separate agent. |
+
+A stage the profile does not name runs in the main session; `model` and
+`effort` apply only to a separate agent, since a main session does not change
+model mid-run. `--profile` selects a profile, then a task label matching
+`tasks.profileLabel`, then `default`. A run names its profile in its reports.
+
+```json
+{
+  "profiles": {
+    "default": { "review": { "runs": "agent", "agent": "reviewer" } },
+    "lighter-code": {
+      "code": { "runs": "agent", "agent": "fix-standard", "model": "<host model>", "effort": "high" },
+      "review": { "runs": "agent", "agent": "reviewer" }
+    }
+  }
+}
+```
+
 ## Worker profiles and models
 
 A worker profile is a host-agnostic body (`.claude/agents/<name>.md`,
 `.codex/agents/<name>.toml`) with host metadata. The profiles this extension
-ships carry a reference host model mapping in that metadata. A repository that
-needs other models or tools selects its own profiles per tier under `workers`
-instead of editing the shipped files; a locally edited shipped file is kept and
-reported by the next install, never overwritten. Host permissions, model
+ships, `fix-standard`, `fix-heavy` and `reviewer`, carry a reference host
+model in that metadata. A repository that needs other models names them in a
+workflow profile, or ships its own worker profiles and names them there,
+instead of editing the shipped files; a locally edited shipped file is kept
+and reported by the next install, never overwritten. Host permissions, model
 access and credentials stay with the workspace and the host.
 
 ## What the policy cannot do

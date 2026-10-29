@@ -23,16 +23,20 @@ const contributorExtension = "@putnami/contributor"
 
 // contributorSkills are the complete active entry-point inventory.
 var contributorSkills = []string{
-	"build", "spec", "design", "prototype", "review", "adr", "check", "content-bump",
+	"build", "spec", "design", "review", "check", "content-bump",
 }
 
 var contributorRemovedSkills = []string{
 	"plan", "execute", "fix", "epic", "code-review", "fix-loop",
 	"putnami-plan", "putnami-change", "putnami-check", "putnami-review",
+	"adr", "prototype",
 }
 
 // contributorWorkers are the worker profiles the extension ships.
-var contributorWorkers = []string{"fix-light", "fix-standard", "fix-heavy", "epic-analyst"}
+var contributorWorkers = []string{"fix-standard", "fix-heavy", "reviewer"}
+
+// contributorRemovedWorkers were merged into another worker profile.
+var contributorRemovedWorkers = []string{"fix-light", "epic-analyst"}
 
 // contributorExplicitOnly are the skills that never run on implicit selection:
 // they mutate shared state in bulk or only apply to a configured integration.
@@ -251,13 +255,13 @@ func TestContributorExplicitOnlySkillsDeclareItOnBothHosts(t *testing.T) {
 }
 
 func TestContributorReviewMetadataKeepsTheReviewQualityFloor(t *testing.T) {
-	profile, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "agents", "epic-analyst", "claude.yaml"))
+	profile, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "agents", "reviewer", "claude.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	modelLine := regexp.MustCompile(`(?m)^model: .+$`).FindString(string(profile))
 	if modelLine == "" {
-		t.Fatal("the analysis profile declares no model")
+		t.Fatal("the reviewer profile declares no model")
 	}
 	result := buildContributorContent(t)
 	for _, skill := range []string{"review"} {
@@ -285,6 +289,16 @@ func TestContributorShipsOnlyCanonicalEntriesAndActiveUtilities(t *testing.T) {
 		for _, host := range []string{".agents", ".claude"} {
 			if _, present := result.Files[host+"/skills/"+removed+"/SKILL.md"]; present {
 				t.Errorf("removed skill %s still renders on %s", removed, host)
+			}
+		}
+	}
+	for _, removed := range contributorRemovedWorkers {
+		if _, err := os.Stat(filepath.Join(contributorRoot(t), "src", "agents", removed)); !os.IsNotExist(err) {
+			t.Errorf("removed contributor worker %s remains: %v", removed, err)
+		}
+		for _, path := range []string{".claude/agents/" + removed + ".md", ".codex/agents/" + removed + ".toml"} {
+			if _, present := result.Files[path]; present {
+				t.Errorf("removed worker %s still renders as %s", removed, path)
 			}
 		}
 	}
@@ -440,13 +454,7 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 		}
 		return string(content)
 	}
-	loop := read("references/loop.md")
-	start := strings.Index(loop, "\n## Intent first\n")
-	end := strings.Index(loop, "\n## One intent, gated phases\n")
-	if start < 0 || end < start {
-		t.Fatalf("loop.md has no Intent first section before the phases section")
-	}
-	section := strings.Join(strings.Fields(loop[start:end]), " ")
+	section := strings.Join(strings.Fields(markdownSection(t, read("references/show.md"), "Intent first")), " ")
 	for _, want := range []string{
 		"`putnami.features.json`", "`specs/*.json`", "`specs.baseline.json`",
 		"`putnami.architecture.json`", "`decisions.json`", "decision record (ADR)",
@@ -459,7 +467,7 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 		"changes no declaration keeps the order",
 	} {
 		if !strings.Contains(section, want) {
-			t.Errorf("the Intent first section of loop.md lacks %q", want)
+			t.Errorf("the Intent first section of show.md lacks %q", want)
 		}
 	}
 	skill := strings.Join(strings.Fields(read("SKILL.md")), " ")
@@ -467,5 +475,173 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 		if !strings.Contains(skill, want) {
 			t.Errorf("build SKILL.md lacks %q", want)
 		}
+	}
+}
+
+// markdownSection returns the body of the level-two section named heading,
+// up to the next level-two heading or the end of the document.
+func markdownSection(t *testing.T, document, heading string) string {
+	t.Helper()
+	start := strings.Index(document, "\n## "+heading+"\n")
+	if start < 0 {
+		t.Fatalf("the document has no %q section", heading)
+	}
+	body := document[start+len("\n## "+heading+"\n"):]
+	if end := strings.Index(body, "\n## "); end >= 0 {
+		body = body[:end]
+	}
+	return body
+}
+
+// contributorLoopStages are the contribution loop's stages, in order.
+var contributorLoopStages = []string{"talk", "declare", "show", "code", "check", "prove", "validate", "merge"}
+
+// buildCoreMaxBytes bounds the rendered build core. At 3.5 bytes per token,
+// a conservative ratio for English prose, 7,000 bytes stay under 2,000
+// tokens.
+const buildCoreMaxBytes = 7000
+
+// TestContributorBuildIsAShortCoreAndOneReferencePerStage pins the shape of
+// build: a core that fits under 2,000 tokens on both hosts, a table that
+// sends each loop stage to its own reference, and the commands that report
+// the stage and size the plan.
+func TestContributorBuildIsAShortCoreAndOneReferencePerStage(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "one-contribution-loop", "build-is-a-short-core-and-one-reference-per-stage")
+	result := buildContributorContent(t)
+	for _, host := range []string{".agents", ".claude"} {
+		core := result.Files[host+"/skills/build/SKILL.md"]
+		if len(core) == 0 || len(core) > buildCoreMaxBytes {
+			t.Errorf("%s build core is %d bytes, want 1 to %d", host, len(core), buildCoreMaxBytes)
+		}
+	}
+	core := string(result.Files[".agents/skills/build/SKILL.md"])
+	loop := markdownSection(t, core, "The loop")
+	flat := strings.Join(strings.Fields(loop), " ")
+	for _, want := range []string{
+		"`\"$PUTNAMI_CLI\" agent stage <stage>`", "read that stage's reference, and only that one",
+	} {
+		if !strings.Contains(flat, want) {
+			t.Errorf("the loop section of build lacks %q", want)
+		}
+	}
+	previous := -1
+	for _, stage := range contributorLoopStages {
+		row := "| " + stage + " | "
+		at := strings.Index(loop, row)
+		if at < 0 || at < previous {
+			t.Errorf("the loop table does not list %s in loop order", stage)
+			continue
+		}
+		previous = at
+		link := "(../../../.agents/skills/build/references/" + stage + ".md)"
+		if !strings.Contains(loop[at:], link) {
+			t.Errorf("the loop table does not send %s to %s", stage, link)
+		}
+		if _, ok := result.Files[".agents/skills/build/references/"+stage+".md"]; !ok {
+			t.Errorf("build ships no reference for the %s stage", stage)
+		}
+	}
+	if !strings.Contains(markdownSection(t, core, "When code waits"), "`\"$PUTNAMI_CLI\" change estimate --issue <id>`") {
+		t.Error("build does not size the plan with change estimate before code")
+	}
+	for name := range result.Files {
+		for _, gone := range []string{"references/loop.md", "references/pilot.md"} {
+			if strings.HasSuffix(name, gone) {
+				t.Errorf("build still ships %s", name)
+			}
+		}
+		if strings.Contains(string(result.Files[name]), "references/loop.md") {
+			t.Errorf("%s still links the deleted loop reference", name)
+		}
+	}
+}
+
+// TestContributorWorkflowProfilesReplaceTiersAndWorkers pins the profile
+// selection: build names profiles, not tiers; the policy documents profiles
+// and drops the tier members; this repository's policy runs only review in a
+// separate agent by default.
+func TestContributorWorkflowProfilesReplaceTiersAndWorkers(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "workflow-profiles", "workflow-profiles-replace-tiers-and-workers")
+	result := buildContributorContent(t)
+	core := string(result.Files[".claude/skills/build/SKILL.md"])
+	for _, want := range []string{"--profile <name>", "`tasks.profileLabel`", "the `reviewer` worker"} {
+		if !strings.Contains(core, want) {
+			t.Errorf("build lacks %q", want)
+		}
+	}
+	policy := string(result.Files[".agents/skills/build/references/policy.md"])
+	for _, want := range []string{"| `profiles` |", "| `tasks.profileLabel` |", "## Workflow profiles"} {
+		if !strings.Contains(policy, want) {
+			t.Errorf("the policy reference lacks %q", want)
+		}
+	}
+	for name, content := range result.Files {
+		for _, gone := range []string{"--tier", "tasks.tiers", "workers.light", "workers.analyst"} {
+			if strings.Contains(string(content), gone) {
+				t.Errorf("%s still names %q", name, gone)
+			}
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(driftRepositoryRoot(t), "putnami.workspace.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workspace struct {
+		Options map[string]json.RawMessage `json:"options"`
+	}
+	if err := json.Unmarshal(raw, &workspace); err != nil {
+		t.Fatal(err)
+	}
+	var contributorPolicy struct {
+		Tasks    map[string]json.RawMessage `json:"tasks"`
+		Workers  json.RawMessage            `json:"workers"`
+		Profiles map[string]map[string]struct {
+			Runs  string `json:"runs"`
+			Agent string `json:"agent"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal(workspace.Options[contributorExtension], &contributorPolicy); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := contributorPolicy.Tasks["tiers"]; present || contributorPolicy.Workers != nil {
+		t.Error("the repository policy still declares tasks.tiers or workers")
+	}
+	stages := contributorPolicy.Profiles["default"]
+	if review := stages["review"]; review.Runs != "agent" || review.Agent != "reviewer" {
+		t.Errorf("the default profile runs review as %+v, want a separate reviewer agent", review)
+	}
+	for stage, setting := range stages {
+		if stage != "review" && setting.Runs == "agent" {
+			t.Errorf("the default profile runs %s in a separate agent", stage)
+		}
+	}
+}
+
+// TestContributorReviewCycleBlocksOnP1AndP2 pins the review cycle of the
+// check stage and the severity scale of the review skill.
+func TestContributorReviewCycleBlocksOnP1AndP2(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "review-cycle", "the-review-cycle-blocks-on-p1-and-p2")
+	result := buildContributorContent(t)
+	check := strings.Join(strings.Fields(string(result.Files[".agents/skills/build/references/check.md"])), " ")
+	for _, want := range []string{
+		"Launch one fresh reviewer",
+		"| P1 | Correctness, security, data loss or a broken required check | yes |",
+		"| P2 | A substantiated design, edge-case or performance defect | yes |",
+		"| P3 | Polish | no: name it in the proposal body |",
+		"A contradiction with an ADR blocks",
+		"A fresh reviewer checks only the P1 and P2 fixes",
+		"After two rounds, a disagreement goes to the owner with both positions.",
+	} {
+		if !strings.Contains(check, want) {
+			t.Errorf("the check stage lacks %q", want)
+		}
+	}
+	review := strings.Join(strings.Fields(string(result.Files[".agents/skills/review/SKILL.md"])), " ")
+	if !strings.Contains(review, "P1 and P2 block; P3 does not.") {
+		t.Error("the review skill does not block on P1 and P2 only")
 	}
 }

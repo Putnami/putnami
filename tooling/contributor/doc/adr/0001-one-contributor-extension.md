@@ -68,6 +68,9 @@ and plan labels; retaining those stored values does not activate task selection.
 
 ### 4. Instructions name worker profiles; profiles carry the model
 
+Amended by [ADR 0009](0009-one-contribution-loop-from-talk-to-merge.md): workflow profiles
+replace the per-tier `workers` member.
+
 Skill and worker bodies never name a model. They delegate to the profile the
 policy selects per tier (`workers.light|standard|heavy|analyst`). The shipped
 profiles' host metadata (`claude.yaml`, `codex.toml`) carries the reference

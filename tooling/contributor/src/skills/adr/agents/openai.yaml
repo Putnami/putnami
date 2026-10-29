@@ -1,4 +1,0 @@
-interface:
-  display_name: "ADR"
-  short_description: "Record a durable choice"
-  default_prompt: "Use $adr to record and challenge this durable decision in its owning project."

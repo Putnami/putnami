@@ -9,7 +9,7 @@ Accept a material spec, design, prototype, ADR or frozen implementation
 candidate. Work in a distinct context from its author. Read the mandate,
 exact examined artifact and relevant source and context versions; a title or
 summary alone is not review coverage. Candidate code review also follows the
-[build loop](../../../.agents/skills/build/references/loop.md), its
+[build check stage](../../../.agents/skills/build/references/check.md), its
 [records contract](../../../.agents/skills/build/references/records.md) and the v2 dossier contract.
 Use the repository's review-quality host profile; add a specialized pass only
 for a distinct risk, without requiring a fixed count of passes or findings.
@@ -58,16 +58,16 @@ only a missing check or targeted experiment. Coordinate any execution with the
 owner of the frozen tree and use resource admission. The build coordinator owns
 the final impacted gate and dossier. In a candidate report, give each changed
 file or justified excluded surface, stable finding ID, severity, location,
-reproducible scenario, consequence, correction and current resolution. Use the
-repository severity policy; otherwise critical denotes correctness, security
-or a broken required check, moderate a substantiated design, edge or
-performance issue, and minor nonblocking polish. Approval requires complete
-relevant coverage, valid required checks and no unresolved blocking finding
-or reservation. Missing coverage or proof remains explicit. The native
-verifier, rather than a free-form opinion, computes `Putnami verified`.
-The local review index uses provider severity vocabulary: map minor to low,
-moderate to medium and critical to critical, retaining the original label and
-rationale in the report. Use high only where repository policy defines it.
+reproducible scenario, consequence, correction and current resolution.
+Severity is P1 for correctness, security, data loss or a broken required
+check, P2 for a substantiated design, edge-case or performance defect, or a
+contradiction with an ADR, and P3 for polish. P1 and P2 block; P3 does not.
+Approval requires complete relevant coverage, valid required checks and no
+unresolved P1 or P2 finding or reservation. Missing coverage or proof remains
+explicit. The native verifier, rather than a free-form opinion, computes
+`Putnami verified`. The local review index uses provider severity vocabulary:
+map P3 to low, P2 to medium and P1 to critical, retaining the original label
+and rationale in the report. Use high only where repository policy defines it.
 
 Review is read-only on product and collaboration state. It never creates a
 task, publishes a review or grants merge/deployment authority unless the

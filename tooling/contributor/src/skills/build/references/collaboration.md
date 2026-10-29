@@ -76,6 +76,6 @@ When `memory capabilities` reports status `bound`:
   request, which replays when the first write landed.
 
 When memory is unbound, keep the checkpoint in the ignored run directory
-(`.context/execute/<run>/`) and state that it does not survive the workspace.
+(`.putnami/<issue>/`) and state that it does not survive the workspace.
 Never name a storage location, repository or file layout for memory: the
 provider owns them.
