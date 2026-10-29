@@ -508,7 +508,7 @@ func TestCollaboration_CapabilitiesMarkAHostOnlyOperation(t *testing.T) {
 	for _, op := range capabilities.Operations {
 		hostOnly[op.Name] = op.HostOnly
 	}
-	if want := map[string]bool{collab.OperationAsk: false, collab.OperationReply: false, collab.OperationSync: true}; !maps.Equal(hostOnly, want) {
+	if want := map[string]bool{collab.OperationAsk: false, collab.OperationReply: false, collab.OperationStatus: false, collab.OperationSync: true}; !maps.Equal(hostOnly, want) {
 		t.Errorf("missions.capabilities marks host-only %v, want %v", hostOnly, want)
 	}
 	envelope = fixture.call(t, collab.ContractTasks, collab.OperationCapabilities, "")

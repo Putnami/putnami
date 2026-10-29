@@ -200,7 +200,7 @@ func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 func collabBoundCall(t *testing.T, contract, operation, arguments string) *providerCall {
 	t.Helper()
 	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":1}}}}`)
-	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "claim", "comments", "merge", "search", "assign", "link"))}, nil)
+	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "claim", "comments", "merge", "search", "assign", "link", "status"))}, nil)
 	call, answer := prepareCall(read, resolution, operation, json.RawMessage(arguments))
 	if answer != nil {
 		t.Fatalf("prepareCall refused: %+v", answer.Error)
@@ -523,6 +523,43 @@ func TestInterpret_MissionsIdentity(t *testing.T) {
 	}
 }
 
+// TestInterpret_MissionsStatusIdentity: a status read answered for another
+// mission is unavailable, not unresolved, since a read changed nothing.
+func TestInterpret_MissionsStatusIdentity(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-cli-makes-a-missions-status-answer-for-another-mission-unavailable")
+	status := collabBoundCall(t, "missions", "status", `{"mission":{"repository":"putnami/putnami","key":"issue-596"}}`)
+	answer := func(key string) *collab.MissionsStatusResult {
+		return &collab.MissionsStatusResult{
+			Mission: collab.MissionView{Key: key, Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}},
+			Sessions: []collab.MissionSession{{Session: collab.SessionRef{Engine: "host-b", ID: "s-1"}, State: collab.SessionStateWorking,
+				ObservedAt: "2026-10-26T09:00:00Z", Stage: collab.LoopStageCode, Usage: &collab.SessionUsage{InputTokens: 10, OutputTokens: 2}}},
+		}
+	}
+	if envelope := interpretResult(status, collabOK(t, answer("issue-596"))); envelope.Outcome != collab.OutcomeOK {
+		t.Fatalf("a status of the requested mission: %s %+v", envelope.Outcome, envelope.Error)
+	}
+	envelope := interpretResult(status, collabOK(t, answer("issue-1")))
+	if envelope.Outcome != collab.OutcomeUnavailable || envelope.Error.Reason != collab.ReasonProviderIdentity {
+		t.Fatalf("a status of another mission: %s %+v", envelope.Outcome, envelope.Error)
+	}
+}
+
+// TestPrepare_RefusesMissionsStatusAProviderDoesNotOffer: status is optional,
+// so a provider that declares only the required missions operations is never
+// started for it.
+func TestPrepare_RefusesMissionsStatusAProviderDoesNotOffer(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-cli-answers-unsupported-for-a-provider-without-missions-status")
+	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"missions":{"provider":"@a/one","version":1}}}}`)
+	resolution := resolveCollab(read, collab.ContractMissions, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, collab.ContractMissions))}, nil)
+	call, envelope := prepareCall(read, resolution, collab.OperationStatus, json.RawMessage(`{"mission":{"repository":"putnami/putnami","key":"issue-596"}}`))
+	if call != nil || envelope == nil {
+		t.Fatalf("prepareCall started a call for an operation the provider lacks")
+	}
+	if envelope.Outcome != collab.OutcomeUnsupported || envelope.Error.Reason != collab.ReasonOperationUnsupported {
+		t.Fatalf("status without the operation: %s %+v", envelope.Outcome, envelope.Error)
+	}
+}
+
 // TestReconcileHint_AMissionsWriteNamesItsRepeat: every missions mutation is
 // reconciled by repeating it, and the hint names that operation, so a valid
 // envelope carries it.
@@ -530,6 +567,9 @@ func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-identity-and-reconciliation", "the-cli-names-the-repeat-of-an-unresolved-missions-write")
 	spec, _ := collab.Lookup(collab.ContractMissions, 1)
 	for _, op := range spec.Operations {
+		if op.Access != collab.AccessMutating {
+			continue
+		}
 		hint := ReconcileHint(collab.ContractMissions, op.Name)
 		contract, operation, ok := collab.ReconcileOperation(collab.ContractMissions, hint)
 		if !ok || contract != collab.ContractMissions || operation != op.Name {

@@ -364,6 +364,15 @@ func missionsMismatch(input, result any) (string, bool) {
 			return fmt.Sprintf("message %s, requested message %s", reply.Message.ID, in.Message), true
 		}
 		return "", true
+	case *collab.MissionsStatusInput:
+		status, wrong := resultAs[*collab.MissionsStatusResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if status.Mission.Key != in.Mission.Key {
+			return fmt.Sprintf("mission %q, requested mission %q", status.Mission.Key, in.Mission.Key), true
+		}
+		return "", true
 	}
 	return "", false
 }
