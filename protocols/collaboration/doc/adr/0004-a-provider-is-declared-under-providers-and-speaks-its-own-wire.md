@@ -77,8 +77,8 @@ hooks, which reach the missions provider through the host channel.
    `ProjectRef` and `Selection` move with it, with their drift test against
    `protocols/job`. The provider writes one `collab.Response` on standard
    output. The MCP result wrapper is gone.
-3. **A manifest with `providers` requires CLI contract 18.** The new rung is
-   `ProviderContract`, and `LatestContract` moves to 18. An older CLI that does
+3. **A manifest with `providers` requires CLI contract 19.** The new rung is
+   `ProviderContract`, and `LatestContract` moves to 19. An older CLI that does
    not know the section refuses the manifest with the usual "requires a newer
    putnami" error instead of loading it with no provider. The extension
    `ProtocolVersion` stays 3: it versions the task contract, and nothing in the
@@ -127,7 +127,7 @@ hooks, which reach the missions provider through the host channel.
 ## Consequences
 
 - A provider extension rebuilt for this change loads only on a CLI that reads
-  contract 18. Until `@putnami/github-collaboration`,
+  contract 19. Until `@putnami/github-collaboration`,
   `@putnami/local-collaboration`, `@putnami/memory-store` and
   `@putnami/intelligence` publish builds that declare `providers`, a workspace
   that pins an older build loses that binding.
