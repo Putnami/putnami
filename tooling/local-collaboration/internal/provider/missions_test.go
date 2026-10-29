@@ -366,10 +366,11 @@ func TestASessionKeepsItsStageItsUsageAndItsEnd(t *testing.T) {
 }
 
 // TestStatusReadsTheStoreWithoutTakingOwnerFiles: status answers the mission
-// the request names, lists at most 50 sessions, newest first and then by
-// engine and id, leaves an owner file untaken, and is unavailable on a store
-// it cannot read.
+// the request names, pages its sessions newest first and then by engine and
+// id, loses none across a sync between two pages, leaves an owner file
+// untaken, and is unavailable on a store it cannot read.
 func TestStatusReadsTheStoreWithoutTakingOwnerFiles(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-local-provider-pages-missions-status-without-losing-a-session")
 	h := newMissionsHarness(t)
 	var empty collab.MissionsStatusResult
 	h.ok("missions", "status", `{"mission":`+missionArguments+`}`, &empty)
@@ -377,27 +378,52 @@ func TestStatusReadsTheStoreWithoutTakingOwnerFiles(t *testing.T) {
 		t.Fatalf("status of a store with no missions answered %+v", empty)
 	}
 
-	for i := range collab.MaxStatusSessions + 1 {
+	for i := range 51 {
 		id := fmt.Sprintf("s-%02d", i)
 		h.ok("missions", "sync", `{"session":{"engine":"host-b","id":"`+id+`"},"mission":`+missionArguments+
 			`,"event":"post_tool_use","state":"working","observedAt":"2026-09-24T07:00:00Z","branch":"topic"}`, &collab.MissionsSyncResult{})
 	}
 	h.sync(10, `,"stage":"check"`)
-	writeOwnerFile(t, h.store, store.MessagesDir, "later.json",
-		ownerMessage{Mission: store.MissionKey{Repository: "acme/app", Key: "issue-7"}, Text: "Not taken by a read."})
 
-	var status collab.MissionsStatusResult
-	h.ok("missions", "status", `{"mission":{"repository":"acme/app","key":"issue-7"}}`, &status)
-	if len(status.Sessions) != collab.MaxStatusSessions {
-		t.Fatalf("status listed %d sessions, want %d", len(status.Sessions), collab.MaxStatusSessions)
+	var first collab.MissionsStatusResult
+	h.ok("missions", "status", `{"mission":{"repository":"acme/app","key":"issue-7"}}`, &first)
+	if len(first.Sessions) != collab.DefaultPageSize || first.Page.Next == "" {
+		t.Fatalf("status without a page listed %d sessions and next %q, want a page of %d", len(first.Sessions), first.Page.Next, collab.DefaultPageSize)
 	}
-	first, second, last := status.Sessions[0], status.Sessions[1], status.Sessions[collab.MaxStatusSessions-1]
-	if first.Session.ID != "s-1" || first.Stage != collab.LoopStageCheck || first.ObservedAt != "2026-09-24T07:00:10Z" {
-		t.Fatalf("the newest session is %+v", first)
+
+	h.ok("missions", "status", `{"mission":`+missionArguments+`,"page":{"size":50}}`, &first)
+	if len(first.Sessions) != 50 || first.Page.Next == "" {
+		t.Fatalf("the first page listed %d sessions and next %q, want 50 and a cursor", len(first.Sessions), first.Page.Next)
+	}
+	newest, second, last := first.Sessions[0], first.Sessions[1], first.Sessions[49]
+	if newest.Session.ID != "s-1" || newest.Stage != collab.LoopStageCheck || newest.ObservedAt != "2026-09-24T07:00:10Z" {
+		t.Fatalf("the newest session is %+v", newest)
 	}
 	if second.Session != (collab.SessionRef{Engine: "host-b", ID: "s-00"}) || second.Branch != "topic" || last.Session.ID != "s-48" {
 		t.Fatalf("the sessions observed at one instant run from %+v to %+v; want s-00 to s-48 by id", second, last)
 	}
+
+	// A session that syncs between the pages goes ahead of the cursor: the
+	// second page still holds exactly the sessions the first did not.
+	h.ok("missions", "sync", `{"session":{"engine":"host-a","id":"s-late"},"mission":`+missionArguments+
+		`,"event":"stop","state":"failed","observedAt":"2026-09-24T07:00:20Z","error":"the gate failed"}`, &collab.MissionsSyncResult{})
+	writeOwnerFile(t, h.store, store.MessagesDir, "later.json",
+		ownerMessage{Mission: store.MissionKey{Repository: "acme/app", Key: "issue-7"}, Text: "Not taken by a read."})
+	var rest collab.MissionsStatusResult
+	h.ok("missions", "status", `{"mission":`+missionArguments+`,"page":{"size":50,"cursor":"`+first.Page.Next+`"}}`, &rest)
+	if len(rest.Sessions) != 2 || rest.Sessions[0].Session.ID != "s-49" || rest.Sessions[1].Session.ID != "s-50" || rest.Page.Next != "" {
+		t.Fatalf("the second page listed %+v and next %q, want s-49 and s-50 and no cursor", rest.Sessions, rest.Page.Next)
+	}
+
+	var again collab.MissionsStatusResult
+	h.ok("missions", "status", `{"mission":`+missionArguments+`,"page":{"size":1}}`, &again)
+	if late := again.Sessions[0]; late.Session.ID != "s-late" || late.State != collab.SessionStateFailed || late.Error != "the gate failed" || late.WaitUntil != "" {
+		t.Fatalf("a new first page starts with %+v, want the failed session that synced last", late)
+	}
+	if failure := h.fails("missions", "status", `{"mission":`+missionArguments+`,"page":{"cursor":"not-a-cursor"}}`, collab.OutcomeInvalid); failure.Reason != collab.ReasonRequestInvalid {
+		t.Fatalf("an unknown cursor failed with %+v", failure)
+	}
+
 	if messages := h.missions().Messages; len(messages) != 0 {
 		t.Fatalf("status took an owner file: %+v", messages)
 	}

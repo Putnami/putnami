@@ -544,6 +544,31 @@ func TestInterpret_MissionsStatusIdentity(t *testing.T) {
 	}
 }
 
+// TestInterpret_MissionsStatusPageBound: the route gives a status request the
+// default page, and a status page above the requested size is unavailable.
+func TestInterpret_MissionsStatusPageBound(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-cli-makes-a-missions-status-page-above-the-requested-size-unavailable")
+	if call := collabBoundCall(t, "missions", "status", `{"mission":{"repository":"putnami/putnami","key":"issue-596"}}`); !strings.Contains(string(call.Arguments), `"size":20`) {
+		t.Errorf("a status request without a page was routed as %s", call.Arguments)
+	}
+	status := collabBoundCall(t, "missions", "status", `{"mission":{"repository":"putnami/putnami","key":"issue-596"},"page":{"size":1}}`)
+	result := &collab.MissionsStatusResult{
+		Mission: collab.MissionView{Key: "issue-596", Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}},
+		Sessions: []collab.MissionSession{
+			{Session: collab.SessionRef{Engine: "host-a", ID: "s-2"}, State: collab.SessionStateWorking, ObservedAt: "2026-10-26T09:01:00Z"},
+			{Session: collab.SessionRef{Engine: "host-a", ID: "s-1"}, State: collab.SessionStateEnded, ObservedAt: "2026-10-26T09:00:00Z"},
+		},
+	}
+	envelope := interpretResult(status, collabOK(t, result))
+	if envelope.Outcome != collab.OutcomeUnavailable || envelope.Error.Reason != collab.ReasonProviderIdentity {
+		t.Fatalf("two sessions for a page of one: %s %+v", envelope.Outcome, envelope.Error)
+	}
+	result.Sessions, result.Page.Next = result.Sessions[:1], "c1"
+	if envelope := interpretResult(status, collabOK(t, result)); envelope.Outcome != collab.OutcomeOK {
+		t.Fatalf("one session for a page of one: %s %+v", envelope.Outcome, envelope.Error)
+	}
+}
+
 // TestPrepare_RefusesMissionsStatusAProviderDoesNotOffer: status is optional,
 // so a provider that declares only the required missions operations is never
 // started for it.

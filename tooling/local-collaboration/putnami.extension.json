@@ -149,7 +149,7 @@
           "openWorld": false
         },
         "status": {
-          "description": "Read a local mission's view and its sessions, with each session's state, stage, usage and branch, newest first. It reads the store as the last write left it and takes no owner file.",
+          "description": "Read a local mission's view and a page of its sessions, with each session's state, stage, usage, branch, and error or waitUntil, newest first. It reads the store as the last write left it and takes no owner file.",
           "openWorld": false
         }
       }
