@@ -154,6 +154,9 @@ func (a *App) runExtensionStructuredCommand(
 
 	commandParams := buildExtensionCommandParams(parsed, effectiveFlags)
 
+	if refuseUnhonoredPreview(stderr, parsed.Global, resolved, group+" "+sub, effectiveFlags) {
+		return ExitUsage
+	}
 	if resolved.Subdef.Interactive {
 		// The interactive path is the ONE deliberate scheduler bypass: the
 		// subprocess inherits the terminal's stdin/stdout, which no renderer-driven
@@ -412,6 +415,29 @@ func extensionAliasPlanSelection(resolved *extension.ResolvedSubcommand) *engine
 		Command:        resolved.CommandName,
 		InheritedFlags: extension.MergeFlagLayers(resolved.GroupFlags, resolved.Subdef.Flags),
 	}
+}
+
+// refuseUnhonoredPreview prints why an interactive subcommand cannot honor the
+// preview the user asked for, and reports whether it refused. An interactive
+// subcommand plans nothing, so it has no plan for --plan to show. --dry-run
+// reaches it only as the dry-run param, which buildExtensionCommandParams
+// forwards when its effective flags declare dry-run; without that declaration
+// the subprocess would never learn it is a dry run and would run for real. A
+// planned subcommand is never refused: the engine previews its plan.
+func refuseUnhonoredPreview(stderr io.Writer, global GlobalFlags, resolved *extension.ResolvedSubcommand, commandPath string, flags map[string]extension.FlagDefinition) bool {
+	if !resolved.Subdef.Interactive {
+		return false
+	}
+	_, declaresDryRun := flags["dry-run"]
+	switch {
+	case global.Plan:
+		iox.Fprintf(stderr, "putnami: --plan is refused on `putnami %s`: an interactive subcommand has no plan to preview\n", commandPath)
+	case global.DryRun && !declaresDryRun:
+		iox.Fprintf(stderr, "putnami: --dry-run is refused on `putnami %s`: the interactive subcommand does not declare it, so it would run for real\n", commandPath)
+	default:
+		return false
+	}
+	return true
 }
 
 // runInteractiveExtensionCommand runs an interactive extension subcommand

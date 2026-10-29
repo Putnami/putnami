@@ -262,6 +262,10 @@
       "text": "extensions validate refuses a manifest flag the core parses as a global flag, by name, short alias or boolean --no- negation, where its command never receives it, naming the field and the global. All commands get --max-parallel and --no-cache. A declaring subcommand or publisher gets --dry-run; other planned ones get a plan preview. A serve workload, or a command with no workload trait, gets --watch; interactive, only if watch defaults true. Interactive subcommands get --projects, --all and --baseline."
     },
     {
+      "id": "an-interactive-subcommand-refuses-a-preview-it-cannot-honor",
+      "text": "An interactive extension subcommand has no plan to preview. It refuses --plan, and refuses --dry-run unless its resolved flags declare dry-run, in a workspace and outside one; each refusal exits 2, names the flag and the subcommand, and runs nothing. A declaring subcommand runs and receives dry-run: true."
+    },
+    {
       "id": "source-bound-stamp",
       "text": "A source-bound task rewrites its project's binding stamp whole, so a reader sees the earlier stamp or the new one. The source-bound tasks of one project take turns from the stamp rewrite to the capture of their entry, within a session and across sessions. A restore of paths the binding excludes keeps the project's computed binding."
     },

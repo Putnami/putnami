@@ -1537,6 +1537,20 @@
           }
         },
         {
+          "id": "an-interactive-subcommand-refuses-a-preview-it-cannot-honor",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-undeclared-interactive-preview-is-refused",
+              "a-declaring-interactive-subcommand-gets-dry-run"
+            ]
+          }
+        },
+        {
           "id": "source-bound-stamp",
           "stage": "coded",
           "evidenceKinds": [
