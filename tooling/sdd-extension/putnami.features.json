@@ -272,7 +272,7 @@
             "checks": [
               "a-project-without-a-manifest-resolves-nothing",
               "an-unserved-surface-name-fails-features-validate",
-              "feature-context-returns-the-declared-surface"
+              "features-list-and-inspect-return-the-declared-surface"
             ]
           }
         },
