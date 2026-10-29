@@ -1530,7 +1530,8 @@
             "kind": "acceptance",
             "checks": [
               "validation-refuses-a-flag-a-core-global-flag-takes",
-              "validation-accepts-a-flag-the-core-hands-to-the-command"
+              "validation-accepts-a-flag-the-core-hands-to-the-command",
+              "an-undeclared-dry-run-previews-the-plan"
             ]
           }
         },

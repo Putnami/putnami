@@ -166,6 +166,9 @@ func TestRejectUnsupportedRemoteShape(t *testing.T) {
 	cases := map[string]func(*Request, []*scheduler.ScheduledJob){
 		"watch":   func(r *Request, _ []*scheduler.ScheduledJob) { r.Global.Watch = true },
 		"dry-run": func(r *Request, _ []*scheduler.ScheduledJob) { r.ExecutesUnderDryRun = true },
+		"command group subcommand": func(r *Request, _ []*scheduler.ScheduledJob) {
+			r.PlanExtension = &PlanExtensionSelection{Name: "@putnami/demo", Command: "build"}
+		},
 		"side effects": func(_ *Request, p []*scheduler.ScheduledJob) {
 			p[0].JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
 		},

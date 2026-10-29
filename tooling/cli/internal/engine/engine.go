@@ -238,8 +238,8 @@ type Request struct {
 	// plan-only preview, so the jobs actually run.
 	//
 	// Two callers, both forwarding the resolved value as a job param for the
-	// task to interpret: the extension-alias adapter (an extension command
-	// group declares its OWN dry-run flag — buildExtensionCommandParams), and
+	// task to interpret: the extension-alias adapter, when the subcommand's
+	// effective flags declare a dry-run flag (buildExtensionCommandParams), and
 	// the terminal adapter's `publish --dry-run` (applyPublishDryRun),
 	// where dropUndryableSideEffectJobs excludes any side-effecting job that
 	// never declared the flag. Previewing instead of running would silently
@@ -531,9 +531,9 @@ func (r *Request) planExtensions(discovered *extension.DiscoveryResult) []*exten
 }
 
 // previewsOnly reports whether --dry-run means "print the plan and stop" for
-// this run. It does for every adapter except the extension alias, whose
-// --dry-run is a task parameter the extension itself interprets, so the jobs
-// have to execute (see Request.ExecutesUnderDryRun). Every stage that asks "does
+// this run. It does unless the adapter forwards --dry-run as a task parameter
+// the extension itself interprets, so the jobs have to execute (see
+// Request.ExecutesUnderDryRun). Every stage that asks "does
 // this run actually execute?" reads this, not Global.DryRun.
 func (r *Request) previewsOnly() bool {
 	return r.Global.DryRun && !r.ExecutesUnderDryRun
