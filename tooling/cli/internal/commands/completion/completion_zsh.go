@@ -81,7 +81,8 @@ _putnami_flags_for() {
 
 # _putnami_global_flag_values sets reply to the values of the global flag $1
 # and succeeds when $1 takes a value that is neither a project target nor a
-# project name. A flag whose value is free sets no word.
+# project name. A flag whose value is free sets no word, and neither does a
+# job-only flag when $2 is 1, on a core command, which refuses it.
 _putnami_global_flag_values() {
     reply=()
     case "$1" in
@@ -178,9 +179,13 @@ _putnami() {
             # next two words, and the CLI refuses a flag before either of them:
             # the first word completes the command names, the second the
             # subcommands of the first, and nothing else, since help takes no
-            # project target. Its flags and the value of a flag whose values
-            # are listed, such as --output, complete below.
-            if _putnami_is_help "${path}" && [[ "${cur}" != -* ]] && ! _putnami_global_flag_values "${prev}"; then
+            # project target. Its flags and the value of a global flag other
+            # than --projects and --exclude, such as --output, complete below.
+            local on_core_root=0
+            if _putnami_core_root "${path}"; then
+                on_core_root=1
+            fi
+            if _putnami_is_help "${path}" && [[ "${cur}" != -* ]] && ! _putnami_global_flag_values "${prev}" "${on_core_root}"; then
                 if (( CURRENT == 2 )); then
                     _describe -t commands 'job commands' commands
                     _describe -t structured 'structured commands' structured_commands
@@ -196,7 +201,7 @@ _putnami() {
                 return 1
             fi
             # A core command takes a job-only flag only as one of its own flags.
-            if ! _putnami_core_root "${path}"; then
+            if (( ! on_core_root )); then
                 global_flags=("${global_flags[@]}" "${job_global_flags[@]}")
             fi
             local i=2
@@ -246,10 +251,14 @@ _putnami() {
 	}
 	if ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, `                    elif [[ "${prev}" == "--exclude" ]]; then
-                        _describe -t project-names 'project name' projects
+                        # --exclude matches project names, and a core command
+                        # refuses it.
+                        if (( ! on_core_root )); then
+                            _describe -t project-names 'project name' projects
+                        fi
 `)
 	}
-	iox.Fprintf(w, `                    elif _putnami_global_flag_values "${prev}"; then
+	iox.Fprintf(w, `                    elif _putnami_global_flag_values "${prev}" "${on_core_root}"; then
                         # The values the catalog lists for the flag, or none
                         # when they are free.
                         if (( ${#reply} > 0 )); then
@@ -384,15 +393,19 @@ func zshFlagSpec(long, description, valueName string, values []string) string {
 
 func writeZshGlobalFlagValueCases(w io.Writer, ctx completionContext) {
 	for _, flag := range ctx.valueGlobalFlags() {
+		if flag.JobOnly {
+			iox.Fprintf(w, "        %s) reply=(%s); if [[ \"$2\" == 1 ]]; then reply=(); fi; return 0 ;;\n", bashQuote(flag.Long), bashWords(flag.Values))
+			continue
+		}
 		iox.Fprintf(w, "        %s) reply=(%s); return 0 ;;\n", bashQuote(flag.Long), bashWords(flag.Values))
 	}
 }
 
 func writeZshValueCases(w io.Writer, ctx completionContext) {
-	for _, key := range ctx.commandValueFlagKeys() {
-		iox.Fprintf(w, "                    %s)\n", bashQuote(key))
+	for _, slot := range ctx.commandValueSlots() {
+		iox.Fprintf(w, "                    %s)\n", bashQuote(slot.Key))
 		iox.Fprintf(w, "                        cmd_values=(\n")
-		for _, value := range ctx.structuredFlagValues[key] {
+		for _, value := range slot.Values {
 			entry := zshDescribeName(value.Value)
 			if value.Description != "" {
 				entry += ":" + value.Description

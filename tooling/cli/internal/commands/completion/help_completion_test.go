@@ -114,13 +114,20 @@ func assertHelpCompletion(t *testing.T, shell, line string, offered []string, c 
 // text lands in the user's terminal.
 func fishCompletionOffers(t *testing.T, scriptPath, line string) []string {
 	t.Helper()
+	return fishCompletionOffersIn(t, scriptPath, line, t.TempDir())
+}
+
+// fishCompletionOffersIn completes line with the current directory cwd, whose
+// files fish offers after a flag that takes a path.
+func fishCompletionOffersIn(t *testing.T, scriptPath, line, cwd string) []string {
+	t.Helper()
 	dir := t.TempDir()
 	cmd := exec.Command("fish", "--no-config", "-c", `source $argv[1]
 for line in (complete --escape -C $argv[2])
     set -l candidate (string split -m1 \t -- $line)[1]
     printf '%s\0' (string unescape -- $candidate | string collect)
 end`, scriptPath, line)
-	cmd.Dir = dir
+	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "HOME="+dir, "XDG_CONFIG_HOME="+dir)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

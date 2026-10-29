@@ -187,7 +187,10 @@ end
 				option += " -a " + fishArguments(names...)
 			}
 			if flag.ValueName != "" {
-				option += " -x"
+				option += fishValueOption(flag.ValueName)
+				if short := fishShort(flag.Short); short != "" {
+					option += " -s " + short
+				}
 			}
 			iox.Fprintln(w, option)
 		}
@@ -218,12 +221,12 @@ end
 
 // writeFishGlobalFlags declares the global flags.
 func writeFishGlobalFlags(w io.Writer, ctx completionContext) {
-	// A flag that takes a value is declared exclusive (-x: it requires a value
-	// and offers no file), so the word after it offers that flag's arguments
-	// and nothing else: the values the catalog lists, the project targets for
-	// --projects, the project names for --exclude, and none for a flag whose
-	// value is free. Several entries for one flag merge their arguments where
-	// their conditions hold.
+	// A flag that takes a value is declared required (-r) and, unless its value
+	// is a path, exclusive (-x: no file), so the word after it offers that
+	// flag's arguments and nothing else: the values the catalog lists, the
+	// project targets for --projects, the project names for --exclude, and none
+	// for a flag whose value is free. Several entries for one flag merge their
+	// arguments where their conditions hold.
 	projectTargets := make([]string, 0, len(ctx.projectIDs)+len(ctx.projects)+len(ctx.projectBasenames)+len(ctx.aliases))
 	projectTargets = append(projectTargets, ctx.projectIDs...)
 	projectTargets = append(projectTargets, ctx.projects...)
@@ -237,7 +240,7 @@ func writeFishGlobalFlags(w io.Writer, ctx completionContext) {
 		name := fishQuote(strings.TrimPrefix(flag.Long, "--"))
 		option := "complete -c putnami -n " + condition + " -l " + name + " -d " + fishQuote(flag.Description)
 		if flag.Type == commandmeta.FlagValue {
-			option += " -x"
+			option += fishValueOption(flag.ValueName)
 		}
 		switch {
 		case flag.Long == "--exclude" && len(ctx.projects) > 0:
@@ -274,6 +277,26 @@ func writeFishHelpCompletions(w io.Writer, ctx completionContext, paths []string
 			iox.Fprintf(w, "complete -c putnami -n %s -a %s\n", fishCondition("__putnami_help_word", root), fishArguments(sub))
 		}
 	}
+}
+
+// fishValueOption returns the option that makes the word after a flag its
+// value: -x for a value that no file completes, -r for a path or a directory,
+// which fish completes with the files of the current directory.
+func fishValueOption(valueName string) string {
+	if valueName == "<path>" || valueName == "<dir>" {
+		return " -r"
+	}
+	return " -x"
+}
+
+// fishShort returns the argument of `complete -s` for a short spelling such as
+// "-m", or "" when the spelling is not one dash and one character.
+func fishShort(short string) string {
+	letter, ok := strings.CutPrefix(short, "-")
+	if !ok || len([]rune(letter)) != 1 || letter == "-" {
+		return ""
+	}
+	return fishQuote(letter)
 }
 
 // fishQuote single-quotes a value as one fish word, read once: a description

@@ -277,7 +277,7 @@ complete -c putnami -n '__putnami_seen_path cache verify' -l 'exclude' -d 'Leave
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'impacted-strict' -d 'Fail when the --impacted baseline can\'t be resolved'
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'profile' -d 'Deployment profile the verified runs use: dev | test | production' -a 'dev production test' -x
 complete -c putnami -n '__putnami_seen_path cache verify' -l 'retry' -d 'Retry transient failures in the verified runs' -x
-complete -c putnami -n '__putnami_seen_path cache verify' -l 'trace-profile' -d 'Write the trace events of the last verified run (Chrome trace format)' -x
+complete -c putnami -n '__putnami_seen_path cache verify' -l 'trace-profile' -d 'Write the trace events of the last verified run (Chrome trace format)' -r
 complete -c putnami -n '__putnami_seen_path cli list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path cli use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
@@ -289,7 +289,7 @@ complete -c putnami -n '__putnami_seen_path deps rm' -l 'dry-run' -d 'Print the 
 complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -x
 complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -x
-complete -c putnami -n '__putnami_seen_path extensions install' -l 'dest' -d 'Materialize into this artifact-store root instead of the machine-global one' -x
+complete -c putnami -n '__putnami_seen_path extensions install' -l 'dest' -d 'Materialize into this artifact-store root instead of the machine-global one' -r
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'platform' -d 'Materialize artifacts for another platform (skips install hooks and the lock write)' -x
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'user' -d 'Pin one registry extension in the user scope (~/.putnami/user) so its commands run outside any workspace'
@@ -300,10 +300,10 @@ complete -c putnami -n '__putnami_seen_path help' -l 'markdown' -d 'Render the f
 complete -c putnami -n '__putnami_seen_path impact-plan' -l 'base' -d 'Required base commit or ref; emitted as its full immutable commit SHA' -x
 complete -c putnami -n '__putnami_seen_path impact-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
-complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project' -x
-complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'workspace' -d 'Workspace name override' -x
 complete -c putnami -n '__putnami_seen_path install' -l 'latest' -d 'Ignore the lock file and resolve the latest extension and template versions'
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'apply' -d 'Perform the migration, atomically and idempotently'
@@ -311,7 +311,7 @@ complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'check' -d 'Report
 complete -c putnami -n '__putnami_seen_path pin' -l 'remove' -d 'Remove the CLI version pin'
 complete -c putnami -n '__putnami_seen_path projects create' -l 'channel' -d 'Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
 complete -c putnami -n '__putnami_seen_path projects create' -l 'force' -d 'Overwrite an existing project directory'
-complete -c putnami -n '__putnami_seen_path projects create' -l 'path' -d 'Workspace-relative project path' -x
+complete -c putnami -n '__putnami_seen_path projects create' -l 'path' -d 'Workspace-relative project path' -r
 complete -c putnami -n '__putnami_seen_path projects create' -l 'template' -d 'Template to scaffold from' -x
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'dry-run' -d 'Show the changes without applying them'
 complete -c putnami -n '__putnami_seen_path projects sync' -l 'prune' -d 'Drop config entries whose project directory no longer exists'
@@ -347,5 +347,5 @@ complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Res
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project' -x
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d 'Workspace-relative path for the initial project' -x
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -x

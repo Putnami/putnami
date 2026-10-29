@@ -241,7 +241,7 @@ func TestCompletionOffersAJobFlagOnlyAfterACommandThatTakesIt(t *testing.T) {
 	}
 
 	if !strings.Contains(zsh.String(), "job_global_flags=(\n        '--watch[") ||
-		!strings.Contains(zsh.String(), `if ! _putnami_core_root "${path}"; then`) {
+		!strings.Contains(zsh.String(), `if (( ! on_core_root )); then`) {
 		t.Error("zsh does not keep the job-only flags apart from the core commands")
 	}
 	for name, script := range map[string]string{"bash": bash.String(), "zsh": zsh.String()} {
