@@ -280,8 +280,8 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 // command group subcommand (its plan selection and inherited flag layers do not
 // travel in a portable request), a command whose resolved traits in extensions
 // declare a workload or source rewriting (refuseUnportableCommands), and jobs
-// with side effects outside the workspace. Rejection is a precise diagnostic, never a silent modification of
-// the request.
+// with side effects outside the workspace. Rejection is a precise diagnostic,
+// never a silent modification of the request.
 func rejectUnsupportedRemoteShape(req *Request, extensions []*internalextension.ExtensionDescription, planned []*scheduler.ScheduledJob) error {
 	if req.Global.Watch {
 		return fmt.Errorf("--watch is not portable; remote execution covers finite commands only")
