@@ -32,6 +32,12 @@ its first checkpoint. A declaration is a file of one of these kinds:
 - `decisions.json`
 - a decision record (ADR)
 
+Before it pushes that commit, `build` runs `test` and `validate` on the
+projects the commit impacts. A declaration whose text breaks a format rule, or
+a document that breaks a rule a repository test enforces, fails there and not
+in hosted CI. The only error that does not stop the push is the missing proof
+of a requirement the commit declares, since its code comes next.
+
 A change that touches no declaration keeps the ADR 0003 flow.
 
 ### 2. The code goes on; the review is read at each checkpoint

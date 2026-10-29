@@ -3172,6 +3172,17 @@
           }
         },
         {
+          "id": "intent-first-validation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-build-loop-checks-declarations-before-it-pushes-them"
+            ]
+          }
+        },
+        {
           "id": "change-finalize-parity",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
