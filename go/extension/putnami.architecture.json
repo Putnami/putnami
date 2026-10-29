@@ -588,6 +588,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/github-collaboration",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/github-collaboration",
           "producerProject": "/protocols/runtime"
         },
         {
