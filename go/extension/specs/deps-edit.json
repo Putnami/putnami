@@ -18,7 +18,7 @@
     },
     {
       "id": "deps-tidy-resolves-as-the-workspace-does",
-      "text": "deps-edit runs go mod tidy on a copy of go.mod that also states each go.work replace directive for a module version the module does not replace itself, then writes go.mod and go.sum from the tidied copy without those directives. The edits of one run are one transaction: a failed go step puts every go.mod and go.sum the run edited back as it was, each through a rename, so a file never holds a part of its bytes."
+      "text": "deps-edit runs go mod tidy on a copy of go.mod that also states the go.work replace directives for module versions the module does not replace itself, then writes go.mod and go.sum from the tidied copy without those directives. A directive whose target is a directory, or whose left side names one version, is stated as written. A directive that pins every version of a module to a module version is stated only for the versions of that module a go.mod of the workspace requires and no proxy serves, so the tidy keeps each requirement a proxy serves at its version and a go.work pin raises no requirement of the module. The edits of one run are one transaction: a failed go step puts every go.mod and go.sum the run edited back as it was, each through a rename, so a file never holds a part of its bytes."
     },
     {
       "id": "deps-run-the-pinned-go",
