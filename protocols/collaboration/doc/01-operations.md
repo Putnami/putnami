@@ -150,6 +150,7 @@ operation must declare `workspaceSelection`.
 | `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage` | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
 | `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
 | `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
+| `status` | read | no | no | — | no | `mission` | `mission`, `sessions` |
 
 A mission is named by `{repository, key, title}`. `repository` and `key` are
 the memory identity's `repository` and `mission`, and both are required.
@@ -167,7 +168,7 @@ it `hostOnly: true`. `putnami missions sync` and the host channel's
 `missions.ask` and `missions.reply` through `putnami agent ask` and
 `putnami agent reply`. It takes the mission's
 repository and key, and the id of each message, from the session sheet that
-the session hook prints.
+the session hook prints. `status` is a read, so an agent may call it.
 
 A message or decision id is a bare token, 1 to 64 characters of
 `[A-Za-z0-9_-]`, not a reference. One binding means one provider, so an id
@@ -220,7 +221,8 @@ message) or `message.denied` (the caller may not answer it). The result's
 holds for the caller, as `open`, `answered` or `acknowledged`.
 
 The result's `mission` is `{key, title, url, plan, openDecisions}`. It always
-describes the mission the sync named, whatever the sync's age. A provider
+describes the mission the sync named, whatever the sync's age; `status`
+answers the same view. A provider
 that does not hold that mission answers `{key, title: "", plan: {steps: []},
 openDecisions: []}`. `plan` is the mission's current plan: the plan that the
 session that published last sent, and empty when none did. `openDecisions`
@@ -258,6 +260,21 @@ is `not_found` with reason `message.not_found`, and a message the caller may
 not answer is `denied` with reason `message.denied`. The result is `message:
 {id, state: "replied"}`. `reply` takes no session: a session claims a message
 through `sync.delivered` and `sync.replies`.
+
+**status** reads a mission's view and its sessions. It is optional: a
+provider that does not offer it is refused before it starts, as
+`unsupported` with reason `operation.unsupported`, and a caller then reports
+stage and usage as unavailable. The request names the mission,
+`{repository, key}`; a `title` changes nothing. The result's `mission` is the
+view `sync` answers. `sessions` lists, at most 50 and each once, the sessions
+whose last applied sync named this mission, in every state, `ended`
+included: `{session, state, observedAt, stage, usage, branch}`, as that sync
+left them. `stage`, `usage` and `branch` are absent when the provider holds
+none. `observedAt` is in UTC. The list runs newest `observedAt` first, then
+by engine and id. A session whose last sync named another mission is not
+listed. A provider that does not hold the mission answers its empty view and
+`sessions: []`. The CLI answers an ok status for another mission
+`unavailable` with reason `provider.identity_mismatch`.
 
 A rate limit is `unavailable` and retryable. An unresolved `sync`, `ask` or
 `reply` is reconciled by repeating the same document.

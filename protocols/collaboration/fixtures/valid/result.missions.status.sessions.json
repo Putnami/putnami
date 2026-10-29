@@ -1,0 +1,23 @@
+{
+  "mission": {
+    "key": "issue-701",
+    "title": "Read a mission's sessions",
+    "plan": { "steps": [{ "key": "contract", "status": "doing", "text": "Add missions.status" }] },
+    "openDecisions": []
+  },
+  "sessions": [
+    {
+      "session": { "engine": "claude-code", "id": "s-2" },
+      "state": "working",
+      "observedAt": "2026-10-29T10:05:00Z",
+      "stage": "code",
+      "usage": { "inputTokens": 1200, "outputTokens": 3400, "cacheWriteTokens": 56000, "cacheReadTokens": 789000 },
+      "branch": "owner/build-701"
+    },
+    {
+      "session": { "engine": "codex", "id": "s-1" },
+      "state": "ended",
+      "observedAt": "2026-10-29T09:00:00.5Z"
+    }
+  ]
+}
