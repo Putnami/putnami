@@ -2,6 +2,7 @@ package providertest
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -44,6 +45,8 @@ type missionsSession struct {
 	stage    collab.LoopStage
 	usage    *collab.SessionUsage
 	branch   string
+	failure  string
+	wait     string
 }
 
 type missionsMessage struct {
@@ -155,6 +158,7 @@ func (s *missionsStore) sync(_ context.Context, call collab.Call) (any, *collab.
 	}
 	if session.observed.IsZero() || observed.After(session.observed) {
 		session.state, session.observed, session.mission, session.branch = in.State, observed, mission, in.Branch
+		session.failure, session.wait = in.Error, in.WaitUntil
 		if in.Stage != "" {
 			session.stage = in.Stage
 		}
@@ -267,6 +271,10 @@ func (s *missionsStore) status(_ context.Context, call collab.Call) (any, *colla
 	mission := missionKey(in.Mission)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	after, failure := statusCursor(in.Page)
+	if failure != nil {
+		return nil, failure
+	}
 	result := &collab.MissionsStatusResult{
 		Mission:  collab.MissionView{Key: in.Mission.Key, Plan: collab.MissionPlan{Steps: []collab.PlanStep{}}, OpenDecisions: []collab.OpenDecision{}},
 		Sessions: []collab.MissionSession{},
@@ -282,23 +290,65 @@ func (s *missionsStore) status(_ context.Context, call collab.Call) (any, *colla
 	slices.SortFunc(result.Mission.OpenDecisions, func(a, b collab.OpenDecision) int { return strings.Compare(a.ID, b.ID) })
 	var held []*missionsSession
 	for _, session := range s.sessions {
-		if session.mission == mission {
+		if session.mission == mission && (after == nil || after.precedes(session.position())) {
 			held = append(held, session)
 		}
 	}
-	slices.SortFunc(held, func(a, b *missionsSession) int {
-		if order := b.observed.Compare(a.observed); order != 0 {
-			return order
-		}
-		return strings.Compare(a.ref.Engine+"/"+a.ref.ID, b.ref.Engine+"/"+b.ref.ID)
-	})
-	for _, session := range held[:min(len(held), collab.MaxStatusSessions)] {
+	slices.SortFunc(held, func(a, b *missionsSession) int { return a.position().compare(b.position()) })
+	size := in.Page.Size
+	if len(held) > size {
+		held = held[:size]
+		next, _ := json.Marshal(held[size-1].position())
+		result.Page.Next = hex.EncodeToString(next)
+	}
+	for _, session := range held {
 		result.Sessions = append(result.Sessions, collab.MissionSession{
 			Session: session.ref, State: session.state, ObservedAt: session.observed.UTC().Format(time.RFC3339Nano),
-			Stage: session.stage, Usage: session.usage, Branch: session.branch,
+			Stage: session.stage, Usage: session.usage, Branch: session.branch, Error: session.failure, WaitUntil: session.wait,
 		})
 	}
 	return result, nil
+}
+
+// sessionPosition is a session's place in the status order. The cursor names
+// the position of a page's last session, not its ordinal, so a sync between
+// two pages neither repeats nor skips a session that did not sync.
+type sessionPosition struct {
+	Observed time.Time `json:"o"`
+	Engine   string    `json:"e"`
+	ID       string    `json:"i"`
+}
+
+func (s *missionsSession) position() sessionPosition {
+	return sessionPosition{Observed: s.observed, Engine: s.ref.Engine, ID: s.ref.ID}
+}
+
+// compare orders newest first, then by engine, then by id.
+func (p sessionPosition) compare(q sessionPosition) int {
+	if order := q.Observed.Compare(p.Observed); order != 0 {
+		return order
+	}
+	if order := strings.Compare(p.Engine, q.Engine); order != 0 {
+		return order
+	}
+	return strings.Compare(p.ID, q.ID)
+}
+
+func (p *sessionPosition) precedes(q sessionPosition) bool { return p.compare(q) < 0 }
+
+func statusCursor(page *collab.PageRequest) (*sessionPosition, *collab.Failure) {
+	if page.Cursor == "" {
+		return nil, nil
+	}
+	var position sessionPosition
+	encoded, err := hex.DecodeString(page.Cursor)
+	if err == nil {
+		err = json.Unmarshal(encoded, &position)
+	}
+	if err != nil {
+		return nil, collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "cursor %q was not issued by this provider", page.Cursor)
+	}
+	return &position, nil
 }
 
 func missionsTarget(t *testing.T, store *missionsStore) Target {

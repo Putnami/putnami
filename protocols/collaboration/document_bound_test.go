@@ -157,19 +157,20 @@ func maximalSyncResult() *MissionsSyncResult {
 	return result
 }
 
-// maximalStatusResult fills the view and the sessions to their bounds.
+// maximalStatusResult fills the view and a page of the largest size to their
+// bounds, so a status page of any size fits and Serve never shortens one.
 func maximalStatusResult() *MissionsStatusResult {
 	result := &MissionsStatusResult{
 		Mission:  MissionView{Key: fill(MaxTokenLength), Title: fill(MaxTitleLength), URL: maximalURL(0), Plan: maximalPlan(), OpenDecisions: []OpenDecision{}},
-		Sessions: []MissionSession{},
+		Sessions: []MissionSession{}, Page: Page{Next: strings.Repeat("<", MaxCursorLength)},
 	}
 	for i := range MaxOpenDecisions {
 		result.Mission.OpenDecisions = append(result.Mission.OpenDecisions, OpenDecision{ID: maximalID(i), Question: fill(MaxQuestionLength)})
 	}
-	for i := range MaxStatusSessions {
+	for i := range MaxPageSize {
 		result.Sessions = append(result.Sessions, MissionSession{
-			Session: SessionRef{Engine: strings.Repeat("e", 32), ID: strings.Repeat("s", 128-len(strconv.Itoa(i))) + strconv.Itoa(i)}, State: SessionStateHandedBack,
-			ObservedAt: maximalUTC, Stage: LoopStageValidate, Branch: fill(MaxBranchLength),
+			Session: SessionRef{Engine: strings.Repeat("e", 32), ID: strings.Repeat("s", 128-len(strconv.Itoa(i))) + strconv.Itoa(i)}, State: SessionStateFailed,
+			ObservedAt: maximalUTC, Stage: LoopStageValidate, Branch: fill(MaxBranchLength), Error: fill(MaxErrorLength),
 			Usage: &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
 		})
 	}

@@ -306,8 +306,9 @@ func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
 		{"syncResult.decisions maxItems", result["decisions"].MaxItems, MaxSyncDecisions},
 		{"syncResult.replies maxItems", result["replies"].MaxItems, MaxSyncReplies},
 		{"missionView.openDecisions maxItems", defs["missionView"].Properties["openDecisions"].MaxItems, MaxOpenDecisions},
-		{"statusResult.sessions maxItems", defs["statusResult"].Properties["sessions"].MaxItems, MaxStatusSessions},
+		{"statusResult.sessions maxItems", defs["statusResult"].Properties["sessions"].MaxItems, MaxListMembers},
 		{"missionSession.branch maxLength", defs["missionSession"].Properties["branch"].MaxLength, MaxBranchLength},
+		{"missionSession.error maxLength", defs["missionSession"].Properties["error"].MaxLength, MaxErrorLength},
 		{"plan.steps maxItems", defs["plan"].Properties["steps"].MaxItems, MaxListMembers},
 		{"syncInput.delivered maxItems", input["delivered"].MaxItems, MaxListMembers},
 		{"syncInput.decisions maxItems", input["decisions"].MaxItems, MaxSyncDecisions},
@@ -329,6 +330,11 @@ func TestDrift_MissionsBoundsMatchTheValidator(t *testing.T) {
 	}
 	if ref := session["stage"]; ref == nil || ref.Ref != "#/$defs/loopStage" {
 		t.Errorf("missionSession.stage does not reference #/$defs/loopStage")
+	}
+	for name, node := range map[string]*schemaNode{"syncInput": input["waitUntil"], "missionSession": session["waitUntil"]} {
+		if node == nil || node.Ref != "collaboration.json#/$defs/timestamp" {
+			t.Errorf("%s.waitUntil does not reference the shared timestamp", name)
+		}
 	}
 	usage := defs["sessionUsage"].Properties
 	for _, field := range []string{"inputTokens", "outputTokens", "cacheWriteTokens", "cacheReadTokens"} {

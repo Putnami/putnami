@@ -1,4 +1,5 @@
 {
   "mission": { "key": "issue-701", "title": "", "plan": { "steps": [] }, "openDecisions": [] },
-  "sessions": null
+  "sessions": null,
+  "page": {}
 }
