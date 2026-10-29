@@ -77,9 +77,11 @@ of the dependent command wait for that project's `build` leaf steps.
 the whole command, as for a bare name. The root steps of the dependent command
 depend on that step, in each extension that runs it for the project, and read
 its files. They also run after every other leaf step of the command, through
-order-only edges that read no files. A step the plan does not hold adds no
-dependency: a step the command does not declare for the project, or one that
-an `if`, an activation gate or `disable` removes. The order-only edges remain.
+order-only edges. An order-only edge keeps a leaf's files only when the
+dependent's cache key reads a file the leaf writes (CLI ADR 0082). A step the
+plan does not hold adds no dependency: a step the command does not declare for
+the project, or one that an `if`, an activation gate or `disable` removes. The
+order-only edges remain.
 A dependent that reads a step only some providers run names each candidate
 step:
 

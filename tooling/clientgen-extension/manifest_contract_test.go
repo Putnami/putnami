@@ -320,9 +320,9 @@ func TestOnlyTheAdoptionCommandWritesAuthoredSources(t *testing.T) {
 
 // TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild pins the
 // ordering contract. The project command is scheduler-mediated through the
-// provider's build: it waits for the build step that writes the contract it
-// reads, describe for a Go app and generate for a Go library or a TypeScript
-// provider, and never for the compile, whose files it does not read (protocol
+// provider's build: it depends on the build step that writes the contract it
+// reads, describe for a Go app and generate otherwise, and runs after the rest
+// of the build through order-only edges, which keep no compile files (protocol
 // ADR 0017). Sync and adopt take no dependsOn because they must snapshot
 // the worktree BEFORE any build of their own can rewrite it and then build the
 // providers themselves; the check builds nothing, so the explicit check command
