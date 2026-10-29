@@ -27,7 +27,7 @@
     },
     {
       "id": "v2-emission-drops-volatile-state",
-      "text": "Canonical v2 bytes are the same over 100 serializations and a strict round trip, sort migrations by identity, keep packages, and hold no sourceBinding, version or packageVersions, which a valid input may carry. A resolved dependency version alone changes no byte. Go and TypeScript drop the same members, and Go describe emits a manifest that validates, equals its canonical bytes and holds no version, the same on each run."
+      "text": "Canonical v2 bytes are the same over 100 serializations and a strict round trip, sort migrations by identity, keep packages, and hold no sourceBinding, version or packageVersions, which a valid input may carry. A resolved dependency version alone changes no byte. Go and TypeScript drop the same members, and Go describe emits a manifest that validates, equals its canonical bytes and holds no version, the same on each run. A secrets sidecar an earlier Go build left changes no byte."
     },
     {
       "id": "packages-stay-on-the-capability-surface",

@@ -69,7 +69,8 @@
               "v2-canonical-bytes-are-stable-and-carry-no-volatile-state",
               "a-resolved-version-change-keeps-the-v2-bytes",
               "the-typescript-application-never-emits-volatile-metadata",
-              "the-go-framework-describes-a-canonical-v2-manifest-without-versions"
+              "the-go-framework-describes-a-canonical-v2-manifest-without-versions",
+              "the-go-framework-ignores-a-left-secrets-sidecar"
             ]
           }
         },
