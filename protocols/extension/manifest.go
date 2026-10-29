@@ -12,15 +12,15 @@ import (
 )
 
 // DeclaresContractSurface reports whether the manifest exposes anything the
-// CLI ↔ extension contract governs: a command, a command group, an
-// agent-facing tool, an agent-content contribution, or a verb vocabulary.
+// CLI ↔ extension contract governs: a command, a command group, a provider,
+// an agent-content contribution, or a verb vocabulary.
 //
 // It is the loader's half of the package-time stamper's rule
 // (gateAndStampManifestContract's manifestDeclaresContractSurface): a hook-only
 // manifest — a framework package shipping a preBuild hook with `"commands": {}`
-// — declares no flags, no exit-code surface, no tools and no agent content, so
+// — declares no flags, no exit-code surface, no providers and no agent content, so
 // the packager deliberately leaves it UNSTAMPED. The stamper works on the raw
-// JSON (it must gate a malformed surface such as `"tools": []` that never
+// JSON (it must gate a malformed surface such as `"providers": []` that never
 // parses); here the manifest has already parsed, so the parsed shape is the
 // same question asked of a document that survived decoding.
 //
@@ -35,7 +35,7 @@ func DeclaresContractSurface(m *Manifest) bool {
 	if m == nil {
 		return false
 	}
-	return len(m.Commands) > 0 || len(m.CommandGroups) > 0 || len(m.Tools) > 0 || m.DeclaresAgentContent() ||
+	return len(m.Commands) > 0 || len(m.CommandGroups) > 0 || DeclaresProviders(m) || m.DeclaresAgentContent() ||
 		m.DeclaresVerbs()
 }
 
@@ -72,8 +72,8 @@ func LoadManifest(path string) (*Manifest, error) {
 //     content, a verb vocabulary, command kinds, publish channels, a
 //     provisioned toolchain candidate, input selectors, a group default that
 //     takes positionals, a step that reads the run's changed files, host
-//     hooks or a dependency on one step of another command, the additive
-//     contract 5, 9, 11, 12, 13, 14, 15, 16, 17 or 18.
+//     hooks, a dependency on one step of another command or providers, the
+//     additive contract 5, 9, 11, 12, 13, 14, 15, 16, 17, 18 or 19.
 //     Loading a manifest stamped below that would run a task whose outputs
 //     the scheduler cannot capture from a declaration, or accept agent
 //     content a reader of its stamp never had to represent.
@@ -134,6 +134,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.ProviderContract:
+			reason = " for its providers"
 		case required == protocolcli.StepDependencyContract:
 			reason = " for a dependency on one step of another command"
 		case required == protocolcli.HostHooksContract:

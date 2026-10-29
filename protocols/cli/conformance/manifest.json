@@ -2,7 +2,7 @@
   "protocol": "putnami.cli.result.v2",
   "suite": "putnami.cli.result.conformance.v1",
   "protocolVersion": 2,
-  "documents": ["resultEnvelope", "sessionStreamRecord", "mcpResult", "sessionFile", "sessionPlanFile", "reportFile"],
+  "documents": ["resultEnvelope", "sessionStreamRecord", "sessionFile", "sessionPlanFile", "reportFile"],
   "cases": [
     {
       "id": "envelope.non-run.success",
@@ -368,52 +368,6 @@
           "reuse": { "localCache": 1, "remoteCache": 0, "coalesced": 1 },
           "durationMs": 3380,
           "failures": []
-        }
-      }
-    },
-    {
-      "id": "mcp.run-jobs",
-      "document": "mcpResult",
-      "expect": "accept",
-      "summary": "run_jobs returns the canonical run summary instead of its own count vocabulary.",
-      "value": {
-        "protocolVersion": 2,
-        "tool": "run_jobs",
-        "commands": ["lint", "test"],
-        "run": {
-          "outcome": "success",
-          "exitCode": 0,
-          "counts": { "total": 6, "succeeded": 6, "failed": 0, "canceled": 0, "skipped": 0 },
-          "reuse": { "localCache": 4, "remoteCache": 0, "coalesced": 0 },
-          "durationMs": 1920
-        }
-      }
-    },
-    {
-      "id": "mcp.plan-jobs",
-      "document": "mcpResult",
-      "expect": "accept",
-      "summary": "plan_jobs reports planned tasks by typed identity; edges reference the derived keys.",
-      "value": {
-        "protocolVersion": 2,
-        "tool": "plan_jobs",
-        "commands": ["build"],
-        "plan": {
-          "dryRun": true,
-          "metrics": { "tasks": 1, "edges": 1, "projects": 1, "byCommand": { "build": 1 } },
-          "tasks": [
-            {
-              "identity": {
-                "key": "/tooling/cli:build~compile",
-                "scope": "project",
-                "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
-                "task": { "name": "build~compile", "command": "build", "step": "compile", "kind": "go-build" },
-                "provider": { "extension": "@putnami/go", "version": "0.1.0" }
-              },
-              "dependsOn": ["/tooling/cli:build~generate"],
-              "cache": true
-            }
-          ]
         }
       }
     },
@@ -838,10 +792,10 @@
       "violations": [{ "code": "cli.result.missing_field", "path": "tree.dirty" }]
     },
     {
-      "id": "session.file.declarations-and-agent",
+      "id": "session.file.declarations",
       "document": "sessionFile",
       "expect": "accept",
-      "summary": "A session states the declarations its declared checks read apart from the tree, so two runs of one branch tell a code change from a declaration change, and names the agent session that launched it through the MCP server. files is a measurement: zero means the workspace declares nothing.",
+      "summary": "A session states the declarations its declared checks read apart from the tree, so two runs of one branch tell a code change from a declaration change. files is a measurement: zero means the workspace declares nothing.",
       "value": {
         "protocolVersion": 2,
         "sessionId": "20261013-101500-a1b2c3",
@@ -853,27 +807,6 @@
           "headSHA": "ad048a6b3c0d1e2f30415263748596a7b8c9d0e1"
         },
         "declarations": { "digest": "9a1c0e7b5d3f2a4c6e8b0d1f3a5c7e9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c", "files": 14 },
-        "agent": { "kind": "claude-code", "sessionId": "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c" },
-        "run": {
-          "outcome": "success",
-          "exitCode": 0,
-          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
-          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
-          "durationMs": 3500
-        }
-      }
-    },
-    {
-      "id": "session.file.agent-without-session-id",
-      "document": "sessionFile",
-      "expect": "accept",
-      "summary": "An agent that named itself but stated no session id records its kind alone. The id is never inferred.",
-      "value": {
-        "protocolVersion": 2,
-        "sessionId": "20261013-101500-a1b2c3",
-        "startTime": "2026-10-13T10:15:00.000Z",
-        "commands": ["lint", "test", "build", "validate"],
-        "agent": { "kind": "codex" },
         "run": {
           "outcome": "success",
           "exitCode": 0,
@@ -903,48 +836,6 @@
         }
       },
       "violations": [{ "code": "cli.result.invalid_value", "path": "declarations.digest" }]
-    },
-    {
-      "id": "invalid.session-file.agent-without-kind",
-      "document": "sessionFile",
-      "expect": "reject",
-      "summary": "A present agent block names the harness. A producer that cannot name it records no block rather than an anonymous session id.",
-      "value": {
-        "protocolVersion": 2,
-        "sessionId": "20261013-101500-a1b2c3",
-        "startTime": "2026-10-13T10:15:00.000Z",
-        "commands": ["lint", "test", "build", "validate"],
-        "agent": { "sessionId": "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c" },
-        "run": {
-          "outcome": "success",
-          "exitCode": 0,
-          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
-          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
-          "durationMs": 3500
-        }
-      },
-      "violations": [{ "code": "cli.result.missing_field", "path": "agent.kind" }]
-    },
-    {
-      "id": "invalid.session-file.agent-control-character",
-      "document": "sessionFile",
-      "expect": "reject",
-      "summary": "Agent members are client-supplied, so they are bounded printable ASCII: a control character never reaches a ledger or a terminal.",
-      "value": {
-        "protocolVersion": 2,
-        "sessionId": "20261013-101500-a1b2c3",
-        "startTime": "2026-10-13T10:15:00.000Z",
-        "commands": ["lint", "test", "build", "validate"],
-        "agent": { "kind": "claude-code\u001b[31m" },
-        "run": {
-          "outcome": "success",
-          "exitCode": 0,
-          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
-          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
-          "durationMs": 3500
-        }
-      },
-      "violations": [{ "code": "cli.result.invalid_value", "path": "agent.kind" }]
     },
     {
       "id": "session.plan-file",
@@ -1712,26 +1603,6 @@
       "violations": [{ "code": "cli.result.invalid_enum", "path": "task.diagnostics[0].severity" }]
     },
     {
-      "id": "invalid.mcp.run-jobs-with-plan",
-      "document": "mcpResult",
-      "expect": "reject",
-      "summary": "A tool result carries the member its tool produces and no other.",
-      "value": {
-        "protocolVersion": 2,
-        "tool": "run_jobs",
-        "commands": ["build"],
-        "run": {
-          "outcome": "success",
-          "exitCode": 0,
-          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
-          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
-          "durationMs": 42
-        },
-        "plan": { "dryRun": true, "metrics": { "tasks": 0, "edges": 0, "projects": 0 }, "tasks": [] }
-      },
-      "violations": [{ "code": "cli.result.unexpected_field", "path": "plan" }]
-    },
-    {
       "id": "invalid.stream.plan-end-with-run",
       "document": "sessionStreamRecord",
       "expect": "reject",
@@ -1752,14 +1623,6 @@
         { "code": "cli.result.missing_field", "path": "plan" },
         { "code": "cli.result.unexpected_field", "path": "run" }
       ]
-    },
-    {
-      "id": "invalid.mcp.plan-jobs-without-plan",
-      "document": "mcpResult",
-      "expect": "reject",
-      "summary": "plan_jobs must return a plan.",
-      "value": { "protocolVersion": 2, "tool": "plan_jobs", "commands": ["build"] },
-      "violations": [{ "code": "cli.result.missing_field", "path": "plan" }]
     },
     {
       "id": "session.file.execution-ledger",
@@ -2920,13 +2783,13 @@
       "id": "report.file.absent-is-not-zero",
       "document": "reportFile",
       "expect": "accept",
-      "summary": "ABSENT IS NOT ZERO: a fully cached MCP run measured no CPU, no coverage and no remote cache, so cpu, coverage, cpuMs, cache and scheduler are OMITTED rather than reported as zeros a consumer would read as measurements.",
+      "summary": "ABSENT IS NOT ZERO: a fully cached run measured no CPU, no coverage and no remote cache, so cpu, coverage, cpuMs, cache and scheduler are OMITTED rather than reported as zeros a consumer would read as measurements.",
       "value": {
         "protocolVersion": 2,
         "sessionId": "20260807-104012-7f31aa",
         "startTime": "2026-08-07T10:40:12.000Z",
         "endTime": "2026-08-07T10:40:12.900Z",
-        "origin": "mcp",
+        "origin": "ephemeral",
         "enforceCoverage": false,
         "run": {
           "outcome": "success",

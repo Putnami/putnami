@@ -8,7 +8,6 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	diag "go.putnami.dev/protocol/diagnostic"
-	proto "go.putnami.dev/protocol/extension"
 )
 
 // providerCall is one request that passed every orchestrator check and is ready for
@@ -23,10 +22,10 @@ type providerCall struct {
 	Arguments json.RawMessage
 }
 
-// providerMember is the provider member of the tool request.
-func (c *providerCall) providerMember() *proto.ToolProviderCall {
+// providerMember is the provider member of the provider request.
+func (c *providerCall) providerMember() *collab.ProviderCall {
 	binding := c.Resolution.Binding
-	return &proto.ToolProviderCall{
+	return &collab.ProviderCall{
 		Contract:  c.Resolution.Contract,
 		Version:   binding.Version,
 		Operation: c.Operation.Name,
@@ -84,7 +83,7 @@ func prepareCall(document collabDocument, resolution collabResolution, operation
 		return nil, failure(resolution, operation, collab.OutcomeInvalid, collab.ReasonRequestInvalid, false,
 			"%s", collab.FormatDiagnostics(diags))
 	}
-	if precondition := requestPrecondition(input); precondition != "" && provided.Declaration.Preconditions == collab.PreconditionsNone {
+	if precondition := requestPrecondition(input); precondition != "" && provided.Preconditions() == collab.PreconditionsNone {
 		return nil, failure(resolution, operation, collab.OutcomeUnsupported, collab.ReasonPreconditionUnsupported, false,
 			"%s cannot check preconditions on %s.%s, so the request's %s cannot be honored; nothing was sent",
 			resolution.Provider.Name, resolution.Contract, operation, precondition)
@@ -184,8 +183,6 @@ func transportFailure(call *providerCall, stage invocationStage, message string)
 		reason, retryable = collab.ReasonProviderTimeout, true
 	case stageCanceled:
 		reason, retryable = collab.ReasonProviderCanceled, true
-	case stageOutput:
-		reason = collab.ReasonProviderInvalidResponse
 	}
 	if mutating {
 		return unresolved(call, reason, "%s; the %s write may have happened", message, resolution.Contract+"."+operation)
@@ -193,25 +190,19 @@ func transportFailure(call *providerCall, stage invocationStage, message string)
 	return *failure(resolution, operation, collab.OutcomeUnavailable, reason, retryable, "%s", message)
 }
 
-// interpretResult checks a provider's tool result and renders the envelope. The
-// result must hold exactly one Response the contract accepts, a read may not
-// claim an unresolved write or a conflict, and an ok result must describe
-// exactly the item or identity the request named. A mutation whose answer
-// fails any check is unresolved.
-func interpretResult(call *providerCall, result proto.ToolCallResult) collab.Envelope {
+// interpretResult checks what a provider wrote on standard output and renders
+// the envelope. The output must be exactly one Response the contract accepts,
+// a read may not claim an unresolved write or a conflict, and an ok result
+// must describe exactly the item or identity the request named. A mutation
+// whose answer fails any check is unresolved.
+func interpretResult(call *providerCall, stdout []byte) collab.Envelope {
 	resolution, op := call.Resolution, call.Operation
-	if len(result.Content) != 1 {
-		return invalidResponse(call, "the provider wrote %d content blocks; a collaboration result is exactly one Response", len(result.Content))
-	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
+	response, diags := collab.ParseResponse(stdout)
 	if diags != nil {
 		return invalidResponse(call, "the provider's response violates the contract: %s%s", collab.FormatDiagnostics(diags), smallerPageHint(call, diags))
 	}
 	if op.Access == collab.AccessRead && (response.Outcome == collab.OutcomeUnresolved || response.Outcome == collab.OutcomeConflict) {
 		return invalidResponse(call, "a read cannot answer %s", response.Outcome)
-	}
-	if result.IsError != (response.Outcome != collab.OutcomeOK) {
-		return invalidResponse(call, "the tool result's isError disagrees with outcome %s", response.Outcome)
 	}
 	envelope := base(resolution, op.Name)
 	if response.Outcome != collab.OutcomeOK {

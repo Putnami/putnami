@@ -1,10 +1,10 @@
 # Writing a collaboration provider
 
-A provider is an ordinary Putnami extension whose manifest declares one tool
-per operation it implements and marks each with `putnami.dev/provider`. It
-needs no service, daemon or new loader: Putnami discovers it like any
-extension, starts its process only when a call arrives, writes one request to
-its stdin and reads one result from its stdout.
+A provider is an ordinary Putnami extension whose manifest declares, under
+`providers`, each contract it implements and the operations of it. It needs no
+service, daemon or new loader: Putnami discovers it like any extension, starts
+its process only when a call arrives, writes one request to its stdin and
+reads one response from its stdout.
 
 The reference implementation is
 [`@putnami/local-collaboration`](../../../tooling/local-collaboration/README.md)
@@ -13,34 +13,39 @@ file store. The excerpts below come from it.
 
 ## 1. Declare the operations
 
-One tool per operation. The tool name is yours (namespace it with your
-extension's name); callers never see it, because Putnami exposes the operation
-under the contract's name.
+One entry per contract, keyed by the contract name. The command, arguments,
+working directory, environment and timeout are shared by every operation of
+the contract; the manifest carries `cliContract` 19. Putnami exposes each
+operation under the contract's name.
 
 ```json
-"local-collaboration.tasks.update": {
-  "description": "Change a local task's title, body or labels. expectedRevision is compared and written under the store's exclusive lock; a change that alters nothing keeps the revision.",
-  "inputSchema": { "type": "object", "description": "The tasks.update request document of go.putnami.dev/protocol/collaboration version 1." },
-  "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false },
-  "_meta": {
-    "putnami.dev/contract": { "access": "mutating", "readOnly": false, "supportsDryRun": false },
-    "putnami.dev/provider": { "contract": "tasks", "version": 1, "operation": "update", "preconditions": "atomic" }
-  },
-  "command": "{extensionRuntime}",
-  "args": ["provider-tool"],
-  "cwd": "{workspaceRoot}",
-  "timeoutMs": 30000
+"providers": {
+  "tasks": {
+    "version": 1,
+    "command": "{extensionRuntime}",
+    "args": ["provider"],
+    "cwd": "{workspaceRoot}",
+    "timeoutMs": 30000,
+    "operations": {
+      "find": {
+        "description": "Find tasks in the workspace-local store by text, semantic state and labels, in creation order, one bounded page at a time.",
+        "openWorld": false
+      },
+      "update": {
+        "description": "Change a local task's title, body or labels. expectedRevision is compared and written under the store's exclusive lock; a change that alters nothing keeps the revision.",
+        "openWorld": false,
+        "preconditions": "atomic"
+      }
+    }
+  }
 }
 ```
 
-The rules `ReadProviderOffer` enforces, and the orchestrator applies when it
-resolves a binding:
+The catalog owns each operation's access, destructiveness and documents
+([operations](01-operations.md)); a declaration states only what the provider
+decides. The rules `ReadProviderOffer` enforces, and the orchestrator applies
+when it resolves a binding:
 
-- `readOnlyHint` and `_meta["putnami.dev/contract"].access` agree with the
-  operation's access ([operations](01-operations.md)); a read is never
-  destructive, and an operation marked destructive there has
-  `destructiveHint: true`. `supportsDryRun` is false: the contracts have no
-  dry-run member.
 - `preconditions` is present exactly for the operations that take a revision:
   `atomic` if your backend compares and writes in one step, `checked` if you
   compare then write (a concurrent writer can interleave), `none` if you cannot
@@ -51,39 +56,38 @@ resolves a binding:
   take `projects`, `impacted` and `baseline`: Putnami resolves them and puts
   the resolved `selection` and the workspace membership on your request. Never
   resolve a selector yourself.
-- Every required operation of a version you declare, and one tool per
-  operation. Any error withdraws that contract version from your offer, so a
-  workspace binding it fails clearly rather than half-working.
+- Every required operation of the version you declare, and no operation the
+  version does not have. Any error withdraws that contract version from your
+  offer, so a workspace binding it fails clearly rather than half-working.
 - `description` says what your backend does and does not do. It is what
   `<contract> capabilities` shows beside each operation: the local provider
   says it runs no hosted checks and offers no merge.
-- `openWorldHint` is true when the operation reaches a system outside the
-  machine.
+- `openWorld` is required: true when the operation reaches a system outside
+  the machine, false otherwise.
 
 Hold your manifest to both gates in a test (`cmd/putnami-local-collaboration/main_test.go`):
 
 ```go
 manifest, diags := extension.ParseManifest(data)            // strict extension protocol
 diags = extension.ValidateManifest(manifest)
-offer, diags := collab.ReadProviderOffer(manifest.Tools)    // collaboration declarations: expect none
+offer, diags := collab.ReadProviderOffer(manifest.Providers) // collaboration declarations: expect none
 ```
 
 ## 2. Answer one call
 
-A routed call's `ToolCallRequest` names your tool and carries a `provider`
-member: the contract, version and operation the workspace bound, and the
-binding's `settings`. `arguments` is the request document, already validated
-and normalized by Putnami (a list request always has an explicit page).
-`collaboration.Serve` validates it again, dispatches on the operation, checks
-your result against the contract, and writes one `ToolCallResult` whose text is
-a `Response`:
+A routed call's `ProviderRequest` carries a `provider` member: the contract,
+version and operation the workspace bound, and the binding's `settings`.
+`arguments` is the request document, already validated and normalized by
+Putnami (a list request always has an explicit page). `collaboration.Serve`
+validates it again, dispatches on the operation, checks your result against
+the contract, and writes one `Response` document and nothing else:
 
 ```go
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	switch {
 	case len(args) == 2 && args[0] == "__putnami" && args[1] == "runtime-info":
 		// the runtime handshake: a runtimeproto.Info naming this extension
-	case len(args) == 1 && args[0] == "provider-tool":
+	case len(args) == 1 && args[0] == "provider":
 		if err := collab.Serve(context.Background(), stdin, stdout, provider.New().Handlers()); err != nil {
 			return 1
 		}
@@ -140,7 +144,7 @@ page into `[]`.
   hosted backend without conditional writes declares `checked` and says so.
   A revision changes whenever anything the item reports changes. The one
   exception is a task's `parent`: a provider that leaves it outside the
-  revision says so in its `link` tool's description, as the GitHub provider
+  revision says so in its `link` operation's description, as the GitHub provider
   does.
 - **Proposal labels and assignees.** Report them on every answer about a
   proposal, including those your own settings add, and `[]` when there are
@@ -164,7 +168,7 @@ page into `[]`.
   `page.size`.
 - **Disclosures.** Report what you do not have. The local provider answers
   `proposals.status` with `checks: {"state": "unsupported", "detail": …}` and
-  declares no `merge` tool, so `capabilities` lists merge as unsupported.
+  declares no `merge` operation, so `capabilities` lists merge as unsupported.
 
 ## 4. Keep credentials yours
 

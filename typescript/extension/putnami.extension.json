@@ -899,47 +899,6 @@
       ]
     }
   },
-  "tools": {
-    "putnami.typescript_docs": {
-      "description": "Return the AI.md bytes from the exact npm package resolved for one TypeScript project. Resolution walks that project's node_modules ancestry in Node order, verifies the installed package name and version, and never invokes Bun, installs dependencies, consults a registry, or substitutes extension-carried docs. Omit project only when the reference identifies exactly one declaring TypeScript project.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "reference": {
-            "type": "string",
-            "description": "Exact npm package name, for example @putnami/web"
-          },
-          "project": {
-            "type": "string",
-            "description": "Optional Putnami project name, npm package name, or workspace-relative project directory"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "reference"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "mcp-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 10000
-    }
-  },
   "tasks": {
     "workspace-fetch-exec": {
       "kind": "command",

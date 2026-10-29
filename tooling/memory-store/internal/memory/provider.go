@@ -30,7 +30,6 @@ import (
 
 	collab "go.putnami.dev/protocol/collaboration"
 	diag "go.putnami.dev/protocol/diagnostic"
-	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/memory-store/internal/filestore"
 	"go.putnami.dev/tooling/memory-store/internal/refstore"
 	"go.putnami.dev/tooling/memory-store/internal/store"
@@ -217,7 +216,6 @@ func (p *Provider) checkpoint(ctx context.Context, call collab.Call) (any, *coll
 		Identity: identity, Title: in.Title, Content: in.Content, Sources: in.Sources, Evidence: in.Evidence,
 	})}
 	now := p.timestamp()
-	recordedBy := agentOf(call.Request.Agent)
 	var replayed *store.Document
 	var replayedStore string
 	written, storeID, err := backend.Update(ctx, id, func(storeID string, current *store.Document) (*store.Document, error) {
@@ -243,7 +241,7 @@ func (p *Provider) checkpoint(ctx context.Context, call collab.Call) (any, *coll
 		next := &store.Document{
 			Format: store.FormatVersion, ID: id, Kind: collab.MemoryKindMission, Identity: identity, Sequence: 1,
 			Title: in.Title, Content: in.Content, Sources: in.Sources, Evidence: in.Evidence,
-			Provenance: collab.Provenance{RecordedAt: now, RecordedBy: recordedBy}, UpdatedAt: now, Write: write,
+			Provenance: collab.Provenance{RecordedAt: now}, UpdatedAt: now, Write: write,
 		}
 		if current != nil {
 			next.Sequence = current.Sequence + 1
@@ -358,13 +356,6 @@ func digest(value any) string {
 
 var tokenPattern = regexp.MustCompile(`^[[:graph:]]{1,200}$`)
 
-func agentOf(agent *extension.AgentIdentity) string {
-	if agent == nil || !tokenPattern.MatchString(agent.ClientName) {
-		return ""
-	}
-	return agent.ClientName
-}
-
 // recordOf renders a stored document as a contract record.
 func recordOf(kind, storeID string, doc *store.Document, retrieved string) collab.MemoryRecord {
 	return collab.MemoryRecord{
@@ -400,7 +391,7 @@ type query struct {
 	identity  collab.MemoryIdentity
 	kinds     []collab.MemoryKind
 	text      string
-	selection *extension.ToolSelection
+	selection *collab.Selection
 }
 
 // matches is the context selection policy. A record is selected when:

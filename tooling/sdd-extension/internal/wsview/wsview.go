@@ -412,6 +412,23 @@ func (ws *Workspace) SeedRoots() []string {
 	return roots
 }
 
+// decodeProjectConfig parses the authored putnami.json the wire carries raw.
+//
+// A config that will not decode is dropped rather than reported: its members are
+// refinements a consumer reads when present (`bin`, `featureAuthority`,
+// `options`), and failing a whole answer over one project's config would trade
+// a slightly poorer answer for no answer at all.
+func decodeProjectConfig(raw json.RawMessage) *workspaceproto.ProjectConfig {
+	if len(raw) == 0 {
+		return nil
+	}
+	var config workspaceproto.ProjectConfig
+	if json.Unmarshal(raw, &config) != nil {
+		return nil
+	}
+	return &config
+}
+
 // ProjectIDFromPath derives a project's canonical logical ID from its physical
 // workspace-relative path, dropping transparent "(group)" folders.
 //

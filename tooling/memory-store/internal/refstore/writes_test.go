@@ -85,7 +85,7 @@ func TestABranchWithRecordsAndNoIdentityIsNeverGivenANewOne(t *testing.T) {
 }
 
 func TestAWriteAnswersWithinItsDeadlines(t *testing.T) {
-	spectest.Proves(t, feature, "retries-never-duplicate", "a-write-answers-before-the-tool-timeout")
+	spectest.Proves(t, feature, "retries-never-duplicate", "a-write-answers-before-the-provider-timeout")
 	isolated(t)
 	remote := filepath.Join(t.TempDir(), "remote.git")
 	run(t, nil, "init", "--bare", "--quiet", remote)

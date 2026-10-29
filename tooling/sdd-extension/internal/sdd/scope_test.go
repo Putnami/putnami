@@ -157,7 +157,7 @@ func TestFeatureCatalogNeverParsesAnUnselectedDesignGraph(t *testing.T) {
 }
 
 // TestFeatureCatalogAppliesQueryAfterProjectSelection pins the composition
-// order the MCP contract promises: selection decides what is read, the query
+// order the catalog contract promises: selection decides what is read, the query
 // only filters what survived.
 func TestFeatureCatalogAppliesQueryAfterProjectSelection(t *testing.T) {
 	ws := manyProjectWorkspace(t)

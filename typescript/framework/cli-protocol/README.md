@@ -51,10 +51,9 @@ When present, `ResultError.next` is a suggested recovery command or documentatio
 
 ## Machine contract version 2
 
-Version 2 stamps `protocolVersion: 2` on all four machine surfaces — the
+Version 2 stamps `protocolVersion: 2` on all three machine surfaces — the
 `--output=json` envelope, the `--output=jsonl` run stream or terminal
-`plan:end`, the recorded session event log, the MCP `run_jobs`/`plan_jobs`
-results, and the session files. A preview `plan:end` is live only and never a
+`plan:end`, the recorded session event log, and the session files. A preview `plan:end` is live only and never a
 persisted session event. **A document without the field is version 1.** Both versions are
 exported for readers; current machine documents use version 2.
 
@@ -73,7 +72,7 @@ const result = JSON.parse(line) as ResultV2;
 
 | Symbol | Purpose |
 |--------|---------|
-| `ResultV2`, `SessionStreamRecord`, `BoundedSessionEndRecord`, `MCPResult`, `SessionFile`, `SessionPlanFile`, `ReportFile` | The v2 documents and opt-in bounded JSONL terminal |
+| `ResultV2`, `SessionStreamRecord`, `BoundedSessionEndRecord`, `SessionFile`, `SessionPlanFile`, `ReportFile` | The v2 documents and opt-in bounded JSONL terminal |
 | `TaskIdentity`, `RunSummary`, `TaskRecord`, `PlanSummary` | Typed task identity, executed-run verdict, and non-executed preview plan |
 | `validateDocument`, `validateSessionStream` / `Violation` / `VIOLATION_CODE` | Per-document and whole bounded-stream validation, mirroring Go |
 | `runSucceeded` / `derivedKey` | The strict success rule and the derived identity key |

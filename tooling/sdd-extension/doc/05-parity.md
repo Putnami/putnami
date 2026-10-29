@@ -2,7 +2,7 @@
 
 The acceptance for the extraction was never "the extension works". It was that
 `@putnami/sdd` writes **the bytes the built-in command wrote**, for every one of
-the fourteen subcommands and four MCP tools. This page says how that is proven
+the fourteen subcommands. This page says how that is proven
 and what a reviewer has to know before touching the proof.
 
 ## Two phases: a live oracle, then a recording
@@ -12,8 +12,7 @@ was measured against a live oracle. One fixture workspace, every subcommand run
 twice — once through the CLI's `App.runStructuredCommand`, once through the real
 interactive extension path with a freshly compiled binary — and stdout, stderr
 and the exit code compared byte for byte, with **zero per-subcommand
-normalization**. The MCP tools were compared the same way, through one real
-`mcp.Server` carrying both implementations, registered by real discovery.
+normalization**.
 
 **Deleting core deletes the oracle.** "The oracle is gone, so the test goes" is
 the regression, not the cleanup — so the answers were recorded first, from
@@ -24,7 +23,6 @@ tree:
 |---|---|
 | `testdata/sdd-parity/structured` | 38 structured invocations |
 | `testdata/sdd-parity/human` | 15 human invocations |
-| `testdata/sdd-parity/mcp` | 20 MCP calls; the `list_features` ones hold the paged answer of [04-mcp-tools.md](04-mcp-tools.md) |
 | `testdata/sdd-parity/contracts` | 4 generated contract artifacts |
 
 They live with the tests that read them, in
@@ -75,9 +73,7 @@ round trip, every success envelope would differ in key order alone.
 
 `capturedPayload` reproduces it for a **success** envelope. A **failure**
 envelope must not be round-tripped, because core passes the attached value
-straight through. The asymmetry is core's, not a choice made here — and it
-inverts on the MCP wire, where nothing round-trips at all (see
-[04-mcp-tools.md](04-mcp-tools.md#parity-with-the-tools-they-replace)).
+straight through. The asymmetry is core's, not a choice made here.
 
 ## Subcommands added after the capture
 

@@ -3,7 +3,7 @@
 //
 // An extension may ship the instructions that belong to it — skills, worker
 // profiles, references and helper scripts, projected onto every supported
-// agent host — under the same resolved version as its commands and tools. The
+// agent host — under the same resolved version as its commands and providers. The
 // content is an agent-artifact tree (protocols/workspace agent-artifact
 // manifest v1: `putnami.agent-artifact.json` plus the files it declares), so
 // the CLI materializes it with the ownership rules it already applies to every
@@ -81,8 +81,9 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: StepDependencyContract for a command that depends on one step
-// of another command, HostHooksContract for a hostHooks member, ChangedFilesContract
+// the manifest: ProviderContract for a providers section, StepDependencyContract
+// for a command that depends on one step of another command,
+// HostHooksContract for a hostHooks member, ChangedFilesContract
 // for a step that gates on or binds the run's changed files,
 // DefaultPositionalsContract for a command group whose default subcommand
 // declares positionals, ProvisionedToolchainContract for a runtime toolchain
@@ -177,6 +178,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// the step form, whatever origin the manifest loads from.
 	if DeclaresStepDependency(m) {
 		required = max(required, protocolcli.StepDependencyContract)
+	}
+	// A provider is reached only through a reader that calls its operations,
+	// whatever origin the manifest loads from.
+	if DeclaresProviders(m) {
+		required = max(required, protocolcli.ProviderContract)
 	}
 	return required
 }

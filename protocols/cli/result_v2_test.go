@@ -61,18 +61,18 @@ func TestValidateDocument_WrongContainerTypes(t *testing.T) {
 			want: []Violation{{Code: ViolationInvalidType, Path: "event"}},
 		},
 		"commands not an array": {
-			kind:     DocumentMCPResult,
-			document: `{"protocolVersion":2,"tool":"plan_jobs","commands":"build","plan":{"dryRun":true,"metrics":{"tasks":0,"edges":0,"projects":0},"tasks":[]}}`,
+			kind:     DocumentSessionPlanFile,
+			document: `{"protocolVersion":2,"sessionId":"s","commands":"build","tasks":[]}`,
 			want:     []Violation{{Code: ViolationInvalidType, Path: "commands"}},
 		},
 		"byCommand not an object": {
-			kind:     DocumentMCPResult,
-			document: `{"protocolVersion":2,"tool":"plan_jobs","commands":["build"],"plan":{"dryRun":true,"metrics":{"tasks":0,"edges":0,"projects":0,"byCommand":[]},"tasks":[]}}`,
+			kind:     DocumentResultEnvelope,
+			document: `{"protocolVersion":2,"command":"build","status":"success","exitCode":0,"plan":{"dryRun":true,"metrics":{"tasks":0,"edges":0,"projects":0,"byCommand":[]},"tasks":[]}}`,
 			want:     []Violation{{Code: ViolationInvalidType, Path: "plan.metrics.byCommand"}},
 		},
 		"byCommand value not an integer": {
-			kind:     DocumentMCPResult,
-			document: `{"protocolVersion":2,"tool":"plan_jobs","commands":["build"],"plan":{"dryRun":true,"metrics":{"tasks":0,"edges":0,"projects":0,"byCommand":{"build":"1"}},"tasks":[]}}`,
+			kind:     DocumentResultEnvelope,
+			document: `{"protocolVersion":2,"command":"build","status":"success","exitCode":0,"plan":{"dryRun":true,"metrics":{"tasks":0,"edges":0,"projects":0,"byCommand":{"build":"1"}},"tasks":[]}}`,
 			want:     []Violation{{Code: ViolationInvalidType, Path: "plan.metrics.byCommand.build"}},
 		},
 		"cache not a boolean": {
@@ -238,15 +238,14 @@ func TestRunSummaryDerivations(t *testing.T) {
 
 // TestResultV2SurfacesShareOneRunSummary is the structural claim behind "one
 // verdict on every surface": the run summary a JSON envelope, a session:end
-// record, an MCP run_jobs result and a session file report is the same type, so
-// the four cannot drift into four vocabularies again.
+// record and a session file report is the same type, so the three cannot drift
+// into three vocabularies again.
 func TestResultV2SurfacesShareOneRunSummary(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "one-run-verdict-on-every-surface", "every-surface-shares-one-run-summary")
 	want := reflect.TypeOf(RunSummary{})
 	surfaces := map[string]reflect.Type{
 		"resultEnvelope.run":      reflect.TypeOf(ResultV2{}.Run).Elem(),
 		"sessionStreamRecord.run": reflect.TypeOf(SessionStreamRecord{}.Run).Elem(),
-		"mcpResult.run":           reflect.TypeOf(MCPResult{}.Run).Elem(),
 		"sessionFile.run":         reflect.TypeOf(SessionFile{}.Run),
 	}
 	for name, got := range surfaces {

@@ -22,7 +22,7 @@ package cli
 //     a newer putnami" — a future contract is never half-interpreted.
 //
 // A manifest that declares NO contract surface at all (no commands, no command
-// groups, no tools, no agent-content contribution — a hook-only framework
+// groups, no providers, no agent-content contribution — a hook-only framework
 // package) is outside the ladder, for the same reason the package-time gate
 // leaves it unstamped: there is nothing for the contract to govern, so there is
 // nothing to be compatible about.
@@ -45,6 +45,13 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	19: ADDITIVE — the collaboration providers an extension declares
+//	   (`providers`, keyed by contract). From 19 on, the CLI reaches each
+//	   declared operation as a subprocess that reads one provider request and
+//	   writes one collaboration response. An older reader would load the
+//	   extension with no provider, so it must refuse the stamp. A manifest
+//	   that declares the section is stamped 19, and the floor binds it from
+//	   every origin. A manifest without it keeps its stamp.
 //	18: ADDITIVE — a command's dependency on one step of another command
 //	   (`dependsOn: ["<command>~<step>"]`). From 18 on, the planner plans the
 //	   whole prerequisite command for the project, as for `<command>`, and
@@ -293,7 +300,13 @@ const HostHooksContract = 17
 // command name and plan nothing, refuses the stamp instead.
 const StepDependencyContract = 18
 
+// ProviderContract is required by a manifest that declares a providers
+// section. A reader at this contract calls the declared operations through the
+// provider wire, so an older reader, which would load the extension with no
+// provider, refuses the stamp instead.
+const ProviderContract = 19
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = StepDependencyContract
+const LatestContract = ProviderContract

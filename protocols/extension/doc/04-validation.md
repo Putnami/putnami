@@ -165,7 +165,7 @@ the command's exit code reaches the host unchanged.
     "hosts": {
       "claude-code": [
         { "event": "SessionStart", "args": ["--engine", "claude-code"], "timeoutSeconds": 30 },
-        { "event": "PostToolUse", "tools": ["TodoWrite"], "mcpTools": ["missions.ask", "missions.reply"],
+        { "event": "PostToolUse", "tools": ["TodoWrite"],
           "args": ["--engine", "claude-code"], "timeoutSeconds": 30 },
         { "event": "Stop", "args": ["--engine", "claude-code", "--idle-wake"], "wake": true, "timeoutSeconds": 660 }
       ],
@@ -184,7 +184,7 @@ the command's exit code reaches the host unchanged.
 | `command` names a group and an interactive subcommand of this manifest, and any nested subcommand under it | `required-field`, `invalid-host-hooks-command` |
 | A host is `claude-code` or `codex`, and lists at least one hook | `unknown-host-hooks-host`, `empty-host-hooks` |
 | An event is one its host runs: `SessionStart`, `PostToolUse`, `Stop`, `StopFailure` and `SessionEnd` for Claude Code; `SessionStart`, `PostToolUse` and `Stop` for Codex | `unknown-host-hook-event` |
-| Only `PostToolUse` names `tools` (host tool names) and `mcpTools` (namespaced Putnami MCP tool names, without a hyphen), and it names at least one of them; no name repeats | `invalid-host-hook-matcher` |
+| Only `PostToolUse` names `tools` (host tool names), and it names at least one; no name repeats | `invalid-host-hook-matcher` |
 | Every argument is letters, digits and `_ . / : = -`, so the shell reads it as written | `invalid-host-hook-args` |
 | Only a Claude Code hook declares `wake` | `invalid-host-hook-wake` |
 | `timeoutSeconds` is from 1 to 3600 | `invalid-host-hook-timeout` |
@@ -269,16 +269,17 @@ changed files (`activation.changedFiles`) or binds them (`from: context`,
 `path: selection.changedFiles`),
 `protocols/cli.HostHooksContract` (17) for a `hostHooks` member, or
 `protocols/cli.StepDependencyContract` (18) for a command `dependsOn` entry
-that names one step of another command (`build~describe`). Rung 6 named the
+that names one step of another command (`build~describe`), or
+`protocols/cli.ProviderContract` (19) for a `providers` section. Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
-input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
-tool, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
+input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group,
+provider, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 and 18 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, input selectors, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content and nothing else requires
@@ -340,8 +341,13 @@ makes the dependent's root steps depend on that step and run after the
 command's other leaves, and an older reader would read the entry as a command
 name and plan nothing. An entry that holds
 `~` counts even when it is not well formed. `RequiredLoadContract` includes
-that rung too. The reader loads every stamp from the one the manifest's
-vocabulary requires up to `protocols/cli.LatestContract` (18):
+that rung too. A manifest that declares `providers` requires contract 19
+wherever it loads from: a reader at 19 calls each declared operation through
+the provider wire, and an older reader would load the extension with no
+provider. `RequiredLoadContract` includes that rung as well. A manifest that
+still carries the deleted `tools` section loads leniently with no provider,
+and strict validation refuses the member. The reader loads every stamp from
+the one the manifest's vocabulary requires up to `protocols/cli.LatestContract` (19):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -350,7 +356,7 @@ vocabulary requires up to `protocols/cli.LatestContract` (18):
 | above the latest | **Reject**: "extension requires a newer putnami (contract N > M)". A future contract is never half-interpreted. |
 
 A manifest that declares **no contract surface** (no commands, command groups,
-tools, agent content, or verb vocabulary) is outside the ladder and loads
+providers, agent content, or verb vocabulary) is outside the ladder and loads
 unstamped: the packager never stamps one, so requiring a stamp would reject
 exactly the manifests it refuses to stamp. `DeclaresContractSurface` is the
 shared predicate. Agent content and a verb vocabulary count as surfaces even
@@ -370,7 +376,7 @@ vocabulary-only extension.
 For the Go archive packager, registry `extensionDependencies` are contract
 surface too. A manifest that declares only hooks and such dependencies takes
 the stamp-only arm: the packager stamps 8 without the strict validation's
-requirement of a command, tool or agent content, and the loader postcondition
+requirement of a command, provider or agent content, and the loader postcondition
 still applies. The npm packager leaves the list out of its stamp decision, so
 an npm framework package that declares only hooks stays unstamped.
 
@@ -380,9 +386,9 @@ this build does not have, whatever surface it happens to declare today, so it is
 rejected like any other future manifest. `TestLoadManifest_CompatibilityMatrix`
 (manifest_matrix_test.go) is the executable form of this table — the full cross
 product of {absent, one behind, current, latest, one ahead} × {commands,
-command groups, tools, agent content, verbs, command kinds, publish channels,
-provisioned toolchain, default positionals, changed-files gate, changed-files
-binding, host hooks, step dependency, none}. Ratcheting a row means editing that table and
+command groups, providers, agent content, verbs, command kinds, publish
+channels, provisioned toolchain, default positionals, changed-files gate,
+changed-files binding, host hooks, step dependency, none}. Ratcheting a row means editing that table and
 this one together.
 
 ### The packaging ratchet

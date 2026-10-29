@@ -72,7 +72,7 @@ workload. Per-step heaviness uses
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. The publish task that serves a channel says so in its own [`declares.publishChannels`](02-commands-and-tasks.md#publish-channels). |
-| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. A command that declares no `sideEffects` has none. |
+| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. A command that declares no `sideEffects` has none. |
 
 ### Command kinds
 
@@ -301,7 +301,7 @@ Strict validation checks the section when it is present:
 | A related command is a path of lowercase words, other than the verb itself, and appears once. | `invalid-verb-related` |
 
 A manifest that declares only a vocabulary is complete: it needs no command,
-MCP tool or agent content. Declaring `verbs` requires CLI contract 9
+provider or agent content. Declaring `verbs` requires CLI contract 9
 (`VerbVocabularyContract`) wherever the manifest loads from, because its
 default traits change how other extensions' jobs are planned. A CLI below 9
 refuses the manifest with "requires a newer putnami". The Go archive and npm

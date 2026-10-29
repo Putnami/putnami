@@ -33,7 +33,7 @@ The smallest valid extension manifest has a single command with at least one pip
 | `name` | yes | Extension identifier (e.g., `@putnami/typescript`): a scoped name (`@scope/name`) or a kebab-case identifier |
 | `version` | no | Extension version (semver) |
 | `cliContract` | no | CLI ↔ extension contract version, stamped by the package job after strict validation (earned, not claimed — see [validation](04-validation.md)) |
-| `commands` | one of `commands`, `tools`, `agentContent`, `verbs` | Public commands exposed to users |
+| `commands` | one of `commands`, `providers`, `agentContent`, `verbs` | Public commands exposed to users |
 | `tasks` | no | Atomic executable units referenced by commands |
 | `extensionDependencies` | no | Other extensions this extension needs, each with a version constraint. The CLI installs, pins and loads each registry dependency (`@scope/name`); a manifest that names one requires CLI contract 8 — see below |
 | `workspaceDevDependencies` | no | NPM devDependencies required at workspace root |
@@ -43,9 +43,9 @@ The smallest valid extension manifest has a single command with at least one pip
 | `hooks` | no | Lifecycle hooks (e.g., `preBuild`, `onInstall`) |
 | `contracts` | no | Input/output schemas for task validation |
 | `optionNamespaces` | no | Bare `options.<name>` blocks of a project config this extension reads — see below |
-| `tools` | one of `commands`, `tools`, `agentContent`, `verbs` | Namespaced MCP tools the extension contributes |
-| `agentContent` | one of `commands`, `tools`, `agentContent`, `verbs` | Agent instructions the extension ships under its own version — see below |
-| `verbs` | one of `commands`, `tools`, `agentContent`, `verbs` | The verb vocabulary: verbs other extensions run, with their descriptions, aliases, default traits and related commands. Requires CLI contract 9 — see [verbs](06-verbs.md#declaring-a-verb-vocabulary) |
+| `providers` | one of `commands`, `providers`, `agentContent`, `verbs` | The collaboration providers the extension implements, keyed by contract. Requires CLI contract 19 — see below |
+| `agentContent` | one of `commands`, `providers`, `agentContent`, `verbs` | Agent instructions the extension ships under its own version — see below |
+| `verbs` | one of `commands`, `providers`, `agentContent`, `verbs` | The verb vocabulary: verbs other extensions run, with their descriptions, aliases, default traits and related commands. Requires CLI contract 9 — see [verbs](06-verbs.md#declaring-a-verb-vocabulary) |
 
 A manifest must name its extension. Strict validation, `putnami extensions
 validate` and the packagers refuse one without a `name`, with a `required-field`
@@ -56,10 +56,57 @@ extension name from the manifest, else from the `name` of the `putnami.json` in
 the extension directory, else from the reference, and the version from the
 manifest alone. It reads no `package.json`.
 
-A manifest must contribute something: at least one command, MCP tool,
+A manifest must contribute something: at least one command, provider,
 agent-content contribution, or verb vocabulary. A content-only extension — no
-runtime, no command, no tool — is a complete manifest, and so is a
+runtime, no command, no provider — is a complete manifest, and so is a
 vocabulary-only one.
+
+## Providers
+
+`providers` declares the collaboration contracts the extension implements
+(`tasks`, `proposals`, `memory`, `missions`), keyed by contract. One entry holds
+what every operation of the contract shares, and the operations:
+
+```json
+{
+  "name": "@acme/tracker",
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}", "args": ["provider"],
+      "cwd": "{workspaceRoot}", "timeoutMs": 120000,
+      "operations": {
+        "find":    { "description": "Find issues in the tracker.", "openWorld": true },
+        "claim":   { "description": "Assign the issue atomically.", "openWorld": true, "preconditions": "atomic" },
+        "context": { "description": "Load the issues of the selected projects.", "openWorld": true, "workspaceSelection": true }
+      }
+    }
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `version` | yes | The contract version the provider implements, 1 or above |
+| `command`, `args`, `cwd`, `env`, `timeoutMs` | `command` | The subprocess every operation runs, with the same placeholders as a task, `{extensionRuntime}` included. `timeoutMs` defaults to 30 seconds |
+| `operations.<name>.description` | yes | The provider-specific behavior and limits of the operation |
+| `operations.<name>.openWorld` | yes | Whether the operation reaches a system outside this machine |
+| `operations.<name>.preconditions` | no | How the provider enforces a revision precondition: `atomic`, `checked` or `none` |
+| `operations.<name>.workspaceSelection` | no | Ask the CLI to resolve the workspace view (the complete membership and the resolved `projects`, `impacted` and `baseline` selection) and put it on the request |
+
+The CLI writes one provider request on the command's standard input and reads
+one collaboration response from its standard output. A provider gets no host
+RPC channel. Strict validation checks the shape. The contract names, the
+operations, which operations a version requires, which take a precondition or
+the workspace view, and both documents belong to
+[`protocols/collaboration`](../../collaboration/README.md), whose
+`ReadProviderOffer` checks a declaration against the catalog.
+
+Declaring `providers` requires `cliContract` 19 (`ProviderContract`), wherever
+the manifest loads from: a CLI below 18 refuses the manifest instead of loading
+the extension with no provider. There is no `tools` section: a manifest that
+still carries one loads leniently with no provider, and strict validation
+refuses the member.
 
 ## Agent Content
 
@@ -94,7 +141,7 @@ project, and the build refuses content that breaks it.
 A packaged contribution is bound end to end: the workspace lock pins the
 extension's manifest digest, the manifest pins the content manifest digest, and
 the content manifest pins every file digest. The content's identity and version
-are the extension's, so an extension that also ships commands or MCP tools ships
+are the extension's, so an extension that also ships commands or providers ships
 its matching instructions under the same resolved version.
 
 Declaring `agentContent` requires `cliContract` 5, the additive contract the

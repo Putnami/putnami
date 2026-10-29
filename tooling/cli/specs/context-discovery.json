@@ -6,7 +6,7 @@
     "A contributor can discover workspace structure and project context without enumerating the repository by hand",
     "A script receives the project, context, and workspace-map facts as JSON documents built by the same code that renders the text",
     "A contributor can ask which project owns a path, what a project depends on or is depended on by, and why a change to one project impacts another, without reading the graph by hand",
-    "An extension can contribute a workspace-answering tool to the collaboration routing without re-deriving membership, selection, or impact",
+    "An extension can contribute a workspace-answering provider operation to the collaboration routing without re-deriving membership, selection, or impact",
     "Reading a fresh or resumed workspace prepares exact locked read surfaces within a fixed budget without a manual context-generation step",
     "A workspace an earlier release registered a Putnami server in loses that registration without losing any entry a person wrote"
   ],
@@ -30,8 +30,8 @@
       "text": "A build session writes no workspace map and reads no variable that controls one. The map comes on demand from putnami context map, which prints it and writes no file."
     },
     {
-      "id": "extension-tool-workspace-facts",
-      "text": "A collaboration provider tool that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact; a tool that does not declare it receives neither."
+      "id": "provider-workspace-facts",
+      "text": "A collaboration provider operation that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact; an operation that does not declare it receives neither."
     },
     {
       "id": "read-preparation",

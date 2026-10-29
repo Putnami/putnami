@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-collaboration-missions.v1.json",
   "title": "Putnami missions contract, version 1",
-  "description": "Request (<operation>Input) and result (<operation>Result) documents of every missions v1 operation. Required: sync, ask, reply. sync is host-only: the host that runs an agent calls it, and the MCP server lists no tool for it. Message and decision ids are bare tokens, not refs: an agent types them, and they never leave their provider. A mission is named by its repository and key, compared exactly. Lengths count characters.",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every missions v1 operation. Required: sync, ask, reply. sync is host-only: the host that runs an agent calls it, never the agent itself. Message and decision ids are bare tokens, not refs: an agent types them, and they never leave their provider. A mission is named by its repository and key, compared exactly. Lengths count characters.",
   "$defs": {
     "id": {
       "type": "string",

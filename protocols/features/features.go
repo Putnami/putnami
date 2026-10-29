@@ -241,21 +241,17 @@ type Feature struct {
 	Relations []Relation `json:"relations,omitempty"`
 	// Requirements declares the evidence needed to earn maturity stages.
 	Requirements []Requirement `json:"requirements,omitempty"`
-	// Surface optionally names the commands and MCP tools that carry the
-	// feature. It exists only from manifest version 2.
+	// Surface optionally names the commands that carry the feature. It exists only from manifest version 2.
 	Surface *FeatureSurface `json:"surface,omitempty"`
 }
 
-// FeatureSurface lists the command paths and MCP tool names that carry one
-// feature. Both lists are sets of keyed identities, and at least one is
-// present. Whether a name resolves is a fact of the declaring project, so the
-// protocol validates the shape only.
+// FeatureSurface lists the command paths that carry one feature. The list is a
+// set of keyed identities and is present. Whether a name resolves is a fact of
+// the declaring project, so the protocol validates the shape only.
 type FeatureSurface struct {
 	// Commands lists command paths as typed after the executable name, in
 	// lower-case words separated by one space, such as "features validate".
 	Commands []string `json:"commands,omitempty"`
-	// Tools lists MCP tool names as the tool listing advertises them.
-	Tools []string `json:"tools,omitempty"`
 }
 
 // Relation is one unordered link to another feature in the same workspace

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/local-collaboration/internal/store"
 )
@@ -139,11 +138,10 @@ func outcomeOf(response collab.Response) writerOutcome {
 }
 
 func serveMissions(p *Provider, workspace, operation, arguments string) (collab.Response, error) {
-	payload, err := json.Marshal(extension.ToolCallRequest{
-		Name:          "local-collaboration.missions." + operation,
+	payload, err := json.Marshal(collab.ProviderRequest{
 		Arguments:     json.RawMessage(arguments),
 		WorkspaceRoot: workspace,
-		Provider:      &extension.ToolProviderCall{Contract: collab.ContractMissions, Version: 1, Operation: operation},
+		Provider:      &collab.ProviderCall{Contract: collab.ContractMissions, Version: 1, Operation: operation},
 	})
 	if err != nil {
 		return collab.Response{}, err
@@ -152,11 +150,7 @@ func serveMissions(p *Provider, workspace, operation, arguments string) (collab.
 	if err := collab.Serve(context.Background(), bytes.NewReader(payload), &out, p.Handlers()); err != nil {
 		return collab.Response{}, err
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil || len(result.Content) != 1 {
-		return collab.Response{}, fmt.Errorf("the provider wrote no tool result: %s", out.String())
-	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
+	response, diags := collab.ParseResponse(out.Bytes())
 	if diags != nil {
 		return collab.Response{}, fmt.Errorf("the provider answered an invalid response: %s", collab.FormatDiagnostics(diags))
 	}

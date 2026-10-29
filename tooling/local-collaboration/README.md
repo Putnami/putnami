@@ -29,7 +29,7 @@ Declare the extension and bind the contracts in `putnami.workspace.json`:
 
 Then `putnami tasks create --input '{"title":"…","idempotencyKey":"…"}'`,
 `putnami proposals upsert --input '{"change":{"base":"main","head":"my-branch"},"title":"…"}'`,
-or the MCP tools `tasks.*`, `proposals.*`, `missions.ask` and `missions.reply`
+or the same operations through the extension host RPC `collaboration.call`
 ([CLI guide](../cli/doc/25-collaboration-providers.md)). The first call compiles
 the runtime from this directory (`bin/prepare`, Go toolchain resolved like any
 extension runtime).
@@ -128,10 +128,10 @@ added later on top of the same files.
 
 ## Layout
 
-- `putnami.extension.json` — the runtime declaration and one tool per
-  operation, each marked `putnami.dev/provider`.
+- `putnami.extension.json` — the runtime declaration and the `tasks`,
+  `proposals` and `missions` providers with their operations.
 - `cmd/putnami-local-collaboration` — the runtime: the `__putnami runtime-info`
-  handshake and the `provider-tool` bridge (`collaboration.Serve`).
+  handshake and the `provider` entry point (`collaboration.Serve`).
 - `internal/provider` — the operation handlers.
 - `internal/store` — the store: `state.json` for tasks and proposals and
   `missions.json` for missions, each written by atomic rename under the one
@@ -144,6 +144,6 @@ It includes the shared contract scenarios of
 [`providertest`](../../protocols/collaboration/providertest/providertest.go),
 which the GitHub provider runs too, the missions scenarios against a store on
 disk, and two processes that sync, ask and reply on one store at once. The
-end-to-end proof of tasks and proposals through the CLI and MCP entry paths is
+end-to-end proof of tasks and proposals through the command line is
 `tooling/cli/internal/cli/collaboration_local_provider_test.go`. No test runs
 missions through the CLI yet.

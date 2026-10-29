@@ -91,7 +91,7 @@ func TestTheSpoolKeepsTheOrderOfTheToolCalls(t *testing.T) {
 }
 
 func TestRepliedMarkersArePruned(t *testing.T) {
-	spectest.Proves(t, sessionFeature, toolRequirement, "a-recorded-reply-wins-over-an-ack-line")
+	spectest.Proves(t, sessionFeature, decisionRequirement, "a-recorded-reply-wins-over-an-ack-line")
 	dir := t.TempDir()
 	now := time.Now()
 	for i := range repliedMarkersMax + 3 {

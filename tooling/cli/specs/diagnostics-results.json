@@ -11,7 +11,7 @@
     "A ledger or benchmark reads what each recorded run cost, over which selection, without writing its own reduction and without counting a nested run as a gate",
     "A reader of a recorded session can tell why a task executed or reused a result from the input digest it was keyed on, without re-running the engine",
     "A runner can identify the actual invocation's recorded plan before its tasks start, without repeating preparation in a separate planning invocation",
-    "A reader comparing two recorded sessions of one branch can tell which declared check failed, whether the declarations changed between them, and which agent session ran each"
+    "A reader comparing two recorded sessions of one branch can tell which declared check failed and whether the declarations changed between them"
   ],
   "nonGoals": [
     "Treating advisory repository hygiene findings as production blockers",

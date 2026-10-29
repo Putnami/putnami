@@ -3,7 +3,7 @@
 This document is the settled contract for the CLI's **machine** output, and it
 is the **only** one: the version-1 emitters are deleted (see
 [ADR 0002 of `@putnami/cli`](../../../tooling/cli/doc/adr/0002-cli-vnext-contracts.md)). Every document the CLI writes carries
-`protocolVersion: 2`, on all four surfaces. A document **without** the member is
+`protocolVersion: 2`, on all three surfaces. A document **without** the member is
 version 1 and can only have come from a build published before the removal.
 
 If you are moving a consumer off version 1, read
@@ -28,7 +28,7 @@ speaks:
 |---------|-----------------|
 | `--output=json` | `Result` — `command` / `status` / `data` / `error` / `exitCode` ([`result.go`](../result.go)); the `$id` exists but is never emitted |
 | `--output=jsonl` | `job:start` / `job:event` / `job:end` / `session:end` (declared by `protocols/runtime/stream.go`, deleted with its last producer at B7a — see below) |
-| MCP `run_jobs` / `plan_jobs` | `runResult` / `planResult` (`tooling/cli/internal/mcp/adapter.go`) |
+| MCP `run_jobs` / `plan_jobs` | `runResult` / `planResult` (the MCP server and its results are gone; no version-2 document replaces them) |
 | session files | `SessionMetadata` / `PlanSnapshot` / `SessionEvent` (`tooling/cli/internal/workspace_state/session.go`) |
 
 A consumer therefore infers the contract from the CLI version it happens to be
@@ -117,7 +117,7 @@ Two reasons the process ordering is the one that survives:
    `aborted`, and `run.counts.failed` plus `run.failures[]` still name every
    failure the run collected. Nothing is hidden.
 
-Derivation, identical on all four surfaces:
+Derivation, identical on all three surfaces:
 
 ```
 outcome  = "aborted"  if the run was aborted        (abortedBy is then required)
@@ -204,13 +204,12 @@ derived-key rule is machine-checked (`cli.result.invalid_key`), so an identity
 whose `key` disagrees with its structured fields is rejected rather than
 silently preferred by one consumer and not another.
 
-## The six documents
+## The five documents
 
 | Document | Surface |
 |----------|---------|
 | `resultEnvelope` | `--output=json` — one object per invocation |
 | `sessionStreamRecord` | `--output=jsonl` — task/session records for a run, or one terminal `plan:end` for a preview. Recorded session event logs use only task records plus `session:end`; `plan:end` never claims persistence. |
-| `mcpResult` | MCP `run_jobs` / `plan_jobs` |
 | `sessionFile` | recorded `session.json` |
 | `sessionPlanFile` | recorded `plan.json` |
 | `reportFile` | recorded `report.json` — the run's bounded synthesis, specified in [`03-report.md`](./03-report.md) |
@@ -384,9 +383,9 @@ addition is not invisible everywhere:
 - An older CLI's `sessions inspect` lists a `test:case` record by its record
   type without its case payload.
 
-The general run summary is **one type** on all four legacy surfaces — the
-envelope's `run` member, a legacy `session:end` record's `run`, the MCP
-`run_jobs` result's `run`, and the session file's `run` are the same shape. The
+The general run summary is **one type** on all three legacy surfaces — the
+envelope's `run` member, a legacy `session:end` record's `run`, and the session
+file's `run` are the same shape. The
 opt-in bounded stream profile uses the strict projection `StreamRunSummary`,
 which preserves verdict/count semantics but makes the unbounded `failures` and
 `publications` arrays impossible. See [`04-machine-output.md`](./04-machine-output.md).
@@ -846,30 +845,13 @@ Like `tree`, the digest is captured when the session OPENS, before its first
 task runs. A producer that cannot read a declaration file (other than a missing
 one) records no `declarations` block rather than a digest over a partial set.
 
-### Recorded agent
-
-`sessionFile.agent` is an additive optional object: **the agent session that
-launched the run through the MCP server**. A run launched any other way, a
-terminal run included, records no block.
-
-| Member | Meaning |
-|--------|---------|
-| `kind` | the harness, as the MCP client named itself in `initialize` (`clientInfo.name`) |
-| `sessionId` | the agent's own session id, absent when the server environment stated none |
-
-`sessionId` comes from `PUTNAMI_AGENT_SESSION_ID` in the MCP server
-environment, else from the variable a harness exports to the processes it
-spawns (`CLAUDE_CODE_SESSION_ID`). Both members are printable ASCII of at most
-128 bytes. Nothing is inferred: a client that sends no name records no block,
-even when a session id is set, and a value outside the bound is dropped.
-
 ### Task input digest
 
 `taskRecord.inputDigest` is an additive optional member: the cache key the
 scheduler computed for the task, spelled `sha256:` followed by 64 lowercase hex
 characters. It appears on every surface that carries a task record — the
-`--output=json` envelope, the `task:end` stream record, the MCP result and the
-recorded session file.
+`--output=json` envelope, the `task:end` stream record and the recorded session
+file.
 
 It exists so a reader can tell **why** a task executed or reused a result
 without re-running the engine. `reuse` says what the run did; `inputDigest`
@@ -1049,8 +1031,8 @@ writer and no reader — which this repository deletes rather than freezes. A
 consumer still parsing v1 lines works from this table and from a pinned
 pre-removal build.
 
-A legacy `session:end` carries the same `runSummary` as the envelope, MCP result,
-and session file. A bounded producer opts in with `machineOutput` and the
+A legacy `session:end` carries the same `runSummary` as the envelope and the
+session file. A bounded producer opts in with `machineOutput` and the
 distinct `BoundedSessionEndRecord`: its `streamRunSummary` retains the exact
 verdict, counts, reuse, duration and optional CPU facts, but cannot carry the
 unbounded failure/publication arrays. Fixed budgets, sanitizer v1, exact split
@@ -1061,17 +1043,6 @@ elision and the retained full-detail artifact are specified in
 of a session stream. Consumers branch on the discriminator: `plan:end.plan`
 proves planning completed; `session:end.run` proves a session executed. A
 consumer that requires work also checks `plan.metrics.tasks > 0`.
-
-### MCP `run_jobs` / `plan_jobs`
-
-The tool answers `{protocolVersion, tool, commands, run}` (for `run_jobs`) or
-`{protocolVersion, tool, commands, plan}` (for `plan_jobs`). The v1 answer's
-flat `success`/`total`/`succeeded`/`failed`/`cached`/`coalesced`/`skipped`/
-`durationMs` map onto `run` exactly as the envelope table above; its
-`failures[].{project,job}` become `run.failures[].identity`, and each failure
-still carries its `diagnostics[]`. `plan_jobs`'s `jobs[]` become `plan.tasks[]`,
-with `key` moving to `identity.key`. `get_diagnostics` is **unchanged**: it is
-not a machine document, and still answers `{count, diagnostics}`.
 
 ### Recorded session files
 
@@ -1196,6 +1167,18 @@ its meaning, so a session file written by a current CLI still parses as one
 written before. A reader that validates against the closed schema needs this
 version of `result-v2.json`, which is the same requirement any additive member
 carries.
+
+### Retired members
+
+The MCP server is gone, so three things it alone produced left the schema:
+the `mcpResult` document, `sessionFile.agent`, and the report `origin` value
+`mcp`. The `origin` value `ephemeral` replaces `mcp`: it marks a run the CLI
+drives for itself on an ephemeral session, such as the build behind
+`cache verify`. `protocolVersion` stays `2`. No current CLI writes any of the
+retired shapes, and the schema stays closed, so a document recorded before the
+removal that carries `agent` or `origin: "mcp"` no longer validates against
+this version of `result-v2.json`. Validate such a document with the schema of
+the CLI build that wrote it.
 
 ### Rolling back
 

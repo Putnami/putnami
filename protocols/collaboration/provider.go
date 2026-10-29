@@ -13,39 +13,23 @@ import (
 	extension "go.putnami.dev/protocol/extension"
 )
 
-// ProviderMetaKey marks a manifest-declared tool as the implementation of one
-// contract operation: tools.<name>._meta["putnami.dev/provider"]. A tool that
-// carries it is reachable only through a workspace binding, under the
-// contract's own operation name; it is never exposed under its declared name.
-const ProviderMetaKey = "putnami.dev/provider"
-
-// contractMetaKey is the extension tool contract metadata every tool carries.
-const contractMetaKey = "putnami.dev/contract"
-
-// ProviderDeclaration is the value of a tool's ProviderMetaKey.
-type ProviderDeclaration struct {
-	// Contract is the contract the tool implements (tasks, proposals, memory, missions).
-	Contract string `json:"contract"`
-	// Version is the contract version the tool implements.
-	Version int `json:"version"`
-	// Operation is the operation name within Contract that the tool answers.
-	Operation string `json:"operation"`
-	// Preconditions states how the tool enforces expectedRevision (or, for an
-	// atomic operation, exclusivity). Required exactly when the operation's
-	// PreconditionRule is not PreconditionRuleNone.
-	Preconditions Preconditions `json:"preconditions,omitempty"`
-}
-
-// ProvidedOperation is one tool that implements one contract operation.
+// ProvidedOperation is one operation a provider declares under its manifest's
+// providers section.
 type ProvidedOperation struct {
-	// Tool is the tool name the extension declared.
-	Tool string
-	// Definition is the extension's manifest tool definition for Tool.
-	Definition extension.ToolDefinition
-	// Declaration is the parsed provider declaration from Definition's metadata.
-	Declaration ProviderDeclaration
+	// Provider is the extension's declaration of the contract: the version,
+	// and the command, arguments, environment and timeout every operation of
+	// the contract runs.
+	Provider extension.ProviderDeclaration
+	// Operation is the extension's declaration of this operation.
+	Operation extension.ProviderOperation
 	// Spec is the catalog's operation specification the declaration resolved to.
 	Spec OperationSpec
+}
+
+// Preconditions returns how the provider enforces a revision precondition for
+// the operation, empty when it declares none.
+func (p ProvidedOperation) Preconditions() Preconditions {
+	return Preconditions(p.Operation.Preconditions)
 }
 
 // ProviderOffer is everything one extension's manifest offers, keyed by
@@ -70,194 +54,131 @@ func (o ProviderOffer) Operations(contract string, version int) (map[string]Prov
 	return ops, ok
 }
 
-// ReadProviderOffer reads the provider declarations of one extension's tools
-// and validates each against the catalog. It is the one check the
-// orchestrator applies when it resolves a binding and the one a provider
-// author runs against their own manifest.
+// ReadProviderOffer reads one extension's providers section and validates
+// each declaration against the catalog. It is the one check the orchestrator
+// applies when it resolves a binding and the one a provider author runs
+// against their own manifest.
 //
 // A declaration naming a contract version this package does not implement is
-// reported as a warning and ignored, so a provider may offer a newer version
-// beside the ones an older orchestrator speaks. Every other problem is an
-// error that withdraws the affected contract version from the offer: a tool
-// whose annotations disagree with its operation, two tools for one operation,
-// or a missing required operation.
-func ReadProviderOffer(tools map[string]extension.ToolDefinition) (ProviderOffer, []diag.Diagnostic) {
-	names := make([]string, 0, len(tools))
-	for name := range tools {
-		names = append(names, name)
+// reported as a warning and ignored. Every other problem is an error that
+// withdraws the contract from the offer: an unknown contract, a declaration
+// without a version or a command, an unknown operation, a precondition rule
+// the operation does not allow, an operation that takes the canonical
+// selection without declaring workspaceSelection, or a missing required
+// operation.
+func ReadProviderOffer(providers map[string]extension.ProviderDeclaration) (ProviderOffer, []diag.Diagnostic) {
+	contracts := make([]string, 0, len(providers))
+	for contract := range providers {
+		contracts = append(contracts, contract)
 	}
-	sort.Strings(names)
-
-	type versionKey struct {
-		contract string
-		version  int
-	}
-	offered := map[versionKey]map[string]ProvidedOperation{}
-	failed := map[versionKey]bool{}
-	var diags []diag.Diagnostic
-	for _, name := range names {
-		def := tools[name]
-		raw, present := def.Meta[ProviderMetaKey]
-		if !present {
-			continue
-		}
-		field := "tools." + name + "._meta." + ProviderMetaKey
-		declaration, declDiags := parseDeclaration(field, raw)
-		if declDiags != nil {
-			diags = append(diags, declDiags...)
-			if declaration != nil {
-				failed[versionKey{declaration.Contract, declaration.Version}] = true
-			}
-			continue
-		}
-		key := versionKey{declaration.Contract, declaration.Version}
-		spec, known := Lookup(declaration.Contract, declaration.Version)
-		if !known {
-			diags = append(diags, diag.Warningf(ErrorCodeUnsupportedVersion, field,
-				"%s version %d is not implemented by this orchestrator; the declaration is ignored",
-				declaration.Contract, declaration.Version))
-			continue
-		}
-		op, known := spec.Operation(declaration.Operation)
-		if !known {
-			diags = append(diags, diag.Errorf(ErrorCodeUnknownOperation, field+".operation",
-				"%s version %d has no operation %q", declaration.Contract, declaration.Version, declaration.Operation))
-			failed[key] = true
-			continue
-		}
-		if toolDiags := validateProvidedTool(field, name, def, *declaration, op); toolDiags != nil {
-			diags = append(diags, toolDiags...)
-			failed[key] = true
-			continue
-		}
-		if offered[key] == nil {
-			offered[key] = map[string]ProvidedOperation{}
-		}
-		if existing, duplicate := offered[key][op.Name]; duplicate {
-			diags = append(diags, diag.Errorf(ErrorCodeInvalidDeclaration, field,
-				"tools %s and %s both implement %s.%s version %d; the choice would be ambiguous",
-				existing.Tool, name, declaration.Contract, op.Name, declaration.Version))
-			failed[key] = true
-			continue
-		}
-		offered[key][op.Name] = ProvidedOperation{Tool: name, Definition: def, Declaration: *declaration, Spec: op}
-	}
+	sort.Strings(contracts)
 
 	offer := ProviderOffer{}
-	keys := make([]versionKey, 0, len(offered))
-	for key := range offered {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].contract != keys[j].contract {
-			return keys[i].contract < keys[j].contract
-		}
-		return keys[i].version < keys[j].version
-	})
-	for _, key := range keys {
-		if failed[key] {
+	var diags []diag.Diagnostic
+	for _, contract := range contracts {
+		declaration := providers[contract]
+		field := "providers." + contract
+		if !IsContract(contract) {
+			diags = append(diags, diag.Errorf(ErrorCodeUnknownContract, field, "unknown contract %q", contract))
 			continue
 		}
-		spec, _ := Lookup(key.contract, key.version)
-		var missing []string
-		for _, required := range spec.RequiredOperations() {
-			if _, ok := offered[key][required]; !ok {
-				missing = append(missing, required)
-			}
-		}
-		if len(missing) > 0 {
-			diags = append(diags, diag.Errorf(ErrorCodeInvalidDeclaration, "tools",
-				"%s version %d is declared without its required operations: %s",
-				key.contract, key.version, strings.Join(missing, ", ")))
+		if declaration.Version < 1 {
+			diags = append(diags, diag.Errorf(ErrorCodeRequired, field+".version",
+				"a provider declaration names its contract version"))
 			continue
 		}
-		if offer[key.contract] == nil {
-			offer[key.contract] = map[int]map[string]ProvidedOperation{}
+		spec, known := Lookup(contract, declaration.Version)
+		if !known {
+			diags = append(diags, diag.Warningf(ErrorCodeUnsupportedVersion, field+".version",
+				"%s version %d is not implemented by this orchestrator; the declaration is ignored",
+				contract, declaration.Version))
+			continue
 		}
-		offer[key.contract][key.version] = offered[key]
+		operations, operationDiags := readProvidedOperations(field, contract, declaration, spec)
+		diags = append(diags, operationDiags...)
+		if diag.HasErrors(operationDiags) {
+			continue
+		}
+		if offer[contract] == nil {
+			offer[contract] = map[int]map[string]ProvidedOperation{}
+		}
+		offer[contract][declaration.Version] = operations
 	}
 	return offer, diags
 }
 
-func parseDeclaration(field string, raw any) (*ProviderDeclaration, []diag.Diagnostic) {
-	encoded, err := json.Marshal(raw)
-	if err != nil {
-		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidDeclaration, field, "the declaration does not encode: %v", err)}
+// readProvidedOperations checks one contract's declaration against its
+// catalog version and returns the operations it offers. Any error withdraws
+// the whole contract version.
+func readProvidedOperations(field, contract string, declaration extension.ProviderDeclaration, spec ContractSpec) (map[string]ProvidedOperation, []diag.Diagnostic) {
+	c := &checker{}
+	if strings.TrimSpace(declaration.Command) == "" {
+		c.errorf(ErrorCodeRequired, field+".command", "a provider declaration names the command its operations run")
 	}
-	var declaration ProviderDeclaration
-	if diags := strictDecode(encoded, &declaration); diags != nil {
-		return nil, prefixDiagnostics(field, diags)
+	names := make([]string, 0, len(declaration.Operations))
+	for name := range declaration.Operations {
+		names = append(names, name)
 	}
-	if !IsContract(declaration.Contract) {
-		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownContract, field+".contract",
-			"unknown contract %q", declaration.Contract)}
+	sort.Strings(names)
+	operations := map[string]ProvidedOperation{}
+	for _, name := range names {
+		operation := declaration.Operations[name]
+		opField := field + ".operations." + name
+		op, known := spec.Operation(name)
+		if !known {
+			c.errorf(ErrorCodeUnknownOperation, opField, "%s version %d has no operation %q", contract, declaration.Version, name)
+			continue
+		}
+		before := len(c.diags)
+		validateProvidedOperation(c, opField, contract, operation, op)
+		if len(c.diags) > before {
+			continue
+		}
+		operations[name] = ProvidedOperation{Provider: declaration, Operation: operation, Spec: op}
 	}
-	if declaration.Version < 1 {
-		return &declaration, []diag.Diagnostic{diag.Errorf(ErrorCodeRequired, field+".version",
-			"a provider declaration names its contract version")}
+	var missing []string
+	for _, required := range spec.RequiredOperations() {
+		if _, declared := declaration.Operations[required]; !declared {
+			missing = append(missing, required)
+		}
 	}
-	return &declaration, nil
+	if len(missing) > 0 {
+		c.errorf(ErrorCodeInvalidDeclaration, field+".operations",
+			"%s version %d is declared without its required operations: %s",
+			contract, declaration.Version, strings.Join(missing, ", "))
+	}
+	return operations, c.diags
 }
 
-func validateProvidedTool(field, name string, def extension.ToolDefinition, declaration ProviderDeclaration, op OperationSpec) []diag.Diagnostic {
-	c := &checker{}
+func validateProvidedOperation(c *checker, field, contract string, operation extension.ProviderOperation, op OperationSpec) {
 	if op.Name == OperationCapabilities {
-		c.errorf(ErrorCodeInvalidDeclaration, field+".operation", "capabilities is answered by the orchestrator")
+		c.errorf(ErrorCodeInvalidDeclaration, field, "capabilities is answered by the orchestrator")
+		return
 	}
-	contract, _ := def.Meta[contractMetaKey].(map[string]any)
-	access, _ := contract["access"].(string)
-	if Access(access) != op.Access {
-		c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+"._meta."+contractMetaKey+".access",
-			"%s.%s is a %s operation, but the tool declares access %q", declaration.Contract, op.Name, op.Access, access)
-	}
-	if dryRun, _ := contract["supportsDryRun"].(bool); dryRun {
-		c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+"._meta."+contractMetaKey+".supportsDryRun",
-			"collaboration operations have no dry-run request member")
-	}
-	annotations := def.Annotations
-	switch {
-	case annotations == nil || annotations.ReadOnlyHint == nil || annotations.DestructiveHint == nil ||
-		annotations.IdempotentHint == nil || annotations.OpenWorldHint == nil:
-		c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+".annotations", "all four safety annotations are required")
-	default:
-		readOnly := op.Access == AccessRead
-		if *annotations.ReadOnlyHint != readOnly {
-			c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+".annotations.readOnlyHint",
-				"%s.%s is %s; readOnlyHint must be %v", declaration.Contract, op.Name, op.Access, readOnly)
-		}
-		if readOnly && *annotations.DestructiveHint {
-			c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+".annotations.destructiveHint",
-				"a read operation is never destructive")
-		}
-		if op.Destructive && !*annotations.DestructiveHint {
-			c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+".annotations.destructiveHint",
-				"%s.%s may modify existing state; destructiveHint must be true", declaration.Contract, op.Name)
-		}
-	}
+	declared := Preconditions(operation.Preconditions)
 	switch op.Preconditions {
 	case PreconditionRuleNone:
-		if declaration.Preconditions != "" {
+		if declared != "" {
 			c.errorf(ErrorCodeInvalidDeclaration, field+".preconditions",
-				"%s.%s takes no revision precondition", declaration.Contract, op.Name)
+				"%s.%s takes no revision precondition", contract, op.Name)
 		}
 	case PreconditionRuleDeclared:
-		if !validPreconditions(declaration.Preconditions) {
+		if !validPreconditions(declared) {
 			c.errorf(ErrorCodeInvalidDeclaration, field+".preconditions",
-				"%s.%s must declare preconditions: atomic, checked or none", declaration.Contract, op.Name)
+				"%s.%s must declare preconditions: atomic, checked or none", contract, op.Name)
 		}
 	case PreconditionRuleAtomic:
-		if declaration.Preconditions != PreconditionsAtomic {
+		if declared != PreconditionsAtomic {
 			c.errorf(ErrorCodeInvalidDeclaration, field+".preconditions",
 				"%s.%s is offered only by a provider that enforces it atomically; declare preconditions: atomic",
-				declaration.Contract, op.Name)
+				contract, op.Name)
 		}
 	}
-	if op.WorkspaceSelection && !def.WorkspaceSelection {
-		c.errorf(ErrorCodeInvalidDeclaration, "tools."+name+".workspaceSelection",
-			"%s.%s takes the canonical selection arguments; the tool must declare workspaceSelection so the orchestrator resolves them",
-			declaration.Contract, op.Name)
+	if op.WorkspaceSelection && !operation.WorkspaceSelection {
+		c.errorf(ErrorCodeInvalidDeclaration, field+".workspaceSelection",
+			"%s.%s takes the canonical selection arguments; the operation must declare workspaceSelection so the orchestrator resolves them",
+			contract, op.Name)
 	}
-	return c.diags
 }
 
 func validPreconditions(value Preconditions) bool {
@@ -292,9 +213,9 @@ type Call struct {
 	Input any
 	// Settings is the binding's settings object, verbatim.
 	Settings json.RawMessage
-	// Request is the whole tool call, for the workspace root and, when the
-	// tool declared workspaceSelection, the resolved workspace view.
-	Request extension.ToolCallRequest
+	// Request is the whole provider request, for the workspace root and, when
+	// the operation declared workspaceSelection, the resolved workspace view.
+	Request ProviderRequest
 }
 
 // Failure is a non-ok outcome a handler returns.
@@ -315,29 +236,29 @@ func Fail(outcome Outcome, reason, format string, args ...any) *Failure {
 // Failure.
 type Handler func(ctx context.Context, call Call) (any, *Failure)
 
-// Serve answers one routed tool call: it reads one ToolCallRequest from in,
-// validates the request against the operation the orchestrator named, runs the
-// handler, validates the result, and writes exactly one ToolCallResult whose
-// text block is a Response. A request that did not come through a binding (no
-// provider member) is refused as invalid.
+// Serve answers one routed provider call: it reads one ProviderRequest from
+// in, validates the request against the operation the orchestrator named,
+// runs the handler, validates the result, and writes exactly one Response
+// document. A request that did not come through a binding (no provider
+// member) is refused as invalid.
 //
 // A handler that panics or returns a result the contract refuses answers
 // unresolved for a mutation — the write may have happened — and unavailable
 // for a read. A list page too large for the document bound is requested again
 // with fewer items (see fitResult).
 func Serve(ctx context.Context, in io.Reader, out io.Writer, handlers map[OperationKey]Handler) error {
-	var request extension.ToolCallRequest
+	var request ProviderRequest
 	decoder := json.NewDecoder(in)
 	if err := decoder.Decode(&request); err != nil {
-		return fmt.Errorf("decode collaboration tool request: %w", err)
+		return fmt.Errorf("decode collaboration provider request: %w", err)
 	}
 	return writeResponse(out, serveOne(ctx, request, handlers))
 }
 
-func serveOne(ctx context.Context, request extension.ToolCallRequest, handlers map[OperationKey]Handler) Response {
+func serveOne(ctx context.Context, request ProviderRequest, handlers map[OperationKey]Handler) Response {
 	if request.Provider == nil {
 		return failureResponse(Fail(OutcomeInvalid, ReasonRequestInvalid,
-			"tool %s implements a collaboration operation and is called only through a workspace binding", request.Name))
+			"a collaboration provider is called only through a workspace binding; the request names no operation"))
 	}
 	key := OperationKey{Contract: request.Provider.Contract, Version: request.Provider.Version, Operation: request.Provider.Operation}
 	handler, ok := handlers[key]
@@ -549,22 +470,16 @@ func failureResponse(failure *Failure) Response {
 	return Response{Outcome: failure.Outcome, Error: &errorValue}
 }
 
+// writeResponse writes the one Response document a provider answers with,
+// followed by a newline, in a single write.
 func writeResponse(out io.Writer, response Response) error {
-	text, err := json.Marshal(response)
-	if err != nil {
-		return fmt.Errorf("encode collaboration response: %w", err)
-	}
-	result := extension.ToolCallResult{
-		Content: []extension.ToolContent{{Type: "text", Text: string(text)}},
-		IsError: response.Outcome != OutcomeOK,
-	}
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(result); err != nil {
-		return fmt.Errorf("encode collaboration tool result: %w", err)
+	if err := encoder.Encode(response); err != nil {
+		return fmt.Errorf("encode collaboration response: %w", err)
 	}
-	_, err = out.Write(buffer.Bytes())
+	_, err := out.Write(buffer.Bytes())
 	return err
 }
 

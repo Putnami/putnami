@@ -44,8 +44,8 @@ A Git repository shared by every clone through a remote:
 ```
 
 Then `putnami memory checkpoint --input '{"mission":"…","precondition":{"mustNotExist":true},"idempotencyKey":"…","content":"…"}'`,
-`putnami memory mission --input '{"mission":"…"}'`, `putnami memory context`,
-or the MCP tools `memory.*` ([CLI guide](../cli/doc/25-collaboration-providers.md)).
+`putnami memory mission --input '{"mission":"…"}'`, or `putnami memory context`
+([CLI guide](../cli/doc/25-collaboration-providers.md)).
 The first call compiles the runtime from this directory (`bin/prepare`).
 
 | Setting | Backend | Default | Meaning |
@@ -78,10 +78,10 @@ The choices behind them are in [ADR 0001](doc/adr/0001-one-memory-provider-two-b
 
 ## Layout
 
-- `putnami.extension.json` — the runtime declaration and one tool per
-  operation, each marked `putnami.dev/provider`.
+- `putnami.extension.json` — the runtime declaration and the `memory`
+  provider with its operations.
 - `cmd/putnami-memory-store` — the runtime: the `__putnami runtime-info`
-  handshake and the `provider-tool` bridge (`collaboration.Serve`).
+  handshake and the `provider` entry point (`collaboration.Serve`).
 - `internal/memory` — the operations, the settings and the selection policy.
 - `internal/store` — the record document, revisions and the backend interface.
 - `internal/filestore` — the file backend.

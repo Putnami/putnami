@@ -34,7 +34,7 @@ func Login(params map[string]any, env map[string]string, ioctx clicore.IO) (Logi
 		// apikeys:write is required so the resulting JWT can mint the per-
 		// registry pkt_* personal access keys that the login flow records for
 		// registry-token resolution. intelligence.read enables the hosted
-		// Intelligence MCP tools; intelligence.audit is the narrower shared
+		// Intelligence reads; intelligence.audit is the narrower shared
 		// attestation permission and never grants graph writes.
 		// intelligence.review.read / intelligence.review.manage let the
 		// workspace session drive `putnami intelligence review`; the

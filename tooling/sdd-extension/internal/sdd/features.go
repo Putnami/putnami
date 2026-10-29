@@ -157,10 +157,10 @@ type FeatureDesignCriticalPath struct {
 	Authority string   `json:"authority"`
 }
 
-// FeatureCatalogReport is the compact MCP discovery projection for explicitly
+// FeatureCatalogReport is the compact discovery projection for explicitly
 // authored product features. It deliberately carries summaries and declaration
-// provenance rather than whole subgraphs: agents discover an ID here, then
-// request only that feature through feature_context.
+// provenance rather than whole subgraphs: a reader discovers an ID here, then
+// requests only that feature.
 type FeatureCatalogReport struct {
 	Compatibility string                    `json:"compatibility"`
 	Revision      featureengine.Revision    `json:"revision"`
@@ -218,73 +218,6 @@ type FeatureAuthorityDeclaration struct {
 	Requirements []featureproto.Requirement     `json:"requirements,omitempty"`
 	Surface      *featureproto.FeatureSurface   `json:"surface,omitempty"`
 	Provenance   *featureproto.DesignProvenance `json:"provenance,omitempty"`
-}
-
-// AgentFeatureContextReport is the intentionally compact MCP projection. The
-// CLI inspection can retain the full scoped node/edge graph for protocol work;
-// routine agent questions receive categorized facts and one representative
-// critical path per technical kind instead of the raw graph.
-type AgentFeatureContextReport struct {
-	Revision           featureengine.Revision              `json:"revision"`
-	Compatibility      string                              `json:"compatibility"`
-	ID                 string                              `json:"id"`
-	Name               string                              `json:"name"`
-	Outcome            string                              `json:"outcome"`
-	Owner              string                              `json:"owner"`
-	Declarations       []FeatureAuthorityDeclaration       `json:"declarations"`
-	ConflictingSources []string                            `json:"conflictingSources,omitempty"`
-	Implementations    []AgentFeatureContextImplementation `json:"implementations"`
-	// Unreadable names design graphs or manifests that exist but could not be
-	// projected, so an agent can distinguish absent context from unreadable
-	// authority.
-	Unreadable []FeatureDesignGraphIssue `json:"unreadable,omitempty"`
-}
-
-// AgentFeatureContextImplementation groups native facts by the questions an
-// agent asks rather than leaking the graph's storage shape.
-type AgentFeatureContextImplementation struct {
-	Project          string                    `json:"project"`
-	Modules          []AgentFeatureContextFact `json:"modules,omitempty"`
-	Surfaces         []AgentFeatureContextFact `json:"surfaces,omitempty"`
-	Schemas          []AgentFeatureContextFact `json:"schemas,omitempty"`
-	Dependencies     []AgentFeatureContextFact `json:"dependencies,omitempty"`
-	Data             []AgentFeatureContextFact `json:"data,omitempty"`
-	Migrations       []AgentFeatureContextFact `json:"migrations,omitempty"`
-	Events           []AgentFeatureContextFact `json:"events,omitempty"`
-	Outboxes         []AgentFeatureContextFact `json:"outboxes,omitempty"`
-	Consumers        []AgentFeatureContextFact `json:"consumers,omitempty"`
-	GeneratedClients []AgentFeatureContextFact `json:"generatedClients,omitempty"`
-	// TypedClients are hand-written clients that declare which producer they
-	// call. They are kept separate from GeneratedClients so an agent never reads
-	// a hand-written call as generated-client authority.
-	TypedClients []AgentFeatureContextFact `json:"typedClients,omitempty"`
-	// Projects and Commands are workspace-level facts the CLI mints from the
-	// loaded workspace model rather than reads from a framework-produced graph:
-	// the project owning this implementation (plus co-implementing direct
-	// dependencies) and the commands that project declares in putnami.json.
-	Projects          []AgentFeatureContextFact   `json:"projects,omitempty"`
-	Commands          []AgentFeatureContextFact   `json:"commands,omitempty"`
-	Config            []AgentFeatureContextFact   `json:"config,omitempty"`
-	Infra             []AgentFeatureContextFact   `json:"infra,omitempty"`
-	Lifecycle         []AgentFeatureContextFact   `json:"lifecycle,omitempty"`
-	Tests             []AgentFeatureContextFact   `json:"tests,omitempty"`
-	CriticalPaths     []FeatureDesignCriticalPath `json:"criticalPaths,omitempty"`
-	CriticalPathCount int                         `json:"criticalPathCount"`
-}
-
-// AgentFeatureContextFact preserves exact identity, authority, properties, and
-// source provenance while its containing field supplies the technical kind.
-// Derived values stay out of Properties so an agent can always tell a declared
-// graph property from one this projection computed.
-type AgentFeatureContextFact struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Authority string `json:"authority"`
-	// GeneratedFrom is derived, not declared: the producer operations a
-	// generated client was emitted from.
-	GeneratedFrom string                         `json:"generatedFrom,omitempty"`
-	Properties    map[string]string              `json:"properties,omitempty"`
-	Provenance    *featureproto.DesignProvenance `json:"provenance,omitempty"`
 }
 
 // BuildFeatureValidationResult validates the selected projection and reports
@@ -545,184 +478,6 @@ func declaredFeatureSurface(ws *workspace.Workspace, id string) *featureproto.Fe
 	return nil
 }
 
-// BuildAgentFeatureContextResult returns the compact projection used by MCP.
-// Durable exact-root manifests and native design feature nodes share the same
-// selector and declaration surface; only a native graph can contribute an
-// implementation. Evidence remains available through `features inspect`, but
-// is deliberately not read here.
-func BuildAgentFeatureContextResult(ws *workspace.Workspace, selector string) (AgentFeatureContextReport, error) {
-	if ws == nil {
-		return AgentFeatureContextReport{}, protocolcli.Classify(
-			errors.New("workspace is required to build a feature context"),
-			protocolcli.ErrInvalidConfig,
-		)
-	}
-	if !validFeatureSelector(selector) {
-		return AgentFeatureContextReport{}, protocolcli.Usagef("feature_context requires a valid feature selector")
-	}
-	// feature_context is an EXACT-feature tool: it stays whole-workspace so an
-	// agent that already knows an id never has to guess a selection to reach it.
-	graphs, manifests, unreadable, err := loadFeatureAuthorities(ws, nil)
-	if err != nil {
-		return AgentFeatureContextReport{}, err
-	}
-	entries := collectFeatureAuthorityDeclarations(ws, graphs, manifests.Manifests)
-	target, candidates := selectFeatureAuthorityID(entries, selector)
-	if len(candidates) > 1 {
-		return AgentFeatureContextReport{}, protocolcli.Usagef(
-			"feature selector is ambiguous; use one exact candidate ID: %s",
-			strings.Join(cappedFeatureCandidates(candidates), ", "),
-		)
-	}
-	if target == "" {
-		return AgentFeatureContextReport{}, protocolcli.NotFoundf(
-			"no authored manifest or native design declaration matches feature %q",
-			selector,
-		)
-	}
-	summaries := summarizeFeatureAuthorities(ws, graphs, manifests.Manifests)
-	var summary *FeatureDesignSummary
-	for index := range summaries {
-		if summaries[index].ID == target {
-			summary = &summaries[index]
-			break
-		}
-	}
-	if summary == nil {
-		return AgentFeatureContextReport{}, protocolcli.NotFoundf("feature authority disappeared for %q", target)
-	}
-	design, err := inspectLoadedNativeFeatureDesign(ws, graphs, target, false)
-	if err != nil {
-		return AgentFeatureContextReport{}, err
-	}
-	report := AgentFeatureContextReport{
-		Revision:           worktreeFeatureRevision(ws.Root),
-		Compatibility:      featureproto.DesignGraphCompatibility,
-		ID:                 summary.ID,
-		Name:               summary.Name,
-		Outcome:            summary.Outcome,
-		Owner:              summary.Owner,
-		Declarations:       summary.Declarations,
-		ConflictingSources: summary.ConflictingSources,
-		Implementations:    []AgentFeatureContextImplementation{},
-		Unreadable:         unreadable,
-	}
-	if design != nil {
-		for _, implementation := range design.Implementations {
-			report.Implementations = append(report.Implementations, compactAgentFeatureImplementation(implementation))
-		}
-	}
-	return report, nil
-}
-
-func selectFeatureAuthorityID(entries []featureAuthorityEntry, selector string) (string, []string) {
-	ids := make(map[string]bool)
-	for _, entry := range entries {
-		ids[entry.id] = true
-	}
-	if ids[selector] {
-		return selector, []string{selector}
-	}
-	if strings.Contains(selector, "/") {
-		return "", nil
-	}
-	var matches []string
-	for id := range ids {
-		if path.Base(id) == selector {
-			matches = append(matches, id)
-		}
-	}
-	sort.Strings(matches)
-	if len(matches) == 1 {
-		return matches[0], matches
-	}
-	return "", matches
-}
-
-// agentFeatureFactBuckets maps every technical node kind onto the compact field
-// that carries it. It is exhaustive over featureproto.OrderedDesignNodeKinds
-// minus the feature node itself (which is the report root, not a fact), and
-// TestCompactFeatureContextBucketsEveryDesignNodeKind pins that: a new protocol
-// node kind must be bucketed here rather than silently vanishing from
-// feature_context.
-var agentFeatureFactBuckets = []struct {
-	kinds  []featureproto.DesignNodeKind
-	assign func(*AgentFeatureContextImplementation, []AgentFeatureContextFact)
-}{
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeModule}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Modules = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeAPIOperation}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Surfaces = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeAPISchema}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Schemas = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeService}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Dependencies = f }},
-	// A schema is the datasource namespace a migration writes into; a table is
-	// one relation inside it. Both answer "what data does this touch", so they
-	// share the compact Data field.
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeDataSchema, featureproto.DesignNodeDataTable}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Data = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeDataMigration}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Migrations = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeEventTopic}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Events = f }},
-	// An outbox does NOT share the Events group. A staged row is durable at
-	// commit time while the topic is published only after a relay claims it, so
-	// folding the two would answer "what does this feature publish" with a
-	// promise the runtime has not kept yet.
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeEventOutbox}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Outboxes = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeEventHandler}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Consumers = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeClient}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.GeneratedClients = f }},
-	// A typed client is hand-written and only declares its producer, so it never
-	// shares the generated-client bucket or its generatedFrom detail.
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeTypedClient}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.TypedClients = f }},
-	// Projects and commands are workspace-level kinds minted by this CLI from
-	// the workspace model; they are bucketed apart so an owning project or a
-	// declared binary is never read as a framework-produced technical surface.
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeProject}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Projects = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeCommand}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Commands = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeConfig}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Config = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeInfra}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Infra = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeLifecycle}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Lifecycle = f }},
-	{[]featureproto.DesignNodeKind{featureproto.DesignNodeTest}, func(i *AgentFeatureContextImplementation, f []AgentFeatureContextFact) { i.Tests = f }},
-}
-
-func compactAgentFeatureImplementation(implementation FeatureDesignImplementation) AgentFeatureContextImplementation {
-	result := AgentFeatureContextImplementation{
-		Project:           implementation.Project,
-		CriticalPaths:     representativeDesignCriticalPaths(implementation),
-		CriticalPathCount: len(implementation.CriticalPaths),
-	}
-	for _, bucket := range agentFeatureFactBuckets {
-		bucket.assign(&result, compactAgentFeatureFacts(implementation, bucket.kinds...))
-	}
-	return result
-}
-
-// compactAgentFeatureFacts folds one or more node kinds into a single agent
-// projection group. Several kinds share a group when they answer the same
-// question — data.schema and data.table are both "what data does this touch".
-func compactAgentFeatureFacts(implementation FeatureDesignImplementation, kinds ...featureproto.DesignNodeKind) []AgentFeatureContextFact {
-	facts := make([]AgentFeatureContextFact, 0)
-	for _, node := range implementation.Nodes {
-		if !slices.Contains(kinds, node.Kind) {
-			continue
-		}
-		fact := AgentFeatureContextFact{
-			ID: node.ID, Name: node.Name,
-			Authority: designNodeAuthority(implementation, node.ID),
-		}
-		if len(node.Properties) > 0 {
-			fact.Properties = node.Properties
-		}
-		if node.Kind == featureproto.DesignNodeClient {
-			fact.GeneratedFrom = generatedClientOperationDetails(implementation, node.ID)
-		}
-		if source := compactFactProvenance(implementation, node); source != nil {
-			provenance := *source
-			fact.Provenance = &provenance
-		}
-		facts = append(facts, fact)
-	}
-	if len(facts) == 0 {
-		return nil
-	}
-	return facts
-}
-
 // compactFactProvenance keeps semantic nodes shareable across modules while
 // preserving the canonical declaration source carried by their ownership edge.
 func compactFactProvenance(implementation FeatureDesignImplementation, node featureproto.DesignNode) *featureproto.DesignProvenance {
@@ -765,38 +520,6 @@ func compareFeatureDesignProvenance(left, right *featureproto.DesignProvenance) 
 		return 1
 	}
 	return strings.Compare(left.Symbol, right.Symbol)
-}
-
-func representativeDesignCriticalPaths(implementation FeatureDesignImplementation) []FeatureDesignCriticalPath {
-	nodes := make(map[string]featureproto.DesignNode, len(implementation.Nodes))
-	for _, node := range implementation.Nodes {
-		nodes[node.ID] = node
-	}
-	seenKinds := make(map[featureproto.DesignNodeKind]bool)
-	paths := make([]FeatureDesignCriticalPath, 0)
-	for _, criticalPath := range implementation.CriticalPaths {
-		if len(criticalPath.Nodes) == 0 {
-			continue
-		}
-		terminal, ok := nodes[criticalPath.Nodes[len(criticalPath.Nodes)-1]]
-		if !ok {
-			// The scoped subgraph always contains every node its own critical
-			// paths terminate on, so this is unreachable for a graph built by
-			// inspectNativeFeatureDesign. Keep the guard rather than indexing
-			// blindly, but keep it distinct from the dedup skip below: an
-			// unresolvable terminal is missing data, not a duplicate kind.
-			continue
-		}
-		if seenKinds[terminal.Kind] {
-			continue
-		}
-		seenKinds[terminal.Kind] = true
-		paths = append(paths, criticalPath)
-	}
-	if len(paths) == 0 {
-		return nil
-	}
-	return paths
 }
 
 // evaluateWorkspaceFeatures evaluates the selected projection.
@@ -1120,8 +843,8 @@ const (
 	featureAuthorityManifest    = "manifest"
 )
 
-// collectFeatureAuthorityDeclarations is the only place the MCP projection
-// mints feature roots. Both inputs have already crossed an explicit protocol
+// collectFeatureAuthorityDeclarations is the only place feature roots are
+// minted. Both inputs have already crossed an explicit protocol
 // boundary: feature:<id> nodes in validated design graphs, or features[] entries
 // in strictly parsed exact-root manifests. Everything else stays technical
 // context and cannot become a feature because its name happens to match.
@@ -1414,15 +1137,14 @@ func inspectNativeFeatureDesign(ws *workspace.Workspace, selector string) (*Feat
 	if target == "" {
 		return nil, unreadable, nil
 	}
-	design, err := inspectLoadedNativeFeatureDesign(ws, graphs, target, true)
+	design, err := inspectLoadedNativeFeatureDesign(ws, graphs, target)
 	return design, unreadable, err
 }
 
 // inspectLoadedNativeFeatureDesign scopes the already validated native graphs
-// for one exact feature ID. CLI inspection rejects divergent native semantics;
-// MCP passes rejectConflicts=false because its declaration list can preserve
-// every colliding source while still returning each exact technical subgraph.
-func inspectLoadedNativeFeatureDesign(ws *workspace.Workspace, graphs []nativeDesignGraphSource, target string, rejectConflicts bool) (*FeatureDesignInspection, error) {
+// for one exact feature ID. It rejects divergent native semantics, because the
+// caller named one feature and there is no coherent single answer to return.
+func inspectLoadedNativeFeatureDesign(ws *workspace.Workspace, graphs []nativeDesignGraphSource, target string) (*FeatureDesignInspection, error) {
 	design := &FeatureDesignInspection{
 		Compatibility:   featureproto.DesignGraphCompatibility,
 		ID:              target,
@@ -1438,7 +1160,7 @@ func inspectLoadedNativeFeatureDesign(ws *workspace.Workspace, graphs []nativeDe
 			design.Name = featureNode.Name
 			design.Outcome = featureNode.Properties["outcome"]
 			design.Owner = featureNode.Properties["owner"]
-		} else if rejectConflicts && (design.Name != featureNode.Name || design.Outcome != featureNode.Properties["outcome"] || design.Owner != featureNode.Properties["owner"]) {
+		} else if design.Name != featureNode.Name || design.Outcome != featureNode.Properties["outcome"] || design.Owner != featureNode.Properties["owner"] {
 			// Unlike the workspace-wide catalog, the caller named this exact
 			// feature: there is no coherent single answer to return.
 			return nil, protocolcli.Classify(

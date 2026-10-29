@@ -28,7 +28,7 @@ const surfaceFeatureManifest = `{
 }`
 
 // surfaceExtensionManifest serves the commands validate and invoices export,
-// the verb build, the group path reports run daily, and the tool billing.export.
+// the verb build and the group path reports run daily.
 // The flat key billing-reports-run is internal, so it serves nothing. The
 // members no extension protocol defines stand for a field a newer protocol
 // adds: resolution ignores them.
@@ -42,8 +42,7 @@ const surfaceExtensionManifest = `{
   "commandGroups": {
     "reports": {"subcommands": {"run": {"command": "billing-reports-run", "subcommands": {"daily": {}}}}}
   },
-  "verbs": [{"name": "build", "description": "Build"}],
-  "tools": {"billing.export": {}}
+  "verbs": [{"name": "build", "description": "Build"}]
 }`
 
 // surfaceWorkspaceWith writes a fixture whose app project declares one feature
@@ -59,31 +58,22 @@ func surfaceWorkspaceWith(t *testing.T, surface string, extensionManifest string
 	return ws
 }
 
-func TestFeatureContextReturnsTheDeclaredSurface(t *testing.T) {
+func TestFeaturesListAndInspectReturnTheDeclaredSurface(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "features-name-their-surface",
-		"feature-context-returns-the-declared-surface")
+		"features-list-and-inspect-return-the-declared-surface")
 	// The declared lists are out of order on purpose: the surface comes back in
 	// canonical order, and is returned as declared even though nothing serves it.
 	ws := featureCommandsWorkspace(t, false)
 	writeFixtureFile(t, filepath.Join(ws.Root, "app", featureproto.ManifestFilename),
-		strings.Replace(surfaceFeatureManifest, "%s", `{"commands":["validate","invoices export"],"tools":["sdd.list_specs","billing.export"]}`, 1))
-	want := featureproto.FeatureSurface{Commands: []string{"invoices export", "validate"}, Tools: []string{"billing.export", "sdd.list_specs"}}
-
-	agent, err := BuildAgentFeatureContextResult(ws, "billing/export")
-	if err != nil {
-		t.Fatalf("feature context: %v", err)
-	}
-	if len(agent.Declarations) != 1 || agent.Declarations[0].Surface == nil ||
-		!slices.Equal(agent.Declarations[0].Surface.Commands, want.Commands) || !slices.Equal(agent.Declarations[0].Surface.Tools, want.Tools) {
-		t.Fatalf("feature context declarations = %+v", agent.Declarations)
-	}
+		strings.Replace(surfaceFeatureManifest, "%s", `{"commands":["validate","invoices export"]}`, 1))
+	want := featureproto.FeatureSurface{Commands: []string{"invoices export", "validate"}}
 
 	catalog, err := BuildFeatureCatalogResult(ws, "export", Selection{})
 	if err != nil {
 		t.Fatalf("features list: %v", err)
 	}
 	if len(catalog.Features) != 1 || len(catalog.Features[0].Declarations) != 1 || catalog.Features[0].Declarations[0].Surface == nil ||
-		!slices.Equal(catalog.Features[0].Declarations[0].Surface.Tools, want.Tools) {
+		!slices.Equal(catalog.Features[0].Declarations[0].Surface.Commands, want.Commands) {
 		t.Fatalf("features list = %+v", catalog.Features)
 	}
 
@@ -91,7 +81,7 @@ func TestFeatureContextReturnsTheDeclaredSurface(t *testing.T) {
 	if err != nil {
 		t.Fatalf("features inspect: %v", err)
 	}
-	if inspection.Surface == nil || !slices.Equal(inspection.Surface.Commands, want.Commands) || !slices.Equal(inspection.Surface.Tools, want.Tools) {
+	if inspection.Surface == nil || !slices.Equal(inspection.Surface.Commands, want.Commands) {
 		t.Fatalf("features inspect surface = %+v", inspection.Surface)
 	}
 
@@ -108,11 +98,11 @@ func TestFeatureContextReturnsTheDeclaredSurface(t *testing.T) {
 func TestAnUnservedSurfaceNameFailsFeaturesValidate(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "features-name-their-surface",
 		"an-unserved-surface-name-fails-features-validate")
-	// The served names are a command key, two group paths, a verb and a tool.
+	// The served names are a command key, two group paths and a verb.
 	// The unserved ones are the internal key behind a group, a verb the manifest
-	// does not declare, and a tool it does not declare.
-	served := `{"commands":["validate","reports run","reports run daily","build"],"tools":["billing.export"]}`
-	unserved := `{"commands":["validate","billing-reports-run","deploy"],"tools":["billing.export","billing.other"]}`
+	// does not declare.
+	served := `{"commands":["validate","reports run","reports run daily","build"]}`
+	unserved := `{"commands":["validate","billing-reports-run","deploy"]}`
 
 	for name, validate := range map[string]func(ws *workspace.Workspace) (FeatureValidationReport, error){
 		"interactive": func(ws *workspace.Workspace) (FeatureValidationReport, error) {
@@ -145,14 +135,13 @@ func TestAnUnservedSurfaceNameFailsFeaturesValidate(t *testing.T) {
 			for _, field := range []string{
 				"app/putnami.features.json#features[0].surface.commands[1]",
 				"app/putnami.features.json#features[0].surface.commands[2]",
-				"app/putnami.features.json#features[0].surface.tools[1]",
 			} {
 				if got[field] == "" {
 					t.Errorf("no %s finding at %s; findings: %v", featureproto.ErrorCodeUnresolvedSurface, field, got)
 				}
 			}
-			if len(got) != 3 {
-				t.Errorf("unresolved findings = %v, want exactly the internal key, the unserved verb and the unserved tool", got)
+			if len(got) != 2 {
+				t.Errorf("unresolved findings = %v, want exactly the internal key and the unserved verb", got)
 			}
 		})
 	}
@@ -175,7 +164,7 @@ func TestAProjectWithoutAManifestResolvesNothing(t *testing.T) {
 		"a-project-without-a-manifest-resolves-nothing")
 	// No putnami.extension.json beside the declaration: the claim is kept as
 	// authored, whatever it names, in both validation entry points.
-	ws := surfaceWorkspaceWith(t, `{"commands":["not served anywhere"],"tools":["anything"]}`, "")
+	ws := surfaceWorkspaceWith(t, `{"commands":["not served anywhere"]}`, "")
 	if report, err := BuildFeatureValidationResult(ws, Selection{}); err != nil || !report.Valid {
 		t.Fatalf("a project without an extension manifest was resolved: %v %+v", err, report.Diagnostics)
 	}

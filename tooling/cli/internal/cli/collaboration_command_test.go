@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +35,7 @@ func TestCollaborationCommandProviderHelperProcess(t *testing.T) {
 	if os.Getenv(collabCommandProviderEnv) == "" {
 		t.Skip("helper process: not invoked as a collaboration provider")
 	}
-	// A provider tool never receives a host RPC channel. This one refuses to
+	// A provider never receives a host RPC channel. This one refuses to
 	// serve when it does, so a leak fails every test that routes through it.
 	if os.Getenv(hostrpcproto.SocketEnv) != "" || os.Getenv(hostrpcproto.TokenEnv) != "" {
 		os.Exit(4)
@@ -103,41 +102,46 @@ func TestCollaborationCommandProviderHelperProcess(t *testing.T) {
 	os.Exit(0)
 }
 
-// collabCommandTool decodes one fixture provider tool from the manifest JSON an
-// extension author writes, with annotations that agree with the catalog.
-func collabCommandTool(t *testing.T, contract, operation string) extproto.ToolDefinition {
+// collabCommandProvider is the fixture provider's declaration of one contract:
+// every required operation, with the precondition rule and the
+// workspaceSelection the catalog asks for, run by this test binary as the
+// helper process.
+func collabCommandProvider(t *testing.T, contract string) extproto.ProviderDeclaration {
 	t.Helper()
 	spec, _ := collab.Lookup(contract, 1)
-	op, _ := spec.Operation(operation)
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	readOnly := op.Access == collab.AccessRead
-	declaration := fmt.Sprintf(`{"contract":%q,"version":1,"operation":%q`, contract, operation)
-	switch op.Preconditions {
-	case collab.PreconditionRuleDeclared:
-		declaration += `,"preconditions":"checked"`
-	case collab.PreconditionRuleAtomic:
-		declaration += `,"preconditions":"atomic"`
+	closedWorld := false
+	operations := map[string]extproto.ProviderOperation{}
+	for _, name := range spec.RequiredOperations() {
+		op, _ := spec.Operation(name)
+		operation := extproto.ProviderOperation{
+			Description:        "Fixture " + contract + "." + name + ".",
+			OpenWorld:          &closedWorld,
+			WorkspaceSelection: op.WorkspaceSelection,
+		}
+		switch op.Preconditions {
+		case collab.PreconditionRuleDeclared:
+			operation.Preconditions = extproto.ProviderPreconditionsChecked
+		case collab.PreconditionRuleAtomic:
+			operation.Preconditions = extproto.ProviderPreconditionsAtomic
+		}
+		operations[name] = operation
 	}
-	document := fmt.Sprintf(`{"description":%q,"inputSchema":{"type":"object"},`+
-		`"annotations":{"readOnlyHint":%t,"destructiveHint":%t,"idempotentHint":%t,"openWorldHint":false},`+
-		`"_meta":{"putnami.dev/contract":{"access":%q,"readOnly":%t,"supportsDryRun":false},"putnami.dev/provider":%s}},`+
-		`"command":%q,"args":["-test.run=^TestCollaborationCommandProviderHelperProcess$"],`+
-		`"env":{%q:"1"},"workspaceSelection":%t}`,
-		"Fixture "+contract+"."+operation+".", readOnly, op.Destructive, readOnly, op.Access, readOnly, declaration,
-		executable, collabCommandProviderEnv, op.WorkspaceSelection)
-	var def extproto.ToolDefinition
-	if err := json.Unmarshal([]byte(document), &def); err != nil {
-		t.Fatalf("decode %s: %v", document, err)
+	return extproto.ProviderDeclaration{
+		Version:    1,
+		Command:    executable,
+		Args:       []string{"-test.run=^TestCollaborationCommandProviderHelperProcess$"},
+		Env:        map[string]string{collabCommandProviderEnv: "1"},
+		Operations: operations,
 	}
-	return def
 }
 
 // collabCommandWorkspace writes a two-project workspace binding tasks and
-// memory to the fixture provider. extra adds tools, commands or groups to the
-// provider manifest.
+// memory to the fixture provider. extra adds providers, commands or groups to
+// the provider manifest.
 func collabCommandWorkspace(t *testing.T, bindings string, extra func(*extproto.Manifest)) string {
 	t.Helper()
 	root := t.TempDir()
@@ -152,18 +156,15 @@ func collabCommandWorkspace(t *testing.T, bindings string, extra func(*extproto.
 }
 
 // collabCommandManifest is the fixture provider's manifest at one release:
-// every required operation of tasks and memory. extra adds tools, commands or
-// groups.
+// every required operation of tasks and memory. extra adds providers, commands
+// or groups.
 func collabCommandManifest(t *testing.T, version string, extra func(*extproto.Manifest)) string {
 	t.Helper()
-	tools := map[string]extproto.ToolDefinition{}
+	providers := map[string]extproto.ProviderDeclaration{}
 	for _, contract := range []string{collab.ContractTasks, collab.ContractMemory} {
-		spec, _ := collab.Lookup(contract, 1)
-		for _, name := range spec.RequiredOperations() {
-			tools["fixture."+contract+"."+name] = collabCommandTool(t, contract, name)
-		}
+		providers[contract] = collabCommandProvider(t, contract)
 	}
-	manifest := extproto.Manifest{Name: "@test/cli-collab", Version: version, CLIContract: protocolcli.CurrentContract, Tools: tools}
+	manifest := extproto.Manifest{Name: "@test/cli-collab", Version: version, CLIContract: protocolcli.ProviderContract, Providers: providers}
 	if extra != nil {
 		extra(&manifest)
 	}

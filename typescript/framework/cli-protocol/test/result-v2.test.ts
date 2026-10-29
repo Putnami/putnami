@@ -243,10 +243,13 @@ describe('validateDocument container types', () => {
   });
 
   it('rejects a non-array command list and a non-object metric map', () => {
-    const plan = { dryRun: true, metrics: { tasks: 0, edges: 0, projects: 0, byCommand: [] }, tasks: [] };
-    const document = JSON.stringify({ protocolVersion: 2, tool: 'plan_jobs', commands: 'build', plan });
-    expect(validateDocument(DOCUMENT_KIND.mcpResult, document)).toEqual([
+    const planFile = JSON.stringify({ protocolVersion: 2, sessionId: 's', commands: 'build', tasks: [] });
+    expect(validateDocument(DOCUMENT_KIND.sessionPlanFile, planFile)).toEqual([
       { code: VIOLATION_CODE.invalidType, path: 'commands' },
+    ]);
+    const plan = { dryRun: true, metrics: { tasks: 0, edges: 0, projects: 0, byCommand: [] }, tasks: [] };
+    const envelope = JSON.stringify({ protocolVersion: 2, command: 'build', status: 'success', exitCode: 0, plan });
+    expect(validateDocument(DOCUMENT_KIND.resultEnvelope, envelope)).toEqual([
       { code: VIOLATION_CODE.invalidType, path: 'plan.metrics.byCommand' },
     ]);
   });

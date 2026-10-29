@@ -343,7 +343,7 @@
       "id": "cli/context-discovery",
       "type": "feature",
       "name": "Context discovery",
-      "outcome": "A user or script can discover workspace structure and project context, and ask who owns a path and why one project impacts another, through public CLI commands that share one authority, and an extension can contribute a workspace-answering tool to the collaboration routing without re-deriving any of it",
+      "outcome": "A user or script can discover workspace structure and project context, and ask who owns a path and why one project impacts another, through public CLI commands that share one authority, and an extension can contribute a workspace-answering provider operation to the collaboration routing without re-deriving any of it",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -397,7 +397,7 @@
           }
         },
         {
-          "id": "extension-tool-workspace-facts",
+          "id": "provider-workspace-facts",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -405,8 +405,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-declaring-tool-receives-the-resolved-view",
-              "a-non-declaring-tool-receives-neither",
+              "a-declaring-operation-receives-the-resolved-view",
+              "a-non-declaring-operation-receives-neither",
               "unknown-selectors-and-missing-resolvers-fail-closed"
             ]
           }
@@ -1378,7 +1378,7 @@
             "checks": [
               "the-launched-process-receives-the-socket-and-token",
               "the-channel-closes-when-the-process-exits-whatever-its-exit",
-              "a-planned-job-and-a-provider-tool-receive-no-channel",
+              "a-planned-job-and-a-provider-call-receive-no-channel",
               "a-hosted-run-opens-no-channel"
             ]
           }
@@ -3055,7 +3055,7 @@
             "kind": "acceptance",
             "checks": [
               "the-cli-and-the-host-channel-return-the-same-envelope",
-              "provider-tools-are-reachable-only-through-the-binding",
+              "provider-operations-are-reachable-only-through-the-binding",
               "settings-and-selection-reach-the-provider"
             ]
           }

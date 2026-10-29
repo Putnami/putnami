@@ -10,9 +10,9 @@
       "owner": "billing",
       "target": "modeled",
       "surface": {
-        "tools": [
-          "billing.export_invoice",
-          "billing.export_invoice"
+        "commands": [
+          "invoices export",
+          "invoices export"
         ]
       }
     }

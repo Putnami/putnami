@@ -427,23 +427,6 @@ The digest is captured with `tree`, before the first task runs, and the block is
 absent when a declaration file could not be read. The byte stream is specified in
 [the result contract](../../../protocols/cli/doc/02-result-v2.md#declaration-digest).
 
-### The launching agent
-
-A session can carry an `agent` block that names the agent session that launched
-the run:
-
-```json
-{
-  "agent": { "kind": "claude-code", "sessionId": "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c" }
-}
-```
-
-The core records no `agent` block for a terminal run, and it serves no protocol
-server that launches runs for an agent. The member stays in the session schema
-so a reader still parses sessions recorded by an earlier CLI. The block is
-recorded locally; it leaves the machine only through a session reporter the
-workspace turned on.
-
 ### Declared-check failure codes
 
 Each failure in `run.failures[]` carries its diagnostics, and a declared-check

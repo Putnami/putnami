@@ -35,7 +35,7 @@ const reportJobDiagnosticsShown = 3
 //     "Newest" can therefore belong to an EARLIER run, which is why a consumer
 //     binding a report to a commit verifies git.sha rather than trusting
 //     recency.
-//   - The newest lookup withholds adapter-origin reports ("mcp", see
+//   - The newest lookup withholds ephemeral-origin reports ("ephemeral", see
 //     ReportStore.Latest): a background run must not answer "what did my last
 //     run do".
 func ReportShow(wsRoot, sessionID, outputFormat string) error {

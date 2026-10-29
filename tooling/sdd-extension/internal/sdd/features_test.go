@@ -315,11 +315,6 @@ func TestFeaturesInspectReportsNativeLeafAmbiguityWithoutLegacyFallback(t *testi
 	if !ok || strings.Join(failure.Candidates, ",") != "admin/manage,tasks/manage" {
 		t.Fatalf("native ambiguity result data = %#v", ResultData(err))
 	}
-
-	_, err = BuildAgentFeatureContextResult(ws, "manage")
-	if !errors.Is(err, protocolcli.ErrUsage) || !strings.Contains(err.Error(), "admin/manage, tasks/manage") {
-		t.Fatalf("agent native ambiguity = %v", err)
-	}
 }
 
 func TestFeaturesInspectScopesNativeDesignAndFollowsGeneratedClientToProducerOperation(t *testing.T) {
@@ -375,34 +370,23 @@ func TestFeaturesInspectScopesNativeDesignAndFollowsGeneratedClientToProducerOpe
 		t.Errorf("generated-from detail = %q", got)
 	}
 
-	agentContext, err := BuildAgentFeatureContextResult(ws, "items/manage")
-	if err != nil {
-		t.Fatal(err)
+	if got := len(designNodesOfKind(implementation, featureproto.DesignNodeAPIOperation)); got != 1 {
+		t.Errorf("scoped operations = %d, want 1", got)
 	}
-	if len(agentContext.Implementations) != 1 {
-		t.Fatalf("agent context implementations = %+v", agentContext.Implementations)
+	if got := len(designNodesOfKind(implementation, featureproto.DesignNodeService)); got != 1 {
+		t.Errorf("scoped dependencies = %d, want 1", got)
 	}
-	compact := agentContext.Implementations[0]
-	if len(compact.Surfaces) != 1 || len(compact.Dependencies) != 1 || len(compact.GeneratedClients) != 1 {
-		t.Fatalf("compact feature context = %+v", compact)
+	clients := designNodesOfKind(implementation, featureproto.DesignNodeClient)
+	if len(clients) != 1 {
+		t.Fatalf("scoped generated clients = %+v", clients)
 	}
-	if compact.GeneratedClients[0].GeneratedFrom != "getItems→GET /items" {
-		t.Fatalf("generated client fact = %+v", compact.GeneratedClients[0])
+	// The derived value stays out of Properties so every entry there is a
+	// declaration from the graph itself.
+	if _, derivedInProperties := clients[0].Properties["generatedFrom"]; derivedInProperties {
+		t.Errorf("derived generatedFrom leaked into declared properties: %+v", clients[0].Properties)
 	}
-	// The derived value stays out of Properties so an agent can trust every
-	// entry there to be a declaration from the graph itself.
-	if _, derivedInProperties := compact.GeneratedClients[0].Properties["generatedFrom"]; derivedInProperties {
-		t.Errorf("derived generatedFrom leaked into declared properties: %+v", compact.GeneratedClients[0].Properties)
-	}
-	if len(compact.CriticalPaths) != 3 || compact.CriticalPathCount != 3 {
-		t.Fatalf("representative critical paths = %+v (%d total)", compact.CriticalPaths, compact.CriticalPathCount)
-	}
-	compactJSON, err := json.Marshal(agentContext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Contains(compactJSON, []byte(`"edges"`)) || bytes.Contains(compactJSON, []byte("unrelated")) {
-		t.Fatalf("agent context leaked raw or unrelated graph data: %s", compactJSON)
+	if len(implementation.CriticalPaths) != 3 {
+		t.Fatalf("critical paths = %+v", implementation.CriticalPaths)
 	}
 }
 
@@ -529,18 +513,14 @@ func TestFeaturesInspectMintsWorkspaceProjectAndCommandNodes(t *testing.T) {
 		}
 	}
 
-	agentContext, err := BuildAgentFeatureContextResult(ws, "tasks/manage")
-	if err != nil {
-		t.Fatal(err)
+	projects := designNodesOfKind(api, featureproto.DesignNodeProject)
+	commands := designNodesOfKind(api, featureproto.DesignNodeCommand)
+	if len(projects) != 2 || len(commands) != 1 {
+		t.Fatalf("workspace facts = projects %+v commands %+v", projects, commands)
 	}
-	compact := agentContext.Implementations[0]
-	if len(compact.Projects) != 2 || len(compact.Commands) != 1 {
-		t.Fatalf("compact workspace facts = projects %+v commands %+v", compact.Projects, compact.Commands)
+	if designNodeAuthority(api, projects[0].ID) != string(featureproto.DesignAuthorityExact) || commands[0].ID != "command:tasks-admin" {
+		t.Fatalf("workspace fact detail = %+v / %+v", projects[0], commands[0])
 	}
-	if compact.Projects[0].Authority != string(featureproto.DesignAuthorityExact) || compact.Commands[0].ID != "command:tasks-admin" {
-		t.Fatalf("compact workspace fact detail = %+v / %+v", compact.Projects[0], compact.Commands[0])
-	}
-
 }
 
 // writeTypedClientDesignFixture publishes one project whose graph holds an
@@ -610,30 +590,22 @@ func TestFeaturesInspectProjectsTypedClientsApartFromGeneratedClients(t *testing
 		t.Errorf("hand-written client carries a generated-client fact: %q", got)
 	}
 
-	agentContext, err := BuildAgentFeatureContextResult(ws, "identity/control-plane")
-	if err != nil {
-		t.Fatal(err)
+	implementation := inspection.Design.Implementations[0]
+	typedClients := designNodesOfKind(implementation, featureproto.DesignNodeTypedClient)
+	if len(typedClients) != 1 || typedClients[0].ID != typedID {
+		t.Fatalf("typed clients = %+v", typedClients)
 	}
-	compact := agentContext.Implementations[0]
-	if len(compact.TypedClients) != 1 || compact.TypedClients[0].ID != "client.typed:cloud/identity:introspectauth" {
-		t.Fatalf("typed clients = %+v", compact.TypedClients)
+	if _, guessed := typedClients[0].Properties["feature"]; guessed {
+		t.Errorf("typed client properties invented a producer feature: %+v", typedClients[0].Properties)
 	}
-	if compact.TypedClients[0].GeneratedFrom != "" {
-		t.Errorf("typed client carries generated-client provenance: %+v", compact.TypedClients[0])
-	}
-	if compact.TypedClients[0].Authority != string(featureproto.DesignAuthorityUnmodeled) {
-		t.Errorf("typed client authority = %q, want currently-unmodeled", compact.TypedClients[0].Authority)
-	}
-	if _, guessed := compact.TypedClients[0].Properties["feature"]; guessed {
-		t.Errorf("typed client properties invented a producer feature: %+v", compact.TypedClients[0].Properties)
-	}
-	// The generated bucket keeps holding exactly the generated client, with its
+	// The generated kind keeps holding exactly the generated client, with its
 	// own generated-from provenance intact.
-	if len(compact.GeneratedClients) != 1 || compact.GeneratedClients[0].ID != "client.generated:go:cloud/identity/IdentityClient" {
-		t.Fatalf("generated clients = %+v", compact.GeneratedClients)
+	generated := designNodesOfKind(implementation, featureproto.DesignNodeClient)
+	if len(generated) != 1 || generated[0].ID != "client.generated:go:cloud/identity/IdentityClient" {
+		t.Fatalf("generated clients = %+v", generated)
 	}
-	if compact.GeneratedClients[0].GeneratedFrom != "introspectToken→POST /v1/introspect" {
-		t.Errorf("generated client provenance = %+v", compact.GeneratedClients[0])
+	if got := generatedClientOperationDetails(implementation, generated[0].ID); got != "introspectToken→POST /v1/introspect" {
+		t.Errorf("generated client provenance = %q", got)
 	}
 }
 
@@ -642,29 +614,33 @@ func TestFeaturesInspectProjectsTypedClientsApartFromGeneratedClients(t *testing
 func TestFeaturesInspectReachesTypedConsumersFromTheProducerFeature(t *testing.T) {
 	ws := writeTypedClientDesignFixture(t)
 
-	agentContext, err := BuildAgentFeatureContextResult(ws, "identity/opaque-tokens")
+	inspection, err := BuildFeatureContextResult(ws, "identity/opaque-tokens")
 	if err != nil {
 		t.Fatal(err)
 	}
-	compact := agentContext.Implementations[0]
-	if len(compact.TypedClients) != 1 {
-		t.Fatalf("producer feature did not reach its typed consumer: %+v", compact)
+	if inspection.Design == nil || len(inspection.Design.Implementations) != 1 {
+		t.Fatalf("producer design = %+v", inspection.Design)
 	}
-	consumers := make([]string, 0, len(compact.Modules))
-	for _, module := range compact.Modules {
+	implementation := inspection.Design.Implementations[0]
+	if typedClients := designNodesOfKind(implementation, featureproto.DesignNodeTypedClient); len(typedClients) != 1 {
+		t.Fatalf("producer feature did not reach its typed consumer: %+v", implementation)
+	}
+	modules := designNodesOfKind(implementation, featureproto.DesignNodeModule)
+	consumers := make([]string, 0, len(modules))
+	for _, module := range modules {
 		consumers = append(consumers, module.ID)
 	}
 	if !slices.Contains(consumers, "module:control-plane") {
 		t.Fatalf("consumer module = %v, want the typed consumer reached through the client", consumers)
 	}
 	var typedPath *FeatureDesignCriticalPath
-	for index, criticalPath := range compact.CriticalPaths {
+	for index, criticalPath := range implementation.CriticalPaths {
 		if criticalPath.Nodes[len(criticalPath.Nodes)-1] == "client.typed:cloud/identity:introspectauth" {
-			typedPath = &compact.CriticalPaths[index]
+			typedPath = &implementation.CriticalPaths[index]
 		}
 	}
 	if typedPath == nil {
-		t.Fatalf("no critical path reaches the typed client: %+v", compact.CriticalPaths)
+		t.Fatalf("no critical path reaches the typed client: %+v", implementation.CriticalPaths)
 	}
 	// Reaching the client backwards from the operation it calls is exactly
 	// declared; only the consumer's producer-feature lineage is unmodeled, and
@@ -784,21 +760,7 @@ func TestBuildFeatureCatalogMergesImplementationsWithoutLoadingSubgraphs(t *test
 	}
 }
 
-func TestBuildAgentFeatureContextDoesNotEvaluateLegacyWorkspaceEvidence(t *testing.T) {
-	root := t.TempDir()
-	writeFixtureFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"design-test","includes":["app"]}`)
-	writeFixtureFile(t, filepath.Join(root, "app", "putnami.json"), `{"name":"app","type":"application"}`)
-	writeFixtureFile(t, filepath.Join(root, "app", featureproto.ManifestFilename), `{"protocolVersion":1,"namespace":"legacy","features":[],"unknown":true}`)
-
-	ws := fixtureWorkspace("design-test", root, appProject("app", "app"))
-
-	_, err := BuildAgentFeatureContextResult(ws, "legacy/feature")
-	if !errors.Is(err, protocolcli.ErrNotFound) {
-		t.Fatalf("feature_context error = %v, want native design not found without legacy evaluation", err)
-	}
-}
-
-func TestBuildFeatureCatalogAndAgentContextExposeExactRootManifestAuthority(t *testing.T) {
+func TestBuildFeatureCatalogExposesExactRootManifestAuthority(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"manifest-test","includes":["tooling"]}`)
 	writeFixtureFile(t, filepath.Join(root, "tooling", "putnami.json"), `{"name":"tooling","type":"application"}`)
@@ -840,17 +802,9 @@ func TestBuildFeatureCatalogAndAgentContextExposeExactRootManifestAuthority(t *t
 	if len(declaration.Relations) != 1 || len(declaration.Requirements) != 1 {
 		t.Fatalf("durable manifest fields were not preserved: %+v", declaration)
 	}
-
-	context, err := BuildAgentFeatureContextResult(ws, "release-status")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if context.ID != feature.ID || len(context.Declarations) != 1 || len(context.Implementations) != 0 {
-		t.Fatalf("manifest-only feature context = %+v", context)
-	}
 }
 
-func TestFeatureMCPAuthorityMergePreservesCollisionsAndDegradesAroundInvalidManifest(t *testing.T) {
+func TestFeatureAuthorityMergePreservesCollisionsAndDegradesAroundInvalidManifest(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureFile(t, filepath.Join(root, "putnami.workspace.json"),
 		`{"name":"mixed-test","includes":["consumer","invalid","tooling"]}`)
@@ -922,15 +876,13 @@ func TestFeatureMCPAuthorityMergePreservesCollisionsAndDegradesAroundInvalidMani
 		t.Fatalf("query must match every preserved declaration: catalog=%+v err=%v", filtered, err)
 	}
 
-	context, err := BuildAgentFeatureContextResult(ws, "shared/status")
+	inspection, err := BuildFeatureContextResult(ws, "shared/status")
 	if err != nil {
 		t.Fatalf("collision must remain inspectable: %v", err)
 	}
-	if context.Name != "Native status" || len(context.Declarations) != 2 || len(context.Implementations) != 1 || context.Implementations[0].Project != "consumer" {
-		t.Fatalf("mixed feature context = %+v", context)
-	}
-	if got := strings.Join(context.ConflictingSources, ","); got != "tooling/putnami.features.json" {
-		t.Fatalf("context conflicting sources = %q", got)
+	if inspection.Design == nil || inspection.Design.Name != "Native status" ||
+		len(inspection.Design.Implementations) != 1 || inspection.Design.Implementations[0].Project != "consumer" {
+		t.Fatalf("mixed feature inspection = %+v", inspection.Design)
 	}
 }
 
@@ -954,7 +906,7 @@ func writeFeatureDesignGraph(t *testing.T, root, project, featureID, name string
 }
 
 // TestBuildFeatureCatalogDegradesAroundUnreadableAndDivergentGraphs pins the
-// discovery contract: list_features is the call an agent makes when it does not
+// discovery contract: `features list` is the call a reader makes when it does not
 // yet know the feature id, so a stale artifact in one project and a renamed
 // declaration in another must not make every healthy feature invisible.
 func TestBuildFeatureCatalogDegradesAroundUnreadableAndDivergentGraphs(t *testing.T) {
@@ -978,7 +930,7 @@ func TestBuildFeatureCatalogDegradesAroundUnreadableAndDivergentGraphs(t *testin
 
 	catalog, err := BuildFeatureCatalogResult(ws, "", Selection{})
 	if err != nil {
-		t.Fatalf("list_features must stay available while graphs are degraded: %v", err)
+		t.Fatalf("the feature catalog must stay available while graphs are degraded: %v", err)
 	}
 	ids := make([]string, 0, len(catalog.Features))
 	for _, feature := range catalog.Features {
@@ -1059,36 +1011,6 @@ func TestBuildFeatureCatalogSkipsUnprefixedFeatureNodes(t *testing.T) {
 	}
 }
 
-// TestCompactFeatureContextBucketsEveryDesignNodeKind fails when the protocol
-// gains a node kind that feature_context does not categorize. Without it a new
-// kind disappears from the compact projection with no compile error.
-func TestCompactFeatureContextBucketsEveryDesignNodeKind(t *testing.T) {
-	bucketed := make(map[featureproto.DesignNodeKind]bool, len(agentFeatureFactBuckets))
-	for _, bucket := range agentFeatureFactBuckets {
-		for _, kind := range bucket.kinds {
-			if bucketed[kind] {
-				t.Errorf("node kind %q is bucketed twice", kind)
-			}
-			bucketed[kind] = true
-		}
-	}
-	for _, kind := range featureproto.OrderedDesignNodeKinds() {
-		// The feature node is the report root (id/name/outcome/owner), not a
-		// technical fact, so it is the one deliberate exclusion.
-		if kind == featureproto.DesignNodeFeature {
-			continue
-		}
-		if !bucketed[kind] {
-			t.Errorf("design node kind %q has no compact feature_context bucket", kind)
-		}
-		delete(bucketed, kind)
-	}
-	delete(bucketed, featureproto.DesignNodeFeature)
-	for kind := range bucketed {
-		t.Errorf("compact bucket %q is not a supported design node kind", kind)
-	}
-}
-
 func TestFeatureContextProjectsNativeCompositionKinds(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"design-test","includes":["tasks"]}`)
@@ -1119,28 +1041,44 @@ func TestFeatureContextProjectsNativeCompositionKinds(t *testing.T) {
 
 	ws := fixtureWorkspace("design-test", root, appProject("tasks", "tasks"))
 
-	context, err := BuildAgentFeatureContextResult(ws, "tasks/manage")
+	inspection, err := BuildFeatureContextResult(ws, "tasks/manage")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(context.Implementations) != 1 {
-		t.Fatalf("implementations = %+v", context.Implementations)
+	if inspection.Design == nil || len(inspection.Design.Implementations) != 1 {
+		t.Fatalf("implementations = %+v", inspection.Design)
 	}
-	implementation := context.Implementations[0]
-	if len(implementation.Config) != 1 || len(implementation.Infra) != 1 || len(implementation.Lifecycle) != 3 || len(implementation.Tests) != 1 {
-		t.Fatalf("native fact buckets = config %+v infra %+v lifecycle %+v tests %+v", implementation.Config, implementation.Infra, implementation.Lifecycle, implementation.Tests)
+	implementation := inspection.Design.Implementations[0]
+	configs := designNodesOfKind(implementation, featureproto.DesignNodeConfig)
+	infra := designNodesOfKind(implementation, featureproto.DesignNodeInfra)
+	lifecycle := designNodesOfKind(implementation, featureproto.DesignNodeLifecycle)
+	tests := designNodesOfKind(implementation, featureproto.DesignNodeTest)
+	if len(configs) != 1 || len(infra) != 1 || len(lifecycle) != 3 || len(tests) != 1 {
+		t.Fatalf("native nodes = config %+v infra %+v lifecycle %+v tests %+v", configs, infra, lifecycle, tests)
 	}
-	config := implementation.Config[0]
-	if config.ID != "config:tasks" || config.Authority != string(featureproto.DesignAuthorityExact) || config.Properties["path"] != "tasks" || config.Provenance == nil || config.Provenance.Path != "tasks/config.go" {
-		t.Fatalf("config fact lost identity, authority, properties, or provenance: %+v", config)
+	config := configs[0]
+	provenance := compactFactProvenance(implementation, config)
+	if config.ID != "config:tasks" || designNodeAuthority(implementation, config.ID) != string(featureproto.DesignAuthorityExact) ||
+		config.Properties["path"] != "tasks" || provenance == nil || provenance.Path != "tasks/config.go" {
+		t.Fatalf("config node lost identity, authority, properties, or provenance: %+v (provenance %+v)", config, provenance)
 	}
-	if implementation.Infra[0].ID != "infra:database:tasks" || implementation.Infra[0].Properties["kind"] != "database" {
-		t.Fatalf("infra fact = %+v", implementation.Infra[0])
+	if infra[0].ID != "infra:database:tasks" || infra[0].Properties["kind"] != "database" {
+		t.Fatalf("infra node = %+v", infra[0])
 	}
-	if implementation.Tests[0].ID != "test:integration:tasks/create" || implementation.Tests[0].Properties["kind"] != "integration" {
-		t.Fatalf("test fact = %+v", implementation.Tests[0])
+	if tests[0].ID != "test:integration:tasks/create" || tests[0].Properties["kind"] != "integration" {
+		t.Fatalf("test node = %+v", tests[0])
 	}
+}
 
+// designNodesOfKind returns the nodes of one implementation that carry a kind.
+func designNodesOfKind(implementation FeatureDesignImplementation, kind featureproto.DesignNodeKind) []featureproto.DesignNode {
+	var nodes []featureproto.DesignNode
+	for _, node := range implementation.Nodes {
+		if node.Kind == kind {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
 }
 
 func TestFeaturesInspectRejectsUnboundedSelectorWithoutEchoingIt(t *testing.T) {

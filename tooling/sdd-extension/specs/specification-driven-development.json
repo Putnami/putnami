@@ -3,21 +3,19 @@
   "protocolVersion": 1,
   "feature": "tooling/specification-driven-development",
   "outcomes": [
-    "A workspace that never declares this extension carries no SDD surface at all: no commands, no MCP tools, no jobs, and no cost",
+    "A workspace that never declares this extension carries no SDD surface at all: no commands, no jobs, and no cost",
     "A workspace that does declare it gets features, specs and architecture checked by the same planner, cache and exit-code contract as build, test and lint, with no planner special case",
     "A workspace can adopt automatic architecture validation in report mode before making coherent findings admission-blocking, while every run states the effective mode and provenance",
-    "A terminal and an agent asking the same question get the same answer, because both call one engine builder rather than two renderings of two evaluations",
-    "An agent can inspect one exact architecture domain, its complete declared contracts and every touching declared or observed edge without granting Git or baseline access to the tool"
+    "A terminal and a script asking the same question get the same answer, because both modes render the result of one engine builder rather than two evaluations"
   ],
   "nonGoals": [
     "Owning what a feature, a spec or an architecture declaration MEANS \u2014 that stays in protocols/features and protocols/architecture, and this extension adds no second opinion about any of it",
-    "Knowing anything about the workspace that the job context or the tool request did not carry: no directory scan, no putnami subprocess, no copied loader",
+    "Knowing anything about the workspace that the job context or the command request did not carry: no directory scan, no putnami subprocess, no copied loader",
     "Authoring durable prose on a human's behalf; specs init writes a skeleton that restates only the declaration and never invents a requirement or a decision",
     "Making contracts generate or contracts check part of the validation jobs while check owns a distinct exit-2 drift verdict and generate writes into the source tree",
     "Owning the extraction-parity recording and the wire-only boundary claim, which cli/sdd-extraction owns \u2014 the parity harness and the boundary observer live in tooling/cli",
     "Turning an observed dependency into a permission: architecture sync proposes a binding only for a relation a human already declared, never writes an import, and leaves an undeclared edge as a failing architecture finding",
-    "Changing explicit interactive architecture validate, snapshot or inspect commands when automatic DAG evaluation is off",
-    "Resolving Git history or an adoption baseline for agent architecture context"
+    "Changing explicit interactive architecture validate, snapshot or inspect commands when automatic DAG evaluation is off"
   ],
   "requirements": [
     {
@@ -34,15 +32,7 @@
     },
     {
       "id": "one-engine-two-surfaces",
-      "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; the interactive subcommands and the sdd.* MCP tools are two renderings of that one value, so they cannot answer differently. A tool that bounds its answer projects that value and never evaluates the workspace a second time."
-    },
-    {
-      "id": "bounded-feature-catalog",
-      "text": "sdd.list_features answers one page of short entries in id order: truncated name, owner and outcome summary, target stage, counts, and at most eight conflicting sources. A page holds 1 to limit entries (default 50, at most 200), stops before 64 KiB of indented JSON, reports the total, and returns next while entries remain; following next returns every feature once. An unscoped page counts projects instead of listing them. putnami features list keeps the full catalog."
-    },
-    {
-      "id": "architecture-agent-context",
-      "text": "sdd.architecture_context requires an exact domain and resolved workspace selection. It reuses the worktree-only ARC/DARC evaluator and returns the complete domain declaration, touching declared and observed edges, relevant findings, coverage, and diagnostics. Argument or selection failures carry no report; structural failures and unknown domains carry the evaluated typed report beside the error. The tool is read-only, resolves no Git history, and leaves interactive baseline-aware commands unchanged."
+      "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; a subcommand renders that one value as a version 2 envelope or as text, so the two modes cannot answer differently and neither evaluates the workspace a second time."
     },
     {
       "id": "refuse-rather-than-widen",
@@ -94,7 +84,7 @@
     },
     {
       "id": "features-name-their-surface",
-      "text": "A feature declaration may name, under surface, the command paths and MCP tool names that carry it. features-validate reports a listed name that the declaring project's own extension manifest does not serve as features.unresolved_surface; a project without a manifest is not resolved. feature_context and features inspect return the surface as declared."
+      "text": "A feature declaration may name, under surface, the command paths that carry it. features-validate reports a listed name that the declaring project's own extension manifest does not serve as features.unresolved_surface; a project without a manifest is not resolved. features inspect returns the surface as declared."
     },
     {
       "id": "every-project-carries-feature-coverage",

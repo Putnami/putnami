@@ -9,12 +9,11 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// The workspace view a provider tool that declares workspaceSelection
+// The workspace view a provider operation that declares workspaceSelection
 // receives.
 //
 // Every assertion reads what the provider PROCESS read on stdin (the
@@ -30,16 +29,16 @@ import (
 // internal/cli instead.
 func fixtureSelectionResolver(
 	ws *workspace.Workspace, selection ProjectSelection,
-) (*proto.ToolSelection, error) {
+) (*collab.Selection, error) {
 	if selection.Projects == "" && !selection.Impacted {
 		ids := make([]string, 0, len(ws.Projects))
 		for _, project := range ws.Projects {
 			ids = append(ids, project.ID)
 		}
-		return &proto.ToolSelection{Mode: proto.ToolSelectionModeAll, ProjectIDs: ids}, nil
+		return &collab.Selection{Mode: collab.SelectionModeAll, ProjectIDs: ids}, nil
 	}
-	return &proto.ToolSelection{
-		Mode:       proto.ToolSelectionModeProjects,
+	return &collab.Selection{
+		Mode:       collab.SelectionModeProjects,
 		Scoped:     true,
 		ProjectIDs: strings.Split(selection.Projects, ","),
 	}, nil
@@ -47,8 +46,8 @@ func fixtureSelectionResolver(
 
 // fixtureWorkspaceView attaches the view the way the command line does: it
 // loads the workspace and resolves through AttachWorkspaceView.
-func fixtureWorkspaceView(root string) func(context.Context, *proto.ToolCallRequest, json.RawMessage) error {
-	return func(_ context.Context, request *proto.ToolCallRequest, args json.RawMessage) error {
+func fixtureWorkspaceView(root string) func(context.Context, *collab.ProviderRequest, json.RawMessage) error {
+	return func(_ context.Context, request *collab.ProviderRequest, args json.RawMessage) error {
 		ws, err := workspace.Load(root)
 		if err != nil {
 			return fmt.Errorf("load workspace: %w", err)
@@ -64,7 +63,7 @@ func fixtureWorkspaceView(root string) func(context.Context, *proto.ToolCallRequ
 // error.
 func TestWorkspaceSelectionPutsTheResolvedViewOnTheRequest(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-discovery", "extension-tool-workspace-facts", "a-declaring-tool-receives-the-resolved-view")
+	spectest.Proves(t, "cli/context-discovery", "provider-workspace-facts", "a-declaring-operation-receives-the-resolved-view")
 	fixture := newCollabFixture(t, "ok", bindAll, nil)
 	expectOutcome(t, fixture.call(t, collab.ContractMemory, collab.OperationContext, `{}`), collab.OutcomeOK, "")
 
@@ -83,10 +82,10 @@ func TestWorkspaceSelectionPutsTheResolvedViewOnTheRequest(t *testing.T) {
 	if request.WorkspaceProjects[0].Type != "application" {
 		t.Errorf("app type = %q, want the resolved classification", request.WorkspaceProjects[0].Type)
 	}
-	// The authored putnami.json travels raw, because the members a tool reads out
-	// of it are facts about somebody ELSE's project.
+	// The authored putnami.json travels raw, because the members a provider
+	// reads out of it are facts about somebody ELSE's project.
 	if len(request.WorkspaceProjects[0].Config) == 0 {
-		t.Errorf("no authored config traveled for %s; a tool cannot read a sibling's bin or featureAuthority",
+		t.Errorf("no authored config traveled for %s; a provider cannot read a sibling's bin or featureAuthority",
 			request.WorkspaceProjects[0].ID)
 	}
 	if request.Selection == nil {
@@ -94,7 +93,7 @@ func TestWorkspaceSelectionPutsTheResolvedViewOnTheRequest(t *testing.T) {
 		// and no selection is a different bug from one carrying neither.
 		t.Fatalf("no selection traveled beside %d workspace projects", len(request.WorkspaceProjects))
 	}
-	if request.Selection.Mode != proto.ToolSelectionModeAll || request.Selection.Scoped {
+	if request.Selection.Mode != collab.SelectionModeAll || request.Selection.Scoped {
 		t.Errorf("selection = %+v, want the unscoped whole-workspace projection", request.Selection)
 	}
 	if len(request.Selection.ProjectIDs) != 2 {
@@ -107,7 +106,7 @@ func TestWorkspaceSelectionPutsTheResolvedViewOnTheRequest(t *testing.T) {
 // the caller typed.
 func TestWorkspaceSelectionNarrowsFromTheRequest(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-discovery", "extension-tool-workspace-facts", "a-declaring-tool-receives-the-resolved-view")
+	spectest.Proves(t, "cli/context-discovery", "provider-workspace-facts", "a-declaring-operation-receives-the-resolved-view")
 	fixture := newCollabFixture(t, "ok", bindAll, nil)
 	expectOutcome(t, fixture.call(t, collab.ContractMemory, collab.OperationContext, `{"projects":["app"]}`), collab.OutcomeOK, "")
 
@@ -118,7 +117,7 @@ func TestWorkspaceSelectionNarrowsFromTheRequest(t *testing.T) {
 	if len(request.Selection.ProjectIDs) != 1 || request.Selection.ProjectIDs[0] != "/packages/app" {
 		t.Errorf("selection projects = %v, want the resolved id of app", request.Selection.ProjectIDs)
 	}
-	// The MEMBERSHIP is deliberately NOT narrowed. A tool that reports on one
+	// The MEMBERSHIP is deliberately NOT narrowed. A provider that reports on one
 	// project still resolves identities against the whole workspace, which is the
 	// same two-tier split the job wire carries.
 	if len(request.WorkspaceProjects) != 2 {
@@ -134,7 +133,7 @@ func TestWorkspaceSelectionNarrowsFromTheRequest(t *testing.T) {
 // Nothing reaches the provider in either case.
 func TestWorkspaceSelectionRefusesAnUnknownSelector(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-discovery", "extension-tool-workspace-facts", "unknown-selectors-and-missing-resolvers-fail-closed")
+	spectest.Proves(t, "cli/context-discovery", "provider-workspace-facts", "unknown-selectors-and-missing-resolvers-fail-closed")
 	fixture := newCollabFixture(t, "ok", bindAll, nil)
 
 	unknown := fixture.call(t, collab.ContractMemory, collab.OperationContext, `{"projects":["nope"]}`)
@@ -160,7 +159,7 @@ func TestWorkspaceSelectionRefusesAnUnknownSelector(t *testing.T) {
 // routed path.
 func TestAttachWorkspaceViewFailsClosed(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-discovery", "extension-tool-workspace-facts", "unknown-selectors-and-missing-resolvers-fail-closed")
+	spectest.Proves(t, "cli/context-discovery", "provider-workspace-facts", "unknown-selectors-and-missing-resolvers-fail-closed")
 	root := fixtureWorkspace(t)
 	ws, err := workspace.Load(root)
 	if err != nil {
@@ -168,13 +167,13 @@ func TestAttachWorkspaceViewFailsClosed(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name, args, want string
-		resolve          func(*workspace.Workspace, ProjectSelection) (*proto.ToolSelection, error)
+		resolve          func(*workspace.Workspace, ProjectSelection) (*collab.Selection, error)
 	}{
 		{"an unknown selector", `{"projects":["nope"]}`, "projects not found: nope", fixtureSelectionResolver},
 		{"two ways to select", `{"projects":["app"],"impacted":true}`, "pass one", fixtureSelectionResolver},
 		{"no resolver", ``, "selection resolver", nil},
 	} {
-		request := proto.ToolCallRequest{Name: "fixture.memory.context"}
+		request := collab.ProviderRequest{Provider: &collab.ProviderCall{Contract: collab.ContractMemory, Version: 1, Operation: collab.OperationContext}}
 		err := AttachWorkspaceView(ws, &request, json.RawMessage(tc.args), tc.resolve)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: err = %v, want %q", tc.name, err, tc.want)
@@ -185,19 +184,19 @@ func TestAttachWorkspaceViewFailsClosed(t *testing.T) {
 	}
 }
 
-// TestAToolThatDidNotAskGetsTheRequestItAlwaysGot is the additive half of the
-// contract: a provider tool that declares no workspaceSelection sees no view
-// members, and the entry path resolves none for it.
-func TestAToolThatDidNotAskGetsTheRequestItAlwaysGot(t *testing.T) {
+// TestAnOperationThatDidNotAskGetsNoView is the additive half of the
+// contract: a provider operation that declares no workspaceSelection sees no
+// view members, and the entry path resolves none for it.
+func TestAnOperationThatDidNotAskGetsNoView(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/context-discovery", "extension-tool-workspace-facts", "a-non-declaring-tool-receives-neither")
+	spectest.Proves(t, "cli/context-discovery", "provider-workspace-facts", "a-non-declaring-operation-receives-neither")
 	fixture := newCollabFixture(t, "ok", bindAll, nil)
-	if fixture.tools["fixture.tasks.find"].WorkspaceSelection {
-		t.Fatal("the fixture's tasks.find declares workspaceSelection; this case needs a tool that does not")
+	if fixture.providers[collab.ContractTasks].Operations[collab.OperationFind].WorkspaceSelection {
+		t.Fatal("the fixture's tasks.find declares workspaceSelection; this case needs an operation that does not")
 	}
 	env := fixture.env(t)
-	env.AttachView = func(context.Context, *proto.ToolCallRequest, json.RawMessage) error {
-		t.Error("the entry path resolved a view for a tool that declared no workspaceSelection")
+	env.AttachView = func(context.Context, *collab.ProviderRequest, json.RawMessage) error {
+		t.Error("the entry path resolved a view for an operation that declared no workspaceSelection")
 		return nil
 	}
 	expectOutcome(t, CallProviderOperation(context.Background(), env, collab.ContractTasks, collab.OperationFind, json.RawMessage(`{}`)),
@@ -205,7 +204,7 @@ func TestAToolThatDidNotAskGetsTheRequestItAlwaysGot(t *testing.T) {
 
 	request := fixture.recorded(t)
 	if request.WorkspaceProjects != nil || request.Selection != nil {
-		t.Errorf("an undeclaring tool received workspaceProjects=%v selection=%v; both members are opt-in",
+		t.Errorf("an undeclaring operation received workspaceProjects=%v selection=%v; both members are opt-in",
 			request.WorkspaceProjects, request.Selection)
 	}
 }

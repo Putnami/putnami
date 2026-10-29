@@ -32,8 +32,8 @@ func readManifest(t *testing.T) *extension.Manifest {
 // TestTheManifestPassesBothGates holds the shipped manifest to the extension
 // protocol's strict validation and to the collaboration offer the orchestrator
 // reads when it resolves a binding: the provider offers exactly the tasks,
-// proposals and missions operations this runtime answers, with truthful
-// annotations.
+// proposals and missions operations this runtime answers, each saying that it
+// stays on the machine.
 func TestTheManifestPassesBothGates(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-local-provider-manifest-draws-no-diagnostic")
 	manifest := readManifest(t)
@@ -43,7 +43,7 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 	if diags := extension.ValidateManifest(manifest); diag.HasErrors(diags) {
 		t.Fatalf("the manifest fails extension validation: %v", diags)
 	}
-	offer, diags := collab.ReadProviderOffer(manifest.Tools)
+	offer, diags := collab.ReadProviderOffer(manifest.Providers)
 	if len(diags) != 0 {
 		t.Fatalf("the provider declarations draw diagnostics: %v", diags)
 	}
@@ -63,11 +63,11 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 				t.Errorf("the manifest offers %s, which the runtime does not answer", key)
 			}
 			delete(answered, key)
-			if !slices.Equal(provided.Definition.Args, []string{providerToolArg}) || provided.Definition.Command != "{extensionRuntime}" {
-				t.Errorf("%s does not route to the runtime's provider bridge", provided.Tool)
+			if !slices.Equal(provided.Provider.Args, []string{providerArg}) || provided.Provider.Command != "{extensionRuntime}" {
+				t.Errorf("%s does not route to the runtime's provider entry point", key)
 			}
-			if *provided.Definition.Annotations.OpenWorldHint {
-				t.Errorf("%s claims to reach outside the machine", provided.Tool)
+			if provided.Operation.OpenWorld == nil || *provided.Operation.OpenWorld {
+				t.Errorf("%s does not say that it stays on the machine", key)
 			}
 		}
 	}
@@ -75,14 +75,14 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 		t.Errorf("the runtime answers operations the manifest does not offer: %v", answered)
 	}
 	status, _ := offer.Operations(collab.ContractProposals, 1)
-	if !strings.Contains(status[collab.OperationStatus].Definition.Description, "no hosted checks") ||
-		!strings.Contains(status[collab.OperationUpsert].Definition.Description, "merge is not offered") {
-		t.Error("the proposals tools must disclose the absence of hosted checks and merge")
+	if !strings.Contains(status[collab.OperationStatus].Operation.Description, "no hosted checks") ||
+		!strings.Contains(status[collab.OperationUpsert].Operation.Description, "merge is not offered") {
+		t.Error("the proposals operations must disclose the absence of hosted checks and merge")
 	}
 	missions, _ := offer.Operations(collab.ContractMissions, 1)
-	if !strings.Contains(missions[collab.OperationAsk].Definition.Description, "answers/<decision>.json") ||
-		!strings.Contains(missions[collab.OperationSync].Definition.Description, "files in the store directory") {
-		t.Error("the missions tools must disclose that the owner answers and writes messages as files")
+	if !strings.Contains(missions[collab.OperationAsk].Operation.Description, "answers/<decision>.json") ||
+		!strings.Contains(missions[collab.OperationSync].Operation.Description, "files in the store directory") {
+		t.Error("the missions operations must disclose that the owner answers and writes messages as files")
 	}
 }
 
@@ -100,34 +100,29 @@ func TestTheRuntimeHandshake(t *testing.T) {
 	}
 }
 
-func TestTheProviderBridge(t *testing.T) {
+func TestTheProviderEntryPoint(t *testing.T) {
 	workspace := t.TempDir()
-	request, _ := json.Marshal(extension.ToolCallRequest{
-		Name:          "local-collaboration.tasks.create",
-		Arguments:     json.RawMessage(`{"title":"from the bridge","idempotencyKey":"k"}`),
+	request, _ := json.Marshal(collab.ProviderRequest{
+		Arguments:     json.RawMessage(`{"title":"from the provider entry point","idempotencyKey":"k"}`),
 		WorkspaceRoot: workspace,
-		Provider:      &extension.ToolProviderCall{Contract: "tasks", Version: 1, Operation: "create"},
+		Provider:      &collab.ProviderCall{Contract: "tasks", Version: 1, Operation: "create"},
 	})
 	var out, errOut bytes.Buffer
-	if code := run([]string{providerToolArg}, bytes.NewReader(request), &out, &errOut); code != 0 {
+	if code := run([]string{providerArg}, bytes.NewReader(request), &out, &errOut); code != 0 {
 		t.Fatalf("code %d: %s", code, errOut.String())
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatal(err)
+	response, diags := collab.ParseResponse(out.Bytes())
+	if diags != nil || response.Outcome != collab.OutcomeOK {
+		t.Fatalf("response %s: %v", out.String(), diags)
 	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
-	if diags != nil || response.Outcome != collab.OutcomeOK || result.IsError {
-		t.Fatalf("response %s: %v", result.Content[0].Text, diags)
-	}
-	if code := run([]string{providerToolArg}, strings.NewReader("{"), &out, &errOut); code != 1 {
+	if code := run([]string{providerArg}, strings.NewReader("{"), &out, &errOut); code != 1 {
 		t.Errorf("an undecodable request exited %d", code)
 	}
 }
 
 func TestAnUnknownInvocationIsAUsageError(t *testing.T) {
 	var out, errOut bytes.Buffer
-	if code := run([]string{"tasks", "find"}, nil, &out, &errOut); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), providerToolArg) {
+	if code := run([]string{"tasks", "find"}, nil, &out, &errOut); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), providerArg) {
 		t.Fatalf("code %d, out %q, err %q", code, out.String(), errOut.String())
 	}
 }

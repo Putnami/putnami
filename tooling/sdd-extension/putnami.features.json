@@ -71,36 +71,6 @@
           }
         },
         {
-          "id": "bounded-feature-catalog",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "catalog-pages-stay-under-their-bound-and-return-every-feature-once",
-              "catalog-entries-are-short-and-capped"
-            ]
-          }
-        },
-        {
-          "id": "architecture-agent-context",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "architecture-context-returns-the-complete-domain",
-              "architecture-context-reads-worktree-only",
-              "architecture-context-fails-closed",
-              "architecture-context-is-read-only-and-workspace-scoped"
-            ]
-          }
-        },
-        {
           "id": "refuse-rather-than-widen",
           "stage": "coded",
           "evidenceKinds": [
@@ -110,7 +80,6 @@
             "kind": "acceptance",
             "checks": [
               "an-unresolved-interactive-selection-is-refused",
-              "an-unresolved-tool-call-is-refused",
               "a-selection-only-view-fails-closed-for-workspace-evaluation"
             ]
           }
@@ -303,7 +272,7 @@
             "checks": [
               "a-project-without-a-manifest-resolves-nothing",
               "an-unserved-surface-name-fails-features-validate",
-              "feature-context-returns-the-declared-surface"
+              "features-list-and-inspect-return-the-declared-surface"
             ]
           }
         },
@@ -350,13 +319,6 @@
           "specs verify",
           "validate",
           "validate-workspace"
-        ],
-        "tools": [
-          "sdd.architecture_context",
-          "sdd.feature_context",
-          "sdd.list_features",
-          "sdd.list_specs",
-          "sdd.spec_context"
         ]
       }
     }

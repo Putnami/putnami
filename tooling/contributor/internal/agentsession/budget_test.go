@@ -65,11 +65,6 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 					t.Errorf("%s: the hook ignores the declared tool %s", engine, tool)
 				}
 			}
-			for _, tool := range entry.MCPTools {
-				if sessionToolKind(tool) == "" {
-					t.Errorf("%s: the hook ignores the declared tool %s", engine, tool)
-				}
-			}
 		}
 	}
 	if wakes != 1 {
@@ -103,11 +98,11 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 	}
 }
 
-// TestTheManifestHooksOnlyTheSessionTools holds the shipped manifest to the
+// TestTheManifestHooksOnlyThePlanTools holds the shipped manifest to the
 // tools the hook reads: each host has one PostToolUse entry, after exactly
-// its plan tools and the two missions tools, and no other entry names a tool.
-func TestTheManifestHooksOnlyTheSessionTools(t *testing.T) {
-	spectest.Proves(t, sessionFeature, toolRequirement, "the-manifest-hooks-only-the-session-tools")
+// its plan tools, and no other entry names a tool.
+func TestTheManifestHooksOnlyThePlanTools(t *testing.T) {
+	spectest.Proves(t, sessionFeature, toolRequirement, "the-manifest-hooks-only-the-plan-tools")
 	want := map[string][]string{
 		claude: {"TodoWrite", "TaskCreate", "TaskUpdate"},
 		codex:  {"update_plan"},
@@ -121,8 +116,8 @@ func TestTheManifestHooksOnlyTheSessionTools(t *testing.T) {
 		for _, entry := range hosts[engine] {
 			if entry.Event == hookEventPostToolUse {
 				postToolUse = append(postToolUse, entry)
-			} else if len(entry.Tools)+len(entry.MCPTools) > 0 {
-				t.Errorf("%s %s names tools %v %v", engine, entry.Event, entry.Tools, entry.MCPTools)
+			} else if len(entry.Tools) > 0 {
+				t.Errorf("%s %s names tools %v", engine, entry.Event, entry.Tools)
 			}
 		}
 		if len(postToolUse) != 1 {
@@ -130,8 +125,8 @@ func TestTheManifestHooksOnlyTheSessionTools(t *testing.T) {
 			continue
 		}
 		entry := postToolUse[0]
-		if !slices.Equal(entry.Tools, tools) || !slices.Equal(entry.MCPTools, []string{toolAsk, toolReply}) {
-			t.Errorf("%s: PostToolUse runs after %v and %v, want %v and %v", engine, entry.Tools, entry.MCPTools, tools, []string{toolAsk, toolReply})
+		if !slices.Equal(entry.Tools, tools) {
+			t.Errorf("%s: PostToolUse runs after %v, want %v", engine, entry.Tools, tools)
 		}
 	}
 }

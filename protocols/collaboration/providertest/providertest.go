@@ -43,7 +43,6 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	extension "go.putnami.dev/protocol/extension"
 )
 
 // Target is one provider under test.
@@ -115,11 +114,10 @@ func (s *Session) Call(contract, operation, arguments string) collab.Response {
 // do is Call reporting a transport or contract failure as an error instead of
 // failing the test, so that concurrent callers can collect it.
 func (s *Session) do(contract, operation, arguments string) (collab.Response, error) {
-	request := extension.ToolCallRequest{
-		Name:          "providertest." + contract + "." + operation,
+	request := collab.ProviderRequest{
 		Arguments:     normalize(contract, operation, arguments, s.target.Workspace),
 		WorkspaceRoot: s.target.WorkspaceRoot,
-		Provider:      &extension.ToolProviderCall{Contract: contract, Version: 1, Operation: operation},
+		Provider:      &collab.ProviderCall{Contract: contract, Version: 1, Operation: operation},
 	}
 	if len(s.target.Settings) > 0 {
 		request.Provider.Settings = s.target.Settings
@@ -132,19 +130,11 @@ func (s *Session) do(contract, operation, arguments string) (collab.Response, er
 	if err := collab.Serve(context.Background(), bytes.NewReader(payload), &out, s.target.Handlers); err != nil {
 		return collab.Response{}, err
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		return collab.Response{}, fmt.Errorf("the provider wrote no tool result: %w", err)
-	}
-	if len(result.Content) != 1 {
-		return collab.Response{}, fmt.Errorf("the provider wrote %d content blocks; a collaboration result is exactly one", len(result.Content))
-	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
+	// The provider's standard output is one Response document and nothing
+	// else: ParseResponse refuses trailing data.
+	response, diags := collab.ParseResponse(out.Bytes())
 	if diags != nil {
 		return collab.Response{}, fmt.Errorf("%s.%s answered a response the contract refuses: %s", contract, operation, collab.FormatDiagnostics(diags))
-	}
-	if result.IsError != (response.Outcome != collab.OutcomeOK) {
-		return collab.Response{}, fmt.Errorf("%s.%s: isError %v disagrees with outcome %s", contract, operation, result.IsError, response.Outcome)
 	}
 	return *response, nil
 }

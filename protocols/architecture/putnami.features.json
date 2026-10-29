@@ -133,7 +133,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-tools-declare-and-honor-read-only",
               "discovery-finds-only-exact-contained-authority-files",
               "the-prior-baseline-loads-from-immutable-git-objects",
               "worktree-validation-reads-no-git-history"

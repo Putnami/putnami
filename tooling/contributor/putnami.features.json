@@ -179,9 +179,21 @@
               "post-tool-use-records-the-plan-without-git-or-provider",
               "a-subagent-plan-is-not-the-session-plan",
               "a-busy-session-spools-the-tool-call",
+              "the-manifest-hooks-only-the-plan-tools"
+            ]
+          }
+        },
+        {
+          "id": "decision-commands",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
               "an-asked-decision-binds-on-the-next-sync",
-              "a-recorded-reply-wins-over-an-ack-line",
-              "the-manifest-hooks-only-the-session-tools"
+              "a-recorded-reply-wins-over-an-ack-line"
             ]
           }
         },
@@ -320,8 +332,10 @@
       ],
       "surface": {
         "commands": [
+          "agent ask",
           "agent attach",
           "agent hook",
+          "agent reply",
           "agent stage"
         ]
       }

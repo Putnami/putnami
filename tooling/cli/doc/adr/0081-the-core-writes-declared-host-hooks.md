@@ -4,6 +4,9 @@
 - **Amended**: 2026-10-28, by
   [ADR 0082](0082-putnami-serves-no-mcp-server.md): hooks no longer share a
   launcher with an MCP server, which the core no longer serves
+- **Amended**: 2026-10-29, by
+  [ADR 0004 of the collaboration contracts](../../../../protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  `hostHooks[].mcpTools` is deleted (decision 11)
 - **Date**: 2026-10-26
 - **Amends**: [ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md)
   and [ADR 0047](0047-extension-owned-agent-content.md)

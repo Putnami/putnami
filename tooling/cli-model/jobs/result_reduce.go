@@ -11,7 +11,7 @@ import (
 //
 // Nine tally loops walked the same result map and each invented its own
 // bucketing (internal/output/json.go, internal/output/jsonl.go,
-// internal/mcp/adapter.go, internal/cli/jobs_helpers.go,
+// the since-deleted MCP adapter, internal/cli/jobs_helpers.go,
 // internal/watch/session_iteration.go, jobs.runSucceeded, and the display-side
 // rollups). SessionReducer is the single fold they collapse onto; every count
 // it produces is pinned against those loops in result_reduce_test.go, which is

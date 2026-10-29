@@ -642,7 +642,7 @@
         "scope": {
           "type": "string",
           "default": "openid profile email apikeys:write intelligence.read intelligence.audit intelligence.review.read intelligence.review.manage",
-          "description": "OAuth scopes to request. apikeys:write enables registry token minting; intelligence.read enables hosted MCP tools; intelligence.audit enables shared audit attestations; intelligence.review.read and intelligence.review.manage enable the workspace review controls."
+          "description": "OAuth scopes to request. apikeys:write enables registry token minting; intelligence.read enables hosted Intelligence reads; intelligence.audit enables shared audit attestations; intelligence.review.read and intelligence.review.manage enable the workspace review controls."
         },
         "workspace": {
           "type": "string",

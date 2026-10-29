@@ -1,6 +1,9 @@
 # 0003: The missions contract
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0004](0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  the agent reaches `missions.ask` and `missions.reply` through
+  `putnami agent ask` and `putnami agent reply`, not as tools
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`)
   and the CLI route that calls it
 - **Amends**: [ADR 0001](0001-collaboration-provider-contracts.md), decisions 5

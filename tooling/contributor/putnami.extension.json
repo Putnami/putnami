@@ -162,7 +162,7 @@
       }
     },
     "agent": {
-      "description": "Agent sessions: publish a session to its mission through the host hooks.",
+      "description": "Agent sessions: publish a session to its mission through the host hooks, and ask or reply through the missions contract.",
       "subcommands": {
         "hook": {
           "description": "Run as an agent host hook: publish the session to its mission and hand the agent the owner's messages.",
@@ -204,6 +204,32 @@
             {
               "command": "putnami agent stage code",
               "description": "Report that the change is being written"
+            }
+          ]
+        },
+        "ask": {
+          "description": "Ask the owner of the session's mission a decision, and bind it to the session.",
+          "command": "agent-ask",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami agent ask --input decision.json",
+              "description": "Ask the decision this missions.ask document holds, without its mission"
+            },
+            {
+              "command": "putnami agent ask --input - < decision.json",
+              "description": "Ask the decision read from standard input"
+            }
+          ]
+        },
+        "reply": {
+          "description": "Record a reply to a message of the owner.",
+          "command": "agent-reply",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami agent reply --message msg-123 --reply \"Done: b.txt holds b.\"",
+              "description": "Reply to the owner's message msg-123"
             }
           ]
         }
@@ -367,7 +393,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Handle one agent host hook event read on standard input, as the hooks this extension declares run it. SessionStart publishes the session and prints its mission sheet and the owner's waiting messages; PostToolUse records a plan change, an asked decision or a recorded reply without calling the provider; Stop publishes the turn's end in one sync and continues the turn with a waiting message; StopFailure publishes the error; SessionEnd publishes that the session ended. Every sync carries the session's loop stage and its token usage, read from the host transcripts, subagents included. It reaches the bound missions provider through the putnami process that launched it, and the memory provider when one is bound. It never fails a turn: every failure exits 0 and leaves one line in hook.log under the Putnami home. With --idle-wake it waits up to 10 minutes after a Claude Code turn and exits 75 with the owner's message on standard error.",
+      "description": "Handle one agent host hook event read on standard input, as the hooks this extension declares run it. SessionStart publishes the session and prints its mission sheet and the owner's waiting messages; PostToolUse records a plan change without calling the provider; Stop publishes the turn's end in one sync and continues the turn with a waiting message; StopFailure publishes the error; SessionEnd publishes that the session ended. Every sync carries the session's loop stage and its token usage, read from the host transcripts, subagents included. It reaches the bound missions provider through the putnami process that launched it, and the memory provider when one is bound. It never fails a turn: every failure exits 0 and leaves one line in hook.log under the Putnami home. With --idle-wake it waits up to 10 minutes after a Claude Code turn and exits 75 with the owner's message on standard error.",
       "flags": {
         "engine": {
           "type": "string",
@@ -400,6 +426,46 @@
         {
           "id": "attach",
           "task": "agent-attach"
+        }
+      ]
+    },
+    "agent-ask": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Ask the owner of the current session's mission a decision through missions.ask, and bind it to the session: the decision's id rides the session's next sync. The input is a missions.ask document without its mission, which the session supplies: question, context, options (2 to 5), recommendation, blocks and an idempotencyKey. Without a key the command derives one from the session and the content, so the same ask run again replays; run it again after a failure whose outcome is unknown. The current session is the one the host names in CLAUDE_CODE_SESSION_ID or CODEX_THREAD_ID, else the session of this checkout and branch that was active last. It reaches the bound missions provider through the putnami process that launched it. --output=json prints the missions.ask result; otherwise it prints DECISION_ID, DECISION_STATE and DECISION_URL lines. A usage error exits 2; no session or mission found, or a provider outcome other than ok, exits 1.",
+      "flags": {
+        "input": {
+          "type": "string",
+          "description": "File that holds the missions.ask document, or - for standard input."
+        }
+      },
+      "run": [
+        {
+          "id": "ask",
+          "task": "agent-ask"
+        }
+      ]
+    },
+    "agent-reply": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Record a reply to a message of the owner through missions.reply, and leave a marker so the session's next Stop sends no [ack <message id>] line for that message. A message takes one reply: a message that already holds one exits 1 and still leaves the marker. It reaches the bound missions provider through the putnami process that launched it. --output=json prints the missions.reply result; otherwise it prints MESSAGE_ID and MESSAGE_STATE lines. A usage error exits 2; a provider outcome other than ok exits 1.",
+      "flags": {
+        "message": {
+          "type": "string",
+          "description": "The id of the message replied to."
+        },
+        "reply": {
+          "type": "string",
+          "description": "The reply's text."
+        }
+      },
+      "run": [
+        {
+          "id": "reply",
+          "task": "agent-reply"
         }
       ]
     },
@@ -482,6 +548,28 @@
       "description": "Declare the mission of this checkout's branch.",
       "timeoutMs": 60000
     },
+    "agent-ask": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "agent-ask"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Ask the owner of the session's mission a decision.",
+      "timeoutMs": 60000
+    },
+    "agent-reply": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "agent-reply"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Record a reply to a message of the owner.",
+      "timeoutMs": 60000
+    },
     "agent-stage": {
       "kind": "command",
       "command": "{extensionRuntime}",
@@ -518,10 +606,6 @@
             "TodoWrite",
             "TaskCreate",
             "TaskUpdate"
-          ],
-          "mcpTools": [
-            "missions.ask",
-            "missions.reply"
           ],
           "args": [
             "--engine",
@@ -577,10 +661,6 @@
           "event": "PostToolUse",
           "tools": [
             "update_plan"
-          ],
-          "mcpTools": [
-            "missions.ask",
-            "missions.reply"
           ],
           "args": [
             "--engine",

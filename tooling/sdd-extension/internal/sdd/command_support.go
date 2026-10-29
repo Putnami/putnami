@@ -10,7 +10,7 @@ import (
 // This file is the engine's seam towards the command layer, and nothing else.
 //
 // `internal/sdd` decides; `cmd/putnami-sdd` shows. That split is why the CLI,
-// the DAG jobs and the MCP tools cannot answer differently, and it is also why
+// and the DAG jobs cannot answer differently, and it is also why
 // the human renderers live outside this package: a report is one value, and the
 // several ways of printing it are not the engine's subject.
 //
@@ -54,9 +54,8 @@ func GeneratedClientOperationDetails(implementation FeatureDesignImplementation,
 }
 
 // CompactFactProvenance returns the provenance a design node carries, or the
-// one its declaring edge carries when the node itself is silent — the same
-// resolution the agent-facing projection applies, so a printed source line and
-// a structured one name the same file.
+// one its declaring edge carries when the node itself is silent, so a printed
+// source line and a structured one name the same file.
 func CompactFactProvenance(
 	implementation FeatureDesignImplementation,
 	node featureproto.DesignNode,

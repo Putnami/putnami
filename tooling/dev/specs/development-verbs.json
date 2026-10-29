@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "eleven-ordered-verbs",
-      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no tool, hook or agent content, and no command, command group or task beyond the version, compose and qualify commands, claims CLI contract 15 and passes the strict validation of the package-time gate."
+      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no provider, hook or agent content, and no command, command group or task beyond the version, compose and qualify commands, claims CLI contract 15 and passes the strict validation of the package-time gate."
     },
     {
       "id": "dev-is-the-sole-declarer",

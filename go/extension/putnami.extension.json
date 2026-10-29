@@ -1687,43 +1687,6 @@
       }
     }
   },
-  "tools": {
-    "putnami.go_docs": {
-      "description": "Return the AI.md bytes from the exact Go module selected for one project. Resolution uses cmd/go with an explicit human GOWORK choice or the project's nearest go.work and existing module cache in offline, read-only mode; it never downloads a module, edits go.mod/go.sum, or substitutes the extension's unversioned framework-docs bundle. Omit project only when the reference identifies exactly one declaring Go project.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "reference": {
-            "type": "string",
-            "description": "Exact Go module path, for example go.putnami.dev/app"
-          },
-          "project": {
-            "type": "string",
-            "description": "Optional Putnami project name, module path, or workspace-relative project directory"
-          }
-        },
-        "additionalProperties": false,
-        "required": ["reference"]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": ["mcp-tool"],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 10000
-    }
-  },
   "ecosystems": [
     {
       "id": "go",

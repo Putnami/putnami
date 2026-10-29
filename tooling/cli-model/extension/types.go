@@ -20,8 +20,8 @@ type CommandDefinition = proto.CommandDefinition
 type SessionPrerequisiteDefinition = proto.SessionPrerequisiteDefinition
 type SessionPrerequisiteParamBinding = proto.SessionPrerequisiteParamBinding
 type CommandTraits = proto.CommandTraits
-type ToolDefinition = proto.ToolDefinition
-type ToolAnnotations = proto.ToolAnnotations
+type ProviderDeclaration = proto.ProviderDeclaration
+type ProviderOperation = proto.ProviderOperation
 type VerbDefinition = proto.VerbDefinition
 
 // Re-exported trait constants from the extension protocol.
@@ -204,7 +204,7 @@ type ExtensionDescription struct {
 	AutoServe         bool
 	Tasks             map[string]TaskDefinition
 	Contracts         *ContractsDefinition
-	Tools             map[string]ToolDefinition
+	Providers         map[string]ProviderDeclaration
 	Runtime           *RuntimeDefinition
 	// Workspace is the extension's workspace adapter, when it declares one. Nil
 	// means the extension contributes nothing to project discovery and is never

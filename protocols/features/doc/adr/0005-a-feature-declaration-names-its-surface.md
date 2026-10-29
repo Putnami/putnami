@@ -1,6 +1,9 @@
 # ADR 0005 — A feature declaration names the surface its own project serves
 
-- **Status**: accepted
+- **Status**: accepted, amended by decision D-022 in the root `decisions.json`
+  and by [ADR 0004 of the collaboration contracts](../../../collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  `surface` has one list, `commands`. The `tools` list, the tool names and the
+  `sdd.feature_context` reader are deleted with the extension tool contract.
 - **Scope**: `go.putnami.dev/protocol/features` (`protocols/features`)
 
 ## Context

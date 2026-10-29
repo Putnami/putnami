@@ -146,13 +146,13 @@ func TestReportShow_RendersTheRunsVerdict(t *testing.T) {
 func TestReportShow_ReadsAnExactSession(t *testing.T) {
 	wsRoot := t.TempDir()
 	writeTestReport(t, wsRoot, "20260807-090000-aaaaaa", protocolcli.ReportOriginCLI, nil)
-	agentRun := writeTestReport(t, wsRoot, "20260807-094000-bbbbbb", protocolcli.ReportOriginMCP, nil)
+	agentRun := writeTestReport(t, wsRoot, "20260807-094000-bbbbbb", protocolcli.ReportOriginEphemeral, nil)
 
 	out, err := sharedtest.CaptureStdout(t, func() error { return ReportShow(wsRoot, agentRun, "") })
 	if err != nil {
 		t.Fatalf("ReportShow --session: %v", err)
 	}
-	if !strings.Contains(out, agentRun) || !strings.Contains(out, "Origin:   mcp") {
+	if !strings.Contains(out, agentRun) || !strings.Contains(out, "Origin:   ephemeral") {
 		t.Errorf("--session did not read the named report:\n%s", out)
 	}
 

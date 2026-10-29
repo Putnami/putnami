@@ -23,7 +23,7 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | `ExitSuccess/Failure/Usage/Auth/API/Signal` | Exit-code taxonomy (`0/1/2/3/4/130`) |
 | `OutputMode` + `ResolveOutputMode` | `text \| json \| jsonl \| cloud-logging`; `--json` = `--output=json` |
 | `ResultV2` / `NewResultV2` / `WriteResultV2` | The `--output=json` envelope — the one every command emits |
-| `SessionStreamRecord`, `BoundedSessionEndRecord`, `MCPResult`, `SessionFile`, `SessionPlanFile` | The other version-2 machine documents, including JSONL `plan:end` previews and the opt-in bounded session terminal |
+| `SessionStreamRecord`, `BoundedSessionEndRecord`, `SessionFile`, `SessionPlanFile` | The other version-2 machine documents, including JSONL `plan:end` previews and the opt-in bounded session terminal |
 | `ReportFile` + `ReportMax*` | The run's bounded synthesis document (`report.json`) and the caps that bound it |
 | `TaskIdentity` / `RunSummary` / `TaskRecord` | The typed task identity and the one run verdict every v2 surface reports |
 | `TestCase` + `TestCaseMax*`, `BoundTestCases`, `BoundTestCasesWithin`, `TestCaseBatchMemberBytes`, `TruncateTestCaseOutput` | The `test:case` stream record's payload, its bounds, and the helpers a test producer bounds it with — [doc/02-result-v2.md](doc/02-result-v2.md#test-case-records) |
@@ -49,8 +49,8 @@ in lock-step.
 ## Machine contract version 2
 
 [doc/02-result-v2.md](doc/02-result-v2.md) specifies the versioned machine
-contract: `protocolVersion` on all four machine surfaces (`--output=json`,
-`--output=jsonl`, MCP, session files), a typed task identity, and the settled
+contract: `protocolVersion` on all three machine surfaces (`--output=json`,
+`--output=jsonl`, session files), a typed task identity, and the settled
 rules for **unified success** (strict — a reused failure fails the run) and
 **abort precedence** (`aborted` > `failure` > `success`, with the envelope and
 the process exit code agreeing). A plan-only machine invocation reports

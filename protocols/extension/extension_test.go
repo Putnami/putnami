@@ -247,7 +247,8 @@ func TestDeclaresContractSurface(t *testing.T) {
 		{"hooks only", &Manifest{Hooks: &ManifestHooks{}}, false},
 		{"a command", &Manifest{Commands: map[string]CommandDefinition{"build": {}}}, true},
 		{"a command group", &Manifest{CommandGroups: map[string]CommandGroupDefinition{"cloud": {}}}, true},
-		{"a tool", &Manifest{Tools: map[string]ToolDefinition{"x.y": {}}}, true},
+		{"a provider", &Manifest{Providers: map[string]ProviderDeclaration{"tasks": {}}}, true},
+		{"empty providers", &Manifest{Providers: map[string]ProviderDeclaration{}}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

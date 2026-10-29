@@ -141,7 +141,7 @@ also why `run` carries no `failures[]` — see below.
 | `protocolVersion` | required | `2`, as on every v2 document |
 | `sessionId` | required | the session this report synthesizes |
 | `startTime` / `endTime` | required | RFC 3339; the run is settled |
-| `origin` | required | `cli` or `mcp` |
+| `origin` | required | `cli` or `ephemeral` |
 | `enforceCoverage` | required | whether this run ran the enforcing cadence |
 | `fix` | optional | the run's explicit `--fix` value |
 | `git` | optional | `reportGit` — absent outside a worktree |

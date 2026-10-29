@@ -23,8 +23,7 @@
         { "id": "retention", "stage": "coded", "evidenceKinds": ["artifact"] }
       ],
       "surface": {
-        "commands": ["invoices export", "invoices list"],
-        "tools": ["billing.export_invoice"]
+        "commands": ["invoices export", "invoices list"]
       }
     }
   ]

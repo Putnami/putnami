@@ -131,8 +131,8 @@ func TestWriteRunReport_AdapterRunsAreRecordedWithTheirOrigin(t *testing.T) {
 	if err := json.Unmarshal(data, &report); err != nil {
 		t.Fatalf("parse report: %v", err)
 	}
-	if report.Origin != protocolcli.ReportOriginMCP {
-		t.Errorf("origin = %q, want %q for an adapter run", report.Origin, protocolcli.ReportOriginMCP)
+	if report.Origin != protocolcli.ReportOriginEphemeral {
+		t.Errorf("origin = %q, want %q for an ephemeral run", report.Origin, protocolcli.ReportOriginEphemeral)
 	}
 	// Outside a worktree the block is absent rather than partially guessed.
 	if report.Git != nil {

@@ -51,12 +51,12 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 		DefaultPositionalsContract != InputSelectorsContract+1 ||
 		ChangedFilesContract != DefaultPositionalsContract+1 ||
 		HostHooksContract != ChangedFilesContract+1 ||
-		StepDependencyContract != HostHooksContract+1 || LatestContract != StepDependencyContract {
-		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, latest %d",
+		StepDependencyContract != HostHooksContract+1 || ProviderContract != StepDependencyContract+1 || LatestContract != ProviderContract {
+		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, providers %d, latest %d",
 			CurrentContract, AgentContentContract, ReleaseBaselineInputContract,
 			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, CommandKindContract,
 			PublishChannelsContract, ProvisionedToolchainContract, InputSelectorsContract, DefaultPositionalsContract,
-			ChangedFilesContract, HostHooksContract, StepDependencyContract, LatestContract)
+			ChangedFilesContract, HostHooksContract, StepDependencyContract, ProviderContract, LatestContract)
 	}
 	// Rung 7 names two meanings that one CLI release added together.
 	if GitInputModeContract != ReleaseBaselineInputContract {

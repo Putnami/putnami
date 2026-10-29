@@ -12,11 +12,10 @@
 // vocabulary. A provider extension owns every backend call, credential,
 // identifier and mapping behind an operation.
 //
-// The wire transport is the extension tool transport of
-// go.putnami.dev/protocol/extension: a provider implements an operation as a
-// manifest-declared tool marked with ProviderMetaKey, reads one
-// ToolCallRequest and writes one ToolCallResult whose single text block is a
-// Response document.
+// A provider declares the contracts it implements under the `providers`
+// section of its extension manifest (go.putnami.dev/protocol/extension). The
+// orchestrator runs the declared command, writes one ProviderRequest on its
+// standard input and reads one Response document from its standard output.
 package collaboration
 
 import (
@@ -84,7 +83,7 @@ const (
 )
 
 // Access classifies an operation as a read or a mutation. It is the contract's
-// statement, and a provider's tool annotations must agree with it.
+// statement; a provider does not repeat it.
 type Access string
 
 // Access values.
@@ -142,22 +141,20 @@ type OperationSpec struct {
 	// contract version; the others are optional capabilities a provider
 	// declares or omits.
 	Required bool
-	// Destructive operations may modify or remove existing state, so a
-	// provider must annotate them destructiveHint: true. A mutating operation
-	// that is not destructive only adds state.
+	// Destructive operations may modify or remove existing state. A mutating
+	// operation that is not destructive only adds state.
 	Destructive bool
 	// Preconditions states what the provider must declare about revision
 	// enforcement.
 	Preconditions PreconditionRule
 	// WorkspaceSelection operations take the canonical projects, impacted and
 	// baseline arguments. The orchestrator resolves them through its own
-	// selection projection, so the provider tool must declare
-	// workspaceSelection and never resolve a selector itself.
+	// selection projection, so the provider must declare workspaceSelection
+	// on the operation and never resolve a selector itself.
 	WorkspaceSelection bool
 	// HostOnly operations are called by the host integration that runs an
-	// agent, never by the agent itself. The MCP server lists no tool for
-	// them. The command line and the host channel route them like any other
-	// operation.
+	// agent, never by the agent itself. The command line and the host
+	// channel route them like any other operation.
 	HostOnly bool
 	// Summary is the provider-neutral, agent-facing description.
 	Summary string

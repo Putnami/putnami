@@ -14,7 +14,7 @@
 #                       sources, adjacent docs, config schema)
 #   + 1 graph reconstruction (rebuild the dependency graph from the manifests)
 #
-# i.e. >= K + 2 round-trips per project. The read-only MCP `agent_context` tool
+# i.e. >= K + 2 round-trips per project. `putnami context pack`
 # returns all of it in exactly 1 structured call, after which the agent reads only
 # the specific source RANGES it actually needs.
 #

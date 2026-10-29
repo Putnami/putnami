@@ -53,7 +53,7 @@ type Provider struct {
 	// 3s, then 4s.
 	HeadLagPause func(ctx context.Context, attempt int) error
 	// Budget bounds one operation, every request included. Default 100s,
-	// below the manifest's tool timeout, so the provider answers before the
+	// below the manifest's provider timeout, so the provider answers before the
 	// orchestrator gives up on it.
 	Budget time.Duration
 

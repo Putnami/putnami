@@ -47,7 +47,6 @@
     "go/go-project-toolchain#replace-closure",
     "go/go-project-toolchain#repository-reads-are-declared-inputs",
     "go/go-project-toolchain#reproducible-archives",
-    "go/go-project-toolchain#resolved-dependency-documentation",
     "go/go-project-toolchain#shared-build-cache",
     "go/go-project-toolchain#single-schema-committer",
     "go/go-project-toolchain#test-failure-attribution",

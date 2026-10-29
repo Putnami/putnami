@@ -2,6 +2,14 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-28
+- **Amended**: 2026-10-29, by
+  [ADR 0004 of the collaboration contracts](../../../../protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  decision 9 is carried out, and so is the note on `mcpTools` in the third
+  amendment of ADR 0081. The extension tool contract, `mcpResult`,
+  `hostHooks[].mcpTools`, `features.surface.tools` and D-022's mention of MCP
+  tools are deleted, and `origin: "mcp"` becomes `"ephemeral"`. A provider is
+  declared under `providers`, and the `mcp-tool` bridge of
+  `tooling/sdd-extension` is deleted without a replacement.
 - **Supersedes**: [ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md).
   The last sentence of its decision 3 stays in force: a skill declared
   explicit-only must declare it for both hosts. It concerns agent content, not
@@ -13,7 +21,7 @@
   `internal/launch`, `putnamiw`, the installer scripts), features
   `cli/context-discovery`, `cli/agent-workflow-lifecycle`,
   `cli/collaboration-providers`. The protocol vocabulary that names MCP stays
-  (decision 9).
+  until ADR 0004 of the collaboration contracts deletes it (decision 9).
 
 ## Context
 

@@ -7,7 +7,7 @@
       "id": "extension/manifest-contract",
       "type": "feature",
       "name": "Extension manifest contract",
-      "outcome": "An extension in any language declares its commands, tasks, pipelines, cache inputs, lifecycles, ecosystems and agent tools as data in one manifest, and the CLI, the package-time gate and the SDK's authoring gate validate it with one implementation, so adding a language never edits the CLI",
+      "outcome": "An extension in any language declares its commands, tasks, pipelines, cache inputs, lifecycles, ecosystems and collaboration providers as data in one manifest, and the CLI, the package-time gate and the SDK's authoring gate validate it with one implementation, so adding a language never edits the CLI",
       "owner": "tooling",
       "target": "coded",
       "requirements": [

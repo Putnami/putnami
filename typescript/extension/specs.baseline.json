@@ -25,7 +25,6 @@
     "typescript/typescript-project-toolchain#phase-isolation",
     "typescript/typescript-project-toolchain#publish-tasks-declare-their-channels",
     "typescript/typescript-project-toolchain#registries-drive-npmrc",
-    "typescript/typescript-project-toolchain#resolved-dependency-documentation",
     "typescript/typescript-project-toolchain#runtime-manifest-parity",
     "typescript/typescript-project-toolchain#serve-entrypoint",
     "typescript/typescript-project-toolchain#serve-supervision",

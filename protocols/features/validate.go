@@ -24,9 +24,9 @@ const (
 	checkIDMaxLength = 128
 	// semanticCodeMaxLength bounds metric, unit, and environment codes.
 	semanticCodeMaxLength = 128
-	// surfaceMaxEntries bounds one list of command paths or tool names.
+	// surfaceMaxEntries bounds one list of command paths.
 	surfaceMaxEntries = 64
-	// surfaceNameMaxLength bounds one command path or tool name in bytes.
+	// surfaceNameMaxLength bounds one command path in bytes.
 	surfaceNameMaxLength = 128
 	// rollingWindowMaxSeconds bounds a rolling duration and its freshness bound
 	// at ten years, so an authored objective stays a reviewable period rather
@@ -47,12 +47,10 @@ var (
 	// extension verb vocabulary and to the surface definition in
 	// schemas/putnami-features.json.
 	surfaceCommandPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$`)
-	// surfaceToolPattern is an MCP tool name as the tool listing advertises it.
-	surfaceToolPattern   = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
-	sourceBindingPattern = regexp.MustCompile(`^source-v1:sha256:[0-9a-f]{64}$`)
-	sha256Pattern        = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	revisionPattern      = regexp.MustCompile(`^git:(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
-	schemePattern        = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*:`)
+	sourceBindingPattern  = regexp.MustCompile(`^source-v1:sha256:[0-9a-f]{64}$`)
+	sha256Pattern         = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	revisionPattern       = regexp.MustCompile(`^git:(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+	schemePattern         = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*:`)
 	// decisionLinkPattern is the exact wire form of a durable decision record:
 	// an optional owning-project prefix followed by the established project-local
 	// doc/adr/<name>.md convention. It is kept byte-identical to the
@@ -271,11 +269,10 @@ func validateFeatureSurface(field string, version int, surface *FeatureSurface) 
 	if version < ManifestProtocolVersion {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "surface requires feature manifest protocolVersion %d", ManifestProtocolVersion)}
 	}
-	if len(surface.Commands) == 0 && len(surface.Tools) == 0 {
-		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidSurface, field, "a surface must list at least one command or tool")}
+	if len(surface.Commands) == 0 {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidSurface, field, "a surface must list at least one command")}
 	}
-	commands := validateSurfaceNames(field+".commands", "command", surface.Commands, surfaceCommandPattern, "a command path of lower-case words separated by one space")
-	return append(commands, validateSurfaceNames(field+".tools", "tool", surface.Tools, surfaceToolPattern, "a lower-case tool name")...)
+	return validateSurfaceNames(field+".commands", "command", surface.Commands, surfaceCommandPattern, "a command path of lower-case words separated by one space")
 }
 
 // validateSurfaceNames checks one surface list. A list that is present must be

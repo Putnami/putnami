@@ -103,8 +103,8 @@ is reported as unclaimed by assessment tooling and cannot raise maturity past
 the authored target.
 
 A feature may carry an optional `surface` object that lists the command paths
-and MCP tool names that carry it, for example
-`"surface": {"commands": ["features validate"], "tools": ["sdd.feature_context"]}`.
+that carry it, for example
+`"surface": {"commands": ["features validate"]}`.
 It needs manifest `protocolVersion: 2`; a version 1 document that carries it is
 refused with `features.unknown_field`. The protocol checks the shape and reports
 `features.invalid_surface`; whether a project serves a name is checked by the
@@ -610,17 +610,14 @@ task:
   evidence, and diagnostics;
 - `putnami features diff <base> <head>` for revision changes.
 
-Those commands and the `sdd.*` tool descriptors below are provided by the
-`@putnami/sdd` extension, not by the CLI itself; a workspace that does not
-declare it has neither. The core serves no MCP server and calls no `sdd.*`
-descriptor: they remain protocol vocabulary, and agents reach the same
-information through the `putnami features` commands above.
+Those commands are provided by the `@putnami/sdd` extension, not by the CLI
+itself; a workspace that does not declare it has none of them.
 
-The `sdd.list_features` descriptor (optionally with query terms) pages through
-short catalog entries and `sdd.feature_context` retrieves one compact authored
-feature. These tools merge only explicit authority from
+`putnami features list` (optionally with query terms) pages through
+short catalog entries and `putnami features inspect` retrieves one compact authored
+feature. These commands merge only explicit authority from
 native design feature nodes and durable `putnami.features.json` files at the
-workspace or exact project roots. `sdd.feature_context` preserves every sorted
+workspace or exact project roots. `features inspect` preserves every sorted
 declaration source and durable manifest field; technical categories and critical
 paths appear only when a native graph declares them. A catalog entry carries
 counts and a one-line summary instead. A spec, nested file, directory name, or
@@ -665,9 +662,7 @@ Go/TypeScript/Python-authored and hand-authored vectors live under
   `parity` claim.
 - **Evidence**: the `@putnami/sdd` extension consumes these contracts for feature
   and spec discovery, validation, inspection, initialization, and diffing, and
-  runs the first two as DAG jobs. The same builders back the
-  `sdd.list_features`, `sdd.feature_context`, `sdd.list_specs`, and
-  `sdd.spec_context` tool descriptors, which the core does not serve over MCP. Strict parsers, repository validators, canonical
+  runs the first two as DAG jobs. Strict parsers, repository validators, canonical
   marshallers, the pure verification evaluator, valid/invalid fixture corpora,
   reusable conformance runners, and Go/TypeScript/Python-authored equivalence
   vectors exercise the wire contracts.

@@ -46,10 +46,10 @@ const (
 // (requireManifestName).
 //
 // The strict validation applies only to manifests that declare a contract
-// surface (non-empty commands, commandGroups, or tools, or an agentContent or
-// verbs section). Hook-only manifests (e.g. framework packages shipping a
-// preBuild hook with `"commands": {}`) expose neither flags nor agent-facing
-// tools for the contract to govern and intentionally fail full strict
+// surface (non-empty commands, commandGroups, or providers, or an agentContent
+// or verbs section). Hook-only manifests (e.g. framework packages shipping a
+// preBuild hook with `"commands": {}`) expose neither flags nor providers for
+// the contract to govern and intentionally fail full strict
 // validation, so they are left untouched and unstamped (contract 0 → outside
 // the ladder). A put archive whose hook-only manifest names a registry
 // extension dependency is the exception: it is stamped without the full
@@ -301,19 +301,19 @@ func verifyStagedManifestLoads(manifestPath string) error {
 }
 
 // manifestDeclaresContractSurface reports whether the raw manifest exposes a
-// command, tool, agent-content or verb-vocabulary surface the contract must
-// govern. Only genuinely absent or empty-object commands, commandGroups, and
-// tools are treated as hook-only and bypass the gate. A present value of the
-// wrong JSON type (e.g. "tools": []) is NOT hook-only — it is a malformed
-// contract surface that must be gated, so strict parsing rejects it instead of
-// publishing an unloadable manifest unstamped. Any non-null agentContent or
-// verbs is gated, an empty one included, because the loader counts it as a
-// surface (proto.DeclaresContractSurface) and strict validation refuses an
-// empty one.
+// command, provider, agent-content or verb-vocabulary surface the contract
+// must govern. Only genuinely absent or empty-object commands, commandGroups,
+// and providers are treated as hook-only and bypass the gate. A present value
+// of the wrong JSON type (e.g. "providers": []) is NOT hook-only — it is a
+// malformed contract surface that must be gated, so strict parsing rejects it
+// instead of publishing an unloadable manifest unstamped. Any non-null
+// agentContent or verbs is gated, an empty one included, because the loader
+// counts it as a surface (proto.DeclaresContractSurface) and strict validation
+// refuses an empty one.
 func manifestDeclaresContractSurface(raw map[string]any) bool {
 	return surfaceNeedsGate(raw["commands"]) ||
 		surfaceNeedsGate(raw["commandGroups"]) ||
-		surfaceNeedsGate(raw["tools"]) ||
+		surfaceNeedsGate(raw["providers"]) ||
 		raw["agentContent"] != nil ||
 		raw["verbs"] != nil
 }
@@ -343,7 +343,7 @@ func namesRegistryDependency(raw map[string]any) bool {
 	return false
 }
 
-// surfaceNeedsGate reports whether a raw command, command-group, or tool value
+// surfaceNeedsGate reports whether a raw command, command-group, or provider value
 // requires the contract gate. A missing key (nil) and an empty JSON object are
 // hook-only and skip the gate; a non-empty object — or any non-object type —
 // must be gated.

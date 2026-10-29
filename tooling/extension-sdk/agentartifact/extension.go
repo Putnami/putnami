@@ -221,8 +221,8 @@ func executableSurfaces(m *extproto.Manifest) []string {
 	if len(m.CommandGroups) > 0 {
 		surfaces = append(surfaces, "command groups")
 	}
-	if len(m.Tools) > 0 {
-		surfaces = append(surfaces, "MCP tools")
+	if extproto.DeclaresProviders(m) {
+		surfaces = append(surfaces, "collaboration providers")
 	}
 	if len(m.Tasks) > 0 {
 		surfaces = append(surfaces, "tasks")

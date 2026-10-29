@@ -56,10 +56,7 @@ the same gate.
    cache.
 3. [Commands](03-commands.md) — the full `features`, `specs`, `architecture`,
    and `contracts` reference.
-4. [MCP tools](04-mcp-tools.md) — the read-only `sdd.*` tools an agent uses to
-   ask what a feature is for or inspect one exact architecture domain before
-   touching its code.
-5. [Parity](05-parity.md) — how the extension proves it matches the behavior it
+4. [Parity](05-parity.md) — how the extension proves it matches the behavior it
    replaced.
 
 For the narrative — why these declarations exist and how they constrain both

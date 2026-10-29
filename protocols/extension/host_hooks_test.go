@@ -55,8 +55,8 @@ func TestHostHooks_InvalidFixturesReportExactCodes(t *testing.T) {
 	}
 }
 
-// The valid fixture declares every event of both hosts, a matcher of host and
-// MCP tools, and a wake entry, and passes strict validation.
+// The valid fixture declares every event of both hosts, a matcher of host
+// tools, and a wake entry, and passes strict validation.
 func TestHostHooks_ValidFixtureValidates(t *testing.T) {
 	m := loadFixtureManifest(t, hostHooksFixture)
 	if diags := FullValidateManifest(m); diag.HasErrors(diags) {

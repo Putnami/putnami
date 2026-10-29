@@ -6,12 +6,11 @@
 // Usage:
 //
 //	putnami-local-collaboration __putnami runtime-info   (the runtime handshake)
-//	putnami-local-collaboration provider-tool            (one routed ToolCallRequest on stdin, one ToolCallResult on stdout)
+//	putnami-local-collaboration provider                 (one routed ProviderRequest on stdin, one Response on stdout)
 //
 // It is never called directly: the workspace binds it in options.collaboration
-// and Putnami routes `putnami tasks|proposals|missions <operation>` and the MCP
-// tools `tasks.*`, `proposals.*`, `missions.ask` and `missions.reply` to it;
-// missions.sync is host-only and has no MCP tool.
+// and Putnami routes `putnami tasks|proposals|missions <operation>` and the
+// host call collaboration.call to it; missions.sync is host-only.
 package main
 
 import (
@@ -33,8 +32,8 @@ import (
 // handshake against the manifest that declared the runtime.
 const extensionName = "@putnami/local-collaboration"
 
-// providerToolArg routes the executable to the collaboration bridge.
-const providerToolArg = "provider-tool"
+// providerArg routes the executable to the collaboration provider.
+const providerArg = "provider"
 
 // runtimeVersion is stamped at link time through
 // options["@putnami/go"].version-var; an unstamped build reports it empty.
@@ -57,14 +56,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
-	case slices.Equal(args, []string{providerToolArg}):
+	case slices.Equal(args, []string{providerArg}):
 		if err := collab.Serve(context.Background(), stdin, stdout, newHandlers()); err != nil {
 			fmt.Fprintf(stderr, "putnami-local-collaboration: %v\n", err)
 			return 1
 		}
 		return 0
 	}
-	fmt.Fprintln(stderr, "putnami-local-collaboration: unknown invocation; this runtime answers "+providerToolArg+" only through a workspace binding")
+	fmt.Fprintln(stderr, "putnami-local-collaboration: unknown invocation; this runtime answers "+providerArg+" only through a workspace binding")
 	return 2
 }
 

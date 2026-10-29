@@ -38,10 +38,10 @@ putnami lint,test,build,validate --impacted --enforce-coverage
   and reports sorted diagnostics. Missing, stale, contradicted, and unclassified
   evidence are assessment *warnings*; malformed documents, conflicting copies,
   and broken or ambiguous contribution references *fail*. A feature may list
-  the command paths and MCP tool names that carry it under `surface`. The step
+  the command paths that carry it under `surface`. The step
   resolves each name against the `putnami.extension.json` at the same project
   root as the declaring manifest: a command key that is not internal, the path
-  of a command-group subcommand, a verb name, or a tool key. It reads only
+  of a command-group subcommand, or a verb name. It reads only
   those members, so a field a newer extension protocol adds does not fail it.
   A name that file does not serve fails as `features.unresolved_surface`. A
   project root without an extension manifest is not resolved, and no other

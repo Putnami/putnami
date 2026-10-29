@@ -1,6 +1,6 @@
 // Package agentcontext defines the agent-context protocol: the one
-// deterministic, redaction-safe artifact that lets Putnami MCP/intelligence
-// tools orient in a project without exploring the whole repository. One
+// deterministic, redaction-safe artifact that lets Putnami and its
+// intelligence tooling orient in a project without exploring the whole repository. One
 // document is emitted per project and aggregates — strictly BY REFERENCE —
 // everything an agent needs to find composition roots, capabilities, public
 // contracts, representative source, tests, and operational surface.
@@ -34,7 +34,7 @@
 // This package is the wire contract only: hand-written Go types are the source
 // of truth (no codegen), strict parsing rejects unknown fields, and the
 // fixtures/ corpus is the cross-language contract. The aggregator that walks a
-// project, its selection rules, and the MCP tool that serves the result live in
+// project, its selection rules, and the command that serves the result live in
 // the CLI — the package is the contract, not the pipeline.
 //
 // Field names are camelCase and field order is deliberate; the canonical
@@ -351,8 +351,7 @@ type Provenance struct {
 }
 
 // Document is the per-project agent-context document. A producer builds it in
-// memory and serves it: the CLI prints it (`putnami context pack`) and the MCP
-// `agent_context` tool returns it. No producer writes it to a file.
+// memory and serves it: the CLI prints it (`putnami context pack`). No producer writes it to a file.
 //
 // Field order is deliberate: it is the canonical serialization order every
 // producer must reproduce byte-for-byte.

@@ -17,7 +17,7 @@ import (
 // cover. Neither an inherited value, which names an outer launch's channel,
 // nor a task's own Env reaches the process.
 func TestHostRPCChannelComesOnlyFromTheSpawn(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "extension-command-host-rpc", "a-planned-job-and-a-provider-tool-receive-no-channel")
+	spectest.Proves(t, "cli/job-planning-execution", "extension-command-host-rpc", "a-planned-job-and-a-provider-call-receive-no-channel")
 	t.Setenv(hostrpcproto.SocketEnv, "/outer/host.sock")
 	t.Setenv(hostrpcproto.TokenEnv, "outer-token")
 	launch := []string{hostrpcproto.SocketEnv + "=/launch/host.sock", hostrpcproto.TokenEnv + "=launch-token"}

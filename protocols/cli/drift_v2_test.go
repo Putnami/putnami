@@ -155,7 +155,6 @@ var v2StructDefs = map[string]any{
 	"memoryPressure":           MemoryPressure{},
 	"sessionTree":              SessionTree{},
 	"sessionDeclarations":      SessionDeclarations{},
-	"sessionAgent":             SessionAgent{},
 	"sessionPlacement":         SessionPlacement{},
 	"sessionProvenance":        SessionProvenance{},
 	"sessionSelectionReuse":    SessionSelectionReuse{},
@@ -175,7 +174,6 @@ var v2StructDefs = map[string]any{
 	"workspaceWarning":         WorkspaceWarning{},
 	"sessionStreamRecord":      SessionStreamRecord{},
 	"boundedSessionEndRecord":  BoundedSessionEndRecord{},
-	"mcpResult":                MCPResult{},
 	"sessionFile":              SessionFile{},
 	"sessionPlanFile":          SessionPlanFile{},
 	"reportGit":                ReportGit{},
@@ -275,14 +273,13 @@ func TestSessionSelectionMatchesSchema(t *testing.T) {
 
 // TestSessionFileCarriesTheOptionalRunContextMembers states, as a contract
 // fact rather than an implementation detail, that a recorded session can name
-// the run that spawned it, how that run selected, which declarations it read,
-// and which agent session launched it. Every member is optional, so a record
-// written before they existed keeps validating.
+// the run that spawned it, how that run selected, and which declarations it read. Every member is optional, so a record written
+// before they existed keeps validating.
 func TestSessionFileCarriesTheOptionalRunContextMembers(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "the-schemas-and-the-types-agree", "the-version-2-schema-matches-the-go-types")
 	names := fieldNames(sessionFileFields)
 	required := requiredFieldNames(sessionFileFields)
-	for _, member := range []string{"parentSessionId", "selection", "declarations", "agent"} {
+	for _, member := range []string{"parentSessionId", "selection", "declarations"} {
 		if !slices.Contains(names, member) {
 			t.Errorf("sessionFile declares no %q member", member)
 		}

@@ -25,7 +25,7 @@
     },
     {
       "id": "one-route-two-entry-paths",
-      "text": "putnami <contract> <operation> --input and the host call collaboration.call share one route: the request is validated and normalized, a missing page to page.size 20, then sent through the extension tool transport to the one tool the bound provider declares, with the binding settings and, for selection operations, the resolved selection. Both return the same envelope; the command exits 0 only for ok. Provider tools never appear under their own names, and a workspace that binds nothing reserves no name."
+      "text": "putnami <contract> <operation> --input and the host call collaboration.call share one route: the request is validated and normalized, a missing page to page.size 20, then sent to the one provider the bound extension declares for the contract, with the binding settings and, for selection operations, the resolved selection. Both return the same envelope; the command exits 0 only for ok. A provider operation is reached only through a bound contract, and a workspace that binds nothing reserves no name."
     },
     {
       "id": "host-only-operations",
@@ -39,6 +39,7 @@
   "decisions": [
     "protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md",
     "protocols/collaboration/doc/adr/0003-missions-contract.md",
-    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md",
+    "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md"
   ]
 }

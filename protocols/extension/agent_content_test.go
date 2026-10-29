@@ -70,12 +70,12 @@ func TestAgentContent_InvalidFixturesReportExactCodes(t *testing.T) {
 }
 
 // A content-only extension is a complete manifest: no runtime, no command and
-// no tool are needed, and the packaged fixture proves it under the same entry
-// points every other manifest goes through.
-func TestAgentContent_ContentOnlyManifestNeedsNoRuntimeCommandOrTool(t *testing.T) {
+// no provider are needed, and the packaged fixture proves it under the same
+// entry points every other manifest goes through.
+func TestAgentContent_ContentOnlyManifestNeedsNoRuntimeCommandOrProvider(t *testing.T) {
 	m := loadFixtureManifest(t, "fixtures/valid/agent-content.json")
-	if m.DeclaresRuntime() || len(m.Commands) != 0 || len(m.Tools) != 0 {
-		t.Fatal("the content-only fixture must declare no runtime, command or tool")
+	if m.DeclaresRuntime() || len(m.Commands) != 0 || DeclaresProviders(m) {
+		t.Fatal("the content-only fixture must declare no runtime, command or provider")
 	}
 	if diags := FullValidateManifest(m); diag.HasErrors(diags) {
 		t.Fatalf("a content-only manifest must validate: %v", diags)
@@ -185,12 +185,13 @@ func TestAgentContent_ValidFixturesLoad(t *testing.T) {
 }
 
 // contract4Manifest is the manifest shape a CLI released at contract 4 decodes
-// into: it has no agentContent member.
+// into: it has no agentContent member. Its tools section, since deleted, is
+// read here as opaque values: only its size took part in the ladder.
 type contract4Manifest struct {
 	CLIContract   int                               `json:"cliContract,omitempty"`
 	Commands      map[string]CommandDefinition      `json:"commands,omitempty"`
 	CommandGroups map[string]CommandGroupDefinition `json:"commandGroups,omitempty"`
-	Tools         map[string]ToolDefinition         `json:"tools,omitempty"`
+	Tools         map[string]json.RawMessage        `json:"tools,omitempty"`
 }
 
 // contract4Load is the negotiation a CLI released at contract 4 runs, restated

@@ -91,7 +91,7 @@
     },
     {
       "id": "the-dev-extension-runs-compose-and-qualify",
-      "text": "The @putnami/dev manifest declares the compose and qualify command groups at CLI contract 15. Each defaults to its only subcommand, up and run, which is interactive and takes the project as a required positional, so putnami compose <project> and putnami qualify <project> run it. compose-up declares the serve workload and qualify-run the once workload, so no portable, commit-addressed or MCP run carries either. Their tasks run the dev executable in the workspace root, uncached and without a deadline."
+      "text": "The @putnami/dev manifest declares the compose and qualify command groups at CLI contract 15. Each defaults to its only subcommand, up and run, which is interactive and takes the project as a required positional, so putnami compose <project> and putnami qualify <project> run it. compose-up declares the serve workload and qualify-run the once workload, so no portable or commit-addressed run carries either. Their tasks run the dev executable in the workspace root, uncached and without a deadline."
     },
     {
       "id": "the-dev-executable-reads-its-launch-from-the-job-context",

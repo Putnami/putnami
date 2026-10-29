@@ -67,7 +67,6 @@ putnami serve api-gateway
 - **[Serve](doc/serve.md)** — dev vs production modes, file watching, environment variables
 - **[Run](doc/run.md)** — one-shot workload runner with exit-code forwarding
 - **[Package](doc/package.md)** — archives, Docker, Go module channels
-- **[Exact dependency documentation](doc/dependency-documentation.md)** — version-resolved, offline MCP documentation reads
 
 ## Toolchain Management
 

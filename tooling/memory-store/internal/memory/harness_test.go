@@ -15,7 +15,6 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/memory-store/internal/store"
 )
 
@@ -34,7 +33,7 @@ type harness struct {
 	settings  string
 	provider  *Provider
 	clock     *time.Time
-	selection *extension.ToolSelection
+	selection *collab.Selection
 }
 
 func newHarness(t *testing.T, workspace, settings string) *harness {
@@ -88,12 +87,10 @@ func (h *harness) do(operation string, arguments any) (collab.Response, error) {
 	if err != nil {
 		return collab.Response{}, err
 	}
-	request := extension.ToolCallRequest{
-		Name:          "memory-store.memory." + operation,
+	request := collab.ProviderRequest{
 		Arguments:     encoded,
 		WorkspaceRoot: h.workspace,
-		Provider:      &extension.ToolProviderCall{Contract: collab.ContractMemory, Version: 1, Operation: operation},
-		Agent:         &extension.AgentIdentity{ClientName: "contract-suite"},
+		Provider:      &collab.ProviderCall{Contract: collab.ContractMemory, Version: 1, Operation: operation},
 	}
 	if h.settings != "" {
 		request.Provider.Settings = json.RawMessage(h.settings)
@@ -109,16 +106,9 @@ func (h *harness) do(operation string, arguments any) (collab.Response, error) {
 	if err := collab.Serve(context.Background(), bytes.NewReader(payload), &out, h.provider.Handlers()); err != nil {
 		return collab.Response{}, err
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		return collab.Response{}, err
-	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
+	response, diags := collab.ParseResponse(out.Bytes())
 	if diags != nil {
-		return collab.Response{}, fmt.Errorf("invalid response %s: %v", result.Content[0].Text, diags)
-	}
-	if result.IsError != (response.Outcome != collab.OutcomeOK) {
-		return collab.Response{}, fmt.Errorf("isError %v disagrees with outcome %s", result.IsError, response.Outcome)
+		return collab.Response{}, fmt.Errorf("invalid response %s: %v", out.String(), diags)
 	}
 	if response.Outcome == collab.OutcomeOK {
 		if _, diags := collab.ParseResult(collab.ContractMemory, 1, operation, response.Result); diags != nil {

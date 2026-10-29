@@ -3,6 +3,9 @@
 - **Status**: accepted, amended by decision D-013 in the root
   `decisions.json`: `putnami migrate agent-content` is deleted, so
   `supersedes` has one consumer, the refusal. Amended by
+  [ADR 0004 of the collaboration contracts](../../../collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
+  the manifest has no `tools` section, so "a command, an MCP tool or agent
+  content" reads "a command, a provider or agent content". Amended by
   [Host hooks](#amendment-host-hooks-ride-the-same-opt-in): a top-level
   `hostHooks` member under contract 17.
 - **Scope**: `go.putnami.dev/protocol/extension` (`agentContent`),

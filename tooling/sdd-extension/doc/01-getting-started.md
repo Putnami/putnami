@@ -18,8 +18,7 @@ Add the extension to `putnami.workspace.json`:
 }
 ```
 
-Then install and regenerate the agent context, so assistants learn the five
-`sdd.*` MCP tools exist:
+Then install and regenerate the agent context:
 
 ```bash
 putnami extensions install
@@ -60,7 +59,6 @@ This repository asserts the invariant for itself in
 |---|---|---|
 | `putnami validate` / `putnami validate-workspace` | Two DAG jobs — features and specs per project, architecture once for the workspace | [02-validation-jobs.md](02-validation-jobs.md) |
 | `features`, `specs`, `architecture`, `contracts` | Four interactive command groups, eighteen subcommands | [03-commands.md](03-commands.md) |
-| `sdd.list_features`, `sdd.feature_context`, `sdd.list_specs`, `sdd.spec_context`, `sdd.architecture_context` | Five read-only MCP tools | [04-mcp-tools.md](04-mcp-tools.md) |
 
 ## First run
 

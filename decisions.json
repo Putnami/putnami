@@ -161,7 +161,7 @@
     },
     {
       "id": "D-022",
-      "statement": "a feature declaration may list the commands and MCP tools that carry the feature",
+      "statement": "a feature declaration may list the commands that carry the feature",
       "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true

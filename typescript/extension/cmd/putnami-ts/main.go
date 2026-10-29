@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -68,13 +67,6 @@ func main() {
 	// manifest that declares it, so one build serves every version stamp.
 	if handled, err := runtimeinfo.HandleFromManifest(os.Args[1:], os.Stdout, tsExtensionName); handled {
 		if err != nil {
-			os.Exit(1)
-		}
-		return
-	}
-	if len(os.Args) > 1 && os.Args[1] == mcpToolArg {
-		if err := runMCPTool(context.Background(), os.Stdin, os.Stdout); err != nil {
-			fmt.Fprintf(os.Stderr, "putnami-ts: %v\n", err)
 			os.Exit(1)
 		}
 		return

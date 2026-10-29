@@ -65,17 +65,21 @@ refused.
 
 ### Provider declaration
 
-A provider implements an operation as a manifest-declared extension tool whose
-`_meta` carries `putnami.dev/provider` (`ProviderDeclaration`): the contract,
-version and operation, and — for an operation that takes a revision
-precondition — how it enforces it (`atomic`, `checked`, `none`).
-`ReadProviderOffer` checks a manifest's declarations against the catalog:
-annotations that agree with the operation's access and destructiveness,
-`workspaceSelection` on operations that take the canonical selection
-arguments, one tool per operation, and every required operation of a declared
-version. The orchestrator applies it when it resolves a binding; a provider
-author applies it in a manifest test. `Serve` is the provider side of one
-routed call.
+A provider declares each contract it implements under the extension
+manifest's `providers` member (`ProviderDeclaration` of
+`go.putnami.dev/protocol/extension`): the contract version, the command every
+operation runs, and the operations, each with a description, `openWorld` and —
+for an operation that takes a revision precondition — how it enforces it
+(`atomic`, `checked`, `none`). `ReadProviderOffer` checks a manifest's
+providers against the catalog: known operations, the precondition rule of
+each, `workspaceSelection` on operations that take the canonical selection
+arguments, and every required operation of a declared version. The
+orchestrator applies it when it resolves a binding; a provider author applies
+it in a manifest test.
+
+The orchestrator writes one `ProviderRequest` to the provider's standard input
+and reads one `Response` from its standard output. `Serve` is the provider
+side of one routed call.
 
 ### Strict parsing
 
@@ -138,7 +142,7 @@ implementation proves the rest in its own tests:
   answers included, reports an uncertain write as unresolved, keeps
   credentials out of every envelope, and keeps pages within their bounds. The
   CLI's `cli/collaboration-providers` keeps what the CLI adds: the binding,
-  capabilities, the two entry paths, the routed tools, host-only operations
+  capabilities, the two entry paths, the routed providers, host-only operations
   and contract names that never shadow a command.
 - `@putnami/local-collaboration` and `@putnami/github-collaboration` pass the
   task and proposal scenarios, and their manifests draw no diagnostic.

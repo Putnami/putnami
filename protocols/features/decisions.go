@@ -72,7 +72,7 @@ const (
 	// root one, the project context for a project one — so the bound is what
 	// keeps that text finite rather than a truncation rule that would silently
 	// hide a settled decision, the one failure this whole file exists to stop.
-	// A shorter listing, such as an MCP server's instructions, counts what it
+	// A shorter listing, such as a command's compact output, counts what it
 	// leaves out and names where the whole registry is.
 	decisionsMaxEntries = 256
 	// decisionsMaxCheckFiles bounds one check's glob set.

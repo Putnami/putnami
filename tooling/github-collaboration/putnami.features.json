@@ -143,7 +143,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "every-tool-reaches-outside-the-machine-and-says-so",
+              "every-operation-reaches-outside-the-machine-and-says-so",
               "the-manifest-passes-both-gates",
               "the-parent-is-outside-the-revision-and-link-says-so"
             ]

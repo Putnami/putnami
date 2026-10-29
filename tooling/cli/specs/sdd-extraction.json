@@ -12,7 +12,7 @@
   "requirements": [
     {
       "id": "recorded-parity-with-the-replaced-surface",
-      "text": "Every subcommand and tool is pinned byte-for-byte against answers recorded from the CLI implementation it replaced, captured before that implementation was deleted; the recording has no update flag, because the only code that could rewrite it is the code under test."
+      "text": "Every subcommand is pinned byte-for-byte against answers recorded from the CLI implementation it replaced, captured before that implementation was deleted; the recording has no update flag, because the only code that could rewrite it is the code under test."
     },
     {
       "id": "wire-only-workspace-knowledge",

@@ -4,6 +4,7 @@
   "executableRequirements": [
     "tooling/agent-session-hooks#agent-stage",
     "tooling/agent-session-hooks#bounded-calls",
+    "tooling/agent-session-hooks#decision-commands",
     "tooling/agent-session-hooks#fail-open",
     "tooling/agent-session-hooks#host-channel",
     "tooling/agent-session-hooks#idle-wake",

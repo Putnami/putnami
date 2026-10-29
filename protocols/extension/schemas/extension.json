@@ -23,8 +23,8 @@
     "cliContract": {
       "type": "integer",
       "minimum": 4,
-      "maximum": 18,
-      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, contract 15 a command group whose default subcommand declares positionals, contract 16 a step that gates on the run's changed files (activation.changedFiles) or binds them (a from: context input binding), contract 17 a hostHooks member, and contract 18 a command dependsOn entry that names one step of another command (command~step). Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+      "maximum": 19,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, contract 15 a command group whose default subcommand declares positionals, contract 16 a step that gates on the run's changed files (activation.changedFiles) or binds them (a from: context input binding), contract 17 a hostHooks member, contract 18 a command dependsOn entry that names one step of another command (command~step), and contract 19 a providers section. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
       "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. The CLI installs, pins and loads each registry name (@scope/name) for an extension installed from the artifact store or declared by path, and leaves any other name to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
@@ -92,11 +92,14 @@
         "$ref": "#/$defs/taskDefinition"
       }
     },
-    "tools": {
+    "providers": {
       "type": "object",
-      "description": "Namespaced MCP tools contributed by this extension. Each invocation runs in the extension-owned subprocess declared by the tool.",
+      "description": "The collaboration providers this extension implements, keyed by contract (tasks, proposals, memory, missions). Every operation of a contract runs in the extension-owned subprocess its entry declares. Requires cliContract 19.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      },
       "additionalProperties": {
-        "$ref": "#/$defs/toolDefinition"
+        "$ref": "#/$defs/providerDeclaration"
       }
     },
     "agentContent": {
@@ -195,7 +198,7 @@
     },
     "hostHookEntry": {
       "type": "object",
-      "description": "One hook: the host event it runs at and how the command is called there. A PostToolUse hook names at least one tool or MCP tool.",
+      "description": "One hook: the host event it runs at and how the command is called there. A PostToolUse hook names at least one tool.",
       "additionalProperties": false,
       "required": ["event", "timeoutSeconds"],
       "allOf": [
@@ -207,10 +210,8 @@
             }
           },
           "then": {
-            "anyOf": [
-              { "required": ["tools"], "properties": { "tools": { "minItems": 1 } } },
-              { "required": ["mcpTools"], "properties": { "mcpTools": { "minItems": 1 } } }
-            ]
+            "required": ["tools"],
+            "properties": { "tools": { "minItems": 1 } }
           }
         }
       ],
@@ -228,15 +229,6 @@
             "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
           },
           "description": "PostToolUse only: host tools the hook runs after."
-        },
-        "mcpTools": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
-          },
-          "description": "PostToolUse only: Putnami MCP tools the hook runs after, as declared (missions.ask). The CLI renders each one as the host names it."
         },
         "args": {
           "type": "array",
@@ -862,7 +854,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Commands that must run before this command. A bare name is a same-project prerequisite: the root steps of this command wait for its leaf steps. command~step plans the whole command for the project and makes the root steps wait for that one step; a step the plan does not hold adds no edge. Requires cliContract 18. A name prefixed with ! is a session barrier across the current project selection, and names a whole command. Pipeline-step references prefixed with ^, /, or * are invalid here."
+          "description": "Commands that must run before this command. A bare name is a same-project prerequisite: the root steps of this command wait for its leaf steps. command~step plans the whole command for the project and makes the root steps wait for that one step; a step the plan does not hold adds no edge. Requires cliContract 19. A name prefixed with ! is a session barrier across the current project selection, and names a whole command. Pipeline-step references prefixed with ^, /, or * are invalid here."
         },
         "sessionPrerequisites": {
           "type": "array",
@@ -914,36 +906,24 @@
         }
       }
     },
-    "toolDefinition": {
+    "providerDeclaration": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "description",
-        "inputSchema",
-        "annotations",
-        "_meta",
-        "command"
+        "version",
+        "command",
+        "operations"
       ],
       "properties": {
-        "description": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inputSchema": {
-          "type": "object",
-          "description": "JSON Schema for the MCP tool arguments object."
-        },
-        "annotations": {
-          "$ref": "#/$defs/toolAnnotations"
-        },
-        "_meta": {
-          "type": "object",
-          "description": "Agent-facing metadata. Must include putnami.dev/contract with access, readOnly, and supportsDryRun."
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The contract version the provider implements."
         },
         "command": {
           "type": "string",
           "minLength": 1,
-          "description": "Extension-owned executable invoked for this tool."
+          "description": "Extension-owned executable every operation of the contract runs. It reads one provider request on standard input and writes one collaboration response on standard output."
         },
         "args": {
           "type": "array",
@@ -962,33 +942,48 @@
           "minimum": 1,
           "description": "Invocation timeout in milliseconds. Omit for the 30-second default."
         },
-        "workspaceSelection": {
-          "type": "boolean",
-          "description": "Ask the orchestrator to resolve this tool's workspace view and publish it on the request: the complete project membership (workspaceProjects) and the projection the canonical projects/impacted/baseline arguments resolve to (selection). Opt-in, because those three argument names are the CLI's vocabulary and not every tool's."
+        "operations": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "The contract operations the provider implements, keyed by operation name.",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/providerOperation"
+          }
         }
       }
     },
-    "toolAnnotations": {
+    "providerOperation": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "readOnlyHint",
-        "destructiveHint",
-        "idempotentHint",
-        "openWorldHint"
+        "description",
+        "openWorld"
       ],
       "properties": {
-        "readOnlyHint": {
-          "type": "boolean"
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provider-specific behavior and limits of the operation."
         },
-        "destructiveHint": {
-          "type": "boolean"
+        "openWorld": {
+          "type": "boolean",
+          "description": "Whether the operation reaches a system outside this machine."
         },
-        "idempotentHint": {
-          "type": "boolean"
+        "preconditions": {
+          "type": "string",
+          "enum": [
+            "atomic",
+            "checked",
+            "none"
+          ],
+          "description": "How the provider enforces a revision precondition. atomic: compare and write in one step the backend guarantees. checked: compare then write; a concurrent writer can interleave. none: no comparison."
         },
-        "openWorldHint": {
-          "type": "boolean"
+        "workspaceSelection": {
+          "type": "boolean",
+          "description": "Ask the orchestrator to resolve the operation's workspace view and publish it on the request: the complete project membership (workspaceProjects) and the projection the canonical projects/impacted/baseline arguments resolve to (selection)."
         }
       }
     },

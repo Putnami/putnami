@@ -93,7 +93,6 @@ var ValidViolationCodes = map[string]bool{
 var ValidDocumentKinds = map[DocumentKind]bool{
 	DocumentResultEnvelope:      true,
 	DocumentSessionStreamRecord: true,
-	DocumentMCPResult:           true,
 	DocumentSessionFile:         true,
 	DocumentSessionPlanFile:     true,
 	DocumentReportFile:          true,
@@ -130,8 +129,6 @@ func ValidateDocument(kind DocumentKind, data []byte) []Violation {
 			}
 		}
 		checkFinalRecordReserve(v, root)
-	case DocumentMCPResult:
-		validateMCPResult(v, root)
 	case DocumentSessionFile:
 		validateSessionFile(v, root)
 	case DocumentSessionPlanFile:
@@ -270,28 +267,6 @@ func nonEmptyStringBytesAtMost(maximum int) check {
 		}
 		if text == "" || len([]byte(text)) > maximum {
 			v.add(ViolationInvalidValue, path)
-		}
-	}
-}
-
-// printableASCIIBytesAtMost requires a nonempty string of at most maximum bytes,
-// each a printable ASCII character (0x20 to 0x7e).
-func printableASCIIBytesAtMost(maximum int) check {
-	return func(v *validator, path string, value any) {
-		text, ok := value.(string)
-		if !ok {
-			v.add(ViolationInvalidType, path)
-			return
-		}
-		if text == "" || len(text) > maximum {
-			v.add(ViolationInvalidValue, path)
-			return
-		}
-		for i := 0; i < len(text); i++ {
-			if text[i] < 0x20 || text[i] > 0x7e {
-				v.add(ViolationInvalidValue, path)
-				return
-			}
 		}
 	}
 }

@@ -16,12 +16,12 @@ import (
 // doc/04-validation.md states the ladder as a table; B6c pinned its rows for a
 // manifest whose surface is COMMANDS. The surface kind is not incidental to the
 // ladder, though — it is what decides whether the ladder applies at all
-// (DeclaresContractSurface), and that predicate counts command groups and MCP
-// tools too. A manifest exposing only agent-facing tools, unstamped, is the case
-// where getting it wrong is quietest: nothing in a build log mentions tools.
+// (DeclaresContractSurface), and that predicate counts command groups and
+// providers too. A manifest exposing only providers, unstamped, is the case
+// where getting it wrong is quietest: nothing in a build log mentions them.
 //
 // So this is the full cross product of {absent, one behind, current, latest,
-// one ahead of latest} × {commands, command groups, tools, agent content,
+// one ahead of latest} × {commands, command groups, providers, agent content,
 // verbs, command kinds, publish channels, provisioned toolchain, default
 // positionals, host hooks, step dependency, none},
 // in one table, next to the doc it mirrors. Ratcheting a row means editing this
@@ -30,9 +30,9 @@ import (
 // The additive contracts above the base are opted into: a manifest needs one
 // only when it declares agent content, a verb vocabulary, command kinds,
 // publish channels, a provisioned toolchain candidate, a group default that
-// takes positionals, host hooks or a dependency on one step of another
-// command, so the floor a stamp must reach depends on the surface, while the
-// ceiling does not.
+// takes positionals, host hooks, a dependency on one step of another
+// command or providers, so the floor a stamp must reach depends on the
+// surface, while the ceiling does not.
 
 // matrixManifest renders a manifest carrying exactly one kind of contract
 // surface at a given declared contract. Contract 0 is written as an ABSENT
@@ -56,13 +56,11 @@ const (
   "commands": {"deploy": {"run": [{"id": "d", "task": "t"}]}},
   "tasks": {"t": {"kind": "command", "command": "echo"}}`
 
-	toolsSurface = `"tools": {
-    "putnami.search": {
-      "description": "Search the index.",
-      "inputSchema": {"type": "object"},
-      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true},
-      "_meta": {"putnami.dev/contract": {"access": "read", "readOnly": true, "supportsDryRun": false}},
-      "command": "search"
+	providersSurface = `"providers": {
+    "tasks": {
+      "version": 1,
+      "command": "search",
+      "operations": {"find": {"description": "Find tasks in the index.", "openWorld": true}}
     }
   }`
 
@@ -149,7 +147,7 @@ func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
 	}{
 		{name: "commands", body: commandsSurface, governs: true, required: current},
 		{name: "commandGroups", body: commandGroupsSurface, governs: true, required: current},
-		{name: "tools", body: toolsSurface, governs: true, required: current},
+		{name: "providers", body: providersSurface, governs: true, required: protocolcli.ProviderContract},
 		{name: "agentContent", body: agentContentSurface, governs: true, required: protocolcli.AgentContentContract},
 		{name: "verbs", body: verbsSurface, governs: true, required: protocolcli.VerbVocabularyContract},
 		{name: "command kinds", body: commandKindsSurface, governs: true, required: protocolcli.CommandKindContract},
@@ -233,16 +231,16 @@ func assertRejected(t *testing.T, m *Manifest, err error, want []string) {
 }
 
 // TestDeclaresContractSurface_CountsEverySurfaceKind is the predicate the whole
-// matrix pivots on, checked directly. A regression that stopped counting tools
-// would make every unstamped tool-only manifest load — silently handing agents
-// capabilities from an extension whose contract was never verified — and the
+// matrix pivots on, checked directly. A regression that stopped counting
+// providers would make every unstamped provider-only manifest load — silently
+// routing calls to an extension whose contract was never verified — and the
 // matrix above would still pass its commands rows.
 func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "a-contract-matches-or-the-manifest-does-not-load", "every-surface-kind-is-governed")
 	cases := map[string]bool{
 		commandsSurface:             true,
 		commandGroupsSurface:        true,
-		toolsSurface:                true,
+		providersSurface:            true,
 		agentContentSurface:         true,
 		verbsSurface:                true,
 		commandKindsSurface:         true,

@@ -198,7 +198,6 @@ func testJob(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 | `cli` | `Run`, `RunSubcommand`, `JobFunc`, `ParseFlags`, `FlagString`, `FlagBool`, `FlagInt` | Job entry point and flags |
 | `exec` | `Run`, `Result`, `Dir`, `Env`, `UnsetEnv`, `Timeout`, `WithContext`, `Stdin` | Subprocess execution |
 | `hostenv` | `PlatformIdentityVars`, `IsPlatformIdentity`, `ScrubPlatformIdentity`, `JobVars`, `ScrubJobVars` | The single list of environment variables a managed runtime injects to describe its own deployment (`K_SERVICE`, `GAE_*`, `AWS_LAMBDA_*`, …), and the scrub a test harness applies so a test process cannot mistake the identity of the machine that launched it for its own. Deployment identity only — credentials, endpoints and project/region selectors are deliberately preserved |
-| `mcp` | `Serve`, `Handler` | One-request MCP-tool bridge for extension binaries |
 | `manifest` | `New`, `Builder`, `Build`, `WriteFile`, `Validate`, `Declares`, `File`, `Directory`, `Effects`, `CommandGroup`, `Subcommand`, `Runs`, `Interactive`, `GroupFlag` | Manifest authoring with protocol validation at build time |
 | `architecture` | `NewDomain`, `Builder`, `Build`, `CanonicalBytes`, `Validate`, `Pin`, `Reference`, `Query`, `Snapshot`, `Command`, `Projection`, `Bind` | ARC/DARC domain-manifest authoring with protocol validation at build time (experimental) |
 | `resultv2` | `Emit`, `Envelope`, `Path` | The CLI's result envelope, written by an interactive extension subcommand. The subprocess inherits stdout and nothing wraps it, so the bytes must be the ones a built-in structured command writes — including the rule that `--output=json` stays indented and only the *handler* is switched to jsonl |
@@ -257,55 +256,40 @@ emitter's wire conformance is a requirement of the runtime protocol's feature,
 Before v1.0.0, minor `0.x` releases may contain documented breaking changes —
 see [RELEASE.md](../../RELEASE.md).
 
-## MCP tool bridge
+## Collaboration providers
 
-Extensions can contribute namespaced tools to `putnami mcp` through their
-`putnami.extension.json` `tools` map. The CLI keeps the MCP JSON-RPC connection
-and starts the declared extension command only when a tool is called. The
-command receives one `extension.ToolCallRequest` JSON value on stdin and must
-write one `extension.ToolCallResult` to stdout.
+An extension implements a collaboration contract (`tasks`, `proposals`,
+`memory` or `missions`) by declaring it under `providers` in
+`putnami.extension.json`, keyed by contract. A manifest with `providers`
+requires CLI contract 19; `manifest.Builder.Provider` adds a declaration and
+`Build` stamps the contract. The CLI starts the declared command for each
+call: the process reads one `ProviderRequest` on stdin and writes one
+`Response` on stdout. Both documents, and `Serve`, which answers one call
+from a table of handlers, live in
+[`go.putnami.dev/protocol/collaboration`](../../protocols/collaboration/README.md).
 
-For Go extensions, route a dedicated binary subcommand to `mcp.Serve`:
+For Go extensions, route a dedicated binary subcommand to `collaboration.Serve`:
 
 ```go
-if len(os.Args) > 1 && os.Args[1] == "mcp-tool" {
-    _ = mcp.Serve(context.Background(), os.Stdin, os.Stdout, map[string]mcp.Handler{
-        "putnami.search": func(ctx context.Context, req extension.ToolCallRequest) (any, error) {
-            return search(ctx, req.Arguments)
-        },
-    })
+if len(os.Args) > 1 && os.Args[1] == "provider" {
+    if err := collaboration.Serve(context.Background(), os.Stdin, os.Stdout, handlers); err != nil {
+        os.Exit(1)
+    }
     return
 }
 ```
 
-The extension retains outbound authentication and network calls; the core CLI
-only forwards the request and result. If agent provenance was enabled for the
-MCP server, `req.Agent` is non-nil and is the structured source of truth for
-the bounded harness/model identity. Apply its documented request headers with
-`req.Agent.ApplyHTTPHeaders(outboundRequest)`.
-
-Return an error for a normal tool error; the helper encodes it as
-`isError: true`. A handler may return a value AND an error, which is the failure
-that still produced a report — a validation that ran and found the document
-invalid. `Serve` then writes two content blocks, the report first and the
-message second, exactly as the CLI's own tools do; a handler that failed before
-it had anything to say returns a nil value and gets the message alone.
+The extension keeps outbound authentication and network calls; the CLI only
+forwards the request and judges the response. A provider gets no host RPC
+channel.
 
 ### Answering about the workspace
 
-A tool that reports on the workspace declares `"workspaceSelection": true` in
-its manifest entry. The CLI then resolves the view and puts it on the request:
-
-```go
-"sdd.list_specs": func(ctx context.Context, req extension.ToolCallRequest) (any, error) {
-    if req.Selection == nil {
-        return nil, errors.New("this CLI does not publish `selection` on a tool request")
-    }
-    // req.WorkspaceProjects is the complete resolved membership; req.Selection
-    // is what this call's projects/impacted/baseline arguments resolved to.
-    return catalog(req.WorkspaceProjects, req.Selection)
-}
-```
+An operation that reports on the workspace declares `"workspaceSelection": true`
+in its manifest entry. The CLI then resolves the view and puts it on the
+request: `call.Request.WorkspaceProjects` is the complete resolved membership,
+and `call.Request.Selection` is what the call's `projects`, `impacted` and
+`baseline` arguments resolved to.
 
 Do not re-derive either. Resolving `impacted` means diffing a baseline, mapping
 changed paths to owners and walking the dependent graph; an extension that did

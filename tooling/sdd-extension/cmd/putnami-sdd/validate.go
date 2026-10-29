@@ -20,7 +20,7 @@ import (
 // `validate-workspace` commands run inside the DAG. Each is a thin adapter — build the view the wire entitles it
 // to, call ONE engine builder, publish the diagnostics — because what a run
 // DECIDES lives in internal/sdd and must be the same answer the interactive
-// commands and the MCP tools give.
+// commands give.
 //
 // The two commands exist separately because their SUBJECTS differ, not for
 // convenience. features and specs are about a project's own durable documents,

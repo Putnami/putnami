@@ -275,7 +275,7 @@ const (
 // check: the feature, the feature-local requirement, and the exact check ID
 // from the manifest's verification criterion. It is discoverability
 // only — the graph shows which declared test is EXPECTED to protect which
-// check, so `sdd.feature_context` can answer "which test proves this?", but
+// check, so `putnami features inspect` can answer "which test proves this?", but
 // a declared binding can never itself prove a passing test: only the test
 // adapter's observed verdict does.
 type DesignTestProof struct {

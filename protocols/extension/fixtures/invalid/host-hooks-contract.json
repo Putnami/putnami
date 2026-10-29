@@ -63,9 +63,6 @@
             "TodoWrite",
             "TaskCreate"
           ],
-          "mcpTools": [
-            "missions.ask"
-          ],
           "args": [
             "--engine",
             "claude-code"
@@ -112,9 +109,6 @@
           "event": "PostToolUse",
           "tools": [
             "update_plan"
-          ],
-          "mcpTools": [
-            "missions.ask"
           ],
           "args": [
             "--engine",

@@ -22,8 +22,8 @@ repository and mission name, so:
 
 A checkpoint replaces the mission's `content`, `sources` and `evidence`. The
 record keeps them exactly as given, with `provenance.recordedAt` (the
-checkpoint time) and `provenance.recordedBy` (the calling agent's client name,
-when Putnami propagates it). Evidence entries are references to gate, review,
+checkpoint time). The provider writes no `provenance.recordedBy`: a provider
+request names no caller. Evidence entries are references to gate, review,
 qualification or session records; no record member states a verdict, and the
 provider never adds one.
 
@@ -112,7 +112,7 @@ before anything else: the checkpoint landed when the branch is its commit or
 descends from it. The provider itself never repeats a write. Every Git command
 of a checkpoint's attempts ends within 100 s of its start, and that
 reconciliation gets 60 s more, so a checkpoint answers within 160 s, before
-the 180 s tool timeout.
+the 180 s provider timeout.
 
 ## The stores
 

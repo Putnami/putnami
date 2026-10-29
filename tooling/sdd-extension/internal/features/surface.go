@@ -13,11 +13,9 @@ import (
 )
 
 // servedSurface is what one project's own extension manifest lets a user or an
-// agent reach: the command paths typed after `putnami` and the MCP tool names
-// the tool listing advertises.
+// agent reach: the command paths typed after `putnami`.
 type servedSurface struct {
 	commands map[string]bool
-	tools    map[string]bool
 }
 
 // surfaceManifest holds the members of an extension manifest that name what
@@ -32,7 +30,6 @@ type surfaceManifest struct {
 	Verbs         []struct {
 		Name string `json:"name"`
 	} `json:"verbs"`
-	Tools map[string]json.RawMessage `json:"tools"`
 }
 
 // surfaceGroup is a command group or a subcommand, reduced to its children.
@@ -47,10 +44,9 @@ type surfaceGroup struct {
 //     nobody types;
 //   - the path of every subcommand of a command group, intermediate paths
 //     included (`cloud config`, `cloud config list`);
-//   - the name of every verb of the vocabulary;
-//   - the key of every tool.
+//   - the name of every verb of the vocabulary.
 func servedSurfaceOf(manifest surfaceManifest) servedSurface {
-	served := servedSurface{commands: make(map[string]bool), tools: make(map[string]bool)}
+	served := servedSurface{commands: make(map[string]bool)}
 	for name, command := range manifest.Commands {
 		if command.Visibility != "internal" {
 			served.commands[name] = true
@@ -61,9 +57,6 @@ func servedSurfaceOf(manifest surfaceManifest) servedSurface {
 	}
 	for _, verb := range manifest.Verbs {
 		served.commands[verb.Name] = true
-	}
-	for name := range manifest.Tools {
-		served.tools[name] = true
 	}
 	return served
 }
@@ -76,7 +69,7 @@ func addSubcommandPaths(into map[string]bool, prefix string, subcommands map[str
 	}
 }
 
-// resolveFeatureSurfaces checks every command path and tool name a feature
+// resolveFeatureSurfaces checks every command path a feature
 // lists against the extension manifest that sits at the same project root as
 // the declaring putnami.features.json, and nothing else. A root without an
 // extension manifest is not resolved: it serves no extension surface this
@@ -118,7 +111,6 @@ func resolveFeatureSurfaces(reader Reader, manifests []featureproto.ManifestSour
 			}
 			field := source.Path + "#" + "features[" + strconv.Itoa(index) + "]" + ".surface"
 			diagnostics = append(diagnostics, unservedNames(field+".commands", "command", feature.Surface.Commands, served.commands, manifestPath)...)
-			diagnostics = append(diagnostics, unservedNames(field+".tools", "tool", feature.Surface.Tools, served.tools, manifestPath)...)
 		}
 	}
 	sort.SliceStable(diagnostics, func(i, j int) bool { return diagnostics[i].Field < diagnostics[j].Field })

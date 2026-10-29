@@ -24,8 +24,8 @@ type CommandDefinition = model.CommandDefinition
 type SessionPrerequisiteDefinition = model.SessionPrerequisiteDefinition
 type SessionPrerequisiteParamBinding = model.SessionPrerequisiteParamBinding
 type CommandTraits = model.CommandTraits
-type ToolDefinition = model.ToolDefinition
-type ToolAnnotations = model.ToolAnnotations
+type ProviderDeclaration = model.ProviderDeclaration
+type ProviderOperation = model.ProviderOperation
 type VerbDefinition = model.VerbDefinition
 
 // Re-exported trait constants from the extension protocol.

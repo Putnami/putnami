@@ -404,14 +404,9 @@ func TestSpecCommandsRenderHumanAndStructuredSurfaces(t *testing.T) {
 	}
 }
 
-// TestRenderedPayloadIsTheBuilderResult is core's TestSpecCLIAndMCPShareOneResult,
-// with the half that has not landed yet removed.
-//
-// Core argued that the CLI and the MCP tools answer with the same value because
-// both call one builder. The MCP tools arrive in a later commit, so what is provable
-// here is the other half of the same claim: the payload the command WRITES is
-// the value the builder RETURNED, unchanged. Once the tools land, they call the
-// same builder and the original assertion is restored whole.
+// TestRenderedPayloadIsTheBuilderResult pins that a subcommand answers with the
+// value its builder returned: the payload the command WRITES is the value the
+// builder RETURNED, unchanged.
 func TestRenderedPayloadIsTheBuilderResult(t *testing.T) {
 	spectest.Proves(t, "tooling/specification-driven-development", "one-engine-two-surfaces", "the-rendered-payload-is-the-builder-result")
 	root, projects := specWorkspace(t)

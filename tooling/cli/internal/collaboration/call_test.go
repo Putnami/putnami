@@ -27,14 +27,14 @@ import (
 
 // The collaboration route, end to end: a real extension manifest on disk,
 // discovered by the extension discovery, bound from the workspace document,
-// invoked through the extension tool transport.
+// invoked through the provider transport.
 //
 // The provider is this test binary re-executed, not a script: a fixture that
 // shells out depends on whatever the host happens to have, while the self-exec
 // helper-process pattern depends on nothing but the Go toolchain already
 // building this test. Its behavior is chosen per fixture through the
-// manifest's tool environment, so one binary plays a well-behaved provider, a
-// slow one, a crashing one and a lying one.
+// provider's environment in the manifest, so one binary plays a well-behaved
+// provider, a slow one, a crashing one and a lying one.
 
 // TestMain isolates the machine-global putnami stores for the whole binary,
 // so no test reaches the real home directory.
@@ -63,7 +63,7 @@ const (
 )
 
 // TestCollaborationProviderHelperProcess is the fake provider. It does
-// nothing unless a tool call spawned it.
+// nothing unless a provider call spawned it.
 func TestCollaborationProviderHelperProcess(t *testing.T) {
 	mode := os.Getenv(collabProviderModeEnv)
 	if mode == "" {
@@ -85,7 +85,7 @@ func TestCollaborationProviderHelperProcess(t *testing.T) {
 		fmt.Fprintln(os.Stderr, "backend refused token "+os.Getenv(collabSecretEnv))
 		os.Exit(3)
 	case "garbage":
-		_, _ = os.Stdout.WriteString("not a tool result")
+		_, _ = os.Stdout.WriteString("not a response")
 		os.Exit(0)
 	}
 	if err := collab.Serve(context.Background(), bytes.NewReader(payload), os.Stdout, fakeCollabHandlers(mode)); err != nil {
@@ -246,22 +246,23 @@ func fakeCollabHandlers(mode string) map[collab.OperationKey]collab.Handler {
 	}
 }
 
-// fakeProviderTool declares one operation of the fake provider, with
-// annotations that agree with the catalog.
-func fakeProviderTool(t *testing.T, contract, operation string, preconditions collab.Preconditions, env map[string]string) proto.ToolDefinition {
+// fakeProvider declares one contract of the fake provider, with no
+// operation yet: this test binary, re-executed as the helper process, with the
+// fixture's environment.
+func fakeProvider(t *testing.T, env map[string]string) proto.ProviderDeclaration {
 	t.Helper()
-	spec, _ := collab.Lookup(contract, 1)
-	if _, ok := spec.Operation(operation); !ok {
-		t.Fatalf("no operation %s.%s", contract, operation)
-	}
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	def := collabToolDefinition(t, contract, operation, preconditions, executable)
-	def.Args = []string{"-test.run=^TestCollaborationProviderHelperProcess$"}
-	def.Env = env
-	return def
+	return proto.ProviderDeclaration{
+		Version:    1,
+		Command:    executable,
+		Args:       []string{"-test.run=^TestCollaborationProviderHelperProcess$"},
+		Env:        env,
+		TimeoutMs:  20000,
+		Operations: map[string]proto.ProviderOperation{},
+	}
 }
 
 // fixtureWorkspace writes a minimal two-project workspace and returns its root.
@@ -302,44 +303,40 @@ func recordWorkspaceIndex(t *testing.T, dir string) {
 
 // collabFixture is one workspace binding the fake provider.
 type collabFixture struct {
-	root   string
-	record string
-	tools  map[string]proto.ToolDefinition
+	root      string
+	record    string
+	providers map[string]proto.ProviderDeclaration
 }
 
 // newCollabFixture writes a workspace whose options.collaboration block is
 // bindings, and a provider extension implementing every required operation of
 // every contract plus tasks.assign (with no precondition support). mutate
-// edits the provider's tools before the manifest is written.
-func newCollabFixture(t *testing.T, mode, bindings string, mutate func(map[string]proto.ToolDefinition)) collabFixture {
+// edits the provider's declarations before the manifest is written.
+func newCollabFixture(t *testing.T, mode, bindings string, mutate func(map[string]proto.ProviderDeclaration)) collabFixture {
 	t.Helper()
 	root := fixtureWorkspace(t)
 	record := filepath.Join(t.TempDir(), "request.json")
 	env := map[string]string{collabProviderModeEnv: mode, collabProviderRecordEnv: record}
-	tools := map[string]proto.ToolDefinition{}
+	providers := map[string]proto.ProviderDeclaration{}
 	for _, contract := range collab.ContractNames {
 		spec, _ := collab.Lookup(contract, 1)
+		declaration := fakeProvider(t, env)
 		for _, op := range spec.Operations {
 			if !op.Required && op.Name != collab.OperationAssign {
 				continue
 			}
-			var preconditions collab.Preconditions
-			switch op.Preconditions {
-			case collab.PreconditionRuleDeclared:
-				preconditions = collab.PreconditionsChecked
-				if op.Name == collab.OperationAssign {
-					preconditions = collab.PreconditionsNone
-				}
-			case collab.PreconditionRuleAtomic:
-				preconditions = collab.PreconditionsAtomic
+			preconditions := catalogPreconditions(op)
+			if op.Name == collab.OperationAssign {
+				preconditions = collab.PreconditionsNone
 			}
-			tools["fixture."+contract+"."+op.Name] = fakeProviderTool(t, contract, op.Name, preconditions, env)
+			declaration.Operations[op.Name] = collabOperation(t, contract, op.Name, preconditions)
 		}
+		providers[contract] = declaration
 	}
 	if mutate != nil {
-		mutate(tools)
+		mutate(providers)
 	}
-	manifest, err := json.Marshal(proto.Manifest{Name: collabProvider, Version: "1.2.3", CLIContract: protocolcli.CurrentContract, Tools: tools})
+	manifest, err := json.Marshal(proto.Manifest{Name: collabProvider, Version: "1.2.3", CLIContract: protocolcli.ProviderContract, Providers: providers})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +358,7 @@ func newCollabFixture(t *testing.T, mode, bindings string, mutate func(map[strin
 	}
 	workspace.InvalidateLoadCache(root)
 	recordWorkspaceIndex(t, root)
-	return collabFixture{root: root, record: record, tools: tools}
+	return collabFixture{root: root, record: record, providers: providers}
 }
 
 const bindAll = `{"tasks":{"provider":"@test/collab","version":1},` +
@@ -401,16 +398,19 @@ func (f collabFixture) call(t *testing.T, contract, operation, arguments string)
 	return *parsed
 }
 
-// recorded reads the ToolCallRequest the provider process read on stdin.
-func (f collabFixture) recorded(t *testing.T) proto.ToolCallRequest {
+// recorded reads the ProviderRequest the provider process read on stdin. It
+// decodes strictly: a member the wire does not declare fails the test.
+func (f collabFixture) recorded(t *testing.T) collab.ProviderRequest {
 	t.Helper()
 	data, err := os.ReadFile(f.record)
 	if err != nil {
 		t.Fatalf("the provider recorded no request: %v", err)
 	}
-	var request proto.ToolCallRequest
-	if err := json.Unmarshal(data, &request); err != nil {
-		t.Fatalf("the provider read no ToolCallRequest: %v\n%s", err, data)
+	var request collab.ProviderRequest
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		t.Fatalf("the provider read no ProviderRequest: %v\n%s", err, data)
 	}
 	return request
 }
@@ -457,31 +457,31 @@ func TestCollaboration_OnlyADeclaredBlockRoutes(t *testing.T) {
 	}
 }
 
-// TestCollaboration_ProviderToolsAreReachableOnlyThroughTheBinding: the route
-// reaches a provider tool only as the operation of a contract the workspace
-// binds, under the tool name the provider declares for it. The tool's own name
-// is neither a contract nor an operation, and an installed provider is never
-// started for a contract the workspace does not bind to it.
-func TestCollaboration_ProviderToolsAreReachableOnlyThroughTheBinding(t *testing.T) {
+// TestCollaboration_ProviderOperationsAreReachableOnlyThroughTheBinding: the
+// route reaches a provider operation only as the operation of a contract the
+// workspace binds. Neither the extension's name nor a dotted
+// contract.operation is a contract or an operation, and an installed provider
+// is never started for a contract the workspace does not bind to it.
+func TestCollaboration_ProviderOperationsAreReachableOnlyThroughTheBinding(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "provider-tools-are-reachable-only-through-the-binding")
+	spectest.Proves(t, "cli/collaboration-providers", "one-route-two-entry-paths", "provider-operations-are-reachable-only-through-the-binding")
 	fixture := newCollabFixture(t, "ok", bindAll, nil)
 	env := fixture.env(t)
 	for _, name := range []struct{ contract, operation string }{
-		{"fixture", "tasks.find"},
-		{"fixture.tasks", "find"},
-		{collab.ContractTasks, "fixture.tasks.find"},
+		{collabProvider, "tasks.find"},
+		{collabProvider + ".tasks", "find"},
+		{collab.ContractTasks, "tasks.find"},
 	} {
 		envelope := CallProviderOperation(context.Background(), env, name.contract, name.operation, json.RawMessage(`{}`))
 		expectOutcome(t, envelope, collab.OutcomeInvalid, collab.ReasonRequestInvalid)
 	}
 	if _, err := os.Stat(fixture.record); !os.IsNotExist(err) {
-		t.Fatal("a call naming the provider tool itself started the provider")
+		t.Fatal("a call naming the provider instead of a bound operation started the provider")
 	}
 	expectOutcome(t, fixture.call(t, collab.ContractTasks, collab.OperationFind, `{}`), collab.OutcomeOK, "")
-	if request := fixture.recorded(t); request.Name != "fixture.tasks.find" || request.Provider == nil ||
+	if request := fixture.recorded(t); request.Provider == nil ||
 		request.Provider.Contract != collab.ContractTasks || request.Provider.Operation != collab.OperationFind {
-		t.Errorf("the bound operation reached %q as %+v, want the tool the provider declares for tasks.find", request.Name, request.Provider)
+		t.Errorf("the bound operation reached the provider as %+v, want tasks.find", request.Provider)
 	}
 
 	tasksOnly := newCollabFixture(t, "ok", `{"tasks":{"provider":"@test/collab","version":1}}`, nil)
@@ -588,7 +588,7 @@ func TestCollaboration_BindingFailuresAreExplicit(t *testing.T) {
 	cases := []struct {
 		name     string
 		bindings string
-		mutate   func(map[string]proto.ToolDefinition)
+		mutate   func(map[string]proto.ProviderDeclaration)
 		disable  bool
 		outcome  collab.Outcome
 		reason   string
@@ -602,15 +602,17 @@ func TestCollaboration_BindingFailuresAreExplicit(t *testing.T) {
 		{"a disabled provider", `{"tasks":{"provider":"@test/collab","version":1}}`,
 			nil, true, collab.OutcomeUnavailable, collab.ReasonBindingProviderMissing},
 		{"a provider missing a required operation", `{"tasks":{"provider":"@test/collab","version":1}}`,
-			func(tools map[string]proto.ToolDefinition) { delete(tools, "fixture.tasks.transition") },
+			func(providers map[string]proto.ProviderDeclaration) {
+				delete(providers["tasks"].Operations, "transition")
+			},
 			false, collab.OutcomeUnsupported, collab.ReasonBindingIncomplete},
 		{"a provider lacking an operation the binding requires", `{"tasks":{"provider":"@test/collab","version":1,"require":["claim"]}}`,
 			nil, false, collab.OutcomeUnsupported, collab.ReasonBindingIncomplete},
-		{"a provider whose annotations disagree", `{"tasks":{"provider":"@test/collab","version":1}}`,
-			func(tools map[string]proto.ToolDefinition) {
-				def := tools["fixture.tasks.find"]
-				def.Annotations.ReadOnlyHint = boolPointer(false)
-				def.Meta["putnami.dev/contract"] = jsonValue(t, `{"access":"mutating","readOnly":false,"supportsDryRun":false}`)
+		{"a provider declaring a precondition the operation does not take", `{"tasks":{"provider":"@test/collab","version":1}}`,
+			func(providers map[string]proto.ProviderDeclaration) {
+				find := providers["tasks"].Operations["find"]
+				find.Preconditions = string(collab.PreconditionsAtomic)
+				providers["tasks"].Operations["find"] = find
 			}, false, collab.OutcomeUnsupported, collab.ReasonBindingIncomplete},
 		{"credential settings", `{"tasks":{"provider":"@test/collab","version":1,"settings":{"apiToken":"x"}}}`,
 			nil, false, collab.OutcomeUnsupported, collab.ReasonBindingInvalid},
@@ -642,13 +644,14 @@ func TestCollaboration_BindingFailuresAreExplicit(t *testing.T) {
 func TestCollaboration_ABrokenBindingAnswersItsFailure(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-cli-refuses-a-call-to-a-withdrawn-contract-version")
-	fixture := newCollabFixture(t, "ok", `{"tasks":{"provider":"@test/collab","version":1}}`, func(tools map[string]proto.ToolDefinition) {
-		def := tools["fixture.tasks.create"]
-		def.Annotations.ReadOnlyHint = boolPointer(true)
+	fixture := newCollabFixture(t, "ok", `{"tasks":{"provider":"@test/collab","version":1}}`, func(providers map[string]proto.ProviderDeclaration) {
+		update := providers["tasks"].Operations["update"]
+		update.Preconditions = ""
+		providers["tasks"].Operations["update"] = update
 	})
 	envelope := fixture.call(t, collab.ContractTasks, collab.OperationCreate, `{"title":"t","idempotencyKey":"k"}`)
 	expectOutcome(t, envelope, collab.OutcomeUnsupported, collab.ReasonBindingIncomplete)
-	if !strings.Contains(envelope.Error.Message, "readOnlyHint must be false") {
+	if !strings.Contains(envelope.Error.Message, "tasks.update must declare preconditions") {
 		t.Errorf("message = %q", envelope.Error.Message)
 	}
 	if _, err := os.Stat(fixture.record); !os.IsNotExist(err) {
@@ -702,7 +705,7 @@ func TestCollaboration_TheProviderReceivesTheValidatedRequestAndItsSettings(t *t
 		t.Errorf("envelope identity = %+v", envelope)
 	}
 	request := fixture.recorded(t)
-	if request.Name != "fixture.proposals.find" || request.Provider == nil ||
+	if request.Provider == nil ||
 		request.Provider.Contract != "proposals" || request.Provider.Operation != "find" || request.Provider.Version != 1 ||
 		string(request.Provider.Settings) != `{"repository":"local"}` {
 		t.Fatalf("request = %+v", request)
@@ -813,15 +816,15 @@ func TestCollaboration_TimeoutsAndCancellation(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-read-unavailable-and-retryable")
 	spectest.Proves(t, "collaboration/provider-contract", "uncertain-writes-are-unresolved", "the-cli-makes-a-timed-out-or-canceled-mutation-unresolved")
-	fixture := newCollabFixture(t, "sleep", bindAll, func(tools map[string]proto.ToolDefinition) {
-		for name, def := range tools {
-			// The canceled checkpoint keeps the default timeout, so its
-			// deadline cannot compete with the cancellation.
-			if name == "fixture.memory.checkpoint" {
+	fixture := newCollabFixture(t, "sleep", bindAll, func(providers map[string]proto.ProviderDeclaration) {
+		for contract, declaration := range providers {
+			// The canceled checkpoint keeps its long timeout, so its deadline
+			// cannot compete with the cancellation.
+			if contract == collab.ContractMemory {
 				continue
 			}
-			def.TimeoutMs = 300
-			tools[name] = def
+			declaration.TimeoutMs = 300
+			providers[contract] = declaration
 		}
 	})
 	env := ProviderEnvironment{WorkspaceRoot: fixture.root, Extensions: discovered(t, fixture.root)}

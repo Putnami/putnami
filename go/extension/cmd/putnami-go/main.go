@@ -25,7 +25,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -207,9 +206,6 @@ func runEntrypoint(
 			return fmt.Errorf("input-resolve: %w", err)
 		}
 		return nil
-	}
-	if len(args) > 0 && args[0] == mcpToolArg {
-		return runMCPTool(context.Background(), os.Stdin, stdout)
 	}
 
 	// The GOCACHEPROG helper is spawned by the `go` command, not by core and
