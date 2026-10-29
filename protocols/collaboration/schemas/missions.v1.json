@@ -293,11 +293,12 @@
     },
     "statusInput": {
       "type": "object",
-      "description": "Reads a mission's view and its sessions. Optional: a provider that does not offer it answers unsupported. An agent may call it.",
+      "description": "Reads a mission's view and a page of its sessions. Optional: a provider that does not offer it answers unsupported. An agent may call it.",
       "additionalProperties": false,
       "required": ["mission"],
       "properties": {
-        "mission": { "$ref": "#/$defs/missionName", "description": "The mission to read. Its title is for display and changes nothing." }
+        "mission": { "$ref": "#/$defs/missionName", "description": "The mission to read. Its title is for display and changes nothing." },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
       }
     },
     "missionSession": {
@@ -311,21 +312,24 @@
         "observedAt": { "$ref": "#/$defs/utcTimestamp", "description": "The observation time of the last sync applied for the session." },
         "stage": { "$ref": "#/$defs/loopStage", "description": "Present when the provider holds a stage for the session." },
         "usage": { "$ref": "#/$defs/sessionUsage", "description": "Present when the provider holds a usage for the session." },
-        "branch": { "type": "string", "maxLength": 256, "description": "One line." }
+        "branch": { "type": "string", "maxLength": 256, "description": "One line." },
+        "error": { "type": "string", "maxLength": 1024, "description": "The error that stopped the session. Only when state is failed." },
+        "waitUntil": { "$ref": "collaboration.json#/$defs/timestamp", "description": "When the session stops waiting. Required when state is waiting, and only then." }
       }
     },
     "statusResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mission", "sessions"],
+      "required": ["mission", "sessions", "page"],
       "properties": {
         "mission": { "$ref": "#/$defs/missionView", "description": "The mission the request named. A provider that does not hold it answers its empty view." },
         "sessions": {
           "type": "array",
-          "maxItems": 50,
+          "maxItems": 100,
           "items": { "$ref": "#/$defs/missionSession" },
-          "description": "The sessions whose last applied sync named the mission, in every state, newest observedAt first, then by engine and id. A session appears once."
-        }
+          "description": "A page of the sessions whose last applied sync named the mission, in every state, newest observedAt first, then by engine and id. A session appears once. A traversal lists once every session that does not sync during it."
+        },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
       }
     }
   }

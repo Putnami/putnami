@@ -92,7 +92,7 @@
     },
     {
       "id": "missions-status",
-      "text": "missions.status, an optional read an agent may call, answers the named mission's view and its sessions, newest observation first, at most 50, each once: session, state, observedAt and, when held, stage, usage and branch of the last sync applied for it. A session whose last sync named another mission is not listed; an unknown mission has its empty view and no session. A provider without it is unsupported with operation.unsupported; an answer for another mission is provider.identity_mismatch."
+      "text": "missions.status, an optional read an agent may call, answers the named mission's view and a page of its sessions, newest observation first, then by engine and id, each once: session, state, observedAt and, when held, stage, usage, branch, error and waitUntil of its last applied sync. A traversal lists once each session that does not sync during it. A provider without it is unsupported with operation.unsupported; an answer for another mission is provider.identity_mismatch."
     },
     {
       "id": "scenarios-normalize-requests",
