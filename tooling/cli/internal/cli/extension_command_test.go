@@ -870,6 +870,111 @@ func TestAppRun_ExtensionStructuredCommand_UndeclaredDryRunPreviewsThePlan(t *te
 	}
 }
 
+// TestAppRun_ExtensionStructuredCommand_InteractiveRefusesAnUnhonoredPreview
+// pins the interactive half of the --dry-run contract. An interactive
+// subcommand has no plan to preview, so --plan is refused, and so is a
+// --dry-run its resolved flags do not declare: it would never reach the
+// subprocess, which would run for real.
+func TestAppRun_ExtensionStructuredCommand_InteractiveRefusesAnUnhonoredPreview(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-subcommand-refuses-a-preview-it-cannot-honor", "an-undeclared-interactive-preview-is-refused")
+	cases := map[string]struct {
+		argv []string
+		want string
+	}{
+		"undeclared dry-run": {
+			argv: []string{"demo", "login", "--dry-run"},
+			want: "putnami: --dry-run is refused on `putnami demo login`: the interactive subcommand does not declare it, so it would run for real\n",
+		},
+		"plan": {
+			argv: []string{"demo", "login", "--plan"},
+			want: "putnami: --plan is refused on `putnami demo login`: an interactive subcommand has no plan to preview\n",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			wsRoot := t.TempDir()
+			writeWorkspaceFixture(t, wsRoot)
+
+			var code int
+			output := captureStdoutStderr(t, func() {
+				app, err := NewApp()
+				if err != nil {
+					t.Fatalf("NewApp: %v", err)
+				}
+				t.Chdir(wsRoot)
+				code = app.Run(context.Background(), c.argv)
+			})
+			if code != ExitUsage {
+				t.Fatalf("%v exit = %d, want %d\n%s", c.argv, code, ExitUsage, output)
+			}
+			if !strings.Contains(output, c.want) {
+				t.Fatalf("%v output does not explain the refusal, want %q:\n%s", c.argv, c.want, output)
+			}
+			mustNotContain(t, output, "demo-login-stdout-marker")
+		})
+	}
+}
+
+// TestAppRun_ExtensionStructuredCommand_InteractiveDeclaredDryRunReachesTheCommand
+// pins that an interactive subcommand that declares `dry-run` runs under
+// --dry-run and reads it from its job context.
+func TestAppRun_ExtensionStructuredCommand_InteractiveDeclaredDryRunReachesTheCommand(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-subcommand-refuses-a-preview-it-cannot-honor", "a-declaring-interactive-subcommand-gets-dry-run")
+	wsRoot := t.TempDir()
+	writeWorkspaceFixture(t, wsRoot)
+	manifestPath := filepath.Join(wsRoot, "demo-extension", "putnami.extension.json")
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatalf("read extension manifest: %v", err)
+	}
+	declared := strings.Replace(string(manifest), `"command": "demo-login",`,
+		`"command": "demo-login", "flags": { "dry-run": { "type": "boolean" } },`, 1)
+	if declared == string(manifest) {
+		t.Fatalf("fixture manifest no longer matches the expected shape:\n%s", manifest)
+	}
+	if err := os.WriteFile(manifestPath, []byte(declared), 0o644); err != nil {
+		t.Fatalf("write extension manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(wsRoot, "demo-extension", "fixture.sh"), []byte(`#!/bin/sh
+ctx=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--putnamiContext" ]; then
+    ctx="$2"
+  fi
+  shift
+done
+if grep -q '"dry-run":true' "$ctx"; then
+  echo "dry-run-received-marker"
+  exit 0
+fi
+exit 9
+`), 0o755); err != nil {
+		t.Fatalf("write fixture script: %v", err)
+	}
+
+	var code int
+	output := captureStdoutStderr(t, func() {
+		app, err := NewApp()
+		if err != nil {
+			t.Fatalf("NewApp: %v", err)
+		}
+		t.Chdir(wsRoot)
+		code = app.Run(context.Background(), []string{"demo", "login", "--dry-run"})
+	})
+	if code != ExitSuccess {
+		t.Fatalf("demo login --dry-run exit = %d, want %d\n%s", code, ExitSuccess, output)
+	}
+	if !strings.Contains(output, "dry-run-received-marker") {
+		t.Fatalf("the declaring interactive subcommand did not receive dry-run:\n%s", output)
+	}
+}
+
 func TestBuildExtensionCommandParams_DryRunRequiresDeclaredFlag(t *testing.T) {
 	t.Parallel()
 	parsed := &ParsedArgs{Global: GlobalFlags{DryRun: true}}

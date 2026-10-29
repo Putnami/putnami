@@ -68,6 +68,9 @@ func (a *App) runUserScopeSubcommand(
 
 	engine.ApplyEnvOverrides(&parsed.Global, cfg)
 	effectiveFlags := resolved.EffectiveFlags()
+	if refuseUnhonoredPreview(stderr, parsed.Global, resolved, group+" "+sub, effectiveFlags) {
+		return ExitUsage
+	}
 	// Outside a workspace no run binds a release set, so the core reads neither
 	// --env nor --release: they are undeclared unless the subcommand declares
 	// them.

@@ -523,6 +523,33 @@ func TestAppRun_UserScope_RejectsSelectionFlags(t *testing.T) {
 	}
 }
 
+// TestAppRun_UserScope_RefusesAnUnhonoredPreview pins that a user-scope
+// subcommand, interactive by construction, refuses --plan and a --dry-run it
+// does not declare, rather than running for real.
+func TestAppRun_UserScope_RefusesAnUnhonoredPreview(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-subcommand-refuses-a-preview-it-cannot-honor", "an-undeclared-interactive-preview-is-refused")
+	userRoot, _ := userScopeTestEnv(t)
+	pinUserScopeExtension(t, userRoot, "user-scope")
+
+	for _, c := range []struct {
+		flag, want string
+	}{
+		{"--dry-run", "putnami: --dry-run is refused on `putnami audit run`: the interactive subcommand does not declare it, so it would run for real\n"},
+		{"--plan", "putnami: --plan is refused on `putnami audit run`: an interactive subcommand has no plan to preview\n"},
+	} {
+		t.Run(c.flag, func(t *testing.T) {
+			code, output := runApp(t, "audit", "run", c.flag)
+			if code != cli.ExitUsage {
+				t.Fatalf("audit run %s exit = %d, want %d:\n%s", c.flag, code, cli.ExitUsage, output)
+			}
+			if !strings.Contains(output, c.want) {
+				t.Fatalf("audit run %s output does not explain the refusal, want %q:\n%s", c.flag, c.want, output)
+			}
+			mustNotContain(t, output, "marker=")
+		})
+	}
+}
+
 // TestAppRun_UserScope_GroupDefaultSubcommand pins the group default: a bare
 // `putnami audit` runs the declared default, and `putnami audit --help` still
 // prints the group help without running anything.
