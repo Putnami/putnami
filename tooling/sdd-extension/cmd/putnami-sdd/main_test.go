@@ -27,7 +27,7 @@ func TestRuntimeHandshakeAnswersBeforeDispatch(t *testing.T) {
 	var stdout bytes.Buffer
 	dispatched := false
 
-	code, err := runEntrypoint([]string{"__putnami", "runtime-info"}, nil, &stdout, io.Discard, func(map[string]cli.JobFunc) {
+	code, err := runEntrypoint([]string{"__putnami", "runtime-info"}, &stdout, io.Discard, func(map[string]cli.JobFunc) {
 		dispatched = true
 	})
 	if err != nil {
@@ -71,7 +71,7 @@ func TestNonHandshakeArgsReachTheDispatcher(t *testing.T) {
 	} {
 		var stdout bytes.Buffer
 		var got map[string]cli.JobFunc
-		_, err := runEntrypoint(args, nil, &stdout, io.Discard, func(commands map[string]cli.JobFunc) { got = commands })
+		_, err := runEntrypoint(args, &stdout, io.Discard, func(commands map[string]cli.JobFunc) { got = commands })
 		if err != nil {
 			t.Fatalf("args %v: %v", args, err)
 		}
@@ -84,8 +84,8 @@ func TestNonHandshakeArgsReachTheDispatcher(t *testing.T) {
 	}
 }
 
-// TestDispatchTableMatchesTheManifest is the seam check jobs, command groups,
-// and MCP tools extend.
+// TestDispatchTableMatchesTheManifest is the seam check jobs and command groups
+// extend.
 //
 // Every task in putnami.extension.json whose command is the prepared runtime
 // selects its work with its own leading arguments, so a manifest that names

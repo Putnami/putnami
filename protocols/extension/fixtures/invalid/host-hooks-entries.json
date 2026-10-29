@@ -62,8 +62,8 @@
         },
         {
           "event": "PostToolUse",
-          "mcpTools": [
-            "missions.ask-decision"
+          "tools": [
+            "missions-ask"
           ],
           "timeoutSeconds": 30
         },

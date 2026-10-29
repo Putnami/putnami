@@ -44,8 +44,7 @@ This is Putnami's own configuration, given as a reference, not a default:
 }
 ```
 
-Then call `putnami tasks <operation>`, `putnami proposals <operation>` or the
-MCP tools `tasks.*` and `proposals.*`
+Then call `putnami tasks <operation>` or `putnami proposals <operation>`
 ([CLI guide](../cli/doc/25-collaboration-providers.md)). The first call
 compiles the runtime from this directory (`bin/prepare`).
 
@@ -113,7 +112,7 @@ GitHub token, from everything it writes.
 - **Hierarchy.** `link` sets or removes the parent through GitHub sub-issues;
   the parent must be an issue of the same repository. `get` and `link` report
   the parent; `find` does not. The parent is outside the revision (see below),
-  and the `link` tool's description says so, which is how the tasks contract
+  and the `link` operation's description says so, which is how the tasks contract
   lets a provider leave it out.
 - **Proposal labels and assignees.** Every proposal answer lists the pull
   request's `labels` and `assignees`, `[]` when it has none. An upsert answers
@@ -257,10 +256,10 @@ sequential repeats are.
 
 ## Layout
 
-- `putnami.extension.json` — the runtime declaration and one tool per
-  operation, each marked `putnami.dev/provider`.
+- `putnami.extension.json` — the runtime declaration and the `providers`
+  section: one declaration per contract, with its operations.
 - `cmd/putnami-github-collaboration` — the runtime: the `__putnami
-  runtime-info` handshake and the `provider-tool` bridge.
+  runtime-info` handshake and the `provider` entry point.
 - `internal/github` — the REST and GraphQL client: credentials, endpoints,
   and failure classification.
 - `internal/provider` — the operation handlers.

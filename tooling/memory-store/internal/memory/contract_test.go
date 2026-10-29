@@ -10,7 +10,6 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -38,7 +37,7 @@ func TestContract_ReadCheckpointResume(t *testing.T) {
 		record := created.Record
 		if created.Replayed || record.Kind != collab.MemoryKindMission || record.Identity.Mission != "42" ||
 			record.Identity.Workspace != workspaceName || record.Identity.Scope != "/tooling" || sequenceOf(t, record.Revision) != 1 ||
-			record.Provenance.RecordedBy != "contract-suite" || record.Provenance.RecordedAt != "2026-09-24T08:00:00Z" {
+			record.Provenance.RecordedBy != "" || record.Provenance.RecordedAt != "2026-09-24T08:00:00Z" {
 			t.Fatalf("created %+v", created)
 		}
 		if !strings.Contains(record.Ref.Source, ":") || record.Ref.ID != MissionID(record.Identity) {
@@ -313,7 +312,7 @@ func TestContract_ContextSelectsByIdentityAndScope(t *testing.T) {
 			slices.Sort(names)
 			return names
 		}
-		check := func(name string, request map[string]any, selection *extension.ToolSelection, want ...string) {
+		check := func(name string, request map[string]any, selection *collab.Selection, want ...string) {
 			t.Helper()
 			h.selection = selection
 			if got := missions(h.all(request, collab.MaxPageSize)); !slices.Equal(got, want) {
@@ -327,13 +326,13 @@ func TestContract_ContextSelectsByIdentityAndScope(t *testing.T) {
 		check("a scope", map[string]any{"identity": map[string]any{"repository": "acme/app", "scope": "/tooling"}}, nil,
 			"anywhere", "cli", "tooling")
 		check("a narrowed selection", map[string]any{"identity": acme},
-			&extension.ToolSelection{Mode: extension.ToolSelectionModeProjects, Scoped: true, ProjectIDs: []string{"/tooling/cli"}},
+			&collab.Selection{Mode: collab.SelectionModeProjects, Scoped: true, ProjectIDs: []string{"/tooling/cli"}},
 			"anywhere", "cli", "tooling")
 		check("an empty impact", map[string]any{"identity": acme},
-			&extension.ToolSelection{Mode: extension.ToolSelectionModeImpacted, Scoped: true, EmptyImpact: true, ProjectIDs: []string{}},
+			&collab.Selection{Mode: collab.SelectionModeImpacted, Scoped: true, EmptyImpact: true, ProjectIDs: []string{}},
 			"anywhere")
 		check("an unscoped selection", map[string]any{"identity": acme},
-			&extension.ToolSelection{Mode: extension.ToolSelectionModeAll, ProjectIDs: []string{"/tooling/cli"}},
+			&collab.Selection{Mode: collab.SelectionModeAll, ProjectIDs: []string{"/tooling/cli"}},
 			"anywhere", "cli", "protocols", "tooling")
 		check("another workspace", map[string]any{"identity": map[string]any{"workspace": "other"}}, nil)
 		check("notes only", map[string]any{"kinds": []string{"note"}}, nil)

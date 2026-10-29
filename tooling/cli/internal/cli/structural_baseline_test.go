@@ -449,7 +449,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       testFiles,
 		ceilingOnly: true,
-		want:        587,
+		want:        586,
 		why: "test fixtures built from untyped maps; they shrink as the canonical model lands. " +
 			"A0 pinned 516; A2b's scheduler and profiler tests now assert against typed records. " +
 			"An earlier change took it from 513 to 515: the two auto-selection tests that used to call " +
@@ -622,14 +622,15 @@ var structuralPins = []structuralPin{
 			"folds a test step and a race step into one command row states the test step's summary event and its " +
 			"testSummary result data in two lines, because a job result carries both as the untyped objects " +
 			"protocols/runtime types. Production adds none: the model types the changed files the step binds. " +
-			"A later change lowers 663→587 (ADR 0082): the tests of the deleted core MCP server go with it",
+			"A later change lowers 663→587 (ADR 0082): the tests of the deleted core MCP server go with it. " +
+			"Another lowers 587→586: a collaboration fixture is typed as a providers declaration",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        822,
+		want:        821,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -701,7 +702,8 @@ var structuralPins = []structuralPin{
 			"the production pin above; tests add none. " +
 			"A later change raises 916→919 = 256 production + 663 test for the race step's planner and live view " +
 			"test lines itemized on the test pin above; production adds none. " +
-			"A later change lowers 919→822 = 235 production + 587 test with the core MCP server (ADR 0082)",
+			"A later change lowers 919→822 = 235 production + 587 test with the core MCP server (ADR 0082). " +
+			"Another lowers 822→821 = 235 production + 586 test with the typed providers fixture",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

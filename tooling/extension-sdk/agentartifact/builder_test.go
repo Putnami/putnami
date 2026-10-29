@@ -646,7 +646,7 @@ func TestBuildReviewHardening(t *testing.T) {
 		root := newMaintainerProject(t)
 		writeSource(t, root, "src/agents/deep-worker/AGENT.md", "Body.\n")
 		writeSource(t, root, "src/agents/deep-worker/claude.yaml", "name: deep-worker\ndescription: Deep worker\n")
-		writeSource(t, root, "src/agents/deep-worker/codex.toml", "model = \"sol\"\n[mcp_servers.putnami]\ncommand = \"putnami\"\n")
+		writeSource(t, root, "src/agents/deep-worker/codex.toml", "model = \"sol\"\n[profiles.deep]\nsandbox = \"read-only\"\n")
 		if _, err := Build(root, "1.0.0"); err == nil || !strings.Contains(err.Error(), "declares a table") {
 			t.Fatalf("Build error = %v, want a table rejection", err)
 		}

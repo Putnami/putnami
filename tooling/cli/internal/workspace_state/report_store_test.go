@@ -66,17 +66,17 @@ func coverageReport(sessionID string, pct float64, enforced bool, origin string)
 
 // TestReportStore_ReadsTheNewestUserReport: `putnami report` with no argument
 // answers "what did my last run do", so the newest lookup passes over an
-// adapter run (origin "mcp") — which an exact --session read still returns.
+// ephemeral run (origin "ephemeral") — which an exact --session read still returns.
 func TestReportStore_ReadsTheNewestUserReport(t *testing.T) {
 	root := t.TempDir()
 	store := NewReportStore(root)
 
-	agentRun := validReport("20260807-094000-cccccc")
-	agentRun.Origin = cli.ReportOriginMCP
+	ephemeralRun := validReport("20260807-094000-cccccc")
+	ephemeralRun.Origin = cli.ReportOriginEphemeral
 	for _, report := range []*cli.ReportFile{
 		validReport("20260807-090000-aaaaaa"),
 		validReport("20260807-093000-bbbbbb"),
-		agentRun,
+		ephemeralRun,
 	} {
 		if err := store.Write(report); err != nil {
 			t.Fatalf("Write failed: %v", err)
@@ -98,8 +98,8 @@ func TestReportStore_ReadsTheNewestUserReport(t *testing.T) {
 	}
 
 	byID, err := store.Read("20260807-094000-cccccc")
-	if err != nil || byID.Report.Origin != cli.ReportOriginMCP {
-		t.Fatalf("Read of the agent's report = %v, %v, want it read back by name", byID, err)
+	if err != nil || byID.Report.Origin != cli.ReportOriginEphemeral {
+		t.Fatalf("Read of the ephemeral report = %v, %v, want it read back by name", byID, err)
 	}
 }
 
@@ -214,7 +214,7 @@ func TestReportStore_ReplacesInPlace(t *testing.T) {
 		t.Fatalf("Write failed: %v", err)
 	}
 	second := validReport("20260807-093000-ab12cd")
-	second.Origin = cli.ReportOriginMCP
+	second.Origin = cli.ReportOriginEphemeral
 	second.Commands = nil
 	second.Jobs = nil
 	second.Run.Counts = cli.RunCounts{}
@@ -226,7 +226,7 @@ func TestReportStore_ReplacesInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read report: %v", err)
 	}
-	if !strings.Contains(string(data), `"origin": "mcp"`) || strings.Contains(string(data), "build~compile") {
+	if !strings.Contains(string(data), `"origin": "ephemeral"`) || strings.Contains(string(data), "build~compile") {
 		t.Errorf("report was not replaced wholesale:\n%s", data)
 	}
 }
@@ -394,51 +394,51 @@ func TestReportStore_PruneWithinBudgetIsFree(t *testing.T) {
 	}
 }
 
-// TestReportStore_PruneDoesNotExemptAgentValidationRuns: the 365-day exemption
-// is for the USER's validation history; an MCP-origin validation report is
+// TestReportStore_PruneDoesNotExemptEphemeralValidationRuns: the 365-day exemption
+// is for the USER's validation history; an ephemeral-origin validation report is
 // count-pruned like any other report.
-func TestReportStore_PruneDoesNotExemptAgentValidationRuns(t *testing.T) {
+func TestReportStore_PruneDoesNotExemptEphemeralValidationRuns(t *testing.T) {
 	rs := NewReportStore(t.TempDir())
 	pruneFixture(t, rs, reportRetainCount+1, func(int) bool { return false })
-	agent := fmt.Sprintf("20260807-%06d-abcdef", 0)
-	report := validReport(agent)
+	ephemeral := fmt.Sprintf("20260807-%06d-abcdef", 0)
+	report := validReport(ephemeral)
 	report.EnforceCoverage = true
-	report.Origin = cli.ReportOriginMCP
+	report.Origin = cli.ReportOriginEphemeral
 	if err := rs.Write(report); err != nil {
 		t.Fatal(err)
 	}
 	aged := time.Now().Add(-2 * reportPruneGraceWindow)
-	if err := os.Chtimes(rs.Path(agent), aged, aged); err != nil {
+	if err := os.Chtimes(rs.Path(ephemeral), aged, aged); err != nil {
 		t.Fatal(err)
 	}
 
 	rs.Prune()
 
-	if _, err := os.Stat(rs.Path(agent)); !os.IsNotExist(err) {
-		t.Errorf("an agent's validation report survived the count cap: %v", err)
+	if _, err := os.Stat(rs.Path(ephemeral)); !os.IsNotExist(err) {
+		t.Errorf("an ephemeral validation report survived the count cap: %v", err)
 	}
 }
 
-// TestReportStore_LatestScansPastAnAgentBurst: the newest-first lookups carry
-// no scan cap, because any fixed window can be filled by a burst of MCP-origin
-// reports — a busy agent afternoon — and would turn "no run report recorded"
+// TestReportStore_LatestScansPastAnEphemeralBurst: the newest-first lookups carry
+// no scan cap, because any fixed window can be filled by a burst of ephemeral-origin
+// reports — a run of `cache verify` calls — and would turn "no run report recorded"
 // into a wrong answer while the user's report sits just past it.
-func TestReportStore_LatestScansPastAnAgentBurst(t *testing.T) {
+func TestReportStore_LatestScansPastAnEphemeralBurst(t *testing.T) {
 	rs := NewReportStore(t.TempDir())
 	user := coverageReport("20260807-000000-user00", 77.5, true, cli.ReportOriginCLI)
 	if err := rs.Write(user); err != nil {
 		t.Fatal(err)
 	}
 	for i := range 300 {
-		agent := validReport(fmt.Sprintf("20260807-%06d-agent0", i+1))
-		agent.Origin = cli.ReportOriginMCP
-		if err := rs.Write(agent); err != nil {
+		burst := validReport(fmt.Sprintf("20260807-%06d-burst0", i+1))
+		burst.Origin = cli.ReportOriginEphemeral
+		if err := rs.Write(burst); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	recorded := rs.Latest()
 	if recorded == nil || recorded.Report.SessionID != "20260807-000000-user00" {
-		t.Fatalf("Latest = %v, want the user's report behind the 300-report agent burst", recorded)
+		t.Fatalf("Latest = %v, want the user's report behind the 300-report ephemeral burst", recorded)
 	}
 }

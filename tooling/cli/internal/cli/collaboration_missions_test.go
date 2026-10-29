@@ -17,10 +17,7 @@ import (
 func collabMissionsWorkspace(t *testing.T) string {
 	t.Helper()
 	return collabCommandWorkspace(t, `{"missions":{"provider":"@test/cli-collab","version":1}}`, func(manifest *extproto.Manifest) {
-		spec, _ := collab.Lookup(collab.ContractMissions, 1)
-		for _, name := range spec.RequiredOperations() {
-			manifest.Tools["fixture.missions."+name] = collabCommandTool(t, collab.ContractMissions, name)
-		}
+		manifest.Providers[collab.ContractMissions] = collabCommandProvider(t, collab.ContractMissions)
 	})
 }
 

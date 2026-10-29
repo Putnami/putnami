@@ -186,29 +186,3 @@ func TestWorktreeValidationReadsNoGitHistory(t *testing.T) {
 		t.Fatalf("ratchet = %+v, want the finding reported as new", worktree.Ratchet)
 	}
 }
-
-// TestArchitectureContextReadsNoGitHistory gives the MCP-facing builder the
-// same no-repository fixture as the cached task, with a coherent declaration so
-// the only thing that can make it fail is an accidental baseline lookup.
-func TestArchitectureContextReadsNoGitHistory(t *testing.T) {
-	spectest.Proves(t, "tooling/specification-driven-development", "architecture-agent-context", "architecture-context-reads-worktree-only")
-	ws := architectureBuildersWorkspace(t, true)
-	writeArchitectureTestFile(t, filepath.Join(ws.Root, archproto.BaselineFilename),
-		`{"protocolVersion":1,"findings":[]}`)
-
-	ordinary, _ := BuildArchitectureInspectionResult(ws, "consumer", "")
-	if !hasDiagnosticCode(ordinary.Diagnostics, ErrorCodeBaselineUnavailable) {
-		t.Fatalf("the fixture does not exercise the interactive git path: %+v", ordinary.Diagnostics)
-	}
-
-	context, err := BuildArchitectureWorktreeInspectionResult(ws, "consumer")
-	if err != nil {
-		t.Fatalf("worktree architecture context: %v (%+v)", err, context)
-	}
-	if hasDiagnosticCode(context.Diagnostics, ErrorCodeBaselineUnavailable) {
-		t.Fatalf("the agent context read git history: %+v", context.Diagnostics)
-	}
-	if context.Domain == nil || context.Domain.ID != "consumer" || context.Baseline.Compared || context.Baseline.Requested != "" {
-		t.Fatalf("worktree context = %+v", context)
-	}
-}

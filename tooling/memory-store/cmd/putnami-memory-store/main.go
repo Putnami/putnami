@@ -6,11 +6,11 @@
 // Usage:
 //
 //	putnami-memory-store __putnami runtime-info   (the runtime handshake)
-//	putnami-memory-store provider-tool            (one routed ToolCallRequest on stdin, one ToolCallResult on stdout)
+//	putnami-memory-store provider                 (one routed ProviderRequest on stdin, one Response on stdout)
 //
 // It is never called directly: the workspace binds it in
 // options.collaboration.memory and Putnami routes `putnami memory <operation>`
-// and the MCP tools `memory.*` to it.
+// and the host call collaboration.call to it.
 package main
 
 import (
@@ -32,8 +32,8 @@ import (
 // handshake against the manifest that declared the runtime.
 const extensionName = "@putnami/memory-store"
 
-// providerToolArg routes the executable to the collaboration bridge.
-const providerToolArg = "provider-tool"
+// providerArg routes the executable to the collaboration provider.
+const providerArg = "provider"
 
 // runtimeVersion is stamped at link time through
 // options["@putnami/go"].version-var; an unstamped build reports it empty.
@@ -56,14 +56,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
-	case slices.Equal(args, []string{providerToolArg}):
+	case slices.Equal(args, []string{providerArg}):
 		if err := collab.Serve(context.Background(), stdin, stdout, newHandlers()); err != nil {
 			fmt.Fprintf(stderr, "putnami-memory-store: %v\n", err)
 			return 1
 		}
 		return 0
 	}
-	fmt.Fprintln(stderr, "putnami-memory-store: unknown invocation; this runtime answers "+providerToolArg+" only through a workspace binding")
+	fmt.Fprintln(stderr, "putnami-memory-store: unknown invocation; this runtime answers "+providerArg+" only through a workspace binding")
 	return 2
 }
 

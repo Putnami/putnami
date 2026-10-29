@@ -696,7 +696,7 @@ func TestSpecSelectorsRejectUnboundedInputWithoutEchoingIt(t *testing.T) {
 
 // TestSpecCatalogDegradesAroundBrokenDocuments keeps discovery usable: a
 // document that cannot be read or does not resolve must not hide the healthy
-// specs, on the CLI or through list_specs.
+// specs in `specs list`.
 func TestSpecCatalogDegradesAroundBrokenDocuments(t *testing.T) {
 	ws := specWorkspace(t)
 	root := ws.Root

@@ -102,7 +102,7 @@ func resolveCollab(document collabDocument, contract string, extensions []*exten
 	provider := matches[0]
 	resolution.Provider = provider
 
-	offer, diags := collab.ReadProviderOffer(provider.Tools)
+	offer, diags := collab.ReadProviderOffer(provider.Providers)
 	operations, offered := offer.Operations(contract, binding.Version)
 	if !offered {
 		if problems := contractDiagnostics(diags, contract); problems != "" {
@@ -128,7 +128,7 @@ func resolveCollab(document collabDocument, contract string, extensions []*exten
 }
 
 // contractDiagnostics renders the declaration errors that concern one
-// contract's tools.
+// contract's provider declaration.
 func contractDiagnostics(diags []diag.Diagnostic, contract string) string {
 	var parts []string
 	for _, d := range diag.Errors(diags) {
@@ -146,7 +146,7 @@ func candidates(contract string, extensions []*extension.ExtensionDescription, u
 		if ext == nil || unavailable[ext.Name] {
 			continue
 		}
-		offer, _ := collab.ReadProviderOffer(ext.Tools)
+		offer, _ := collab.ReadProviderOffer(ext.Providers)
 		if len(offer.Versions(contract)) > 0 {
 			found = append(found, collab.ProviderIdentity{Name: ext.Name, Version: ext.Version})
 		}
@@ -176,10 +176,10 @@ func capabilitiesOf(resolution collabResolution) collab.Capabilities {
 		entry := collab.OperationCapability{Name: op.Name, Access: op.Access, Required: op.Required, HostOnly: op.HostOnly}
 		if provided, ok := resolution.Operations[op.Name]; ok {
 			entry.Supported = true
-			entry.Preconditions = provided.Declaration.Preconditions
-			entry.Description = provided.Definition.Description
-			if annotations := provided.Definition.Annotations; annotations != nil && annotations.OpenWorldHint != nil {
-				openWorld := *annotations.OpenWorldHint
+			entry.Preconditions = provided.Preconditions()
+			entry.Description = provided.Operation.Description
+			if declared := provided.Operation.OpenWorld; declared != nil {
+				openWorld := *declared
 				entry.OpenWorld = &openWorld
 			}
 		}

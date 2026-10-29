@@ -222,11 +222,6 @@ var (
 		req("files", intAtLeast(0)),
 	}
 
-	sessionAgentFields = []field{
-		req("kind", printableASCIIBytesAtMost(SessionAgentValueMaxBytes)),
-		opt("sessionId", printableASCIIBytesAtMost(SessionAgentValueMaxBytes)),
-	}
-
 	sessionPlacementFields = []field{
 		req("requested", enumOf("local", "remote")),
 		req("actual", enumOf("local", "remote")),
@@ -438,14 +433,6 @@ var (
 		req("machineOutput", machineOutputSummary),
 	}
 
-	mcpResultFields = []field{
-		req("protocolVersion", protocolVersion),
-		req("tool", enumOf(MCPToolRunJobs, MCPToolPlanJobs)),
-		req("commands", arrayOf(nonEmptyString)),
-		opt("run", runSummary),
-		opt("plan", planSummary),
-	}
-
 	sessionFileFields = []field{
 		req("protocolVersion", protocolVersion),
 		req("sessionId", nonEmptyString),
@@ -458,7 +445,6 @@ var (
 		opt("tree", sessionTree),
 		opt("declarations", sessionDeclarations),
 		opt("placement", sessionPlacement),
-		opt("agent", sessionAgent),
 		req("run", runSummary),
 		opt("tasks", arrayOf(taskRecord)),
 		opt("executions", arrayOf(executionRecord)),
@@ -554,7 +540,7 @@ var (
 		req("sessionId", nonEmptyString),
 		req("startTime", nonEmptyString),
 		req("endTime", nonEmptyString),
-		req("origin", enumOf(ReportOriginCLI, ReportOriginMCP)),
+		req("origin", enumOf(ReportOriginCLI, ReportOriginEphemeral)),
 		req("enforceCoverage", boolean),
 		opt("fix", boolean),
 		opt("git", reportGit),
@@ -606,7 +592,6 @@ var v2FieldSets = map[string][]field{
 	"memoryPressure":           memoryPressureFields,
 	"sessionTree":              sessionTreeFields,
 	"sessionDeclarations":      sessionDeclarationsFields,
-	"sessionAgent":             sessionAgentFields,
 	"sessionPlacement":         sessionPlacementFields,
 	"sessionProvenance":        sessionProvenanceFields,
 	"sessionSelectionReuse":    sessionSelectionReuseFields,
@@ -626,7 +611,6 @@ var v2FieldSets = map[string][]field{
 	"workspaceWarning":         workspaceWarningFields,
 	"sessionStreamRecord":      sessionStreamRecordFields,
 	"boundedSessionEndRecord":  boundedSessionEndRecordFields,
-	"mcpResult":                mcpResultFields,
 	"sessionFile":              sessionFileFields,
 	"sessionPlanFile":          sessionPlanFileFields,
 	"reportGit":                reportGitFields,
@@ -996,10 +980,6 @@ func sessionTree(v *validator, path string, value any) {
 
 func sessionDeclarations(v *validator, path string, value any) {
 	object(v, path, value, sessionDeclarationsFields)
-}
-
-func sessionAgent(v *validator, path string, value any) {
-	object(v, path, value, sessionAgentFields)
 }
 
 // sessionPlacement applies the one semantic rule beside the member set:
@@ -1423,19 +1403,6 @@ func checkMachineOutputBudgetMember(v *validator, path string, budget map[string
 	if got, ok := childInt(budget, name); ok && got != want {
 		v.add(ViolationInvalidValue, join(path, name))
 	}
-}
-
-func validateMCPResult(v *validator, root map[string]any) {
-	obj := object(v, "", root, mcpResultFields)
-	tool, ok := childString(obj, "tool")
-	if !ok {
-		return
-	}
-	if tool == MCPToolRunJobs {
-		requireMembers(v, obj, []string{"run"})
-		return
-	}
-	requireMembers(v, obj, []string{"plan"})
 }
 
 func validateSessionFile(v *validator, root map[string]any) {

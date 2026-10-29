@@ -1,7 +1,7 @@
 # Collaboration providers
 
 A workspace chooses where its work items, change proposals, agent memory and
-agent missions live, one contract at a time, and every tool and script calls the same
+agent missions live, one contract at a time, and every command and script calls the same
 operations whatever the backend is. Putnami routes each call to the provider
 extension the workspace binds; the provider owns the backend, its
 credentials, its identifiers and its mappings.
@@ -47,8 +47,8 @@ leaving `memory` out leaves it unbound. Putnami never picks a provider the
 workspace did not name, even when exactly one is installed, and never falls
 back to another one when the bound provider fails.
 
-A workspace without `options.collaboration` has none of the commands or tools
-below, and reserves none of their names.
+A workspace without `options.collaboration` has none of the commands below,
+and reserves none of their names.
 
 ## Call an operation
 

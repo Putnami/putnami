@@ -72,8 +72,8 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	// digest-bound tree, so an empty section can never stand in for a
 	// contribution. A vocabulary-only extension is complete for the same
 	// reason, and ValidateVerbs rejects an empty vocabulary.
-	if len(m.Commands) == 0 && len(m.Tools) == 0 && !m.DeclaresAgentContent() && !m.DeclaresVerbs() {
-		diags = append(diags, diag.Errorf("required-field", "commands", "at least one command, MCP tool, agent-content contribution or verb vocabulary is required"))
+	if len(m.Commands) == 0 && !DeclaresProviders(m) && !m.DeclaresAgentContent() && !m.DeclaresVerbs() {
+		diags = append(diags, diag.Errorf("required-field", "commands", "at least one command, provider, agent-content contribution or verb vocabulary is required"))
 	}
 	diags = append(diags, ValidateNoReservedFlagShadows(m)...)
 
@@ -378,13 +378,8 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	// declares none.
 	diags = append(diags, ValidateVerbs(m)...)
 
-	// Validate MCP tool declarations in sorted order for deterministic
-	// diagnostics. A malformed tool must fail package-time validation instead
-	// of becoming a surprising agent-facing capability at runtime.
-	toolNames := sortedKeys(m.Tools)
-	for _, name := range toolNames {
-		diags = append(diags, validateToolDefinition(name, m.Tools[name])...)
-	}
+	// The providers (providers.go). Inert for a manifest that declares none.
+	diags = append(diags, ValidateProviders(m)...)
 
 	return diags
 }
@@ -571,95 +566,6 @@ func stepDependsTransitively(stepsByID map[string]PipelineStep, stepID, dependen
 		return false
 	}
 	return visit(stepID)
-}
-
-func validateToolDefinition(name string, tool ToolDefinition) []diag.Diagnostic {
-	field := "tools." + name
-	var diags []diag.Diagnostic
-	if !isNamespacedToolName(name) {
-		diags = append(diags, diag.Errorf("invalid-tool-name", field,
-			"tool name %q must be namespaced (for example, putnami.search)", name))
-	}
-	if strings.TrimSpace(tool.Description) == "" {
-		diags = append(diags, diag.Errorf("required-field", field+".description", "tool description is required"))
-	}
-	if strings.TrimSpace(tool.Command) == "" {
-		diags = append(diags, diag.Errorf("required-field", field+".command", "tool command is required"))
-	}
-	if tool.TimeoutMs < 0 {
-		diags = append(diags, diag.Errorf("invalid-value", field+".timeoutMs", "tool timeoutMs cannot be negative"))
-	}
-
-	var schema map[string]any
-	if len(tool.InputSchema) == 0 {
-		diags = append(diags, diag.Errorf("required-field", field+".inputSchema", "tool inputSchema is required"))
-	} else if err := json.Unmarshal(tool.InputSchema, &schema); err != nil || schema == nil {
-		if err != nil {
-			diags = append(diags, diag.Errorf("invalid-schema", field+".inputSchema", "tool inputSchema must be a JSON object: %v", err))
-		} else {
-			diags = append(diags, diag.Errorf("invalid-schema", field+".inputSchema", "tool inputSchema must be a JSON object"))
-		}
-	}
-
-	if tool.Annotations == nil {
-		diags = append(diags, diag.Errorf("required-field", field+".annotations", "tool annotations are required"))
-	} else {
-		for _, annotation := range []struct {
-			name  string
-			value *bool
-		}{
-			{"readOnlyHint", tool.Annotations.ReadOnlyHint},
-			{"destructiveHint", tool.Annotations.DestructiveHint},
-			{"idempotentHint", tool.Annotations.IdempotentHint},
-			{"openWorldHint", tool.Annotations.OpenWorldHint},
-		} {
-			if annotation.value == nil {
-				diags = append(diags, diag.Errorf("required-field", field+".annotations."+annotation.name,
-					"tool %s is required", annotation.name))
-			}
-		}
-	}
-
-	contract, ok := tool.Meta["putnami.dev/contract"].(map[string]any)
-	if !ok {
-		diags = append(diags, diag.Errorf("required-field", field+"._meta.putnami.dev/contract",
-			"tool contract metadata is required"))
-		return diags
-	}
-	access, accessOK := contract["access"].(string)
-	readOnly, readOnlyOK := contract["readOnly"].(bool)
-	if !accessOK || (access != "read" && access != "mutating") {
-		diags = append(diags, diag.Errorf("invalid-enum", field+"._meta.putnami.dev/contract.access",
-			"contract access must be read or mutating"))
-	}
-	if !readOnlyOK {
-		diags = append(diags, diag.Errorf("required-field", field+"._meta.putnami.dev/contract.readOnly",
-			"contract readOnly is required"))
-	} else if accessOK && readOnly != (access == "read") {
-		diags = append(diags, diag.Errorf("invalid-value", field+"._meta.putnami.dev/contract.readOnly",
-			"contract readOnly must agree with contract access"))
-	}
-	if _, ok := contract["supportsDryRun"].(bool); !ok {
-		diags = append(diags, diag.Errorf("required-field", field+"._meta.putnami.dev/contract.supportsDryRun",
-			"contract supportsDryRun is required"))
-	}
-	if tool.Annotations != nil && tool.Annotations.ReadOnlyHint != nil && readOnlyOK && *tool.Annotations.ReadOnlyHint != readOnly {
-		diags = append(diags, diag.Errorf("invalid-value", field+".annotations.readOnlyHint",
-			"readOnlyHint must agree with contract readOnly"))
-	}
-	return diags
-}
-
-func isNamespacedToolName(name string) bool {
-	if strings.Count(name, ".") == 0 || strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
-		return false
-	}
-	for _, r := range name {
-		if !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9') && r != '.' && r != '-' && r != '_' {
-			return false
-		}
-	}
-	return true
 }
 
 // ValidateNoReservedFlagShadows checks only the manifest flag surfaces for

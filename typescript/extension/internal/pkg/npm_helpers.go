@@ -751,14 +751,14 @@ func (o *orderedJSON) marshal() json.RawMessage {
 // at build time. Without this file, hook discovery fails and code generation
 // (serve entrypoints, route loaders, SSR bundles) is skipped.
 //
-// For manifests that declare a command or MCP tool contract surface it also
+// For manifests that declare a command or provider contract surface it also
 // runs the package-time contract gate: the staged manifest is validated
 // strictly at the current CLI contract and, on success, stamped with the
 // earned cliContract. A non-conforming manifest returns an error that fails
 // the package job — it must never reach the registry, because the loader's
 // tolerance for older contracts is only safe when stamped contracts are
-// verified. Hook-only manifests (empty commands) have no flag or agent-facing
-// tool surface for the contract to govern and keep the historical best-effort
+// verified. Hook-only manifests (empty commands) have no flag or provider
+// surface for the contract to govern and keep the historical best-effort
 // behavior.
 //
 // A manifest that declares agentContent has its content built into the package

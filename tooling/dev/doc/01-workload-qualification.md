@@ -488,10 +488,9 @@ summary, so a reviewer sees which build was proven.
   target does not read `/version`.
 - A local target needs a git worktree, and fails closed when its own run writes
   into a file git does not ignore.
-- `qualify` waits on a live workload, so the MCP `run_jobs` tool refuses
-  `qualify-run`, which only an interactive subcommand carries, and
-  `compose-up`, whose traits declare the `serve` workload. A portable or
-  commit-addressed run refuses both by their traits.
+- `qualify` waits on a live workload, so a portable or commit-addressed run
+  refuses `qualify-run`, which only an interactive subcommand carries, and
+  `compose-up`, whose traits declare the `serve` workload.
 - A hosted run (`--credential-fd`) refuses the `compose` and `qualify` groups,
   as it refuses every extension command group, so `qualify --target <url>`
   does not run there. Run it from a CI job that is not a hosted run.

@@ -91,7 +91,7 @@ the `clients.services` config), beside credentials:
 
 ```go
 binding := client.ServiceBinding{
-    URL: "https://intelligence.example", ClientID: "mcp-consumer",
+    URL: "https://intelligence.example", ClientID: "example-consumer",
     Headers: map[string]string{"X-Putnami-Observed-Revision": revision},
     Credentials: map[string]client.CredentialBinding{
         "user": {Source: client.CredentialSourceForwardedUser},

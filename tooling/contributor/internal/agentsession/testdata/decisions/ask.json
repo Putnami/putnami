@@ -1,0 +1,19 @@
+{
+  "question": "Which color should the logo be?",
+  "context": "The site header and the favicon share the logo.",
+  "options": [
+    {
+      "id": "blue",
+      "label": "Blue"
+    },
+    {
+      "id": "green",
+      "label": "Green"
+    }
+  ],
+  "recommendation": {
+    "option": "blue",
+    "reason": "It matches the site."
+  },
+  "blocks": "The logo asset."
+}

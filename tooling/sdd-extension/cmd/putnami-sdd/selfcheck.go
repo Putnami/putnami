@@ -9,7 +9,7 @@ import (
 // it, and nothing else.
 //
 // It exists for two reasons, one of them structural. The extension protocol
-// requires a manifest to declare at least one command or MCP tool
+// requires a manifest to declare at least one command or provider
 // (extension.ValidateManifest), so a manifest with a prepared runtime and
 // nothing to run is not a legal document — the scaffold needs one command.
 // Given that, the useful one is the check that the wiring works end to end:

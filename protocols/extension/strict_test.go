@@ -1,7 +1,6 @@
 package extension
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -397,57 +396,6 @@ func TestValidateManifest_MissingCommands(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected diagnostic for commands field")
-	}
-}
-
-func TestValidateManifest_ToolOnlyExtension(t *testing.T) {
-	trueVal, falseVal := true, false
-	m := &Manifest{
-		Name: "@test/extension",
-		Tools: map[string]ToolDefinition{
-			"putnami.search": {
-				Description: "Search the hosted index.",
-				InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
-				Annotations: &ToolAnnotations{
-					ReadOnlyHint:    &trueVal,
-					DestructiveHint: &falseVal,
-					IdempotentHint:  &trueVal,
-					OpenWorldHint:   &trueVal,
-				},
-				Meta: map[string]any{"putnami.dev/contract": map[string]any{
-					"access": "read", "readOnly": true, "supportsDryRun": false,
-				}},
-				Command: "bin/acme-tool",
-			},
-		},
-	}
-	if diags := ValidateManifest(m); diag.HasErrors(diags) {
-		t.Fatalf("tool-only manifest should be valid: %v", diags)
-	}
-}
-
-func TestValidateManifest_InvalidToolDefinition(t *testing.T) {
-	m := &Manifest{
-		Name: "@test/extension",
-		Tools: map[string]ToolDefinition{
-			"bare": {
-				Description: "Missing required execution and safety data.",
-				InputSchema: json.RawMessage(`[]`),
-			},
-		},
-	}
-	diags := ValidateManifest(m)
-	if !diag.HasErrors(diags) {
-		t.Fatal("expected invalid tool diagnostics")
-	}
-	fields := map[string]bool{}
-	for _, d := range diags {
-		fields[d.Field] = true
-	}
-	for _, want := range []string{"tools.bare", "tools.bare.command", "tools.bare.annotations", "tools.bare._meta.putnami.dev/contract"} {
-		if !fields[want] {
-			t.Errorf("missing diagnostic for %s: %v", want, diags)
-		}
 	}
 }
 

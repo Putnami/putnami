@@ -99,9 +99,6 @@
         "commands": [
           "logs flush",
           "logs tail"
-        ],
-        "tools": [
-          "logging.flush_sinks"
         ]
       }
     }

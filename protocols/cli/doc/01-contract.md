@@ -282,6 +282,13 @@ hold adds no dependency. A reader below 18
 would read the entry as a command name, plan nothing and run the dependent
 before the step it reads, so it refuses the stamp. The floor binds a manifest
 wherever it loads from. Only a manifest with such an entry is stamped 18.
+Contract `19` (`ProviderContract`) is additive for the `providers` section:
+the collaboration providers an extension declares, keyed by contract. From 19
+on, the CLI calls each declared operation as a subprocess that reads one
+provider request and writes one collaboration response. A reader below 19
+would load the extension with no provider, so it refuses the stamp. The floor
+binds a manifest wherever it loads from. Only a manifest that declares the
+section is stamped 19.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.
@@ -312,7 +319,7 @@ the CLI and an extension come from the same release train — they negotiate:
 | **above `LatestContract`** | Fail loud: "extension requires a newer putnami (contract N > M)". A future contract is never half-interpreted. |
 
 One manifest is outside the ladder: a manifest that declares **no contract
-surface** — no commands, no command groups, no tools, no agent content, e.g. a framework package
+surface** — no commands, no command groups, no providers, no agent content, e.g. a framework package
 shipping only a `preBuild` hook. The packager deliberately leaves it unstamped
 because there is nothing for the contract to govern, so the loader must not
 demand a stamp from it. Loader and packager share the predicate

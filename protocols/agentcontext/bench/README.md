@@ -1,8 +1,7 @@
 # Agent-context orientation benchmark
 
 This benchmark is the dogfood evidence for the protocol's premise: an agent
-oriented by one `putnami context pack` document (or one read-only MCP
-`agent_context` call) makes **fewer orientation reads / round-trips** than one
+oriented by one `putnami context pack` document makes **fewer orientation reads / round-trips** than one
 that reconstructs the same facts by hand from the filesystem — on at least one
 Go and one TypeScript task.
 
@@ -18,7 +17,7 @@ aggregates for a project. At minimum that is:
   adjacent docs, config schema), and
 - **1** dependency-graph reconstruction from the manifests,
 
-i.e. **≥ K + 2** round-trips per project. The read-only MCP `agent_context` tool
+i.e. **≥ K + 2** round-trips per project. `putnami context pack`
 returns all of it in exactly **1** structured call, after which the agent reads
 only the specific source **ranges** it actually needs.
 

@@ -19,10 +19,12 @@ fi
 ```
 
 When the workspace binds `missions`, the host hooks publish the session to its
-mission and print the mission sheet at session start: ask the owner with
-`missions.ask` and the repository and key the sheet names, and reply to an
-owner's message with `missions.reply` or an `[ack <message id>] <reply>` line
-in the final message of the turn.
+mission and print the mission sheet at session start. Ask the owner with
+`"$PUTNAMI_CLI" agent ask --input <file>` (`-` reads standard input): the file
+is a `missions.ask` document without its `mission`, which the session supplies,
+and the command binds the decision to the session. Reply to an owner's message
+with `"$PUTNAMI_CLI" agent reply --message <message id> --reply <text>` or an
+`[ack <message id>] <reply>` line in the final message of the turn.
 
 ## Read the envelope
 

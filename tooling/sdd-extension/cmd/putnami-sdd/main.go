@@ -9,7 +9,6 @@
 //
 //	putnami-sdd <job> [flags]
 //	putnami-sdd <group> <subcommand> [args] [flags]
-//	putnami-sdd mcp-tool   (one ToolCallRequest on stdin, one ToolCallResult on stdout)
 //
 // Jobs (the DAG's):
 //
@@ -33,11 +32,6 @@
 //	architecture  validate | snapshot | inspect
 //	contracts     generate | check
 //
-// MCP tools (the agent surface): sdd.list_features,
-// sdd.feature_context, sdd.list_specs, sdd.spec_context and
-// sdd.architecture_context, all five answered by the single `mcp-tool`
-// argument.
-//
 // The two tables answer the same questions and must never answer them
 // differently, which is why both call the SAME engine builders in internal/sdd
 // and neither holds a verdict of its own.
@@ -52,7 +46,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -96,7 +89,7 @@ func commandHandlers() map[string]cli.JobFunc {
 }
 
 // runEntrypoint is main with its process-level dependencies — the argument
-// vector, the two streams, and the job dispatcher — passed in, so the reserved
+// vector, the two output streams, and the job dispatcher — passed in, so the reserved
 // handshake and the interactive routing are testable without spawning the
 // binary. It returns the process exit code beside the error.
 //
@@ -107,12 +100,9 @@ func commandHandlers() map[string]cli.JobFunc {
 //     would reject that as a usage error before the descriptor was ever written.
 //  2. The interactive command groups next, because their stdout is the
 //     terminal's and must carry their own document — never cli.Run's JSONL.
-//  3. The MCP tool bridge, whose stdout carries one ToolCallResult and whose
-//     stdin carries the request, so it can never go through cli.Run either.
-//  4. Everything else is a job.
+//  3. Everything else is a job.
 func runEntrypoint(
 	args []string,
-	stdin io.Reader,
 	stdout, stderr io.Writer,
 	runSubcommands func(map[string]cli.JobFunc),
 ) (int, error) {
@@ -124,16 +114,12 @@ func runEntrypoint(
 		return runInteractiveSubcommand(sub, rest, stdout, stderr), nil
 	}
 
-	if len(args) > 0 && args[0] == mcpToolArg {
-		return 0, runMCPTool(context.Background(), stdin, stdout)
-	}
-
 	runSubcommands(commandHandlers())
 	return 0, nil
 }
 
 func main() {
-	code, err := runEntrypoint(os.Args[1:], os.Stdin, os.Stdout, os.Stderr, func(commands map[string]cli.JobFunc) {
+	code, err := runEntrypoint(os.Args[1:], os.Stdout, os.Stderr, func(commands map[string]cli.JobFunc) {
 		// SDD work is workspace-shaped as often as it is project-shaped
 		// (`architecture` is workspace-once), so an empty project name is not a
 		// reason to skip: the job body decides.

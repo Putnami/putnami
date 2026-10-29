@@ -46,10 +46,10 @@ type ReportMeta struct {
 	// StartTime and EndTime bound the settled run.
 	StartTime time.Time
 	EndTime   time.Time
-	// Origin is protocolcli.ReportOriginCLI, or ReportOriginMCP for an adapter
-	// run. It is the origin field recorded session metadata has never had, which
-	// is why an adapter run is reported rather than withheld: readers filter,
-	// they do not guess.
+	// Origin is protocolcli.ReportOriginCLI, or ReportOriginEphemeral for an
+	// ephemeral run such as `cache verify`. It is the origin field recorded
+	// session metadata has never had, which is why an ephemeral run is reported
+	// rather than withheld: readers filter, they do not guess.
 	Origin string
 	// EnforceCoverage records whether the run ran the enforcing cadence, so a
 	// longitudinal consumer compares like with like.
@@ -155,11 +155,11 @@ func reportRun(summary protocolcli.RunSummary) protocolcli.ReportRun {
 }
 
 // reportOrigin closes the origin vocabulary. A producer that named no surface
-// is the command line: "cli" is the weaker claim, and readers filter adapter
-// runs OUT by default, so guessing "mcp" would hide a real run.
+// is the command line: "cli" is the weaker claim, and readers filter ephemeral
+// runs OUT by default, so guessing "ephemeral" would hide a real run.
 func reportOrigin(origin string) string {
-	if origin == protocolcli.ReportOriginMCP {
-		return protocolcli.ReportOriginMCP
+	if origin == protocolcli.ReportOriginEphemeral {
+		return protocolcli.ReportOriginEphemeral
 	}
 	return protocolcli.ReportOriginCLI
 }

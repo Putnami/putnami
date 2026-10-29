@@ -88,6 +88,14 @@ type fakeMissions struct {
 	onSync func(in collab.MissionsSyncInput)
 	// answer changes each sync result before it goes out.
 	answer func(*collab.MissionsSyncResult)
+
+	// decision is the id missions.ask opens; decisionID when empty.
+	decision string
+	// asks and replies hold the missions.ask and missions.reply requests.
+	asks    []collab.MissionsAskInput
+	replies []collab.MissionsReplyInput
+	// failAsk and failReply answer this envelope instead of the result.
+	failAsk, failReply *collab.Envelope
 }
 
 func newFakeMissions(t *testing.T) *fakeMissions {
@@ -122,6 +130,18 @@ func (f *fakeMissions) Call(_ context.Context, contract, operation string, input
 	switch request := parsed.(type) {
 	case *collab.MissionsSyncInput:
 		return f.sync(*request), nil
+	case *collab.MissionsAskInput:
+		f.asks = append(f.asks, *request)
+		if f.failAsk != nil {
+			return *f.failAsk, nil
+		}
+		return f.envelope(contract, operation, collab.OutcomeOK, collab.MissionsAskResult{Decision: collab.MissionDecision{ID: firstString(f.decision, decisionID), State: collab.DecisionStateOpen}}, nil), nil
+	case *collab.MissionsReplyInput:
+		f.replies = append(f.replies, *request)
+		if f.failReply != nil {
+			return *f.failReply, nil
+		}
+		return f.envelope(contract, operation, collab.OutcomeOK, collab.MissionsReplyResult{Message: collab.RepliedMessage{ID: request.Message, State: collab.ReplyStateReplied}}, nil), nil
 	case *collab.MemoryMissionInput:
 		if f.memory == nil {
 			return f.envelope(contract, operation, collab.OutcomeUnsupported, nil, &collab.Error{Message: "no memory provider is bound", Reason: collab.ReasonBindingMissing}), nil

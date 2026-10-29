@@ -91,8 +91,8 @@ var firstPartyExtensionManifests = []string{
 // CLI runs, and the ladder must resolve the way the manifest's own shape says it
 // should — stamped at the contract its vocabulary requires when it declares a
 // contract surface (proto.RequiredCLIContract: the current contract, or the
-// agent-content contract for a manifest that ships agent content), unstamped
-// when it is hook-only.
+// rung of the newest vocabulary it uses, such as the provider contract for a
+// manifest that declares providers), unstamped when it is hook-only.
 //
 // A first-party manifest stamped one contract behind is not a warning here. It
 // is an extension that vanishes: `putnami build` in a consumer workspace loses

@@ -1,8 +1,8 @@
 # Extension Protocol
 
 The contract for `putnami.extension.json`: how a Putnami extension declares
-commands, tasks, pipelines, cache policy, lifecycles, and agent tools as **data**
-instead of as CLI code.
+commands, tasks, pipelines, cache policy, lifecycles, and collaboration
+providers as **data** instead of as CLI code.
 
 ## Why
 
@@ -40,7 +40,8 @@ validated, tested, cached on, and reasoned about by tooling in any language.
   cache handoff;
 - manifest **hooks**;
 - embedded **JSON-schema contracts** for task I/O;
-- namespaced **MCP tool** descriptors and their one-request subprocess contract.
+- the **collaboration providers** an extension implements, keyed by contract,
+  and the subprocess each runs.
 
 ### How tooling consumes it
 
@@ -74,39 +75,29 @@ validated, tested, cached on, and reasoned about by tooling in any language.
   `ValidLifecycleRecoveryCodes` separately names successful recovery such as
   orphan lease reaping, so recovery can never also classify an invocation as
   failed.
-- `ToolCallRequest` / `ToolCallResult` define the stdin/stdout boundary for
-  extension-contributed tools. The core serves no MCP server and owns no MCP
-  JSON-RPC; the manifest `tools` section remains as the call contract of
-  collaboration providers. Extensions retain their own execution,
-  authentication and network behaviour. A `ToolCallRequest.agent` object, when
-  present, is vocabulary kept for collaboration providers; the core sets none.
-  `AgentIdentity.ApplyHTTPHeaders` applies its stable `User-Agent`,
-  `Putnami-Agent-Harness` and `Putnami-Agent-Model` headers safely.
-- `ToolDefinition.workspaceSelection` is how a tool that answers ABOUT THE
-  WORKSPACE asks the orchestrator for the view it already holds. The CLI then
-  puts two members on the request: `workspaceProjects` (`ToolProjectRef`, the
-  complete resolved membership with each project's resolved direct edges,
-  version, type and authored `putnami.json`) and `selection` (`ToolSelection`,
-  the projection the canonical `projects` / `impacted` / `baseline` arguments
-  resolved to). Both are omitted for a tool that does not declare it, so the
-  addition changes nothing for a tool that never asked.
+- `ProviderDeclaration` / `ProviderOperation` are the `providers` section: one
+  entry per collaboration contract, keyed by contract name, with the version it
+  implements, the subprocess every operation of it runs (`command`, `args`,
+  `cwd`, `env`, `timeoutMs`, the `{extensionRuntime}` placeholder included),
+  and its operations. An operation declares its `description`, whether it
+  reaches outside the machine (`openWorld`), the rule it enforces for a
+  revision (`preconditions`: `atomic`, `checked` or `none`) and whether it takes
+  the resolved workspace view (`workspaceSelection`). Strict validation checks
+  the shape; the contracts, the request and response documents, the check of a
+  declaration against the catalog (`ReadProviderOffer`) and the routing belong
+  to [`protocols/collaboration`](../collaboration/README.md). This package does
+  not import it. A provider is a subprocess and gets no host RPC channel.
+  Declaring the section requires CLI contract 18. A manifest that still
+  carries the deleted `tools` section loads leniently with no provider, and
+  strict validation refuses it.
 
-  It is opt-in for one reason: those three argument names are the CLI's
-  vocabulary, not every extension's, and a tool that means something else by
-  `projects` must not have its arguments rejected as unknown project selectors.
-  It exists because the alternative is worse — an extension that resolved
-  `impacted` itself would be a second definition of what the workspace contains,
-  and the two would diverge on the first scope, alias or transparent group
-  folder. `ToolSelection` marshals byte-identically to `protocols/job`'s
-  `Selection`; the equality is pinned by a drift test there, since that package
-  already imports this one.
-- `ToolCallRequest.provider` (`ToolProviderCall`) is present exactly when the
-  CLI calls a tool as the implementation of a collaboration contract operation
-  the workspace bound to the extension: it names the contract, version and
-  operation, and carries the binding's settings. The contracts, the
-  `_meta["putnami.dev/provider"]` declaration and the routing belong to
-  [`protocols/collaboration`](../collaboration/README.md); this package does
-  not import it.
+  `workspaceSelection` is how an operation that answers ABOUT THE WORKSPACE
+  asks the orchestrator for the view it already holds: the complete resolved
+  membership and the projection the canonical `projects` / `impacted` /
+  `baseline` arguments resolved to. It exists because the alternative is
+  worse — an extension that resolved `impacted` itself would be a second
+  definition of what the workspace contains, and the two would diverge on the
+  first scope, alias or transparent group folder.
 - The subpackage [`hostrpc`](hostrpc/README.md) is the wire contract of the
   host RPC channel: the calls an interactive subcommand's process makes into
   the CLI that started it, over a Unix socket the CLI opens for that launch.
@@ -274,8 +265,8 @@ validates the staged manifest strictly and stamps it on success, so the field is
 | `tooling/cli/internal/extension`, `.../cli`, `.../engine`, `.../jobs` | Manifest loading, contract negotiation, planning and scheduling |
 | `tooling/cli/internal/commandmeta`, `.../commands`, `.../output` | Command surface, help, and rendering |
 | `tooling/cli/internal/hooks`, `.../store`, `.../workspace` | Hooks, per-extension cache roots, project discovery |
-| `tooling/cli/internal/collaboration`, `.../machine`, `.../useragent` | Collaboration provider calls, machine output, agent provenance headers |
-| `tooling/extension-sdk/manifest`, `.../mcp` | The authoring-side gate extension authors build against |
+| `tooling/cli/internal/collaboration`, `.../machine` | Collaboration provider calls, machine output |
+| `tooling/extension-sdk/manifest` | The authoring-side gate extension authors build against |
 | `go/extension/internal/jobs/{lint,pkg}` | Package-time validation and stamping |
 | [`protocols/job`](../job/README.md) | Job context derived from a task declaration |
 
@@ -313,7 +304,7 @@ contract matches, or the extension does not load:
 | Absent (`0`) or lower | Hard error naming the fix — re-package the extension, or `putnami extensions update` |
 
 A manifest that declares **no contract surface at all** (no commands, no command
-groups, no tools — a hook-only framework package) is outside the ladder, because
+groups, no providers — a hook-only framework package) is outside the ladder, because
 the packager deliberately never stamps one and there is nothing for the contract
 to govern. `DeclaresContractSurface()` is the loader's half of that rule.
 
@@ -342,7 +333,7 @@ only the dependent command. Re-package an authored extension, or run
   including negative assertions such as "the schema must not declare `when`",
   the runtime-expression field contract v3 deleted.
 - Fixtures: [`fixtures/valid/`](fixtures/valid) — `minimal`, `full`,
-  `multi-command`, `command-groups`, `mcp-tool`, `with-contracts`,
+  `multi-command`, `command-groups`, `with-contracts`,
   `lifecycle-v3`, `task-contract-v3`, `task-contract-v3-ownership`,
   `ecosystem-owner`, `ecosystem-uses`;
   [`fixtures/invalid/`](fixtures/invalid) — 37 counter-examples covering output

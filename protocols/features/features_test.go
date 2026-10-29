@@ -541,16 +541,13 @@ func TestFeatureSurfaceShapeIsClosed(t *testing.T) {
 		surface *FeatureSurface
 		wantErr bool
 	}{
-		{name: "commands and tools", surface: &FeatureSurface{Commands: []string{"features validate", "validate"}, Tools: []string{"sdd.feature_context", "list_projects"}}},
-		{name: "commands only", surface: &FeatureSurface{Commands: []string{"cloud config list"}}},
-		{name: "tools only", surface: &FeatureSurface{Tools: []string{"impacted"}}},
+		{name: "commands", surface: &FeatureSurface{Commands: []string{"features validate", "validate"}}},
+		{name: "nested command", surface: &FeatureSurface{Commands: []string{"cloud config list"}}},
 		{name: "empty object", surface: &FeatureSurface{}, wantErr: true},
-		{name: "empty command list", surface: &FeatureSurface{Commands: []string{}, Tools: []string{"impacted"}}, wantErr: true},
+		{name: "empty command list", surface: &FeatureSurface{Commands: []string{}}, wantErr: true},
 		{name: "upper-case command", surface: &FeatureSurface{Commands: []string{"Features validate"}}, wantErr: true},
 		{name: "double space", surface: &FeatureSurface{Commands: []string{"features  validate"}}, wantErr: true},
-		{name: "flat manifest key as a tool", surface: &FeatureSurface{Tools: []string{"sdd feature"}}, wantErr: true},
 		{name: "duplicate command", surface: &FeatureSurface{Commands: []string{"validate", "validate"}}, wantErr: true},
-		{name: "duplicate tool", surface: &FeatureSurface{Tools: []string{"impacted", "impacted"}}, wantErr: true},
 		{name: "unbounded name", surface: &FeatureSurface{Commands: []string{strings.Repeat("a", surfaceNameMaxLength+1)}}, wantErr: true},
 		{name: "bounded name", surface: &FeatureSurface{Commands: []string{strings.Repeat("a", surfaceNameMaxLength)}}},
 		{name: "too many commands", surface: &FeatureSurface{Commands: tooMany}, wantErr: true},
@@ -600,16 +597,13 @@ func TestFeatureSurfaceRidesOnTheCurrentManifestVersion(t *testing.T) {
 }
 
 func TestFeatureSurfaceCanonicalizationSortsAndDoesNotMutate(t *testing.T) {
-	surface := &FeatureSurface{Commands: []string{"validate", "features validate"}, Tools: []string{"sdd.list_specs", "sdd.feature_context"}}
+	surface := &FeatureSurface{Commands: []string{"validate", "features validate"}}
 	manifest := surfaceManifest(surface)
 	canonical := CanonicalManifest(manifest)
 	if want := []string{"features validate", "validate"}; !slices.Equal(canonical.Features[0].Surface.Commands, want) {
 		t.Fatalf("commands = %v, want %v", canonical.Features[0].Surface.Commands, want)
 	}
-	if want := []string{"sdd.feature_context", "sdd.list_specs"}; !slices.Equal(canonical.Features[0].Surface.Tools, want) {
-		t.Fatalf("tools = %v, want %v", canonical.Features[0].Surface.Tools, want)
-	}
-	if surface.Commands[0] != "validate" || surface.Tools[0] != "sdd.list_specs" {
+	if surface.Commands[0] != "validate" {
 		t.Fatalf("canonicalization reordered a caller-owned surface: %#v", surface)
 	}
 	if canonical.Features[0].Surface == surface {
@@ -634,13 +628,13 @@ func TestFeatureSurfaceSchemaMatchesTheGoWire(t *testing.T) {
 		t.Fatal(err)
 	}
 	surface := schema.Defs["surface"]
-	if surface.AdditionalProperties || len(surface.Properties) != 2 || surface.Properties["commands"] == nil || surface.Properties["tools"] == nil {
+	if surface.AdditionalProperties || len(surface.Properties) != 1 || surface.Properties["commands"] == nil {
 		t.Fatalf("surface schema drifted from FeatureSurface: %#v", surface)
 	}
-	if schema.Defs["surfaceCommand"].Pattern != surfaceCommandPattern.String() || schema.Defs["surfaceTool"].Pattern != surfaceToolPattern.String() {
+	if schema.Defs["surfaceCommand"].Pattern != surfaceCommandPattern.String() {
 		t.Fatal("surface name patterns drifted between the schema and the validator")
 	}
-	if schema.Defs["surfaceCommand"].MaxLength != surfaceNameMaxLength || schema.Defs["surfaceTool"].MaxLength != surfaceNameMaxLength {
+	if schema.Defs["surfaceCommand"].MaxLength != surfaceNameMaxLength {
 		t.Fatal("surface name bound drifted between the schema and the validator")
 	}
 }

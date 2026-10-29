@@ -32,20 +32,15 @@ const conformingManifest = `{
 	"tasks": {"t": {"kind": "command", "command": "echo"}}
 }`
 
-const conformingToolOnlyManifest = `{
+const conformingProviderOnlyManifest = `{
 	"name": "@putnami/testext",
-	"tools": {
-		"putnami.search": {
-			"description": "Search the extension index.",
-			"inputSchema": {"type": "object", "properties": {}},
-			"annotations": {
-				"readOnlyHint": true,
-				"destructiveHint": false,
-				"idempotentHint": true,
-				"openWorldHint": true
-			},
-			"_meta": {"putnami.dev/contract": {"access": "read", "readOnly": true, "supportsDryRun": false}},
-			"command": "search"
+	"providers": {
+		"tasks": {
+			"version": 1,
+			"command": "search",
+			"operations": {
+				"find": {"description": "Find tasks in the extension index.", "openWorld": true}
+			}
 		}
 	}
 }`
@@ -92,14 +87,15 @@ func TestGateAndStampManifestContract_StampsEarnedContract(t *testing.T) {
 	}
 }
 
-// TestGateAndStampManifestContract_StampsToolOnlyManifest ensures the MCP
-// surface participates in the same package-time lifecycle as commands. This
-// prevents an older CLI from silently loading a tool it cannot understand.
-func TestGateAndStampManifestContract_StampsToolOnlyManifest(t *testing.T) {
+// TestGateAndStampManifestContract_StampsProviderOnlyManifest ensures the
+// providers section participates in the same package-time lifecycle as
+// commands. This prevents an older CLI from silently loading a provider it
+// cannot understand.
+func TestGateAndStampManifestContract_StampsProviderOnlyManifest(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-go-extension-stamps-the-rung-its-vocabulary-requires")
-	dir := stageManifest(t, conformingToolOnlyManifest)
+	dir := stageManifest(t, conformingProviderOnlyManifest)
 	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
-		t.Fatalf("gate should pass a conforming tool-only manifest: %v", err)
+		t.Fatalf("gate should pass a conforming provider-only manifest: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
 	if err != nil {
@@ -111,8 +107,8 @@ func TestGateAndStampManifestContract_StampsToolOnlyManifest(t *testing.T) {
 	if err := json.Unmarshal(data, &staged); err != nil {
 		t.Fatal(err)
 	}
-	if staged.CLIContract != protocolcli.CurrentContract {
-		t.Errorf("cliContract = %d, want %d", staged.CLIContract, protocolcli.CurrentContract)
+	if staged.CLIContract != protocolcli.ProviderContract {
+		t.Errorf("cliContract = %d, want %d", staged.CLIContract, protocolcli.ProviderContract)
 	}
 }
 
@@ -242,7 +238,7 @@ func TestGateAndStampManifestContract_RefusesANamelessManifest(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "the-packager-refuses-a-nameless-manifest", "the-go-packager-refuses-a-nameless-manifest")
 	nameless := map[string]string{
 		"conforming":          strings.Replace(conformingManifest, `"name": "@putnami/testext",`, "", 1),
-		"tool-only":           strings.Replace(conformingToolOnlyManifest, `"name": "@putnami/testext",`, "", 1),
+		"provider-only":       strings.Replace(conformingProviderOnlyManifest, `"name": "@putnami/testext",`, "", 1),
 		"hook-only":           `{"commands": {}, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`,
 		"hook-only dependent": strings.Replace(hookOnlyDependentManifest, `"name": "@putnami/testext",`, "", 1),
 		"empty name":          strings.Replace(conformingManifest, `"@putnami/testext"`, `""`, 1),
@@ -277,7 +273,7 @@ func TestGateAndStampManifestContract_UnparseableStagedManifest(t *testing.T) {
 }
 
 // TestGateAndStampManifestContract_GatesMalformedContractSurface pins that a
-// commands, commandGroups, or tools value of the wrong JSON type is NOT
+// commands, commandGroups, or providers value of the wrong JSON type is NOT
 // mistaken for a hook-only manifest: it is gated and fails strict parsing,
 // rather than publishing an unloadable manifest unstamped that every consumer
 // would fail to unmarshal and skip.
@@ -286,7 +282,7 @@ func TestGateAndStampManifestContract_GatesMalformedContractSurface(t *testing.T
 	for _, m := range []string{
 		`{"name": "@putnami/testext", "commands": []}`,
 		`{"name": "@putnami/testext", "commandGroups": "nope"}`,
-		`{"name": "@putnami/testext", "tools": []}`,
+		`{"name": "@putnami/testext", "providers": []}`,
 	} {
 		dir := stageManifest(t, m)
 		if err := gateAndStampManifestContract(dir, putArchive); err == nil {

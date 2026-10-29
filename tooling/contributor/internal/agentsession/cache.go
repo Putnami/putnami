@@ -30,7 +30,7 @@ const (
 	// sessionPathMax bounds a path an engine payload names.
 	sessionPathMax = 4096
 	// repliedMarkerMaxAge and repliedMarkersMax bound the markers a
-	// missions.reply call leaves: every cache write removes the markers older
+	// `agent reply` run leaves: every cache write removes the markers older
 	// than a day and keeps the newest repliedMarkersMax.
 	repliedMarkerMaxAge = 24 * time.Hour
 	repliedMarkersMax   = 256

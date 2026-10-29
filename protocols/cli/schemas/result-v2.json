@@ -2,11 +2,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://putnami.dev/schemas/putnami-cli-result-v2.json",
   "title": "Putnami CLI machine result contract, version 2",
-  "description": "The versioned machine-readable documents every Putnami CLI surface emits: the --output=json envelope, the --output=jsonl run stream or terminal plan record, the recorded session event log, the MCP run_jobs/plan_jobs results, and the session files. Every document carries protocolVersion 2; a document without the field is version 1. Cross-field rules JSON Schema cannot express (unified success, abort precedence, exit-code agreement, count arithmetic, derived identity key) are stated in the per-property descriptions, specified in doc/02-result-v2.md, and machine-checked by ValidateDocument plus the conformance/manifest.json corpus in both Go and TypeScript.",
+  "description": "The versioned machine-readable documents every Putnami CLI surface emits: the --output=json envelope, the --output=jsonl run stream or terminal plan record, the recorded session event log, and the session files. Every document carries protocolVersion 2; a document without the field is version 1. Cross-field rules JSON Schema cannot express (unified success, abort precedence, exit-code agreement, count arithmetic, derived identity key) are stated in the per-property descriptions, specified in doc/02-result-v2.md, and machine-checked by ValidateDocument plus the conformance/manifest.json corpus in both Go and TypeScript.",
   "oneOf": [
     { "$ref": "#/$defs/resultEnvelope" },
     { "$ref": "#/$defs/sessionStreamRecord" },
-    { "$ref": "#/$defs/mcpResult" },
     { "$ref": "#/$defs/sessionFile" },
     { "$ref": "#/$defs/sessionPlanFile" },
     { "$ref": "#/$defs/reportFile" }
@@ -873,26 +872,6 @@
         }
       ]
     },
-    "mcpResult": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["protocolVersion", "tool", "commands"],
-      "description": "The result an MCP tool call returns. run_jobs reports the canonical run summary; plan_jobs reports the plan.",
-      "properties": {
-        "protocolVersion": { "$ref": "#/$defs/protocolVersion" },
-        "tool": { "type": "string", "enum": ["run_jobs", "plan_jobs"] },
-        "commands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "run": { "$ref": "#/$defs/runSummary" },
-        "plan": { "$ref": "#/$defs/planSummary" }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "tool": { "const": "run_jobs" } }, "required": ["tool"] },
-          "then": { "required": ["run"], "not": { "required": ["plan"] } },
-          "else": { "required": ["plan"], "not": { "required": ["run"] } }
-        }
-      ]
-    },
     "sessionFile": {
       "type": "object",
       "additionalProperties": false,
@@ -937,7 +916,6 @@
         "tree": { "$ref": "#/$defs/sessionTree" },
         "declarations": { "$ref": "#/$defs/sessionDeclarations" },
         "placement": { "$ref": "#/$defs/sessionPlacement" },
-        "agent": { "$ref": "#/$defs/sessionAgent" },
         "run": { "$ref": "#/$defs/runSummary" },
         "tasks": { "type": "array", "items": { "$ref": "#/$defs/taskRecord" } },
         "executions": {
@@ -1163,28 +1141,6 @@
           "type": "integer",
           "minimum": 0,
           "description": "How many declaration files the digest covers. Zero is a measurement: the workspace declares nothing."
-        }
-      }
-    },
-    "sessionAgent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind"],
-      "description": "The agent session that launched the run through the MCP server. Absent for any other run, including a terminal run. No member is inferred.",
-      "properties": {
-        "kind": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[\\x20-\\x7e]+$",
-          "description": "The agent harness, as the MCP client named itself during initialize. Printable ASCII."
-        },
-        "sessionId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[\\x20-\\x7e]+$",
-          "description": "The agent's own session id, as the MCP server environment stated it (PUTNAMI_AGENT_SESSION_ID, or the harness's exported variable). Absent when none was stated. Printable ASCII."
         }
       }
     },
@@ -1563,8 +1519,8 @@
         },
         "origin": {
           "type": "string",
-          "enum": ["cli", "mcp"],
-          "description": "Which surface drove the run. Not cosmetic: an MCP run is an agent's, and a consumer aggregating build economics over time has to keep agent traffic apart from a human's or CI's rather than average them together."
+          "enum": ["cli", "ephemeral"],
+          "description": "Which surface drove the run. Not cosmetic: an ephemeral run is a verification pass the CLI drives for itself, not a build someone asked for, and a consumer aggregating build economics over time has to keep that traffic apart from the runs a human or CI drove rather than average them together."
         },
         "enforceCoverage": {
           "type": "boolean",

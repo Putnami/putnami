@@ -62,8 +62,8 @@ type Error struct {
 	Reconcile string `json:"reconcile,omitempty"`
 }
 
-// Response is the document a provider writes as the single text block of its
-// ToolCallResult. The orchestrator validates it and wraps it into an Envelope.
+// Response is the one document a provider writes on its standard output. The
+// orchestrator validates it and wraps it into an Envelope.
 type Response struct {
 	// Outcome is the closed result of the operation; see the Outcome* constants.
 	Outcome Outcome `json:"outcome"`
@@ -82,8 +82,8 @@ type ProviderIdentity struct {
 	Version string `json:"version,omitempty"`
 }
 
-// Envelope is the answer to every operation call on every entry path: the MCP
-// tool result text and the CLI's standard output carry the same document.
+// Envelope is the answer to every operation call on every entry path: the
+// CLI's standard output and the host channel carry the same document.
 // Contract, Version, Operation and Provider are the orchestrator's statement of
 // what was routed where; a provider cannot set them.
 type Envelope struct {
@@ -196,14 +196,14 @@ type OperationCapability struct {
 	// Preconditions is how the provider enforces expectedRevision, for an
 	// operation that takes one.
 	Preconditions Preconditions `json:"preconditions,omitempty"`
-	// OpenWorld is the provider's annotation: whether the operation reaches a
+	// OpenWorld is the provider's declaration: whether the operation reaches a
 	// system outside this machine.
 	OpenWorld *bool `json:"openWorld,omitempty"`
-	// Description is the provider tool's own description, which states
-	// provider-specific behavior and limits.
+	// Description is the provider's own description of the operation, which
+	// states provider-specific behavior and limits.
 	Description string `json:"description,omitempty"`
 	// HostOnly is true when only the host that runs an agent calls the
-	// operation: the agent has no tool for it.
+	// operation, never the agent itself.
 	HostOnly bool `json:"hostOnly,omitempty"`
 }
 

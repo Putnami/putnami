@@ -11,12 +11,16 @@
 //	putnami-contributor agent-hook [flags]        (putnami agent hook)
 //	putnami-contributor agent-attach [flags]      (putnami agent attach)
 //	putnami-contributor agent-stage <name>        (putnami agent stage)
+//	putnami-contributor agent-ask [flags]         (putnami agent ask)
+//	putnami-contributor agent-reply [flags]       (putnami agent reply)
 //
 // It answers the runtime handshake, serves the change and agent commands, and
 // refuses every other invocation. putnami launches each command as an
 // interactive subcommand and appends --putnamiContext <file>. finalize reads
 // the output mode and the project selection from that job context, estimate
-// its output mode and invocation directory; the other commands ignore it.
+// its output mode and invocation directory, agent ask and agent reply their
+// output mode, and agent ask the invocation directory; the other commands
+// ignore it.
 package main
 
 import (
@@ -28,6 +32,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	job "go.putnami.dev/protocol/job"
 	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 
@@ -51,12 +56,14 @@ var runtimeVersion string
 // path of the job context file.
 const contextFlag = "--putnamiContext"
 
-// agentHookRemedy, agentStageRemedy, languageRemedy and finalizeRemedy name
-// the launch that opens the host channel, for a run that needs the channel
-// and has none.
+// agentHookRemedy, agentStageRemedy, agentAskRemedy, agentReplyRemedy,
+// languageRemedy and finalizeRemedy name the launch that opens the host
+// channel, for a run that needs the channel and has none.
 const (
 	agentHookRemedy  = "the hook reaches the missions provider only when putnami launches it as `putnami agent hook`"
 	agentStageRemedy = "the stage reaches the missions provider only when putnami launches it as `putnami agent stage`"
+	agentAskRemedy   = "the decision reaches the missions provider only when putnami launches it as `putnami agent ask`"
+	agentReplyRemedy = "the reply reaches the missions provider only when putnami launches it as `putnami agent reply`"
 	languageRemedy   = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
 	finalizeRemedy   = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
 )
@@ -100,7 +107,13 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "agent-stage" {
 		return runAgentStage(args[1:], stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, estimate, agent-hook, agent-attach and agent-stage commands")
+	if len(args) > 0 && args[0] == "agent-ask" {
+		return runAgentAsk(args[1:], contextFile, stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "agent-reply" {
+		return runAgentReply(args[1:], contextFile, stdin, stdout, stderr)
+	}
+	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify, finalize, estimate, agent-hook, agent-attach, agent-stage, agent-ask and agent-reply commands")
 	return 2
 }
 
@@ -265,6 +278,53 @@ func runAgentStage(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return agentsession.Stage(context.Background(), agentsession.NewEnv(root, channel), args, stdout, stderr)
+}
+
+// runAgentAsk runs putnami agent ask in the workspace root. It asks the
+// decision through the host channel and records it in the session cache.
+func runAgentAsk(args []string, contextFile string, stdin io.Reader, stdout, stderr io.Writer) int {
+	channel := host.Take(agentAskRemedy)
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "agent ask: %v\n", err)
+		return 1
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return agentsession.Ask(ctx, agentsession.NewEnv(root, channel), args, decisionIO(contextFile, stdin, stdout, stderr))
+}
+
+// runAgentReply runs putnami agent reply in the workspace root. It records
+// the reply through the host channel and leaves the replied marker.
+func runAgentReply(args []string, contextFile string, stdin io.Reader, stdout, stderr io.Writer) int {
+	channel := host.Take(agentReplyRemedy)
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "agent reply: %v\n", err)
+		return 1
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return agentsession.Reply(ctx, agentsession.NewEnv(root, channel), args, decisionIO(contextFile, stdin, stdout, stderr))
+}
+
+// decisionIO is what agent ask and agent reply read and write: the output
+// mode and the invocation directory come from the job context, and a launch
+// without a readable one prints the text lines and resolves against the
+// working directory.
+func decisionIO(contextFile string, stdin io.Reader, stdout, stderr io.Writer) agentsession.CommandIO {
+	cmd := agentsession.CommandIO{Stdin: stdin, Stdout: stdout, Stderr: stderr, ResolvePath: invocationResolver(contextFile)}
+	if contextFile != "" {
+		if launch, err := job.ParseFile(contextFile); err == nil {
+			switch launch.Params.String("output") {
+			case "json", "jsonl", "cloud-logging":
+				cmd.JSON = true
+			}
+		}
+	}
+	return cmd
 }
 
 func main() {

@@ -52,8 +52,8 @@ const (
 
 const (
 	// specListOutcomeLimit bounds the outcomes one catalog row carries. The
-	// catalog is a discovery surface: an agent reads identities here and asks
-	// spec_context for the whole document.
+	// catalog is a discovery surface: a reader takes identities here and asks
+	// `specs inspect` for the whole document.
 	specListOutcomeLimit = 4
 	// specSelectorMaxBytes bounds an accepted feature selector.
 	specSelectorMaxBytes = 512
@@ -62,7 +62,7 @@ const (
 // SpecSummary is one compact catalog row: the feature a spec details, where the
 // document lives, who owns that location, and enough of its intent to choose
 // between rows. It deliberately carries counts rather than whole collections;
-// the full document is one spec_context call away.
+// the full document is one `specs inspect` away.
 type SpecSummary struct {
 	Feature string `json:"feature"`
 	// Path is the exact workspace-relative document path.
@@ -87,7 +87,7 @@ type SpecCatalogCounts struct {
 	FeaturesWithoutSpec int `json:"featuresWithoutSpec"`
 }
 
-// SpecCatalogReport is the shared `specs list` / list_specs projection.
+// SpecCatalogReport is the shared `specs list` projection.
 type SpecCatalogReport struct {
 	Revision    featureengine.Revision `json:"revision"`
 	Selection   SelectionReport        `json:"selection"`
@@ -106,7 +106,7 @@ type SpecDecisionLink struct {
 	Exists bool `json:"exists"`
 }
 
-// SpecContextReport is the shared `specs inspect` / spec_context projection: one
+// SpecContextReport is the shared `specs inspect` projection: one
 // spec, the durable declaration of the feature it details, its resolved
 // decision links, its exact source provenance, and the findings scoped to it.
 // No design graph, evidence document, or capability manifest is read.
@@ -329,10 +329,9 @@ func diagnosticNamesPath(finding diag.Diagnostic, target string) bool {
 	return artifact == target
 }
 
-// BuildSpecCatalogResult is the shared discovery projection behind `specs list`
-// and the list_specs MCP tool. It reads only canonical specs/*.json documents
-// and the durable manifests they resolve against, and it returns the rows the
-// resolved project selection owns.
+// BuildSpecCatalogResult is the discovery projection behind `specs list`. It
+// reads only canonical specs/*.json documents and the durable manifests they
+// resolve against, and it returns the rows the resolved project selection owns.
 func BuildSpecCatalogResult(ws *workspace.Workspace, selection Selection) (SpecCatalogReport, error) {
 	repository, err := loadSpecRepository(ws, selection)
 	if err != nil {
@@ -360,8 +359,8 @@ func BuildSpecCatalogResult(ws *workspace.Workspace, selection Selection) (SpecC
 	// Discovery degrades rather than fails: a broken document is reported (as a
 	// diagnostic, and as valid:false on its row) instead of hiding every healthy
 	// spec in the workspace. Failing the contract is `specs validate`'s job, and
-	// an agent calling list_specs must still be able to find the specs that are
-	// fine — the same degradation list_features already applies.
+	// `specs list` must still find the specs that are fine — the same degradation
+	// `features list` already applies.
 	report := SpecCatalogReport{
 		Revision:  repository.revision,
 		Selection: repository.selection,

@@ -253,6 +253,6 @@ one run at all.
 
 - [Protocols](/docs/protocols) — the contracts underneath everything on this page.
 - [Develop with AI assistants](/docs/how-to/develop-with-ai) — the practical setup and prompt patterns.
-- [Write a feature spec](/docs/how-to/write-a-feature-spec) — how intent gets recorded so `sdd.spec_context` has something to return.
+- [Write a feature spec](/docs/how-to/write-a-feature-spec) — how intent gets recorded so `putnami specs inspect` has something to return.
 - [Spec-driven development](/docs/concepts/spec-driven-development) — the loop that turns declared intent into a CI verdict, and the architecture contracts (ARC and DARC) that bound what agents may couple.
 - [Principles](/docs/principles) — in particular, *automation is a first-class user*.

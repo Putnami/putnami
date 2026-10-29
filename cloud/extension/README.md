@@ -63,7 +63,7 @@ platform, and ignores the caller's `GOFLAGS`, `GOOS`, `GOARCH`, `GOEXPERIMENT`
 and the other Go controls that change the compiled bytes. Two prepares of one
 runtime digest build the same binary.
 
-Every manifest task and MCP tool runs `{extensionRuntime}`, including the
+Every manifest task runs `{extensionRuntime}`, including the
 remote build-cache provider. The Putnami CLI resolves `{extensionRuntime}` to the
 archive's `compiled/putnami-cloud`, or to `compiled/putnami-cloud.exe` on
 Windows, and checks it with the `__putnami runtime-info` handshake (identity,
@@ -133,7 +133,7 @@ putnami cloud setup --workspace <workspace-id>
 
 ### Intelligence
 
-The Intelligence commands and the six `putnami.*` MCP tools ship with the
+The Intelligence commands ship with the
 `@putnami/intelligence` extension, not with this one: `putnami intelligence
 setup`, `status`, `review`, `audit-attest` and `provenance`. They use the
 workspace link and the session this extension writes.
@@ -827,8 +827,8 @@ when a session exists or `--workspace` is supplied. It never creates or selects
 a workspace, subscribes or activates a product. A linked checkout needs no
 session and no network for this local preparation; hosted reads use the
 existing session when invoked. Existing `.putnami/cache.json` settings are
-preserved unless the install is forced. The Cloud installer never writes MCP or
-Codex wiring: the `@putnami/intelligence` extension's own installer does, when
+preserved unless the install is forced. The Cloud installer never writes agent
+configuration wiring: the `@putnami/intelligence` extension's own installer does, when
 the repository enables Intelligence.
 
 `putnami cloud token --json` prints a workspace-scoped bearer for

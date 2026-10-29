@@ -40,7 +40,7 @@ func readOffer(t *testing.T) collab.ProviderOffer {
 	if diags := extension.ValidateManifest(manifest); diag.HasErrors(diags) {
 		t.Fatalf("the manifest fails extension validation: %v", diags)
 	}
-	offer, diags := collab.ReadProviderOffer(manifest.Tools)
+	offer, diags := collab.ReadProviderOffer(manifest.Providers)
 	if len(diags) != 0 {
 		t.Fatalf("the provider declarations draw diagnostics: %v", diags)
 	}
@@ -50,7 +50,7 @@ func readOffer(t *testing.T) collab.ProviderOffer {
 // TestTheManifestPassesBothGates holds the shipped manifest to the extension
 // protocol's strict validation and to the collaboration offer the
 // orchestrator reads: the provider offers exactly the operations this runtime
-// answers, through the runtime's provider bridge.
+// answers, through the runtime's provider entry point.
 func TestTheManifestPassesBothGates(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-github-provider-manifest-draws-no-diagnostic")
 	spectest.Proves(t, feature, "truthful-manifest", "the-manifest-passes-both-gates")
@@ -71,11 +71,11 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 				t.Errorf("the manifest offers %s, which the runtime does not answer", key)
 			}
 			delete(answered, key)
-			if !slices.Equal(provided.Definition.Args, []string{providerToolArg}) || provided.Definition.Command != "{extensionRuntime}" {
-				t.Errorf("%s does not route to the runtime's provider bridge", provided.Tool)
+			if !slices.Equal(provided.Provider.Args, []string{providerArg}) || provided.Provider.Command != "{extensionRuntime}" {
+				t.Errorf("%s does not route to the runtime's provider entry point", key)
 			}
-			if provided.Spec.Preconditions == collab.PreconditionRuleDeclared && provided.Declaration.Preconditions != collab.PreconditionsChecked {
-				t.Errorf("%s declares preconditions %q; GitHub has no conditional write, so it compares then writes", provided.Tool, provided.Declaration.Preconditions)
+			if provided.Spec.Preconditions == collab.PreconditionRuleDeclared && provided.Preconditions() != collab.PreconditionsChecked {
+				t.Errorf("%s declares preconditions %q; GitHub has no conditional write, so it compares then writes", key, provided.Preconditions())
 			}
 		}
 	}
@@ -83,20 +83,20 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 		t.Errorf("the runtime answers operations the manifest does not offer: %v", answered)
 	}
 	proposals, _ := offer.Operations(collab.ContractProposals, 1)
-	if !strings.Contains(proposals[collab.OperationMerge].Definition.Description, "settings.allowMerge") {
-		t.Error("the merge tool must say that the binding has to allow it")
+	if !strings.Contains(proposals[collab.OperationMerge].Operation.Description, "settings.allowMerge") {
+		t.Error("the merge operation must say that the binding has to allow it")
 	}
 }
 
-// TestTheLinkToolDeclaresTheParentOutsideTheRevision: the tasks contract lets
-// a provider leave the parent outside a task's revision only when its link
-// operation says so, where capabilities reports it.
-func TestTheLinkToolDeclaresTheParentOutsideTheRevision(t *testing.T) {
+// TestTheLinkOperationDeclaresTheParentOutsideTheRevision: the tasks contract
+// lets a provider leave the parent outside a task's revision only when its
+// link operation says so, where capabilities reports it.
+func TestTheLinkOperationDeclaresTheParentOutsideTheRevision(t *testing.T) {
 	spectest.Proves(t, feature, "truthful-manifest", "the-parent-is-outside-the-revision-and-link-says-so")
 	tasks, _ := readOffer(t).Operations(collab.ContractTasks, 1)
-	description := tasks[collab.OperationLink].Definition.Description
+	description := tasks[collab.OperationLink].Operation.Description
 	if !strings.Contains(description, "outside the issue's revision") || !strings.Contains(description, "expectedRevision does not detect a concurrent link") {
-		t.Fatalf("the link tool does not declare that the parent is outside the revision: %q", description)
+		t.Fatalf("the link operation does not declare that the parent is outside the revision: %q", description)
 	}
 }
 
@@ -106,22 +106,22 @@ func TestNoClaimIsOffered(t *testing.T) {
 	if _, offered := tasks[collab.OperationClaim]; offered {
 		t.Fatal("GitHub cannot hold a task exclusively; claim must not be offered")
 	}
-	if !strings.Contains(tasks[collab.OperationAssign].Definition.Description, "never an exclusive claim") {
-		t.Error("the assign tool must say an assignee is not a claim")
+	if !strings.Contains(tasks[collab.OperationAssign].Operation.Description, "never an exclusive claim") {
+		t.Error("the assign operation must say an assignee is not a claim")
 	}
 }
 
-func TestEveryToolReachesOutsideTheMachineAndSaysSo(t *testing.T) {
-	spectest.Proves(t, feature, "truthful-manifest", "every-tool-reaches-outside-the-machine-and-says-so")
+func TestEveryOperationReachesOutsideTheMachineAndSaysSo(t *testing.T) {
+	spectest.Proves(t, feature, "truthful-manifest", "every-operation-reaches-outside-the-machine-and-says-so")
 	offer := readOffer(t)
 	for _, contract := range []string{collab.ContractTasks, collab.ContractProposals} {
 		operations, _ := offer.Operations(contract, 1)
-		for _, provided := range operations {
-			if !*provided.Definition.Annotations.OpenWorldHint {
-				t.Errorf("%s reaches GitHub and must say openWorldHint: true", provided.Tool)
+		for name, provided := range operations {
+			if provided.Operation.OpenWorld == nil || !*provided.Operation.OpenWorld {
+				t.Errorf("%s.%s reaches GitHub and must say openWorld: true", contract, name)
 			}
-			if provided.Definition.TimeoutMs <= 100000 {
-				t.Errorf("%s times out after %dms, before the provider's own 100s budget", provided.Tool, provided.Definition.TimeoutMs)
+			if provided.Provider.TimeoutMs <= 100000 {
+				t.Errorf("%s.%s times out after %dms, before the provider's own 100s budget", contract, name, provided.Provider.TimeoutMs)
 			}
 		}
 	}
@@ -141,9 +141,9 @@ func TestTheRuntimeHandshake(t *testing.T) {
 	}
 }
 
-// TestTheProviderBridgeRedactsItsAnswer runs one routed call through the
-// runtime against a loopback stand-in whose answer carries the credential.
-func TestTheProviderBridgeRedactsItsAnswer(t *testing.T) {
+// TestTheProviderRedactsItsAnswer runs one routed call through the runtime
+// against a loopback stand-in whose answer carries the credential.
+func TestTheProviderRedactsItsAnswer(t *testing.T) {
 	const token = "ghp_bridgeTOKENbridgeTOKENbridgeTOKEN00"
 	var agent atomic.Value
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -158,14 +158,13 @@ func TestTheProviderBridgeRedactsItsAnswer(t *testing.T) {
 	defer server.Close()
 	env := map[string]string{github.OverrideVariable: server.URL, "GH_TOKEN": token}
 	p := &provider.Provider{Getenv: func(name string) string { return env[name] }}
-	request, _ := json.Marshal(extension.ToolCallRequest{
-		Name:      "github-collaboration.tasks.get",
+	request, _ := json.Marshal(collab.ProviderRequest{
 		Arguments: json.RawMessage(`{"ref":{"source":"github:acme/app","id":"3"}}`),
-		Provider: &extension.ToolProviderCall{Contract: "tasks", Version: 1, Operation: "get",
+		Provider: &collab.ProviderCall{Contract: "tasks", Version: 1, Operation: "get",
 			Settings: json.RawMessage(`{"repository":"acme/app"}`)},
 	})
 	var out, errOut bytes.Buffer
-	if code := run([]string{providerToolArg}, p, bytes.NewReader(request), &out, &errOut); code != 0 {
+	if code := run([]string{providerArg}, p, bytes.NewReader(request), &out, &errOut); code != 0 {
 		t.Fatalf("code %d: %s", code, errOut.String())
 	}
 	if strings.Contains(out.String(), token) || !strings.Contains(out.String(), github.RedactedMarker) {
@@ -174,22 +173,18 @@ func TestTheProviderBridgeRedactsItsAnswer(t *testing.T) {
 	if seen, _ := agent.Load().(string); !strings.HasPrefix(seen, "putnami-github-collaboration/") {
 		t.Errorf("user agent %q", seen)
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatal(err)
+	response, diags := collab.ParseResponse(out.Bytes())
+	if diags != nil || response.Outcome != collab.OutcomeOK {
+		t.Fatalf("response %s: %v", out.String(), diags)
 	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
-	if diags != nil || response.Outcome != collab.OutcomeOK || result.IsError {
-		t.Fatalf("response %s: %v", result.Content[0].Text, diags)
-	}
-	if code := run([]string{providerToolArg}, p, strings.NewReader("{"), &out, &errOut); code != 1 {
+	if code := run([]string{providerArg}, p, strings.NewReader("{"), &out, &errOut); code != 1 {
 		t.Errorf("an undecodable request exited %d", code)
 	}
 }
 
 func TestAnUnknownInvocationIsAUsageError(t *testing.T) {
 	var out, errOut bytes.Buffer
-	if code := run([]string{"tasks", "find"}, provider.New(), nil, &out, &errOut); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), providerToolArg) {
+	if code := run([]string{"tasks", "find"}, provider.New(), nil, &out, &errOut); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), providerArg) {
 		t.Fatalf("code %d, out %q, err %q", code, out.String(), errOut.String())
 	}
 }

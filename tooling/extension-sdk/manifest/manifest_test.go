@@ -438,29 +438,28 @@ func TestBuild_TaskAndCommandReplace(t *testing.T) {
 	}
 }
 
-func TestBuilder_Tool(t *testing.T) {
-	readOnly := true
-	built, err := New("sample/tools", "1.0.0").
-		Tool("sample.search", proto.ToolDefinition{
-			Description: "Search the sample index",
-			Command:     "sample mcp-tool",
-			InputSchema: json.RawMessage(`{"type":"object"}`),
-			Annotations: &proto.ToolAnnotations{
-				ReadOnlyHint:    &readOnly,
-				DestructiveHint: boolPtr(false),
-				IdempotentHint:  &readOnly,
-				OpenWorldHint:   boolPtr(false),
+// A provider-only manifest builds, and its stamp is the contract that reads
+// the providers section: a reader that predates it refuses the manifest
+// instead of loading the extension with no provider.
+func TestBuilder_Provider(t *testing.T) {
+	built, err := New("sample/provider", "1.0.0").
+		Provider("tasks", proto.ProviderDeclaration{
+			Version: 1,
+			Command: "{extensionRuntime}",
+			Args:    []string{"provider"},
+			Operations: map[string]proto.ProviderOperation{
+				"find": {Description: "Find tasks in the sample tracker.", OpenWorld: boolPtr(false)},
 			},
-			Meta: map[string]any{"putnami.dev/contract": map[string]any{
-				"access": "read", "readOnly": true, "supportsDryRun": false,
-			}},
 		}).
 		Build()
 	if err != nil {
-		t.Fatalf("tool-only manifest was rejected: %v", err)
+		t.Fatalf("provider-only manifest was rejected: %v", err)
 	}
-	if _, ok := built.Tools["sample.search"]; !ok {
-		t.Error("tool did not reach the built manifest")
+	if _, ok := built.Providers["tasks"]; !ok {
+		t.Error("provider did not reach the built manifest")
+	}
+	if built.CLIContract != protocolcli.ProviderContract {
+		t.Errorf("cliContract = %d, want %d", built.CLIContract, protocolcli.ProviderContract)
 	}
 }
 

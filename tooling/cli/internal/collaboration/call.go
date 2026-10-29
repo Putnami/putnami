@@ -18,7 +18,6 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -41,13 +40,13 @@ func Capabilities(
 
 // ProviderEnvironment is what one entry path knows when it routes a
 // collaboration operation: the extensions it discovered, the ones that must
-// not serve, and how it attaches the workspace view to a tool that declares
-// workspaceSelection.
+// not serve, and how it attaches the workspace view to an operation that
+// declares workspaceSelection.
 type ProviderEnvironment struct {
 	WorkspaceRoot string
 	Extensions    []*extension.ExtensionDescription
 	Unavailable   map[string]bool
-	AttachView    func(ctx context.Context, request *proto.ToolCallRequest, args json.RawMessage) error
+	AttachView    func(ctx context.Context, request *collab.ProviderRequest, args json.RawMessage) error
 	// Environ is the environment the provider inherits, whose credentials are
 	// redacted from the envelope. Nil means the process environment.
 	Environ []string
@@ -87,17 +86,16 @@ func CallProviderOperation(ctx context.Context, env ProviderEnvironment, contrac
 		return redactor.redactEnvelope(*answer, false)
 	}
 	mutating := call.Operation.Access == collab.AccessMutating
-	request := proto.ToolCallRequest{
-		Name:          call.Provided.Tool,
+	request := collab.ProviderRequest{
 		Arguments:     call.Arguments,
 		WorkspaceRoot: env.WorkspaceRoot,
 		ExtensionRoot: resolution.Provider.Path,
 		Provider:      call.providerMember(),
 	}
-	if call.Provided.Definition.WorkspaceSelection {
+	if call.Provided.Operation.WorkspaceSelection {
 		if env.AttachView == nil {
 			return redactor.redactEnvelope(transportFailure(call, stagePrepare,
-				"this entry path cannot resolve the workspace selection the provider tool declares"), mutating)
+				"this entry path cannot resolve the workspace selection the provider operation declares"), mutating)
 		}
 		if err := env.AttachView(ctx, &request, call.Arguments); err != nil {
 			envelope := collab.Envelope{
@@ -109,19 +107,19 @@ func CallProviderOperation(ctx context.Context, env ProviderEnvironment, contrac
 			return redactor.redactEnvelope(envelope, mutating)
 		}
 	}
-	candidate := extensionToolCandidate{name: call.Provided.Tool, ext: resolution.Provider, def: call.Provided.Definition}
-	result, err := invokeExtensionTool(ctx, env.WorkspaceRoot, candidate, request)
+	candidate := providerCandidate{ext: resolution.Provider, contract: contract, declaration: call.Provided.Provider}
+	stdout, err := invokeProvider(ctx, env.WorkspaceRoot, candidate, request)
 	if err != nil {
 		stage, message := collaborationStage(err)
 		return redactor.redactEnvelope(transportFailure(call, stage, message), mutating)
 	}
-	return redactor.redactEnvelope(interpretResult(call, result), mutating)
+	return redactor.redactEnvelope(interpretResult(call, stdout), mutating)
 }
 
 // collaborationStage reads how far a failed invocation got, and describes it
 // without the provider's stderr, which never reaches an envelope.
 func collaborationStage(err error) (invocationStage, string) {
-	var failure *extensionToolError
+	var failure *providerError
 	if !errors.As(err, &failure) {
 		return stagePrepare, err.Error()
 	}

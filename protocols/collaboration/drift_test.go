@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	job "go.putnami.dev/protocol/job"
 )
 
 type schemaNode struct {
@@ -133,7 +135,10 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 		{"PageRequest", common.Defs["pageRequest"], PageRequest{}},
 		{"Page", common.Defs["page"], Page{}},
 		{"Binding", common.Defs["binding"], Binding{}},
-		{"ProviderDeclaration", common.Defs["providerDeclaration"], ProviderDeclaration{}},
+		{"ProviderRequest", common.Defs["providerRequest"], ProviderRequest{}},
+		{"ProviderCall", common.Defs["providerCall"], ProviderCall{}},
+		{"ProjectRef", common.Defs["projectRef"], ProjectRef{}},
+		{"Selection", common.Defs["selection"], Selection{}},
 		{"Capabilities", common.Defs["capabilities"], Capabilities{}},
 		{"OperationCapability", common.Defs["operationCapability"], OperationCapability{}},
 		{"CapabilityIssue", common.Defs["capabilityIssue"], CapabilityIssue{}},
@@ -201,6 +206,8 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 		{"contract", common.Defs["contract"].Enum, ContractNames},
 		{"outcome", common.Defs["outcome"].Enum, stringsOf(ValidOutcomes)},
 		{"preconditions", common.Defs["preconditions"].Enum, stringsOf(ValidPreconditions)},
+		{"manifest preconditions", stringsOf(ValidPreconditions), extension.ProviderPreconditions},
+		{"selection.mode", common.Defs["selection"].Properties["mode"].Enum, SelectionModes},
 		{"capabilities.status", common.Defs["capabilities"].Properties["status"].Enum, stringsOf(ValidBindingStatuses)},
 		{"taskState", tasks.Defs["taskState"].Enum, stringsOf(ValidTaskStates)},
 		{"proposalState", proposals.Defs["proposalState"].Enum, stringsOf(ValidProposalStates)},
@@ -400,4 +407,69 @@ func stringsOf[T ~string](values []T) []string {
 		out[i] = string(v)
 	}
 	return out
+}
+
+// TestDrift_SelectionMarshalsLikeTheJobSelection is the anti-drift pin on the
+// other wire that carries a resolved selection.
+//
+// A provider call has no job context, so this contract declares its own
+// Selection. Three types describe one resolved answer: the CLI's
+// ResolvedSelection, protocols/job's Selection and this one. What holds them
+// together is the bytes. A member added to one and forgotten on another would
+// let the same narrowing read differently depending on which surface answered,
+// which is the one failure a shared resolver exists to prevent. The comparison
+// is over the marshaled document (member names, member order and omitempty
+// behavior), because that is the whole contract.
+func TestDrift_SelectionMarshalsLikeTheJobSelection(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "schemas-track-the-go-types", "entity-schemas-match-the-go-types")
+	for _, sample := range []struct {
+		name      string
+		job       job.Selection
+		selection Selection
+	}{
+		{
+			name:      "the unscoped whole-workspace projection",
+			job:       job.Selection{Mode: job.SelectionModeAll, ProjectIDs: []string{"/a", "/b"}},
+			selection: Selection{Mode: SelectionModeAll, ProjectIDs: []string{"/a", "/b"}},
+		},
+		{
+			name:      "an explicit selector",
+			job:       job.Selection{Mode: job.SelectionModeProjects, Scoped: true, ProjectIDs: []string{"/a"}},
+			selection: Selection{Mode: SelectionModeProjects, Scoped: true, ProjectIDs: []string{"/a"}},
+		},
+		{
+			name: "impacted, with the baseline it resolved to",
+			job: job.Selection{
+				Mode: job.SelectionModeImpacted, Scoped: true,
+				Baseline: "origin/main", BaselineSource: "trunk",
+				ProjectIDs: []string{}, EmptyImpact: true,
+			},
+			selection: Selection{
+				Mode: SelectionModeImpacted, Scoped: true,
+				Baseline: "origin/main", BaselineSource: "trunk",
+				ProjectIDs: []string{}, EmptyImpact: true,
+			},
+		},
+	} {
+		t.Run(sample.name, func(t *testing.T) {
+			jobBytes, err := json.Marshal(sample.job)
+			if err != nil {
+				t.Fatalf("marshal job selection: %v", err)
+			}
+			selectionBytes, err := json.Marshal(sample.selection)
+			if err != nil {
+				t.Fatalf("marshal provider selection: %v", err)
+			}
+			if string(jobBytes) != string(selectionBytes) {
+				t.Errorf("the two selection contracts no longer marshal identically:\n  job:      %s\n  provider: %s",
+					jobBytes, selectionBytes)
+			}
+		})
+	}
+
+	// The vocabularies are the same closed set, in the same canonical order, so
+	// a consumer of either reads one mode table.
+	if !slices.Equal(SelectionModes, job.SelectionModes) {
+		t.Errorf("selection modes = %v, job selection modes = %v", SelectionModes, job.SelectionModes)
+	}
 }

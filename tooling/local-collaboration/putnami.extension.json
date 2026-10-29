@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/local-collaboration",
-  "cliContract": 4,
+  "cliContract": 18,
   "runtime": {
     "executable": "compiled/putnami-local-collaboration",
     "toolchains": {
@@ -65,381 +65,90 @@
       ]
     }
   },
-  "tools": {
-    "local-collaboration.tasks.find": {
-      "description": "Find tasks in the workspace-local store by text, semantic state and labels, in creation order, one bounded page at a time.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The tasks.find request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
-        },
-        "putnami.dev/provider": {
-          "contract": "tasks",
-          "version": 1,
-          "operation": "find"
-        }
-      },
+  "providers": {
+    "tasks": {
+      "version": 1,
       "command": "{extensionRuntime}",
       "args": [
-        "provider-tool"
+        "provider"
       ],
       "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.tasks.get": {
-      "description": "Read one task of the workspace-local store.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The tasks.get request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
+      "timeoutMs": 30000,
+      "operations": {
+        "find": {
+          "description": "Find tasks in the workspace-local store by text, semantic state and labels, in creation order, one bounded page at a time.",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "tasks",
-          "version": 1,
-          "operation": "get"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.tasks.create": {
-      "description": "Record a task in the workspace-local store. A repeated idempotency key returns the task it created; the same key with other content is a conflict.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The tasks.create request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
+        "get": {
+          "description": "Read one task of the workspace-local store.",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "tasks",
-          "version": 1,
-          "operation": "create"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.tasks.update": {
-      "description": "Change a local task's title, body or labels. expectedRevision is compared and written under the store's exclusive lock; a change that alters nothing keeps the revision.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The tasks.update request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
+        "create": {
+          "description": "Record a task in the workspace-local store. A repeated idempotency key returns the task it created; the same key with other content is a conflict.",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "tasks",
-          "version": 1,
-          "operation": "update",
+        "update": {
+          "description": "Change a local task's title, body or labels. expectedRevision is compared and written under the store's exclusive lock; a change that alters nothing keeps the revision.",
+          "openWorld": false,
+          "preconditions": "atomic"
+        },
+        "transition": {
+          "description": "Move a local task to another state. expectedRevision is compared and written under the store's exclusive lock. Assignment, hierarchy and exclusive claims are not offered by this provider.",
+          "openWorld": false,
           "preconditions": "atomic"
         }
-      },
+      }
+    },
+    "proposals": {
+      "version": 1,
       "command": "{extensionRuntime}",
       "args": [
-        "provider-tool"
+        "provider"
       ],
       "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.tasks.transition": {
-      "description": "Move a local task to another state. expectedRevision is compared and written under the store's exclusive lock. Assignment, hierarchy and exclusive claims are not offered by this provider.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The tasks.transition request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
+      "timeoutMs": 30000,
+      "operations": {
+        "find": {
+          "description": "Find the local proposals recorded for an exact repository, base and head. The repository defaults to the binding's repository setting, else \"local\".",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "tasks",
-          "version": 1,
-          "operation": "transition",
+        "upsert": {
+          "description": "Record or update the one open local proposal for an exact repository, base and head in the workspace-local store. Nothing is pushed or opened on a hosting service, and merge is not offered.",
+          "openWorld": false,
           "preconditions": "atomic"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.proposals.find": {
-      "description": "Find the local proposals recorded for an exact repository, base and head. The repository defaults to the binding's repository setting, else \"local\".",
-      "inputSchema": {
-        "type": "object",
-        "description": "The proposals.find request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
         },
-        "putnami.dev/provider": {
-          "contract": "proposals",
-          "version": 1,
-          "operation": "find"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.proposals.upsert": {
-      "description": "Record or update the one open local proposal for an exact repository, base and head in the workspace-local store. Nothing is pushed or opened on a hosting service, and merge is not offered.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The proposals.upsert request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
+        "status": {
+          "description": "Read a local proposal and the reviews recorded for it. The local provider runs no hosted checks: checks are always reported unsupported.",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "proposals",
-          "version": 1,
-          "operation": "upsert",
-          "preconditions": "atomic"
+        "review": {
+          "description": "Record a review of a local proposal. A repeated idempotency key returns the review it recorded; nothing is published to a hosting service.",
+          "openWorld": false
         }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
+      }
     },
-    "local-collaboration.proposals.status": {
-      "description": "Read a local proposal and the reviews recorded for it. The local provider runs no hosted checks: checks are always reported unsupported.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The proposals.status request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
-        },
-        "putnami.dev/provider": {
-          "contract": "proposals",
-          "version": 1,
-          "operation": "status"
-        }
-      },
+    "missions": {
+      "version": 1,
       "command": "{extensionRuntime}",
       "args": [
-        "provider-tool"
+        "provider"
       ],
       "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.proposals.review": {
-      "description": "Record a review of a local proposal. A repeated idempotency key returns the review it recorded; nothing is published to a hosting service.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The proposals.review request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
+      "timeoutMs": 30000,
+      "operations": {
+        "sync": {
+          "description": "Publish an agent session's state and plan to its local mission, then read the mission and the inbox. Before it answers, the store takes the decision answers and messages its owner wrote as files in the store directory; nothing leaves the machine.",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "proposals",
-          "version": 1,
-          "operation": "review"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.missions.sync": {
-      "description": "Publish an agent session's state and plan to its local mission, then read the mission and the inbox. Before it answers, the store takes the decision answers and messages its owner wrote as files in the store directory; nothing leaves the machine.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The missions.sync request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
+        "ask": {
+          "description": "Ask the local mission's owner one decision. The owner answers it by writing answers/<decision>.json in the store directory. A repeated idempotency key returns the decision already recorded; the same key with other content is a conflict.",
+          "openWorld": false
         },
-        "putnami.dev/provider": {
-          "contract": "missions",
-          "version": 1,
-          "operation": "sync"
+        "reply": {
+          "description": "Reply to one message of the local mission's inbox. A message takes one reply: the same reply again changes nothing, and another reply is a conflict.",
+          "openWorld": false
         }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.missions.ask": {
-      "description": "Ask the local mission's owner one decision. The owner answers it by writing answers/<decision>.json in the store directory. A repeated idempotency key returns the decision already recorded; the same key with other content is a conflict.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The missions.ask request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
-        },
-        "putnami.dev/provider": {
-          "contract": "missions",
-          "version": 1,
-          "operation": "ask"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
-    },
-    "local-collaboration.missions.reply": {
-      "description": "Reply to one message of the local mission's inbox. A message takes one reply: the same reply again changes nothing, and another reply is a conflict.",
-      "inputSchema": {
-        "type": "object",
-        "description": "The missions.reply request document of go.putnami.dev/protocol/collaboration version 1."
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "mutating",
-          "readOnly": false,
-          "supportsDryRun": false
-        },
-        "putnami.dev/provider": {
-          "contract": "missions",
-          "version": 1,
-          "operation": "reply"
-        }
-      },
-      "command": "{extensionRuntime}",
-      "args": [
-        "provider-tool"
-      ],
-      "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
+      }
     }
   }
 }

@@ -212,20 +212,20 @@ func shellQuote(value string) string {
 // binds the local provider failed before its first assertion.
 func TestHarnessManifestCarriesAWindowsRuntimePath(t *testing.T) {
 	runtimePath := `C:\w\tmp\putnami-contributor-harness-1\putnami-local-collaboration`
-	resolved, err := resolveExtensionRuntime([]byte(`{"tools":{"a":{"command":"{extensionRuntime}","timeoutMs":30000}}}`), runtimePath)
+	resolved, err := resolveExtensionRuntime([]byte(`{"providers":{"tasks":{"command":"{extensionRuntime}","timeoutMs":30000}}}`), runtimePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		Tools map[string]struct {
+		Providers map[string]struct {
 			Command   string `json:"command"`
 			TimeoutMs int    `json:"timeoutMs"`
-		} `json:"tools"`
+		} `json:"providers"`
 	}
 	if err := json.Unmarshal(resolved, &manifest); err != nil {
 		t.Fatalf("the resolved manifest is not JSON: %v\n%s", err, resolved)
 	}
-	if tool := manifest.Tools["a"]; tool.Command != runtimePath || tool.TimeoutMs != 30000 {
-		t.Fatalf("resolved tool = %+v, want command %s and timeoutMs 30000", tool, runtimePath)
+	if provider := manifest.Providers["tasks"]; provider.Command != runtimePath || provider.TimeoutMs != 30000 {
+		t.Fatalf("resolved provider = %+v, want command %s and timeoutMs 30000", provider, runtimePath)
 	}
 }

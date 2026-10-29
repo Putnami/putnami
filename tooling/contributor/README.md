@@ -12,7 +12,8 @@ and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
 (`.agents/skills`, `.codex/agents`) under the extension's own version. It also
 declares a compiled runtime, `compiled/putnami-contributor`, which serves
 `putnami change language`, `change verify`, `change finalize`,
-`change estimate`, `agent hook`, `agent attach` and `agent stage`
+`change estimate`, `agent hook`, `agent attach`, `agent stage`, `agent ask`
+and `agent reply`
 ([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md),
 [ADR 0005](doc/adr/0005-the-contributor-executable-serves-the-change-noun.md),
 [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)).
@@ -101,7 +102,8 @@ contract. Each hook runs `putnami agent hook`, which the executable serves:
 
 - At session start, the agent receives its mission sheet and the owner's
   waiting messages.
-- A plan change, an asked decision and a recorded reply are kept locally.
+- A plan change is kept locally. So are an asked decision and a recorded
+  reply, which `putnami agent ask` and `putnami agent reply` record.
 - At the end of a turn, one sync publishes the state, the plan, the delivered
   messages, the decisions and the `[ack <id>] <reply>` lines of the last
   message. A waiting message continues the turn once.
@@ -120,9 +122,14 @@ makes `issue-<n>` the mission of the checkout's branch.
 `putnami agent stage <talk|declare|show|code|check|prove|validate|merge>`
 records the loop stage of the current session and syncs it when the session
 reports to a mission; every later sync carries it. Once it read the
-transcript, it also prints the tokens the session spent so far. A hook never fails a
-turn: a failure leaves one line in `hook.log` under
-`<Putnami home>/contributor/sessions`.
+transcript, it also prints the tokens the session spent so far.
+`putnami agent ask --input <file|->` asks the owner a decision through
+`missions.ask` for the session's mission, and the next sync binds the decision
+to the session; the input is a `missions.ask` document without its `mission`.
+`putnami agent reply --message <id> --reply <text>` records a reply through
+`missions.reply`, and the session's next Stop then sends no `[ack <id>]` line
+for that message. A hook never fails a turn: a failure leaves one line in
+`hook.log` under `<Putnami home>/contributor/sessions`.
 
 Codex needs three things from the workspace before these hooks report a
 session:

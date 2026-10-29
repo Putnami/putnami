@@ -5,7 +5,7 @@ as a standalone Putnami extension.
 
 **Status: extracted.** This project owns the whole SDD surface: the four
 engines, the two validation jobs the DAG and CI run, the four interactive
-command groups, and the five `sdd.*` MCP tools. The CLI has no copy —
+and command groups. The CLI has no copy —
 `putnami features|specs|architecture|contracts` do not exist in a workspace that
 does not declare this extension.
 
@@ -19,7 +19,6 @@ Support status: **experimental** — no compatibility promise yet. See
 | [doc/01-getting-started.md](doc/01-getting-started.md) | Declaring the extension, per-project activation, first run |
 | [doc/02-validation-jobs.md](doc/02-validation-jobs.md) | `validate` and `validate-workspace`, the caching policy, the wire |
 | [doc/03-commands.md](doc/03-commands.md) | The sixteen interactive subcommands |
-| [doc/04-mcp-tools.md](doc/04-mcp-tools.md) | The five `sdd.*` tools, architecture context, and the breaking rename |
 | [doc/05-parity.md](doc/05-parity.md) | How parity with the replaced surface is proven |
 
 The decisions behind all of it are in
@@ -53,8 +52,6 @@ planner special case — and its semantics stay where they belong, in
 | `cmd/putnami-sdd/interactive.go` | The sixteen interactive subcommands: argument arity, selection refusals, output-mode resolution, and the result envelope. |
 | `cmd/putnami-sdd/render_*.go`, `labels.go` | The human rendering, ported verbatim from the CLI's command layer. |
 | `manifest_groups_test.go` | The four command groups, authored — and the assertions that hold the manifest to the inventory table. |
-| `cmd/putnami-sdd/mcptool.go` | The five `sdd.*` MCP tools: one request on stdin, one result on stdout, through the SDK's `mcp.Serve`. |
-| `manifest_tools_test.go` | The five tools, authored — the names, closed schemas, read-only contract, and `workspaceSelection` declaration. |
 | `doc/` | The user-facing pages listed above. |
 
 "Copied from" above is provenance, not a live twin: the CLI paths it names were
@@ -75,7 +72,7 @@ produced and the classified error the run failed with, and it never writes a
 byte to stdout. Argument parsing, positional arity, human output and the
 ResultV2 envelope live in `cmd/putnami-sdd`.
 
-The split is why the CLI and the MCP tools cannot answer differently — they call
+The split is why the CLI and the DAG jobs cannot answer differently — they call
 one builder — and it is also why the engines take a workspace value rather than
 a path: an extension has no loader, so membership arrives on the wire and is
 passed in.
@@ -155,102 +152,6 @@ One more is narrower: a selection-rejecting subcommand given an INVALID selector
 failure, because the CLI resolves the selection before dispatch. A valid
 selector still gets the verbatim refusal.
 
-## The agent surface
-
-Five MCP tools expose bounded, read-only context to an agent. Four are the
-feature/spec questions extracted from core; the fifth projects the existing
-ARC/DARC evaluation for one exact domain:
-
-| Tool | Replaces | Arguments |
-|---|---|---|
-| `sdd.list_features` | `list_features` | `query`, `projects`, `impacted`, `baseline`, `cursor`, `limit` |
-| `sdd.feature_context` | `feature_context` | `feature` |
-| `sdd.list_specs` | `list_specs` | `projects`, `impacted`, `baseline` |
-| `sdd.spec_context` | `spec_context` | `feature` |
-| `sdd.architecture_context` | New agent projection of `architecture inspect` | `domain` |
-
-The names are dot-namespaced because they have to be: an extension tool name
-without a dot is dropped by the CLI's extension-tool validator, and a name core
-already owns loses the collision to core. D4 renames all four with **no alias**,
-so agent configuration and docs move in the same PR.
-
-`cmd/putnami-sdd/mcptool.go` is the whole implementation: `mcp-tool` on argv
-routes one `ToolCallRequest` from stdin to one of five adapters over the SAME
-engine builders the commands call, and writes one `ToolCallResult`. There is no
-MCP server here — the CLI owns JSON-RPC and the agent's connection.
-
-### The wire had to grow, and what it grew
-
-A tool call carries no job context, and until this task it carried no workspace
-either: `ToolCallRequest` had a `workspaceRoot` and nothing else. That is not a
-detail an extension can work around, because the MUST NOT list items #2 and #3 forbid
-both remedies — no re-derivation by scanning, no copied loader — and for good
-reason: resolving `impacted` means diffing a baseline, mapping changed paths to
-owners and walking the dependent graph, and a second implementation of that is a
-second definition of what the workspace contains.
-
-So the contract grew additively, the same way selfcheck and `135550670` grew the
-job wire. A tool declares `"workspaceSelection": true`, and the CLI publishes:
-
-| The engine wants | The request member that carries it |
-|---|---|
-| Every workspace project, with its resolved version, type and direct edges | `workspaceProjects` |
-| A SIBLING's authored `putnami.json` (`bin`, `featureAuthority`, `options`) | `workspaceProjects[].config`, raw |
-| What the caller asked for and what it resolved to | `selection`, byte-identical to the job wire's |
-
-`workspaceProjects[].config` is shared with the job wire: both surfaces answer
-workspace questions and therefore may need a sibling's authored facts. The tool
-also receives resolved authored members such as tags directly. `feature_context`
-reads a project's `bin` to mint its command nodes; without the raw config it
-would report a project with no commands, and say so confidently.
-
-The declaration is opt-in rather than implicit because `projects`, `impacted`
-and `baseline` are the CLI's vocabulary and not every extension's: a third-party
-tool that means something else by `projects` must not have its arguments
-rejected as unknown project selectors.
-
-### Measured, not assumed
-
-Before the wire carried any of it, `sdd.list_features` over this repository's own
-parity fixture returned:
-
-```json
-{ "selection": { "mode": "all", "scoped": false, "projects": [] },
-  "manifests": 0, "features": [] }
-```
-
-Exit zero, well-formed, and empty — over a workspace with two authored features
-and a spec. That is the same shape the validation jobs caught (`valid: true, specs: 0`), and
-it is why every handler here REFUSES a request with no resolved `selection`
-instead of falling back to the whole workspace. A wrong answer an agent cannot
-tell from a right one is worse than an error.
-
-Parity is measured the way the interactive surface's was:
-`tooling/cli/internal/cli/sdd_mcp_parity_test.go` runs twenty calls — every
-tool, every narrowing its schema declares, and every failure — through ONE real
-`mcp.Server` carrying the four extracted tools registered by real discovery,
-and compares their content blocks byte for byte against the answers recorded
-from core before they were removed. The `sdd.list_features` recordings hold
-the bounded page this tool answers instead, and change only with the contract
-in [doc/04-mcp-tools.md](doc/04-mcp-tools.md). `sdd.architecture_context` postdates that
-oracle; its acceptance instead pins the shared evaluator, worktree-only
-boundary, complete typed projection, and failure envelope in this project.
-
-Two adaptations were needed and neither is cosmetic:
-
-- **No `capturedPayload` here.** The interactive path re-encodes its payload
-  through `map[string]any` because the CLI captures a built-in command's stdout,
-  so its keys come out alphabetical. `handleToolsCall` does the opposite — it
-  hands the handler's return value straight to `json.MarshalIndent` — so a
-  report struct encodes in declaration order and applying the interactive
-  adaptation here would BREAK parity rather than achieve it. Same extraction,
-  opposite rule, one wire apart.
-- **A failure may carry its report.** A core tool that fails with a value
-  attached writes two content blocks, the value then the message; the SDK's
-  `mcp.Serve` collapsed both into the message alone. It now reproduces core's
-  split, and each handler mirrors its counterpart's: argument guards return a nil
-  payload, engine calls return the report beside the error.
-
 ## The manifest has one author
 
 The committed `putnami.extension.json` must be exactly the document
@@ -287,10 +188,6 @@ go run ./cmd/putnami-sdd __putnami runtime-info
 
 # What the extension sees on the job-context wire, through the CLI.
 putnami sdd-selfcheck
-
-# The five tools, through the CLI's own MCP server.
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | putnami mcp
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sdd.list_specs","arguments":{"projects":["@putnami/cli"]}}}' | putnami mcp
 ```
 
 `sdd-selfcheck` is an internal command. It reports the extension identity, the
@@ -498,8 +395,7 @@ and are unchanged when the automatic mode is `off`.
 The extension binary may not import `go.putnami.dev/tooling/cli/internal/...`,
 may not `replace` into `tooling/cli`, and may not exec `putnami` at run time.
 Everything it knows about the workspace arrives on a wire: the job-context
-document for a job or an interactive subcommand, the `ToolCallRequest` for an
-MCP tool.
+document for a job or an interactive subcommand.
 
 That boundary costs something, and `internal/wsview` is where you see it. The
 CLI engines read a workspace the loader resolved: every project, with its
@@ -534,8 +430,3 @@ One limitation remains on the JOB wire and fails closed rather than quietly:
 | The engine wants | Consequence today |
 |---|---|
 | Loader warning codes | The view raises `workspace.provider_view_unavailable` itself when a workspace-scoped job receives no membership, so `architecture validate` refuses instead of reporting a subset as the whole. |
-
-The tool wire's own members are listed under
-[The wire had to grow](#the-wire-had-to-grow-and-what-it-grew), and the same
-rule governs them: a fact the request does not carry is a gap in
-`protocols/extension` to close, never a fact to re-derive here.

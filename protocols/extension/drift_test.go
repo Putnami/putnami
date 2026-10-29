@@ -392,11 +392,11 @@ func TestDrift_SessionPrerequisiteParamBinding(t *testing.T) {
 		goTypeJSONFields(t, SessionPrerequisiteParamBinding{}))
 }
 
-func TestDrift_ToolDefinition(t *testing.T) {
+func TestDrift_ProviderDeclaration(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
-	schemaFields := schemaDefProperties(t, "toolDefinition")
-	goFields := goTypeJSONFields(t, ToolDefinition{})
-	assertFieldParity(t, "ToolDefinition", schemaFields, goFields)
+	schemaFields := schemaDefProperties(t, "providerDeclaration")
+	goFields := goTypeJSONFields(t, ProviderDeclaration{})
+	assertFieldParity(t, "ProviderDeclaration", schemaFields, goFields)
 }
 
 func TestDrift_AgentContentContribution(t *testing.T) {
@@ -456,11 +456,38 @@ func TestDrift_VerbDefinition(t *testing.T) {
 	assertFieldParity(t, "VerbDefinition", schemaDefProperties(t, "verbDefinition"), goTypeJSONFields(t, VerbDefinition{}))
 }
 
-func TestDrift_ToolAnnotations(t *testing.T) {
+// TestDrift_ProviderOperation pins the operation's members and its closed
+// preconditions enum against the vocabulary the validator enforces.
+func TestDrift_ProviderOperation(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "the-schema-and-the-go-types-agree", "every-wire-struct-matches-the-schema")
-	schemaFields := schemaDefProperties(t, "toolAnnotations")
-	goFields := goTypeJSONFields(t, ToolAnnotations{})
-	assertFieldParity(t, "ToolAnnotations", schemaFields, goFields)
+	schemaFields := schemaDefProperties(t, "providerOperation")
+	goFields := goTypeJSONFields(t, ProviderOperation{})
+	assertFieldParity(t, "ProviderOperation", schemaFields, goFields)
+
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Defs struct {
+			Operation struct {
+				Properties struct {
+					Preconditions struct {
+						Enum []string `json:"enum"`
+					} `json:"preconditions"`
+				} `json:"properties"`
+			} `json:"providerOperation"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	if got := schema.Defs.Operation.Properties.Preconditions.Enum; !slices.Equal(got, ProviderPreconditions) {
+		t.Errorf("providerOperation.preconditions enum %v, Go vocabulary %v", got, ProviderPreconditions)
+	}
+	if !slices.IsSorted(ProviderPreconditions) {
+		t.Errorf("ProviderPreconditions %v is not in canonical order", ProviderPreconditions)
+	}
 }
 
 func TestDrift_HookDefinition(t *testing.T) {

@@ -27,7 +27,7 @@ const providerProcessEnv = "PUTNAMI_MEMORY_STORE_TEST_PROVIDER"
 
 func TestMain(m *testing.M) {
 	if os.Getenv(providerProcessEnv) == "1" {
-		os.Exit(run([]string{providerToolArg}, os.Stdin, os.Stdout, os.Stderr))
+		os.Exit(run([]string{providerArg}, os.Stdin, os.Stdout, os.Stderr))
 	}
 	os.Exit(m.Run())
 }
@@ -48,7 +48,7 @@ func readManifest(t *testing.T) *extension.Manifest {
 // TestTheManifestPassesBothGates holds the shipped manifest to the extension
 // protocol's strict validation and to the collaboration offer the orchestrator
 // reads when it resolves a binding: the provider offers exactly the memory
-// operations this runtime answers, with truthful annotations.
+// operations this runtime answers, with truthful declarations.
 func TestTheManifestPassesBothGates(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "the-memory-store-manifest-draws-no-diagnostic")
 	spectest.Proves(t, feature, "truthful-manifest", "the-manifest-passes-both-gates")
@@ -59,7 +59,7 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 	if diags := extension.ValidateManifest(manifest); diag.HasErrors(diags) {
 		t.Fatalf("the manifest fails extension validation: %v", diags)
 	}
-	offer, diags := collab.ReadProviderOffer(manifest.Tools)
+	offer, diags := collab.ReadProviderOffer(manifest.Providers)
 	if len(diags) != 0 {
 		t.Fatalf("the provider declarations draw diagnostics: %v", diags)
 	}
@@ -78,26 +78,26 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 			t.Errorf("the manifest offers %s, which the runtime does not answer", key)
 		}
 		delete(answered, key)
-		definition := provided.Definition
-		if !slices.Equal(definition.Args, []string{providerToolArg}) || definition.Command != "{extensionRuntime}" {
-			t.Errorf("%s does not route to the runtime's provider bridge", provided.Tool)
+		if !slices.Equal(provided.Provider.Args, []string{providerArg}) || provided.Provider.Command != "{extensionRuntime}" {
+			t.Errorf("%s does not route to the runtime's provider entry point", key)
 		}
 		// The git backend with a remote reaches the network; one manifest
-		// serves both backends, so every tool says it may.
-		if !*definition.Annotations.OpenWorldHint || !strings.Contains(definition.Description, "Only the git backend with a remote reaches the network") {
-			t.Errorf("%s does not disclose that it may reach outside the machine", provided.Tool)
+		// serves both backends, so every operation says it may.
+		if provided.Operation.OpenWorld == nil || !*provided.Operation.OpenWorld ||
+			!strings.Contains(provided.Operation.Description, "Only the git backend with a remote reaches the network") {
+			t.Errorf("%s does not disclose that it may reach outside the machine", key)
 		}
 	}
 	if len(answered) != 0 {
 		t.Errorf("the runtime answers operations the manifest does not offer: %v", answered)
 	}
 	checkpoint := operations[collab.OperationCheckpoint]
-	if checkpoint.Declaration.Preconditions != collab.PreconditionsAtomic || !*checkpoint.Definition.Annotations.DestructiveHint ||
-		!strings.Contains(checkpoint.Definition.Description, "never records that anything passed") {
-		t.Errorf("checkpoint %+v", checkpoint.Declaration)
+	if checkpoint.Preconditions() != collab.PreconditionsAtomic ||
+		!strings.Contains(checkpoint.Operation.Description, "never records that anything passed") {
+		t.Errorf("checkpoint %+v", checkpoint.Operation)
 	}
 	for _, name := range []string{collab.OperationContext, collab.OperationSearch} {
-		if !operations[name].Definition.WorkspaceSelection {
+		if !operations[name].Operation.WorkspaceSelection {
 			t.Errorf("%s does not take the resolved selection", name)
 		}
 	}
@@ -119,10 +119,10 @@ func TestTheRuntimeHandshake(t *testing.T) {
 
 func TestAnUnknownInvocationIsAUsageError(t *testing.T) {
 	var out, errOut bytes.Buffer
-	if code := run([]string{"memory", "context"}, nil, &out, &errOut); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), providerToolArg) {
+	if code := run([]string{"memory", "context"}, nil, &out, &errOut); code != 2 || out.Len() != 0 || !strings.Contains(errOut.String(), providerArg) {
 		t.Fatalf("code %d, out %q, err %q", code, out.String(), errOut.String())
 	}
-	if code := run([]string{providerToolArg}, strings.NewReader("{"), &out, &errOut); code != 1 {
+	if code := run([]string{providerArg}, strings.NewReader("{"), &out, &errOut); code != 1 {
 		t.Errorf("an undecodable request exited %d", code)
 	}
 }
@@ -136,9 +136,9 @@ func checkpointRequest(t *testing.T, workspace, settings, key string, preconditi
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := json.Marshal(extension.ToolCallRequest{
-		Name: "memory-store.memory.checkpoint", Arguments: arguments, WorkspaceRoot: workspace,
-		Provider: &extension.ToolProviderCall{Contract: collab.ContractMemory, Version: 1, Operation: collab.OperationCheckpoint,
+	request, err := json.Marshal(collab.ProviderRequest{
+		Arguments: arguments, WorkspaceRoot: workspace,
+		Provider: &collab.ProviderCall{Contract: collab.ContractMemory, Version: 1, Operation: collab.OperationCheckpoint,
 			Settings: json.RawMessage(settings)},
 	})
 	if err != nil {
@@ -158,13 +158,9 @@ func provide(request []byte) (*collab.Response, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("provider process: %w: %s", err, stderr.String())
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		return nil, fmt.Errorf("provider output %q: %w", stdout.String(), err)
-	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
+	response, diags := collab.ParseResponse(stdout.Bytes())
 	if diags != nil {
-		return nil, fmt.Errorf("provider response %s: %v", result.Content[0].Text, diags)
+		return nil, fmt.Errorf("provider response %s: %v", stdout.String(), diags)
 	}
 	return response, nil
 }

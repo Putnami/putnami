@@ -68,13 +68,6 @@ const (
 	promptReminderMax = 200
 )
 
-// The missions tools the hook watches, as the MCP server names them. A host
-// prefixes them with mcp__<server>__ and replaces the dot.
-const (
-	toolAsk   = "missions.ask"
-	toolReply = "missions.reply"
-)
-
 var (
 	// sessionIDPattern is the session id rule of missions.sync.
 	sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
@@ -471,26 +464,19 @@ func applySpooled(cache *sessionCache, spooled []spooledToolUse) {
 	}
 }
 
-// hookPostToolUse records a plan change, a decision the session asked, or a
-// reply the agent recorded. The hook entry runs it on the plan tools and the
-// two missions tools only, and it ignores any other tool at once. It runs no
-// git and calls no provider: what it records goes with the next sync, at the
-// end of the turn. It never delivers a message: the models ignore or refuse
-// a message that follows a tool call. When another hook holds the lock, it
-// spools what it observed and returns at once.
+// hookPostToolUse records a plan change. The hook entry runs it on the plan
+// tools only, and it ignores any other tool at once. It runs no git and calls
+// no provider: what it records goes with the next sync, at the end of the
+// turn. It never delivers a message: the models ignore or refuse a message
+// that follows a tool call. When another hook holds the lock, it spools what
+// it observed and returns at once.
 func (e *Env) hookPostToolUse(engine string, input hookInput) error {
-	kind := sessionToolKind(input.ToolName)
-	if kind == toolReply {
-		return e.markReplied(input)
-	}
-	plan := isPlanTool(input.ToolName)
-	if !plan && kind != toolAsk {
+	if !isPlanTool(input.ToolName) {
 		return nil
 	}
-	if plan && input.AgentID != "" {
+	if input.AgentID != "" {
 		// Claude Code runs a subagent's hooks under the parent's session id:
-		// a subagent's plan is not the session's plan. A decision a subagent
-		// asks still binds to the session.
+		// a subagent's plan is not the session's plan.
 		return nil
 	}
 	now := e.Now()
@@ -532,26 +518,6 @@ func (e *Env) hookPostToolUse(engine string, input hookInput) error {
 	return nil
 }
 
-// markReplied leaves a marker for a message missions.reply recorded a reply
-// to, or found closed. The tool takes no session, so the marker is per
-// message; the Stop of the session that holds the prompt reads it, and its
-// `[ack]` line for that message is then not sent.
-func (e *Env) markReplied(input hookInput) error {
-	envelope, ok := toolEnvelope(input.ToolResponse)
-	if !ok || envelope.Contract != collab.ContractMissions || envelope.Operation != collab.OperationReply {
-		return nil
-	}
-	closed := envelope.Outcome == collab.OutcomeConflict && envelope.Error != nil && envelope.Error.Reason == collab.ReasonMessageClosed
-	if envelope.Outcome != collab.OutcomeOK && !closed {
-		return nil
-	}
-	var request collab.MissionsReplyInput
-	if json.Unmarshal(input.ToolInput, &request) != nil || !missionIDPattern.MatchString(request.Message) {
-		return errors.New("a missions.reply call names no valid message id")
-	}
-	return writeFileAtomic(repliedMarkerPath(e.sessionsDir(), request.Message), []byte(e.Now().UTC().Format(time.RFC3339Nano)))
-}
-
 // hookStop publishes the end of the turn with the agent's last message, its
 // plan, the messages it received and its `[ack <id>]` replies, in one sync,
 // then decides whether the turn continues:
@@ -584,7 +550,7 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 			}
 		}
 		cache.LastMessage = boundedText(input.LastMessage, collab.MaxLastMessageLength)
-		// A reply missions.reply recorded comes first: the provider keeps the
+		// A reply `agent reply` recorded comes first: the provider keeps the
 		// first reply of a message and refuses another.
 		closeRepliedPrompts(cache, dir)
 		recordAckLines(cache, input.LastMessage, dir)
@@ -712,7 +678,7 @@ func stopFailureError(input hookInput) string {
 
 // recordAckLines queues the `[ack <id>] <reply>` lines of the agent's last
 // message as replies. Only a message delivered to this session counts, once,
-// and the first line for an id wins. A reply missions.reply recorded wins
+// and the first line for an id wins. A reply `agent reply` recorded wins
 // over a line: the provider keeps the first reply of a message and refuses
 // another, so a line for a message whose marker is there queues nothing.
 func recordAckLines(cache *sessionCache, message, dir string) {
@@ -743,7 +709,7 @@ func replyQueued(replies []messageReply, id string) bool {
 	return false
 }
 
-// closeRepliedPrompts closes the prompts missions.reply replied to, and
+// closeRepliedPrompts closes the prompts `agent reply` replied to, and
 // removes their markers.
 func closeRepliedPrompts(cache *sessionCache, dir string) {
 	for _, prompt := range append([]pendingPrompt(nil), cache.Prompts...) {
@@ -767,8 +733,8 @@ func closePrompt(cache *sessionCache, id string) {
 	cache.Prompts = kept
 }
 
-// repliedMarkerPath is the marker a missions.reply call leaves for one
-// message id; the id matches missionIDPattern, so it is a plain file name.
+// repliedMarkerPath is the marker `agent reply` leaves for one message id;
+// the id matches missionIDPattern, so it is a plain file name.
 func repliedMarkerPath(dir, message string) string {
 	return filepath.Join(dir, repliedMarkersDir, message)
 }
@@ -812,7 +778,7 @@ func stopReason(cache *sessionCache, stopHookActive, newOnly bool) (string, []in
 // sessionReplyWays names both ways a reply reaches the owner. A text the hook
 // gives the agent states it once, at its end: after the SessionStart context,
 // and after the messages or reminders of a turn end that hold a prompt.
-const sessionReplyWays = `The missions.reply tool records a reply to a message id; a line "[ack <message id>] <reply>" in the final message of a turn also records it.`
+const sessionReplyWays = `The command "putnami agent reply --message <message id> --reply <text>" records a reply to a message id; a line "[ack <message id>] <reply>" in the final message of a turn also records it.`
 
 // deliveredText is the text that delivers messages at the end of a turn or
 // during a wait: each message, then the ways a reply reaches the owner once
@@ -827,81 +793,22 @@ func deliveredText(messages []inboxMessage) string {
 	return text
 }
 
-// observeToolUse records what one plan or ask call changes in the session,
-// and answers whether it changed anything to publish.
+// observeToolUse records what one plan call changes in the session, and
+// answers whether it changed anything to publish.
 func observeToolUse(cache *sessionCache, toolName string, input, response json.RawMessage) bool {
-	if isPlanTool(toolName) {
-		next, ok := applyPlanTool(toolName, input, response, cache.Plan)
-		if !ok {
-			return false
-		}
-		digest := planDigest(next)
-		if digest == cache.PlanDigest {
-			return false
-		}
-		cache.Plan, cache.PlanDigest = next, digest
-		return true
-	}
-	if sessionToolKind(toolName) != toolAsk {
+	if !isPlanTool(toolName) {
 		return false
 	}
-	envelope, ok := toolEnvelope(response)
-	if !ok || envelope.Outcome != collab.OutcomeOK || envelope.Contract != collab.ContractMissions || envelope.Operation != collab.OperationAsk {
+	next, ok := applyPlanTool(toolName, input, response, cache.Plan)
+	if !ok {
 		return false
 	}
-	var answer collab.MissionsAskResult
-	if json.Unmarshal(envelope.Result, &answer) != nil || !missionIDPattern.MatchString(answer.Decision.ID) {
+	digest := planDigest(next)
+	if digest == cache.PlanDigest {
 		return false
 	}
-	cache.Asked = appendBounded(cache.Asked, answer.Decision.ID, collab.MaxOpenDecisions)
-	if containsString(cache.Decisions, answer.Decision.ID) {
-		return false
-	}
-	cache.Decisions = appendBounded(cache.Decisions, answer.Decision.ID, collab.MaxSyncDecisions)
+	cache.Plan, cache.PlanDigest = next, digest
 	return true
-}
-
-// sessionToolKind names the missions tool a tool call ran, or "". Hosts
-// prefix an MCP tool with mcp__<server>__ and replace the dot of its name.
-func sessionToolKind(toolName string) string {
-	normalized := strings.ReplaceAll(toolName, ".", "_")
-	for _, kind := range []string{toolAsk, toolReply} {
-		suffix := strings.ReplaceAll(kind, ".", "_")
-		if normalized == suffix || (strings.HasPrefix(normalized, "mcp__") && strings.HasSuffix(normalized, "__"+suffix)) {
-			return kind
-		}
-	}
-	return ""
-}
-
-// mcpToolContent is one content item of an MCP tool result.
-type mcpToolContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-// toolEnvelope decodes the envelope a missions tool answered. Claude Code
-// passes the MCP content list, Codex the whole result. The text is the
-// envelope whatever the result's error flag says: a reply to a closed
-// message is a conflict envelope.
-func toolEnvelope(response json.RawMessage) (collab.Envelope, bool) {
-	var content []mcpToolContent
-	if json.Unmarshal(response, &content) != nil {
-		var result struct {
-			Content []mcpToolContent `json:"content"`
-		}
-		if json.Unmarshal(response, &result) != nil {
-			return collab.Envelope{}, false
-		}
-		content = result.Content
-	}
-	for _, item := range content {
-		var envelope collab.Envelope
-		if item.Type == "text" && json.Unmarshal([]byte(item.Text), &envelope) == nil && envelope.Contract != "" {
-			return envelope, true
-		}
-	}
-	return collab.Envelope{}, false
 }
 
 // nextMessages answers the waiting messages a text gives, in order, while

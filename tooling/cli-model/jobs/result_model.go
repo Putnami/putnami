@@ -192,8 +192,7 @@ type Publication struct {
 // TaskResult is the canonical outcome of one scheduled task: identity, the
 // orthogonal status/reuse pair, timings, and the structured records the task
 // produced. It replaces JobResult, batchWireResult, jobReadResult,
-// output.jobRunEntry, mcp.jobFailure, mcp.diagnostic and
-// workspace_state.SessionJobEntry as the thing consumers read (A2b).
+// output.jobRunEntry and workspace_state.SessionJobEntry as the thing consumers read (A2b).
 type TaskResult struct {
 	Key       string
 	Project   string

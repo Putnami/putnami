@@ -6,7 +6,7 @@ package cli
 // Version 1 had four machine surfaces and none of them said which contract it
 // spoke: the --output=json envelope (Result), the --output=jsonl session stream
 // (protocols/runtime's job:*/session:end envelopes), the MCP run_jobs/plan_jobs
-// results, and the recorded session files. Version 2 stamps every one of them
+// results (since removed), and the recorded session files. Version 2 stamps every one of them
 // with ProtocolVersion, so a consumer reads the contract off the document
 // instead of guessing from the CLI version — a document WITHOUT the field is
 // version 1, and can now only come from a build published before B1b.
@@ -178,12 +178,6 @@ const (
 	MachineOutputFinalReserveRecords = 1
 )
 
-// MCP tools that return a v2 result document.
-const (
-	MCPToolRunJobs  = "run_jobs"
-	MCPToolPlanJobs = "plan_jobs"
-)
-
 // DocumentKind names one of the v2 machine documents. It is the discriminator
 // ValidateDocument takes, because the four surfaces write different documents
 // to different places and a reader always knows which one it opened.
@@ -198,8 +192,6 @@ const (
 	// DocumentSessionStreamRecord is one --output=jsonl line. Task/session
 	// variants are recorded; the plan:end preview variant is live-only.
 	DocumentSessionStreamRecord DocumentKind = "sessionStreamRecord"
-	// DocumentMCPResult is an MCP run_jobs/plan_jobs result.
-	DocumentMCPResult DocumentKind = "mcpResult"
 	// DocumentSessionFile is the recorded session.json.
 	DocumentSessionFile DocumentKind = "sessionFile"
 	// DocumentSessionPlanFile is the recorded plan.json.
@@ -211,14 +203,16 @@ const (
 )
 
 // Report origins — which surface drove the run a report describes. The two are
-// not cosmetic: an MCP run is an agent's, and a consumer aggregating build
-// economics over time has to keep agent traffic apart from a human's or CI's
-// rather than average them together.
+// not cosmetic: an ephemeral run is a verification pass, not a build someone
+// asked for, and a consumer aggregating build economics over time has to keep
+// that traffic apart from the runs a human or CI drove rather than average them
+// together.
 const (
 	// ReportOriginCLI is a run driven by the command line.
 	ReportOriginCLI = "cli"
-	// ReportOriginMCP is a run driven by an MCP tool call.
-	ReportOriginMCP = "mcp"
+	// ReportOriginEphemeral is a run the CLI drives for itself on an
+	// ephemeral session, such as the build behind `cache verify`.
+	ReportOriginEphemeral = "ephemeral"
 )
 
 // Coverage granularities. Languages measure coverage differently (Go counts
@@ -706,7 +700,7 @@ type PlannedTask struct {
 	Cache bool `json:"cache"`
 }
 
-// PlanSummary is the plan a dry run or plan_jobs reports.
+// PlanSummary is the plan a dry run reports.
 type PlanSummary struct {
 	// DryRun reports that the plan was computed without executing it.
 	DryRun bool `json:"dryRun"`
@@ -876,21 +870,6 @@ func MachineOutputBudgetFor(mode string) (MachineOutputBudget, bool) {
 	}
 }
 
-// MCPResult is the document an MCP tool call returns.
-type MCPResult struct {
-	// ProtocolVersion is ResultProtocolVersion.
-	ProtocolVersion int `json:"protocolVersion"`
-	// Tool is MCPToolRunJobs or MCPToolPlanJobs, and decides which of Run and
-	// Plan is present.
-	Tool string `json:"tool"`
-	// Commands are the commands the tool call ran or planned.
-	Commands []string `json:"commands"`
-	// Run is present exactly for MCPToolRunJobs.
-	Run *RunSummary `json:"run,omitempty"`
-	// Plan is present exactly for MCPToolPlanJobs.
-	Plan *PlanSummary `json:"plan,omitempty"`
-}
-
 // SessionGit captures the git state recorded with a session.
 type SessionGit struct {
 	// Branch is the checked-out branch, absent on a detached HEAD.
@@ -953,21 +932,6 @@ type SessionDeclarations struct {
 	// Files is the number of declaration files the digest covers. Zero is a
 	// measurement: the workspace declares nothing.
 	Files int `json:"files"`
-}
-
-// SessionAgentValueMaxBytes bounds each member of SessionAgent.
-const SessionAgentValueMaxBytes = 128
-
-// SessionAgent names the agent session that launched a run. It is present only
-// when an agent launched the run through the MCP server, and each member only
-// when the agent stated it; a terminal run records none. No member is inferred.
-type SessionAgent struct {
-	// Kind is the agent harness, as the MCP client named itself during
-	// initialize (for example "claude-code"). Printable ASCII.
-	Kind string `json:"kind"`
-	// SessionID is the agent's own session identifier, absent when the agent
-	// stated none. Printable ASCII.
-	SessionID string `json:"sessionId,omitempty"`
 }
 
 // SessionPlacement records requested and actual execution locations. It is
@@ -1452,9 +1416,6 @@ type SessionFile struct {
 	// Placement distinguishes the requested location from actual execution.
 	// Absent when the producer did not record placement.
 	Placement *SessionPlacement `json:"placement,omitempty"`
-	// Agent names the agent session that launched the run through the MCP
-	// server. Absent for any other run.
-	Agent *SessionAgent `json:"agent,omitempty"`
 	// Run is the session's verdict, identical to the one the other surfaces
 	// reported for the same run.
 	Run RunSummary `json:"run"`
@@ -1752,7 +1713,7 @@ type ReportFile struct {
 	// written from a settled run, so an unfinished one has no report rather than
 	// a report missing its end.
 	EndTime string `json:"endTime"`
-	// Origin is ReportOriginCLI or ReportOriginMCP — which surface drove the run.
+	// Origin is ReportOriginCLI or ReportOriginEphemeral — which surface drove the run.
 	Origin string `json:"origin"`
 	// EnforceCoverage records whether a configured coverage-threshold could fail
 	// this run. It defaults to true; a run that passed --no-enforce-coverage still

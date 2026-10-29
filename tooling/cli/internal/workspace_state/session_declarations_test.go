@@ -118,7 +118,4 @@ func TestSessionRecordsTheDeclarationsItOpenedOn(t *testing.T) {
 	if parsed.Declarations == nil || parsed.Declarations.Digest != atStart {
 		t.Errorf("recorded declarations = %+v, want the start-of-run digest %s", parsed.Declarations, atStart)
 	}
-	if parsed.Agent != nil {
-		t.Errorf("a session nobody named an agent for recorded %+v", parsed.Agent)
-	}
 }

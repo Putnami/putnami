@@ -28,7 +28,7 @@ const sheetHeader = "Putnami mission sheet:"
 // missionSheet is the sheet the SessionStart context opens with, rendered
 // from the mission view the last sync answered and the checkpoint
 // memory.mission answered. It names the mission's repository and key, which
-// missions.ask takes. Every text an agent session or the owner wrote is
+// putnami agent ask takes. Every text an agent session or the owner wrote is
 // quoted with "> ", so none of it can pass for a line of the hook. started is
 // when this session start began: a view older than it is stale, and the sheet
 // says so with its date. A session that names no mission, or a workspace
@@ -41,7 +41,7 @@ func missionSheet(cache *sessionCache, syncErr error, started time.Time) string 
 	identity, _ := json.Marshal(map[string]string{"repository": cache.Repository, "key": mission.Key})
 	parts := []string{
 		sheetHeader,
-		fmt.Sprintf("Mission %s of repository %s.\nmissions.ask takes this mission as %s.", mission.Key, cache.Repository, identity),
+		fmt.Sprintf("Mission %s of repository %s.\nputnami agent ask takes this mission as %s.", mission.Key, cache.Repository, identity),
 	}
 	note := ""
 	switch {

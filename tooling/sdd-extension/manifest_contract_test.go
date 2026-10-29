@@ -39,7 +39,7 @@ const manifestPath = "putnami.extension.json"
 // verdict:
 //
 //   - runtime. The SDK builder (tooling/extension-sdk/manifest) has methods for
-//     commands, command groups, tasks and tools, but none for the runtime
+//     commands, command groups and tasks, but none for the runtime
 //     lifecycle primitive, so the RuntimeDefinition is assigned directly. That
 //     gap is worth a Builder.Runtime method, which is an SDK change.
 //   - cliContract. Build stamps it only when the manifest declares a contract
@@ -469,11 +469,6 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 	// one-author rule reads better when the table it authors is next to it.
 	builder = withSDDCommandGroups(builder)
 
-	// The five MCP tools, in manifest_tools_test.go for
-	// the same reason. They are bounded questions asked by an agent instead of a
-	// terminal, and they run the same engine builders.
-	builder = withSDDMCPTools(builder)
-
 	built, err := builder.Build()
 	if err != nil {
 		t.Fatalf("the authored manifest was rejected at authoring time: %v", err)
@@ -631,7 +626,7 @@ func TestExtensionManifestPassesFullValidation(t *testing.T) {
 // the JSON.
 //
 // Build earns the cliContract stamp only for a manifest that declares a
-// contract surface — commands, command groups or tools
+// contract surface — commands, command groups or providers
 // (proto.DeclaresContractSurface) — because the packager never stamps a
 // hook-only manifest and requiring a stamp from one would reject every
 // framework package. This manifest DOES declare a command, so the stamp is
@@ -642,7 +637,7 @@ func TestExtensionManifestPassesFullValidation(t *testing.T) {
 func TestScaffoldStampsItsContractExplicitly(t *testing.T) {
 	m := committedManifest(t)
 	if !proto.DeclaresContractSurface(m) {
-		t.Fatal("the manifest declares no command, command group or tool; proto.ValidateManifest requires at least one and LoadManifest would treat it as hook-only")
+		t.Fatal("the manifest declares no command, command group or provider; proto.ValidateManifest requires at least one and LoadManifest would treat it as hook-only")
 	}
 	if m.CLIContract != proto.RequiredCLIContract(m) {
 		t.Fatalf("cliContract = %d, want %d; a manifest stamped below its vocabulary is rejected by LoadManifest and the extension disappears from discovery",

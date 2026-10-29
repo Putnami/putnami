@@ -294,6 +294,24 @@ func TestFromContextDecodesSiblingConfigAndPreservesOwnAuthority(t *testing.T) {
 	}
 }
 
+// TestFromContextToleratesAnUnreadableConfig states the choice: a config that
+// will not decode costs the refinements it carried, never the whole answer.
+func TestFromContextToleratesAnUnreadableConfig(t *testing.T) {
+	ws, _ := FromContext(&pctx.Context{
+		WorkspaceRoot: "/repo",
+		WorkspaceProjects: []pctx.ProjectRef{
+			{ID: "/billing", Name: "@acme/billing", Path: "billing", Config: json.RawMessage(`"not an object"`)},
+		},
+	})
+	billing := ws.ProjectByID("/billing")
+	if billing == nil {
+		t.Fatal("an unreadable config removed the project from the view")
+	}
+	if billing.Config != nil {
+		t.Errorf("config = %+v, want none", billing.Config)
+	}
+}
+
 // TestFromContextOnAProjectScopedJobSeesItsOwnProject pins the third source.
 //
 // A project-scoped task receives neither collection: the orchestrator attaches

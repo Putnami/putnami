@@ -240,11 +240,11 @@ func writeRunReport(
 
 // reportOrigin names the surface that drove the run. EphemeralSession is set by
 // exactly one caller — `cache verify` (Request.EphemeralSession) — so it is the
-// origin signal the engine already carries. The protocol names an adapter run
-// "mcp", and readers filter that origin out by default.
+// origin signal the engine already carries. The protocol names that run
+// "ephemeral", and readers filter that origin out by default.
 func reportOrigin(req *Request) string {
 	if req.EphemeralSession {
-		return protocolcli.ReportOriginMCP
+		return protocolcli.ReportOriginEphemeral
 	}
 	return protocolcli.ReportOriginCLI
 }

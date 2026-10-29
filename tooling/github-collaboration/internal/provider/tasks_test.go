@@ -330,7 +330,7 @@ func TestHierarchyThroughSubIssues(t *testing.T) {
 	if linked.Task.Parent == nil || *linked.Task.Parent != parent.Ref {
 		t.Fatalf("link answered %+v", linked.Task)
 	}
-	// The parent is outside the revision, as the link tool declares: a
+	// The parent is outside the revision, as the link operation declares: a
 	// precondition taken before the link still holds after it.
 	if linked.Task.Revision != child.Revision {
 		t.Fatalf("link moved the revision from %s to %s", child.Revision, linked.Task.Revision)

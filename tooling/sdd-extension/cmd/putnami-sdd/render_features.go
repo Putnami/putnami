@@ -203,17 +203,13 @@ func printFeatureInspectionHuman(w io.Writer, report sdd.FeatureInspectionReport
 	fmt.Fprintln(w)
 }
 
-// printFeatureSurfaceHuman prints the commands and MCP tools a declaration
-// lists, as declared.
+// printFeatureSurfaceHuman prints the commands a declaration lists, as declared.
 func printFeatureSurfaceHuman(w io.Writer, surface *featureproto.FeatureSurface, indent string) {
 	if surface == nil {
 		return
 	}
 	if len(surface.Commands) > 0 {
 		fmt.Fprintf(w, "%scommands: %s\n", indent, strings.Join(surface.Commands, ", "))
-	}
-	if len(surface.Tools) > 0 {
-		fmt.Fprintf(w, "%stools: %s\n", indent, strings.Join(surface.Tools, ", "))
 	}
 }
 

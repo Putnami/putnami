@@ -420,14 +420,16 @@ func TestReport_UncountableStatusStaysOutOfBothSides(t *testing.T) {
 	}
 }
 
-// TestReport_OriginIsClosed: the vocabulary is cli|mcp, and a producer that
-// named no surface is the command line — the weaker claim, since a reader
-// filters adapter runs out by default and guessing "mcp" would hide a real run.
+// TestReport_OriginIsClosed: the vocabulary is cli|ephemeral, and a producer
+// that named no surface is the command line — the weaker claim, since a reader
+// filters ephemeral runs out by default and guessing "ephemeral" would hide a
+// real run. The retired "mcp" is outside the vocabulary and projects to "cli".
 func TestReport_OriginIsClosed(t *testing.T) {
 	for _, tc := range []struct{ origin, want string }{
 		{"", protocolcli.ReportOriginCLI},
 		{"cli", protocolcli.ReportOriginCLI},
-		{"mcp", protocolcli.ReportOriginMCP},
+		{"ephemeral", protocolcli.ReportOriginEphemeral},
+		{"mcp", protocolcli.ReportOriginCLI},
 		{"agent", protocolcli.ReportOriginCLI},
 	} {
 		meta := reportMeta()

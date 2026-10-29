@@ -144,7 +144,7 @@ still forwards its own user token:
 
 ```yaml
 clients:
-  clientId: mcp-consumer
+  clientId: example-consumer
   services:
     intelligence:
       url: https://intelligence.example

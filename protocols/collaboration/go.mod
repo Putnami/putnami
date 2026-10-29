@@ -8,6 +8,9 @@ require (
 	// features is TEST-ONLY: spectest binds the conformance tests to the
 	// requirements of collaboration/provider-contract.
 	go.putnami.dev/protocol/features v0.0.0
+	// job is TEST-ONLY: it pins the provider request's Selection against the
+	// job context's (drift_test.go).
+	go.putnami.dev/protocol/job v0.0.0
 )
 
 require go.putnami.dev/protocol/cli v0.0.0 // indirect
@@ -21,3 +24,5 @@ replace go.putnami.dev/protocol/diagnostic => ../diagnostic
 replace go.putnami.dev/protocol/extension => ../extension
 
 replace go.putnami.dev/protocol/features => ../features
+
+replace go.putnami.dev/protocol/job => ../job

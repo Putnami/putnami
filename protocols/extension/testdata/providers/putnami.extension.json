@@ -1,0 +1,32 @@
+{
+  "name": "@acme/memory",
+  "cliContract": 18,
+  "runtime": {
+    "executable": "bin/acme-memory"
+  },
+  "providers": {
+    "memory": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": ["provider"],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 30000,
+      "operations": {
+        "checkpoint": {
+          "description": "Save a mission checkpoint in the hosted store.",
+          "openWorld": true,
+          "preconditions": "atomic"
+        },
+        "context": {
+          "description": "Load the records relevant to the selected projects.",
+          "openWorld": true,
+          "workspaceSelection": true
+        },
+        "mission": {
+          "description": "Read one mission record.",
+          "openWorld": true
+        }
+      }
+    }
+  }
+}

@@ -67,9 +67,9 @@ func TestHostRPCExtensionHelperProcess(t *testing.T) {
 // hostRPCNested is a nested putnami that the launched command runs, so it
 // inherits the launch's channel. It enters the process as putnami does, then
 // prints the channel variables its own environment, a provider the core
-// prepares, and the collaboration provider tool each hold. The fixture
-// provider tool refuses to serve when it receives a channel, so its outcome
-// says whether it did.
+// prepares, and the collaboration provider each hold. The fixture
+// collaboration provider refuses to serve when it receives a channel, so its
+// outcome says whether it did.
 func hostRPCNested(t *testing.T, root string, out io.Writer) int {
 	if err := enterProcess(nil); err != nil {
 		iox.Fprintf(out, "error=%v\n", err)
@@ -79,7 +79,7 @@ func hostRPCNested(t *testing.T, root string, out io.Writer) int {
 	iox.Fprintf(out, "provider=%s\n", hostRPCVariables(hostRPCProviderEnv(t, root)))
 	envelope := collaborationEnvelope(t.Context(), root, wsproto.Load(root), collabCommandExtensions(t, root),
 		collab.ContractTasks, "find", json.RawMessage(`{}`))
-	iox.Fprintf(out, "tool=%s\n", envelope.Outcome)
+	iox.Fprintf(out, "collaboration=%s\n", envelope.Outcome)
 	return 0
 }
 
@@ -295,17 +295,17 @@ func TestHostRPC_AHostedRunOpensNoChannel(t *testing.T) {
 	}
 }
 
-// TestHostRPC_AProviderToolReceivesNoChannel starts provider tools the way the
-// core does while a channel is open: from the process that opened it, and from
-// a nested putnami that the launched command runs, which inherits the pair.
+// TestHostRPC_AProviderCallReceivesNoChannel starts providers the way the core
+// does while a channel is open: from the process that opened it, and from a
+// nested putnami that the launched command runs, which inherits the pair.
 // Neither a provider the core prepares (scheduler.PrepareProviderLaunch: the cache
 // provider, the runner provider, the session reporter) nor the collaboration
-// provider tool that collaboration.call reaches receives the channel, and the
+// provider that collaboration.call reaches receives the channel, and the
 // nested process drops the pair it inherited. The nested putnami is a child
 // process, so the test never sets this process's environment.
-func TestHostRPC_AProviderToolReceivesNoChannel(t *testing.T) {
+func TestHostRPC_AProviderCallReceivesNoChannel(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, hostRPCFeature, hostRPCLifecycle, "a-planned-job-and-a-provider-tool-receive-no-channel")
+	spectest.Proves(t, hostRPCFeature, hostRPCLifecycle, "a-planned-job-and-a-provider-call-receive-no-channel")
 	root := collabCommandWorkspace(t, collabCommandBindings, nil)
 	var stderr bytes.Buffer
 	channel, stop := startHostRPC(t.Context(), hostRPCBinding{}, &stderr)
@@ -321,7 +321,7 @@ func TestHostRPC_AProviderToolReceivesNoChannel(t *testing.T) {
 	envelope := collaborationEnvelope(t.Context(), root, wsproto.Load(root), collabCommandExtensions(t, root),
 		collab.ContractTasks, "find", json.RawMessage(`{}`))
 	if envelope.Outcome != collab.OutcomeOK {
-		t.Errorf("the collaboration provider tool the launching process starts answered %s: %+v", envelope.Outcome, envelope.Error)
+		t.Errorf("the collaboration provider the launching process starts answered %s: %+v", envelope.Outcome, envelope.Error)
 	}
 
 	executable, err := os.Executable()
@@ -345,8 +345,8 @@ func TestHostRPC_AProviderToolReceivesNoChannel(t *testing.T) {
 	if report["provider"] != "" {
 		t.Errorf("a provider the nested putnami starts receives %s", report["provider"])
 	}
-	if report["tool"] != string(collab.OutcomeOK) {
-		t.Errorf("the collaboration provider tool the nested putnami starts answered %q", report["tool"])
+	if report["collaboration"] != string(collab.OutcomeOK) {
+		t.Errorf("the collaboration provider the nested putnami starts answered %q", report["collaboration"])
 	}
 }
 
@@ -548,10 +548,7 @@ func TestHostRPC_CollaborationCallRefusesWhatTheCommandPrintsNoEnvelopeFor(t *te
 func TestHostRPC_CollaborationCallRoutesProposalsFinalizeAsAnyOperation(t *testing.T) {
 	t.Parallel()
 	root := collabCommandWorkspace(t, `{"proposals":{"provider":"@test/cli-collab","version":1}}`, func(manifest *extproto.Manifest) {
-		spec, _ := collab.Lookup(collab.ContractProposals, 1)
-		for _, name := range spec.RequiredOperations() {
-			manifest.Tools["fixture.proposals."+name] = collabCommandTool(t, collab.ContractProposals, name)
-		}
+		manifest.Providers[collab.ContractProposals] = collabCommandProvider(t, collab.ContractProposals)
 	})
 	binding := hostRPCBinding{root: root, config: wsproto.Load(root), extensions: collabCommandExtensions(t, root)}
 	answer, err := dialHostRPC(t, binding).CallCollaboration(t.Context(), collab.ContractProposals, "finalize", nil)

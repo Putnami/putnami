@@ -1587,9 +1587,9 @@ func TestExtensionManifestDeclaresV3RuntimeAndTypedCloudContributions(t *testing
 			t.Fatalf("task %q command = %v, want {extensionRuntime}: a script command cannot start on Windows", name, got)
 		}
 	}
-	// The Intelligence MCP tools belong to the @putnami/intelligence extension.
+	// The Intelligence agent surface belongs to the @putnami/intelligence extension.
 	if _, ok := manifest["tools"]; ok {
-		t.Fatal("Cloud must not declare MCP tools: they ship with @putnami/intelligence")
+		t.Fatal("Cloud must not declare tools: the agent surface ships with @putnami/intelligence")
 	}
 
 	assertSchemaInput := func(taskName string) {

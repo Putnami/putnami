@@ -151,16 +151,6 @@ func BuildArchitectureInspectionResult(ws *workspace.Workspace, domain, baseline
 	return architectureInspectionResult("architecture inspect", domain, result)
 }
 
-// BuildArchitectureWorktreeInspectionResult selects one exact declared domain
-// from a CURRENT-WORKTREE-ONLY evaluation. It is the agent-facing counterpart
-// to BuildArchitectureInspectionResult: both reuse the same evaluator and
-// bounded projection, while this variant never resolves Git history or an
-// adoption baseline the tool request does not carry.
-func BuildArchitectureWorktreeInspectionResult(ws *workspace.Workspace, domain string) (ArchitectureInspectionReport, error) {
-	result := EvaluateWorkspace(ws, EvaluationOptions{WorktreeOnly: true, Today: time.Now().UTC()})
-	return architectureInspectionResult("architecture context", domain, result)
-}
-
 func architectureInspectionResult(command, domain string, result Result) (ArchitectureInspectionReport, error) {
 	report := buildArchitectureInspection(domain, result)
 	if result.Snapshot == nil || diag.HasErrors(result.Diagnostics) || archproto.HasBlockingFindings(result.Snapshot.Findings) {

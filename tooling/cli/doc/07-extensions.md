@@ -44,7 +44,7 @@ Each extension is defined by a `putnami.extension.json` file:
   },
   "commands": { ... },
   "tasks": { ... },
-  "tools": { ... },
+  "providers": { ... },
   "contracts": { ... },
   "hooks": { ... }
 }
@@ -60,7 +60,7 @@ Each extension is defined by a `putnami.extension.json` file:
 | `extensionDependencies` | `map[string]string` | Other extensions this one needs, each with a version constraint. Installing it installs and pins each registry dependency (`@scope/name`), and a manifest that names one requires CLI contract 8 — see [Extension Dependencies](#extension-dependencies) |
 | `commands` | `map[string]Command` | User-facing job definitions |
 | `tasks` | `map[string]Task` | Atomic executable units |
-| `tools` | `map[string]Tool` | Tool descriptors served by an extension-owned subprocess; the core serves them to no agent, and they remain the call contract of collaboration providers — see [Tools](#tools) |
+| `providers` | `map[string]ProviderDeclaration` | Collaboration providers, keyed by contract name: the contract version, the subprocess every operation runs, and the operations. Requires CLI contract 18 — see [Collaboration Providers](#collaboration-providers) |
 | `contracts` | `map[string]Contract` | JSON schema definitions for I/O validation |
 | `hooks` | `HooksConfig` | Lifecycle hooks |
 | `runtime` | `RuntimeDefinition` | The extension's own executable and how to prepare it — see [Lifecycle Primitives](#lifecycle-primitives) |
@@ -68,7 +68,7 @@ Each extension is defined by a `putnami.extension.json` file:
 | `agentContent` | `AgentContentContribution` | Agent instructions (skills, workers, references, helpers) shipped under the extension's own version; materialized only in a workspace that opts in with `extension:<name>` — see [Agent Workflows](18-agent-workflows.md#how-a-workspace-opts-in) |
 | `verbs` | `[]VerbDefinition` | The verb vocabulary: verbs that other extensions run, in help order, with their descriptions, aliases, default traits and related commands. Help, completion and alias resolution read it, because the core declares no verb, and a job whose command declares no traits takes its verb's. Requires CLI contract 9 — see [Well-Known Verbs](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary) |
 
-A manifest contributes at least one command, tool, agent-content
+A manifest contributes at least one command, provider, agent-content
 contribution or verb vocabulary; a content-only or vocabulary-only extension
 needs no runtime.
 
@@ -268,67 +268,63 @@ A `default` that declares positionals requires contract 15, because an older
 CLI answers "unknown subcommand" for the word it takes; see
 [ADR 0013](../../../protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md).
 
-## Tools
+## Collaboration Providers
 
-The core serves no tools to agents, so a tool in the manifest no longer reaches
-an agent. The `tools` section stays as the call contract of collaboration
-providers: a tool carries a descriptor, and the core launches its command only
-when it routes a provider operation to it. Tool names include a namespace such
-as `putnami.search`.
+A provider implements the operations of one collaboration contract — tasks,
+change proposals, memory or missions — in an extension subprocess. The
+`providers` member declares one entry per contract, keyed by the contract
+name. A manifest that declares it carries `cliContract` 18; a CLI that
+predates the member refuses the manifest instead of loading it without its
+providers.
 
 ```json
 {
-  "tools": {
-    "putnami.search": {
-      "description": "Search the hosted workspace intelligence index.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {"query": {"type": "string"}},
-        "required": ["query"],
-        "additionalProperties": false
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": true
-      },
-      "_meta": {
-        "putnami.dev/contract": {
-          "access": "read",
-          "readOnly": true,
-          "supportsDryRun": false
-        }
-      },
-      "command": "{extensionRoot}/bin/acme-tool",
-      "args": ["mcp-tool"],
+  "cliContract": 18,
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": ["provider"],
       "cwd": "{workspaceRoot}",
-      "timeoutMs": 30000
+      "timeoutMs": 30000,
+      "operations": {
+        "find": {
+          "description": "Find tasks by text, state and labels, one bounded page at a time.",
+          "openWorld": true
+        },
+        "update": {
+          "description": "Change a task's title, body or labels.",
+          "openWorld": true,
+          "preconditions": "checked"
+        }
+      }
     }
   }
 }
 ```
 
-`command`, `args`, `cwd`, `env`, and `timeoutMs` follow task subprocess
-conventions. The CLI writes a single JSON request to stdin with the tool name,
-arguments, workspace root, and extension root; the command writes a single MCP
-tool result (`{"content":[{"type":"text","text":"…"}]}`) to stdout.
-The Go extension SDK's `mcp.Serve` helper implements that boundary. All four
-safety hints and `putnami.dev/contract` metadata are required. A malformed
-manifest or missing executable is isolated to that extension.
+| Member | Meaning |
+|---|---|
+| `version` | The contract version the provider implements. |
+| `command`, `args`, `cwd`, `env`, `timeoutMs` | The subprocess every operation of the contract runs. They follow task subprocess conventions, `{extensionRuntime}` included. |
+| `operations` | The operations, keyed by operation name. Each states its `description`, whether it reaches outside the machine (`openWorld`, required), and for an operation that takes a revision how it enforces it (`preconditions`: `atomic`, `checked` or `none`). An operation that takes `projects`, `impacted` and `baseline` declares `workspaceSelection`. |
 
-### Collaboration provider tools
+The collaboration catalog owns each operation's access, destructiveness and
+documents. A declaration that names an unknown operation, breaks an
+operation's precondition rule or leaves out a required operation withdraws
+that contract from the extension's offer.
 
-A tool whose `_meta` also carries `putnami.dev/provider`
-(`{"contract": "tasks", "version": 1, "operation": "find"}`) implements one
-operation of a collaboration contract — tasks, change proposals, memory or
-missions. It
-is never advertised under its own name. A workspace binds a provider in
-`options.collaboration` of `putnami.workspace.json`, and Putnami then exposes
-the operation as the command `putnami tasks find`,
-routes every call to the bound provider through this same subprocess boundary,
-and adds a `provider` member (contract, version, operation, binding settings) to
-the request. See [Collaboration providers](25-collaboration-providers.md).
+A workspace binds a provider in `options.collaboration` of
+`putnami.workspace.json`, and Putnami then exposes the operation as a command
+such as `putnami tasks find`. The CLI launches the command only when it routes
+an operation to it. It writes one provider request to stdin: the arguments,
+the workspace root, the extension root and a `provider` member (contract,
+version, operation, binding settings). The command writes one collaboration
+response to stdout and nothing else. A provider gets no host RPC channel.
+`Serve` of `go.putnami.dev/protocol/collaboration` implements that boundary,
+and its [provider-author guide](../../../protocols/collaboration/doc/02-provider-authoring.md)
+walks through one provider. See
+[Collaboration providers](25-collaboration-providers.md).
 
 ### Pipeline Steps
 
@@ -1449,7 +1445,7 @@ The archives are uploaded to the Putnami registry via the CI publish job. The re
 
 An extension can ship the agent instructions that belong to it — skills, worker
 profiles, references and helper scripts — under the same version as its
-commands and tools. A workspace receives them only when it opts in with
+commands and providers. A workspace receives them only when it opts in with
 `agentArtifacts: ["extension:<name>"]` ([Agent Workflows](18-agent-workflows.md#how-a-workspace-opts-in)).
 
 ### Author the content
@@ -1482,7 +1478,7 @@ stamps `cliContract` 5. A manifest without `agentContent` keeps contract 4.
 
 | Extension kind | Package job | What ships |
 |---|---|---|
-| Content only (no runtime, commands, tools, tasks or hooks) | `putnami package`, with `@putnami/scaffold` in the project's `extensions` | One archive, written with identical bytes under every registry platform key |
+| Content only (no runtime, commands, providers, tasks or hooks) | `putnami package`, with `@putnami/scaffold` in the project's `extensions` | One archive, written with identical bytes under every registry platform key |
 | Go, with a runtime | `putnami package` from `@putnami/go` | One archive per platform; each carries its own executable and the same content bytes |
 | npm | `putnami package --npm` from `@putnami/typescript` | The npm package directory, with the content under `path` |
 
@@ -1498,7 +1494,7 @@ Packaging fails, and writes no archive, when:
 ### Install and upgrade
 
 A consumer declares the extension and opts into its content. The content always
-comes from the directory the extension's commands and tools load from:
+comes from the directory the extension's commands and providers load from:
 
 - **Registry extension** (declared in `extensions`): `putnami install` installs
   the pinned release, and the content comes from that same release. The lock

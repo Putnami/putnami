@@ -106,7 +106,7 @@ language-neutral contract:
   declares which authored executable-spec checks it protects — a
   `proves` property of sorted, space-separated
   `feature#requirement#check` triplets. That binding is discoverability only:
-  it lets a reader (and `sdd.feature_context`) answer "which declared test is
+  it lets a reader (and `putnami features inspect`) answer "which declared test is
   expected to prove this check", and can never itself prove a passing test —
   only the test adapter's observed verdict does.
 
@@ -169,7 +169,7 @@ ownership edge rather than being assigned to every feature.
 
 This extension adds node kinds only and reuses `contains`; it does not change
 the durable Capability Manifest v2 compatibility promise. The design graph and
-its compact CLI/MCP projections remain `provisional`. Graduating them requires
+its compact CLI projections remain `provisional`. Graduating them requires
 an explicit compatibility decision for node properties, producer coverage, and
 the lifecycle aggregation boundary; consumers must therefore use kind and
 relationships rather than rely on producer-specific optional provenance.
@@ -431,7 +431,7 @@ The resulting authoring boundary is:
 5. Treat graphs, source bindings, digests, snapshots, maps, and promoted producer
    files as generated projections. Authors and agents do not repair their fields
    individually.
-6. Consume the graph through scoped CLI or MCP projections; do not make
+6. Consume the graph through scoped CLI projections; do not make
    whole-corpus JSON the default agent context.
 
 Feature protocol v1 defines durable discovered repository bytes, not the
@@ -791,9 +791,8 @@ stage from `coded` through `target` must declare at least one requirement.
 Requirements at later stages may cite earlier evidence as an additional input,
 but the resolver never infers a requirement from prose or a contribution name.
 
-A feature may also carry `surface`, an object with optional `commands` (command
-paths as typed after the executable, such as `features validate`) and `tools`
-(MCP tool names as the tool listing advertises them). It needs manifest
+A feature may also carry `surface`, an object with a `commands` list (command
+paths as typed after the executable, such as `features validate`). It needs manifest
 `protocolVersion: 2`, validates as `features.invalid_surface`, and sorts in
 canonical form. A feature lists only the surface its own project serves; see
 ADR 0005.

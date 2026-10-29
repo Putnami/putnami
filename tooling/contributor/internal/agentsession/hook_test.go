@@ -3,7 +3,6 @@ package agentsession
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -22,6 +21,7 @@ import (
 const (
 	startRequirement    = "session-start-sheet"
 	toolRequirement     = "tool-use-capture"
+	decisionRequirement = "decision-commands"
 	stopRequirement     = "stop-publication"
 	wakeRequirement     = "idle-wake"
 	failOpenRequirement = "fail-open"
@@ -40,7 +40,7 @@ const (
 // defaultSheet is the sheet of a new mission on the harness branch.
 const defaultSheet = "Putnami mission sheet:\n\n" +
 	"Mission branch:feat/session-hooks of repository acme/widgets.\n" +
-	"missions.ask takes this mission as {\"key\":\"branch:feat/session-hooks\",\"repository\":\"acme/widgets\"}.\n\n" +
+	"putnami agent ask takes this mission as {\"key\":\"branch:feat/session-hooks\",\"repository\":\"acme/widgets\"}.\n\n" +
 	"Title:\n> feat/session-hooks"
 
 func TestSessionStartSyncsAndPrintsTheMissionSheet(t *testing.T) {
@@ -292,11 +292,6 @@ func TestASubagentPlanIsNotTheSessionPlan(t *testing.T) {
 	if spooled, _ := h.files(claude, claudeSession).readSpool(); len(spooled) != 0 {
 		t.Errorf("a subagent's plan was spooled: %+v", spooled)
 	}
-	// A decision a subagent asks still binds to the session.
-	h.hook(claude, "post-tool-use-ask", claudeSession, func(payload map[string]any) { payload["agent_id"] = "a5f0c2e9d1b7a3c48" })
-	if decisions := h.cache(claude, claudeSession).Decisions; !slices.Equal(decisions, []string{decisionID}) {
-		t.Errorf("decisions %v", decisions)
-	}
 }
 
 func TestABusySessionSpoolsTheToolCall(t *testing.T) {
@@ -313,93 +308,22 @@ func TestABusySessionSpoolsTheToolCall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	planned := len(h.cache(claude, claudeSession).Plan)
 	started := time.Now()
-	h.hook(claude, "post-tool-use-ask", claudeSession, nil)
+	h.hook(claude, "post-tool-use-task-create-1", claudeSession, nil)
 	if elapsed := time.Since(started); elapsed >= hookLockWait {
 		t.Errorf("the tool call waited %v for the lock", elapsed)
 	}
 	lock.release()
-	if spooled, _ := h.files(claude, claudeSession).readSpool(); len(spooled) != 1 || h.cache(claude, claudeSession).Decisions != nil {
+	if spooled, _ := h.files(claude, claudeSession).readSpool(); len(spooled) != 1 || len(h.cache(claude, claudeSession).Plan) != planned {
 		t.Fatalf("spooled %+v", spooled)
 	}
 	h.hook(claude, "stop", claudeSession, nil)
-	if sync := h.provider.lastSync(t); !slices.Equal(sync.Decisions, []string{decisionID}) {
-		t.Errorf("the stop did not send the spooled decision: %v", sync.Decisions)
+	if sync := h.provider.lastSync(t); sync.Plan == nil || len(sync.Plan.Steps) != planned+1 {
+		t.Errorf("the stop did not send the spooled plan change: %+v", sync.Plan)
 	}
 	if spooled, paths := h.files(claude, claudeSession).readSpool(); len(spooled) != 0 || len(paths) != 0 {
 		t.Errorf("the spool was not emptied: %v", paths)
-	}
-}
-
-func TestAnAskedDecisionBindsOnTheNextSync(t *testing.T) {
-	spectest.Proves(t, sessionFeature, toolRequirement, "an-asked-decision-binds-on-the-next-sync")
-	for _, tc := range []struct{ engine, session, decision string }{
-		{claude, claudeSession, decisionID},
-		{codex, codexSession, "dec-codex"},
-	} {
-		h := newHarness(t)
-		h.hook(tc.engine, "session-start", tc.session, nil)
-		calls := len(h.provider.recordedCalls())
-		h.hook(tc.engine, "post-tool-use-ask", tc.session, nil)
-		if len(h.provider.recordedCalls()) != calls {
-			t.Errorf("%s: the tool call called the provider", tc.engine)
-		}
-		h.hook(tc.engine, "stop", tc.session, lastMessage("Asked."))
-		if sync := h.provider.lastSync(t); !slices.Equal(sync.Decisions, []string{tc.decision}) {
-			t.Errorf("%s: decisions %v", tc.engine, sync.Decisions)
-		}
-		if decisions := h.cache(tc.engine, tc.session).Decisions; decisions != nil {
-			t.Errorf("%s: a bound decision stays queued: %v", tc.engine, decisions)
-		}
-	}
-	// An ask that failed binds nothing.
-	h := newHarness(t)
-	h.hook(claude, "session-start", claudeSession, nil)
-	h.hook(claude, "post-tool-use-ask", claudeSession, func(payload map[string]any) {
-		payload["tool_response"] = []any{map[string]any{"type": "text", "text": `{"contract":"missions","operation":"ask","outcome":"invalid","error":{"message":"no","retryable":false}}`}}
-	})
-	if decisions := h.cache(claude, claudeSession).Decisions; decisions != nil {
-		t.Errorf("a failed ask queued %v", decisions)
-	}
-}
-
-func TestARecordedReplyWinsOverAnAckLine(t *testing.T) {
-	spectest.Proves(t, sessionFeature, toolRequirement, "a-recorded-reply-wins-over-an-ack-line")
-	for _, tc := range []struct{ engine, session, fixture string }{
-		{claude, claudeSession, "post-tool-use-reply"},
-		{codex, codexSession, "post-tool-use-reply-closed"},
-	} {
-		h := newHarness(t)
-		h.provider.post(promptMessage())
-		h.hook(tc.engine, "session-start", tc.session, nil)
-		calls := len(h.provider.recordedCalls())
-		h.hook(tc.engine, tc.fixture, tc.session, nil)
-		marker := repliedMarkerPath(h.env.sessionsDir(), promptID)
-		if _, err := os.Stat(marker); err != nil || len(h.provider.recordedCalls()) != calls {
-			t.Fatalf("%s: marker %v, calls %v", tc.fixture, err, h.provider.recordedCalls()[calls:])
-		}
-		out := h.hook(tc.engine, "stop", tc.session, lastMessage("Wrote b.txt.\n[ack msg-prompt] Done."))
-		if out != nil {
-			t.Errorf("%s: a replied prompt continued the turn: %+v", tc.fixture, out)
-		}
-		sync := h.provider.lastSync(t)
-		if sync.Replies != nil || !slices.Equal(sync.Delivered, []string{promptID}) {
-			t.Errorf("%s: replies %+v, delivered %v", tc.fixture, sync.Replies, sync.Delivered)
-		}
-		if cache := h.cache(tc.engine, tc.session); !slices.Equal(cache.Replied, []string{promptID}) || len(cache.Prompts) != 0 {
-			t.Errorf("%s: replied %v, prompts %v", tc.fixture, cache.Replied, cache.Prompts)
-		}
-		if _, err := os.Stat(marker); !os.IsNotExist(err) {
-			t.Errorf("%s: the marker stays: %v", tc.fixture, err)
-		}
-	}
-	// A reply the provider refused for another reason leaves no marker.
-	h := newHarness(t)
-	h.hook(claude, "post-tool-use-reply", claudeSession, func(payload map[string]any) {
-		payload["tool_response"] = []any{map[string]any{"type": "text", "text": `{"contract":"missions","operation":"reply","outcome":"denied","error":{"message":"no","reason":"message.denied","retryable":false}}`}}
-	})
-	if _, err := os.Stat(repliedMarkerPath(h.env.sessionsDir(), promptID)); !os.IsNotExist(err) {
-		t.Errorf("a denied reply left a marker: %v", err)
 	}
 }
 
@@ -410,7 +334,7 @@ func TestStopPublishesInOneSync(t *testing.T) {
 	h.provider.open = []collab.OpenDecision{{ID: decisionID, Question: "Which color should the logo be?"}}
 	h.hook(claude, "session-start", claudeSession, nil)
 	h.hook(claude, "post-tool-use-todo-write", claudeSession, nil)
-	h.hook(claude, "post-tool-use-ask", claudeSession, nil)
+	h.askDecision(claude, claudeSession)
 	h.advance(time.Minute)
 	calls := len(h.provider.recordedCalls())
 	last := "Wrote the files.\n\n[ack msg-prompt] Done: b.txt holds b."
@@ -503,15 +427,15 @@ func TestCodexContinuesWithABlock(t *testing.T) {
 
 func TestCodexWaitsForAnOpenDecision(t *testing.T) {
 	spectest.Proves(t, sessionFeature, stopRequirement, "codex-waits-for-an-open-decision")
-	// The Codex ask fixture opens dec-codex.
 	const asked = "dec-codex"
 	open := []collab.OpenDecision{{ID: asked, Question: "Which color should the logo be?"}}
 	answer := answerMessage()
 	answer.Decision.ID = asked
 	rendered := strings.Replace(answerRendered, decisionID, asked, 1)
 	start := func(h *harness) {
+		h.provider.decision = asked
 		h.hook(codex, "session-start", codexSession, nil)
-		h.hook(codex, "post-tool-use-ask", codexSession, nil)
+		h.askDecision(codex, codexSession)
 	}
 
 	h := newHarness(t)
@@ -580,7 +504,9 @@ func TestCodexWaitsForAnOpenDecision(t *testing.T) {
 		h.provider.open = []collab.OpenDecision{{ID: decisionID, Question: "Which font?"}}
 		h.hook(codex, "session-start", codexSession, nil)
 		if ask {
-			h.hook(codex, "post-tool-use-ask", codexSession, nil)
+			// This session's decision is not the open one.
+			h.provider.decision = "dec-codex"
+			h.askDecision(codex, codexSession)
 		}
 		if out := h.hook(codex, "stop", codexSession, lastMessage("Done.")); out != nil || h.slept != nil {
 			t.Errorf("asked %v: output %+v after waiting %v for another session's decision", ask, out, h.slept)
@@ -591,7 +517,7 @@ func TestCodexWaitsForAnOpenDecision(t *testing.T) {
 	h = newHarness(t)
 	h.provider.open = []collab.OpenDecision{{ID: decisionID, Question: "Which color should the logo be?"}}
 	h.hook(claude, "session-start", claudeSession, nil)
-	h.hook(claude, "post-tool-use-ask", claudeSession, nil)
+	h.askDecision(claude, claudeSession)
 	h.hook(claude, "stop", claudeSession, nil)
 	if h.slept != nil {
 		t.Errorf("a Claude Code stop waited %v", h.slept)
@@ -776,7 +702,7 @@ func TestATransportErrorRedialsAndKeepsTheQueue(t *testing.T) {
 	h := newHarness(t)
 	h.provider.post(promptMessage())
 	h.hook(claude, "session-start", claudeSession, nil)
-	h.hook(claude, "post-tool-use-ask", claudeSession, nil)
+	h.askDecision(claude, claudeSession)
 	h.provider.broken = errors.New("broken pipe")
 	h.hook(claude, "stop", claudeSession, lastMessage("[ack msg-prompt] Done."))
 	if h.provider.closes != 1 {
@@ -868,36 +794,6 @@ func TestHookLogRotates(t *testing.T) {
 	}
 }
 
-func TestToolEnvelopeReadsBothShapes(t *testing.T) {
-	spectest.Proves(t, sessionFeature, toolRequirement, "an-asked-decision-binds-on-the-next-sync")
-	text := `{"contract":"missions","operation":"ask","outcome":"ok","result":{}}`
-	for _, raw := range []string{
-		`[{"type":"text","text":` + quoteJSON(text) + `}]`,
-		`{"content":[{"type":"image","text":"x"},{"type":"text","text":` + quoteJSON(text) + `}],"isError":false}`,
-	} {
-		if envelope, ok := toolEnvelope([]byte(raw)); !ok || envelope.Operation != collab.OperationAsk {
-			t.Errorf("%s: %+v %v", raw, envelope, ok)
-		}
-	}
-	for _, raw := range []string{`""`, `"Plan updated"`, `[{"type":"text","text":"{}"}]`, `{"content":"x"}`} {
-		if _, ok := toolEnvelope([]byte(raw)); ok {
-			t.Errorf("%s read as an envelope", raw)
-		}
-	}
-	for name, want := range map[string]string{
-		"mcp__putnami__missions_ask":   toolAsk,
-		"mcp__putnami__missions_reply": toolReply,
-		"missions.ask":                 toolAsk,
-		"mcp__other__missions_reply":   toolReply,
-		"missions_asked":               "",
-		"Bash":                         "",
-	} {
-		if got := sessionToolKind(name); got != want {
-			t.Errorf("sessionToolKind(%q) = %q, want %q", name, got, want)
-		}
-	}
-}
-
 func TestTheTranscriptNamesTheModel(t *testing.T) {
 	spectest.Proves(t, sessionFeature, stopRequirement, "stop-publishes-in-one-sync")
 	h := newHarness(t)
@@ -957,11 +853,6 @@ func logSays(lines []map[string]string, text string) bool {
 		}
 	}
 	return false
-}
-
-func quoteJSON(text string) string {
-	data, _ := json.Marshal(text)
-	return string(data)
 }
 
 func sum(durations []time.Duration) time.Duration {

@@ -67,7 +67,7 @@ func HostHookEvents(host string) []string {
 const (
 	// MaxHostHookTimeoutSeconds is the longest timeout a hook may declare.
 	MaxHostHookTimeoutSeconds = 3600
-	// maxHostHookMatcherNames bounds the tools and MCP tools of one entry.
+	// maxHostHookMatcherNames bounds the tools of one entry.
 	maxHostHookMatcherNames = 32
 	// maxHostHookArgs bounds the arguments of one entry.
 	maxHostHookArgs = 16
@@ -106,10 +106,6 @@ type HostHookEntry struct {
 	Event string `json:"event"`
 	// Tools names the host's own tools a PostToolUse hook runs after.
 	Tools []string `json:"tools,omitempty"`
-	// MCPTools names the Putnami MCP tools a PostToolUse hook runs after,
-	// as the extension declares them (`missions.ask`). The CLI renders each
-	// one as the host names it.
-	MCPTools []string `json:"mcpTools,omitempty"`
 	// Args are the arguments the command receives after its path.
 	Args []string `json:"args,omitempty"`
 	// Wake asks the host to start a turn when the command exits 75. Only
@@ -138,11 +134,6 @@ var (
 	// regular expression character, so a matcher built from it matches the
 	// names and nothing else.
 	hostHookToolFormat = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
-	// hostHookMCPToolFormat is the grammar of a Putnami MCP tool name in a
-	// hook: namespaced, without a hyphen. A host turns the dot into an
-	// underscore; a hyphen has no rendering both hosts agree on, so it is
-	// refused.
-	hostHookMCPToolFormat = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
 	// hostHookArgFormat is the grammar of an argument: words a POSIX shell
 	// reads as written, with no quoting, expansion or operator.
 	hostHookArgFormat = regexp.MustCompile(`^[A-Za-z0-9_./:=-]+$`)
@@ -273,23 +264,21 @@ func validateHostHookEntry(host string, events []string, field string, entry Hos
 			"host %s runs no hook at event %q; its events are %s", host, entry.Event, strings.Join(events, ", ")))
 	}
 
-	matches := len(entry.Tools) + len(entry.MCPTools)
+	matches := len(entry.Tools)
 	switch {
 	case matches > 0 && entry.Event != HostHookEventPostToolUse:
 		diags = append(diags, diag.Errorf("invalid-host-hook-matcher", field,
 			"only a %s hook names the tools it runs after", HostHookEventPostToolUse))
 	case matches == 0 && entry.Event == HostHookEventPostToolUse:
 		diags = append(diags, diag.Errorf("invalid-host-hook-matcher", field,
-			"a %s hook names the tools it runs after in tools or mcpTools; without them it runs after every tool", HostHookEventPostToolUse))
+			"a %s hook names the tools it runs after in tools; without them it runs after every tool", HostHookEventPostToolUse))
 	}
 	if matches > maxHostHookMatcherNames {
 		diags = append(diags, diag.Errorf("invalid-host-hook-matcher", field,
-			"a hook names at most %d tools and MCP tools, this one names %d", maxHostHookMatcherNames, matches))
+			"a hook names at most %d tools, this one names %d", maxHostHookMatcherNames, matches))
 	}
 	diags = append(diags, validateHostHookNames(field+".tools", entry.Tools, hostHookToolFormat,
 		"host tool %q must be letters, digits and underscores, starting with a letter")...)
-	diags = append(diags, validateHostHookNames(field+".mcpTools", entry.MCPTools, hostHookMCPToolFormat,
-		"MCP tool %q must be a namespaced name (for example, missions.ask) of lowercase letters, digits and underscores")...)
 
 	if len(entry.Args) > maxHostHookArgs {
 		diags = append(diags, diag.Errorf("invalid-host-hook-args", field+".args",
@@ -335,6 +324,6 @@ func validateHostHookNames(field string, names []string, format *regexp.Regexp, 
 // hostHookEntryKey identifies what a hook does, without its timeout: two
 // entries with the same key would run the same command at the same point.
 func hostHookEntryKey(entry HostHookEntry) string {
-	return fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%t", entry.Event,
-		strings.Join(entry.Tools, "\x01"), strings.Join(entry.MCPTools, "\x01"), strings.Join(entry.Args, "\x01"), entry.Wake)
+	return fmt.Sprintf("%s\x00%s\x00%s\x00%t", entry.Event,
+		strings.Join(entry.Tools, "\x01"), strings.Join(entry.Args, "\x01"), entry.Wake)
 }

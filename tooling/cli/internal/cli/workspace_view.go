@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	extproto "go.putnami.dev/protocol/extension"
+	collab "go.putnami.dev/protocol/collaboration"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/collaboration"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
@@ -161,18 +161,19 @@ func catalogProjectSelection(selection collaboration.ProjectSelection) shared.Pr
 	}
 }
 
-// toolSelectionWire projects the resolved selection onto the EXTENSION
-// contract's selection block.
+// providerSelectionWire projects the resolved selection onto the provider
+// request's selection block.
 //
 // It goes through ResolvedSelection.Wire() rather than reading the fields
 // directly, so this mapping can never drift from the one a job subprocess gets:
-// the job wire is the definition, and the tool wire is that definition's members
-// under the tool contract's own type. protocols/job's
-// TestToolSelectionMarshalsLikeTheJobSelection pins that the two encode to the
-// same bytes; this function is what makes the claim true for one invocation.
-func toolSelectionWire(resolved shared.ResolvedSelection) *extproto.ToolSelection {
+// the job wire is the definition, and the provider wire is that definition's
+// members under the collaboration protocol's own type. protocols/collaboration's
+// TestDrift_SelectionMarshalsLikeTheJobSelection pins that the two encode to
+// the same bytes; this function is what makes the claim true for one
+// invocation.
+func providerSelectionWire(resolved shared.ResolvedSelection) *collab.Selection {
 	wire := resolved.Wire()
-	return &extproto.ToolSelection{
+	return &collab.Selection{
 		Mode:           wire.Mode,
 		Scoped:         wire.Scoped,
 		Baseline:       wire.Baseline,

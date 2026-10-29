@@ -47,16 +47,15 @@ func CanonicalManifest(input *Manifest) *Manifest {
 	return &out
 }
 
-// canonicalFeatureSurface deep-copies one surface and sorts both name lists.
-// Names are unordered sets of keyed identities, so sorting normalizes them; the
+// canonicalFeatureSurface deep-copies one surface and sorts its command list.
+// Names are an unordered set of keyed identities, so sorting normalizes them; the
 // pointer is copied so canonicalization never reorders a caller-owned surface.
 func canonicalFeatureSurface(input *FeatureSurface) *FeatureSurface {
 	if input == nil {
 		return nil
 	}
-	out := FeatureSurface{Commands: cloneStrings(input.Commands), Tools: cloneStrings(input.Tools)}
+	out := FeatureSurface{Commands: cloneStrings(input.Commands)}
 	sort.Strings(out.Commands)
-	sort.Strings(out.Tools)
 	return &out
 }
 

@@ -32,7 +32,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 		AutoServe:         manifest.AutoServe == nil || *manifest.AutoServe,
 		Tasks:             manifest.Tasks,
 		Contracts:         manifest.Contracts,
-		Tools:             manifest.Tools,
+		Providers:         manifest.Providers,
 		Runtime:           manifest.Runtime,
 		Workspace:         manifest.Workspace,
 		Ecosystems:        manifest.Ecosystems,

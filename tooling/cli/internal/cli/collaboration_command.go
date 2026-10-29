@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/collaboration"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
@@ -270,21 +269,21 @@ func collaborationInput(args []string, stdin io.Reader) (json.RawMessage, error)
 	return nil, nil
 }
 
-// cliWorkspaceView attaches the workspace view to a provider tool that
+// cliWorkspaceView attaches the workspace view to a provider operation that
 // declares workspaceSelection, through the resolver every other CLI surface
 // uses.
-func cliWorkspaceView(wsRoot string) func(context.Context, *extproto.ToolCallRequest, json.RawMessage) error {
-	return func(_ context.Context, request *extproto.ToolCallRequest, args json.RawMessage) error {
+func cliWorkspaceView(wsRoot string) func(context.Context, *collab.ProviderRequest, json.RawMessage) error {
+	return func(_ context.Context, request *collab.ProviderRequest, args json.RawMessage) error {
 		ws, err := workspace.Load(wsRoot)
 		if err != nil {
 			return fmt.Errorf("load workspace: %w", err)
 		}
-		return collaboration.AttachWorkspaceView(ws, request, args, func(ws *workspace.Workspace, selection collaboration.ProjectSelection) (*extproto.ToolSelection, error) {
+		return collaboration.AttachWorkspaceView(ws, request, args, func(ws *workspace.Workspace, selection collaboration.ProjectSelection) (*collab.Selection, error) {
 			resolved, err := shared.ResolveProjectSelection(ws, catalogProjectSelection(selection))
 			if err != nil {
 				return nil, err
 			}
-			return toolSelectionWire(resolved), nil
+			return providerSelectionWire(resolved), nil
 		})
 	}
 }

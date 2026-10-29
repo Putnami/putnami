@@ -29,7 +29,7 @@ The host sets neither variable for these processes:
 - a planned job, such as a build job or a non-interactive subcommand, whose
   result the cache keys and whose answer must not depend on a call the key
   does not cover;
-- a provider tool the core calls;
+- a collaboration provider the core calls;
 - any process of a hosted run (`--credential-fd`).
 
 The host also removes an inherited value from these processes, so a nested

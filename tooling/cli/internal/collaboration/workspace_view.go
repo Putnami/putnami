@@ -8,16 +8,16 @@ import (
 	"sort"
 	"strings"
 
-	proto "go.putnami.dev/protocol/extension"
+	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// The workspace view a provider tool that declares workspaceSelection
+// The workspace view a provider operation that declares workspaceSelection
 // receives on its request.
 //
 // An extension has no workspace loader and must never grow one: two
-// derivations of the same fact is how a tool and the orchestrator start
+// derivations of the same fact is how a provider and the orchestrator start
 // disagreeing about what the workspace contains. So the orchestrator, which
 // holds the answer already, resolves it here and publishes it, exactly as it
 // does for a job subprocess.
@@ -36,29 +36,29 @@ type ProjectSelection struct {
 	Baseline string
 }
 
-// toolSelectionArgs is the canonical selection vocabulary a request narrows
+// selectionArgs is the canonical selection vocabulary a request narrows
 // with: the projects, impacted and baseline members.
 //
-// It is decoded LENIENTLY: the tool owns the rest of its argument object and
-// the orchestrator has no business rejecting a member it does not recognize. A
-// member that is present but ill-typed is still an error — that is the tool's
-// own vocabulary being misused.
-type toolSelectionArgs struct {
+// It is decoded LENIENTLY: the operation owns the rest of its argument object
+// and the orchestrator has no business rejecting a member it does not
+// recognize. A member that is present but ill-typed is still an error — that
+// is the operation's own vocabulary being misused.
+type selectionArgs struct {
 	Projects []string `json:"projects"`
 	Impacted bool     `json:"impacted"`
 	Baseline string   `json:"baseline"`
 }
 
-// AttachWorkspaceView fills the members a tool that declared
+// AttachWorkspaceView fills the members an operation that declared
 // WorkspaceSelection is entitled to, from an already-loaded workspace: the
 // projection its canonical projects, impacted and baseline arguments resolve
 // to through resolve, and the complete resolved membership. Every entry path
-// that calls such a tool attaches its view through this one function.
+// that calls such an operation attaches its view through this one function.
 func AttachWorkspaceView(
-	ws *workspace.Workspace, request *proto.ToolCallRequest, args json.RawMessage,
-	resolve func(*workspace.Workspace, ProjectSelection) (*proto.ToolSelection, error),
+	ws *workspace.Workspace, request *collab.ProviderRequest, args json.RawMessage,
+	resolve func(*workspace.Workspace, ProjectSelection) (*collab.Selection, error),
 ) error {
-	var parsed toolSelectionArgs
+	var parsed selectionArgs
 	if len(args) > 0 {
 		if err := json.Unmarshal(args, &parsed); err != nil {
 			return fmt.Errorf("invalid arguments: %w", err)
@@ -69,22 +69,31 @@ func AttachWorkspaceView(
 		return err
 	}
 	if resolve == nil {
-		return fmt.Errorf("extension tool %s declares workspaceSelection, but this entry path has no selection resolver",
-			request.Name)
+		return fmt.Errorf("provider operation %s declares workspaceSelection, but this entry path has no selection resolver",
+			providerOperationName(request))
 	}
 	resolved, err := resolve(ws, selection)
 	if err != nil {
 		return err
 	}
 	request.Selection = resolved
-	request.WorkspaceProjects = toolWorkspaceProjects(ws)
+	request.WorkspaceProjects = providerWorkspaceProjects(ws)
 	return nil
+}
+
+// providerOperationName names the request's operation as contract.operation,
+// for messages.
+func providerOperationName(request *collab.ProviderRequest) string {
+	if request == nil || request.Provider == nil {
+		return "(unnamed)"
+	}
+	return request.Provider.Contract + "." + request.Provider.Operation
 }
 
 // catalogSelectionIn resolves a request's project narrowing against an
 // already-loaded workspace, so one call reads the tree once.
 //
-// The two guards are the ORCHESTRATOR's, not the tool's. `projects` and
+// The two guards are the ORCHESTRATOR's, not the provider's. `projects` and
 // `impacted` are two ways to say the same thing, and an unresolvable selector
 // must answer "projects not found" instead of silently narrowing to a subset of
 // what was asked for — neither of which an extension can enforce, because it
@@ -123,28 +132,28 @@ func resolveProject(ws *workspace.Workspace, selector string) *workspace.Project
 	return ws.ProjectByName(selector)
 }
 
-// toolWorkspaceProjects projects the loaded workspace onto the tool wire, in
-// canonical project-id order.
+// providerWorkspaceProjects projects the loaded workspace onto the provider
+// wire, in canonical project-id order.
 //
 // It is the same projection cachekey.WorkspaceProjectsContext makes for a job
 // subprocess, plus the authored project config — which a job never needs,
-// because a job acts on its own project, and a workspace-answering tool always
-// does, because it reports ON other projects.
+// because a job acts on its own project, and a workspace-answering provider
+// always does, because it reports ON other projects.
 //
 // Two members differ between the two wires, deliberately. The first is
 // Version. A job carries the version of its project's LINE, derived from the
-// git tags the run resolved; this tool describes a workspace without running
+// git tags the run resolved; this wire describes a workspace without running
 // anything, so it reports the package version the probe read from the
 // project's own manifest.
 // Reporting a line version here would mean resolving git per call, and reading
 // a run's stamp out of a read-only description is exactly the kind of answer
 // that goes stale between two calls.
 //
-// The second is Type. This tool describes, so it leaves an unclassified
+// The second is Type. This wire describes, so it leaves an unclassified
 // project's type empty and a consumer applies the workspace default. A job acts
 // on the membership, so its wire always names the type and an absent one means
 // an older producer the job must decline.
-func toolWorkspaceProjects(ws *workspace.Workspace) []proto.ToolProjectRef {
+func providerWorkspaceProjects(ws *workspace.Workspace) []collab.ProjectRef {
 	if ws == nil {
 		return nil
 	}
@@ -156,9 +165,9 @@ func toolWorkspaceProjects(ws *workspace.Workspace) []proto.ToolProjectRef {
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].ID < members[j].ID })
 
-	refs := make([]proto.ToolProjectRef, 0, len(members))
+	refs := make([]collab.ProjectRef, 0, len(members))
 	for _, project := range members {
-		refs = append(refs, proto.ToolProjectRef{
+		refs = append(refs, collab.ProjectRef{
 			ID:           project.ID,
 			Name:         project.Name,
 			SourceName:   project.SourceName,
@@ -182,9 +191,9 @@ func toolWorkspaceProjects(ws *workspace.Workspace) []proto.ToolProjectRef {
 // encodedProjectConfig re-encodes the authored putnami.json the loader parsed.
 //
 // A config that will not re-encode is omitted rather than reported: the members
-// a tool reads out of it are optional refinements (`bin`, `featureAuthority`,
-// `options`), and failing a whole tool call over one project's config would turn
-// a slightly poorer answer into no answer at all.
+// a provider reads out of it are optional refinements (`bin`,
+// `featureAuthority`, `options`), and failing a whole provider call over one
+// project's config would turn a slightly poorer answer into no answer at all.
 func encodedProjectConfig(project *workspace.Project) json.RawMessage {
 	if project == nil || project.Config == nil {
 		return nil

@@ -109,57 +109,45 @@ func TestReadDocument_AnUnreadableDocumentIsAnError(t *testing.T) {
 	}
 }
 
-// collabToolDefinition decodes one provider tool from the manifest JSON an
-// extension author writes, with annotations that agree with the catalog.
-func collabToolDefinition(t *testing.T, contract, operation string, preconditions collab.Preconditions, command string) proto.ToolDefinition {
+// collabOperation declares one provider operation the way an extension author
+// writes it: a description, openWorld false, the precondition rule given, and
+// workspaceSelection where the catalog asks for it.
+func collabOperation(t *testing.T, contract, operation string, preconditions collab.Preconditions) proto.ProviderOperation {
 	t.Helper()
 	spec, _ := collab.Lookup(contract, 1)
 	op, ok := spec.Operation(operation)
 	if !ok {
 		t.Fatalf("no operation %s.%s", contract, operation)
 	}
-	readOnly := op.Access == collab.AccessRead
-	declaration := fmt.Sprintf(`{"contract":%q,"version":1,"operation":%q`, contract, operation)
-	if preconditions != "" {
-		declaration += fmt.Sprintf(`,"preconditions":%q`, preconditions)
+	return proto.ProviderOperation{
+		Description:        "Fixture " + contract + "." + operation + ".",
+		OpenWorld:          boolPointer(false),
+		Preconditions:      string(preconditions),
+		WorkspaceSelection: op.WorkspaceSelection,
 	}
-	document := fmt.Sprintf(`{"description":%q,"inputSchema":{"type":"object"},`+
-		`"annotations":{"readOnlyHint":%t,"destructiveHint":%t,"idempotentHint":%t,"openWorldHint":false},`+
-		`"_meta":{"putnami.dev/contract":{"access":%q,"readOnly":%t,"supportsDryRun":false},"putnami.dev/provider":%s}},`+
-		`"command":%q,"timeoutMs":20000,"workspaceSelection":%t}`,
-		"Fixture "+contract+"."+operation+".", readOnly, op.Destructive, readOnly, op.Access, readOnly, declaration,
-		command, op.WorkspaceSelection)
-	var def proto.ToolDefinition
-	if err := json.Unmarshal([]byte(document), &def); err != nil {
-		t.Fatalf("decode %s: %v", document, err)
-	}
-	return def
 }
 
-// jsonValue decodes a JSON literal into the untyped value a manifest's _meta
-// holds.
-func jsonValue(t *testing.T, text string) any {
-	t.Helper()
-	var value any
-	if err := json.Unmarshal([]byte(text), &value); err != nil {
-		t.Fatal(err)
+// catalogPreconditions is the precondition rule a fixture declares for an
+// operation: checked where the provider decides, atomic where the catalog
+// demands it, none declared where the operation takes no precondition.
+func catalogPreconditions(op collab.OperationSpec) collab.Preconditions {
+	switch op.Preconditions {
+	case collab.PreconditionRuleDeclared:
+		return collab.PreconditionsChecked
+	case collab.PreconditionRuleAtomic:
+		return collab.PreconditionsAtomic
 	}
-	return value
+	return ""
 }
 
-func collabProviderTools(t *testing.T, contract string, extra ...string) map[string]proto.ToolDefinition {
+// collabProviders declares version 1 of contract with every required
+// operation and the extra ones the contract has.
+func collabProviders(t *testing.T, contract string, extra ...string) map[string]proto.ProviderDeclaration {
 	t.Helper()
 	spec, _ := collab.Lookup(contract, 1)
-	tools := map[string]proto.ToolDefinition{}
+	declaration := proto.ProviderDeclaration{Version: 1, Command: "provider", TimeoutMs: 20000, Operations: map[string]proto.ProviderOperation{}}
 	add := func(op collab.OperationSpec) {
-		var preconditions collab.Preconditions
-		switch op.Preconditions {
-		case collab.PreconditionRuleDeclared:
-			preconditions = collab.PreconditionsChecked
-		case collab.PreconditionRuleAtomic:
-			preconditions = collab.PreconditionsAtomic
-		}
-		tools["p."+contract+"."+op.Name] = collabToolDefinition(t, contract, op.Name, preconditions, "provider")
+		declaration.Operations[op.Name] = collabOperation(t, contract, op.Name, catalogPreconditions(op))
 	}
 	for _, op := range spec.Operations {
 		if op.Required {
@@ -171,17 +159,17 @@ func collabProviderTools(t *testing.T, contract string, extra ...string) map[str
 			add(op)
 		}
 	}
-	return tools
+	return map[string]proto.ProviderDeclaration{contract: declaration}
 }
 
-func provider(name string, tools map[string]proto.ToolDefinition) *extension.ExtensionDescription {
-	return &extension.ExtensionDescription{Name: name, Version: "1.0.0", Path: "/ext/" + name, Tools: tools}
+func provider(name string, providers map[string]proto.ProviderDeclaration) *extension.ExtensionDescription {
+	return &extension.ExtensionDescription{Name: name, Version: "1.0.0", Path: "/ext/" + name, Providers: providers}
 }
 
 func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 	read := readCollabFixture(t, `{"options":{"collaboration":{"tasks":{"provider":"@a/one","version":1}}}}`)
-	one := provider("@a/one", collabProviderTools(t, "tasks", "claim"))
-	two := provider("@a/two", collabProviderTools(t, "tasks"))
+	one := provider("@a/one", collabProviders(t, "tasks", "claim"))
+	two := provider("@a/two", collabProviders(t, "tasks"))
 	resolution := resolveCollab(read, "tasks", []*extension.ExtensionDescription{two, one, nil}, nil)
 	if resolution.Status != collab.BindingStatusBound || resolution.Provider != one {
 		t.Fatalf("resolution %+v", resolution)
@@ -202,7 +190,7 @@ func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 	if disabled.Status != collab.BindingStatusInvalid || disabled.Issues[0].Reason != collab.ReasonBindingProviderMissing {
 		t.Errorf("a disabled provider: %+v", disabled)
 	}
-	versions := provider("@a/one", collabProviderTools(t, "memory"))
+	versions := provider("@a/one", collabProviders(t, "memory"))
 	wrong := resolveCollab(read, "tasks", []*extension.ExtensionDescription{versions}, nil)
 	if wrong.Status != collab.BindingStatusInvalid || !strings.Contains(wrong.Issues[0].Message, "does not implement the tasks contract") {
 		t.Errorf("a provider without the contract: %+v", wrong)
@@ -212,7 +200,7 @@ func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 func collabBoundCall(t *testing.T, contract, operation, arguments string) *providerCall {
 	t.Helper()
 	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":1}}}}`)
-	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviderTools(t, contract, "claim", "comments", "merge", "search", "assign", "link"))}, nil)
+	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "claim", "comments", "merge", "search", "assign", "link"))}, nil)
 	call, answer := prepareCall(read, resolution, operation, json.RawMessage(arguments))
 	if answer != nil {
 		t.Fatalf("prepareCall refused: %+v", answer.Error)
@@ -220,16 +208,18 @@ func collabBoundCall(t *testing.T, contract, operation, arguments string) *provi
 	return call
 }
 
-func collabRespond(t *testing.T, response collab.Response) proto.ToolCallResult {
+// collabRespond is what a provider writes on standard output: one Response
+// document.
+func collabRespond(t *testing.T, response collab.Response) []byte {
 	t.Helper()
 	text, err := json.Marshal(response)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return proto.ToolCallResult{Content: []proto.ToolContent{{Type: "text", Text: string(text)}}, IsError: response.Outcome != collab.OutcomeOK}
+	return text
 }
 
-func collabOK(t *testing.T, result any) proto.ToolCallResult {
+func collabOK(t *testing.T, result any) []byte {
 	t.Helper()
 	encoded, err := json.Marshal(result)
 	if err != nil {
@@ -263,69 +253,72 @@ func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
 		operation string
 		contract  string
 		arguments string
-		result    func(t *testing.T) proto.ToolCallResult
+		result    func(t *testing.T) []byte
 		outcome   collab.Outcome
 		reason    string
 	}{
-		{"two blocks", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(*testing.T) proto.ToolCallResult {
-			return proto.ToolCallResult{Content: []proto.ToolContent{{Type: "text", Text: "{}"}, {Type: "text", Text: "{}"}}}
+		{"no answer", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(*testing.T) []byte {
+			return nil
 		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
-		{"a read answering conflict", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) proto.ToolCallResult {
+		{"two documents", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) []byte {
+			one := collabOK(t, &collab.TaskResult{Task: task})
+			return append(append(one, '\n'), one...)
+		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
+		{"a mutation answering two documents", "create", "tasks", `{"title":"t","idempotencyKey":"k"}`, func(t *testing.T) []byte {
+			one := collabOK(t, &collab.TaskCreateResult{Task: task, Created: true})
+			return append(append(one, '\n'), one...)
+		}, collab.OutcomeUnresolved, collab.ReasonProviderInvalidResponse},
+		{"a read answering conflict", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) []byte {
 			return collabRespond(t, collab.Response{Outcome: collab.OutcomeConflict, Error: &collab.Error{Message: "x"}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
-		{"a read answering unresolved", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) proto.ToolCallResult {
+		{"a read answering unresolved", "get", "tasks", `{"ref":{"source":"local:x","id":"T-1"}}`, func(t *testing.T) []byte {
 			return collabRespond(t, collab.Response{Outcome: collab.OutcomeUnresolved, Error: &collab.Error{Message: "x"}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse},
-		{"isError disagreeing", "create", "tasks", `{"title":"t","idempotencyKey":"k"}`, func(t *testing.T) proto.ToolCallResult {
-			result := collabOK(t, &collab.TaskCreateResult{Task: task, Created: true})
-			result.IsError = true
-			return result
-		}, collab.OutcomeUnresolved, collab.ReasonProviderInvalidResponse},
-		{"a result the contract refuses", "create", "tasks", `{"title":"t","idempotencyKey":"k"}`, func(t *testing.T) proto.ToolCallResult {
+		{"a result the contract refuses", "create", "tasks", `{"title":"t","idempotencyKey":"k"}`, func(t *testing.T) []byte {
 			return collabOK(t, json.RawMessage(`{"task":{"title":"no ref"},"created":true}`))
 		}, collab.OutcomeUnresolved, collab.ReasonProviderInvalidResponse},
-		{"a transition to another state", "transition", "tasks", `{"ref":{"source":"local:x","id":"T-1"},"state":"blocked"}`, func(t *testing.T) proto.ToolCallResult {
+		{"a transition to another state", "transition", "tasks", `{"ref":{"source":"local:x","id":"T-1"},"state":"blocked"}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.TaskResult{Task: task})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
-		{"a claim for another holder", "claim", "tasks", `{"ref":{"source":"local:x","id":"T-1"},"holder":"me"}`, func(t *testing.T) proto.ToolCallResult {
+		{"a claim for another holder", "claim", "tasks", `{"ref":{"source":"local:x","id":"T-1"},"holder":"me"}`, func(t *testing.T) []byte {
 			held := task
 			held.Holder = "someone"
 			return collabOK(t, &collab.TaskClaimResult{Task: held, Held: true})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
-		{"a release still held", "claim", "tasks", `{"ref":{"source":"local:x","id":"T-1"},"holder":"me","release":true}`, func(t *testing.T) proto.ToolCallResult {
+		{"a release still held", "claim", "tasks", `{"ref":{"source":"local:x","id":"T-1"},"holder":"me","release":true}`, func(t *testing.T) []byte {
 			held := task
 			held.Holder = "me"
 			return collabOK(t, &collab.TaskClaimResult{Task: held, Held: true})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
-		{"a find outside the states", "find", "tasks", `{"states":["open"]}`, func(t *testing.T) proto.ToolCallResult {
+		{"a find outside the states", "find", "tasks", `{"states":["open"]}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.TaskListResult{Items: []collab.Task{task}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
-		{"a status for another proposal", "status", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) proto.ToolCallResult {
+		{"a status for another proposal", "status", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalStatusResult{
 				Proposal: collab.Proposal{Ref: collab.Ref{Source: "local:x", ID: "P-2"}, Revision: "r", Title: "t", State: collab.ProposalStateOpen,
 					Change: collab.Change{Repository: "r", Base: "main", Head: "h"}},
 				Checks: collab.Checks{State: collab.ChecksStateNone},
 			})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
-		{"comments from another source", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) proto.ToolCallResult {
+		{"comments from another source", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalCommentListResult{Items: []collab.ProposalComment{{Ref: collab.Ref{Source: "local:y", ID: "C-1"}, Body: "b"}}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
-		{"a comment naming a review from another source", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) proto.ToolCallResult {
+		{"a comment naming a review from another source", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"}}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalCommentListResult{Items: []collab.ProposalComment{{Ref: collab.Ref{Source: "local:x", ID: "C-1"},
 				Review: &collab.Ref{Source: "local:y", ID: "R-1"}, Body: "b"}}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
-		{"comments above the page size", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"page":{"size":1}}`, func(t *testing.T) proto.ToolCallResult {
+		{"comments above the page size", "comments", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"page":{"size":1}}`, func(t *testing.T) []byte {
 			comment := collab.ProposalComment{Ref: collab.Ref{Source: "local:x", ID: "C-1"}, Body: "b"}
 			return collabOK(t, &collab.ProposalCommentListResult{Items: []collab.ProposalComment{comment, comment}})
 		}, collab.OutcomeUnavailable, collab.ReasonProviderIdentity},
-		{"a review of another commit", "review", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"verdict":"approve","body":"b","commit":"abcdef1","idempotencyKey":"k"}`, func(t *testing.T) proto.ToolCallResult {
+		{"a review of another commit", "review", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"verdict":"approve","body":"b","commit":"abcdef1","idempotencyKey":"k"}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalReviewResult{Review: collab.Review{Ref: collab.Ref{Source: "local:x", ID: "R"}, Verdict: collab.ReviewVerdictApprove, Commit: "1234567"}, Created: true})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
-		{"a merge that did not merge", "merge", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"expectedHeadCommit":"abcdef1"}`, func(t *testing.T) proto.ToolCallResult {
+		{"a merge that did not merge", "merge", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"expectedHeadCommit":"abcdef1"}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalResult{Proposal: collab.Proposal{Ref: collab.Ref{Source: "local:x", ID: "P-1"}, Revision: "r", Title: "t",
 				State: collab.ProposalStateOpen, Change: collab.Change{Repository: "r", Base: "main", Head: "h"}}})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
-		{"an upsert on another head commit", "upsert", "proposals", `{"change":{"base":"main","head":"h","headCommit":"abcdef1"},"title":"t"}`, func(t *testing.T) proto.ToolCallResult {
+		{"an upsert on another head commit", "upsert", "proposals", `{"change":{"base":"main","head":"h","headCommit":"abcdef1"},"title":"t"}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalUpsertResult{Proposal: collab.Proposal{Ref: collab.Ref{Source: "local:x", ID: "P-1"}, Revision: "r", Title: "t",
 				State: collab.ProposalStateOpen, Change: collab.Change{Repository: "r", Base: "main", Head: "h", HeadCommit: "1234567"}}})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
@@ -356,8 +349,8 @@ func TestInterpret_APageAboveTheDocumentBoundAsksForASmallerPageSize(t *testing.
 			Body: strings.Repeat("<", collab.MaxBodyBytes), State: collab.TaskStateOpen}
 	}
 	oversized := collabOK(t, &collab.TaskListResult{Items: items})
-	if len(oversized.Content[0].Text) <= collab.MaxDocumentBytes {
-		t.Fatalf("the page encodes to %d bytes, within the bound", len(oversized.Content[0].Text))
+	if len(oversized) <= collab.MaxDocumentBytes {
+		t.Fatalf("the page encodes to %d bytes, within the bound", len(oversized))
 	}
 	envelope := interpretResult(collabBoundCall(t, "tasks", "find", `{}`), oversized)
 	if envelope.Outcome != collab.OutcomeUnavailable || envelope.Error.Reason != collab.ReasonProviderInvalidResponse || envelope.Error.Retryable {
@@ -378,8 +371,7 @@ func TestInterpret_APageAboveTheDocumentBoundAsksForASmallerPageSize(t *testing.
 
 	// A document above the bound that is not a list page gets no advice
 	// about pages.
-	padded := proto.ToolCallResult{Content: []proto.ToolContent{{Type: "text",
-		Text: `{"outcome":"ok","result":{}}` + strings.Repeat(" ", collab.MaxDocumentBytes)}}}
+	padded := []byte(`{"outcome":"ok","result":{}}` + strings.Repeat(" ", collab.MaxDocumentBytes))
 	envelope = interpretResult(collabBoundCall(t, "tasks", "get", `{"ref":{"source":"local:x","id":"T-1"}}`), padded)
 	if envelope.Outcome != collab.OutcomeUnavailable || !strings.Contains(envelope.Error.Message, "exceeds") || strings.Contains(envelope.Error.Message, "page.size") {
 		t.Fatalf("an oversized answer to a get: %s %+v", envelope.Outcome, envelope.Error)
@@ -578,8 +570,6 @@ func TestTransportFailure_ClassifiesByStageAndAccess(t *testing.T) {
 		{write, stageCanceled, collab.OutcomeUnresolved, collab.ReasonProviderCanceled, false},
 		{read, stageRun, collab.OutcomeUnavailable, collab.ReasonProviderFailed, false},
 		{write, stageRun, collab.OutcomeUnresolved, collab.ReasonProviderFailed, false},
-		{read, stageOutput, collab.OutcomeUnavailable, collab.ReasonProviderInvalidResponse, false},
-		{write, stageOutput, collab.OutcomeUnresolved, collab.ReasonProviderInvalidResponse, false},
 		// Nothing ran before the process started, so even a write is
 		// unavailable, and repeating it can help.
 		{read, stageTimeoutBeforeStart, collab.OutcomeUnavailable, collab.ReasonProviderTimeout, true},

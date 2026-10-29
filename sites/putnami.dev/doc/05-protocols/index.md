@@ -116,7 +116,7 @@ consumer rather than belonging to whichever pillar defined it first.
 
 | Protocol | What it carries |
 | --- | --- |
-| [`cli`](https://github.com/putnami/putnami/tree/main/protocols/cli) | One exit-code taxonomy, one `--output` vocabulary, the reserved global-flag registry, and the machine documents (JSON, JSONL, MCP, session / plan / report files). |
+| [`cli`](https://github.com/putnami/putnami/tree/main/protocols/cli) | One exit-code taxonomy, one `--output` vocabulary, the reserved global-flag registry, and the machine documents (JSON, JSONL, session / plan / report files). |
 | [`runtime`](https://github.com/putnami/putnami/tree/main/protocols/runtime) | The JSONL event envelope: logs, progress, phases, diagnostics, metrics, artifacts, results. |
 | [`job`](https://github.com/putnami/putnami/tree/main/protocols/job) | The `--putnamiContext` document: workspace / project / extension / job identity, merged params with coercion rules, and the env-var mirror. |
 | [`config`](https://github.com/putnami/putnami/tree/main/protocols/config) | Schema manifests, canonical field types, SHA-256 hashing, remote resolution, and dimension layering — identical in Go and TypeScript. |

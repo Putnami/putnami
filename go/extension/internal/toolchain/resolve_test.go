@@ -818,7 +818,7 @@ func TestInstallFailedError(t *testing.T) {
 }
 
 func TestResolveGoForUsesExplicitRootsAndTheRequestedProjectRequirement(t *testing.T) {
-	// An MCP tool call carries its roots in the request and exports no
+	// A caller outside a job carries its roots in the request and exports no
 	// PUTNAMI_PROJECT_PATH, so resolution must work from explicit inputs alone.
 	clearManagedGoResolutionEnv(t)
 	workspace := t.TempDir()

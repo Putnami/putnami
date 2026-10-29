@@ -13,7 +13,6 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	extension "go.putnami.dev/protocol/extension"
 )
 
 // The provider is driven through collab.Serve with the request a routed call
@@ -35,11 +34,10 @@ func newHarness(t *testing.T, settings string) *harness {
 
 func (h *harness) call(contract, operation, arguments string) collab.Response {
 	h.t.Helper()
-	request := extension.ToolCallRequest{
-		Name:          "local-collaboration." + contract + "." + operation,
+	request := collab.ProviderRequest{
 		Arguments:     json.RawMessage(arguments),
 		WorkspaceRoot: h.workspace,
-		Provider:      &extension.ToolProviderCall{Contract: contract, Version: 1, Operation: operation},
+		Provider:      &collab.ProviderCall{Contract: contract, Version: 1, Operation: operation},
 	}
 	if h.settings != "" {
 		request.Provider.Settings = json.RawMessage(h.settings)
@@ -52,13 +50,9 @@ func (h *harness) call(contract, operation, arguments string) collab.Response {
 	if err := collab.Serve(context.Background(), bytes.NewReader(payload), &out, h.provider.Handlers()); err != nil {
 		h.t.Fatal(err)
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		h.t.Fatal(err)
-	}
-	response, diags := collab.ParseResponse([]byte(result.Content[0].Text))
+	response, diags := collab.ParseResponse(out.Bytes())
 	if diags != nil {
-		h.t.Fatalf("invalid response %s: %v", result.Content[0].Text, diags)
+		h.t.Fatalf("invalid response %s: %v", out.String(), diags)
 	}
 	return *response
 }

@@ -50,11 +50,6 @@ var hostHookFiles = []hostHookFile{
 	{host: extproto.HostCodex, rel: ".codex/hooks.json"},
 }
 
-// hostHookMCPServer is the server name a host puts in every MCP tool name. A
-// hook entry's mcpTools field (a protocol field) is matched under it. Putnami
-// registers no MCP server of its own.
-const hostHookMCPServer = "putnami"
-
 // The guards a rendered hook command ends with. A host reads exit code 2 from
 // a Stop hook as "continue the turn", and from a wake hook as "start a turn".
 // The CLI itself exits 2 on a usage or bootstrap error, so no exit code of the
@@ -349,18 +344,12 @@ func hostHookLauncher(host, base string) string {
 
 // hostHookMatcher renders the tools a PostToolUse hook runs after. Claude Code
 // reads `A|B`. Codex reads a regular expression and matches a substring, so
-// its matcher is anchored: `^(A|B)$`. A Putnami MCP tool is named as the host
-// names it: mcp__<server>__<tool>, with the dot of the tool name turned into
-// an underscore.
+// its matcher is anchored: `^(A|B)$`.
 func hostHookMatcher(host string, entry extproto.HostHookEntry) string {
-	names := slices.Clone(entry.Tools)
-	for _, tool := range entry.MCPTools {
-		names = append(names, "mcp__"+hostHookMCPServer+"__"+strings.ReplaceAll(tool, ".", "_"))
-	}
-	if len(names) == 0 {
+	if len(entry.Tools) == 0 {
 		return ""
 	}
-	joined := strings.Join(names, "|")
+	joined := strings.Join(entry.Tools, "|")
 	if host == extproto.HostCodex {
 		return "^(" + joined + ")$"
 	}

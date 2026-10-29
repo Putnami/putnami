@@ -23,7 +23,7 @@ atomically.
 - **Revision** — `revision`, an opaque token that changes whenever the item
   changes; `expectedRevision` compares against it. A task's `parent` is the
   one member a provider may leave outside it; such a provider says so in its
-  `link` tool's description, which `capabilities` reports, and an
+  `link` operation's description, which `capabilities` reports, and an
   `expectedRevision` then does not detect a concurrent `link`.
 - **Page** — a list request takes `page: {"size", "cursor"}` (size 0–100;
   0 or absent means the default, 20); a list result carries `items` (never
@@ -141,7 +141,7 @@ checkpoint proves nothing the referenced record does not.
 `context` and `search` take the canonical selection arguments. The
 orchestrator resolves them through its own selection projection and hands the
 provider the resolved `selection` and the workspace membership; the provider
-tool must declare `workspaceSelection`.
+operation must declare `workspaceSelection`.
 
 ## missions v1
 
@@ -163,8 +163,9 @@ is that host's own session id, `[A-Za-z0-9._:-]{1,128}`.
 A **host-only** operation is one the host that runs an agent calls, never the
 agent. `missions.capabilities` marks
 it `hostOnly: true`. `putnami missions sync` and the host channel's
-`collaboration.call` route it like any other operation. The agent sees
-`missions.ask` and `missions.reply` as tools. It takes the mission's
+`collaboration.call` route it like any other operation. The agent calls
+`missions.ask` and `missions.reply` through `putnami agent ask` and
+`putnami agent reply`. It takes the mission's
 repository and key, and the id of each message, from the session sheet that
 the session hook prints.
 

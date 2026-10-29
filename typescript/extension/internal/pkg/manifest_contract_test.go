@@ -24,20 +24,15 @@ const conformingCLIManifest = `{
 	"tasks": {"t": {"kind": "command", "command": "echo"}}
 }`
 
-const conformingToolOnlyManifest = `{
+const conformingProviderOnlyManifest = `{
 	"name": "@putnami/testext",
-	"tools": {
-		"putnami.search": {
-			"description": "Search the extension index.",
-			"inputSchema": {"type": "object", "properties": {}},
-			"annotations": {
-				"readOnlyHint": true,
-				"destructiveHint": false,
-				"idempotentHint": true,
-				"openWorldHint": true
-			},
-			"_meta": {"putnami.dev/contract": {"access": "read", "readOnly": true, "supportsDryRun": false}},
-			"command": "search"
+	"providers": {
+		"tasks": {
+			"version": 1,
+			"command": "search",
+			"operations": {
+				"find": {"description": "Find tasks in the extension index.", "openWorld": true}
+			}
 		}
 	}
 }`
@@ -91,19 +86,19 @@ func TestCopyHookFiles_StampsEarnedCLIContract(t *testing.T) {
 	}
 }
 
-// TestCopyHookFiles_StampsToolOnlyManifest ensures the MCP surface earns the
-// same package-time contract stamp as commands, so older CLIs reject it rather
-// than silently ignoring agent-facing capabilities.
-func TestCopyHookFiles_StampsToolOnlyManifest(t *testing.T) {
+// TestCopyHookFiles_StampsProviderOnlyManifest ensures the providers section
+// earns the same package-time contract stamp as commands, so older CLIs reject
+// it rather than silently ignoring a collaboration provider.
+func TestCopyHookFiles_StampsProviderOnlyManifest(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-stamps-the-rung-its-vocabulary-requires")
 	projDir := t.TempDir()
 	outDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(conformingToolOnlyManifest), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(conformingProviderOnlyManifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := copyHookFiles(projDir, outDir, "1.0.0"); err != nil {
-		t.Fatalf("copyHookFiles should pass a conforming tool-only manifest: %v", err)
+		t.Fatalf("copyHookFiles should pass a conforming provider-only manifest: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(outDir, "putnami.extension.json"))
 	if err != nil {
@@ -115,8 +110,8 @@ func TestCopyHookFiles_StampsToolOnlyManifest(t *testing.T) {
 	if err := json.Unmarshal(data, &staged); err != nil {
 		t.Fatal(err)
 	}
-	if staged.CLIContract != protocolcli.CurrentContract {
-		t.Errorf("staged cliContract = %d, want %d", staged.CLIContract, protocolcli.CurrentContract)
+	if staged.CLIContract != protocolcli.ProviderContract {
+		t.Errorf("staged cliContract = %d, want %d", staged.CLIContract, protocolcli.ProviderContract)
 	}
 }
 
@@ -258,12 +253,12 @@ func TestCopyHookFiles_HookOnlyManifestNotGated(t *testing.T) {
 }
 
 // TestCopyHookFiles_GatesMalformedContractSurface pins that a commands,
-// commandGroups, or tools value of the wrong JSON type is not mistaken for a
+// commandGroups, or providers value of the wrong JSON type is not mistaken for a
 // hook-only manifest: it is gated and fails the package job, rather than
 // publishing an unloadable manifest unstamped.
 func TestCopyHookFiles_GatesMalformedContractSurface(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "first-party-packagers-stamp-and-gate-the-contract", "the-typescript-extension-refuses-what-the-protocol-refuses")
-	for _, m := range []string{`{"commands": []}`, `{"commandGroups": "nope"}`, `{"tools": []}`} {
+	for _, m := range []string{`{"commands": []}`, `{"commandGroups": "nope"}`, `{"providers": []}`} {
 		projDir := t.TempDir()
 		outDir := t.TempDir()
 		os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(m), 0o644)
@@ -286,7 +281,7 @@ func TestGateAndStampManifestContract_RefusesANamelessManifest(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "the-packager-refuses-a-nameless-manifest", "the-npm-packager-refuses-a-nameless-manifest")
 	nameless := map[string]string{
 		"conforming":          strings.Replace(conformingCLIManifest, `"name": "@putnami/testext",`, "", 1),
-		"tool-only":           strings.Replace(conformingToolOnlyManifest, `"name": "@putnami/testext",`, "", 1),
+		"provider-only":       strings.Replace(conformingProviderOnlyManifest, `"name": "@putnami/testext",`, "", 1),
 		"hook-only":           `{"commands": {}, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`,
 		"hook-only dependent": `{"extensionDependencies": ["@putnami/application"], "commands": {}, "hooks": {"preBuild": {"kind": "command", "command": "echo"}}}`,
 		"empty name":          strings.Replace(conformingCLIManifest, `"@putnami/testext"`, `""`, 1),

@@ -16,58 +16,45 @@ import (
 
 func boolPtr(v bool) *bool { return &v }
 
-// providerTool builds a tool that implements one operation with annotations
-// that agree with the catalog.
-func providerTool(contract, operation string) extension.ToolDefinition {
-	const version = 1
-	spec, _ := Lookup(contract, version)
+// providerOperation declares one operation with the precondition rule and the
+// workspace view the catalog asks of it.
+func providerOperation(contract, operation string) extension.ProviderOperation {
+	spec, _ := Lookup(contract, 1)
 	op, _ := spec.Operation(operation)
-	readOnly := op.Access == AccessRead
-	declaration := map[string]any{"contract": contract, "version": version, "operation": operation}
-	switch op.Preconditions {
-	case PreconditionRuleDeclared:
-		declaration["preconditions"] = string(PreconditionsChecked)
-	case PreconditionRuleAtomic:
-		declaration["preconditions"] = string(PreconditionsAtomic)
-	}
-	return extension.ToolDefinition{
-		Description: "Local " + contract + "." + operation,
-		InputSchema: json.RawMessage(`{"type":"object"}`),
-		Annotations: &extension.ToolAnnotations{
-			ReadOnlyHint:    boolPtr(readOnly),
-			DestructiveHint: boolPtr(op.Destructive),
-			IdempotentHint:  boolPtr(readOnly),
-			OpenWorldHint:   boolPtr(false),
-		},
-		Meta: map[string]any{
-			contractMetaKey: map[string]any{"access": string(op.Access), "readOnly": readOnly, "supportsDryRun": false},
-			ProviderMetaKey: declaration,
-		},
-		Command:            "provider",
+	declared := extension.ProviderOperation{
+		Description:        "Local " + contract + "." + operation,
+		OpenWorld:          boolPtr(false),
 		WorkspaceSelection: op.WorkspaceSelection,
 	}
+	switch op.Preconditions {
+	case PreconditionRuleDeclared:
+		declared.Preconditions = string(PreconditionsChecked)
+	case PreconditionRuleAtomic:
+		declared.Preconditions = string(PreconditionsAtomic)
+	}
+	return declared
 }
 
 // fullProvider declares every required operation of one contract version.
-func fullProvider(contract string) map[string]extension.ToolDefinition {
+func fullProvider(contract string) extension.ProviderDeclaration {
 	spec, _ := Lookup(contract, 1)
-	tools := map[string]extension.ToolDefinition{}
+	operations := map[string]extension.ProviderOperation{}
 	for _, name := range spec.RequiredOperations() {
-		tools["local."+contract+"."+name] = providerTool(contract, name)
+		operations[name] = providerOperation(contract, name)
 	}
-	return tools
+	return extension.ProviderDeclaration{Version: 1, Command: "provider", Args: []string{"provider"}, Operations: operations}
 }
 
 func TestReadProviderOffer_AcceptsACompleteDeclaration(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "a-complete-declaration-is-offered")
-	tools := fullProvider(ContractTasks)
-	tools["local.tasks.claim"] = providerTool(ContractTasks, OperationClaim)
-	for name, def := range fullProvider(ContractProposals) {
-		tools[name] = def
+	tasks := fullProvider(ContractTasks)
+	tasks.Operations[OperationClaim] = providerOperation(ContractTasks, OperationClaim)
+	providers := map[string]extension.ProviderDeclaration{
+		ContractTasks:     tasks,
+		ContractProposals: fullProvider(ContractProposals),
 	}
-	tools["plain.tool"] = extension.ToolDefinition{Description: "not a provider tool"}
 
-	offer, diags := ReadProviderOffer(tools)
+	offer, diags := ReadProviderOffer(providers)
 	if diag.HasErrors(diags) {
 		t.Fatalf("a complete declaration was refused: %v", diags)
 	}
@@ -75,8 +62,12 @@ func TestReadProviderOffer_AcceptsACompleteDeclaration(t *testing.T) {
 		t.Errorf("tasks versions = %v", got)
 	}
 	ops, ok := offer.Operations(ContractTasks, 1)
-	if !ok || len(ops) != 6 || ops[OperationClaim].Tool != "local.tasks.claim" {
-		t.Errorf("tasks v1 operations = %v", ops)
+	if !ok || len(ops) != 6 {
+		t.Fatalf("tasks v1 operations = %v", ops)
+	}
+	claim := ops[OperationClaim]
+	if claim.Spec.Name != OperationClaim || claim.Preconditions() != PreconditionsAtomic || claim.Provider.Command != "provider" {
+		t.Errorf("tasks.claim = %+v", claim)
 	}
 	if _, ok := offer.Operations(ContractMemory, 1); ok {
 		t.Error("memory is not offered")
@@ -87,99 +78,45 @@ func TestReadProviderOffer_WithdrawsAContractVersionOnAnyError(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "any-declaration-error-withdraws-the-contract-version")
 	cases := []struct {
 		name   string
-		mutate func(map[string]extension.ToolDefinition)
+		mutate func(*extension.ProviderDeclaration)
 		want   string
 	}{
-		{"a missing required operation", func(tools map[string]extension.ToolDefinition) {
-			delete(tools, "local.tasks.transition")
+		{"a missing required operation", func(p *extension.ProviderDeclaration) {
+			delete(p.Operations, OperationTransition)
 		}, "without its required operations: transition"},
-		{"a read annotated as mutating", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.find"]
-			def.Annotations.ReadOnlyHint = boolPtr(false)
-			tools["local.tasks.find"] = def
-		}, "readOnlyHint must be true"},
-		{"a mutation annotated read-only", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.create"]
-			def.Annotations.ReadOnlyHint = boolPtr(true)
-			tools["local.tasks.create"] = def
-		}, "readOnlyHint must be false"},
-		{"a destructive operation annotated additive", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.update"]
-			def.Annotations.DestructiveHint = boolPtr(false)
-			tools["local.tasks.update"] = def
-		}, "destructiveHint must be true"},
-		{"a destructive read", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Annotations.DestructiveHint = boolPtr(true)
-			tools["local.tasks.get"] = def
-		}, "never destructive"},
-		{"contract metadata that disagrees", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[contractMetaKey] = map[string]any{"access": "mutating", "readOnly": false, "supportsDryRun": false}
-			tools["local.tasks.get"] = def
-		}, "declares access \"mutating\""},
-		{"a dry-run claim", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[contractMetaKey] = map[string]any{"access": "read", "readOnly": true, "supportsDryRun": true}
-			tools["local.tasks.get"] = def
-		}, "no dry-run"},
-		{"an undeclared precondition", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.update"]
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "version": 1, "operation": "update"}
-			tools["local.tasks.update"] = def
+		{"an undeclared precondition", func(p *extension.ProviderDeclaration) {
+			op := p.Operations[OperationUpdate]
+			op.Preconditions = ""
+			p.Operations[OperationUpdate] = op
 		}, "must declare preconditions"},
-		{"a precondition on a read", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "version": 1, "operation": "get", "preconditions": "atomic"}
-			tools["local.tasks.get"] = def
+		{"a precondition on a read", func(p *extension.ProviderDeclaration) {
+			op := p.Operations[OperationGet]
+			op.Preconditions = string(PreconditionsAtomic)
+			p.Operations[OperationGet] = op
 		}, "takes no revision precondition"},
-		{"a non-atomic claim", func(tools map[string]extension.ToolDefinition) {
-			def := providerTool(ContractTasks, OperationClaim)
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "version": 1, "operation": "claim", "preconditions": "checked"}
-			tools["local.tasks.claim"] = def
+		{"a non-atomic claim", func(p *extension.ProviderDeclaration) {
+			op := providerOperation(ContractTasks, OperationClaim)
+			op.Preconditions = string(PreconditionsChecked)
+			p.Operations[OperationClaim] = op
 		}, "enforces it atomically"},
-		{"two tools for one operation", func(tools map[string]extension.ToolDefinition) {
-			tools["other.tasks.find"] = providerTool(ContractTasks, OperationFind)
-		}, "the choice would be ambiguous"},
-		{"an unknown operation", func(tools map[string]extension.ToolDefinition) {
-			def := providerTool(ContractTasks, OperationFind)
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "version": 1, "operation": "merge"}
-			tools["local.tasks.merge"] = def
+		{"an unknown operation", func(p *extension.ProviderDeclaration) {
+			p.Operations["merge"] = providerOperation(ContractTasks, OperationFind)
 		}, "has no operation \"merge\""},
-		{"missing annotations", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Annotations = nil
-			tools["local.tasks.get"] = def
-		}, "all four safety annotations"},
-		{"a malformed declaration", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "version": 1, "operation": "get", "fallback": true}
-			tools["local.tasks.get"] = def
-		}, "unknown member"},
-		{"a versionless declaration", func(tools map[string]extension.ToolDefinition) {
-			def := tools["local.tasks.get"]
-			def.Meta = cloneMeta(def.Meta)
-			def.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "operation": "get"}
-			tools["local.tasks.get"] = def
+		{"the orchestrator's own operation", func(p *extension.ProviderDeclaration) {
+			p.Operations[OperationCapabilities] = providerOperation(ContractTasks, OperationFind)
+		}, "has no operation \"capabilities\""},
+		{"a declaration without a command", func(p *extension.ProviderDeclaration) {
+			p.Command = " "
+		}, "names the command its operations run"},
+		{"a versionless declaration", func(p *extension.ProviderDeclaration) {
+			p.Version = 0
 		}, "names its contract version"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tools := fullProvider(ContractTasks)
-			for name, def := range tools {
-				annotations := *def.Annotations
-				def.Annotations = &annotations
-				tools[name] = def
-			}
-			tc.mutate(tools)
-			offer, diags := ReadProviderOffer(tools)
+			provider := fullProvider(ContractTasks)
+			tc.mutate(&provider)
+			offer, diags := ReadProviderOffer(map[string]extension.ProviderDeclaration{ContractTasks: provider})
 			if !diag.HasErrors(diags) {
 				t.Fatal("the declaration was accepted")
 			}
@@ -191,15 +128,28 @@ func TestReadProviderOffer_WithdrawsAContractVersionOnAnyError(t *testing.T) {
 			}
 		})
 	}
+
+	// A contract this package does not know is refused, and withdraws only
+	// itself.
+	offer, diags := ReadProviderOffer(map[string]extension.ProviderDeclaration{
+		ContractTasks: fullProvider(ContractTasks),
+		"chores":      fullProvider(ContractTasks),
+	})
+	if !strings.Contains(FormatDiagnostics(diags), "unknown contract \"chores\"") {
+		t.Errorf("diagnostics = %v", diags)
+	}
+	if _, offered := offer.Operations(ContractTasks, 1); !offered {
+		t.Error("an unknown contract withdrew tasks v1")
+	}
 }
 
 func TestReadProviderOffer_SelectionOperationsRequireTheWorkspaceView(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "selection-operations-declare-the-workspace-view")
-	tools := fullProvider(ContractMemory)
-	def := tools["local.memory.context"]
-	def.WorkspaceSelection = false
-	tools["local.memory.context"] = def
-	_, diags := ReadProviderOffer(tools)
+	memory := fullProvider(ContractMemory)
+	op := memory.Operations[OperationContext]
+	op.WorkspaceSelection = false
+	memory.Operations[OperationContext] = op
+	_, diags := ReadProviderOffer(map[string]extension.ProviderDeclaration{ContractMemory: memory})
 	if !strings.Contains(FormatDiagnostics(diags), "must declare workspaceSelection") {
 		t.Fatalf("diagnostics = %v", diags)
 	}
@@ -207,33 +157,28 @@ func TestReadProviderOffer_SelectionOperationsRequireTheWorkspaceView(t *testing
 
 func TestReadProviderOffer_IgnoresAVersionItDoesNotSpeak(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "truthful-provider-declarations", "a-version-nobody-speaks-draws-one-warning")
-	tools := fullProvider(ContractTasks)
-	future := providerTool(ContractTasks, OperationFind)
-	future.Meta = cloneMeta(future.Meta)
-	future.Meta[ProviderMetaKey] = map[string]any{"contract": "tasks", "version": 2, "operation": "find"}
-	tools["local.tasks.find.v2"] = future
-	offer, diags := ReadProviderOffer(tools)
+	future := fullProvider(ContractTasks)
+	future.Version = 2
+	offer, diags := ReadProviderOffer(map[string]extension.ProviderDeclaration{
+		ContractTasks:     future,
+		ContractProposals: fullProvider(ContractProposals),
+	})
 	if diag.HasErrors(diags) {
-		t.Fatalf("a newer version beside v1 must not fail v1: %v", diags)
+		t.Fatalf("a version nobody speaks must not fail another contract: %v", diags)
 	}
 	if len(diags) != 1 || diags[0].Severity != diag.Warning {
 		t.Fatalf("want one warning for the unknown version, got %v", diags)
 	}
-	if got := offer.Versions(ContractTasks); !slices.Equal(got, []int{1}) {
-		t.Errorf("versions = %v", got)
+	if got := offer.Versions(ContractTasks); len(got) != 0 {
+		t.Errorf("tasks versions = %v, want none", got)
 	}
-}
-
-func cloneMeta(meta map[string]any) map[string]any {
-	out := make(map[string]any, len(meta))
-	for key, value := range meta {
-		out[key] = value
+	if got := offer.Versions(ContractProposals); !slices.Equal(got, []int{1}) {
+		t.Errorf("proposals versions = %v", got)
 	}
-	return out
 }
 
 // serveCall runs Serve on one request and decodes the Response.
-func serveCall(t *testing.T, request extension.ToolCallRequest, handlers map[OperationKey]Handler) Response {
+func serveCall(t *testing.T, request ProviderRequest, handlers map[OperationKey]Handler) Response {
 	t.Helper()
 	payload, err := json.Marshal(request)
 	if err != nil {
@@ -243,28 +188,19 @@ func serveCall(t *testing.T, request extension.ToolCallRequest, handlers map[Ope
 	if err := Serve(context.Background(), bytes.NewReader(payload), &out, handlers); err != nil {
 		t.Fatalf("Serve: %v", err)
 	}
-	var result extension.ToolCallResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatalf("decode tool result %s: %v", out.String(), err)
-	}
-	if len(result.Content) != 1 {
-		t.Fatalf("want one content block, got %v", result.Content)
-	}
-	response, diags := ParseResponse([]byte(result.Content[0].Text))
+	// The provider's standard output is one Response document and nothing
+	// else: ParseResponse refuses trailing data.
+	response, diags := ParseResponse(out.Bytes())
 	if diags != nil {
-		t.Fatalf("the provider wrote an invalid response %s: %v", result.Content[0].Text, diags)
-	}
-	if result.IsError != (response.Outcome != OutcomeOK) {
-		t.Errorf("isError %v disagrees with outcome %s", result.IsError, response.Outcome)
+		t.Fatalf("the provider wrote an invalid response %s: %v", out.String(), diags)
 	}
 	return *response
 }
 
-func routed(contract, operation, arguments string) extension.ToolCallRequest {
-	return extension.ToolCallRequest{
-		Name:      "local." + contract + "." + operation,
+func routed(contract, operation, arguments string) ProviderRequest {
+	return ProviderRequest{
 		Arguments: json.RawMessage(arguments),
-		Provider:  &extension.ToolProviderCall{Contract: contract, Version: 1, Operation: operation, Settings: json.RawMessage(`{"root":"x"}`)},
+		Provider:  &ProviderCall{Contract: contract, Version: 1, Operation: operation, Settings: json.RawMessage(`{"root":"x"}`)},
 	}
 }
 
@@ -282,7 +218,7 @@ func TestServe_RunsTheHandlerOnAValidatedRequest(t *testing.T) {
 	if response.Outcome != OutcomeOK {
 		t.Fatalf("outcome = %s: %+v", response.Outcome, response.Error)
 	}
-	if string(seen.Settings) != `{"root":"x"}` || seen.Request.Name != "local.tasks.get" {
+	if string(seen.Settings) != `{"root":"x"}` || seen.Request.Provider == nil || seen.Request.Provider.Operation != OperationGet {
 		t.Errorf("the handler saw %+v", seen)
 	}
 	if seen.String() != "tasks.get@v1" {
@@ -301,10 +237,10 @@ func TestServe_RefusesWhatTheContractRefuses(t *testing.T) {
 	}
 	cases := []struct {
 		name    string
-		request extension.ToolCallRequest
+		request ProviderRequest
 		outcome Outcome
 	}{
-		{"a direct call", extension.ToolCallRequest{Name: "local.tasks.create", Arguments: json.RawMessage(`{}`)}, OutcomeInvalid},
+		{"a direct call", ProviderRequest{Arguments: json.RawMessage(`{}`)}, OutcomeInvalid},
 		{"an operation without handler", routed(ContractTasks, OperationFind, `{}`), OutcomeUnsupported},
 		{"a request the contract refuses", routed(ContractTasks, OperationCreate, `{"title":"t"}`), OutcomeInvalid},
 	}
@@ -388,7 +324,7 @@ func TestServe_ANilPageIsTheEmptyList(t *testing.T) {
 			return &ProposalCommentListResult{}, nil
 		},
 	}
-	for _, request := range []extension.ToolCallRequest{
+	for _, request := range []ProviderRequest{
 		routed(ContractTasks, OperationFind, `{}`),
 		routed(ContractProposals, OperationFind, `{"change":{"base":"main","head":"h"}}`),
 		routed(ContractProposals, OperationComments, `{"ref":{"source":"local:x","id":"P-1"}}`),
@@ -396,7 +332,7 @@ func TestServe_ANilPageIsTheEmptyList(t *testing.T) {
 	} {
 		response := serveCall(t, request, handlers)
 		if response.Outcome != OutcomeOK || !strings.Contains(string(response.Result), `"items":[]`) {
-			t.Errorf("%s: %s %s", request.Name, response.Outcome, response.Result)
+			t.Errorf("%s.%s: %s %s", request.Provider.Contract, request.Provider.Operation, response.Outcome, response.Result)
 		}
 	}
 }

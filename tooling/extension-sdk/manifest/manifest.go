@@ -56,12 +56,14 @@ func New(name, version string) *Builder {
 	}}
 }
 
-// Tool adds an MCP tool contributed by the extension.
-func (b *Builder) Tool(name string, tool proto.ToolDefinition) *Builder {
-	if b.manifest.Tools == nil {
-		b.manifest.Tools = map[string]proto.ToolDefinition{}
+// Provider declares the extension's collaboration provider for one contract
+// (tasks, proposals, memory or missions). A later call for the same contract
+// replaces the earlier one.
+func (b *Builder) Provider(contract string, provider proto.ProviderDeclaration) *Builder {
+	if b.manifest.Providers == nil {
+		b.manifest.Providers = map[string]proto.ProviderDeclaration{}
 	}
-	b.manifest.Tools[name] = tool
+	b.manifest.Providers[contract] = provider
 	return b
 }
 

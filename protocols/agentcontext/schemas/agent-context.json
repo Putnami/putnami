@@ -186,7 +186,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["protocolVersion", "identity", "provenance"],
-      "description": "The per-project agent-context document that putnami context pack prints and the MCP agent_context tool serves.",
+      "description": "The per-project agent-context document that putnami context pack prints.",
       "properties": {
         "$schema": { "type": "string", "description": "JSON Schema reference." },
         "protocolVersion": { "type": "integer", "const": 2, "description": "Current agent-context protocol version." },

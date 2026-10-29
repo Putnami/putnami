@@ -104,8 +104,7 @@ member as a `putnami serve` run of the putnami executable that launched it
 other verdict exits `1`, and a usage error exits `2`.
 
 `compose-up` declares the `serve` workload and `qualify-run` the `once`
-workload, so a portable or commit-addressed run refuses both, and the MCP
-`run_jobs` tool refuses both. A hosted run (`--credential-fd`) refuses both
+workload, so a portable or commit-addressed run refuses both. A hosted run (`--credential-fd`) refuses both
 groups, as it refuses every extension command group, so a hosted run does not
 qualify a URL target. [Workload qualification](doc/01-workload-qualification.md)
 describes the composition, the contract, the targets, the phases and the

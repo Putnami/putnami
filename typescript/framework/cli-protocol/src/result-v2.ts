@@ -3,10 +3,10 @@
  *
  * The canonical source is `protocols/cli/schemas/result-v2.json` (`$id`
  * `https://putnami.dev/schemas/putnami-cli-result-v2.json`), implemented in Go as
- * `go.putnami.dev/protocol/cli`. Version 2 stamps `protocolVersion` on all four
+ * `go.putnami.dev/protocol/cli`. Version 2 stamps `protocolVersion` on all three
  * machine surfaces — the `--output=json` envelope, the `--output=jsonl` run
- * stream or live-only `plan:end`, the recorded session event log, the MCP
- * `run_jobs`/`plan_jobs` results, and the session files — so a consumer reads the contract off the
+ * stream or live-only `plan:end`, the recorded session event log, and the
+ * session files — so a consumer reads the contract off the
  * document instead of guessing from the CLI version. A document WITHOUT the
  * field is version 1.
  *
@@ -30,7 +30,6 @@ export const RESULT_V2_SCHEMA_ID = 'https://putnami.dev/schemas/putnami-cli-resu
 export const DOCUMENT_KIND = {
   resultEnvelope: 'resultEnvelope',
   sessionStreamRecord: 'sessionStreamRecord',
-  mcpResult: 'mcpResult',
   sessionFile: 'sessionFile',
   sessionPlanFile: 'sessionPlanFile',
   reportFile: 'reportFile',
@@ -221,15 +220,14 @@ export const MACHINE_OUTPUT_BUDGETS = {
   },
 } as const;
 
-/** MCP tools that return a v2 result document. */
-export const MCP_TOOL = { runJobs: 'run_jobs', planJobs: 'plan_jobs' } as const;
-
 /**
- * Which surface drove the run a report describes. Not cosmetic: an MCP run is an
- * agent's, and a consumer aggregating build economics over time has to keep
- * agent traffic apart from a human's or CI's rather than average them together.
+ * Which surface drove the run a report describes. Not cosmetic: an ephemeral run
+ * is a verification pass the CLI drives for itself, not a build someone asked
+ * for, and a consumer aggregating build economics over time has to keep that
+ * traffic apart from the runs a human or CI drove rather than average them
+ * together.
  */
-export const REPORT_ORIGIN = { cli: 'cli', mcp: 'mcp' } as const;
+export const REPORT_ORIGIN = { cli: 'cli', ephemeral: 'ephemeral' } as const;
 
 /** A report's origin. */
 export type ReportOrigin = (typeof REPORT_ORIGIN)[keyof typeof REPORT_ORIGIN];
@@ -561,7 +559,7 @@ export interface PlannedTask {
   cache: boolean;
 }
 
-/** The plan a dry run or `plan_jobs` reports. */
+/** The plan a dry run reports. */
 export interface PlanSummary {
   dryRun: boolean;
   metrics: PlanMetrics;
@@ -668,15 +666,6 @@ export function machineOutputBudgetFor(mode: MachineOutputMode): MachineOutputBu
   return { ...MACHINE_OUTPUT_BUDGETS[mode] };
 }
 
-/** The document an MCP tool call returns. */
-export interface MCPResult {
-  protocolVersion: typeof RESULT_PROTOCOL_VERSION;
-  tool: (typeof MCP_TOOL)[keyof typeof MCP_TOOL];
-  commands: string[];
-  run?: RunSummary;
-  plan?: PlanSummary;
-}
-
 /** The git state recorded with a session. */
 export interface SessionGit {
   branch?: string;
@@ -704,20 +693,6 @@ export interface SessionDeclarations {
   digest: string;
   /** How many declaration files the digest covers. Zero means the workspace declares nothing. */
   files: number;
-}
-
-/** Bound on each {@link SessionAgent} member, in bytes. */
-export const SESSION_AGENT_VALUE_MAX_BYTES = 128;
-
-/**
- * The agent session that launched a run through the MCP server. Each member is
- * present only when the agent stated it, and is never inferred.
- */
-export interface SessionAgent {
-  /** The harness, as the MCP client named itself during initialize. Printable ASCII. */
-  kind: string;
-  /** The agent's own session identifier, absent when the agent stated none. Printable ASCII. */
-  sessionId?: string;
 }
 
 export interface SessionTree {
@@ -1084,8 +1059,6 @@ export interface SessionFile {
   declarations?: SessionDeclarations;
   /** Absent when the producer did not record placement, including older sessions. */
   placement?: SessionPlacement;
-  /** The agent session that launched the run through the MCP server; absent for any other run. */
-  agent?: SessionAgent;
   run: RunSummary;
   tasks?: TaskRecord[];
   /**
@@ -1394,19 +1367,6 @@ function nonEmptyStringBytesAtMost(maximum: number): Check {
       return;
     }
     if (value === '' || UTF8.encode(value).length > maximum) {
-      v.add(VIOLATION_CODE.invalidValue, path);
-    }
-  };
-}
-
-// Each byte is printable ASCII (0x20 to 0x7e).
-function printableAsciiBytesAtMost(maximum: number): Check {
-  return (v, path, value) => {
-    if (typeof value !== 'string') {
-      v.add(VIOLATION_CODE.invalidType, path);
-      return;
-    }
-    if (value === '' || value.length > maximum || !/^[\x20-\x7e]+$/.test(value)) {
       v.add(VIOLATION_CODE.invalidValue, path);
     }
   };
@@ -2046,12 +2006,6 @@ const sessionTree: Check = (v, path, value) => object(v, path, value, sessionTre
 const sessionDeclarationsFields: Field[] = [req('digest', sha256Digest), req('files', intAtLeast(0))];
 const sessionDeclarations: Check = (v, path, value) => object(v, path, value, sessionDeclarationsFields);
 
-const sessionAgentFields: Field[] = [
-  req('kind', printableAsciiBytesAtMost(SESSION_AGENT_VALUE_MAX_BYTES)),
-  opt('sessionId', printableAsciiBytesAtMost(SESSION_AGENT_VALUE_MAX_BYTES)),
-];
-const sessionAgent: Check = (v, path, value) => object(v, path, value, sessionAgentFields);
-
 // Every member is required: the executing engine states all three from the
 // one bound request it was handed, so a partial block would be a claim nobody
 // executed.
@@ -2502,14 +2456,6 @@ const boundedSessionEndRecordFields: Field[] = [
   req('machineOutput', machineOutputSummary),
 ];
 
-const mcpResultFields: Field[] = [
-  req('protocolVersion', protocolVersion),
-  req('tool', enumOf(MCP_TOOL.runJobs, MCP_TOOL.planJobs)),
-  req('commands', arrayOf(nonEmptyString)),
-  opt('run', runSummary),
-  opt('plan', planSummary),
-];
-
 const sessionFileFields: Field[] = [
   req('protocolVersion', protocolVersion),
   req('sessionId', nonEmptyString),
@@ -2522,7 +2468,6 @@ const sessionFileFields: Field[] = [
   opt('tree', sessionTree),
   opt('declarations', sessionDeclarations),
   opt('placement', sessionPlacement),
-  opt('agent', sessionAgent),
   req('run', runSummary),
   opt('tasks', arrayOf(taskRecord)),
   opt('executions', arrayOf(executionRecord)),
@@ -2881,7 +2826,7 @@ const reportFileFields: Field[] = [
   req('sessionId', nonEmptyString),
   req('startTime', nonEmptyString),
   req('endTime', nonEmptyString),
-  req('origin', enumOf(REPORT_ORIGIN.cli, REPORT_ORIGIN.mcp)),
+  req('origin', enumOf(REPORT_ORIGIN.cli, REPORT_ORIGIN.ephemeral)),
   req('enforceCoverage', boolean),
   opt('fix', boolean),
   opt('git', reportGit),
@@ -3026,7 +2971,6 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['memoryPressure', memoryPressureFields],
       ['sessionTree', sessionTreeFields],
       ['sessionDeclarations', sessionDeclarationsFields],
-      ['sessionAgent', sessionAgentFields],
       ['sessionPlacement', sessionPlacementFields],
       ['sessionProvenance', sessionProvenanceFields],
       ['sessionSelectionReuse', sessionSelectionReuseFields],
@@ -3046,7 +2990,6 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['workspaceWarning', workspaceWarningFields],
       ['sessionStreamRecord', sessionStreamRecordFields],
       ['boundedSessionEndRecord', boundedSessionEndRecordFields],
-      ['mcpResult', mcpResultFields],
       ['sessionFile', sessionFileFields],
       ['sessionPlanFile', sessionPlanFileFields],
       ['reportGit', reportGitFields],
@@ -3271,19 +3214,9 @@ function validateSessionStreamRecord(v: Validator, root: JsonObject): void {
   }
 }
 
-function validateMCPResult(v: Validator, root: JsonObject): void {
-  const obj = object(v, '', root, mcpResultFields);
-  const tool = childString(obj, 'tool');
-  if (tool === undefined) {
-    return;
-  }
-  requireMembers(v, obj, tool === MCP_TOOL.runJobs ? ['run'] : ['plan']);
-}
-
 const DOCUMENT_VALIDATORS: Record<DocumentKind, (v: Validator, root: JsonObject) => void> = {
   resultEnvelope: validateResultEnvelope,
   sessionStreamRecord: validateSessionStreamRecord,
-  mcpResult: validateMCPResult,
   sessionFile: (v, root) => {
     const obj = object(v, '', root, sessionFileFields);
     checkExecutionReferences(v, obj);

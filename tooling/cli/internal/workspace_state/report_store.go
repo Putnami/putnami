@@ -18,8 +18,8 @@ const ReportsDirName = "reports"
 
 // The newest-first lookup (Latest) deliberately carries NO scan cap. Its
 // origin filter only learns whether a file matches by reading it, so any fixed
-// window can be filled by a burst of non-matching reports — adapter runs, of
-// origin "mcp" — and turn "no run report recorded" into a wrong answer while the
+// window can be filled by a burst of non-matching reports — ephemeral runs, of
+// origin "ephemeral" — and turn "no run report recorded" into a wrong answer while the
 // matching report sits just past it. The store's size is bounded where it
 // belongs, by Prune: steady state is the count cap plus the cadence-exempt
 // tail, and the only unbounded residue is whatever landed inside the prune's
@@ -148,7 +148,7 @@ func (rs *ReportStore) Prune() {
 		}
 		// The exemption is for the USER's validation history — the figure the
 		// replay display and a longitudinal consumer file under a commit. An
-		// adapter run (origin "mcp") is neither, so it is count-pruned like the
+		// ephemeral run (origin "ephemeral") is neither, so it is count-pruned like the
 		// rest rather than accumulating exempt for a year.
 		if recorded, err := readRecordedReport(path); err == nil &&
 			recorded.Report.EnforceCoverage &&
@@ -201,7 +201,7 @@ func (rs *ReportStore) List() []string {
 // Read returns the report recorded for one session id.
 //
 // It is an exact lookup and applies no origin filter: an id is something the
-// caller already chose, so an agent's own report is readable by asking for it
+// caller already chose, so an ephemeral run's report is readable by asking for it
 // by name. The id is validated as a plain file name for the reason Write
 // validates it — a session id addresses a file inside this directory and is
 // never a path.
@@ -215,7 +215,7 @@ func (rs *ReportStore) Read(sessionID string) (*RecordedReport, error) {
 // Latest returns the newest recorded report a USER's run produced, or nil when
 // the store holds none.
 //
-// Origin filters adapter runs (origin "mcp") out — such a run is not the user's
+// Origin filters ephemeral runs (origin "ephemeral") out — such a run is not the user's
 // build, and `putnami report` with no argument answers "what did my last run
 // do" — a question a background run must not answer. Asking for that report by
 // --session still reads it.
@@ -225,7 +225,7 @@ func (rs *ReportStore) Read(sessionID string) (*RecordedReport, error) {
 func (rs *ReportStore) Latest() *RecordedReport {
 	for _, id := range rs.List() {
 		recorded, err := readRecordedReport(rs.Path(id))
-		if err != nil || recorded.Report.Origin == cli.ReportOriginMCP {
+		if err != nil || recorded.Report.Origin == cli.ReportOriginEphemeral {
 			continue
 		}
 		return recorded

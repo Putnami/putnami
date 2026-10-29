@@ -7,7 +7,7 @@ plan, and report files.
 Use this package when you need:
 
 - to read a `putnami <command> --output=json` result from TypeScript
-- to validate a session stream, an MCP result, or a report file before trusting it
+- to validate a session stream, a session file, or a report file before trusting it
 - the exact violation list for a document that failed validation
 
 Do not use this package for:

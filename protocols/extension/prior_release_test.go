@@ -195,12 +195,12 @@ func TestPriorReleaseManifestGovernsTheLadder(t *testing.T) {
 		var probe struct {
 			Commands      map[string]json.RawMessage `json:"commands"`
 			CommandGroups map[string]json.RawMessage `json:"commandGroups"`
-			Tools         map[string]json.RawMessage `json:"tools"`
+			Providers     map[string]json.RawMessage `json:"providers"`
 		}
 		if err := json.Unmarshal(data, &probe); err != nil {
 			t.Fatalf("parse %s: %v", fixture.File, err)
 		}
-		surfaces := len(probe.Commands) + len(probe.CommandGroups) + len(probe.Tools)
+		surfaces := len(probe.Commands) + len(probe.CommandGroups) + len(probe.Providers)
 		if fixture.Expect == "reject" && surfaces == 0 {
 			t.Errorf("%s is expected to be rejected but declares no contract surface; "+
 				"the exemption would apply and the fixture would prove the opposite rule", fixture.File)

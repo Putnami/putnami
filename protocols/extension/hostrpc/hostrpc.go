@@ -9,7 +9,7 @@
 //
 // The host names the socket in SocketEnv and the token in TokenEnv. It sets
 // both only for an interactive command-group subcommand it launches. A build
-// job, a provider tool and a hosted run (--credential-fd) never receive them.
+// job, a provider and a hosted run (--credential-fd) never receive them.
 //
 // The extension side is go.putnami.dev/sdk/extension/hostrpc; the host side
 // is internal to the CLI. Both read this package, so neither defines a frame,

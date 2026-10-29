@@ -13,10 +13,10 @@
 //
 // The seam is `Build<Something>Result`. Core's `<Something>Command` functions
 // were "build the report, then render it"; three of the four verticals already
-// had the builder split out for the MCP tools, and the ones that did not
+// already had the builder split out, and the ones that did not
 // (features validate/snapshot, features diff, the three architecture commands)
 // got one here with the same body. So the command layer that arrives later
-// calls exactly what the MCP tools call, and neither surface can drift.
+// calls exactly what the DAG jobs call, and neither can drift.
 //
 // Nothing in this package writes to stdout, reads a flag, or knows an exit
 // code exists beyond the classified error it returns.

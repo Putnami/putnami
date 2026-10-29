@@ -90,7 +90,6 @@ format ──→ check
 - **[Package](doc/07-package.md)** — npm and Docker packaging
 - **[Workspace Install](doc/08-workspace-install.md)** — Dependency installation
 - **[Templates](doc/09-templates.md)** — Project scaffolding templates
-- **[Exact dependency documentation](doc/10-dependency-documentation.md)** — per-project, version-resolved MCP documentation reads
 - **[Validate](doc/11-validate.md)** — the API check that holds the breaking-change marker for stable packages
 
 ## Support and contract

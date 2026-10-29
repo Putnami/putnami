@@ -35,11 +35,11 @@ const hostHooksDeclaration = `{
   "hosts": {
     "claude-code": [
       {"event": "SessionStart", "args": ["--engine", "claude-code"], "timeoutSeconds": 30},
-      {"event": "PostToolUse", "tools": ["TodoWrite", "TaskCreate"], "mcpTools": ["missions.ask", "missions.reply"], "args": ["--engine", "claude-code"], "timeoutSeconds": 30},
+      {"event": "PostToolUse", "tools": ["TodoWrite", "TaskCreate"], "args": ["--engine", "claude-code"], "timeoutSeconds": 30},
       {"event": "Stop", "args": ["--engine", "claude-code", "--idle-wake"], "wake": true, "timeoutSeconds": 660}
     ],
     "codex": [
-      {"event": "PostToolUse", "tools": ["update_plan"], "mcpTools": ["missions.ask", "missions.reply"], "args": ["--engine", "codex"], "timeoutSeconds": 30},
+      {"event": "PostToolUse", "tools": ["update_plan"], "args": ["--engine", "codex"], "timeoutSeconds": 30},
       {"event": "Stop", "args": ["--engine", "codex"], "timeoutSeconds": 240}
     ]
   }
@@ -136,7 +136,7 @@ func wantClaudeHooks(launcher string) string {
     ],
     "PostToolUse": [
       {
-        "matcher": "TodoWrite|TaskCreate|mcp__putnami__missions_ask|mcp__putnami__missions_reply",
+        "matcher": "TodoWrite|TaskCreate",
         "hooks": [
           {
             "type": "command",
@@ -170,7 +170,7 @@ func wantCodexHooks(launcher string) string {
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "^(update_plan|mcp__putnami__missions_ask|mcp__putnami__missions_reply)$",
+        "matcher": "^(update_plan)$",
         "hooks": [
           {
             "type": "command",
@@ -270,7 +270,7 @@ func TestHostHooksMergeTable(t *testing.T) {
         ]
       }`
 	postToolUse := `{
-        "matcher": "TodoWrite|TaskCreate|mcp__putnami__missions_ask|mcp__putnami__missions_reply",
+        "matcher": "TodoWrite|TaskCreate",
         "hooks": [
           {
             "type": "command",
@@ -413,7 +413,7 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
         ],
         "PostToolUse": [
             {
-                "matcher": "TodoWrite|TaskCreate|mcp__putnami__missions_ask|mcp__putnami__missions_reply",
+                "matcher": "TodoWrite|TaskCreate",
                 "hooks": [
                     {
                         "type": "command",
@@ -679,14 +679,14 @@ func TestHostHooksLauncherFollowsTheWorkspaceSource(t *testing.T) {
 }
 
 // Claude Code matchers are alternations; Codex matchers are anchored regular
-// expressions. A Putnami MCP tool is named as the host names it.
+// expressions.
 func TestHostHookMatcherRendering(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "host-hooks-exit-guard", "matchers-follow-each-host")
-	entry := extproto.HostHookEntry{Event: "PostToolUse", Tools: []string{"TodoWrite"}, MCPTools: []string{"missions.ask", "missions.reply"}}
-	if got, want := hostHookMatcher(extproto.HostClaudeCode, entry), "TodoWrite|mcp__putnami__missions_ask|mcp__putnami__missions_reply"; got != want {
+	entry := extproto.HostHookEntry{Event: "PostToolUse", Tools: []string{"TodoWrite", "TaskCreate"}}
+	if got, want := hostHookMatcher(extproto.HostClaudeCode, entry), "TodoWrite|TaskCreate"; got != want {
 		t.Errorf("Claude Code matcher = %q, want %q", got, want)
 	}
-	if got, want := hostHookMatcher(extproto.HostCodex, entry), "^(TodoWrite|mcp__putnami__missions_ask|mcp__putnami__missions_reply)$"; got != want {
+	if got, want := hostHookMatcher(extproto.HostCodex, entry), "^(TodoWrite|TaskCreate)$"; got != want {
 		t.Errorf("Codex matcher = %q, want %q", got, want)
 	}
 	if got := hostHookMatcher(extproto.HostCodex, extproto.HostHookEntry{Event: "Stop"}); got != "" {
