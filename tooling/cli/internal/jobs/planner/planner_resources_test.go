@@ -54,7 +54,7 @@ func TestSerializeWriteResources_ConflictingWritersSerialized(t *testing.T) {
 	build := resourceJob("/p", "build~generate", nil, proj("gen"), nil)
 	pkg := resourceJob("/p", "package~generate", nil, proj("gen"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{build, pkg}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{build, pkg}, nil, nil)
 
 	// Lower topological position (build < package by key) runs first.
 	if len(build.SerializeAfter) != 0 {
@@ -78,7 +78,7 @@ func TestSerializeWriteResources_IndependentWritersNotSerialized(t *testing.T) {
 	// Same resource id but different projects: project scope keeps them apart.
 	other := resourceJob("/q", "build~generate", nil, proj("gen"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{gen, dist, other}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{gen, dist, other}, nil, nil)
 
 	for _, job := range []*jobmodel.ScheduledJob{gen, dist, other} {
 		if len(job.SerializeAfter) != 0 {
@@ -96,7 +96,7 @@ func TestSerializeWriteResources_ReadersParallelWriterExclusive(t *testing.T) {
 	// A second, independent writer in another command rewrites the same tree.
 	writer2 := resourceJob("/p", "test~generate", nil, proj("gen"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{writer, r1, r2, writer2}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{writer, r1, r2, writer2}, nil, nil)
 
 	// Readers derive from their writer functionally, so no serialize edge is
 	// added — and they share none between themselves, so they stay parallel.
@@ -165,7 +165,7 @@ func TestSerializeWriteResources_WritersStayOrderedWhenAPassDropsAWriter(t *test
 	testRun := resourceJob("/p", "test~test", []string{testGen.Key()}, nil, proj("gen"))
 
 	plan := []*jobmodel.ScheduledJob{lintDocs, buildGen, buildTranspile, buildTypes, pkgGen, pkgTranspile, pkgDocker, testGen, testRun}
-	serializeWriteResources(plan, nil)
+	serializeWriteResources(plan, nil, nil)
 	if err := ValidatePlanDAG(plan); err != nil {
 		t.Fatalf("plan with serialize edges must stay schedulable: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestSerializeWriteResources_ReadOnlyTasksNotSerialized(t *testing.T) {
 	// A writer of an unrelated resource does not pull the readers in.
 	unrelated := resourceJob("/p", "build~bundle", nil, proj("dist"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{check1, check2, bare, unrelated}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{check1, check2, bare, unrelated}, nil, nil)
 
 	for _, job := range []*jobmodel.ScheduledJob{check1, check2, bare, unrelated} {
 		if len(job.SerializeAfter) != 0 {
@@ -233,7 +233,7 @@ func TestSerializeWriteResources_SourceFixWriterSerializesReaders(t *testing.T) 
 	build := resourceJob("/p", "build~compile", nil, nil, proj("sources"))
 	test := resourceJob("/p", "test~test", nil, nil, proj("sources"))
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{lintFix, build, test}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{lintFix, build, test}, nil, nil)
 
 	for _, want := range []string{build.Key(), test.Key()} {
 		if !containsStr(lintFix.SerializeAfter, want) {
@@ -250,7 +250,7 @@ func TestSerializeWriteResources_WorkspaceScopeConflictsAcrossProjects(t *testin
 	a := resourceJob("/a", "publish~push", nil, wsRes("out"), nil)
 	b := resourceJob("/b", "publish~push", nil, wsRes("out"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{a, b}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{a, b}, nil, nil)
 
 	// /a sorts before /b, so /b serializes after /a.
 	if len(a.SerializeAfter) != 0 {
@@ -263,7 +263,7 @@ func TestSerializeWriteResources_WorkspaceScopeConflictsAcrossProjects(t *testin
 	// The same ids at project scope must NOT conflict across projects.
 	c := resourceJob("/a", "publish~push", nil, proj("out"), nil)
 	d := resourceJob("/b", "publish~push", nil, proj("out"), nil)
-	serializeWriteResources([]*jobmodel.ScheduledJob{c, d}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{c, d}, nil, nil)
 	if len(c.SerializeAfter) != 0 || len(d.SerializeAfter) != 0 {
 		t.Errorf("project-scoped resources must not conflict across projects: c=%v d=%v", c.SerializeAfter, d.SerializeAfter)
 	}
@@ -275,7 +275,7 @@ func TestSerializeWriteResources_FollowsFunctionalOrderNoCycle(t *testing.T) {
 	first := resourceJob("/p", "build~generate", nil, proj("gen"), nil)
 	second := resourceJob("/p", "build~regen", []string{first.Key()}, proj("gen"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{second, first}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{second, first}, nil, nil)
 
 	// The serialize edge follows the functional order and is pruned as redundant.
 	if len(second.SerializeAfter) != 0 {
@@ -295,7 +295,7 @@ func TestSerializeWriteResources_ReadWriteSameJobIsWriter(t *testing.T) {
 	describe := resourceJob("/p", "build~describe", nil, proj("gen"), proj("gen"))
 	generate := resourceJob("/p", "build~generate", nil, proj("gen"), nil)
 
-	serializeWriteResources([]*jobmodel.ScheduledJob{describe, generate}, nil)
+	serializeWriteResources([]*jobmodel.ScheduledJob{describe, generate}, nil, nil)
 
 	// build~describe sorts before build~generate; the second writer waits.
 	if !reflect.DeepEqual(generate.SerializeAfter, []string{describe.Key()}) {
@@ -319,7 +319,7 @@ func TestSerializeWriteResources_PrecomputeIgnoresSerializeEdges(t *testing.T) {
 	b.JobDef.Writes = proj("gen")
 
 	plan := []*jobmodel.ScheduledJob{a, b}
-	serializeWriteResources(plan, nil)
+	serializeWriteResources(plan, nil, nil)
 	if len(b.SerializeAfter) == 0 {
 		t.Fatal("expected package~generate to serialize after build~generate")
 	}
@@ -341,5 +341,39 @@ func TestSerializeWriteResources_PrecomputeIgnoresSerializeEdges(t *testing.T) {
 	}
 	if keys[b.Key()] != wantB {
 		t.Errorf("serialized successor key = %s, want standalone %s", keys[b.Key()], wantB)
+	}
+}
+
+// TestSerializeWriteResources_AnOrderedReaderJoinsTheBlockItRunsAfter pins the
+// order-only edges the plan carries into this pass: a reader that derives from
+// the first writer, and is ordered after the second, observes what the second
+// wrote. It joins the second writer's block, so the second writer does not
+// wait for it, and the plan keeps no cycle. Without the edge in ordered, the
+// second writer would wait for a reader already ordered after it.
+func TestSerializeWriteResources_AnOrderedReaderJoinsTheBlockItRunsAfter(t *testing.T) {
+	t.Parallel()
+	build := func() (generate, infra, reader *jobmodel.ScheduledJob, jobs []*jobmodel.ScheduledJob) {
+		generate = resourceJob("/p", "build~generate", nil, proj("gen"), nil)
+		infra = resourceJob("/p", "build~infra", []string{generate.Key()}, proj("gen"), nil)
+		reader = resourceJob("/p", "clientgen~generate-go", []string{generate.Key()}, nil, proj("gen"))
+		reader.SerializeAfter = []string{infra.Key()}
+		return generate, infra, reader, []*jobmodel.ScheduledJob{generate, infra, reader}
+	}
+
+	_, infra, reader, jobs := build()
+	serializeWriteResources(jobs, nil, map[string][]string{reader.Key(): {infra.Key()}})
+	for _, key := range infra.SerializeAfter {
+		if key == reader.Key() {
+			t.Fatalf("%s waits for %s, which is ordered after it", infra.Key(), reader.Key())
+		}
+	}
+	if err := ValidatePlanDAG(jobs); err != nil {
+		t.Fatalf("plan with the ordered reader: %v", err)
+	}
+
+	_, infra, _, jobs = build()
+	serializeWriteResources(jobs, nil, nil)
+	if err := ValidatePlanDAG(jobs); err == nil {
+		t.Fatalf("control: without the ordered edge the plan has no cycle; %s waits for %v", infra.Key(), infra.SerializeAfter)
 	}
 }

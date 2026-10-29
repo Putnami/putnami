@@ -276,8 +276,9 @@ the member is stamped 17.
 Contract `18` (`StepDependencyContract`) is additive for a command's
 dependency on one step of another command: `dependsOn: ["build~describe"]`.
 From 18 on, the planner plans the whole prerequisite command for the project,
-as for `build`, and makes every root step of the dependent command wait for
-that step alone. A step the plan does not hold adds no edge. A reader below 18
+as for `build`. Every root step of the dependent command depends on that
+step and runs after the command's other leaf steps. A step the plan does not
+hold adds no dependency. A reader below 18
 would read the entry as a command name, plan nothing and run the dependent
 before the step it reads, so it refuses the stamp. The floor binds a manifest
 wherever it loads from. Only a manifest with such an entry is stamped 18.

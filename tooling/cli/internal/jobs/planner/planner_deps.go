@@ -1585,12 +1585,17 @@ func computeCommandLeaves(jobs []*jobmodel.ScheduledJob) map[string][]string {
 // resolveCommandDeps wires command-level dependsOn into job-level deps.
 // For each job whose command has CommandDependsOn, its root steps (steps
 // with no intra-pipeline deps) get dependencies on the leaf steps of
-// each prerequisite command in the same project. A dependency on one step
-// ("build~describe") waits for the planned jobs of the project that are that
-// step of that command instead, whichever extension runs them; a step the
-// plan does not hold adds no edge.
+// each prerequisite command in the same project.
+//
+// A dependency on one step ("build~describe") depends instead on the planned
+// jobs of the project that are that step of that command, whichever extension
+// runs them, and reads their files; a step the plan does not hold adds no
+// dependency. The root step is still ordered after every leaf of the command it
+// does not depend on, by an order-only edge (SerializeAfter), so it runs where
+// a dependency on the whole command runs it. That edge keeps a leaf's files
+// only when the dependent's key reads a file the leaf writes (CLI ADR 0082).
 func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]string) {
-	var steps map[string][]string
+	var stepJobs func(projectID, command, step string) []string
 	for _, job := range jobs {
 		if len(job.JobDef.CommandDependsOn) == 0 {
 			continue
@@ -1608,45 +1613,57 @@ func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]strin
 			continue
 		}
 
+		var orderedLeaves []string
 		for _, rawDep := range job.JobDef.CommandDependsOn {
 			dep := extension.ParseCommandDependency(rawDep)
 			if dep.Session || dep.Command == "" {
 				continue
 			}
+			commandLeaves := leaves[job.Project.ID+":"+dep.Command]
 			if dep.Step == "" {
-				job.DependsOn = append(job.DependsOn, leaves[job.Project.ID+":"+dep.Command]...)
+				job.DependsOn = append(job.DependsOn, commandLeaves...)
 				continue
 			}
-			if steps == nil {
-				steps = commandStepJobs(jobs)
+			if stepJobs == nil {
+				stepJobs = commandStepJobs(jobs)
 			}
-			job.DependsOn = append(job.DependsOn, steps[commandStepKey(job.Project.ID, dep.Command, dep.Step)]...)
+			job.DependsOn = append(job.DependsOn, stepJobs(job.Project.ID, dep.Command, dep.Step)...)
+			orderedLeaves = append(orderedLeaves, commandLeaves...)
 		}
 		job.DependsOn = jobmodel.DedupeSorted(job.DependsOn)
+		var orderOnly []string
+		for _, leaf := range orderedLeaves {
+			if leaf != job.Key() && !slices.Contains(job.DependsOn, leaf) {
+				orderOnly = append(orderOnly, leaf)
+			}
+		}
+		if len(orderOnly) > 0 {
+			job.SerializeAfter = jobmodel.DedupeSorted(append(job.SerializeAfter, orderOnly...))
+		}
 	}
 }
 
 // commandStepJobs indexes the key of every planned job by its project, its
-// command and its step id. The step id is the one the manifest declares, so a
-// step that several extensions contribute to one command, each under its own
-// namespaced plan name, is indexed under one entry. A finalizer is left out,
-// as computeCommandLeaves leaves it out: no dependent waits for a cleanup.
-func commandStepJobs(jobs []*jobmodel.ScheduledJob) map[string][]string {
+// command and its step id, and returns the lookup of one step of a command in
+// a project. The step id is the one the manifest declares, so a step that
+// several extensions contribute to one command, each under its own namespaced
+// plan name, is indexed under one entry. A finalizer is left out, as
+// computeCommandLeaves leaves it out: no dependent waits for a cleanup.
+func commandStepJobs(jobs []*jobmodel.ScheduledJob) func(projectID, command, step string) []string {
+	entry := func(projectID, command, step string) string {
+		return projectID + ":" + extension.StepJobName(command, step)
+	}
 	index := make(map[string][]string)
 	for _, job := range jobs {
 		if job.Project == nil || job.JobDef == nil || job.StepID() == "" || jobmodel.IsFinalizerJob(job) {
 			continue
 		}
-		key := commandStepKey(job.Project.ID, job.CommandName(), job.StepID())
+		key := entry(job.Project.ID, job.CommandName(), job.StepID())
 		index[key] = append(index[key], job.Key())
 	}
-	return index
-}
-
-// commandStepKey is the commandStepJobs entry of one step of a command in a
-// project.
-func commandStepKey(projectID, command, step string) string {
-	return projectID + ":" + extension.StepJobName(command, step)
+	return func(projectID, command, step string) []string {
+		return index[entry(projectID, command, step)]
+	}
 }
 
 // resolveSessionCommandDeps wires "!command" dependencies into job-level deps.

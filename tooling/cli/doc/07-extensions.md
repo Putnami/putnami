@@ -394,10 +394,12 @@ across the current project selection:
 }
 ```
 
-`build~describe` plans all of `build` for the project, then every root step
-of the dependent command waits for the project's `describe` step alone. A step
-the plan does not hold adds no edge. A manifest that uses the form requires
-`cliContract: 18`, and `!command~step` is invalid.
+`build~describe` plans all of `build` for the project. Every root step of the
+dependent command depends on the project's `describe` step and reads its
+files, and runs after the other `build` leaf steps through order-only edges. A
+step the plan does not hold adds no dependency, and the order-only edges
+remain. A manifest that uses the form requires `cliContract: 18`, and
+`!command~step` is invalid.
 
 `!build` plans `build` across the selected projects, then every root step of
 the dependent command waits for every `build` leaf job in the final plan. These

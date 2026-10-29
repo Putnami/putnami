@@ -318,8 +318,9 @@ init or upgrade, and an older reader would install the extension without them.
 `RequiredLoadContract` includes that rung too. A manifest whose command
 `dependsOn` names one step of another command (`build~describe`) requires
 contract 18 wherever it loads from: a reader at 18 plans the whole command and
-makes the dependent's root steps wait for that step alone, and an older reader
-would read the entry as a command name and plan nothing. An entry that holds
+makes the dependent's root steps depend on that step and run after the
+command's other leaves, and an older reader would read the entry as a command
+name and plan nothing. An entry that holds
 `~` counts even when it is not well formed. `RequiredLoadContract` includes
 that rung too. The reader loads every stamp from the one the manifest's
 vocabulary requires up to `protocols/cli.LatestContract` (18):

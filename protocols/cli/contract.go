@@ -287,10 +287,10 @@ const HostHooksContract = 17
 
 // StepDependencyContract is required by a manifest whose command depends on
 // one step of another command (`<command>~<step>` in a command's dependsOn).
-// A reader at this contract plans the whole prerequisite command and makes the
-// dependent's root steps wait for that step alone, so an older reader, which
-// would read the entry as a command name and plan nothing, refuses the stamp
-// instead.
+// A reader at this contract plans the whole prerequisite command, makes the
+// dependent's root steps depend on that step and orders them after the
+// command's other leaves, so an older reader, which would read the entry as a
+// command name and plan nothing, refuses the stamp instead.
 const StepDependencyContract = 18
 
 // LatestContract is the highest contract this CLI reads. A manifest stamped

@@ -12,8 +12,9 @@ import (
 )
 
 // A command that depends on one step of another command (protocol ADR 0017)
-// plans the whole prerequisite command and waits for that step alone. The
-// fixtures follow the two language builds clientgen reads: a Go build whose
+// plans the whole prerequisite command, depends on that step and reads its
+// files, and runs after the command's other leaves through order-only edges.
+// The fixtures follow the two language builds clientgen reads: a Go build whose
 // describe writes the contract (generate → describe → compile, and infra after
 // generate and describe), with describe removed for a library, and a
 // TypeScript build without a describe step.
@@ -112,9 +113,10 @@ func planClientgen(t *testing.T, extensions []*extension.ExtensionDescription, g
 	return planned
 }
 
-// assertClientgenWaitsFor checks that both clientgen roots of project wait for
-// exactly want.
-func assertClientgenWaitsFor(t *testing.T, planned []*jobmodel.ScheduledJob, project string, want []string) {
+// assertClientgenWaitsFor checks that both clientgen roots of project depend
+// on exactly reads and are ordered, without depending, after exactly after.
+// The fixtures declare no resources, so no write serialization adds an edge.
+func assertClientgenWaitsFor(t *testing.T, planned []*jobmodel.ScheduledJob, project string, reads, after []string) {
 	t.Helper()
 	for _, step := range []string{"generate-go", "generate-ts"} {
 		key := project + ":clientgen~" + step
@@ -122,26 +124,35 @@ func assertClientgenWaitsFor(t *testing.T, planned []*jobmodel.ScheduledJob, pro
 		if job == nil {
 			t.Fatalf("%s not planned; jobs=%v", key, jobKeys(planned))
 		}
-		if !slices.Equal(job.DependsOn, want) {
-			t.Errorf("%s deps = %v, want %v", key, job.DependsOn, want)
+		if !slices.Equal(job.DependsOn, reads) {
+			t.Errorf("%s deps = %v, want %v", key, job.DependsOn, reads)
+		}
+		if !slices.Equal(job.SerializeAfter, after) {
+			t.Errorf("%s order-only edges = %v, want %v", key, job.SerializeAfter, after)
 		}
 	}
 }
 
-// TestPlan_StepDependencyWaitsForTheNamedStepsOnly pins the clientgen shape:
-// each root waits for describe and generate where the plan holds them, never
-// for compile or infra, and the plan holds the same jobs as with a bare
-// dependency on build.
-func TestPlan_StepDependencyWaitsForTheNamedStepsOnly(t *testing.T) {
+// TestPlan_StepDependencyReadsOneStepAndRunsAfterTheCommand pins the clientgen
+// shape: each root depends on describe and generate where the plan holds them,
+// and is ordered after compile and infra, the build's leaves, without depending
+// on them. The plan holds the same jobs as with a bare dependency on build.
+func TestPlan_StepDependencyReadsOneStepAndRunsAfterTheCommand(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "dependency-plan", "a-step-dependency-waits-for-that-step-alone")
+	spectest.Proves(t, "cli/job-planning-execution", "dependency-plan", "a-step-dependency-reads-one-step-and-runs-after-the-command")
 	steps := planClientgen(t, []*extension.ExtensionDescription{
 		stepDependencyGoBuild("@putnami/go"), stepDependencyTypeScriptBuild(),
 		stepDependencyClientgen("build~generate", "build~describe"),
 	})
-	assertClientgenWaitsFor(t, steps, "/go/app", []string{"/go/app:build~describe", "/go/app:build~generate"})
-	assertClientgenWaitsFor(t, steps, "/go/lib", []string{"/go/lib:build~generate"})
-	assertClientgenWaitsFor(t, steps, "/ts/app", []string{"/ts/app:build~generate"})
+	assertClientgenWaitsFor(t, steps, "/go/app",
+		[]string{"/go/app:build~describe", "/go/app:build~generate"},
+		[]string{"/go/app:build~compile", "/go/app:build~infra"})
+	assertClientgenWaitsFor(t, steps, "/go/lib",
+		[]string{"/go/lib:build~generate"},
+		[]string{"/go/lib:build~compile", "/go/lib:build~infra"})
+	assertClientgenWaitsFor(t, steps, "/ts/app",
+		[]string{"/ts/app:build~generate"},
+		[]string{"/ts/app:build~infra"})
 	for _, key := range []string{"/go/app:build~compile", "/go/app:build~infra", "/go/lib:build~compile", "/ts/app:build~infra"} {
 		if scheduledJobByKey(steps, key) == nil {
 			t.Errorf("%s not planned: a step dependency plans the whole command; jobs=%v", key, jobKeys(steps))
@@ -156,24 +167,28 @@ func TestPlan_StepDependencyWaitsForTheNamedStepsOnly(t *testing.T) {
 		t.Errorf("planned jobs with build~generate and build~describe = %v, want the jobs of a bare build %v",
 			jobKeys(steps), jobKeys(whole))
 	}
-	// A bare command keeps waiting for every leaf step of the command.
-	assertClientgenWaitsFor(t, whole, "/go/app", []string{"/go/app:build~compile", "/go/app:build~infra"})
-	assertClientgenWaitsFor(t, whole, "/go/lib", []string{"/go/lib:build~compile", "/go/lib:build~infra"})
-	assertClientgenWaitsFor(t, whole, "/ts/app", []string{"/ts/app:build~infra"})
+	// A bare command keeps depending on every leaf step of the command.
+	assertClientgenWaitsFor(t, whole, "/go/app", []string{"/go/app:build~compile", "/go/app:build~infra"}, nil)
+	assertClientgenWaitsFor(t, whole, "/go/lib", []string{"/go/lib:build~compile", "/go/lib:build~infra"}, nil)
+	assertClientgenWaitsFor(t, whole, "/ts/app", []string{"/ts/app:build~infra"}, nil)
 }
 
-// TestPlan_StepDependencyOnAStepThePlanDoesNotHoldAddsNoEdge pins that a
-// named step the prerequisite command does not run for the project is not
-// waited for, while the command is still planned.
-func TestPlan_StepDependencyOnAStepThePlanDoesNotHoldAddsNoEdge(t *testing.T) {
+// TestPlan_StepDependencyOnAStepThePlanDoesNotHoldKeepsTheOrder pins that a
+// named step the prerequisite command does not run for the project adds no
+// dependency, while the command is still planned and the dependent still runs
+// after its leaves: the library's build removes describe, and the TypeScript
+// build has none.
+func TestPlan_StepDependencyOnAStepThePlanDoesNotHoldKeepsTheOrder(t *testing.T) {
 	t.Parallel()
 	planned := planClientgen(t, []*extension.ExtensionDescription{
 		stepDependencyGoBuild("@putnami/go"), stepDependencyTypeScriptBuild(),
 		stepDependencyClientgen("build~describe"),
 	})
-	assertClientgenWaitsFor(t, planned, "/go/app", []string{"/go/app:build~describe"})
-	assertClientgenWaitsFor(t, planned, "/go/lib", nil)
-	assertClientgenWaitsFor(t, planned, "/ts/app", nil)
+	assertClientgenWaitsFor(t, planned, "/go/app",
+		[]string{"/go/app:build~describe"},
+		[]string{"/go/app:build~compile", "/go/app:build~infra"})
+	assertClientgenWaitsFor(t, planned, "/go/lib", nil, []string{"/go/lib:build~compile", "/go/lib:build~infra"})
+	assertClientgenWaitsFor(t, planned, "/ts/app", nil, []string{"/ts/app:build~infra"})
 	if scheduledJobByKey(planned, "/ts/app:build~generate") == nil {
 		t.Errorf("/ts/app:build~generate not planned; jobs=%v", jobKeys(planned))
 	}
@@ -192,14 +207,21 @@ func TestPlan_StepDependencyMatchesEachExtensionThatRunsTheStep(t *testing.T) {
 	assertClientgenWaitsFor(t, planned, "/go/app", []string{
 		"/go/app:build~@acme/go~describe",
 		"/go/app:build~@putnami/go~describe",
+	}, []string{
+		"/go/app:build~@acme/go~compile", "/go/app:build~@acme/go~infra",
+		"/go/app:build~@putnami/go~compile", "/go/app:build~@putnami/go~infra",
 	})
-	assertClientgenWaitsFor(t, planned, "/go/lib", nil)
+	assertClientgenWaitsFor(t, planned, "/go/lib", nil, []string{
+		"/go/lib:build~@acme/go~compile", "/go/lib:build~@acme/go~infra",
+		"/go/lib:build~@putnami/go~compile", "/go/lib:build~@putnami/go~infra",
+	})
 }
 
 // TestResolveCommandDeps_StepDependency pins the edge rule on a hand-built
-// plan: a root step waits for the job that is the named step of the named
-// command in its own project, and for nothing of another project or another
-// command.
+// plan: a root step depends on the job that is the named step of the named
+// command in its own project, is ordered after the command's other leaves in
+// that project, and gets no edge to another project or another command. A leaf
+// the step already depends on gets no order-only edge.
 func TestResolveCommandDeps_StepDependency(t *testing.T) {
 	t.Parallel()
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
@@ -208,16 +230,30 @@ func TestResolveCommandDeps_StepDependency(t *testing.T) {
 		Name: "clientgen~generate-go", CommandName: "clientgen", StepID: "generate-go",
 		CommandDependsOn: []string{"build~describe"},
 	}}
+	leafReader := &jobmodel.ScheduledJob{Project: app, JobDef: &extension.JobDefinition{
+		Name: "publish~upload", CommandName: "publish", StepID: "upload",
+		CommandDependsOn: []string{"build~compile"},
+	}}
 	jobs := []*jobmodel.ScheduledJob{
 		{Project: app, JobDef: &extension.JobDefinition{Name: "build~describe", CommandName: "build", StepID: "describe"}},
 		{Project: app, JobDef: &extension.JobDefinition{Name: "build~compile", CommandName: "build", StepID: "compile", DependsOn: []string{"build~describe"}}},
 		{Project: app, JobDef: &extension.JobDefinition{Name: "package~describe", CommandName: "package", StepID: "describe"}},
 		{Project: other, JobDef: &extension.JobDefinition{Name: "build~describe", CommandName: "build", StepID: "describe"}},
-		dependent,
+		{Project: other, JobDef: &extension.JobDefinition{Name: "build~compile", CommandName: "build", StepID: "compile", DependsOn: []string{"build~describe"}}},
+		dependent, leafReader,
 	}
 	resolveCommandDeps(jobs, computeCommandLeaves(jobs))
 	if want := []string{"/app:build~describe"}; !slices.Equal(dependent.DependsOn, want) {
-		t.Fatalf("deps = %v, want %v", dependent.DependsOn, want)
+		t.Errorf("deps = %v, want %v", dependent.DependsOn, want)
+	}
+	if want := []string{"/app:build~compile"}; !slices.Equal(dependent.SerializeAfter, want) {
+		t.Errorf("order-only edges = %v, want %v", dependent.SerializeAfter, want)
+	}
+	if want := []string{"/app:build~compile"}; !slices.Equal(leafReader.DependsOn, want) {
+		t.Errorf("a dependency on a leaf: deps = %v, want %v", leafReader.DependsOn, want)
+	}
+	if len(leafReader.SerializeAfter) != 0 {
+		t.Errorf("a dependency on a leaf: order-only edges = %v, want none beside the dependency", leafReader.SerializeAfter)
 	}
 }
 
@@ -240,7 +276,7 @@ func TestResolveCommandDeps_StepDependencySkipsAFinalizer(t *testing.T) {
 	}
 	jobs := []*jobmodel.ScheduledJob{teardown, dependent}
 	resolveCommandDeps(jobs, computeCommandLeaves(jobs))
-	if len(dependent.DependsOn) != 0 {
-		t.Fatalf("deps = %v, want none", dependent.DependsOn)
+	if len(dependent.DependsOn) != 0 || len(dependent.SerializeAfter) != 0 {
+		t.Fatalf("deps = %v, order-only edges = %v, want none", dependent.DependsOn, dependent.SerializeAfter)
 	}
 }

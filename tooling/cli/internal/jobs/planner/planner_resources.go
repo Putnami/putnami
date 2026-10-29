@@ -38,8 +38,16 @@ import (
 // leaders maps each shared-execution follower to its leader. A follower writes
 // nothing to the tree: it captures what its leader wrote. It joins its leader's
 // place in the write order, and the readers of that block wait for it.
-func serializeWriteResources(jobs []*jobmodel.ScheduledJob, leaders map[string]string) {
-	pos, ok := functionalTopoOrder(jobs, leaders)
+//
+// ordered holds the order-only edges the plan carries before this pass, keyed
+// by the waiting job, such as the edges that order a step dependency's
+// dependent after the other leaves of the command (resolveCommandDeps). A job
+// ordered after a writer observes what it wrote, as a functional dependent
+// does, so these edges join the functional graph here: in the topological
+// order and in the writer a reader derives from. Without them a later writer
+// would wait for a reader already ordered after it, and close a cycle.
+func serializeWriteResources(jobs []*jobmodel.ScheduledJob, leaders map[string]string, ordered map[string][]string) {
+	pos, ok := functionalTopoOrder(jobs, leaders, ordered)
 	if !ok {
 		// The functional graph has a cycle; ValidatePlanDAG reports it. Adding
 		// edges on an inconsistent order could only make the diagnosis worse.
@@ -61,6 +69,11 @@ func serializeWriteResources(jobs []*jobmodel.ScheduledJob, leaders map[string]s
 		// from the follower derives from the leader's write.
 		if leader := leaders[job.Key()]; inPlan[leader] {
 			functionalDeps[job.Key()] = append(functionalDeps[job.Key()], leader)
+		}
+		for _, predecessor := range ordered[job.Key()] {
+			if inPlan[predecessor] {
+				functionalDeps[job.Key()] = append(functionalDeps[job.Key()], predecessor)
+			}
 		}
 	}
 
@@ -279,10 +292,11 @@ func ResourceConflictKey(projectID string, ref extension.ResourceRef) string {
 }
 
 // functionalTopoOrder returns a deterministic topological ordering of the plan
-// over functional dependencies alone, as a map of job key → position. The ready
+// over functional dependencies, each follower after its leader and each job
+// after its ordered predecessors, as a map of job key → position. The ready
 // queue is drained in sorted-key order so the result does not depend on slice
-// order or map iteration. ok is false when the functional graph has a cycle.
-func functionalTopoOrder(jobs []*jobmodel.ScheduledJob, leaders map[string]string) (map[string]int, bool) {
+// order or map iteration. ok is false when that graph has a cycle.
+func functionalTopoOrder(jobs []*jobmodel.ScheduledJob, leaders map[string]string, ordered map[string][]string) (map[string]int, bool) {
 	byKey, indegree, dependents := cachekey.FunctionalDegrees(jobs)
 	for follower, leader := range leaders {
 		if byKey[follower] == nil || byKey[leader] == nil {
@@ -290,6 +304,15 @@ func functionalTopoOrder(jobs []*jobmodel.ScheduledJob, leaders map[string]strin
 		}
 		indegree[follower]++
 		dependents[leader] = append(dependents[leader], follower)
+	}
+	for waiter, predecessors := range ordered {
+		for _, predecessor := range predecessors {
+			if byKey[waiter] == nil || byKey[predecessor] == nil {
+				continue
+			}
+			indegree[waiter]++
+			dependents[predecessor] = append(dependents[predecessor], waiter)
+		}
 	}
 
 	var ready []string

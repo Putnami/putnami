@@ -74,12 +74,14 @@ plans `build` for each project that has the dependent command, then root steps
 of the dependent command wait for that project's `build` leaf steps.
 
 `command~step` names one step of a same-project prerequisite. The planner plans
-the whole command, as for a bare name, and the root steps of the dependent
-command wait for that step alone, in each extension that runs it for the
-project. A step the plan does not hold adds no edge: a step the command does
-not declare for the project, or one that an `if`, an activation gate or
-`disable` removes. A dependent that reads a step only some providers run names
-each candidate step:
+the whole command, as for a bare name. The root steps of the dependent command
+depend on that step, in each extension that runs it for the project, and read
+its files. They also run after every other leaf step of the command, through
+order-only edges that read no files. A step the plan does not hold adds no
+dependency: a step the command does not declare for the project, or one that
+an `if`, an activation gate or `disable` removes. The order-only edges remain.
+A dependent that reads a step only some providers run names each candidate
+step:
 
 ```json
 {
