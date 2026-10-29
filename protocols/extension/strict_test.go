@@ -991,6 +991,54 @@ func TestValidateManifest_ReservedGlobalFlagShadows(t *testing.T) {
 	}
 }
 
+// VisitFlagDefinitions visits every flag at any depth and reports the
+// invocations that receive it: a group flag reaches each subcommand, a nested
+// subcommand inherits its parent's command and runs under its top-level
+// subcommand's interactive field, a flag declared on it is nested, and a
+// command a subcommand runs is reached only through that subcommand.
+func TestVisitFlagDefinitions_ReportsTheInvocationsThatReceiveEachFlag(t *testing.T) {
+	m := &Manifest{
+		Commands: map[string]CommandDefinition{
+			"build":  {Flags: map[string]FlagDefinition{"target": {}}},
+			"draft":  {Flags: map[string]FlagDefinition{"level": {}}},
+			"status": {Flags: map[string]FlagDefinition{"wait": {}}},
+		},
+		CommandGroups: map[string]CommandGroupDefinition{
+			"cloud": {
+				Flags: map[string]FlagDefinition{"env": {}},
+				Subcommands: map[string]SubcommandDefinition{
+					"status": {
+						Command:     "status",
+						Interactive: true,
+						Flags:       map[string]FlagDefinition{"follow": {}},
+						Subcommands: map[string]SubcommandDefinition{
+							"show": {Flags: map[string]FlagDefinition{"raw": {}}},
+							"note": {Command: "draft"},
+						},
+					},
+				},
+			},
+		},
+	}
+	got := map[string][]FlagReach{}
+	VisitFlagDefinitions(m, func(field, name string, _ FlagDefinition, reach []FlagReach) {
+		got[field+"."+name] = reach
+	})
+	interactive := FlagReach{Command: "status", Interactive: true}
+	nested := FlagReach{Command: "status", Interactive: true, Nested: true}
+	want := map[string][]FlagReach{
+		"commands.build.flags.target":                                       {{Command: "build"}},
+		"commands.draft.flags.level":                                        {nested},
+		"commands.status.flags.wait":                                        {interactive},
+		"commandGroups.cloud.flags.env":                                     {interactive},
+		"commandGroups.cloud.subcommands.status.flags.follow":               {interactive},
+		"commandGroups.cloud.subcommands.status.subcommands.show.flags.raw": {nested},
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("reach = %v\nwant %v", got, want)
+	}
+}
+
 func TestValidateManifest_NestedSubcommandsInheritCommand(t *testing.T) {
 	m := &Manifest{
 		Name: "@test/extension",

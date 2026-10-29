@@ -7,6 +7,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/iox"
 
 	proto "go.putnami.dev/protocol/extension"
@@ -57,6 +58,13 @@ func ExtensionsValidate(args []string) error {
 
 	iox.Fprintf(os.Stdout, "  ✓ Structural validation passed\n")
 
+	if shadows := coreGlobalFlagShadows(manifest); len(shadows) > 0 {
+		iox.Fprintf(os.Stdout, "  ✗ Flags a core global flag takes:\n")
+		printDiagnostics(shadows)
+		return cmderr.Classify(fmt.Errorf("%d flag(s) never reach their command", len(shadows)), cmderr.ErrInvalidConfig)
+	}
+	iox.Fprintf(os.Stdout, "  ✓ Every flag reaches its command\n")
+
 	// Contract validation (requires CLI-level resolved extension description).
 	proto.NormalizeManifest(manifest)
 	extPath := filepath.Dir(path)
@@ -74,6 +82,53 @@ func ExtensionsValidate(args []string) error {
 
 	iox.Fprintf(os.Stdout, "\n  Extension is valid.\n")
 	return nil
+}
+
+// coreGlobalFlagShadows reports each manifest flag, by name or short alias,
+// that the core parses as its own global flag before the command runs, in at
+// least one invocation that receives the flag, so that the command never
+// receives it there (commandmeta.ExtensionFlagShadow).
+func coreGlobalFlagShadows(manifest *proto.Manifest) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	proto.VisitFlagDefinitions(manifest, func(field, name string, def proto.FlagDefinition, reach []proto.FlagReach) {
+		boolean := def.Type == "" || def.Type == "boolean"
+		flag := commandmeta.ExtensionFlag{Boolean: boolean, DefaultOn: boolean && def.Default == true}
+		for _, r := range reach {
+			global, taken := commandmeta.ExtensionFlagShadow(name, flag, extensionInvocation(manifest, r))
+			if !taken {
+				continue
+			}
+			diags = append(diags, diag.Errorf("core-global-flag", field+"."+name,
+				"the core parses %s as its own global flag (%s), so %s never receives it; rename the flag",
+				global.Long, global.Description, invocationName(r)))
+			break
+		}
+		if global, taken := commandmeta.ExtensionShortShadow(name, def.Short); taken {
+			diags = append(diags, diag.Errorf("core-global-flag", field+"."+name+".short",
+				"the core parses %s as %s, so the command never receives it; choose another short alias", global.Short, global.Long))
+		}
+	})
+	return diags
+}
+
+// extensionInvocation describes r with the workload its command's own traits
+// declare in manifest.
+func extensionInvocation(manifest *proto.Manifest, r proto.FlagReach) commandmeta.ExtensionInvocation {
+	invocation := commandmeta.ExtensionInvocation{Interactive: r.Interactive, Nested: r.Nested}
+	if command, ok := manifest.Commands[r.Command]; ok && command.Traits != nil {
+		invocation.Workload = command.Traits.Workload
+	}
+	return invocation
+}
+
+func invocationName(r proto.FlagReach) string {
+	if r.Nested {
+		return fmt.Sprintf("the nested subcommand that runs %s, whose flags the CLI does not resolve,", r.Command)
+	}
+	if r.Interactive {
+		return fmt.Sprintf("the interactive subcommand that runs %s", r.Command)
+	}
+	return fmt.Sprintf("the planned command %s", r.Command)
 }
 
 // printDiagnostics renders protocol diagnostics to stdout.

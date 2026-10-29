@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
+	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
@@ -382,5 +384,149 @@ func TestExtensionsValidate_MissingPath(t *testing.T) {
 	err := ExtensionsValidate([]string{filepath.Join(t.TempDir(), "missing")})
 	if err == nil || !strings.Contains(err.Error(), "path not found") {
 		t.Fatalf("err = %v, want path not found", err)
+	}
+}
+
+// flagShadowManifest declares the given flags on four invocations: the planned
+// command estimate, whose workload is once; the serve workload serve; the
+// group change, whose subcommands run estimate and, interactively, report;
+// and change's interactive subcommand report and its nested subcommand show,
+// which runs interactive too.
+func flagShadowManifest(estimate, serve, group, report, show string) string {
+	return `{
+  "name": "@putnami/test-ext",
+  "version": "1.0.0",
+  "cliContract": 17,
+  "commands": {
+    "estimate": {
+      "traits": {"workload": "once"},
+      "flags": {` + estimate + `},
+      "run": [{"id": "estimate", "task": "exec"}]
+    },
+    "serve": {
+      "traits": {"workload": "serve"},
+      "flags": {` + serve + `},
+      "run": [{"id": "serve", "task": "exec"}]
+    },
+    "report": {"run": [{"id": "report", "task": "exec"}]}
+  },
+  "commandGroups": {
+    "change": {
+      "flags": {` + group + `},
+      "subcommands": {
+        "estimate": {"command": "estimate"},
+        "report": {
+          "command": "report",
+          "interactive": true,
+          "flags": {` + report + `},
+          "subcommands": {"show": {"flags": {` + show + `}}}
+        }
+      }
+    }
+  },
+  "tasks": {"exec": {"kind": "command", "command": "echo", "cache": false}}
+}`
+}
+
+// `putnami extensions validate` refuses a flag the core parses as its own
+// global flag, by name, by short alias or by its negation, wherever an
+// invocation that receives the flag never gets it, and names each field and
+// the global flag that takes it.
+func TestExtensionsValidate_RefusesAFlagACoreGlobalFlagTakes(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-refuses-a-flag-a-core-global-flag-takes")
+	dir := t.TempDir()
+	manifest := flagShadowManifest(
+		`"plan": {"type": "string"}, "workspace": {"type": "string", "short": "w"}, "watch": {"type": "boolean"}, "projects": {"type": "string"}, "w": {"type": "string"}, "cache-projects": {"type": "boolean"}`,
+		`"retry": {"type": "string"}`,
+		`"exclude": {"type": "string"}, "all": {"type": "boolean"}`,
+		`"watch": {"type": "boolean"}`,
+		`"markdown": {"type": "boolean"}, "dry-run": {"type": "boolean"}`,
+	)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("a manifest whose flags the core takes validated:\n%s", out)
+	}
+	for _, want := range []string{
+		"commands.estimate.flags.plan: the core parses --plan as its own global flag",
+		"commands.estimate.flags.workspace.short: the core parses -w as --watch",
+		"commands.estimate.flags.watch: the core parses --watch",
+		"commands.estimate.flags.projects: the core parses --projects",
+		"commands.estimate.flags.w: the core parses --watch",
+		"commands.estimate.flags.cache-projects: the core parses --no-cache-projects",
+		"commands.serve.flags.retry: the core parses --retry",
+		"commandGroups.change.flags.exclude: the core parses --exclude",
+		"commandGroups.change.flags.all: the core parses --all as its own global flag (All projects), so the planned command estimate never receives it",
+		"commandGroups.change.subcommands.report.flags.watch: the core parses --watch",
+		"commandGroups.change.subcommands.report.subcommands.show.flags.markdown: the core parses --markdown",
+		"commandGroups.change.subcommands.report.subcommands.show.flags.dry-run: the core parses --dry-run as its own global flag (Show changes without applying), so the nested subcommand that runs report",
+	} {
+		if !strings.Contains(out, "[core-global-flag] "+want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "flags.workspace: ") {
+		t.Errorf("the flag name workspace is no global flag, only its short alias is taken:\n%s", out)
+	}
+}
+
+// `putnami extensions validate` accepts a flag named like a global flag on an
+// invocation the core hands that flag to: --max-parallel and --no-cache
+// everywhere, --dry-run outside a nested subcommand, --watch on a serve
+// workload, interactive when its flag defaults to true, and --projects, --all
+// and --baseline on an interactive subcommand, nested ones included.
+func TestExtensionsValidate_AcceptsAFlagTheCoreHandsToTheCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-accepts-a-flag-the-core-hands-to-the-command")
+	dir := t.TempDir()
+	manifest := flagShadowManifest(
+		`"dry-run": {"type": "boolean"}, "max-parallel": {"type": "string"}, "no-cache": {"type": "boolean"}, "cache": {"type": "boolean"}, "plan-file": {"type": "string"}`,
+		`"watch": {"type": "boolean", "short": "w"}`,
+		`"dry-run": {"type": "boolean"}`,
+		`"projects": {"type": "string"}, "all": {"type": "boolean"}, "watch": {"type": "boolean", "default": true}`,
+		`"baseline": {"type": "string"}`,
+	)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err != nil {
+		t.Fatalf("a manifest whose flags reach their command was refused: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Every flag reaches its command") {
+		t.Errorf("output missing the flag check:\n%s", out)
+	}
+}
+
+// Every extension manifest under this project's test data declares only flags
+// its commands receive: the shapes the CLI's own tests run stay valid.
+func TestExtensionsValidate_TestDataManifestsDeclareNoTakenFlag(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-flags-reach-their-command", "validation-accepts-a-flag-the-core-hands-to-the-command")
+	root := filepath.Join("..", "..", "..")
+	var checked int
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || entry.Name() != "putnami.extension.json" || !strings.Contains(path, "testdata") {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		manifest, diags := proto.ParseManifest(data)
+		if diag.HasErrors(diags) {
+			return nil
+		}
+		checked++
+		for _, shadow := range coreGlobalFlagShadows(manifest) {
+			t.Errorf("%s: %s: %s", path, shadow.Field, shadow.Message)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked == 0 {
+		t.Fatal("no test data manifest was checked")
 	}
 }

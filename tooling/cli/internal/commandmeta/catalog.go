@@ -135,6 +135,117 @@ type GlobalFlag struct {
 	// extensions accept it. The full Markdown reference lists it always.
 	// False means a core command reads the flag, or help must always list it.
 	JobOnly bool
+	// Delivery states which extension commands that declare a flag of the same
+	// name receive the global flag from the core. The zero value, Undelivered,
+	// means the parser takes the flag and no extension command receives it,
+	// so `putnami extensions validate` refuses a manifest flag of its name.
+	Delivery Delivery
+}
+
+// Delivery is the set of extension commands that receive a global flag they
+// declare under its name (GlobalFlag.Delivery).
+type Delivery int
+
+const (
+	// Undelivered: no extension command receives the flag.
+	Undelivered Delivery = iota
+	// DeliveredToEvery: every command receives it (internal/cli's
+	// runExtensionStructuredCommand, engine.execute's overlay).
+	DeliveredToEvery
+	// DeliveredToResolvedFlags: a command receives it when the flags the CLI
+	// resolves for it declare it, those of the command, its group and its
+	// top-level subcommand; the core previews the plan of a planned command it
+	// cannot hand the flag to and runs nothing (internal/cli's
+	// buildExtensionCommandParams and applyPublishDryRun). A flag declared
+	// only on a nested subcommand is not resolved.
+	DeliveredToResolvedFlags
+	// DeliveredToServeWorkload: a serve workload, which the core watches when
+	// planned and whose `watch` flag reads --no-watch (internal/cli's
+	// ownsWatchFlag, engine's forcesServeWatch). An interactive launch never
+	// watches, so its `watch` flag must default to true for --watch to change
+	// nothing.
+	DeliveredToServeWorkload
+	// DeliveredToInteractive: an interactive subcommand of a command group,
+	// whose launch hands it the flags its resolved selection cannot carry
+	// (internal/cli's runExtensionStructuredCommand).
+	DeliveredToInteractive
+)
+
+// ExtensionInvocation is one way an extension command runs, as far as one
+// manifest states it.
+type ExtensionInvocation struct {
+	// Interactive reports a command group's interactive subcommand.
+	Interactive bool
+	// Nested reports a flag declared on a nested subcommand, outside the
+	// flags the CLI resolves for the invocation.
+	Nested bool
+	// Workload is the workload the command's own traits declare, or "" when
+	// they declare none and the verb vocabulary may supply one.
+	Workload string
+}
+
+// ExtensionFlag is the shape of an extension command's flag that decides
+// whether a global flag of its name, or of its negation, reaches it.
+type ExtensionFlag struct {
+	// Boolean reports a boolean flag, which reads --no-<name>.
+	Boolean bool
+	// DefaultOn reports a boolean flag whose default is true.
+	DefaultOn bool
+}
+
+// receives reports whether invocation receives a global of this delivery
+// through flag. A planned command that declares no workload may take serve
+// from its verb, so it receives a serve workload's flag.
+func (d Delivery) receives(invocation ExtensionInvocation, flag ExtensionFlag) bool {
+	switch d {
+	case DeliveredToEvery:
+		return true
+	case DeliveredToResolvedFlags:
+		return !invocation.Nested
+	case DeliveredToServeWorkload:
+		serve := invocation.Workload == "" || invocation.Workload == "serve"
+		return serve && (!invocation.Interactive || flag.DefaultOn)
+	case DeliveredToInteractive:
+		return invocation.Interactive
+	default:
+		return false
+	}
+}
+
+// ExtensionFlagShadow returns the global flag the parser takes in place of an
+// extension command's flag called name in invocation, so that the command
+// never receives it, and `putnami extensions validate` refuses the
+// declaration. It checks the long name against the global and help render
+// flags, a one-letter name against the global short aliases, and, for a
+// boolean flag, its --no-<name> negation against a value-taking global.
+func ExtensionFlagShadow(name string, flag ExtensionFlag, invocation ExtensionInvocation) (GlobalFlag, bool) {
+	for _, global := range append(GlobalFlags(), HelpRenderFlags()...) {
+		switch {
+		case global.Long == "--"+name && !global.Delivery.receives(invocation, flag),
+			len(name) == 1 && global.Short == "-"+name,
+			flag.Boolean && global.Long == "--no-"+name && global.Type == FlagValue:
+			return global, true
+		}
+	}
+	return GlobalFlag{}, false
+}
+
+// ExtensionShortShadow returns the global flag the parser takes in place of
+// the short alias, written with or without its dash, of an extension command's
+// flag called name: a global flag with that alias and another long name.
+func ExtensionShortShadow(name, short string) (GlobalFlag, bool) {
+	if short == "" {
+		return GlobalFlag{}, false
+	}
+	if !strings.HasPrefix(short, "-") {
+		short = "-" + short
+	}
+	for _, flag := range GlobalFlags() {
+		if flag.Short == short && flag.Long != "--"+name {
+			return flag, true
+		}
+	}
+	return GlobalFlag{}, false
 }
 
 // GlobalFlagCategory is one group of help's categorized global-flag listing.
