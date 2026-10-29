@@ -251,7 +251,7 @@
     },
     {
       "id": "extension-flags-reach-their-command",
-      "text": "extensions validate refuses a manifest flag the core parses as a global flag, by name, short alias or boolean --no- negation, where its command never receives it, naming the field and the global. Every command receives --max-parallel and --no-cache; one whose resolved flags declare --dry-run receives it. A serve workload, or a command with no workload trait, receives --watch; an interactive one only if watch defaults to true. An interactive subcommand receives --projects, --all and --baseline."
+      "text": "extensions validate refuses a manifest flag the core parses as a global flag, by name, short alias or boolean --no- negation, where its command never receives it, naming the field and the global. All commands receive --max-parallel and --no-cache. A declaring subcommand or publisher receives --dry-run; others get a plan preview. A serve workload, or a command with no workload trait, receives --watch; interactive, only if watch defaults true. Interactive subcommands receive --projects, --all and --baseline."
     },
     {
       "id": "source-bound-stamp",
