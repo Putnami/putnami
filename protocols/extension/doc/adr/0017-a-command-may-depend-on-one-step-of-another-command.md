@@ -87,8 +87,9 @@ names a command.
   from a result-only entry when nothing else reads its files.
 - `clientgen` still runs after the whole `build`, as it did with a dependency
   on `build`, and reads only the files of the step that writes its contract.
-- A failed leaf step that the dependent does not read, such as `compile`, no
-  longer skips the dependent: an order-only edge does not pass a failure on.
-  The run still fails.
+- A leaf step that fails and that the dependent does not read, such as
+  `compile`, no longer skips the dependent. A leaf step that is skipped
+  because a step before it failed still skips the dependent. The run fails in
+  both cases.
 - Impact analysis and toolchain preparation read `<command>~<step>` as the
   command it names.
