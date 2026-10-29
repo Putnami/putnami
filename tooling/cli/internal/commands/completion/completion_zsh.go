@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -120,14 +121,14 @@ _putnami() {
 	for _, flag := range ctx.globalFlags {
 		if !flag.JobOnly {
 			iox.Fprintf(w, "        %s\n", bashQuote(zshFlagSpec(
-				flag.Long, flag.Description, flag.ValueName, flag.Values)))
+				flag.Long, flag.Description, flag.ValueName, zshGlobalSpecValues(ctx, flag))))
 		}
 	}
 	iox.Fprintf(w, "    )\n\n    job_global_flags=(\n")
 	for _, flag := range ctx.globalFlags {
 		if flag.JobOnly {
 			iox.Fprintf(w, "        %s\n", bashQuote(zshFlagSpec(
-				flag.Long, flag.Description, flag.ValueName, flag.Values)))
+				flag.Long, flag.Description, flag.ValueName, zshGlobalSpecValues(ctx, flag))))
 		}
 	}
 	iox.Fprintf(w, "    )\n\n")
@@ -371,13 +372,29 @@ func zshDescribeNames(names []string) string {
 	return strings.Join(words, " ")
 }
 
-// zshFlagSpec renders one zsh completion spec: "--name[description]" for a
-// boolean, plus ":metavariable:" for a value flag and "(a b c)" when the value
-// has a known candidate set. _values reads a backslash as an escape, ends the
-// name at "[" or ":" and the description at "]", so the name escapes the
-// backslash, "[" and ":", and the description the backslash and "]". bashQuote
-// handles the surrounding single quotes, including any apostrophe the prose
-// carries.
+// zshGlobalSpecValues returns the values the spec of a global flag lists for
+// --flag=: the project targets of --projects, the project names of --exclude,
+// or the catalog values. Only plain words are listed (zshSpecValues).
+func zshGlobalSpecValues(ctx completionContext, flag commandmeta.GlobalFlag) []string {
+	var values []string
+	switch flag.Long {
+	case "--projects":
+		values = append(values, ctx.projectIDs...)
+		values = append(values, ctx.projects...)
+		values = append(values, ctx.projectBasenames...)
+		values = append(values, aliasNames(ctx.aliases)...)
+	case "--exclude":
+		values = ctx.projects
+	default:
+		values = flag.Values
+	}
+	words := make([]completionValue, len(values))
+	for i, value := range values {
+		words[i] = completionValue{Value: value}
+	}
+	return zshSpecValues(words)
+}
+
 // zshSpecValues returns the values a flag spec lists for --flag=, so _values
 // completes them after the "=". A value that is not a plain word is left out:
 // the spec's "(a b)" action splits on spaces. The word after the flag still
@@ -392,6 +409,13 @@ func zshSpecValues(values []completionValue) []string {
 	return words
 }
 
+// zshFlagSpec renders one zsh completion spec: "--name[description]" for a
+// boolean, plus ":metavariable:" for a value flag and "(a b c)" when the value
+// has a known candidate set. _values reads a backslash as an escape, ends the
+// name at "[" or ":" and the description at "]", so the name escapes the
+// backslash, "[" and ":", and the description the backslash and "]". bashQuote
+// handles the surrounding single quotes, including any apostrophe the prose
+// carries.
 func zshFlagSpec(long, description, valueName string, values []string) string {
 	name := strings.NewReplacer(`\`, `\\`, `[`, `\[`, `:`, `\:`).Replace(long)
 	spec := name + "[" + strings.NewReplacer(`\`, `\\`, `]`, `\]`).Replace(description) + "]"

@@ -31,7 +31,8 @@ type flagValueCompletion struct {
 
 // writeValueFlagWorkspace writes a workspace whose @acme/flow extension declares
 // the job command lint-docs with the value flags --mode (short -m) and --level
-// (choices, short written without its dash), and a command group whose subcommand flag lists choices.
+// (choices, short written without its dash), and a command group whose
+// subcommand flag lists choices.
 func writeValueFlagWorkspace(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -146,6 +147,16 @@ func TestCompletionOffersOnlyTheValuesOfTheFlagBeforeTheCursor(t *testing.T) {
 		CompletionBash(&bash, ws.root, cfg, nil)
 		CompletionZsh(&zsh, ws.root, cfg, nil)
 		CompletionFish(&fish, ws.root, cfg, nil)
+		// zsh completes --flag= from the flag's spec, so each spec lists the
+		// values the word after the flag offers.
+		for _, spec := range []string{
+			`'--projects[Comma-separated project names]:list:(/flow @acme/flow flow)'`,
+			`'--exclude[Exclude by name]:names:(@acme/flow)'`,
+		} {
+			if !strings.Contains(zsh.String(), spec) {
+				t.Errorf("the zsh script lacks the spec %s", spec)
+			}
+		}
 		fishScript := filepath.Join(t.TempDir(), "putnami.fish")
 		if err := os.WriteFile(fishScript, fish.Bytes(), 0o644); err != nil {
 			t.Fatal(err)
