@@ -733,7 +733,7 @@ func TestHostedPartialWithoutAnEligibleUnitPublishesWithoutAReceipt(t *testing.T
 	}
 	opts.PartialDelivery = false
 	git.pushes = 0
-	if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "use --partial-delivery") || git.pushes != 0 {
+	if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "cannot complete the parent: workflow outcome is incomplete; complete the workflow, or publish one unit with --partial-delivery") || git.pushes != 0 {
 		t.Fatalf("normal delivery without an eligible unit reached a write: %v", err)
 	}
 }
