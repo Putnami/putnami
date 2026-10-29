@@ -40,7 +40,8 @@ core CLI runs a job when the project's extension declares it.**
   and treats the edits of one run as one transaction. A go.work directive that
   pins every version of a module to a release applies to the tidy only for
   the versions no proxy serves, so a requirement a proxy serves keeps the
-  version go.mod states.
+  version go.mod states, unless the release a stated pin reads requires a
+  newer one.
 - A Go template renders each framework requirement at `v0.0.0`, and
   `project-setup` rewrites it after the render. The template no longer needs
   a variable that only the core could compute.
