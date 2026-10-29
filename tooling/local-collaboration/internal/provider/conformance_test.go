@@ -38,6 +38,7 @@ func TestTheSharedContractScenarios(t *testing.T) {
 // directory.
 func TestTheMissionsScenarios(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-passes-the-missions-scenarios")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-local-provider-passes-the-missions-status-scenario")
 	providertest.RunMissions(t, func(t *testing.T) providertest.Target {
 		clock := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
 		p := &Provider{Now: func() time.Time { return clock }}
