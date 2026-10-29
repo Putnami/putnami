@@ -9,8 +9,9 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
-// StepSeparator is used in step job names: build~transpile.
-const StepSeparator = "~"
+// StepSeparator is used in step job names (build~transpile) and in a command
+// dependency on one step (build~describe).
+const StepSeparator = proto.StepSeparator
 
 // StepJobName builds a composite name: {commandName}~{stepId}.
 func StepJobName(commandName, stepId string) string {

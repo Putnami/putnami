@@ -61,7 +61,9 @@ func LoadManifest(path string) (*Manifest, error) {
 //   - contract from RequiredLoadContract up to LatestContract → enforce
 //     strictly: the packager stamped compliance, so a reserved global-flag
 //     shadow is a hard error, and so is, from ChangedFilesContract, an input
-//     binding source the planner does not resolve.
+//     binding source the planner does not resolve, and, from
+//     StepDependencyContract, a command dependency that is not command,
+//     command~step or !command.
 //   - contract absent (0) or below RequiredLoadContract → hard error naming
 //     the fix. The stamp is what proves an extension speaks the contracts its
 //     manifest relies on — the four that move together at 3 (task contract
@@ -69,8 +71,9 @@ func LoadManifest(path string) (*Manifest, error) {
 //     session prerequisites of 4, and, for a manifest that declares agent
 //     content, a verb vocabulary, command kinds, publish channels, a
 //     provisioned toolchain candidate, input selectors, a group default that
-//     takes positionals, a step that reads the run's changed files or host
-//     hooks, the additive contract 5, 9, 11, 12, 13, 14, 15, 16 or 17.
+//     takes positionals, a step that reads the run's changed files, host
+//     hooks or a dependency on one step of another command, the additive
+//     contract 5, 9, 11, 12, 13, 14, 15, 16, 17 or 18.
 //     Loading a manifest stamped below that would run a task whose outputs
 //     the scheduler cannot capture from a declaration, or accept agent
 //     content a reader of its stamp never had to represent.
@@ -112,6 +115,13 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 				return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
 			}
 		}
+		// From StepDependencyContract, every command dependency is one the
+		// planner reads.
+		if m.CLIContract >= protocolcli.StepDependencyContract {
+			if diags := validateManifestCommandDependencies(&m); diag.HasErrors(diags) {
+				return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
+			}
+		}
 		return &m, nil
 	case !DeclaresContractSurface(&m):
 		// Hook-only: nothing the contract governs, and nothing the packager
@@ -124,6 +134,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.StepDependencyContract:
+			reason = " for a dependency on one step of another command"
 		case required == protocolcli.HostHooksContract:
 			reason = " for its host hooks"
 		case required == protocolcli.ChangedFilesContract:

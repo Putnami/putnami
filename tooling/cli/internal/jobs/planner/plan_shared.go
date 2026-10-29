@@ -124,7 +124,8 @@ func attachSharedExecutions(
 
 // serializeWithSharedExecutions orders every declared resource access with the
 // members of each shared execution group (attachSharedExecutions) as one
-// writer.
+// writer. The order-only edges the plan holds before this pass order the
+// accesses too (serializeWriteResources).
 //
 // A group's first member by key LEADS: it runs after every member's ordering
 // producers. The other members FOLLOW it, one after another in key order, and
@@ -141,11 +142,15 @@ func attachSharedExecutions(
 // results are the same, and the run repeats the work sharing would have saved.
 func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJob, groups [][]*jobmodel.ScheduledJob) {
 	saved := make([][]string, len(jobs))
+	ordered := make(map[string][]string)
 	for i, job := range jobs {
 		saved[i] = append([]string(nil), job.SerializeAfter...)
+		if len(job.SerializeAfter) > 0 {
+			ordered[job.Key()] = append([]string(nil), job.SerializeAfter...)
+		}
 	}
 	leaders := orderSharedExecutions(jobs, groups)
-	serializeWriteResources(jobs, leaders)
+	serializeWriteResources(jobs, leaders, ordered)
 	orderContractClients(jobs, ws)
 	if len(groups) == 0 || ValidatePlanDAG(jobs) == nil {
 		return
@@ -154,7 +159,7 @@ func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.Sch
 		job.SerializeAfter = saved[i]
 		job.SharedExecutionID = ""
 	}
-	serializeWriteResources(jobs, nil)
+	serializeWriteResources(jobs, nil, ordered)
 	orderContractClients(jobs, ws)
 	// A plan that cannot be scheduled without sharing either has a cycle of its
 	// own, which Plan reports as an error, so only a plan that sharing broke

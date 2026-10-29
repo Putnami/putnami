@@ -373,8 +373,9 @@ tasks receive job-context `invocation.artifactRoot` and the matching
 ### Command Barriers
 
 Command-level `dependsOn` auto-plans prerequisite commands. Bare command names
-are scoped to the same project; `!command` is a session barrier across the
-current project selection:
+are scoped to the same project; `command~step` is scoped to the same project
+and waits for that one step of the command; `!command` is a session barrier
+across the current project selection:
 
 ```json
 {
@@ -382,6 +383,13 @@ current project selection:
   "deploy": { "dependsOn": ["!publish"] }
 }
 ```
+
+`build~describe` plans all of `build` for the project. Every root step of the
+dependent command depends on the project's `describe` step and reads its
+files, and runs after the other `build` leaf steps through order-only edges. A
+step the plan does not hold adds no dependency, and the order-only edges
+remain. A manifest that uses the form requires `cliContract: 18`, and
+`!command~step` is invalid.
 
 `!build` plans `build` across the selected projects, then every root step of
 the dependent command waits for every `build` leaf job in the final plan. These

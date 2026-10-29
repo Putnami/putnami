@@ -81,7 +81,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: HostHooksContract for a hostHooks member, ChangedFilesContract
+// the manifest: StepDependencyContract for a command that depends on one step
+// of another command, HostHooksContract for a hostHooks member, ChangedFilesContract
 // for a step that gates on or binds the run's changed files,
 // DefaultPositionalsContract for a command group whose default subcommand
 // declares positionals, ProvisionedToolchainContract for a runtime toolchain
@@ -171,6 +172,11 @@ func RequiredLoadContract(m *Manifest) int {
 	// it, whatever origin the manifest loads from.
 	if DeclaresHostHooks(m) {
 		required = max(required, protocolcli.HostHooksContract)
+	}
+	// A dependency on one step plans its command only in a reader that reads
+	// the step form, whatever origin the manifest loads from.
+	if DeclaresStepDependency(m) {
+		required = max(required, protocolcli.StepDependencyContract)
 	}
 	return required
 }

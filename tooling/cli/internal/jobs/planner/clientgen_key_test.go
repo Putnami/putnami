@@ -146,12 +146,13 @@ func (f *clientgenKeyFixture) key(t *testing.T, clientgen *extension.ExtensionDe
 // during the run, so a key that hashed them would differ between the value the
 // run computes before any task starts and the value the task computes when it
 // starts. Those bytes are fixed by the producer's key instead, which the
-// clientgen keys fold through build-infra: the Go describe declares both trees
-// emptied, and the TypeScript build-generate owns .gen whole as a required
-// output, so each tree holds what its producer's execution or restore wrote
-// and nothing else. The committed generation contract, clientgen.json, and the
-// committed sidecar schema/openapi.json are files no task writes, and an edit
-// to either moves the key.
+// clientgen keys fold through their dependency on build~generate and
+// build~describe: the Go describe declares both trees emptied, and the
+// TypeScript build-generate owns .gen whole as a required output, so each tree
+// holds what its producer's execution or restore wrote and nothing else. The
+// committed generation contract, clientgen.json, and the committed sidecar
+// schema/openapi.json are files no task writes, and an edit to either moves
+// the key.
 func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-key-ignores-the-describe-owned-trees")
 	clientgen := loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen")
@@ -376,23 +377,18 @@ func (p *clientgenPlan) precomputedKeys(t *testing.T) map[string]string {
 }
 
 // In a real plan the clientgen key folds describe's key: the clientgen command
-// depends on build, its generator job depends on build-infra, and build-infra
-// depends on describe. A describe whose key moves therefore moves the
-// clientgen key, which is what lets the clientgen key leave out the trees
-// describe writes.
+// depends on build~describe, so its generator job depends on the describe job.
+// A describe whose key moves therefore moves the clientgen key, which is what
+// lets the clientgen key leave out the trees describe writes.
 func TestClientgenKeyFoldsDescribesKeyInARealPlan(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-key-folds-describes-key-in-a-real-plan")
 	plan := planClientgenOnAGoProvider(t)
 	describe := plan.job(t, "build~describe")
-	infra := plan.job(t, "build~infra")
 	for _, task := range clientgenTasks {
 		generator := plan.job(t, task.job)
-		if !slices.Contains(generator.DependsOn, infra.Key()) {
-			t.Errorf("%s depends on %v, want it to depend on %s", generator.Key(), generator.DependsOn, infra.Key())
+		if !slices.Contains(generator.DependsOn, describe.Key()) {
+			t.Errorf("%s depends on %v, want it to depend on %s", generator.Key(), generator.DependsOn, describe.Key())
 		}
-	}
-	if !slices.Contains(infra.DependsOn, describe.Key()) {
-		t.Fatalf("%s depends on %v, want it to depend on %s", infra.Key(), infra.DependsOn, describe.Key())
 	}
 
 	unmoved := plan.startKeys(t, nil)
@@ -401,9 +397,6 @@ func TestClientgenKeyFoldsDescribesKeyInARealPlan(t *testing.T) {
 			keys[job.Key()] = "a describe key that moved"
 		}
 	})
-	if moved[infra.Key()] == unmoved[infra.Key()] {
-		t.Errorf("a moved describe key left the %s key unmoved", infra.Key())
-	}
 	for _, task := range clientgenTasks {
 		generator := plan.job(t, task.job)
 		if moved[generator.Key()] == "" || moved[generator.Key()] == unmoved[generator.Key()] {

@@ -75,7 +75,7 @@
     },
     {
       "id": "dependency-plan",
-      "text": "Planning produces a deterministic dependency DAG that preserves functional dependencies separately from write-serialization edges, resolves dependent-owned same-session prerequisites across every contributing provider, and rejects missing selected commands. A captured runner AFTER contract adds functional dependencies from every protected write to every required gate leaf before final authorization; missing gates and dependency cycles still fail closed."
+      "text": "Planning produces a deterministic dependency DAG that keeps functional dependencies apart from write-serialization edges, resolves same-session prerequisites across every contributing provider, and rejects missing selected commands. A dependency on one step of a command plans the whole command, reads that step and runs after the command's other leaves. A captured runner AFTER contract adds functional dependencies from every protected write to every required gate leaf; missing gates and cycles fail closed."
     },
     {
       "id": "dependents-wait-for-an-output-they-read",

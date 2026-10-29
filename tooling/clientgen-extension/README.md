@@ -344,8 +344,9 @@ Neither key hashes a file a build writes under `.gen`. The provider build
 writes `.gen/clientgen` and `.gen/schema` during the run, so a key that hashed
 them would differ between the value the run computes before any task starts
 and the value the task computes when it starts, and the task would miss the
-entry the run looked up. Those bytes are fixed by the key of the build that writes them,
-which these keys fold, because the `clientgen` command depends on `build`. The
+entry the run looked up. Those bytes are fixed by the key of the build step
+that writes them, which these keys fold, because the `clientgen` command
+depends on `build~generate` and `build~describe`. The
 TypeScript `build-generate` owns `.gen` whole, and the Go `build-describe`
 declares `.gen/schema` and `.gen/clientgen` `emptied`, so each tree holds what
 that build's execution or restore wrote and nothing else (CLI ADR 0068). Each

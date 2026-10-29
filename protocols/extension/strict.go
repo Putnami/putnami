@@ -88,15 +88,7 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 				"command name %q must not contain ~, which joins a command and a step in a plan name", name))
 		}
 		for i, dep := range cmd.DependsOn {
-			target := strings.TrimPrefix(dep, "!")
-			if isExternalRef(target) {
-				diags = append(diags, diag.Errorf(
-					"invalid-command-dependency",
-					fmt.Sprintf("commands.%s.dependsOn[%d]", name, i),
-					"dependency %q uses pipeline-step syntax; command-level dependsOn accepts bare command names or !command session barriers",
-					dep,
-				))
-			}
+			diags = append(diags, validateCommandDependency(fmt.Sprintf("commands.%s.dependsOn[%d]", name, i), dep)...)
 		}
 		seenCompanions := make(map[string]int, len(cmd.AlsoRuns))
 		for i, companion := range cmd.AlsoRuns {

@@ -51,6 +51,24 @@ Pipeline step dependencies must form a directed acyclic graph:
 }
 ```
 
+### Command Dependencies
+A command's `dependsOn` entry is `command`, `command~step` or `!command`.
+Validation refuses every other spelling with `invalid-command-dependency`: a
+`^`, `/` or `*` prefix, an empty command or step, a second `~`, and a session
+barrier on one step:
+
+```json
+// INVALID: a session barrier names a whole command
+{
+  "commands": {
+    "clientgen": {
+      "dependsOn": ["!build~describe"],
+      "run": [{ "id": "generate", "task": "generate" }]
+    }
+  }
+}
+```
+
 ### Contract Schema References
 `inputSchemaRef` and `outputSchemaRef` must reference schemas defined in `contracts.schemas`:
 
@@ -248,8 +266,10 @@ task file pattern that names an input selector,
 default subcommand declares positionals,
 `protocols/cli.ChangedFilesContract` (16) for a step that gates on the run's
 changed files (`activation.changedFiles`) or binds them (`from: context`,
-`path: selection.changedFiles`), or
-`protocols/cli.HostHooksContract` (17) for a `hostHooks` member. Rung 6 named the
+`path: selection.changedFiles`),
+`protocols/cli.HostHooksContract` (17) for a `hostHooks` member, or
+`protocols/cli.StepDependencyContract` (18) for a command `dependsOn` entry
+that names one step of another command (`build~describe`). Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
@@ -258,7 +278,7 @@ tool, or agent-content surface, and to a verb vocabulary. A non-conforming manif
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 and 17 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 and 18 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, input selectors, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content and nothing else requires
@@ -313,9 +333,15 @@ older reader would plan the step on every run and key it without them.
 `hostHooks` requires contract 17 wherever it loads from: a reader at 17 writes
 the declared hooks into the agent hosts' hook files on an explicit install,
 init or upgrade, and an older reader would install the extension without them.
-`RequiredLoadContract` includes that rung too. The reader loads every stamp
-from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (17):
+`RequiredLoadContract` includes that rung too. A manifest whose command
+`dependsOn` names one step of another command (`build~describe`) requires
+contract 18 wherever it loads from: a reader at 18 plans the whole command and
+makes the dependent's root steps depend on that step and run after the
+command's other leaves, and an older reader would read the entry as a command
+name and plan nothing. An entry that holds
+`~` counts even when it is not well formed. `RequiredLoadContract` includes
+that rung too. The reader loads every stamp from the one the manifest's
+vocabulary requires up to `protocols/cli.LatestContract` (18):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -356,7 +382,7 @@ rejected like any other future manifest. `TestLoadManifest_CompatibilityMatrix`
 product of {absent, one behind, current, latest, one ahead} × {commands,
 command groups, tools, agent content, verbs, command kinds, publish channels,
 provisioned toolchain, default positionals, changed-files gate, changed-files
-binding, host hooks, none}. Ratcheting a row means editing that table and
+binding, host hooks, step dependency, none}. Ratcheting a row means editing that table and
 this one together.
 
 ### The packaging ratchet
@@ -394,6 +420,9 @@ package job.
 | current | contract-16 manifest whose step gates on or binds the changed files | Loads; the step is planned only for a project that owns a matching changed file, and the files key it. A run that measured no diff plans no gated step. |
 | current | manifest whose step gates on or binds the changed files, stamped 15 or lower, or unstamped | Rejected for a step that reads the run's changed files, with `putnami extensions update` as the remedy. |
 | current | contract-16 manifest with an input binding the planner does not resolve: `from: command`, or a context path other than `selection.changedFiles` | Rejected for that binding. Strict validation refuses it at any stamp; a manifest stamped 15 or lower loads, and the binding binds nothing. |
+| current | contract-18 manifest whose command depends on `build~describe` | Loads; the planner plans all of `build` and the dependent's root steps wait for `describe` alone. A step the plan does not hold adds no edge. |
+| current | manifest whose command `dependsOn` holds `~`, stamped 17 or lower, or unstamped | Rejected for a dependency on one step of another command, with `putnami extensions update` as the remedy. |
+| current | contract-18 manifest with a command dependency that is not `command`, `command~step` or `!command` | Rejected for that entry. Strict validation refuses it at any stamp. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
 | current | manifest naming a registry dependency, stamped 7 or lower or unstamped, from the artifact store or a declared path | Rejected: the stamp does not cover the dependencies the CLI would install and load. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |
@@ -401,6 +430,7 @@ package job.
 | contract-13 CLI | contract-14 artifact | Rejected by that CLI's own higher-contract arm. It expands no selector through the extension. |
 | contract-14 CLI | contract-15 artifact | Rejected by that CLI's own higher-contract arm. It would answer "unknown subcommand" for a word the default takes. |
 | contract-15 CLI | contract-16 artifact | Rejected by that CLI's own higher-contract arm. It would plan a change-gated step on every run and key it without the changed files. |
+| contract-17 CLI | contract-18 artifact | Rejected by that CLI's own higher-contract arm. It would read `build~describe` as a command name, plan nothing and run the dependent before the step it reads. |
 | contract-3 CLI | contract-4 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). The remedy is `putnami upgrade`; there is no artifact shape that both permits the new field and lets the old reader ignore it. |
 
 Task-contract version stays ORTHOGONAL to this ladder. A contract-4 manifest

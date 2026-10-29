@@ -27,7 +27,7 @@
     },
     {
       "id": "an-additive-vocabulary-raises-the-contract-floor",
-      "text": "Agent content, a verb vocabulary, command kinds, publish channels, a provisioned toolchain, a group default that takes positionals, input selectors, a source-bound task and a git or release baseline input each raise the contract a manifest requires, only when the manifest uses them. RequiredCLIContract takes the highest rung across the manifest, and a manifest stamped below the rung its vocabulary requires does not load."
+      "text": "Agent content, a verb vocabulary, command kinds, publish channels, a provisioned toolchain, a group default that takes positionals, input selectors, a source-bound task, a git or release baseline input and a command dependency on one step of another command each raise the contract a manifest requires, only when the manifest uses them. RequiredCLIContract takes the highest rung across the manifest, and a manifest stamped below the rung its vocabulary requires does not load."
     },
     {
       "id": "a-registry-extension-dependency-requires-rung-8",

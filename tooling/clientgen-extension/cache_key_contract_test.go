@@ -66,10 +66,10 @@ func TestClientgenTsCacheKeyCoversEveryResolvedFormatterInput(t *testing.T) {
 // run, so a key that hashed them would differ between the value the run
 // computes before any task starts and the value the job computes when it
 // starts, and the job would miss the entry the run looked up. Those bytes are
-// fixed by the producer's key, which these keys fold through build-infra: the
-// TypeScript build-generate owns .gen as a required output, and the Go
-// build-describe declares both trees emptied (protocols/extension ADR 0009, CLI
-// ADR 0068). The clientgen command depends on build, which
+// fixed by the producer's key, which these keys fold: the TypeScript
+// build-generate owns .gen as a required output, and the Go build-describe
+// declares both trees emptied (protocols/extension ADR 0009, CLI ADR 0068). The
+// clientgen command depends on build~generate and build~describe, which
 // TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild pins.
 //
 // A project whose describe is not planned can still commit its generation

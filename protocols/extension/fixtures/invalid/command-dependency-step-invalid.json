@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/command-dependency-step-invalid",
+  "commands": {
+    "clientgen": {
+      "dependsOn": [
+        "build~describe",
+        "~describe",
+        "build~",
+        "build~describe~schema",
+        "!build~describe",
+        "build~^describe",
+        "^build~describe"
+      ],
+      "run": [{ "id": "generate", "task": "generate-exec" }]
+    }
+  },
+  "tasks": {
+    "generate-exec": { "kind": "command", "command": "echo" }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 7,
+  "cliContract": 18,
   "name": "@putnami/clientgen",
   "runtime": {
     "executable": "compiled/putnami-clientgen",
@@ -56,7 +56,7 @@
   "commands": {
     "clientgen": {
       "description": "Generate strict first-party Go and TypeScript clients from a provider's built contract.",
-      "dependsOn": ["build"],
+      "dependsOn": ["build~generate", "build~describe"],
       "run": [
         { "id": "generate-go", "task": "clientgen-go" },
         { "id": "generate-ts", "task": "clientgen-ts" }
