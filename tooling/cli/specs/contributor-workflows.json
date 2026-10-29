@@ -45,7 +45,7 @@
     },
     {
       "id": "intent-first-validation",
-      "text": "Before build pushes a declarations commit, it runs test and validate on the projects that commit impacts, and it pushes nothing while one of them fails on an error other than the missing proof of a requirement the commit declares."
+      "text": "Before build pushes a declarations commit, it runs test and validate on the projects that commit impacts, and it pushes nothing while one of them fails on an error other than one the code resolves: a missing proof of a requirement, a decision check on a file the code changes, or an architecture edge the commit declares. The push body names each error it tolerates."
     },
     {
       "id": "change-finalize-parity",

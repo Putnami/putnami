@@ -35,8 +35,15 @@ its first checkpoint. A declaration is a file of one of these kinds:
 Before it pushes that commit, `build` runs `test` and `validate` on the
 projects the commit impacts. A declaration whose text breaks a format rule, or
 a document that breaks a rule a repository test enforces, fails there and not
-in hosted CI. The only error that does not stop the push is the missing proof
-of a requirement the commit declares, since its code comes next.
+in hosted CI. An error the code resolves does not stop the push: the missing
+proof of a requirement the commit declares (`features.unresolved_requirement`),
+a decision the commit adds or changes whose check reads a file the code
+changes (`features.decision_violated`), and a binding or import the commit
+declares that the code does not observe yet
+(`architecture.declared_binding_unobserved`,
+`architecture.declared_without_evidence`). The push body names each error it
+tolerates. Every other error stops the push. The same check runs before the
+push of a declarations commit made after an approval.
 
 A change that touches no declaration keeps the ADR 0003 flow.
 
