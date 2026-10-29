@@ -74,8 +74,10 @@ extension runtime).
 A local mission has one owner: you, the person who works in the workspace.
 Agent sessions publish their state and plan with `missions sync`, ask you
 decisions with `missions ask`, and reply to your messages with
-`missions reply`. `missions status` reads a mission's view and its sessions:
-each session's state, loop stage, token usage and branch, newest first.
+`missions reply`. `missions status` reads a mission's view and a page of its
+sessions: each session's state, loop stage, token usage and branch, and its
+error or `waitUntil` when it failed or waits, newest first. Its cursor names
+the last session of a page, so a sync between two pages loses none.
 Decision ids are `D-<n>`, message ids `M-<n>`.
 
 You answer a decision and write a message as **files in the store
