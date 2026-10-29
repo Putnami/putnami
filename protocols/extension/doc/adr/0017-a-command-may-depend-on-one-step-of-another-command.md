@@ -41,11 +41,11 @@ names a command.
    an order-only edge keeps a leaf's files only when the dependent's key reads
    a file the leaf writes. The `!` session barrier keeps naming whole
    commands; `!<command>~<step>` is invalid.
-2. **A named step the plan does not hold adds no edge.** A step that the
+2. **A named step the plan does not hold adds no dependency.** A step that the
    prerequisite command does not declare for the project, or that an `if`, an
-   activation gate or `disable` removes, is not waited for, as a prerequisite
-   command with no step for the project is not waited for today. A dependent
-   that reads a step which only some providers run names each candidate step.
+   activation gate or `disable` removes, is not read. The order-only edges to
+   the command's leaf steps remain. A dependent that reads a step which only
+   some providers run names each candidate step.
 3. **The form enters as contract 18.** `DeclaresStepDependency` is the
    predicate, and `RequiredLoadContract` includes the rung. A CLI below 18
    would read `build~describe` as a command name, plan nothing and let the
@@ -87,5 +87,8 @@ names a command.
   from a result-only entry when nothing else reads its files.
 - `clientgen` still runs after the whole `build`, as it did with a dependency
   on `build`, and reads only the files of the step that writes its contract.
+- A failed leaf step that the dependent does not read, such as `compile`, no
+  longer skips the dependent: an order-only edge does not pass a failure on.
+  The run still fails.
 - Impact analysis and toolchain preparation read `<command>~<step>` as the
   command it names.
