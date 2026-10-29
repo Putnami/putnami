@@ -37,7 +37,13 @@ A declaration is a `putnami.features.json`, a `specs/*.json`, a
 decision record (ADR).
 
 1. Write the declarations first, and commit them alone: the commit touches no
-   other file. Open the draft with that commit, or push it to the open draft,
+   other file. Before you push it, run
+   `"$PUTNAMI_CLI" test,validate --impacted`: on a declarations commit, it
+   selects the projects whose validation or tests read those files. Fix each
+   error in the declarations commit, except the missing proof of a
+   requirement the commit declares (`features.unresolved_requirement`), which
+   the code resolves. Push nothing while another error remains.
+   Then open the draft with that commit, or push it to the open draft,
    before any implementation commit. It is the one checkpoint pushed before a
    `--projects` gate: the checks it names stay unproven until the code lands.
    State the intent in the body, so the reviewer knows what to approve.
