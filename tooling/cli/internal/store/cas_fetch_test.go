@@ -266,3 +266,30 @@ func TestOpenBlob_RoundTripsAndRejectsMissing(t *testing.T) {
 		t.Error("expected an error opening an invalid digest")
 	}
 }
+
+// A remote manifest's mode cannot loosen or lock the CAS blob that every entry
+// holding the same bytes shares: linking chmods that inode through the hardlink.
+func TestPrefetchBlobs_ManifestModeCannotLoosenSharedBlob(t *testing.T) {
+	dir := t.TempDir()
+	s := NewLocalStore(dir)
+	content := "trusted bytes"
+	putWithFile(t, s, hashA, "a.txt", content)
+	digest := cache.DigestOf([]byte(content))
+
+	for _, mode := range []uint32{0, 0o777 | uint32(os.ModeSetuid)} {
+		manifest := &cache.Manifest{Files: []cache.FileEntry{
+			{Path: "hint.txt", Digest: digest, Mode: mode, Size: int64(len(content))},
+		}}
+		if err := s.PrefetchBlobs(manifest, nil); err != nil {
+			t.Fatalf("PrefetchBlobs(mode %o): %v", mode, err)
+		}
+		info, err := os.Stat(s.casBlobPath(digest))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := info.Mode()
+		if got&0o400 == 0 || got&0o022 != 0 || got&os.ModeSetuid != 0 {
+			t.Errorf("manifest mode %o left the CAS blob at %v", mode, got)
+		}
+	}
+}
