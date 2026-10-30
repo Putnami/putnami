@@ -2,8 +2,11 @@ package oci
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
 func TestWrapAuthError(t *testing.T) {
@@ -92,5 +95,52 @@ func TestUniqueStrings(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestTransportOf_DefaultBoundsResponses proves a registry call without a
+// per-call transport runs on a transport whose responses must begin within
+// RegistryResponseHeaderTimeout, so a stalled public registry cannot hang a
+// push, a tag, or a digest lookup.
+func TestTransportOf_DefaultBoundsResponses(t *testing.T) {
+	for name, options := range map[string][]PushOptions{
+		"no options":    nil,
+		"nil transport": {{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := transportOf(options)
+			if err != nil {
+				t.Fatalf("transportOf: %v", err)
+			}
+			bounded, ok := got.(*http.Transport)
+			if !ok {
+				t.Fatalf("transportOf returned %T, want *http.Transport", got)
+			}
+			if bounded.ResponseHeaderTimeout != RegistryResponseHeaderTimeout {
+				t.Fatalf("ResponseHeaderTimeout = %v, want %v", bounded.ResponseHeaderTimeout, RegistryResponseHeaderTimeout)
+			}
+			if got == remote.DefaultTransport {
+				t.Fatal("transportOf returned the library default itself instead of a bounded clone")
+			}
+		})
+	}
+	if DefaultRegistryTransport() != DefaultRegistryTransport() {
+		t.Fatal("DefaultRegistryTransport built a new transport per call; publishers must share one pool")
+	}
+}
+
+// TestTransportOf_KeepsOverride proves a per-call transport, such as a private
+// publication broker's, is used as given.
+func TestTransportOf_KeepsOverride(t *testing.T) {
+	override := &http.Transport{}
+	got, err := transportOf([]PushOptions{{Transport: override}})
+	if err != nil {
+		t.Fatalf("transportOf: %v", err)
+	}
+	if got != override {
+		t.Fatalf("transportOf returned %v, want the override", got)
+	}
+	if _, err := transportOf([]PushOptions{{}, {}}); err == nil {
+		t.Fatal("transportOf accepted two options values")
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -50,7 +49,7 @@ func privateOCITransportFor(target imagePublishTarget) (http.RoundTripper, strin
 	}
 	localTransport := base.Clone()
 	localTransport.Proxy = nil
-	localTransport.ResponseHeaderTimeout = 5 * time.Minute
+	localTransport.ResponseHeaderTimeout = oci.RegistryResponseHeaderTimeout
 	return &privateOCITransport{
 		logicalHost: target.Host,
 		broker:      &url.URL{Scheme: "http", Host: broker.Host},
@@ -178,10 +177,13 @@ func (r dockerRoute) pushOptions() []oci.PushOptions {
 	return []oci.PushOptions{{Transport: r.transport}}
 }
 
+// craneOptions builds the crane options for a registry call on this route: the
+// broker transport on a private route, the bounded default registry transport
+// otherwise.
 func (r dockerRoute) craneOptions(keychain authn.Keychain) []crane.Option {
-	options := []crane.Option{crane.WithAuthFromKeychain(keychain)}
-	if r.transport != nil {
-		options = append(options, crane.WithTransport(r.transport))
+	transport := r.transport
+	if transport == nil {
+		transport = oci.DefaultRegistryTransport()
 	}
-	return options
+	return []crane.Option{crane.WithAuthFromKeychain(keychain), crane.WithTransport(transport)}
 }

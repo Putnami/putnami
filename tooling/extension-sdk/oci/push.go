@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -88,27 +90,65 @@ func execStderr(result *exec.Result) string {
 }
 
 // PushOptions holds the one per-call transport override supported by the OCI
-// layout publisher. A nil Transport preserves the standard registry transport.
+// layout publisher. A nil Transport selects DefaultRegistryTransport.
 // This stays per call so a private publication broker cannot change process-wide
 // registry routing or affect another publisher running in the same process.
 type PushOptions struct {
 	Transport http.RoundTripper
 }
 
-// transportOf returns the single per-call transport override, or nil for the
-// standard registry transport. More than one options value is a caller bug.
+// RegistryResponseHeaderTimeout bounds how long a registry may take to start
+// answering one request once it has been written. The registry calls of a
+// publish run on contexts without a deadline, so without it a registry that
+// accepts the connection and never answers hangs the publish. It counts from
+// the end of the request body, so it never limits a large blob upload.
+const RegistryResponseHeaderTimeout = 5 * time.Minute
+
+// boundedTransports caches the bounded clone of go-containerregistry's default
+// transport, so every publisher in the process shares one connection pool. It
+// is keyed on the transport it cloned: a program or test that replaces
+// remote.DefaultTransport gets a clone of the replacement.
+var boundedTransports struct {
+	sync.Mutex
+	base    *http.Transport
+	bounded *http.Transport
+}
+
+// DefaultRegistryTransport returns the transport registry calls use when no
+// per-call transport is given: go-containerregistry's default transport, with
+// responses bounded by RegistryResponseHeaderTimeout. A remote.DefaultTransport
+// replaced by something other than an *http.Transport is returned unchanged:
+// its owner chose that transport.
+func DefaultRegistryTransport() http.RoundTripper {
+	base, ok := remote.DefaultTransport.(*http.Transport)
+	if !ok {
+		return remote.DefaultTransport
+	}
+	boundedTransports.Lock()
+	defer boundedTransports.Unlock()
+	if boundedTransports.base != base {
+		bounded := base.Clone()
+		bounded.ResponseHeaderTimeout = RegistryResponseHeaderTimeout
+		boundedTransports.base, boundedTransports.bounded = base, bounded
+	}
+	return boundedTransports.bounded
+}
+
+// transportOf returns the single per-call transport override, or
+// DefaultRegistryTransport when none is set. More than one options value is a
+// caller bug.
 func transportOf(options []PushOptions) (http.RoundTripper, error) {
 	if len(options) > 1 {
 		return nil, fmt.Errorf("registry helpers accept at most one options value")
 	}
-	if len(options) == 1 {
+	if len(options) == 1 && options[0].Transport != nil {
 		return options[0].Transport, nil
 	}
-	return nil, nil
+	return DefaultRegistryTransport(), nil
 }
 
 // craneOptions builds the crane options for one registry call: the keychain
-// always, plus the per-call transport when one is set.
+// always, plus the transport transportOf selected.
 func craneOptions(keychain authn.Keychain, transport http.RoundTripper) []crane.Option {
 	options := []crane.Option{crane.WithAuthFromKeychain(keychain)}
 	if transport != nil {

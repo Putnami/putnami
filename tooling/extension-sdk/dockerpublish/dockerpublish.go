@@ -623,12 +623,13 @@ func publishImmutableImageProject(ctx *pctx.Context, emit *jsonl.Emitter, dryRun
 	// The request therefore carries the credential only on a canonical managed
 	// OCI request before the per-call transport maps it to loopback.
 	keychain := oci.NewRegistryKeychain(target.Host, token)
-	headOptions := []crane.Option{crane.WithAuthFromKeychain(keychain)}
+	headTransport := oci.DefaultRegistryTransport()
 	var pushOptions []oci.PushOptions
 	if privateTransport != nil {
-		headOptions = append(headOptions, crane.WithTransport(privateTransport))
+		headTransport = privateTransport
 		pushOptions = append(pushOptions, oci.PushOptions{Transport: privateTransport})
 	}
+	headOptions := []crane.Option{crane.WithAuthFromKeychain(keychain), crane.WithTransport(headTransport)}
 	// The lookup is the publication's only manifest HEAD. On a hit it verifies the
 	// digest: go-containerregistry rejects a HEAD by digest unless the registry
 	// answers with that digest. On a miss the push verifies it: the registry
