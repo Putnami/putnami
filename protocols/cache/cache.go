@@ -369,7 +369,7 @@ type FileEntry struct {
 	Path string `json:"path"`
 	// Digest is the CAS content address of the file's bytes.
 	Digest string `json:"digest"`
-	// Mode is the unix file mode bits to restore.
+	// Mode is the unix permission bits to restore, within 0o777.
 	Mode uint32 `json:"mode"`
 	// Size is the file size in bytes.
 	Size int64 `json:"size,omitempty"`

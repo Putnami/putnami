@@ -32,7 +32,9 @@ without a cycle.
 - The store is split into an **Action Cache** (`key → ActionResult + Manifest`)
   and a **CAS** (`digest → bytes`). A `Manifest` lists a task's output files,
   each with a content `Digest`, so bytes dedup across keys and are fetched
-  lazily.
+  lazily. A file's `Mode` holds permission bits only (within `0o777`): a
+  validator refuses the setuid, setgid and sticky bits, since a consumer
+  restores an entry onto a blob the whole machine shares.
 - Bytes move over **presigned URLs** issued by the server. On a hit the
   *negotiate* response carries `GET` URLs to download CAS blobs. On a miss the
   client uses the post-build *store/commit* exchange (below) to obtain `PUT`
