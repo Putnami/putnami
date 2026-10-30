@@ -75,9 +75,12 @@ profile. P1 to P3 name the severity of a review finding, not a priority.
 ### 7. Profiles change on measurement
 
 A workflow profile maps each stage to a model, an effort level, and the place
-it runs. A profile becomes the default for an issue type only after paired
-runs on the same base commit, five to start, show lower cost with no more P1
-or P2 findings and no more rework.
+it runs. A profile becomes the default for an issue type only after five
+paired runs on the same base commit. It wins when all three hold over the five
+pairs: its total cost is lower, and lower in at least four of the five pairs;
+its P1 plus P2 findings are not more; its rework is not more. Five pairs cannot
+show a statistical difference, so the per-pair rule guards against one cheap
+outlier.
 
 Profiles live in the contributor policy, `options["@putnami/contributor"]` of
 `putnami.workspace.json`, where they replace the tier labels and workers.

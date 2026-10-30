@@ -45,6 +45,7 @@
     "cli/contributor-workflows#change-finalize-parity",
     "cli/contributor-workflows#explicit-only-invocation",
     "cli/contributor-workflows#intent-first-publication",
+    "cli/contributor-workflows#intent-first-validation",
     "cli/contributor-workflows#one-contribution-loop",
     "cli/contributor-workflows#one-contributor-extension",
     "cli/contributor-workflows#provider-neutral-content",

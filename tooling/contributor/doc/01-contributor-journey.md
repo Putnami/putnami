@@ -21,7 +21,7 @@ stage's reference only.
 |---|---|---|
 | Talk | Iterates with the owner until a viable solution exists | `talk.md` |
 | Declare | Reads or creates the task, checks the intent against the declarations, writes the plan to `.putnami/<issue>/plan.json` and sizes it with `putnami change estimate` | `declare.md` |
-| Show | Opens the draft proposal with the declarations first: spec, architecture, ADR, mockups | `show.md` |
+| Show | Checks the declarations with `test,validate --impacted`, then opens the draft proposal with them first: spec, architecture, ADR, mockups | `show.md` |
 | Code | Codes the slices in sequence in the main session, gates and pushes each one | `code.md` |
 | Check | Freezes the candidate, has a fresh reviewer review it, repairs P1 and P2 findings, runs the final gate | `check.md` |
 | Prove | Qualifies each workload the change reaches, and captures the changed screens | `prove.md` |

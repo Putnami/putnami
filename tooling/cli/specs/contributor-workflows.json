@@ -44,6 +44,10 @@
       "text": "When an outcome changes a feature declaration, spec, specs baseline, architecture manifest, decisions file or ADR, build commits those declarations alone and pushes them to its draft before any code. It goes on without waiting, reads reviews and comments before each later checkpoint and before ready, answers a comment on a declaration on the proposal, and gives a declaration changed after its approval its own commit. A change with no declaration keeps the milestone order."
     },
     {
+      "id": "intent-first-validation",
+      "text": "Before build pushes a declarations commit, it runs test and validate on the projects that commit impacts, and it pushes nothing while one of them fails on an error other than one the code resolves: a missing proof of a requirement, a decision check on a file the code changes, or an architecture edge the commit declares. The push body names each error it tolerates."
+    },
+    {
       "id": "change-finalize-parity",
       "text": "putnami change finalize, launched by the core and served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as goldens recorded from putnami proposals finalize, the core command it replaced, for a draft seed, a hosted gate and a usage error."
     },

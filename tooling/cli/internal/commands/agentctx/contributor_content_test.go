@@ -478,6 +478,36 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 	}
 }
 
+// TestContributorBuildLoopChecksDeclarationsBeforeThePush pins the local
+// check of a declarations commit: test and validate on the impacted projects
+// run before each declarations push, and only an error the code resolves lets
+// the push go on.
+func TestContributorBuildLoopChecksDeclarationsBeforeThePush(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "intent-first-validation", "the-build-loop-checks-declarations-before-it-pushes-them")
+	result := buildContributorContent(t)
+	show := string(result.Files[".agents/skills/build/references/show.md"])
+	section := strings.Join(strings.Fields(markdownSection(t, show, "Intent first")), " ")
+	check := strings.Index(section, "Before you push it, run `\"$PUTNAMI_CLI\" test,validate --impacted`")
+	push := strings.Index(section, "Then open the draft with that commit, or push it to the open draft")
+	if check < 0 || push < 0 || check > push {
+		t.Errorf("the Intent first section of show.md does not check the declarations commit before it pushes it: %q", section)
+	}
+	for _, want := range []string{
+		"except an error the code resolves",
+		"the missing proof of a requirement the commit declares (`features.unresolved_requirement`)",
+		"whose check reads a file the code changes (`features.decision_violated`)",
+		"(`architecture.declared_binding_unobserved`, `architecture.declared_without_evidence`)",
+		"Name each tolerated error in the push body.",
+		"Push nothing while another error remains.",
+		"since the approval. Run the same check as step 1 before you push it.",
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("the Intent first section of show.md lacks %q", want)
+		}
+	}
+}
+
 // markdownSection returns the body of the level-two section named heading,
 // up to the next level-two heading or the end of the document.
 func markdownSection(t *testing.T, document, heading string) string {

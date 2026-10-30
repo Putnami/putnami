@@ -37,7 +37,18 @@ A declaration is a `putnami.features.json`, a `specs/*.json`, a
 decision record (ADR).
 
 1. Write the declarations first, and commit them alone: the commit touches no
-   other file. Open the draft with that commit, or push it to the open draft,
+   other file. Before you push it, run
+   `"$PUTNAMI_CLI" test,validate --impacted`: on a declarations commit, it
+   selects the projects whose validation or tests read those files. Fix each
+   error in the declarations commit, except an error the code resolves: the
+   missing proof of a requirement the commit declares
+   (`features.unresolved_requirement`), a decision the commit adds or changes
+   whose check reads a file the code changes (`features.decision_violated`),
+   and a binding or import the commit declares that the code does not observe
+   yet (`architecture.declared_binding_unobserved`,
+   `architecture.declared_without_evidence`). Name each tolerated error in
+   the push body. Push nothing while another error remains.
+   Then open the draft with that commit, or push it to the open draft,
    before any implementation commit. It is the one checkpoint pushed before a
    `--projects` gate: the checks it names stay unproven until the code lands.
    State the intent in the body, so the reviewer knows what to approve.
@@ -61,7 +72,7 @@ decision record (ADR).
    or a comment that reports the approval of one declaration file at a
    commit. A declaration that changes after its approval goes in its own
    commit, which touches declarations only, so the reviewer sees what changed
-   since the approval.
+   since the approval. Run the same check as step 1 before you push it.
 5. Read the reviews and comments once more before the ready finalization,
    and handle a new comment on a declaration first. The proposal turns ready
    for review when the final local gate and the dossier pass. An approval is
