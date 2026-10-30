@@ -345,6 +345,16 @@ func (s *LocalStore) ingestOneFile(
 	manifestPath string,
 	manifest *cache.Manifest,
 ) (int64, error) {
+	// A walk reports a symlink's own lstat mode, 0777 on Linux, while
+	// digestFile reads the bytes of the file it names. Capturing that mode
+	// would make the shared CAS blob and every restored copy world-writable,
+	// so take the mode of the file the link names.
+	if info.Mode()&os.ModeSymlink != 0 {
+		var err error
+		if info, err = os.Stat(srcPath); err != nil {
+			return 0, fmt.Errorf("stat %s: %w", manifestPath, err)
+		}
+	}
 	digest, size, err := digestFile(srcPath)
 	if err != nil {
 		return 0, fmt.Errorf("digest %s: %w", manifestPath, err)

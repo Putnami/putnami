@@ -173,6 +173,13 @@ func (s *LocalStore) ingestFiles(srcDir, dstFiles string) (*cache.Manifest, int6
 		if uncacheableArtifact(rel) {
 			return nil
 		}
+		// A symlink's own mode is 0777 while digestFile reads its target's
+		// bytes; capture the target's mode instead.
+		if info.Mode()&os.ModeSymlink != 0 {
+			if info, err = os.Stat(path); err != nil {
+				return err
+			}
+		}
 
 		digest, size, err := digestFile(path)
 		if err != nil {
