@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +52,24 @@ func runHelper(program string, args []string) int {
 			return 2
 		}
 		time.Sleep(d)
+		return 0
+	case "orphan":
+		// Start a grandchild that sleeps while holding this program's stdout
+		// and stderr, print its pid for the test to kill it, then exit
+		// (args[0] == "exit") or sleep until killed (args[0] == "sleep").
+		exe, err := os.Executable()
+		if err != nil {
+			return 2
+		}
+		grandchild := exec.Command(exe, helperArg, "sleep", "30s")
+		grandchild.Stdout, grandchild.Stderr = os.Stdout, os.Stderr
+		if err := grandchild.Start(); err != nil {
+			return 2
+		}
+		fmt.Println(grandchild.Process.Pid)
+		if args[0] == "sleep" {
+			time.Sleep(30 * time.Second)
+		}
 		return 0
 	}
 	return 2
@@ -235,6 +255,73 @@ func TestRun_Timeout(t *testing.T) {
 	}
 	if result.Success {
 		t.Error("Run with timeout should not succeed")
+	}
+}
+
+// shortWaitDelay lowers waitDelay for one test, so a run that waits on a
+// descendant's pipes returns well inside the test's bound.
+func shortWaitDelay(t *testing.T) {
+	t.Helper()
+	previous := waitDelay
+	t.Cleanup(func() { waitDelay = previous })
+	waitDelay = 200 * time.Millisecond
+}
+
+// killOrphan kills the grandchild whose pid the orphan helper printed as its
+// first stdout line, so no sleeping process outlives the test.
+func killOrphan(t *testing.T, stdout string) {
+	t.Helper()
+	line, _, _ := strings.Cut(stdout, "\n")
+	pid, err := strconv.Atoi(strings.TrimSpace(line))
+	if err != nil {
+		t.Fatalf("Stdout = %q, want the grandchild pid on its first line", stdout)
+	}
+	if process, err := os.FindProcess(pid); err == nil {
+		_ = process.Kill()
+	}
+}
+
+// TestRun_TimeoutWithGrandchild proves a timed-out command returns once
+// waitDelay elapses even when a descendant it left behind keeps its output
+// pipes open: the timeout kills the direct child only, and without the delay
+// Run would block until the descendant exits.
+func TestRun_TimeoutWithGrandchild(t *testing.T) {
+	shortWaitDelay(t)
+	name, args := helper(t, "orphan", "sleep")
+	start := time.Now()
+	result, err := Run(name, args, Timeout(50*time.Millisecond))
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	killOrphan(t, result.Stdout)
+	if elapsed > 2*time.Second {
+		t.Errorf("Run returned after %v, want within 2s of the timeout", elapsed)
+	}
+	if result.Success {
+		t.Error("Success = true, want false for a timed-out command")
+	}
+}
+
+// TestRun_ExitedChildWithGrandchild proves a command that exits with status 0
+// but leaves a descendant holding its output pipes is a failed run that keeps
+// the output captured so far, not a hard error and not a success: the output
+// may stop short of what the descendant still had to write.
+func TestRun_ExitedChildWithGrandchild(t *testing.T) {
+	shortWaitDelay(t)
+	name, args := helper(t, "orphan", "exit")
+	start := time.Now()
+	result, err := Run(name, args)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	killOrphan(t, result.Stdout)
+	if elapsed > 2*time.Second {
+		t.Errorf("Run returned after %v, want within 2s of the child's exit", elapsed)
+	}
+	if result.Success || result.ExitCode == 0 {
+		t.Errorf("result = %+v, want a failed run", result)
 	}
 }
 

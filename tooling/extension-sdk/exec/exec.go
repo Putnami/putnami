@@ -12,6 +12,16 @@ import (
 	"time"
 )
 
+// waitDelay bounds how long Run waits, once the command has exited or its
+// context is done, for the command's output pipes to close. A timeout or a
+// cancellation kills the direct child only; a descendant that inherited the
+// child's stdout or stderr and outlives it, as a test runner's worker or a
+// daemon a hook starts, would otherwise hold cmd.Run until that descendant
+// exits. Once the delay elapses the pipes are closed, the output captured so
+// far is kept, and the run is a failed run. It is a variable only so the
+// test can shorten it.
+var waitDelay = 5 * time.Second
+
 // Result holds the output of a subprocess execution.
 type Result struct {
 	ExitCode int
@@ -114,6 +124,7 @@ func Run(name string, args []string, opts ...Option) (*Result, error) {
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.WaitDelay = waitDelay
 
 	if o.dir != "" {
 		cmd.Dir = o.dir
@@ -137,10 +148,18 @@ func Run(name string, args []string, opts ...Option) (*Result, error) {
 	exitCode := 0
 	if err != nil {
 		exitErr := &exec.ExitError{}
-		if !errors.As(err, &exitErr) {
+		switch {
+		case errors.As(err, &exitErr):
+			exitCode = exitErr.ExitCode()
+		case errors.Is(err, exec.ErrWaitDelay):
+			// The command exited on its own with status 0, but a descendant
+			// kept its output pipes open past waitDelay. The captured output
+			// may stop short of what that descendant still had to write, so
+			// this is a failed run: neither a success nor a start failure.
+			exitCode = -1
+		default:
 			return nil, fmt.Errorf("executing %s: %w", name, err)
 		}
-		exitCode = exitErr.ExitCode()
 	}
 
 	return &Result{
