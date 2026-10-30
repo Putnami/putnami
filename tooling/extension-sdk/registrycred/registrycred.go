@@ -51,6 +51,14 @@ import (
 // provider cannot stall a publish.
 const cloudTokenTimeout = 30 * time.Second
 
+// credentialWaitDelay bounds how long a credential call waits, once its
+// context is done, for the child's output pipes to close. A credential helper
+// or a browser flow the cloud CLI starts inherits those pipes and may outlive
+// the CLI; the timeout kills the CLI only, so without the delay cmd.Run
+// blocked until that process exited, past the documented bound, and
+// EnsureNativeCredential held materializedMu for the whole wait.
+const credentialWaitDelay = time.Second
+
 // cloudCLIName is the fallback launcher the credential seam shells out to when
 // it is used outside a CLI-spawned extension. It is a package var so tests can
 // point it at a fake binary; extension jobs prefer the absolute executable the
@@ -118,6 +126,7 @@ func resolveTokenWithCLI(parent context.Context, host, executable string, noRela
 		registry.SeamSubcommand,
 		"--"+registry.SeamHostFlag, host,
 	)
+	cmd.WaitDelay = credentialWaitDelay
 	// The child is a credential leaf: it must mint one bearer and nothing else.
 	// Without this, the CLI's first-use bootstrap runs a full `putnami install`
 	// inside the child whenever the lock changed since the last install — which

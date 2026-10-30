@@ -262,6 +262,29 @@ func TestEnsureNativeCredential_ACallPastItsBoundIsAWarning(t *testing.T) {
 	}
 }
 
+// A credential helper or a browser flow the cloud CLI starts and leaves
+// behind holds the child's output pipes. The call still ends at its bound
+// plus credentialWaitDelay, so one stuck mint cannot hold materializedMu and
+// serialize every job that asks for a host.
+func TestEnsureNativeCredential_AStuckHelperCannotHoldTheCallPastItsBound(t *testing.T) {
+	previous := materializeTimeout
+	t.Cleanup(func() { materializeTimeout = previous })
+	materializeTimeout = 100 * time.Millisecond
+	fakeMaterializeCLI(t, stuckHelperCLI(t))
+	started := time.Now()
+	outcome := EnsureNativeCredential(context.Background(), "", "npm.putnami.dev")
+	elapsed := time.Since(started)
+	if outcome.Kind != KindFailed || outcome.Level != "warn" {
+		t.Fatalf("outcome = %+v, want a KindFailed warning", outcome)
+	}
+	if !strings.Contains(outcome.Message, "timed out after 100ms") {
+		t.Errorf("Message = %q, want the bound named", outcome.Message)
+	}
+	if elapsed > 5*time.Second {
+		t.Errorf("EnsureNativeCredential returned after %v, want the bound plus %v", elapsed, credentialWaitDelay)
+	}
+}
+
 func TestFirstLine_BoundsTheRelayedDiagnostic(t *testing.T) {
 	if got := firstLine("\n\n  hello  \nworld\n"); got != "hello" {
 		t.Errorf("firstLine = %q, want hello", got)
