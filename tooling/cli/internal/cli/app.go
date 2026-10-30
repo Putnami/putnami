@@ -99,6 +99,14 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	cwd, _ := os.Getwd()
 	wsRoot, _ := workspace.FindRoot(cwd)
 
+	// The reporter selections and tokens leave the environment before any
+	// process can inherit it: the bootstrap provider below, and the host-keyed
+	// credential seam a pinned CLI's download asks on a run without the run
+	// credential, which starts a CLI that loads the workspace's path extensions
+	// (extension.AuthorizeRegistryRequestWithCLI). The relaunch hands the
+	// captured entries to the pinned CLI alone, which captures them again.
+	ctx = sessionreporter.Capture(ctx)
+
 	// A hosted run, or one that enables the install provider, downloads the
 	// pinned CLI and the lock-pinned extensions through the credential provider
 	// of the user scope. The workspace's own provider is installed after the
@@ -135,7 +143,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// broken PUBLISHED pin, and deliberately does not apply to a source
 	// workspace.
 	if !providerChild && !launch.IsExemptInvocation(args) {
-		if err := launch.Relaunch(ctx, wsRoot, args, boot.launchBootstrap()); err != nil {
+		if err := launch.Relaunch(ctx, wsRoot, args, boot.launchBootstrap(), sessionreporter.Captured(ctx)...); err != nil {
 			printCommandError(os.Stderr, err)
 			return exitCodeForError(err)
 		}
@@ -151,7 +159,6 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// The credential-provider choice holds for this process; nothing it
 	// starts inherits the variable.
 	providersEnv := takeProvidersEnv()
-	ctx = sessionreporter.Capture(ctx)
 	providerMode, err := scheduler.ValidateReleaseSetProviderInvocation(ctx, args)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)

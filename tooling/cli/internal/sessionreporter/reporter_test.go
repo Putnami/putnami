@@ -16,6 +16,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/sessionstream"
 )
 
@@ -41,6 +42,39 @@ func TestReportingCaptureAndProviderEnvironment(t *testing.T) {
 	}
 	if got := SessionReporter.providerEnv(context.Background(), []string{"PATH=/bin"}); len(got) != 1 {
 		t.Fatal(got)
+	}
+}
+
+// TestCapturedHandsOnWhatCaptureTook returns each capability's captured
+// selection and token as the entries Capture removed, for the pinned CLI the
+// launcher execs; a hosted run captured no token, and a context without a
+// capture has nothing to hand on.
+func TestCapturedHandsOnWhatCaptureTook(t *testing.T) {
+	t.Setenv(protocolcli.SessionReporterEnv, " @test/session ")
+	t.Setenv(protocolcli.SessionReporterTokenEnv, "session-token")
+	t.Setenv(protocolcli.LogReporterEnv, "@test/logs")
+	t.Setenv(protocolcli.LogReporterTokenEnv, "log-token")
+	want := []string{
+		protocolcli.SessionReporterEnv + "=@test/session", protocolcli.SessionReporterTokenEnv + "=session-token",
+		protocolcli.LogReporterEnv + "=@test/logs", protocolcli.LogReporterTokenEnv + "=log-token",
+	}
+	if got := Captured(Capture(context.Background())); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("Captured = %v, want %v", got, want)
+	}
+	if got := Captured(context.Background()); got != nil {
+		t.Fatalf("Captured without a capture = %v, want nil", got)
+	}
+
+	defer runcredential.SetForTest("hosted-bearer")()
+	for name, value := range map[string]string{
+		protocolcli.SessionReporterEnv: "@test/session", protocolcli.SessionReporterTokenEnv: "session-token",
+		protocolcli.LogReporterEnv: "@test/logs", protocolcli.LogReporterTokenEnv: "log-token",
+	} {
+		t.Setenv(name, value)
+	}
+	want = []string{protocolcli.SessionReporterEnv + "=@test/session", protocolcli.LogReporterEnv + "=@test/logs"}
+	if got := Captured(Capture(context.Background())); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("hosted Captured = %v, want %v", got, want)
 	}
 }
 

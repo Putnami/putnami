@@ -47,6 +47,29 @@ func Capture(ctx context.Context) context.Context {
 	return context.WithValue(ctx, credentialKey{}, captured)
 }
 
+// Captured returns every capability's captured selection and token as
+// NAME=value entries, for the one process that continues this run in this
+// process's place: the pinned CLI the launcher execs, which captures them again
+// from its own environment. A hosted run captured no token, so none is
+// returned. A context without a capture returns nil.
+func Captured(ctx context.Context) []string {
+	captured, ok := ctx.Value(credentialKey{}).(*credentials)
+	if !ok {
+		return nil
+	}
+	var entries []string
+	for _, c := range Capabilities() {
+		selected := captured.selected[c.Name]
+		if selected.provider != "" {
+			entries = append(entries, c.SelectorEnv+"="+selected.provider)
+		}
+		if selected.token != "" {
+			entries = append(entries, c.TokenEnv+"="+selected.token)
+		}
+	}
+	return entries
+}
+
 // Provider is the extension the capability's selector named when the context
 // was captured, or "" when the capability is not selected.
 func (c Capability) Provider(ctx context.Context) string {
