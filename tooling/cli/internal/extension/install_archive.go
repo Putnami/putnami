@@ -39,7 +39,10 @@ func (inst *Installer) download(ctx context.Context, name, constraint string, sp
 	}
 	defer resp.Body.Close()
 
-	resolvedVersion := artifactResolvedVersion(resp.Header.Get("X-Resolved-Version"), constraint)
+	resolvedVersion, err := artifactResolvedVersion(resp.Header.Get("X-Resolved-Version"), constraint)
+	if err != nil {
+		return "", "", "", fmt.Errorf("download %s: %w", name, err)
+	}
 	advertisedIntegrity := pinnedarchive.ReadAdvertisedIntegrity(resp.Header)
 
 	// Write to temp file
@@ -68,9 +71,13 @@ func (inst *Installer) ResolveArtifact(ctx context.Context, name, constraint str
 	}
 	defer resp.Body.Close()
 
+	version, err := artifactResolvedVersion(resp.Header.Get("X-Resolved-Version"), constraint)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", name, err)
+	}
 	return &InstallResult{
 		Name:      name,
-		Version:   artifactResolvedVersion(resp.Header.Get("X-Resolved-Version"), constraint),
+		Version:   version,
 		Integrity: pinnedarchive.ReadAdvertisedIntegrity(resp.Header),
 		Source:    source,
 	}, nil
@@ -229,17 +236,41 @@ func (inst *Installer) artifactFetchError(name, constraint string, params url.Va
 	return err
 }
 
-func artifactResolvedVersion(resolvedVersion string, constraint string) string {
+// artifactResolvedVersion returns the version the registry resolved, read from
+// its X-Resolved-Version header. That version names the install directory
+// (layout.ArtifactDir), which is removed and extracted into before the manifest
+// hash is checked, so a header that is not a version is refused: a value such
+// as "1.0.0-x/../../victim" would otherwise point that directory anywhere.
+func artifactResolvedVersion(resolvedVersion string, constraint string) (string, error) {
 	if resolvedVersion == "" {
 		// Fallback: try to infer from constraint if it's an exact version
 		v, err := ParseVersion(constraint)
 		if err == nil {
-			resolvedVersion = v.String()
-		} else {
-			resolvedVersion = "0.0.0"
+			return v.String(), nil
+		}
+		return "0.0.0", nil
+	}
+	if err := checkArtifactVersion(resolvedVersion); err != nil {
+		return "", fmt.Errorf("registry resolved version %q: %w", resolvedVersion, err)
+	}
+	return resolvedVersion, nil
+}
+
+// checkArtifactVersion refuses a version that cannot name a directory.
+// ParseVersion accepts any prerelease text, so the prerelease is also held to
+// the semver identifier and build characters [0-9A-Za-z.+-], which exclude
+// every path separator.
+func checkArtifactVersion(version string) error {
+	v, err := ParseVersion(version)
+	if err != nil {
+		return fmt.Errorf("not a version: %w", err)
+	}
+	for _, r := range v.Prerelease {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && r != '.' && r != '-' && r != '+' {
+			return fmt.Errorf("not a version: invalid prerelease %q", v.Prerelease)
 		}
 	}
-	return resolvedVersion
+	return nil
 }
 
 // ExtractTarGz extracts a .tar.gz archive to the destination directory.
