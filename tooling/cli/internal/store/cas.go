@@ -142,7 +142,12 @@ func (s *LocalStore) linkBlob(digest, target string, mode os.FileMode) error {
 			return fmt.Errorf("materialize blob: link: %w; copy: %w", err, cpErr)
 		}
 	}
-	return os.Chmod(target, mode)
+	// The target is a hardlink to the CAS inode every entry holding the same
+	// bytes shares, and the mode can come from a remote manifest: keep only
+	// permission bits, never grant group or other write, and always leave the
+	// owner able to read. A restore applies the manifest's own mode to the
+	// workspace copy (see recordedModes).
+	return os.Chmod(target, mode.Perm()&^0o022|0o400)
 }
 
 // ingestFiles walks srcDir, ingests each non-excluded file into CAS, hardlinks
