@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -55,8 +56,9 @@ func runHelper(program string, args []string) int {
 		return 0
 	case "orphan":
 		// Start a grandchild that sleeps while holding this program's stdout
-		// and stderr, print its pid for the test to kill it, then exit
-		// (args[0] == "exit") or sleep until killed (args[0] == "sleep").
+		// and stderr, record its pid in the file args[1] for the test to kill
+		// it, print it, then exit (args[0] == "exit") or sleep until killed
+		// (args[0] == "sleep").
 		exe, err := os.Executable()
 		if err != nil {
 			return 2
@@ -66,7 +68,11 @@ func runHelper(program string, args []string) int {
 		if err := grandchild.Start(); err != nil {
 			return 2
 		}
-		fmt.Println(grandchild.Process.Pid)
+		pid := strconv.Itoa(grandchild.Process.Pid)
+		if err := os.WriteFile(args[1], []byte(pid), 0o600); err != nil {
+			return 2
+		}
+		fmt.Println(pid)
 		if args[0] == "sleep" {
 			time.Sleep(30 * time.Second)
 		}
@@ -273,18 +279,27 @@ func shortWaitDelay(t *testing.T) {
 	waitDelay = time.Second
 }
 
-// killOrphan kills the grandchild whose pid the orphan helper printed as its
-// first stdout line, so no sleeping process outlives the test.
-func killOrphan(t *testing.T, stdout string) {
+// orphanPidFile returns the path the orphan helper records its grandchild's
+// pid in, and kills that grandchild when the test ends, so no sleeping process
+// outlives the test. A file that never appears means the helper was killed
+// before it started the grandchild, which leaves nothing to kill.
+func orphanPidFile(t *testing.T) string {
 	t.Helper()
-	line, _, _ := strings.Cut(stdout, "\n")
-	pid, err := strconv.Atoi(strings.TrimSpace(line))
-	if err != nil {
-		t.Fatalf("Stdout = %q, want the grandchild pid on its first line", stdout)
-	}
-	if process, err := os.FindProcess(pid); err == nil {
-		_ = process.Kill()
-	}
+	path := filepath.Join(t.TempDir(), "orphan-pid")
+	t.Cleanup(func() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return
+		}
+		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err != nil {
+			return
+		}
+		if process, err := os.FindProcess(pid); err == nil {
+			_ = process.Kill()
+		}
+	})
+	return path
 }
 
 // TestRun_TimeoutWithGrandchild proves a timed-out command returns once
@@ -293,14 +308,15 @@ func killOrphan(t *testing.T, stdout string) {
 // Run would block until the descendant exits.
 func TestRun_TimeoutWithGrandchild(t *testing.T) {
 	shortWaitDelay(t)
-	name, args := helper(t, "orphan", "sleep")
+	name, args := helper(t, "orphan", "sleep", orphanPidFile(t))
 	start := time.Now()
+	// Under the race detector the helper may not have started its grandchild
+	// when the timeout fires; either way the run must not outlive the bound.
 	result, err := Run(name, args, Timeout(50*time.Millisecond))
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	killOrphan(t, result.Stdout)
 	if elapsed > 3*time.Second {
 		t.Errorf("Run returned after %v, want within 3s of the timeout", elapsed)
 	}
@@ -315,14 +331,21 @@ func TestRun_TimeoutWithGrandchild(t *testing.T) {
 // may stop short of what the descendant still had to write.
 func TestRun_ExitedChildWithGrandchild(t *testing.T) {
 	shortWaitDelay(t)
-	name, args := helper(t, "orphan", "exit")
+	pidFile := orphanPidFile(t)
+	name, args := helper(t, "orphan", "exit", pidFile)
 	start := time.Now()
 	result, err := Run(name, args)
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	killOrphan(t, result.Stdout)
+	pid, err := os.ReadFile(pidFile)
+	if err != nil {
+		t.Fatalf("the helper recorded no grandchild pid: %v", err)
+	}
+	if line, _, _ := strings.Cut(result.Stdout, "\n"); strings.TrimSpace(line) != strings.TrimSpace(string(pid)) {
+		t.Errorf("Stdout = %q, want the grandchild pid %s on its first line", result.Stdout, pid)
+	}
 	if elapsed > 3*time.Second {
 		t.Errorf("Run returned after %v, want within 3s of the child's exit", elapsed)
 	}
