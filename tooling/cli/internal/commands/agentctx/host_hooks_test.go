@@ -431,6 +431,33 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
 	}
 }
 
+// The person's file keeps its mode too: a settings file kept 0600 for the
+// keys in its env block is not made world-readable by the rewrite.
+func TestHostHooksKeepThePersonsFileMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows keeps no owner-only permission bits")
+	}
+	ws := newHostHooksWorkspace(t, true, true)
+	writePathFile(t, ws.root, claudeHooksFile, `{"env": {"ACME_API_KEY": "secret"}}`+"\n")
+	path := filepath.Join(ws.root, filepath.FromSlash(claudeHooksFile))
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, warn := ws.register(t); warn != "" {
+		t.Fatalf("warnings = %q", warn)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Errorf("mode of %s after the rewrite = %o, want 0600", claudeHooksFile, got)
+	}
+	if got := ws.read(t, claudeHooksFile); !strings.Contains(got, `"ACME_API_KEY": "secret"`) || !strings.Contains(got, `"SessionStart"`) {
+		t.Errorf("the rewrite should keep the env block and add our hooks, got:\n%s", got)
+	}
+}
+
 // A group that holds a handler of the person beside ours keeps the person's,
 // with its matcher; ours moves to its own group right after it.
 func TestHostHooksSplitAMixedGroup(t *testing.T) {

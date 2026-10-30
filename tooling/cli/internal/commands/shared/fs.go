@@ -16,11 +16,17 @@ func FileExists(path string) bool {
 
 // AtomicWriteFile writes data to path via a same-directory temp file and
 // rename(2), so a reader never observes a partially written artifact and a
-// failed write never truncates the existing good file.
+// failed write never truncates the existing good file. An existing file keeps
+// its permission bits (a `.claude/settings.json` kept 0600 for the keys in its
+// env block stays 0600); a new file is 0644.
 func AtomicWriteFile(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create artifact directory %s: %w", dir, err)
+	}
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
 	}
 	tmp, err := os.CreateTemp(dir, ".contracts-*.tmp")
 	if err != nil {
@@ -35,7 +41,7 @@ func AtomicWriteFile(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close temp artifact: %w", err)
 	}
-	if err := os.Chmod(tmpName, 0o644); err != nil {
+	if err := os.Chmod(tmpName, mode); err != nil {
 		return fmt.Errorf("chmod temp artifact: %w", err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
