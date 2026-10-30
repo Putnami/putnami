@@ -328,6 +328,38 @@ validate_registry_url() {
     esac
 }
 
+# Print the --proto-redir value for a validated source URL: the schemes a
+# redirect may land on. The registry rule above checks the URL the user gave,
+# and curl follows redirects on its own, so without this an https:// registry
+# answering "302 Location: http://..." would be fetched in plaintext, with the
+# integrity headers of that plaintext response (install.ps1 holds every redirect
+# target to the same rule). An https:// source only ever hops to https://. An
+# http:// source is already plaintext — loopback, or the explicit opt-in — so a
+# hop to either scheme takes nothing away.
+redirect_protocols() {
+    local url="$1"
+
+    case "$(to_lower "${url%%://*}")" in
+        https) printf '=https' ;;
+        *) printf '=https,http' ;;
+    esac
+}
+
+# Print curl's stderr as hints. curl refuses a redirect outside --proto-redir
+# before resolving its host, with "Protocol "http" not supported", which says
+# nothing about where the http:// came from; name the downgrade first.
+print_curl_hints() {
+    local curl_err="$1"
+
+    if grep -q 'Protocol "http" not supported' "$curl_err" 2>/dev/null; then
+        print_hint "The server redirected an https:// request to plaintext http://; the installer does not follow that downgrade."
+    fi
+    local line
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && print_hint "curl: ${line}"
+    done < "$curl_err"
+}
+
 # Read the last occurrence of a response header. curl -D appends one block per
 # response, so after a redirect the last block is the one that carried the body.
 read_header() {
@@ -1072,13 +1104,10 @@ fetch_command_map() {
     local file="$2"
 
     local curl_err="${TEMP_DIR}/command-map.stderr"
-    if ! curl -fsSL --connect-timeout 30 --max-filesize "$COMMAND_MAP_MAX_BYTES" \
-        -o "$file" "$url" 2>"$curl_err"; then
+    if ! curl -fsSL --connect-timeout 30 --proto-redir "$(redirect_protocols "$url")" \
+        --max-filesize "$COMMAND_MAP_MAX_BYTES" -o "$file" "$url" 2>"$curl_err"; then
         print_error "Could not download the command map from $(redact_url "$url")"
-        local line
-        while IFS= read -r line; do
-            [[ -n "$line" ]] && print_hint "curl: ${line}"
-        done < "$curl_err"
+        print_curl_hints "$curl_err"
         return 1
     fi
 }
@@ -1448,7 +1477,8 @@ main() {
     print_detail "Target:   ${INSTALL_DIR}"
 
     local curl_err="${TEMP_DIR}/curl.stderr"
-    if ! curl -fsSL --connect-timeout 30 -D "$HEADERS_FILE" -o "$ASSET_FILE" "$download_target" 2>"$curl_err"; then
+    if ! curl -fsSL --connect-timeout 30 --proto-redir "$(redirect_protocols "$download_target")" \
+        -D "$HEADERS_FILE" -o "$ASSET_FILE" "$download_target" 2>"$curl_err"; then
         if [[ -n "$DOWNLOAD_URL" ]]; then
             print_error "Could not download $(redact_url "$DOWNLOAD_URL")"
         else
@@ -1456,10 +1486,7 @@ main() {
             print_hint "Registry: $(redact_url "$download_target")"
             print_hint "Set PUTNAMI_DOWNLOAD_URL or use --download-url to provide an explicit asset URL."
         fi
-        local line
-        while IFS= read -r line; do
-            [[ -n "$line" ]] && print_hint "curl: ${line}"
-        done < "$curl_err"
+        print_curl_hints "$curl_err"
         exit 1
     fi
 

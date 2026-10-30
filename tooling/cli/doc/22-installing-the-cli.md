@@ -312,6 +312,16 @@ The check runs on `PUTNAMI_REGISTRY_URL`, or on `--download-url` when that is
 given. With a command to run, it also runs on the command map URL. It runs
 before the installer creates any directory.
 
+A redirect is held to the scheme of the URL that passed the check. An
+`https://` registry (or command map) may redirect to `https://` only: a
+`302 Location: http://…` is refused before its host is resolved, with
+`The server redirected an https:// request to plaintext http://; the installer
+does not follow that downgrade.` above curl's own `Protocol "http" not
+supported`. Without this, the bytes and the integrity headers the installer
+verifies would be the ones of the plaintext response, so whoever sits on that
+path could serve a consistent pair. An `http://` registry that the check
+accepted is already plaintext and may redirect to either scheme.
+
 A registry URL may carry credentials (`https://user:token@…`). Every line the
 installer prints replaces that userinfo with `***@`, on the success path and on
 every refusal, because the release smoke tails this log straight into CI output
@@ -931,6 +941,7 @@ map is served the same way: removing an entry is a pull request against
 | A Windows shell gets the `install.ps1` one-liner and nothing installed; unknown `uname` values refuse, naming the detected value and the matrix | `TestInstallRefusesUnsupportedPlatforms` |
 | `uname -m` maps onto `GOARCH` vocabulary | `TestInstallScriptSpeaksGOARCHVocabulary` |
 | Plaintext non-loopback registries refuse; loopback and the opt-in do not | `TestInstallRefusesPlaintextNonLoopbackRegistry`, `TestInstallAcceptsPlaintextRegistryWithExplicitOptIn`, `TestInstallAcceptsLoopbackHTTPRegistryWithoutOptIn` |
+| An `https://` registry that redirects to `http://` is refused before the host is resolved, and the refusal names the downgrade; a redirect that keeps `https://`, and a plaintext loopback registry that redirects within plaintext, are followed | `TestInstallRefusesARedirectFromHTTPSToPlaintext` |
 | No branch escalates privileges, and the fake `sudo`/`doas`/`pkexec`/`run0` that prove it | `TestInstallScriptContainsNoPrivilegeEscalation`, `TestFakeEscalatorsRecordAnEscalationAttempt` |
 | A successful install leaves no temporary directory behind | `TestInstallLeavesNoTemporaryDirectoryBehind` |
 | Registry credentials never reach stdout, on success or on refusal | `TestInstallRedactsRegistryCredentials` |
