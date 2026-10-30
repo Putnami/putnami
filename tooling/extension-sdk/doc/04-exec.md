@@ -133,16 +133,19 @@ Sets a timeout. The command is killed if it exceeds the duration.
 
 Sets a context for cancellation. The command is killed when the context is cancelled.
 
+A timeout or a cancellation kills the direct child only. A descendant that inherited the command's stdout or stderr and outlives it (a test runner's worker, a daemon a hook starts) keeps those pipes open; `Run` waits at most five seconds more for them, then closes the pipes and returns a failed `Result` with the output captured so far. The same bound applies to a command that exits on its own and leaves such a descendant behind.
+
 #### `Stdin(s string) Option`
 
 Provides string content as standard input to the command.
 
 ## Error Handling
 
-The `exec` package distinguishes between two failure modes:
+The `exec` package distinguishes between three failure modes:
 
 1. **Start failure** — the command could not be started (binary not found, permission denied). Returns `(nil, error)`.
 2. **Non-zero exit** — the command ran but exited with a non-zero code. Returns `(*Result, nil)` with `Result.Success == false`.
+3. **Abandoned pipes** — the command exited with status 0 but a descendant kept its output pipes open past the five-second bound. Returns `(*Result, nil)` with `Result.ExitCode == -1` and `Result.Success == false`: the captured output may be incomplete.
 
 ```go
 result, err := exec.Run("might-not-exist", nil)

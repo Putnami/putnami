@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +53,33 @@ func runHelper(program string, args []string) int {
 			return 2
 		}
 		time.Sleep(d)
+		return 0
+	case "orphan":
+		// Start a grandchild that sleeps while holding this program's stdout
+		// and stderr, record its pid in the file args[1] for the test to kill
+		// it, print it, then exit (args[0] == "exit") or sleep until killed
+		// (args[0] == "sleep").
+		exe, err := os.Executable()
+		if err != nil {
+			return 2
+		}
+		grandchild := exec.Command(exe, helperArg, "sleep", "30s")
+		grandchild.Stdout, grandchild.Stderr = os.Stdout, os.Stderr
+		if err := grandchild.Start(); err != nil {
+			return 2
+		}
+		pid := strconv.Itoa(grandchild.Process.Pid)
+		if err := os.WriteFile(args[1], []byte(pid), 0o600); err != nil {
+			return 2
+		}
+		fmt.Println(pid)
+		if args[0] == "sleep" {
+			time.Sleep(30 * time.Second)
+		}
+		// Give the parent's copying goroutine the pid while this process is
+		// still alive: once it exits, only waitDelay bounds that read, and
+		// under the race detector on a loaded host that was not enough.
+		time.Sleep(100 * time.Millisecond)
 		return 0
 	}
 	return 2
@@ -235,6 +265,92 @@ func TestRun_Timeout(t *testing.T) {
 	}
 	if result.Success {
 		t.Error("Run with timeout should not succeed")
+	}
+}
+
+// shortWaitDelay lowers waitDelay for one test, so a run that waits on a
+// descendant's pipes returns well inside the test's bound. One second keeps
+// the pid the helper prints readable under the race detector on a loaded
+// host, where the default would be read fine but take the whole bound.
+func shortWaitDelay(t *testing.T) {
+	t.Helper()
+	previous := waitDelay
+	t.Cleanup(func() { waitDelay = previous })
+	waitDelay = time.Second
+}
+
+// orphanPidFile returns the path the orphan helper records its grandchild's
+// pid in, and kills that grandchild when the test ends, so no sleeping process
+// outlives the test. A file that never appears means the helper was killed
+// before it started the grandchild, which leaves nothing to kill.
+func orphanPidFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "orphan-pid")
+	t.Cleanup(func() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return
+		}
+		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err != nil {
+			return
+		}
+		if process, err := os.FindProcess(pid); err == nil {
+			_ = process.Kill()
+		}
+	})
+	return path
+}
+
+// TestRun_TimeoutWithGrandchild proves a timed-out command returns once
+// waitDelay elapses even when a descendant it left behind keeps its output
+// pipes open: the timeout kills the direct child only, and without the delay
+// Run would block until the descendant exits.
+func TestRun_TimeoutWithGrandchild(t *testing.T) {
+	shortWaitDelay(t)
+	name, args := helper(t, "orphan", "sleep", orphanPidFile(t))
+	start := time.Now()
+	// Under the race detector the helper may not have started its grandchild
+	// when the timeout fires; either way the run must not outlive the bound.
+	result, err := Run(name, args, Timeout(50*time.Millisecond))
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if elapsed > 3*time.Second {
+		t.Errorf("Run returned after %v, want within 3s of the timeout", elapsed)
+	}
+	if result.Success {
+		t.Error("Success = true, want false for a timed-out command")
+	}
+}
+
+// TestRun_ExitedChildWithGrandchild proves a command that exits with status 0
+// but leaves a descendant holding its output pipes is a failed run that keeps
+// the output captured so far, not a hard error and not a success: the output
+// may stop short of what the descendant still had to write.
+func TestRun_ExitedChildWithGrandchild(t *testing.T) {
+	shortWaitDelay(t)
+	pidFile := orphanPidFile(t)
+	name, args := helper(t, "orphan", "exit", pidFile)
+	start := time.Now()
+	result, err := Run(name, args)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	pid, err := os.ReadFile(pidFile)
+	if err != nil {
+		t.Fatalf("the helper recorded no grandchild pid: %v", err)
+	}
+	if line, _, _ := strings.Cut(result.Stdout, "\n"); strings.TrimSpace(line) != strings.TrimSpace(string(pid)) {
+		t.Errorf("Stdout = %q, want the grandchild pid %s on its first line", result.Stdout, pid)
+	}
+	if elapsed > 3*time.Second {
+		t.Errorf("Run returned after %v, want within 3s of the child's exit", elapsed)
+	}
+	if result.Success || result.ExitCode == 0 {
+		t.Errorf("result = %+v, want a failed run", result)
 	}
 }
 
