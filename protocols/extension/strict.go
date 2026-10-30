@@ -77,6 +77,15 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	}
 	diags = append(diags, ValidateNoReservedFlagShadows(m)...)
 
+	// A dependency key is a registry name or a package name: the CLI builds a
+	// registry route and a lock key from a registry name.
+	for _, name := range sortedKeys(m.ExtensionDeps.List) {
+		if !IsDependencyName(name) {
+			diags = append(diags, diag.Errorf("invalid-extension-dependency", "extensionDependencies."+name,
+				"extension dependency name %q must be @scope/name or a package name: lowercase letters, digits, '.', '_' and '-', starting with a letter or digit", name))
+		}
+	}
+
 	// Validate commands in sorted order for deterministic diagnostics.
 	cmdNames := sortedKeys(m.Commands)
 	for _, name := range cmdNames {

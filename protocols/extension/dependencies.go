@@ -2,21 +2,39 @@ package extension
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
-	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 )
 
-// IsRegistryName reports whether name is a registry extension name:
-// @scope/name, with one non-empty scope and one non-empty name.
+// RegistryNamePattern is the grammar of a registry extension name: @scope/name,
+// where the scope and the name each hold lowercase letters, digits, '.', '_'
+// and '-' and start with a letter or digit. The CLI builds the registry route
+// and the lock key from the two parts, so a name holds nothing a URL path or
+// query would read.
+const RegistryNamePattern = `^@[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$`
+
+// PackageNamePattern is the grammar of an unscoped dependency name, which the
+// package manager that installed the extension resolves.
+const PackageNamePattern = `^[a-z0-9][a-z0-9._-]*$`
+
+var (
+	registryName = regexp.MustCompile(RegistryNamePattern)
+	packageName  = regexp.MustCompile(PackageNamePattern)
+)
+
+// IsRegistryName reports whether name is a registry extension name
+// (RegistryNamePattern).
 func IsRegistryName(name string) bool {
-	rest, ok := strings.CutPrefix(name, "@")
-	if !ok {
-		return false
-	}
-	scope, pkg, ok := strings.Cut(rest, "/")
-	return ok && scope != "" && pkg != "" && !strings.Contains(pkg, "/")
+	return registryName.MatchString(name)
+}
+
+// IsDependencyName reports whether name is a legal extensionDependencies key:
+// a registry name (RegistryNamePattern) or an unscoped package name
+// (PackageNamePattern).
+func IsDependencyName(name string) bool {
+	return registryName.MatchString(name) || packageName.MatchString(name)
 }
 
 // RegistryDependencies returns, sorted, the names m's extensionDependencies

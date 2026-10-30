@@ -228,11 +228,14 @@ to run first, which is exactly the case for `@putnami/web` (it depends on
 ## Extension Dependencies
 
 `extensionDependencies` is a list of names or a map from name to version
-constraint. The CLI acts only on a registry name (`@scope/name`). For an
-extension installed from the artifact store or declared by path, and for a
-declared name the lock pins, `putnami install` installs each registry
-dependency, pins it in `putnami.lock.json`, and discovery loads it. Any other
-name is left to the package manager.
+constraint. A name is a registry name (`@scope/name`) or an unscoped package
+name; each part holds lowercase letters, digits, `.`, `_` and `-` and starts
+with a letter or digit (`RegistryNamePattern`, `PackageNamePattern`). Strict
+validation refuses any other key with `invalid-extension-dependency`. The CLI
+acts only on a registry name. For an extension installed from the artifact
+store or declared by path, and for a declared name the lock pins, `putnami
+install` installs each registry dependency, pins it in `putnami.lock.json`,
+and discovery loads it. Any other name is left to the package manager.
 
 A dependency the workspace does not declare loses every reserved provider
 command: credential, cache and runner providers, session and log reporters,

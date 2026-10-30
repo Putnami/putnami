@@ -615,12 +615,11 @@ func validateArtifactManifestContext(ctx context.Context, name, resolvedVersion 
 // committed lock reinstalls the exact resolved version rather than whatever the
 // original constraint resolves to.
 func (inst *Installer) sourceURL(name, resolvedVersion, constraint string) string {
-	ns, pkg := RegistryRef(name)
 	channel := resolvedVersion
 	if !isPinnableVersion(channel) {
 		channel = constraint
 	}
-	return fmt.Sprintf("%s/%s/%s/download?channel=%s", inst.ResolverURL, ns, pkg, url.QueryEscape(channel))
+	return registryDownloadURL(inst.ResolverURL, name, url.Values{"channel": {channel}})
 }
 
 // isPinnableVersion reports whether v is a concrete version usable as a
