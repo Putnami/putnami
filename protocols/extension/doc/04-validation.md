@@ -108,17 +108,23 @@ such as `-v` are reserved for the framework CLI contract.
 
 ### Command Names and Step IDs
 
-A plan name joins a command and a step with `~` (`build~compile`), so a command
-name and a pipeline step id hold no `~`. Strict validation refuses one with
-`invalid-command-name` at `commands.<name>` or `invalid-step-id` at
-`commands.<name>.run[<i>].id`, and the schema states both with a pattern. The
+A command name and a pipeline step id are each one path segment: the CLI
+creates, links and removes `.putnami/out/<project>/<command>[/<step>]`, and a
+plan name joins the two with `~` (`build~compile`). Both match
+`^[A-Za-z0-9][A-Za-z0-9._-]*$`: ASCII letters, digits, `.`, `_` and `-`,
+starting with a letter or a digit, so no separator, whitespace, control
+character or `~`, and neither `.` nor `..`. Strict validation refuses any other
+name with `invalid-command-name` at `commands.<name>` or `invalid-step-id` at
+`commands.<name>.run[<i>].id`, and the schema states the same pattern. The
 load path does not apply the rule.
 
 ```json
-// INVALID: "a~b" reads as step b of command a, and so does step "x~y"
+// INVALID: "a~b" reads as step b of command a, "../../tmp/x" leaves the
+// output directory, and step "x~y" is neither one segment nor one step
 {
   "commands": {
     "a~b": { "run": [{ "id": "build", "task": "build-exec" }] },
+    "../../tmp/x": { "run": [{ "id": "build", "task": "build-exec" }] },
     "build": { "run": [{ "id": "x~y", "task": "build-exec" }] }
   }
 }

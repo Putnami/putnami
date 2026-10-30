@@ -999,6 +999,108 @@ func TestValidateManifest_StepSeparatorInANameIsRefused(t *testing.T) {
 	}
 }
 
+// A command name and a step id are each one segment of a path the CLI
+// creates, links and removes (.putnami/out/<project>/<command>[/<step>]), so
+// strict validation refuses a name that is not one: a separator, whitespace, a
+// control character, a leading - or ., and so . and .. themselves. The schema
+// states the same grammar.
+func TestValidateManifest_ANameIsOnePathSegment(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "a-name-is-one-path-segment")
+	for fixture, want := range map[string]string{
+		"command-name-path.json": "invalid-command-name commands.../../../../tmp/x",
+		"step-id-path.json":      "invalid-step-id commands.build.run[0].id",
+	} {
+		t.Run(fixture, func(t *testing.T) {
+			diags := FullValidateManifest(loadFixtureManifest(t, filepath.Join("fixtures/invalid", fixture)))
+			if len(diags) != 1 || diags[0].Code+" "+diags[0].Field != want {
+				t.Fatalf("diagnostics = %v, want exactly %s", diags, want)
+			}
+		})
+	}
+
+	accepted := []string{"build", "Build", "0build", "build-v2", "build.v2", "build_v2", "a.b-c_d", "a-"}
+	refused := []string{"", ".", "..", ".hidden", "-x", "a/b", "a\\b", "a b", "a\tb", "a\nb", "a\x00b", "a~b", "caf\u00e9", "a:b", "a*b"}
+	for _, name := range accepted {
+		m := &Manifest{
+			Name:     "@test/extension",
+			Commands: map[string]CommandDefinition{name: {Run: []PipelineStep{{ID: name, Task: "build-exec"}}}},
+			Tasks:    map[string]TaskDefinition{"build-exec": {Kind: "command", Command: "echo"}},
+		}
+		for _, d := range ValidateManifest(m) {
+			if d.Code == "invalid-command-name" || d.Code == "invalid-step-id" {
+				t.Errorf("name %q refused: %v", name, d)
+			}
+		}
+	}
+	for _, name := range refused {
+		m := &Manifest{
+			Name:     "@test/extension",
+			Commands: map[string]CommandDefinition{"build": {Run: []PipelineStep{{ID: "build", Task: "build-exec"}}}},
+			Tasks:    map[string]TaskDefinition{"build-exec": {Kind: "command", Command: "echo"}},
+		}
+		if name != "" {
+			// An empty step id is a required-field diagnostic, not a format one.
+			m.Commands["build"] = CommandDefinition{Run: []PipelineStep{{ID: name, Task: "build-exec"}}}
+		}
+		m.Commands[name] = CommandDefinition{Run: []PipelineStep{{ID: "build", Task: "build-exec"}}}
+		codes := make(map[string]string)
+		for _, d := range ValidateManifest(m) {
+			codes[d.Code] = d.Field
+		}
+		if codes["invalid-command-name"] != "commands."+name {
+			t.Errorf("command name %q: invalid-command-name at %q, want commands.%s (%v)", name, codes["invalid-command-name"], name, codes)
+		}
+		if name != "" && codes["invalid-step-id"] != "commands.build.run[0].id" {
+			t.Errorf("step id %q: invalid-step-id at %q, want commands.build.run[0].id (%v)", name, codes["invalid-step-id"], codes)
+		}
+	}
+
+	data, err := os.ReadFile("schemas/extension.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Properties struct {
+			Commands struct {
+				PropertyNames struct {
+					Pattern string `json:"pattern"`
+				} `json:"propertyNames"`
+			} `json:"commands"`
+		} `json:"properties"`
+		Defs struct {
+			PipelineStep struct {
+				Properties struct {
+					ID struct {
+						Pattern string `json:"pattern"`
+					} `json:"id"`
+				} `json:"properties"`
+			} `json:"pipelineStep"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	for field, pattern := range map[string]string{
+		"commands.propertyNames.pattern":           schema.Properties.Commands.PropertyNames.Pattern,
+		"$defs.pipelineStep.properties.id.pattern": schema.Defs.PipelineStep.Properties.ID.Pattern,
+	} {
+		if pattern != commandNameFormat.String() {
+			t.Errorf("schema %s = %q, want the strict grammar %q", field, pattern, commandNameFormat.String())
+		}
+		re := regexp.MustCompile(pattern)
+		for _, name := range accepted {
+			if !re.MatchString(name) {
+				t.Errorf("schema %s refuses %q", field, name)
+			}
+		}
+		for _, name := range refused {
+			if re.MatchString(name) {
+				t.Errorf("schema %s accepts %q", field, name)
+			}
+		}
+	}
+}
+
 // VisitFlagDefinitions visits every flag at any depth and reports the
 // invocations that receive it: a group flag reaches each subcommand, a nested
 // subcommand inherits its parent's command and runs under its top-level
