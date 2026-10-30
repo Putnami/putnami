@@ -22,7 +22,9 @@
             "checks": [
               "a-project-with-a-template-manifest-is-packaged",
               "a-missing-manifest-fails-the-job-with-a-diagnostic",
-              "an-unparseable-manifest-fails-the-job-with-a-diagnostic"
+              "an-unparseable-manifest-fails-the-job-with-a-diagnostic",
+              "the-archive-name-encodes-a-scoped-template-name",
+              "a-name-that-is-not-one-file-name-fails-the-job"
             ]
           }
         },

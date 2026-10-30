@@ -41,7 +41,7 @@
             "root": "command-output",
             "path": "archives",
             "optionalEmpty": true,
-            "description": "The packaged content archive (<template-name>-<version>.tar.gz for a template, <encoded-name>-<os>-<arch>.tar.gz for each registry platform key of a content-only extension) and the channel record beside it. Sole owner of <command-output>/archives. Absent on a dry run, which reports what it would build without creating it."
+            "description": "The packaged content archive (<encoded-name>-<version>.tar.gz for a template, <encoded-name>-<os>-<arch>.tar.gz for each registry platform key of a content-only extension) and the channel record beside it. Sole owner of <command-output>/archives. Absent on a dry run, which reports what it would build without creating it."
           },
           "publication-manifest": {
             "kind": "file",
