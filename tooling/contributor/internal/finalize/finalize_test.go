@@ -37,14 +37,14 @@ func (g *finalizerGit) Staged() (bool, error)                          { return 
 func (g *finalizerGit) Ahead(string) (bool, error)                     { return g.ahead, nil }
 func (g *finalizerGit) ChangedPaths(string) ([]string, error)          { return g.paths, nil }
 func (g *finalizerGit) CommitMessages(string) ([]CommitMessage, error) { return g.commits, nil }
-func (g *finalizerGit) Seed(title string) error {
+func (g *finalizerGit) Seed(_ context.Context, title string) error {
 	g.seeds++
 	g.ahead = true
 	g.head = "seeded-head"
 	g.commits = append(g.commits, CommitMessage{Text: title, Empty: true})
 	return nil
 }
-func (g *finalizerGit) Push(string) error {
+func (g *finalizerGit) Push(context.Context, string) error {
 	g.pushes++
 	if g.pushHook != nil {
 		g.pushHook()
@@ -857,7 +857,7 @@ type fetchingGit struct {
 	fetch func()
 }
 
-func (g fetchingGit) Push(string) error {
+func (g fetchingGit) Push(context.Context, string) error {
 	g.fetch()
 	return nil
 }
@@ -1029,7 +1029,7 @@ func TestNativeGitIgnoresForeignGitDirectoryAndDraftSeed(t *testing.T) {
 	if fingerprint, err := git.Fingerprint(); err != nil || len(fingerprint) != 64 {
 		t.Fatalf("foreign Git directory changed fingerprint root: %q %v", fingerprint, err)
 	}
-	if err := git.Seed("fix: seed title only"); err != nil {
+	if err := git.Seed(context.Background(), "fix: seed title only"); err != nil {
 		t.Fatal(err)
 	}
 	commits, err := git.CommitMessages("HEAD~1")

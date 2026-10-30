@@ -2,10 +2,12 @@ package finalize
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"go.putnami.dev/sdk/extension/treefingerprint"
 
@@ -25,8 +27,8 @@ type Git interface {
 	Ahead(string) (bool, error)
 	ChangedPaths(string) ([]string, error)
 	CommitMessages(string) ([]CommitMessage, error)
-	Seed(string) error
-	Push(string) error
+	Seed(context.Context, string) error
+	Push(context.Context, string) error
 	Fingerprint() (string, error)
 }
 
@@ -61,18 +63,34 @@ func (g NativeGit) run(args ...string) ([]byte, error) {
 	return answer, nil
 }
 
-func (g NativeGit) runWrite(args ...string) error {
+// gitWriteTimeout bounds each repository-writing git command, so a stalled
+// remote, a credential prompt or a hook that never exits aborts the run
+// instead of wedging it. It is generous enough not to interrupt a
+// legitimately large push. A variable only so a test can shorten it.
+var gitWriteTimeout = 5 * time.Minute
+
+// gitWriteWaitDelay bounds how long a killed write may keep its output open
+// through a hook or helper process that outlives it.
+const gitWriteWaitDelay = 5 * time.Second
+
+func (g NativeGit) runWrite(ctx context.Context, args ...string) error {
 	if len(args) == 0 || args[0] != "commit" && args[0] != "push" {
 		return fmt.Errorf("unsupported repository-writing git operation")
 	}
+	ctx, cancel := context.WithTimeout(ctx, gitWriteTimeout)
+	defer cancel()
 	// Commit hooks and push transport helpers may execute repository code.
 	// The executable holds no run credential, so it has nothing to mark.
-	cmd := exec.Command("git", append([]string{"-C", g.Root}, args...)...)
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", g.Root}, args...)...)
 	cmd.Env = gitEnvironment(os.Environ())
+	cmd.WaitDelay = gitWriteWaitDelay
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			err = fmt.Errorf("timed out after %s", gitWriteTimeout)
+		}
 		return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return nil
@@ -144,11 +162,11 @@ func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 	}
 	return result, nil
 }
-func (g NativeGit) Seed(title string) error {
-	return g.runWrite("commit", "--allow-empty", "-m", title)
+func (g NativeGit) Seed(ctx context.Context, title string) error {
+	return g.runWrite(ctx, "commit", "--allow-empty", "-m", title)
 }
-func (g NativeGit) Push(branch string) error {
-	return g.runWrite("push", "-u", "origin", branch)
+func (g NativeGit) Push(ctx context.Context, branch string) error {
+	return g.runWrite(ctx, "push", "-u", "origin", branch)
 }
 func (g NativeGit) Fingerprint() (string, error) {
 	result, err := treefingerprint.Compute(g.Root)
