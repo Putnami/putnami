@@ -40,7 +40,8 @@
               "every-invalid-fixture-is-refused",
               "each-counter-example-reports-its-exact-codes",
               "the-harness-and-the-strict-path-agree",
-              "a-step-separator-in-a-name-is-refused"
+              "a-step-separator-in-a-name-is-refused",
+              "a-name-is-one-path-segment"
             ]
           }
         },

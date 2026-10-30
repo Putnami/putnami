@@ -33,6 +33,26 @@ import (
 // batchPhaseFormat is the grammar of TaskBatchPolicy.Phase.
 var batchPhaseFormat = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
+// commandNameFormat is the grammar of a command name and of a pipeline step
+// id. The CLI uses both as one segment of a path, in
+// .putnami/out/<project>/<command>[/<step>] which it creates, links and
+// removes, and as one half of a plan name (build~compile). A name is therefore
+// a word of ASCII letters, digits, ".", "_" and "-" that starts with a letter
+// or a digit: it holds no path separator, no whitespace, no control character
+// and no "~", and the leading character rules out ".", ".." and a name that
+// reads as a flag. The host hooks grammar (hostHooksCommandTokenFormat) is a
+// subset of it.
+var commandNameFormat = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// invalidNameMessage explains why a command name or a step id is refused. A
+// "~" keeps its own explanation, since the name may otherwise be well formed.
+func invalidNameMessage(kind, name string) string {
+	if strings.Contains(name, "~") {
+		return fmt.Sprintf("%s %q must not contain ~, which joins a command and a step in a plan name", kind, name)
+	}
+	return fmt.Sprintf("%s %q must be one path segment: ASCII letters, digits, '.', '_' and '-', starting with a letter or a digit", kind, name)
+}
+
 // ParseManifest decodes JSON data into a Manifest using strict mode.
 // Unknown fields are rejected and structured diagnostics are returned.
 func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
@@ -81,11 +101,9 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	cmdNames := sortedKeys(m.Commands)
 	for _, name := range cmdNames {
 		cmd := m.Commands[name]
-		// A plan name joins a command and a step with ~ (build~compile), so a
-		// ~ inside either name makes that join ambiguous.
-		if strings.Contains(name, "~") {
+		if !commandNameFormat.MatchString(name) {
 			diags = append(diags, diag.Errorf("invalid-command-name", "commands."+name,
-				"command name %q must not contain ~, which joins a command and a step in a plan name", name))
+				"%s", invalidNameMessage("command name", name)))
 		}
 		for i, dep := range cmd.DependsOn {
 			diags = append(diags, validateCommandDependency(fmt.Sprintf("commands.%s.dependsOn[%d]", name, i), dep)...)
@@ -181,9 +199,9 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 			field := fmt.Sprintf("commands.%s.run[%d]", name, i)
 			if step.ID == "" {
 				diags = append(diags, diag.Errorf("required-field", field+".id", "pipeline step id is required"))
-			} else if strings.Contains(step.ID, "~") {
+			} else if !commandNameFormat.MatchString(step.ID) {
 				diags = append(diags, diag.Errorf("invalid-step-id", field+".id",
-					"pipeline step id %q must not contain ~, which joins a command and a step in a plan name", step.ID))
+					"%s", invalidNameMessage("pipeline step id", step.ID)))
 			}
 			if step.Task == "" {
 				diags = append(diags, diag.Errorf("required-field", field+".task", "pipeline step task is required"))

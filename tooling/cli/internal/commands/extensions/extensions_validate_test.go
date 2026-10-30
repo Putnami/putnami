@@ -160,13 +160,16 @@ func TestExtensionsValidate_ReservedGlobalFlagFailure(t *testing.T) {
 	}
 }
 
-// `putnami extensions validate` refuses a ~ in a command name and in a step
-// id, since a plan name joins a command and a step with it, and names the
-// field that holds it.
+// `putnami extensions validate` refuses a command name and a step id that is
+// not one path segment, a ~ (a plan name joins a command and a step with it)
+// or a path (the CLI creates and removes .putnami/out/<project>/<command>[/<step>])
+// alike, and names the field that holds it.
 func TestExtensionsValidate_AStepSeparatorInANameIsRefused(t *testing.T) {
 	for name, tc := range map[string]struct{ from, to, want string }{
-		"command name": {`"build": {`, `"a~b": {`, "[invalid-command-name] commands.a~b: "},
-		"step id":      {`"id": "build"`, `"id": "x~y"`, "[invalid-step-id] commands.build.run[0].id: "},
+		"command name":      {`"build": {`, `"a~b": {`, "[invalid-command-name] commands.a~b: "},
+		"step id":           {`"id": "build"`, `"id": "x~y"`, "[invalid-step-id] commands.build.run[0].id: "},
+		"command name path": {`"build": {`, `"../../../../tmp/x": {`, "[invalid-command-name] commands.../../../../tmp/x: "},
+		"step id path":      {`"id": "build"`, `"id": "../escape"`, "[invalid-step-id] commands.build.run[0].id: "},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -176,7 +179,7 @@ func TestExtensionsValidate_AStepSeparatorInANameIsRefused(t *testing.T) {
 			}
 			out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
 			if err == nil {
-				t.Fatalf("a manifest with a ~ in a %s validated:\n%s", name, out)
+				t.Fatalf("a manifest with an invalid %s validated:\n%s", name, out)
 			}
 			if !strings.Contains(out, tc.want) {
 				t.Errorf("output missing %q:\n%s", tc.want, out)

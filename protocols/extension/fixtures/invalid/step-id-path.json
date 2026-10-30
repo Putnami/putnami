@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@test/extension",
+  "commands": {
+    "build": {
+      "run": [{ "id": "../escape", "task": "build-exec" }]
+    }
+  },
+  "tasks": {
+    "build-exec": {
+      "kind": "command",
+      "command": "echo"
+    }
+  }
+}
