@@ -603,7 +603,9 @@ func TestInstallRefusesARedirectFromHTTPSToPlaintext(t *testing.T) {
 		if !res.contains("redirected an https:// request to plaintext http://") {
 			t.Fatalf("refusal did not name the downgrade:\n%s", res.output)
 		}
-		if !res.contains(`curl: (1) Protocol "http" not supported`) {
+		// curl 8.5 says `not supported or disabled in libcurl`, newer curl says
+		// `disabled`; the exit code and the scheme are the stable part.
+		if !res.contains(`curl: (1) Protocol "http"`) {
 			t.Fatalf("curl's own refusal was not surfaced:\n%s", res.output)
 		}
 		if res.contains("Could not resolve host") {

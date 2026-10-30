@@ -346,12 +346,13 @@ redirect_protocols() {
 }
 
 # Print curl's stderr as hints. curl refuses a redirect outside --proto-redir
-# before resolving its host, with "Protocol "http" not supported", which says
-# nothing about where the http:// came from; name the downgrade first.
+# before resolving its host, with "Protocol "http" not supported" (curl 8.5 and
+# older) or "Protocol "http" disabled" (newer curl), which says nothing about
+# where the http:// came from; name the downgrade first.
 print_curl_hints() {
     local curl_err="$1"
 
-    if grep -q 'Protocol "http" not supported' "$curl_err" 2>/dev/null; then
+    if grep -Eq 'Protocol "http" (not supported|disabled)' "$curl_err" 2>/dev/null; then
         print_hint "The server redirected an https:// request to plaintext http://; the installer does not follow that downgrade."
     fi
     local line
