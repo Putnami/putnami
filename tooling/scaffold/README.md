@@ -12,7 +12,7 @@ command:
 
 | Command | Task | Produces |
 |---------|------|----------|
-| `putnami package` | `package-content` | `<command-output>/archives/<name>-<version>.tar.gz` for a template, `<command-output>/archives/<encoded-name>-<os>-<arch>.tar.gz` for each registry platform key of a content-only extension (identical bytes), plus the matching `template-archives` or `archives` entry in the project's package metadata index |
+| `putnami package` | `package-content` | `<command-output>/archives/<encoded-name>-<version>.tar.gz` for a template, `<command-output>/archives/<encoded-name>-<os>-<arch>.tar.gz` for each registry platform key of a content-only extension (identical bytes), plus the matching `template-archives` or `archives` entry in the project's package metadata index |
 
 A project carries one content form; two fail the job. Agent content ships only
 inside an extension: a bare `src/skills/` tree selects nothing

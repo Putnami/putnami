@@ -71,6 +71,17 @@ func Template(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 		return "FAILED", nil, nil
 	}
 
+	// The archive is named, and published, under the encoded name the registry
+	// and the consumer agree on, as the content-only extension packager names
+	// its own. A name that still is not one file name after encoding, such as
+	// "../x", would write the archive outside the archives directory this task
+	// owns, so it fails the job before anything is written.
+	artifact := encodeArtifactName(manifest.Name)
+	if !filepath.IsLocal(artifact) || filepath.Base(artifact) != artifact || artifact == "." {
+		emit.Diagnostic("error", fmt.Sprintf("Template name %q is not a valid archive name: it must encode to a single file name", manifest.Name), "", 0)
+		return "FAILED", nil, nil
+	}
+
 	version := ""
 	if ctx.Version != nil && ctx.Version.Full != "" {
 		version = ctx.Version.Full
@@ -134,7 +145,7 @@ func Template(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 		return "FAILED", nil, nil
 	}
 
-	archiveName := fmt.Sprintf("%s-%s.tar.gz", manifest.Name, version)
+	archiveName := fmt.Sprintf("%s-%s.tar.gz", artifact, version)
 	archivePath := filepath.Join(outputDir, archiveName)
 	if err := treearchive.WriteTarGz(archivePath, stageDir); err != nil {
 		emit.Diagnostic("error", "Failed to create archive: "+err.Error(), "", 0)
@@ -150,7 +161,7 @@ func Template(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 	metadataPath := pkgmeta.MetadataPath(ctx.WorkspaceRoot, ctx.Project.Path)
 	if err := writeArchiveRecords(ctx, outputDir, pkgmeta.PackageMetadata{
 		Version:  version,
-		Artifact: manifest.Name,
+		Artifact: artifact,
 		Stable:   stable,
 		Channels: []string{"template-archives"},
 		Template: true,

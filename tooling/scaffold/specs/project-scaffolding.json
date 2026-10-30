@@ -20,7 +20,7 @@
   "requirements": [
     {
       "id": "manifest-selects-the-template",
-      "text": "A project is packaged as a template only when it carries a putnami.template.json; a missing or unparseable manifest fails the job with a diagnostic instead of producing an archive."
+      "text": "A project is packaged as a template only when it carries a putnami.template.json; a missing or unparseable manifest fails the job with a diagnostic instead of producing an archive. The archive is named and published under the manifest name encoded as the registry encodes it (@scope/name becomes scope-name), and a name that still is not one file name after encoding fails the job and writes nothing."
     },
     {
       "id": "resolved-version",
