@@ -55,6 +55,24 @@ func TestResolveTokenWithCLI_RefusesRelativeExecutableAndHonorsCancellation(t *t
 	}
 }
 
+// A credential helper the cloud CLI starts and leaves behind holds the
+// child's output pipes; the bearer request still ends at its deadline plus
+// credentialWaitDelay, with no token.
+func TestResolveTokenWithCLI_AStuckHelperCannotHoldTheCallPastItsDeadline(t *testing.T) {
+	executable := fakeCLIExecutable(t, stuckHelperCLI(t))
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	token, _ := ResolveTokenWithCLI(ctx, "put.example.test", executable)
+	elapsed := time.Since(started)
+	if token != "" {
+		t.Fatalf("token = %q, want none from a timed-out request", token)
+	}
+	if elapsed > 5*time.Second {
+		t.Errorf("ResolveTokenWithCLI returned after %v, want the deadline plus %v", elapsed, credentialWaitDelay)
+	}
+}
+
 func TestResolveTokenCLI_FallbackRetainsLauncherPolicy(t *testing.T) {
 	t.Setenv("PUTNAMI_NO_RELAUNCH", "")
 	fakeCloudCLI(t, fakeCLI{RefuseEnv: map[string]string{"PUTNAMI_NO_RELAUNCH": "1"}, Stdout: "pkt_live_token\n"})

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -43,11 +45,17 @@ type fakeCLI struct {
 	CountFile string `json:"countFile,omitempty"`
 	// CwdFile receives the working directory with symbolic links resolved,
 	// as pwd -P prints it.
-	CwdFile string        `json:"cwdFile,omitempty"`
-	Sleep   time.Duration `json:"sleep,omitempty"`
-	Stdout  string        `json:"stdout,omitempty"`
-	Stderr  string        `json:"stderr,omitempty"`
-	Exit    int           `json:"exit,omitempty"`
+	CwdFile string `json:"cwdFile,omitempty"`
+	// OrphanSleep starts a copy of the test binary that sleeps this long
+	// holding the fake's stdout and stderr, as a credential helper or a
+	// browser the cloud CLI starts and leaves behind would. OrphanPidFile
+	// receives its pid, so the test can kill it.
+	OrphanSleep   time.Duration `json:"orphanSleep,omitempty"`
+	OrphanPidFile string        `json:"orphanPidFile,omitempty"`
+	Sleep         time.Duration `json:"sleep,omitempty"`
+	Stdout        string        `json:"stdout,omitempty"`
+	Stderr        string        `json:"stderr,omitempty"`
+	Exit          int           `json:"exit,omitempty"`
 }
 
 func runFakeCLI(spec string, args []string) int {
@@ -109,10 +117,68 @@ func runFakeCLI(spec string, args []string) int {
 			return 125
 		}
 	}
+	if fake.OrphanSleep > 0 {
+		if err := startOrphan(fake); err != nil {
+			fmt.Fprintf(os.Stderr, "fake CLI: %v\n", err)
+			return 125
+		}
+	}
 	time.Sleep(fake.Sleep)
 	fmt.Fprint(os.Stdout, fake.Stdout)
 	fmt.Fprint(os.Stderr, fake.Stderr)
 	return fake.Exit
+}
+
+// startOrphan starts the sleeping grandchild fake.OrphanSleep asks for, with
+// the fake's own stdout and stderr, and records its pid in fake.OrphanPidFile.
+// The grandchild runs the test binary as a fake that only sleeps: the fake
+// CLI variable is replaced, not appended, since the first value wins.
+func startOrphan(fake fakeCLI) error {
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	spec, err := json.Marshal(fakeCLI{Sleep: fake.OrphanSleep})
+	if err != nil {
+		return err
+	}
+	orphan := exec.Command(executable)
+	for _, entry := range os.Environ() {
+		if !strings.HasPrefix(entry, fakeCLIEnv+"=") {
+			orphan.Env = append(orphan.Env, entry)
+		}
+	}
+	orphan.Env = append(orphan.Env, fakeCLIEnv+"="+string(spec))
+	orphan.Stdout, orphan.Stderr = os.Stdout, os.Stderr
+	if err := orphan.Start(); err != nil {
+		return err
+	}
+	if fake.OrphanPidFile == "" {
+		return nil
+	}
+	return os.WriteFile(fake.OrphanPidFile, []byte(strconv.Itoa(orphan.Process.Pid)), 0o600)
+}
+
+// stuckHelperCLI is a fake CLI that starts a grandchild holding its pipes and
+// then sleeps past every bound a test sets, as a cloud CLI stuck behind a
+// credential helper would. The grandchild is killed when the test ends.
+func stuckHelperCLI(t *testing.T) fakeCLI {
+	t.Helper()
+	pidFile := filepath.Join(t.TempDir(), "orphan-pid")
+	t.Cleanup(func() {
+		data, err := os.ReadFile(pidFile)
+		if err != nil {
+			return
+		}
+		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err != nil {
+			return
+		}
+		if process, err := os.FindProcess(pid); err == nil {
+			_ = process.Kill()
+		}
+	})
+	return fakeCLI{OrphanSleep: time.Minute, OrphanPidFile: pidFile, Sleep: time.Minute}
 }
 
 // fakeCLIExecutable makes the test binary behave as fake when a child of this

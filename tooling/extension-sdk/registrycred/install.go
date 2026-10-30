@@ -140,6 +140,7 @@ func materializeNativeCredential(ctx context.Context, workspaceRoot, host string
 		"--"+registry.SeamHostFlag, host,
 		"--"+registry.SeamMaterializeFlag,
 	)
+	cmd.WaitDelay = credentialWaitDelay
 	if dir := strings.TrimSpace(workspaceRoot); dir != "" {
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
 			cmd.Dir = dir
