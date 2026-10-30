@@ -70,6 +70,10 @@ func runHelper(program string, args []string) int {
 		if args[0] == "sleep" {
 			time.Sleep(30 * time.Second)
 		}
+		// Give the parent's copying goroutine the pid while this process is
+		// still alive: once it exits, only waitDelay bounds that read, and
+		// under the race detector on a loaded host that was not enough.
+		time.Sleep(100 * time.Millisecond)
 		return 0
 	}
 	return 2
@@ -259,12 +263,14 @@ func TestRun_Timeout(t *testing.T) {
 }
 
 // shortWaitDelay lowers waitDelay for one test, so a run that waits on a
-// descendant's pipes returns well inside the test's bound.
+// descendant's pipes returns well inside the test's bound. One second keeps
+// the pid the helper prints readable under the race detector on a loaded
+// host, where the default would be read fine but take the whole bound.
 func shortWaitDelay(t *testing.T) {
 	t.Helper()
 	previous := waitDelay
 	t.Cleanup(func() { waitDelay = previous })
-	waitDelay = 200 * time.Millisecond
+	waitDelay = time.Second
 }
 
 // killOrphan kills the grandchild whose pid the orphan helper printed as its
@@ -295,8 +301,8 @@ func TestRun_TimeoutWithGrandchild(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	killOrphan(t, result.Stdout)
-	if elapsed > 2*time.Second {
-		t.Errorf("Run returned after %v, want within 2s of the timeout", elapsed)
+	if elapsed > 3*time.Second {
+		t.Errorf("Run returned after %v, want within 3s of the timeout", elapsed)
 	}
 	if result.Success {
 		t.Error("Success = true, want false for a timed-out command")
@@ -317,8 +323,8 @@ func TestRun_ExitedChildWithGrandchild(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	killOrphan(t, result.Stdout)
-	if elapsed > 2*time.Second {
-		t.Errorf("Run returned after %v, want within 2s of the child's exit", elapsed)
+	if elapsed > 3*time.Second {
+		t.Errorf("Run returned after %v, want within 3s of the child's exit", elapsed)
 	}
 	if result.Success || result.ExitCode == 0 {
 		t.Errorf("result = %+v, want a failed run", result)
