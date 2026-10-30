@@ -1,6 +1,8 @@
 package githooks
 
 import (
+	"crypto/rand"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -94,6 +96,61 @@ func TestInstall_WritesHooks(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "/path/to/putnami") {
 		t.Errorf("commit-msg hook should re-invoke the self binary, got:\n%s", data)
+	}
+}
+
+// The pre-commit hook's size and binary gate reads every staged name as git
+// spells it: a space, a glob character or a non-ASCII byte used to make
+// `git cat-file` miss the file, and the `|| continue` then exempted it. The gate
+// exits before the hook reaches `putnami lint`, so no CLI is needed on PATH.
+func TestInstall_PreCommitHookChecksEveryStagedFileName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the hook runs under sh")
+	}
+	t.Setenv("CI", "")
+
+	repo := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		if out, err := exec.Command(git.Executable(), append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	run("init")
+	run("symbolic-ref", "HEAD", "refs/heads/work") // the hook refuses main before it looks at files
+	run("config", "user.name", "Test")
+	run("config", "user.email", "test@example.com")
+	run("config", "core.quotePath", "true") // git's default: a non-ASCII name prints as "caf\303\251.bin"
+
+	names := []string{"a b.bin", "café.bin", "star*.bin"}
+	for _, name := range names {
+		blob := make([]byte, 1<<20+1)
+		if _, err := rand.Read(blob); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(repo, name), blob, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run(append([]string{"add", "--"}, names...)...)
+	t.Chdir(repo)
+
+	Install("/path/to/putnami")
+
+	cmd := exec.Command("sh", filepath.Join(repo, ".git", "hooks", "pre-commit"))
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 1 {
+		t.Fatalf("hook exit = %v, want 1; output:\n%s", err, out)
+	}
+	for _, name := range names {
+		if !strings.Contains(string(out), "  "+name+" (") {
+			t.Errorf("the hook did not block %q:\n%s", name, out)
+		}
+	}
+	if strings.Contains(string(out), "binary file") {
+		t.Errorf("a 1 MiB + 1 blob is reported by its size, not as binary:\n%s", out)
 	}
 }
 

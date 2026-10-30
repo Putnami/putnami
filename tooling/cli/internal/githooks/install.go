@@ -88,10 +88,18 @@ if [ "$branch" = "main" ]; then
   exit 1
 fi
 
-# Reject binary files and large files (>1MB)
+# Reject binary files and large files (>1MB). The loop stays in the main
+# shell so the errors it collects survive it. Names are read one per line,
+# unquoted (core.quotePath=false keeps non-ASCII bytes as they are) and
+# unexpanded (set -f keeps a * or ? in a name from matching files), so that a
+# space, a glob character or an accent never makes git miss the file and the
+# check silently skip it.
 MAX_SIZE=1048576
 errors=""
-for file in $(git diff --cached --name-only --diff-filter=d); do
+set -f
+IFS='
+'
+for file in $(git -c core.quotePath=false diff --cached --name-only --diff-filter=d); do
   size=$(git cat-file -s ":$file" 2>/dev/null) || continue
   if [ "$size" -gt "$MAX_SIZE" ]; then
     size_human=$(awk "BEGIN {printf \"%.1fMB\", $size / 1048576}")
@@ -102,6 +110,8 @@ for file in $(git diff --cached --name-only --diff-filter=d); do
     errors="${errors}\n  ${file} (binary file)"
   fi
 done
+unset IFS
+set +f
 if [ -n "$errors" ]; then
   echo "Commit blocked — binary or large files (>1MB) detected:"
   printf "%b\n" "$errors"
