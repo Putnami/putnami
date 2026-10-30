@@ -2,6 +2,7 @@ package finalize
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 )
@@ -21,8 +23,44 @@ func TestNativeGitReadBoundaryRejectsWritingVerbs(t *testing.T) {
 			t.Fatalf("read boundary accepted %q: %v", verb, err)
 		}
 	}
-	if err := g.runWrite("status"); err == nil || !strings.Contains(err.Error(), "unsupported repository-writing git operation") {
+	if err := g.runWrite(context.Background(), "status"); err == nil || !strings.Contains(err.Error(), "unsupported repository-writing git operation") {
 		t.Fatalf("write boundary accepted status: %v", err)
+	}
+}
+
+func TestNativeGitPushThatHangsTimesOut(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the hanging hook is a POSIX executable")
+	}
+	// Not parallel: it shortens the package write timeout.
+	previous := gitWriteTimeout
+	gitWriteTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { gitWriteTimeout = previous })
+	root, origin, hooks := t.TempDir(), t.TempDir(), t.TempDir()
+	run := func(dir string, args ...string) {
+		t.Helper()
+		if output, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+	run(origin, "init", "-q", "--bare")
+	run(root, "init", "-q", "-b", "fix/hang")
+	run(root, "config", "user.name", "Test")
+	run(root, "config", "user.email", "test@example.invalid")
+	run(root, "config", "commit.gpgsign", "false")
+	run(root, "config", "core.hooksPath", hooks)
+	run(root, "remote", "add", "origin", origin)
+	run(root, "commit", "-q", "--allow-empty", "-m", "fix: base")
+	if err := os.WriteFile(filepath.Join(hooks, "pre-push"), []byte("#!/bin/sh\nsleep 60\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	err := (NativeGit{Root: root}).Push(context.Background(), "fix/hang")
+	if err == nil || !strings.Contains(err.Error(), "timed out after 200ms") {
+		t.Fatalf("hanging push: %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > gitWriteWaitDelay+10*time.Second {
+		t.Fatalf("hanging push returned after %s", elapsed)
 	}
 }
 

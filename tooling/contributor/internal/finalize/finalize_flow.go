@@ -341,7 +341,7 @@ func (f Finalizer) seedAndFind(ctx context.Context, c *publicationCandidate) (*R
 		return nil, err
 	}
 	if c.opts.Draft && !ahead {
-		if err := f.Git.Seed(c.opts.Title); err != nil {
+		if err := f.Git.Seed(ctx, c.opts.Title); err != nil {
 			return nil, err
 		}
 		c.head, err = f.Git.Head()
@@ -501,7 +501,7 @@ func (f Finalizer) publish(ctx context.Context, c *publicationCandidate) (Result
 	if _, err := c.recheck(ctx, f); err != nil {
 		return Result{}, err
 	}
-	if err := f.Git.Push(c.opts.Branch); err != nil {
+	if err := f.Git.Push(ctx, c.opts.Branch); err != nil {
 		return Result{}, fmt.Errorf("push may have happened; inspect origin before resuming: %w", err)
 	}
 	if _, err := c.recheck(ctx, f); err != nil {
