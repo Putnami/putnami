@@ -15,6 +15,7 @@ package installscript
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
@@ -80,6 +81,7 @@ type registryOptions struct {
 	resolved   string // X-Resolved-Version; empty omits the header
 	statusCode int    // defaults to 200
 	commandMap string // body of /install-commands.txt; empty serves 404
+	tls        bool   // serve over https with the httptest certificate
 }
 
 func newRegistry(t *testing.T, opts registryOptions) *httptest.Server {
@@ -88,7 +90,7 @@ func newRegistry(t *testing.T, opts registryOptions) *httptest.Server {
 	if err != nil {
 		t.Fatalf("read install script: %v", err)
 	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/install.sh" {
 			serveInstallScript(w, r, installer)
 			return
@@ -124,6 +126,40 @@ func newRegistry(t *testing.T, opts registryOptions) *httptest.Server {
 		w.WriteHeader(status)
 		_, _ = w.Write(opts.body)
 	}))
+	if opts.tls {
+		server.StartTLS()
+	} else {
+		server.Start()
+	}
+	t.Cleanup(server.Close)
+	return server
+}
+
+// caBundle writes the certificate an httptest TLS server presents to a PEM file
+// curl trusts through CURL_CA_BUNDLE. Every httptest server presents the same
+// certificate, so one bundle covers a redirect between two of them.
+func caBundle(t *testing.T, server *httptest.Server) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ca.pem")
+	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	if err := os.WriteFile(path, block, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// redirectingServer answers every request with a redirect to the same path and
+// query under target, over https when tls is set.
+func redirectingServer(t *testing.T, target string, tls bool) *httptest.Server {
+	t.Helper()
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target+r.URL.RequestURI(), http.StatusFound)
+	}))
+	if tls {
+		server.StartTLS()
+	} else {
+		server.Start()
+	}
 	t.Cleanup(server.Close)
 	return server
 }
@@ -539,6 +575,83 @@ func TestInstallAcceptsLoopbackHTTPRegistryWithoutOptIn(t *testing.T) {
 		t.Fatalf("loopback http registry was refused (exit %d):\n%s", res.exitCode, res.output)
 	}
 	e.assertNeverEscalated(t)
+}
+
+// The registry rule checks the URL the user gave, and curl follows redirects on
+// its own. An https:// registry answering "302 Location: http://..." was
+// followed in plaintext, and read_header reads the headers of the response that
+// carried the body — the plaintext one — so an on-path answer with a consistent
+// body and digest was "Integrity verified". install.ps1 holds each redirect
+// target to the registry rule; install.sh passes curl --proto-redir, which
+// refuses the hop before it resolves the host, so the refusal has to name the
+// downgrade rather than a DNS failure. A redirect that keeps https, and a
+// plaintext registry (loopback, or the opt-in) that redirects within plaintext,
+// are still followed.
+func TestInstallRefusesARedirectFromHTTPSToPlaintext(t *testing.T) {
+	requireBash(t)
+
+	t.Run("https to http is refused before the host is resolved", func(t *testing.T) {
+		server := redirectingServer(t, "http://example.invalid", true)
+		e := newEnv(t).
+			set("PUTNAMI_REGISTRY_URL", server.URL).
+			set("CURL_CA_BUNDLE", caBundle(t, server))
+
+		res := e.run(t, "--install-dir", e.installDir)
+		if res.exitCode == 0 {
+			t.Fatalf("a redirect from https:// to http:// was followed:\n%s", res.output)
+		}
+		if !res.contains("redirected an https:// request to plaintext http://") {
+			t.Fatalf("refusal did not name the downgrade:\n%s", res.output)
+		}
+		// curl 8.5 says `not supported or disabled in libcurl`, newer curl says
+		// `disabled`; the exit code and the scheme are the stable part.
+		if !res.contains(`curl: (1) Protocol "http"`) {
+			t.Fatalf("curl's own refusal was not surfaced:\n%s", res.output)
+		}
+		if res.contains("Could not resolve host") {
+			t.Fatalf("curl resolved the redirect target instead of refusing its scheme:\n%s", res.output)
+		}
+		e.assertNothingInstalled(t)
+		e.assertNeverEscalated(t)
+	})
+
+	t.Run("https to https is followed", func(t *testing.T) {
+		body := stubCLI(stubVersion)
+		registry := newRegistry(t, registryOptions{
+			body:      body,
+			integrity: "sha256:" + sha256Hex(body),
+			resolved:  stubVersion,
+			tls:       true,
+		})
+		front := redirectingServer(t, registry.URL, true)
+		e := newEnv(t).
+			set("PUTNAMI_REGISTRY_URL", front.URL).
+			set("CURL_CA_BUNDLE", caBundle(t, front))
+
+		res := e.run(t, "--install-dir", e.installDir)
+		if res.exitCode != 0 {
+			t.Fatalf("an https:// redirect was refused (exit %d):\n%s", res.exitCode, res.output)
+		}
+		if !res.contains("Integrity verified (sha256:" + sha256Hex(body)) {
+			t.Fatalf("installer did not verify the redirected download:\n%s", res.output)
+		}
+		e.assertNeverEscalated(t)
+	})
+
+	t.Run("a plaintext loopback registry may redirect within plaintext", func(t *testing.T) {
+		registry, body := defaultRegistry(t)
+		front := redirectingServer(t, registry.URL, false)
+		e := newEnv(t).set("PUTNAMI_REGISTRY_URL", front.URL)
+
+		res := e.run(t, "--install-dir", e.installDir)
+		if res.exitCode != 0 {
+			t.Fatalf("a loopback http:// redirect was refused (exit %d):\n%s", res.exitCode, res.output)
+		}
+		if !res.contains("Integrity verified (sha256:" + sha256Hex(body)) {
+			t.Fatalf("installer did not verify the redirected download:\n%s", res.output)
+		}
+		e.assertNeverEscalated(t)
+	})
 }
 
 func TestDownloadURLRequiresAnExpectedDigest(t *testing.T) {
