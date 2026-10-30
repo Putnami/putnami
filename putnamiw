@@ -954,23 +954,151 @@ ensure_locked_go() {
 
 # --- Download pre-built CLI ---
 
+# validate_resolver_url refuses a RESOLVER_URL that cannot carry an
+# authenticated download, the rule install.sh and extension.ValidateRegistryURL
+# apply: https always, http to a loopback host only, any other http with
+# PUTNAMI_ALLOW_INSECURE_REGISTRY=1, and no other scheme at all. It runs before
+# any fetch. The userinfo of the URL is never printed.
+validate_resolver_url() {
+  local raw="$1"
+  local shown scheme rest authority host
+  shown="$(printf '%s' "$raw" | sed -E 's#(://)[^/@]*@#\1***@#')"
+  case "$raw" in
+    *://*) ;;
+    *) fail "Invalid PUTNAMI_REGISTRY_URL \"$shown\": no scheme (expected https://...)" ;;
+  esac
+  scheme="$(printf '%s' "${raw%%://*}" | tr '[:upper:]' '[:lower:]')"
+  rest="${raw#*://}"
+  authority="${rest%%/*}"
+  authority="${authority##*@}"
+  case "$authority" in
+    \[*\]*) host="${authority%%\]*}]" ;;
+    *)      host="${authority%%:*}" ;;
+  esac
+  host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+  case "$scheme" in
+    https) return 0 ;;
+    http)
+      case "$host" in
+        localhost|127.0.0.1|::1|"[::1]") return 0 ;;
+      esac
+      [ "${PUTNAMI_ALLOW_INSECURE_REGISTRY:-}" = "1" ] && return 0
+      fail "PUTNAMI_REGISTRY_URL \"$shown\" uses plaintext http://; refusing to fetch the putnami CLI over an unauthenticated channel. Switch to https://, or set PUTNAMI_ALLOW_INSECURE_REGISTRY=1 to override."
+      ;;
+    *) fail "PUTNAMI_REGISTRY_URL \"$shown\" has unsupported scheme \"$scheme\" (only https and http are accepted)" ;;
+  esac
+}
+
+# response_header prints the value of the last response header named $2 in the
+# capture $1, or nothing. The last one wins because curl -D appends one block
+# per response, and after a redirect the last block is the one that carried the
+# body. wget -S indents every line, so the name is matched after any indent.
+response_header() {
+  [ -f "$1" ] || return 0
+  { grep -i "^[[:space:]]*$2:" "$1" 2>/dev/null || true; } \
+    | tail -n 1 \
+    | sed -e 's/^[^:]*:[[:space:]]*//' \
+    | tr -d '\r' \
+    | awk '{$1=$1; print}'
+}
+
+# advertised_sha256 prints the SHA-256 the registry advertised for the bytes it
+# streamed, read from the response capture $1 as install.sh and
+# pinnedarchive.ReadAdvertisedIntegrity read it: the X-Integrity header, else
+# the sha-256 member of an RFC 9530 Digest header, lower-cased and without a
+# sha256:, sha-256:, sha256- or sha-256- prefix. It prints nothing when none is
+# advertised, and fails when the value is not 64 hex characters.
+advertised_sha256() {
+  local value
+  value="$(response_header "$1" "X-Integrity")"
+  if [ -z "$value" ]; then
+    value="$(response_header "$1" "Digest" \
+      | tr ',' '\n' \
+      | sed -n -e 's/^[[:space:]]*[Ss][Hh][Aa]-256=[[:space:]]*//p' \
+      | head -n 1)"
+  fi
+  value="$(printf '%s' "$value" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    sha256:*)  value="${value#sha256:}" ;;
+    sha-256:*) value="${value#sha-256:}" ;;
+    sha256-*)  value="${value#sha256-}" ;;
+    sha-256-*) value="${value#sha-256-}" ;;
+  esac
+  [ -z "$value" ] && return 0
+  [[ "$value" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s' "$value"
+}
+
+# locked_cli_sha256 prints the SHA-256 the workspace lock records for the CLI
+# executable of version $1 on platform $2, such as linux/amd64, and fails when
+# the lock pins no published CLI, pins another version, or records none for the
+# platform. It reads the layout the CLI writes: two-space indentation,
+# cli.{version,integrities}. A source workspace (cli.source: "workspace")
+# records neither, and the digest is of the extracted binary, not of its
+# archive.
+locked_cli_sha256() {
+  local lock="$SCRIPT_DIR/putnami.lock.json"
+  [ -f "$lock" ] || return 1
+  awk -v want="$1" -v platform="$2" '
+    /^  "cli": [{]/ { in_cli = 1; next }
+    in_cli && /^  [}]/ { in_cli = 0 }
+    in_cli && /^    "version": / { version = $2; gsub(/[",]/, "", version) }
+    in_cli && index($0, "      \"" platform "\": ") == 1 { digest = $2; gsub(/[",]/, "", digest) }
+    END {
+      sub(/^v/, "", version); sub(/^v/, "", want)
+      if (want != "" && version == want && length(digest) == 64 && digest !~ /[^0-9a-f]/) { print digest; exit 0 }
+      exit 1
+    }
+  ' "$lock"
+}
+
 download_cli() {
   detect_platform
+  validate_resolver_url "$RESOLVER_URL"
   local url="${RESOLVER_URL}/putnami?version=latest&target=${GO_ARCH}&platform=${GO_OS}"
 
   info "Downloading putnami CLI from ${DIM}putnami.dev${NC}..."
   mkdir -p "$(dirname "$CLI_BINARY")"
 
-  local tmp_archive
+  # The response headers are captured beside the archive: the registry
+  # advertises the SHA-256 of the bytes it streams there, and the version it
+  # resolved. curl writes them with -D; wget -S prints them on stderr.
+  local tmp_archive headers_file
   tmp_archive="$(mktemp "${TMPDIR:-/tmp}/putnami-dl.XXXXXX")"
   register_cleanup "$tmp_archive"
+  headers_file="$(mktemp "${TMPDIR:-/tmp}/putnami-dl.XXXXXX")"
+  register_cleanup "$headers_file"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "${CURL_LIMITS[@]}" -o "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
+    curl -fsSL "${CURL_LIMITS[@]}" -D "$headers_file" -o "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q "${WGET_LIMITS[@]}" -O "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
+    wget -q -S "${WGET_LIMITS[@]}" -O "$tmp_archive" "$url" 2>"$headers_file" || fail "Failed to download putnami CLI"
   else
     fail "curl or wget is required to download putnami CLI"
+  fi
+
+  # The archive is extracted only when its SHA-256 is the one the registry
+  # advertised for the bytes it streamed, the rule install.sh and
+  # `putnami upgrade` apply. PUTNAMI_UNSAFE_INSTALL=1 is the single override,
+  # for a registry that advertises no digest or a host with no hashing tool; a
+  # digest that disagrees is refused whatever the environment.
+  local expected actual resolved_version
+  expected="$(advertised_sha256 "$headers_file")" || fail "Invalid integrity advertised for the putnami CLI: expected a 64-character hex SHA-256 in X-Integrity or Digest"
+  resolved_version="$(response_header "$headers_file" "X-Resolved-Version")"
+  rm -f "$headers_file"
+  actual="$(sha256_of "$tmp_archive")"
+  if [ -z "$expected" ] || [ -z "$actual" ]; then
+    if [ "${PUTNAMI_UNSAFE_INSTALL:-}" != "1" ]; then
+      if [ -z "$expected" ]; then
+        fail "The registry did not advertise an integrity hash for the putnami CLI; refusing to run an unverified binary. Set PUTNAMI_UNSAFE_INSTALL=1 to override."
+      fi
+      fail "Cannot verify the putnami CLI: no sha256sum, shasum or openssl. Install one, or set PUTNAMI_UNSAFE_INSTALL=1 to override."
+    fi
+    warn "Installing without integrity verification (PUTNAMI_UNSAFE_INSTALL=1)."
+  elif [ "$actual" != "$expected" ]; then
+    fail "Integrity check failed for the putnami CLI: expected $expected, got $actual. The download does not match the digest the registry advertised; nothing was installed."
+  else
+    success "Integrity verified ${DIM}(sha256:${expected})${NC}"
   fi
 
   # Extract binary from the tar.gz archive
@@ -989,6 +1117,22 @@ download_cli() {
 
   local sha
   sha="$(sha256_of "$extracted_binary" || true)"
+
+  # A workspace that pins a published CLI records the SHA-256 of that version's
+  # executable per platform. When the registry resolved the pinned version, the
+  # extracted binary must hash to the recorded digest. Another resolved version
+  # is left to the binary's own launcher, which honors the pin.
+  local locked
+  if locked="$(locked_cli_sha256 "$resolved_version" "$GO_OS/$GO_ARCH")"; then
+    if [ -z "$sha" ]; then
+      rm -rf "$tmp_dir"
+      fail "Cannot verify the putnami CLI $resolved_version against putnami.lock.json: no sha256sum, shasum or openssl"
+    fi
+    if [ "$sha" != "$locked" ]; then
+      rm -rf "$tmp_dir"
+      fail "Refusing putnami CLI $resolved_version: SHA-256 $sha, putnami.lock.json records $locked for $GO_OS/$GO_ARCH"
+    fi
+  fi
   mkdir -p "$(dirname "$CLI_BINARY")"
 
   if [ -n "$sha" ]; then

@@ -49,7 +49,7 @@ The repository includes a `putnamiw` wrapper script (similar to Gradle's `gradle
 |-----------------|-----------------------------------------------------------------------------------------|
 | (none)          | Build from Go source if binary is missing or stale. Reuses cached binary otherwise.     |
 | `--bootstrap`   | Force rebuild from source, even if the binary is up to date.                            |
-| `--download`    | Download a pre-built binary from `putnami.dev` instead of compiling. No Go required.    |
+| `--download`    | Download a pre-built binary from `putnami.dev` instead of compiling. No Go required. The archive runs only when its SHA-256 is the one the registry advertised, as with the [installer](22-installing-the-cli.md#what-the-installer-trusts-and-what-it-refuses). |
 | `--print-engine` | Build or reuse the from-source CLI, prepare the provider runtimes of the workspace's own extensions, and print where the CLI is. Workspaces with `tooling/cli` only. |
 
 The binary is cached at `.putnami/bin/putnami`. On subsequent runs, `putnamiw` skips the build/download if the binary is already present and up to date.

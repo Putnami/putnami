@@ -892,7 +892,12 @@ fail-closed on every launch — see
 
 For a cold workspace pin, the Go launcher uses the configured native Put
 endpoint and host-scoped authentication before verifying the downloaded digest.
-The shell `putnamiw` download path still uses the `/dl` resolver.
+The shell `putnamiw` download path still uses the `/dl` resolver, which redirects
+to the same registry download endpoint; it applies the same rule, running the
+archive only when its SHA-256 is the one the registry advertised, with
+`PUTNAMI_UNSAFE_INSTALL=1` as the single override, and refuses a plaintext
+`PUTNAMI_REGISTRY_URL` under the same loopback and
+`PUTNAMI_ALLOW_INSECURE_REGISTRY=1` rule as the installer.
 
 Three rollbacks are **not** available, and all three absences are decisions:
 
