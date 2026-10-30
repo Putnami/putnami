@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -209,6 +210,12 @@ func VersionUpdateWithOptions(ctx context.Context, currentVersion string, binDir
 		iox.Fprintf(os.Stdout, "  Already up to date (%s)\n", currentVersion)
 		return VersionUpdateResult{}, nil
 	}
+	// The resolved version names the installed binary and is printed, so a
+	// version this binary would replace must be one; an answer equal to the
+	// running version, such as a development build's, installs nothing.
+	if !resolvedVersionPattern.MatchString(latestVersion) {
+		return VersionUpdateResult{}, fmt.Errorf("check for updates: resolver returned %q as the resolved version, which is not a version", latestVersion)
+	}
 
 	if opts.DryRun {
 		iox.Fprintf(os.Stdout, "  Would update: %s → %s\n", currentVersion, latestVersion)
@@ -336,6 +343,12 @@ func verifyDownloadedBinaryStamp(ctx context.Context, binaryPath, resolvedVersio
 }
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
+
+// resolvedVersionPattern is a strict semantic version, with or without a
+// leading v. A resolved version an update installs must match it, so a path
+// never names the installed binary.
+var resolvedVersionPattern = regexp.MustCompile(
+	`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 
 func fetchLatestRelease(ctx context.Context, client *http.Client, baseURL string) (version, downloadURL, integrity string, err error) {
 	return fetchRelease(ctx, client, baseURL, "latest")

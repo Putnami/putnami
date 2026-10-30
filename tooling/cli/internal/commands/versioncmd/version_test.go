@@ -564,6 +564,59 @@ func TestVersionUpdate_ActivationFailureReturnsError(t *testing.T) {
 	}
 }
 
+func TestVersionUpdate_RefusesAResolvedVersionThatIsNotAVersion(t *testing.T) {
+	// The resolved version names the installed binary, so a resolver that
+	// answers a path must not place a binary, or the putnami link, outside
+	// binDir. The archive holds a binary that reports no version, so the
+	// stamp check would not catch it.
+	for _, resolved := range []string{"../evil", "x/../../evil", "1.2.3/../../evil"} {
+		t.Run(resolved, func(t *testing.T) {
+			t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
+			t.Setenv("PUTNAMI_REGISTRY_URL", "")
+
+			root := t.TempDir()
+			binDir := filepath.Join(root, "home", "bin")
+			archivePath := filepath.Join(t.TempDir(), "release.tar.gz")
+			writeTarGz(t, archivePath, map[string][]byte{
+				cliArchiveEntry: []byte("fake-binary"),
+			})
+			archiveBytes, err := os.ReadFile(archivePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hash, err := hashFileSHA256(archivePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("X-Resolved-Version", resolved)
+				w.Header().Set("X-Integrity", "sha256:"+hash)
+				_, _ = w.Write(archiveBytes)
+			}))
+			t.Cleanup(srv.Close)
+			t.Setenv("PUTNAMI_REGISTRY_URL", srv.URL)
+
+			_, err = VersionUpdateWithOptions(context.Background(), "1.0.0", binDir, VersionUpdateOptions{Channel: "latest"})
+			if err == nil {
+				t.Fatal("expected a refused resolved version, got nil")
+			}
+			if !strings.Contains(err.Error(), "not a version") {
+				t.Errorf("error = %q, want it to say the resolved version is not a version", err)
+			}
+			var created []string
+			_ = filepath.WalkDir(root, func(path string, _ os.DirEntry, _ error) error {
+				if path != root {
+					created = append(created, path)
+				}
+				return nil
+			})
+			if len(created) != 0 {
+				t.Errorf("update created %v, want nothing written", created)
+			}
+		})
+	}
+}
+
 func TestVersionUpdate_RejectsBadIntegrity(t *testing.T) {
 	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")
 	t.Setenv("PUTNAMI_REGISTRY_URL", "")
