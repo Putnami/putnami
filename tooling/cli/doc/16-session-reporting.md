@@ -11,8 +11,9 @@ events while the graph runs (see [Trimmed events](#trimmed-events)), then the
 terminal session, including failed and canceled work, and last the spec gate's
 record. Local and
 hosted execution use the same capability. A trusted launcher may supply
-`PUTNAMI_SESSION_REPORTER_TOKEN`; the authoritative CLI captures it before
-workspace setup/hooks/tasks and passes it only to the selected provider
+`PUTNAMI_SESSION_REPORTER_TOKEN`; the CLI captures it before it fetches a
+pinned CLI, and before workspace setup/hooks/tasks, hands it to the pinned
+CLI it execs and otherwise passes it only to the selected provider
 process. Do not put it in repository commands. A hosted run
 (`--credential-fd`) ignores the token instead: it removes it from the
 environment with a warning, and hands the reporter the run credential over the

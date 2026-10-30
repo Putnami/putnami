@@ -524,6 +524,35 @@ func TestRelaunchPreservesCapabilityTransportForPinnedChild(t *testing.T) {
 	}
 }
 
+// The entries the caller captured out of its environment before the download
+// reach the pinned child through set, on top of the environment the download
+// ran in, which no longer holds them.
+func TestRelaunchHandsTheCapturedEntriesToThePinnedChild(t *testing.T) {
+	ws := t.TempDir()
+	writeCLILock(t, ws, "linux", "amd64", testSHA)
+	self := touch(t, filepath.Join(ws, "self"))
+	resolved := touch(t, filepath.Join(ws, "resolved"))
+	var cap capture
+	c := baseConfig(&cap, self)
+	c.set = []string{
+		"PUTNAMI_SESSION_REPORTER=@acme/session-reporter",
+		"PUTNAMI_SESSION_REPORTER_TOKEN=captured-session-reporter-token",
+	}
+	c.resolve = func(context.Context, *lockfile.LockEntry, string, string) (string, error) {
+		return resolved, nil
+	}
+
+	launched, err := relaunch(context.Background(), ws, c)
+	if err != nil || !launched {
+		t.Fatalf("relaunch = %v, %v; want pinned child", launched, err)
+	}
+	want := append(slices.Clone(c.environ()), c.set...)
+	want = append(want, LaunchedEnv+"="+testSHA)
+	if !slices.Equal(cap.env, want) {
+		t.Errorf("pinned child env = %v, want %v", cap.env, want)
+	}
+}
+
 // A resolved binary that will not exec (corrupt store entry, noexec mount, wrong
 // platform) must not silently degrade into "run whatever this process is".
 func TestRelaunchExecErrorFailsClosed(t *testing.T) {

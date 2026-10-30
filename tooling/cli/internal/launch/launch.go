@@ -294,6 +294,11 @@ type Bootstrap struct {
 // bootstrap serves the pinned CLI's download and nothing else. Relaunch closes
 // it before it hands control to the pinned CLI.
 //
+// set holds NAME=value entries the pinned CLI receives on top of this process's
+// environment: what the caller captured out of that environment before the
+// download, so that no process the download starts sees it, and the pinned CLI
+// captures again. The caller removed each name from the environment.
+//
 // A process that holds the run credential hands it only to a pinned CLI that
 // advertises runcredential.CustodyLevel or above, and refuses to launch any
 // other with ErrPinBelowCustodyLevel (see credentialProbe).
@@ -303,7 +308,7 @@ type Bootstrap struct {
 // build this binary: the caller must NOT continue with the running binary, it
 // must report the error (which carries a protocolcli class and a WithNext
 // recovery command) and exit.
-func Relaunch(ctx context.Context, wsRoot string, args []string, bootstrap Bootstrap) error {
+func Relaunch(ctx context.Context, wsRoot string, args []string, bootstrap Bootstrap, set ...string) error {
 	if wsRoot == "" {
 		return nil
 	}
@@ -328,6 +333,7 @@ func Relaunch(ctx context.Context, wsRoot string, args []string, bootstrap Boots
 		probe:      credentialProbe(os.Getenv),
 		serve:      bootstrap.Serve,
 		beforeExec: bootstrap.Close,
+		set:        set,
 	})
 	return err
 }
@@ -353,6 +359,8 @@ type config struct {
 	serve func() (restore func())
 	// beforeExec, when set, runs right before exec.
 	beforeExec func()
+	// set holds the NAME=value entries exec adds to environ's (see Relaunch).
+	set []string
 }
 
 // relaunch is the pure decision core. It returns (true, nil) only when it handed
@@ -447,7 +455,7 @@ func relaunch(ctx context.Context, wsRoot string, c config) (bool, error) {
 		c.beforeExec()
 	}
 	argv := append([]string{resolved}, c.args...)
-	env := append(c.environ(), LaunchedEnv+"="+sha)
+	env := append(append(c.environ(), c.set...), LaunchedEnv+"="+sha)
 	if err := c.exec(resolved, argv, env); err != nil {
 		return false, execError(c, entry.Version, resolved, err)
 	}

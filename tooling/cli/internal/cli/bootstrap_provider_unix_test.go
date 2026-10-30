@@ -37,6 +37,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/credentialprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -195,6 +196,74 @@ func bootstrapTestEnv(t *testing.T) (userRoot string) {
 		t.Fatal(err)
 	}
 	return userRoot
+}
+
+// A run without the run credential whose store lacks the pinned CLI fetches it
+// through the host-keyed credential seam, which starts a CLI that loads the
+// workspace's path extensions. The reporter selections and tokens are out of
+// the environment before that fetch, and App.Run captured them for the pinned
+// CLI alone.
+func TestRelaunchFetchesThePinnedCLIWithoutTheReporterTokens(t *testing.T) {
+	bootstrapTestEnv(t)
+	// The suite runs under ./putnamiw, which exports PUTNAMI_NO_RELAUNCH for its
+	// own from-source build; this test exercises the launcher itself.
+	t.Setenv(launch.NoRelaunchEnv, "")
+	t.Setenv(launch.LaunchedEnv, "")
+	reporterEnv := map[string]string{
+		protocolcli.SessionReporterEnv:      "@acme/session-reporter",
+		protocolcli.SessionReporterTokenEnv: "ambient-session-reporter-token",
+		protocolcli.LogReporterEnv:          "@acme/log-reporter",
+		protocolcli.LogReporterTokenEnv:     "ambient-log-reporter-token",
+	}
+	for name, value := range reporterEnv {
+		t.Setenv(name, value)
+	}
+	seam := 0
+	extension.ResolveRegistryTokenWithCLI = func(context.Context, string, string) (string, string) {
+		seam++
+		for name := range reporterEnv {
+			if value, ok := os.LookupEnv(name); ok {
+				t.Errorf("the pinned CLI's download started with %s=%q in its environment", name, value)
+			}
+		}
+		return "", ""
+	}
+
+	binary := []byte("the pinned cli")
+	server, seen := recordingRegistry(t, "no-extension", nil, binary)
+	t.Setenv(extension.PutRegistryURLEnv, server.URL)
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, wsproto.WorkspaceConfigFilename), []byte(`{"name":"ws"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(binary)
+	entry := lockfile.LockEntry{Version: "1.2.3"}
+	entry.SetPlatformIntegrity(lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH), hex.EncodeToString(sum[:]))
+	lf := lockfile.NewLockFile()
+	lf.SetCLI(entry)
+	if err := lockfile.WriteLockFile(ws, lf); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(ws)
+
+	// The download verifies, and the launcher then refuses to exec over a Go
+	// test binary: the run stops there, after the fetch and before dispatch.
+	output := captureStdoutStderr(t, func() {
+		if code := (&App{}).Run(context.Background(), []string{"build"}); code == ExitSuccess {
+			t.Error("App.Run dispatched past the relaunch")
+		}
+	})
+	if !strings.Contains(output, "refusing to replace a Go test binary") {
+		t.Fatalf("the run did not stop at the relaunch:\n%s", output)
+	}
+	if seam == 0 || len(seen["cli"]) == 0 {
+		t.Fatalf("the pinned CLI was not fetched through the host-keyed seam: seam asked %d times, downloads %v", seam, seen["cli"])
+	}
+	for name := range reporterEnv {
+		if value, ok := os.LookupEnv(name); ok {
+			t.Errorf("%s=%q remained ambient after App.Run", name, value)
+		}
+	}
 }
 
 // recordingRegistry serves archive for a path that holds extensionName, and
