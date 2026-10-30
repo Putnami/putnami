@@ -237,7 +237,7 @@ func assertNoLeftovers(t *testing.T, home, tmp string) {
 	}
 	if entries, err := os.ReadDir(tmp); err == nil {
 		for _, e := range entries {
-			if strings.HasPrefix(e.Name(), "putnami-dl.") || strings.HasPrefix(e.Name(), "putnami-extract.") {
+			if strings.HasPrefix(e.Name(), "putnami-dl.") || strings.HasPrefix(e.Name(), "putnami-extract.") || strings.HasPrefix(e.Name(), "putnami-srckey.") {
 				t.Errorf("leftover temp in TMPDIR: %s", e.Name())
 			}
 		}
@@ -578,9 +578,14 @@ exit 0
 `)
 
 	home = filepath.Join(root, "home", ".putnami")
+	tmp := filepath.Join(root, "tmp")
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	env = append(os.Environ(),
 		"PATH="+stubBin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"PUTNAMI_HOME="+home,
+		"TMPDIR="+tmp,
 		"GO_LOG="+goLog,
 		"GO_BUILD_FAIL="+buildFail,
 		"SENTINEL_FAIL="+sentinelFail,
@@ -728,6 +733,88 @@ func TestPutnamiwSourceKey_SecondRunReusesTheBlob(t *testing.T) {
 	}
 	if got := sourceBlobs(t, home); len(got) != 1 || got[0] != blobs[0] {
 		t.Errorf("blobs = %v, want reuse of %v", got, blobs)
+	}
+}
+
+// The source key goes through scratch files in TMPDIR, which on a shared
+// machine is a world-writable /tmp. compute_source_key used to mktemp one file
+// and then create `<file>.paths` and `<file>.blobs` beside it by name: another
+// local user who saw the mktemp name could pre-create those siblings as
+// symlinks, and the wrapper's `: >` truncated whatever they pointed at, with
+// the paths file then feeding `xargs git hash-object`. The scratch files now
+// live in a directory mktemp -d created 0700, so a sibling planted beside it
+// is never opened. A mktemp wrapper on PATH plays the other user: it logs what
+// the wrapper asked for, and plants both symlinks at a canary the moment the
+// name exists.
+func TestPutnamiwSourceKey_ScratchFilesStayInAPrivateDirectory(t *testing.T) {
+	repo, home, env := gitSourceRepo(t)
+	tmp := envValue(env, "TMPDIR")
+	stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+	realMktemp, err := exec.LookPath("mktemp")
+	if err != nil {
+		t.Skipf("mktemp not available: %v", err)
+	}
+	const canaryBody = "another user's file\n"
+	canary := filepath.Join(filepath.Dir(tmp), "canary")
+	if err := os.WriteFile(canary, []byte(canaryBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mktempLog := filepath.Join(filepath.Dir(tmp), "mktemp.log")
+	writeExec(t, filepath.Join(stubBin, "mktemp"), `#!/usr/bin/env bash
+out="$(`+realMktemp+` "$@")" || exit 1
+printf '%s\n' "$out"
+case "$*" in
+  *putnami-srckey.*)
+    kind=file; [ -d "$out" ] && kind=dir
+    printf '%s %s\n' "$kind" "$*" >> "`+mktempLog+`"
+    ln -s "`+canary+`" "$out.paths"
+    ln -s "`+canary+`" "$out.blobs"
+    ;;
+esac
+exit 0
+`)
+
+	out, code := runIn(t, repo, env, "ping")
+	if code != 0 || !strings.Contains(out, "RAN_BUILT") {
+		t.Fatalf("run: code=%d out=%s", code, out)
+	}
+	if blobs := sourceBlobs(t, home); len(blobs) != 1 {
+		t.Fatalf("the key path did not run (want one from-source blob, got %v):\n%s", blobs, out)
+	}
+
+	logged, err := os.ReadFile(mktempLog)
+	if err != nil {
+		t.Fatalf("the wrapper never asked mktemp for its source-key scratch: %v", err)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
+		if !strings.HasPrefix(line, "dir -d ") {
+			t.Errorf("source-key scratch was not created as a directory with mktemp -d: %q", line)
+		}
+	}
+
+	got, err := os.ReadFile(canary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != canaryBody {
+		t.Errorf("the wrapper wrote through a planted sibling symlink: canary = %q, want %q", got, canaryBody)
+	}
+
+	// The wrapper reclaims its own directory; the planted siblings are not its
+	// to remove, so they are the only putnami-srckey.* entries left.
+	entries, err := os.ReadDir(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, "putnami-srckey.") {
+			continue
+		}
+		if e.Type()&os.ModeSymlink != 0 && (strings.HasSuffix(name, ".paths") || strings.HasSuffix(name, ".blobs")) {
+			continue // planted by the stub
+		}
+		t.Errorf("leftover source-key scratch in TMPDIR: %s", name)
 	}
 }
 
