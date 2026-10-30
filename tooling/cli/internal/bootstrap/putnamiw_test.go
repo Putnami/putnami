@@ -56,11 +56,35 @@ func writeExec(t *testing.T, path, body string) {
 	}
 }
 
+// fakeArchive is what the stub curl streams for the CLI archive.
+const fakeArchive = "FAKE-ARCHIVE"
+
+// fakeArchiveSHA256 is the hex SHA-256 of fakeArchive, the digest a registry
+// advertises for it.
+func fakeArchiveSHA256() string {
+	sum := sha256.Sum256([]byte(fakeArchive))
+	return hex.EncodeToString(sum[:])
+}
+
+// advertisedHeaders are the response headers a registry sends with the CLI
+// archive: the digest of the bytes it streams and the version it resolved.
+func advertisedHeaders() []string {
+	return []string{"X-Integrity: sha256:" + fakeArchiveSHA256(), "X-Resolved-Version: 1.2.3"}
+}
+
 // downloadEnv builds an isolated environment for a --download run: a copy of the
 // script in a scratch "repo", a stub bin dir (stubbed curl + tar so no network
 // or real archive is needed), a private PUTNAMI_HOME store, and a private TMPDIR.
+// The stub curl advertises the archive's digest, as the registry does.
 // It returns the script path, the PUTNAMI_HOME, the TMPDIR, and the env slice.
 func downloadEnv(t *testing.T, tarBody string) (script, home, tmp string, env []string) {
+	t.Helper()
+	return downloadEnvWithHeaders(t, tarBody, advertisedHeaders())
+}
+
+// downloadEnvWithHeaders is downloadEnv with the response headers the stub curl
+// writes to its -D file, one "Name: value" line each.
+func downloadEnvWithHeaders(t *testing.T, tarBody string, headers []string) (script, home, tmp string, env []string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("putnamiw is a bash script; skip on Windows")
@@ -85,13 +109,20 @@ func downloadEnv(t *testing.T, tarBody string) (script, home, tmp string, env []
 	}
 
 	stubBin := filepath.Join(root, "bin")
-	// Stub curl: write fixed bytes to the -o target (no network), and append its
-	// arguments to curl.args beside the home dir.
+	// Stub curl: write fixed bytes to the -o target (no network), the response
+	// headers to the -D target as curl does (CRLF line ends, one block per
+	// response), and append its arguments to curl.args beside the home dir.
+	headerBlock := "HTTP/2 200 \\r\\n"
+	for _, h := range headers {
+		headerBlock += h + "\\r\\n"
+	}
+	headerBlock += "\\r\\n"
 	writeExec(t, filepath.Join(stubBin, "curl"), `#!/usr/bin/env bash
 printf '%s\n' "$*" >> "`+filepath.Join(root, "curl.args")+`"
-out=""
-while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; *) shift;; esac; done
-[ -n "$out" ] && printf 'FAKE-ARCHIVE' > "$out"
+out=""; hdr=""
+while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -D) hdr="$2"; shift 2;; *) shift;; esac; done
+[ -n "$out" ] && printf '`+fakeArchive+`' > "$out"
+[ -n "$hdr" ] && printf '`+headerBlock+`' > "$hdr"
 exit 0
 `)
 	// Stub tar: extract a deterministic compiled/putnami into the -C dir. A stable
@@ -224,6 +255,189 @@ func TestPutnamiwDownload_CleansStagingOnFailure(t *testing.T) {
 		t.Fatalf("expected failure when tar fails, got success:\n%s", out)
 	}
 	assertNoLeftovers(t, home, tmp)
+}
+
+// assertNothingInstalled checks that a refused download published no blob and
+// left no worktree CLI behind.
+func assertNothingInstalled(t *testing.T, script, home string) {
+	t.Helper()
+	if entries, err := os.ReadDir(cliDir(home)); err == nil && len(entries) > 0 {
+		t.Errorf("a refused download published %d blob(s) under %s", len(entries), cliDir(home))
+	}
+	link := filepath.Join(filepath.Dir(script), ".putnami", "bin", "putnami")
+	if _, err := os.Lstat(link); err == nil {
+		t.Errorf("a refused download left %s behind", link)
+	}
+}
+
+// The wrapper runs a downloaded CLI only when the archive's SHA-256 is the one
+// the registry advertised for the bytes it streamed, the rule install.sh and
+// `putnami upgrade` apply. PUTNAMI_UNSAFE_INSTALL=1 is the single override, for
+// a registry that advertises no digest; a digest that disagrees is refused
+// whatever the environment, and nothing is installed.
+func TestPutnamiwDownload_RunsOnlyTheArchiveTheRegistryAdvertised(t *testing.T) {
+	digest := fakeArchiveSHA256()
+	wrong := strings.Repeat("0", 64)
+	cases := []struct {
+		name     string
+		headers  []string
+		env      []string
+		installs bool
+		output   string
+		absent   string
+	}{
+		{name: "the advertised digest matches", headers: []string{"X-Integrity: sha256:" + digest}, installs: true, output: "Integrity verified"},
+		{name: "an RFC 9530 Digest header is accepted", headers: []string{"Digest: md5=ignored, SHA-256=" + strings.ToUpper(digest)}, installs: true, output: "Integrity verified"},
+		{name: "wget-style indented headers are read", headers: []string{"  X-Integrity: sha-256:" + digest}, installs: true, output: "Integrity verified"},
+		{name: "the advertised digest differs", headers: []string{"X-Integrity: sha256:" + wrong}, output: "Integrity check failed", absent: "Integrity verified"},
+		{name: "the advertised digest is malformed", headers: []string{"X-Integrity: sha256:not-hex"}, output: "Invalid integrity", absent: "Integrity verified"},
+		{name: "no digest is advertised", headers: []string{"X-Resolved-Version: 1.2.3"}, output: "PUTNAMI_UNSAFE_INSTALL=1", absent: "Integrity verified"},
+		{name: "no digest with the override", headers: []string{"X-Resolved-Version: 1.2.3"}, env: []string{"PUTNAMI_UNSAFE_INSTALL=1"}, installs: true, output: "without integrity verification", absent: "Integrity verified"},
+		{name: "a differing digest ignores the override", headers: []string{"X-Integrity: sha256:" + wrong}, env: []string{"PUTNAMI_UNSAFE_INSTALL=1"}, output: "Integrity check failed", absent: "Integrity verified"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			script, home, tmp, env := downloadEnvWithHeaders(t, okTar, c.headers)
+			cmd := exec.Command("bash", script, "--download", "ping")
+			env = append(env, c.env...)
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			if !strings.Contains(string(out), c.output) {
+				t.Errorf("output lacks %q:\n%s", c.output, out)
+			}
+			if c.absent != "" && strings.Contains(string(out), c.absent) {
+				t.Errorf("output names %q:\n%s", c.absent, out)
+			}
+			if c.installs {
+				if err != nil || !strings.Contains(string(out), "stub-putnami ping") {
+					t.Fatalf("run failed (%v), want the CLI installed and run:\n%s", err, out)
+				}
+				soleBlob(t, home)
+			} else {
+				if err == nil {
+					t.Fatalf("run succeeded, want a refusal:\n%s", out)
+				}
+				assertNothingInstalled(t, script, home)
+			}
+			assertNoLeftovers(t, home, tmp)
+		})
+	}
+}
+
+// The wrapper fetches the CLI only from a registry URL that can carry an
+// authenticated download: https, or http to a loopback host, or any http with
+// PUTNAMI_ALLOW_INSECURE_REGISTRY=1. A refused URL stops the run before any
+// fetch.
+func TestPutnamiwDownload_RefusesAPlaintextRegistry(t *testing.T) {
+	cases := []struct {
+		name, url string
+		env       []string
+		fetches   bool
+		output    string
+	}{
+		{name: "plaintext http to a remote host", url: "http://example.invalid/dl", output: "PUTNAMI_ALLOW_INSECURE_REGISTRY=1"},
+		{name: "plaintext http with credentials", url: "http://user:secret@example.invalid/dl", output: "http://***@example.invalid/dl"},
+		{name: "an unsupported scheme", url: "ftp://example.invalid/dl", output: "unsupported scheme"},
+		{name: "http to 127.0.0.1", url: "http://127.0.0.1:1/dl", fetches: true},
+		{name: "http to localhost", url: "http://localhost/dl", fetches: true},
+		{name: "http to [::1]", url: "http://[::1]:8080/dl", fetches: true},
+		{name: "https", url: "https://example.invalid/dl", fetches: true},
+		{name: "plaintext http with the override", url: "http://example.invalid/dl", env: []string{"PUTNAMI_ALLOW_INSECURE_REGISTRY=1"}, fetches: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			script, home, tmp, env := downloadEnv(t, okTar)
+			cmd := exec.Command("bash", script, "--download", "ping")
+			env = append(env, "PUTNAMI_REGISTRY_URL="+c.url)
+			env = append(env, c.env...)
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			curlArgs := filepath.Join(filepath.Dir(home), "curl.args")
+			_, fetched := os.Stat(curlArgs)
+			if c.fetches {
+				if err != nil || fetched != nil {
+					t.Fatalf("run failed (%v), fetched %v, want the CLI fetched from %s and run:\n%s", err, fetched == nil, c.url, out)
+				}
+				args, _ := os.ReadFile(curlArgs)
+				if !strings.Contains(string(args), c.url+"/putnami?") {
+					t.Errorf("curl fetched %q, want %s", strings.TrimSpace(string(args)), c.url)
+				}
+				assertNoLeftovers(t, home, tmp)
+				return
+			}
+			if err == nil || !strings.Contains(string(out), c.output) {
+				t.Errorf("run = %v, want a refusal naming %q:\n%s", err, c.output, out)
+			}
+			if strings.Contains(string(out), "secret") {
+				t.Errorf("the refusal prints the URL's credentials:\n%s", out)
+			}
+			if fetched == nil {
+				t.Errorf("curl ran after the registry URL was refused")
+			}
+			assertNothingInstalled(t, script, home)
+		})
+	}
+}
+
+// A workspace that pins a published CLI records the SHA-256 of that version's
+// executable per platform. When the registry resolves the pinned version, the
+// wrapper runs the extracted binary only at that digest. Another resolved
+// version is left to the binary's own launcher, and a lock that records no
+// digest, such as a source workspace's, pins nothing here.
+func TestPutnamiwDownload_HonorsTheLockedCLIDigest(t *testing.T) {
+	const stubBinary = "#!/usr/bin/env bash\necho \"stub-putnami $*\"\n"
+	sum := sha256.Sum256([]byte(stubBinary))
+	digest := hex.EncodeToString(sum[:])
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	pin := func(version, digest string) string {
+		return `{
+  "version": 5,
+  "cli": {
+    "version": "` + version + `",
+    "integrities": {
+      "` + platform + `": "` + digest + `"
+    },
+    "source": "https://put.putnami.dev/putnami/cli/download?channel=` + version + `"
+  },
+  "toolchains": {}
+}
+`
+	}
+	cases := []struct {
+		name, lock string
+		installs   bool
+		output     string
+	}{
+		{name: "the lock records the resolved version's binary", lock: pin("1.2.3", digest), installs: true},
+		{name: "the lock records another binary for the resolved version", lock: pin("1.2.3", strings.Repeat("0", 64)), output: "Refusing putnami CLI 1.2.3"},
+		{name: "the lock pins the resolved version with a v prefix", lock: pin("v1.2.3", strings.Repeat("0", 64)), output: "Refusing putnami CLI 1.2.3"},
+		{name: "the lock pins another version", lock: pin("9.9.9", strings.Repeat("0", 64)), installs: true},
+		{name: "the lock records a source workspace", lock: "{\n  \"version\": 5,\n  \"cli\": {\n    \"source\": \"workspace\"\n  }\n}\n", installs: true},
+		{name: "the lock pins no CLI", lock: "{\n  \"version\": 5,\n  \"toolchains\": {}\n}\n", installs: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			script, home, tmp, env := downloadEnv(t, okTar)
+			if err := os.WriteFile(filepath.Join(filepath.Dir(script), "putnami.lock.json"), []byte(c.lock), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("bash", script, "--download", "ping")
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			if c.installs {
+				if err != nil || !strings.Contains(string(out), "stub-putnami ping") {
+					t.Fatalf("run failed (%v), want the CLI installed and run:\n%s", err, out)
+				}
+				soleBlob(t, home)
+			} else {
+				if err == nil || !strings.Contains(string(out), c.output) {
+					t.Errorf("run = %v, want a refusal naming %q:\n%s", err, c.output, out)
+				}
+				assertNothingInstalled(t, script, home)
+			}
+			assertNoLeftovers(t, home, tmp)
+		})
+	}
 }
 
 // assertNoLeftovers checks that neither the artifact staging dir nor TMPDIR has
