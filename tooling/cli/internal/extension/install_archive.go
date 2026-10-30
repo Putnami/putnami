@@ -28,6 +28,14 @@ func RegistryRef(name string) (namespace, pkg string) {
 	return "putnami", name
 }
 
+// registryDownloadURL is the download route of name on the registry at base.
+// The namespace and the package travel as escaped path segments, so a name
+// holds nothing the route or its query reads.
+func registryDownloadURL(base, name string, params url.Values) string {
+	ns, pkg := RegistryRef(name)
+	return fmt.Sprintf("%s/%s/%s/download?%s", base, url.PathEscape(ns), url.PathEscape(pkg), params.Encode())
+}
+
 // download fetches the artifact archive from the registry.
 // Returns the path to the downloaded file, the resolved version, and the
 // SHA-256 hash the resolver advertised for the archive (empty string when
@@ -144,12 +152,11 @@ func (inst *Installer) openArtifact(ctx context.Context, name, constraint string
 	if err := ValidateRegistryURL(inst.ResolverURL); err != nil {
 		return nil, "", err
 	}
-	ns, pkg := RegistryRef(name)
 	params := url.Values{}
 	params.Set("channel", constraint)
 	params.Set("os", spec.OS)
 	params.Set("arch", spec.Arch)
-	dlURL := fmt.Sprintf("%s/%s/%s/download?%s", inst.ResolverURL, ns, pkg, params.Encode())
+	dlURL := registryDownloadURL(inst.ResolverURL, name, params)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, nil)
 	if err != nil {
@@ -191,7 +198,7 @@ func (inst *Installer) openArtifact(ctx context.Context, name, constraint string
 		authorized := req.Header.Get("Authorization") != ""
 		return nil, "", inst.artifactFetchError(name, constraint, params, spec, resp.StatusCode, authorized, missing)
 	}
-	return resp, fmt.Sprintf("%s/%s/%s/download?channel=%s", inst.ResolverURL, ns, pkg, url.QueryEscape(constraint)), nil
+	return resp, registryDownloadURL(inst.ResolverURL, name, url.Values{"channel": {constraint}}), nil
 }
 
 // artifactFetchError names everything needed to reproduce a failed fetch in one
@@ -209,11 +216,10 @@ func (inst *Installer) openArtifact(ctx context.Context, name, constraint string
 // the message. The query it does carry — channel, os, arch — is built here from
 // the arguments and is credential-free by construction.
 func (inst *Installer) artifactFetchError(name, constraint string, params url.Values, spec ArtifactSpec, status int, authorized bool, missing string) error {
-	ns, pkg := RegistryRef(name)
 	endpoint := RedactRegistryURL(inst.ResolverURL)
 	safeURL := "an unparseable registry URL"
 	if endpoint != "" {
-		safeURL = fmt.Sprintf("%s/%s/%s/download?%s", endpoint, ns, pkg, params.Encode())
+		safeURL = registryDownloadURL(endpoint, name, params)
 	}
 
 	credential := "the request was anonymous"

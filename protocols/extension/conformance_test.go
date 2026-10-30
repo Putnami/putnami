@@ -452,6 +452,13 @@ var lifecycleInvalidFixtureCodes = map[string][]string{
 		"invalid-command-dependency", "invalid-command-dependency", "invalid-command-dependency",
 		"invalid-command-dependency", "invalid-command-dependency", "invalid-command-dependency",
 	},
+	// A dependency key is a registry name or a package name. A '#', a '?', a
+	// '..' segment and a space would each reach the registry route or the
+	// lock as something other than one package.
+	"extension-dependency-name.json": {
+		"invalid-extension-dependency", "invalid-extension-dependency",
+		"invalid-extension-dependency", "invalid-extension-dependency",
+	},
 }
 
 // TestConformance_FixtureProtocolVersions pins that adding the v3 vocabulary did

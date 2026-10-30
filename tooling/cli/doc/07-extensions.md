@@ -963,7 +963,10 @@ A channel never moves a pin to an older build. When `extensions update`, the ext
 An extension lists the extensions it needs in `extensionDependencies`. The
 extensions `putnami.workspace.json` declares are the roots. Every registry
 extension (`@scope/name`) that a member's manifest names is a dependency, and
-so on down the graph. See
+so on down the graph. A name follows the package grammar: the scope and the
+name each hold lowercase letters, digits, `.`, `_` and `-` and start with a
+letter or digit, so the registry route and the lock key the CLI builds from
+them hold nothing else; strict validation refuses any other key. See
 [ADR 0066](adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md).
 
 - **Install.** `putnami install` installs each dependency and pins it with an

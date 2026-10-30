@@ -27,16 +27,21 @@
       "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, contract 12 a task that declares publishChannels, contract 13 a runtime toolchain that declares a provisioned candidate, contract 14 input selectors listed in runtime.inputSelectors or named by a task file pattern, contract 15 a command group whose default subcommand declares positionals, contract 16 a step that gates on the run's changed files (activation.changedFiles) or binds them (a from: context input binding), contract 17 a hostHooks member, contract 18 a command dependsOn entry that names one step of another command (command~step), and contract 19 a providers section. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
-      "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. The CLI installs, pins and loads each registry name (@scope/name) for an extension installed from the artifact store or declared by path, and leaves any other name to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
+      "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. A name is a registry name (@scope/name) or an unscoped package name; each part holds lowercase letters, digits, '.', '_' and '-' and starts with a letter or digit. The CLI installs, pins and loads each registry name for an extension installed from the artifact store or declared by path, and leaves any other name to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
       "oneOf": [
         {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$"
           }
         },
         {
           "type": "object",
+          "propertyNames": {
+            "pattern": "^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$",
+            "description": "A registry name (@scope/name) or an unscoped package name."
+          },
           "additionalProperties": {
             "type": "string"
           }

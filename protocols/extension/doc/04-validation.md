@@ -130,6 +130,24 @@ load path does not apply the rule.
 }
 ```
 
+### Extension Dependency Names
+
+An `extensionDependencies` key is a registry name (`@scope/name`) or an
+unscoped package name; each part holds lowercase letters, digits, `.`, `_` and
+`-` and starts with a letter or digit. The CLI builds the registry route and
+the lock key from a registry name, so strict validation refuses any other key
+with `invalid-extension-dependency` at `extensionDependencies.<name>`, and the
+schema states the grammar for the list and the map form. The load path does
+not apply the rule; a key outside the registry grammar is not a registry
+dependency there.
+
+```json
+// INVALID: a '#' and a '..' segment would each change the registry route
+{
+  "extensionDependencies": ["@putnami/dev#", "@putnami/.."]
+}
+```
+
 ### Activation Pattern Validity
 `activationFiles` patterns must be valid glob expressions.
 
