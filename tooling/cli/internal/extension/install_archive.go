@@ -426,7 +426,41 @@ func extractArchiveSymlink(root *os.Root, name, target string) error {
 			"the publisher must ship a link that stays inside the archive, or a regular file",
 			filepath.ToSlash(name), target)
 	}
+	// The lexical check above holds only when every directory it walks is a
+	// real one. A .. after a descending component can climb out of a link
+	// (`d -> .` makes `d/..` the tree's parent), so .. may only lead the
+	// target, where it walks up the link's own parent directories.
+	descended := false
+	for _, part := range strings.Split(filepath.ToSlash(target), "/") {
+		switch {
+		case part == ".." && descended:
+			return fmt.Errorf("archive entry %s is a symbolic link to %s, whose .. follows a descending component "+
+				"and can climb out of the extracted tree through another link: the publisher must ship a link "+
+				"whose .. components lead its target", filepath.ToSlash(name), target)
+		case part != ".." && part != "." && part != "":
+			descended = true
+		}
+	}
+	// Those parent directories must be real: os.Root follows a link extracted
+	// earlier, so with `d -> .` the entry `d/l -> ../x` would become `l -> ../x`
+	// at the top of the tree, outside it.
 	if dir := filepath.Dir(name); dir != "." {
+		prefix := ""
+		for _, part := range strings.Split(dir, string(filepath.Separator)) {
+			prefix = filepath.Join(prefix, part)
+			info, err := root.Lstat(prefix)
+			if errors.Is(err, os.ErrNotExist) {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("inspect parent dir %s: %w", filepath.ToSlash(prefix), err)
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("archive entry %s is a symbolic link created through the symbolic link %s, "+
+					"which can place it outside the extracted tree: the publisher must ship the link under "+
+					"its real directory", filepath.ToSlash(name), filepath.ToSlash(prefix))
+			}
+		}
 		if err := root.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("create parent dir: %w", err)
 		}

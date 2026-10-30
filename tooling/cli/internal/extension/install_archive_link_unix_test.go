@@ -32,3 +32,33 @@ func TestExtractTarGzRecreatesContainedSymlinks(t *testing.T) {
 		}
 	}
 }
+
+// A link whose parent path runs through a link extracted earlier fails the
+// extraction: os.Root follows `d -> .`, so `d/l -> ../x`, lexically `x`, would
+// be created as `l -> ../x` at the top of the tree, outside it.
+func TestExtractTarGzRefusesSymlinkUnderSymlinkedDirectory(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "chain.tar.gz")
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	createLinkTestArchive(t, archivePath, nil,
+		[]archiveLink{{name: "d", target: "."}, {name: "d/l", target: "../x"}})
+
+	assertLinkRefused(t, ExtractTarGz(archivePath, destDir), "d/l", "through the symbolic link d")
+	if _, err := os.Lstat(filepath.Join(destDir, "l")); !os.IsNotExist(err) {
+		t.Fatalf("the refused link exists at the top of the tree: %v", err)
+	}
+}
+
+// A link whose target walks back up with .. after descending fails the
+// extraction: `d -> .` makes `l -> d/..`, lexically `.`, resolve to the
+// parent of the tree.
+func TestExtractTarGzRefusesSymlinkTargetWithInnerDotDot(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "inner.tar.gz")
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	createLinkTestArchive(t, archivePath, nil,
+		[]archiveLink{{name: "d", target: "."}, {name: "l", target: "d/.."}})
+
+	assertLinkRefused(t, ExtractTarGz(archivePath, destDir), "l", "symbolic link to d/..")
+	if _, err := os.Lstat(filepath.Join(destDir, "l")); !os.IsNotExist(err) {
+		t.Fatalf("the refused link exists: %v", err)
+	}
+}
