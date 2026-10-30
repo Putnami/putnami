@@ -75,7 +75,7 @@
           "path": "tooling/extension-sdk/oci/tagdigest.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "a6c42f03bf7b52418667acebff8c4f612d10898065a99632d682bf4453f9b43b"
+          "fingerprint": "016f9fc869c825dddb1be6545f9bb11b5297ad3db2284c339d18125ca1826e4a"
         },
         {
           "path": "tooling/extension-sdk/oci/tagdigest.go",

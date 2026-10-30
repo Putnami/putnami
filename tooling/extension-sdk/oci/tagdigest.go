@@ -28,6 +28,13 @@ const (
 	ociTagTimeout   = 30 * time.Second
 )
 
+// ociHandshakeTimeout bounds the registry handshake newOCITagClient performs
+// while it builds the client: the /v2/ ping and, behind a bearer challenge, the
+// token exchange. The fast path is best effort, so a registry that accepts the
+// connection and never answers must cost it this bound, not the publish. It is a
+// variable only so a test can shorten it.
+var ociHandshakeTimeout = 30 * time.Second
+
 // ociTagClient talks to a putnami OCI registry's tag-digest endpoint with the
 // same credentials and token scope as regular pushes to the repository.
 type ociTagClient struct {
@@ -37,7 +44,8 @@ type ociTagClient struct {
 }
 
 // newOCITagClient builds a client for the registry that hosts ref. It fails when
-// credentials cannot be resolved — callers treat any error as "no fast path" and
+// credentials cannot be resolved or the registry handshake does not complete
+// within ociHandshakeTimeout — callers treat any error as "no fast path" and
 // fall back to the distribution API. A nil base uses the default transport; a
 // private publication broker supplies its own so the probe, the token
 // exchange, and the tag call never reach the registry host directly.
@@ -54,12 +62,19 @@ func newOCITagClient(ctx context.Context, refStr string, keychain authn.Keychain
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	tr, err := transport.NewWithContext(ctx, repo.Registry, auth, base, []string{repo.Scope(transport.PushScope)})
+	// transport.NewWithContext pings the registry and exchanges a token on ctx
+	// before it returns, so it gets its own deadline: the default transport has
+	// no response-header timeout.
+	handshakeCtx, cancel := context.WithTimeout(ctx, ociHandshakeTimeout)
+	defer cancel()
+	tr, err := transport.NewWithContext(handshakeCtx, repo.Registry, auth, base, []string{repo.Scope(transport.PushScope)})
 	if err != nil {
 		return nil, err
 	}
 	return &ociTagClient{
-		httpClient: &http.Client{Transport: tr},
+		// Each request carries its own shorter deadline; the client timeout is
+		// the backstop for any request made without one.
+		httpClient: &http.Client{Transport: tr, Timeout: ociTagTimeout},
 		baseURL:    fmt.Sprintf("%s://%s", repo.Registry.Scheme(), repo.RegistryStr()),
 		repoPath:   repo.RepositoryStr(),
 	}, nil

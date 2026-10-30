@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 
@@ -69,6 +70,40 @@ func newTestTagClient(t *testing.T, h http.Handler) (*ociTagClient, func()) {
 func TestNewOCITagClient_BadReference(t *testing.T) {
 	if _, err := newOCITagClient(context.Background(), "::::not a ref", authn.NewMultiKeychain(), nil); err == nil {
 		t.Fatal("expected parse error for malformed reference, got nil")
+	}
+}
+
+// TestNewOCITagClient_HandshakeIsBounded proves a registry that accepts the
+// connection but never answers the /v2/ ping costs the best-effort fast path
+// its handshake bound, even when the caller's context has no deadline.
+func TestNewOCITagClient_HandshakeIsBounded(t *testing.T) {
+	previous := ociHandshakeTimeout
+	ociHandshakeTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { ociHandshakeTimeout = previous })
+
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer srv.Close()
+	defer close(release)
+	host := strings.TrimPrefix(srv.URL, "http://")
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := newOCITagClient(context.Background(), host+"/team/app:latest", authn.NewMultiKeychain(), nil)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("newOCITagClient succeeded against a registry that never answers")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("newOCITagClient did not return within its handshake bound")
 	}
 }
 
