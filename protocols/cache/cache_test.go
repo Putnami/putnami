@@ -756,6 +756,67 @@ func TestParseAndValidate_UploadBatch_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestValidFileMode(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "a-negotiate-response-is-validated")
+	for mode, want := range map[uint32]bool{
+		0:                          true,
+		0o644:                      true,
+		0o755:                      true,
+		FileModePermissionBits:     true,
+		FileModePermissionBits + 1: false,
+		0o4755:                     false,
+		0o2755:                     false,
+		0o1777:                     false,
+		0o100644:                   false,
+		1<<23 | 0o755:              false,
+		1<<22 | 0o755:              false,
+		1<<20 | 0o755:              false,
+		1<<31 | 0o644:              false,
+	} {
+		if got := ValidFileMode(mode); got != want {
+			t.Errorf("ValidFileMode(%#o) = %v, want %v", mode, got, want)
+		}
+	}
+}
+
+func TestValidateResponse_FileModeHoldsPermissionBitsOnly(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "negotiate-is-strict-and-canonical", "a-negotiate-response-is-validated")
+	resp := &NegotiateResponse{
+		ProtocolVersion: ProtocolVersion,
+		Results: []KeyResult{{
+			Key:      keyA,
+			Hit:      true,
+			Result:   &ActionResult{Status: "success"},
+			Manifest: &Manifest{Files: []FileEntry{{Path: "bin/tool", Digest: digX, Mode: 1<<23 | 0o755}}},
+		}},
+	}
+	diags := ValidateResponse(resp)
+	if !codeSet(diags)[CodeInvalidFileMode] {
+		t.Fatalf("a setuid manifest file mode should be flagged, got %v", diags)
+	}
+	resp.Results[0].Manifest.Files[0].Mode = 0o755
+	if diags := ValidateResponse(resp); diag.HasErrors(diags) {
+		t.Errorf("a permission-only mode should be accepted, got %v", diags)
+	}
+}
+
+func TestValidateRestoreResult_FileModeHoldsPermissionBitsOnly(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "the-provider-envelope-is-closed", "a-restore-is-a-hit-a-miss-or-an-error")
+	r := &RestoreResult{
+		Status:   RestoreHit,
+		Result:   &ActionResult{Status: "success"},
+		Manifest: &Manifest{Files: []FileEntry{{Path: "bin/tool", Digest: digX, Mode: 1<<22 | 0o755}}},
+	}
+	diags := ValidateRestoreResult(r)
+	if !codeSet(diags)[CodeInvalidFileMode] {
+		t.Fatalf("a setgid manifest file mode should be flagged, got %v", diags)
+	}
+	r.Manifest.Files[0].Mode = 0o644
+	if diags := ValidateRestoreResult(r); diag.HasErrors(diags) {
+		t.Errorf("a permission-only mode should be accepted, got %v", diags)
+	}
+}
+
 func codeSet(diags []diag.Diagnostic) map[string]bool {
 	out := make(map[string]bool, len(diags))
 	for _, d := range diags {

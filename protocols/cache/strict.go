@@ -20,6 +20,7 @@ const (
 	CodeInvalidDigest    = "invalid-digest"
 	CodeInvalidPath      = "invalid-path"
 	CodeInvalidMode      = "invalid-mode"
+	CodeInvalidFileMode  = "invalid-file-mode"
 	CodeInvalidMethod    = "invalid-method"
 	CodeInvalidSelection = "invalid-selection"
 	CodeDuplicateKey     = "duplicate-key"
@@ -193,8 +194,19 @@ func validateActionResult(field string, r *ActionResult) []diag.Diagnostic {
 	return diags
 }
 
-// validateManifestFiles checks each file entry's path and digest under the
-// given field prefix. A nil manifest is a no-op — callers enforce presence
+// FileModePermissionBits is the set of unix mode bits a manifest file entry
+// may carry: the permission bits only. A consumer restores a manifest entry
+// with a chmod on a blob shared by every workspace on the machine, so the
+// setuid, setgid and sticky bits never travel in a manifest.
+const FileModePermissionBits uint32 = 0o777
+
+// ValidFileMode reports whether mode holds permission bits only.
+func ValidFileMode(mode uint32) bool {
+	return mode&^FileModePermissionBits == 0
+}
+
+// validateManifestFiles checks each file entry's path, digest and mode under
+// the given field prefix. A nil manifest is a no-op — callers enforce presence
 // separately where a manifest is required.
 func validateManifestFiles(field string, m *Manifest) []diag.Diagnostic {
 	if m == nil {
@@ -216,6 +228,10 @@ func validateManifestFiles(field string, m *Manifest) []diag.Diagnostic {
 		}
 		if !ValidDigest(f.Digest) {
 			diags = append(diags, diag.Errorf(CodeInvalidDigest, ff+".digest", "malformed digest %q", f.Digest))
+		}
+		if !ValidFileMode(f.Mode) {
+			diags = append(diags, diag.Errorf(CodeInvalidFileMode, ff+".mode",
+				"manifest file mode %#o must hold permission bits only", f.Mode))
 		}
 	}
 	return diags
