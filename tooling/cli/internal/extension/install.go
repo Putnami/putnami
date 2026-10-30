@@ -530,6 +530,12 @@ func (inst *Installer) installPerWorktree(name, resolvedVersion, constraint stri
 	// not name the version.
 	if resolvedVersion == "0.0.0" {
 		if v := spec.ManifestVersion(manifestPath); v != "" {
+			// The manifest comes from an archive nothing has verified yet, and
+			// its version names the directory removed below.
+			if err := checkArtifactVersion(v); err != nil {
+				os.RemoveAll(installDir)
+				return nil, fmt.Errorf("extracted archive for %s: manifest version %q: %w", name, v, err)
+			}
 			correctDir := layout.ArtifactDir(inst.WorkspaceRoot, spec.Kind, name, v)
 			if correctDir != installDir {
 				os.RemoveAll(correctDir)

@@ -6,11 +6,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/sdk/extension/recorded"
+	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
@@ -211,5 +213,111 @@ func TestResolveOnlyLookupsSendHead(t *testing.T) {
 				t.Errorf("methods = %v, want [%s]", methods, tc.want)
 			}
 		})
+	}
+}
+
+// TestArtifactResolvedVersion_RefusesAHeaderThatIsNotAVersion pins the check at
+// the point the X-Resolved-Version header is read: the value names a directory,
+// so anything that is not a version, or carries a path separator in its
+// prerelease, is refused. A missing header still falls back to the constraint.
+func TestArtifactResolvedVersion_RefusesAHeaderThatIsNotAVersion(t *testing.T) {
+	for _, header := range []string{
+		"../../victim",
+		"1.0.0/../../victim",
+		"1.0.0-x/../../victim",
+		"1.2.3-x/../../victim",
+		`1.0.0-x\..\victim`,
+		"latest",
+	} {
+		if v, err := artifactResolvedVersion(header, "1.0.0"); err == nil {
+			t.Errorf("artifactResolvedVersion(%q) = %q, want an error", header, v)
+		} else if !strings.Contains(err.Error(), "not a version") {
+			t.Errorf("artifactResolvedVersion(%q) error = %v, want it to say not a version", header, err)
+		}
+	}
+	for header, want := range map[string]string{
+		"1.2.3":                          "1.2.3",
+		"1.2.3-beta.1":                   "1.2.3-beta.1",
+		"1.2.3-rc.1+build.5":             "1.2.3-rc.1+build.5",
+		"0.0.0-e9388a298":                "0.0.0-e9388a298",
+		"0.0.0-20261002155126-05f5df1b2": "0.0.0-20261002155126-05f5df1b2",
+		"":                               "0.0.0",
+	} {
+		if got, err := artifactResolvedVersion(header, "latest"); err != nil || got != want {
+			t.Errorf("artifactResolvedVersion(%q) = %q, %v, want %q", header, got, err, want)
+		}
+	}
+}
+
+// victimDir creates a directory next to the workspace root, outside its
+// artifacts directory, holding a sentinel file an escaping install would delete.
+func victimDir(t *testing.T) (wsRoot, sentinel string) {
+	t.Helper()
+	base := t.TempDir()
+	wsRoot = filepath.Join(base, "ws")
+	sentinel = filepath.Join(base, "victim", "sentinel")
+	if err := os.MkdirAll(filepath.Dir(sentinel), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sentinel, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return wsRoot, sentinel
+}
+
+// escapeToVictim climbs from .putnami/bin/artifacts/extensions/<name>@<v> to
+// the directory that holds the workspace root.
+const escapeToVictim = "/../../../../../../victim"
+
+// TestInstall_RefusesAResolvedVersionThatEscapes covers the unverified
+// per-worktree install, reached by default for a lock with a manifest hash but
+// no digest for this platform when the registry advertises none. The resolved
+// version names the directory removed and extracted into before the manifest
+// hash is checked, so a header that is a path must fail the install and leave
+// every directory outside the artifacts directory alone.
+func TestInstall_RefusesAResolvedVersionThatEscapes(t *testing.T) {
+	t.Setenv(UnsafeInstallEnv, "")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+
+	for _, header := range []string{"../../victim", "1.0.0" + escapeToVictim, "1.0.0-x" + escapeToVictim} {
+		t.Run(header, func(t *testing.T) {
+			archiveBytes := buildExtensionArchive(t, "@putnami/test", "1.0.0")
+			srv, _, _ := integrityProbeServer(t, archiveBytes, map[string]string{"X-Resolved-Version": header})
+			wsRoot, sentinel := victimDir(t)
+			inst := &Installer{WorkspaceRoot: wsRoot, ResolverURL: srv.URL, HTTPClient: srv.Client()}
+
+			lockEntry := &lockfile.LockEntry{
+				Version:      "1.0.0",
+				ManifestHash: sha256Bytes([]byte(extensionManifestJSON("@putnami/test", "1.0.0"))),
+				Integrities:  map[string]string{"plan9/abc": strings.Repeat("b", 64)},
+			}
+			_, err := inst.Install(context.Background(), "@putnami/test", "latest", lockEntry)
+			assertFileExists(t, sentinel)
+			if err == nil || !strings.Contains(err.Error(), "not a version") {
+				t.Fatalf("Install error = %v, want a refused resolved version", err)
+			}
+		})
+	}
+}
+
+// TestInstall_RefusesAManifestVersionThatEscapes covers the relocation of an
+// install the registry could not name: the version read from the unverified
+// archive's manifest names the directory it moves to, removed first.
+func TestInstall_RefusesAManifestVersionThatEscapes(t *testing.T) {
+	t.Setenv(UnsafeInstallEnv, "1")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+
+	archiveBytes := buildExtensionArchive(t, "@putnami/test", "1.0.0-x"+escapeToVictim)
+	srv, _, _ := integrityProbeServer(t, archiveBytes, nil)
+	wsRoot, sentinel := victimDir(t)
+	inst := &Installer{WorkspaceRoot: wsRoot, ResolverURL: srv.URL, HTTPClient: srv.Client()}
+
+	_, err := inst.Install(context.Background(), "@putnami/test", "latest", nil)
+	assertFileExists(t, sentinel)
+	if err == nil || !strings.Contains(err.Error(), "manifest version") {
+		t.Fatalf("Install error = %v, want a refused manifest version", err)
+	}
+	if _, err := os.Stat(layout.ArtifactDir(wsRoot, layout.Extensions, "@putnami/test", "0.0.0")); !os.IsNotExist(err) {
+		t.Errorf("the refused install must not leave its directory behind: %v", err)
 	}
 }
