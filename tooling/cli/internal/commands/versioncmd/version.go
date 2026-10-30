@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -337,6 +338,12 @@ func verifyDownloadedBinaryStamp(ctx context.Context, binaryPath, resolvedVersio
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
+// resolvedVersionPattern is a strict semantic version, with or without a
+// leading v. The resolved version names the installed binary and is printed,
+// so anything else, such as a path, is refused.
+var resolvedVersionPattern = regexp.MustCompile(
+	`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
+
 func fetchLatestRelease(ctx context.Context, client *http.Client, baseURL string) (version, downloadURL, integrity string, err error) {
 	return fetchRelease(ctx, client, baseURL, "latest")
 }
@@ -377,6 +384,9 @@ func fetchRelease(ctx context.Context, client *http.Client, baseURL string, chan
 	resolvedVersion := resp.Header.Get("X-Resolved-Version")
 	if resolvedVersion == "" {
 		return "", "", "", fmt.Errorf("no version resolved")
+	}
+	if !resolvedVersionPattern.MatchString(resolvedVersion) {
+		return "", "", "", fmt.Errorf("resolver returned %q as the resolved version, which is not a version", resolvedVersion)
 	}
 
 	// The resolver advertises the binary's SHA-256 in X-Integrity or in the
