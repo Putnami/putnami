@@ -143,6 +143,11 @@ GO_MANAGED_DIR="$PUTNAMI_HOME/toolchains/go"
 # GO_CHECKSUM_URL is where go.dev publishes the SHA-256 of each Go archive.
 GO_CHECKSUM_URL="https://dl.google.com/go/"
 RESOLVER_URL="${PUTNAMI_REGISTRY_URL:-https://putnami.dev/dl}"
+# Every download is bounded so a black-holed connection cannot hang bootstrap:
+# a connect timeout, and an abort when a transfer stalls (curl: under 1 KiB/s for
+# 60s; wget: no data for 60s). No total deadline, since the Go archive is large.
+CURL_LIMITS=(--connect-timeout 30 --speed-limit 1024 --speed-time 60)
+WGET_LIMITS=(--timeout=60 --tries=2)
 
 # --- Colors ---
 
@@ -852,9 +857,9 @@ install_managed_go() {
   local archive="$stage/go${ext}"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$archive" "$url" || { rm -rf "$stage"; fail "Failed to download Go $version"; }
+    curl -fsSL "${CURL_LIMITS[@]}" -o "$archive" "$url" || { rm -rf "$stage"; fail "Failed to download Go $version"; }
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$archive" "$url" || { rm -rf "$stage"; fail "Failed to download Go $version"; }
+    wget -q "${WGET_LIMITS[@]}" -O "$archive" "$url" || { rm -rf "$stage"; fail "Failed to download Go $version"; }
   else
     rm -rf "$stage"
     fail "curl or wget is required to download Go"
@@ -867,9 +872,9 @@ install_managed_go() {
   if ! expected="$(locked_go_sha256 "$version" "$GO_OS/$GO_ARCH")"; then
     local checksum_url="${GO_CHECKSUM_URL}go${version}.${GO_OS}-${GO_ARCH}${ext}.sha256"
     if command -v curl >/dev/null 2>&1; then
-      expected="$(curl -fsSL "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
+      expected="$(curl -fsSL "${CURL_LIMITS[@]}" "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
     else
-      expected="$(wget -q -O - "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
+      expected="$(wget -q "${WGET_LIMITS[@]}" -O - "$checksum_url" 2>/dev/null | awk '{print $1}')" || expected=""
     fi
     [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || expected=""
   fi
@@ -961,9 +966,9 @@ download_cli() {
   register_cleanup "$tmp_archive"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
+    curl -fsSL "${CURL_LIMITS[@]}" -o "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
+    wget -q "${WGET_LIMITS[@]}" -O "$tmp_archive" "$url" || fail "Failed to download putnami CLI"
   else
     fail "curl or wget is required to download putnami CLI"
   fi

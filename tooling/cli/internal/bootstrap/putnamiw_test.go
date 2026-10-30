@@ -85,8 +85,10 @@ func downloadEnv(t *testing.T, tarBody string) (script, home, tmp string, env []
 	}
 
 	stubBin := filepath.Join(root, "bin")
-	// Stub curl: write fixed bytes to the -o target (no network).
+	// Stub curl: write fixed bytes to the -o target (no network), and append its
+	// arguments to curl.args beside the home dir.
 	writeExec(t, filepath.Join(stubBin, "curl"), `#!/usr/bin/env bash
+printf '%s\n' "$*" >> "`+filepath.Join(root, "curl.args")+`"
 out=""
 while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; *) shift;; esac; done
 [ -n "$out" ] && printf 'FAKE-ARCHIVE' > "$out"
@@ -1202,6 +1204,58 @@ exec "`+filepath.Join(stubBin, "go")+`" "$@"
 		"an-older-system-go-builds-with-the-managed-install")
 }
 
+// Every download the wrapper makes, the CLI archive, the Go archive and the
+// go.dev checksum, passes curl a connect timeout and a stall limit, so a
+// black-holed connection fails instead of hanging bootstrap.
+func TestPutnamiwDownloads_BoundTheirConnections(t *testing.T) {
+	const limits = "--connect-timeout 30 --speed-limit 1024 --speed-time 60"
+	requireBounded := func(t *testing.T, argsFile string, want int) {
+		t.Helper()
+		data, err := os.ReadFile(argsFile)
+		if err != nil {
+			t.Fatalf("read curl arguments: %v", err)
+		}
+		calls := strings.Split(strings.TrimSpace(string(data)), "\n")
+		if len(calls) != want {
+			t.Fatalf("curl ran %d times, want %d:\n%s", len(calls), want, data)
+		}
+		for _, call := range calls {
+			if !strings.Contains(call, limits) {
+				t.Errorf("curl %s: want %q", call, limits)
+			}
+		}
+	}
+
+	t.Run("the CLI archive", func(t *testing.T) {
+		script, home, _, env := downloadEnv(t, okTar)
+		cmd := exec.Command("bash", script, "--download", "ping")
+		cmd.Env = env
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("download run failed: %v\n%s", err, out)
+		}
+		requireBounded(t, filepath.Join(filepath.Dir(home), "curl.args"), 1)
+	})
+
+	t.Run("the Go archive and its go.dev checksum", func(t *testing.T) {
+		requireGoDownloadPlatform(t)
+		const archive = "FAKE-GO-ARCHIVE"
+		sum := sha256.Sum256([]byte(archive))
+		repo, _, env := gitSourceRepo(t)
+		stubBin := strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0]
+		if err := os.WriteFile(filepath.Join(repo, "go.work"), []byte("go 1.30.0\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		// The lock pins another release, so the wrapper also fetches the checksum.
+		writeGoLock(t, repo, "1.29.0", strings.Repeat("0", 64))
+		downloadBin, curlLog := fakeGoDownload(t, archive, hex.EncodeToString(sum[:]), filepath.Join(stubBin, "go"))
+		env = append(env, "PATH="+downloadBin+string(os.PathListSeparator)+envValue(env, "PATH"))
+		if out, code := runIn(t, repo, env, "ping"); code != 0 {
+			t.Fatalf("run = %d, want the verified Go installed and the CLI run:\n%s", code, out)
+		}
+		requireBounded(t, filepath.Join(filepath.Dir(curlLog), "curl.args"), 2)
+	})
+}
+
 // The wrapper installs a Go archive it downloads only when the archive's
 // SHA-256 is the one the workspace lock records for that release and platform,
 // or, when the lock pins another release, the one go.dev publishes beside the
@@ -1302,12 +1356,14 @@ func writeGoLock(t *testing.T, repo, version, digest string) {
 // fakeGoDownload writes a curl that answers a .sha256 URL with published, or
 // fails when published is empty, and any other URL with archive, and a tar that
 // extracts any archive to a go/bin/go that runs stubGo. The curl appends each
-// URL it is given to curlLog. It returns the directory to put first on PATH.
+// URL it is given to curlLog, and its full arguments to curl.args beside it. It
+// returns the directory to put first on PATH.
 func fakeGoDownload(t *testing.T, archive, published, stubGo string) (bin, curlLog string) {
 	t.Helper()
 	bin = t.TempDir()
 	curlLog = filepath.Join(t.TempDir(), "curl.log")
 	writeExec(t, filepath.Join(bin, "curl"), `#!/usr/bin/env bash
+printf '%s\n' "$*" >> "`+filepath.Join(filepath.Dir(curlLog), "curl.args")+`"
 out=""; url=""
 while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
 printf '%s\n' "$url" >> "`+curlLog+`"
