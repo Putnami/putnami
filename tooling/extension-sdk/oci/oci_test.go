@@ -3,11 +3,15 @@ package oci
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"io"
+	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -452,6 +456,74 @@ func TestFetchBase_PlatformSelectionAndOfflineCache(t *testing.T) {
 	cachedDigest, _ := cached.Digest()
 	if cachedDigest != wantDigest {
 		t.Errorf("cached base digest = %s, want %s", cachedDigest, wantDigest)
+	}
+}
+
+// TestFetchBase_PullRunsOnTheBoundedTransport proves the base pull runs on
+// DefaultRegistryTransport, whose responses must begin within
+// RegistryResponseHeaderTimeout, and not on go-containerregistry's default
+// transport, which has no such bound: a registry that accepts the connection
+// and never answers the manifest GET or a layer fetch cannot hang `package`.
+func TestFetchBase_PullRunsOnTheBoundedTransport(t *testing.T) {
+	srv := httptest.NewServer(registry.New())
+	defer srv.Close()
+	host := strings.TrimPrefix(srv.URL, "http://")
+
+	img, err := random.Image(256, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := name.ParseReference(host + "/base:latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remote.Write(ref, img); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := img.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pinnedRef := host + "/base@" + digest.String()
+
+	// Replace the library default with a transport that records its dials,
+	// then tell its bounded clone apart by recording the clone's dials on a
+	// counter of their own. The clone is fresh, since it is keyed on the base
+	// it cloned, and no request has gone through it yet.
+	previous := remote.DefaultTransport
+	t.Cleanup(func() { remote.DefaultTransport = previous })
+	var libraryDials, boundedDials atomic.Int32
+	dialer := &net.Dialer{}
+	library := http.DefaultTransport.(*http.Transport).Clone()
+	library.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		libraryDials.Add(1)
+		return dialer.DialContext(ctx, network, addr)
+	}
+	remote.DefaultTransport = library
+	bounded, ok := DefaultRegistryTransport().(*http.Transport)
+	if !ok {
+		t.Fatalf("DefaultRegistryTransport() = %T, want *http.Transport", DefaultRegistryTransport())
+	}
+	bounded.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		boundedDials.Add(1)
+		return dialer.DialContext(ctx, network, addr)
+	}
+
+	got, err := FetchBase(pinnedRef, "linux/amd64", t.TempDir())
+	if err != nil {
+		t.Fatalf("FetchBase: %v", err)
+	}
+	if gotDigest, _ := got.Digest(); gotDigest != digest {
+		t.Errorf("FetchBase digest = %s, want %s", gotDigest, digest)
+	}
+	if boundedDials.Load() == 0 {
+		t.Error("the base pull did not dial through DefaultRegistryTransport")
+	}
+	if libraryDials.Load() != 0 {
+		t.Errorf("the base pull dialed %d times through remote.DefaultTransport, which has no response deadline", libraryDials.Load())
+	}
+	if bounded.ResponseHeaderTimeout != RegistryResponseHeaderTimeout {
+		t.Errorf("ResponseHeaderTimeout = %v, want %v", bounded.ResponseHeaderTimeout, RegistryResponseHeaderTimeout)
 	}
 }
 

@@ -43,7 +43,12 @@ func FetchBaseWithKeychain(refStr, platformStr, cacheDir string, keychain authn.
 		keychain = authn.DefaultKeychain
 	}
 
+	// The pull runs on no deadline: the manifest GET here and every lazy
+	// layer fetch WriteLayout triggers below run on the registry transport,
+	// whose RegistryResponseHeaderTimeout bounds a registry that accepts the
+	// connection and never answers. The library default has no such bound.
 	desc, err := remote.Get(ref,
+		remote.WithTransport(DefaultRegistryTransport()),
 		remote.WithAuthFromKeychain(anonymousFallbackKeychain{keychain}),
 		remote.WithPlatform(*platform))
 	if err != nil {
