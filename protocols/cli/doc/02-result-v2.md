@@ -345,32 +345,48 @@ The bounds are UTF-8 byte counts, pinned by the schema and by `TestCaseMax*` in
   CLI in one result line, which the CLI reads whole. Both budgets are value-only
   `$defs`, like the count bound, and the cases they leave out count in
   `testCasesDropped`.
+- `task.testCasesDroppedDurationMs` is the wall time of the dropped cases: the
+  sum of their `durationMs`, an integer of at least 1. It is omitted when
+  nothing was dropped, and when the dropped cases took 0 ms in total.
 
-`testCasesDropped` is a member of the task record, so it appears wherever a
-task record does: in `task:end`, and in the `tasks` of the session file
-(`session.json`).
+`testCasesDropped` and `testCasesDroppedDurationMs` are members of the task
+record, so they appear wherever a task record does: in `task:end`, and in the
+`tasks` of the session file (`session.json`).
 
 The schema states the text bounds as `maxLength`, which JSON Schema counts in
 code points; `ValidateDocument` and `validateDocument` enforce the stricter byte
 bound (`cli.result.invalid_value`).
 
-A producer builds the payload with `BoundTestCases`, or with
-`BoundTestCasesWithin` and the member budget in a batch. It sanitizes each
-string with sanitizer v1 before it cuts, so the CLI's own sanitization never
-grows a bounded string again, and drops a case it cannot describe. When the
-cases exceed the count or byte budget, it keeps the failed ones first, then the
-skipped, then the passed, each while it fits, and reports the rest as
-dropped. `TruncateTestCaseOutput` keeps the
-head and the tail of a long output and sets `outputTruncated`.
+A producer builds the payload with `SelectTestCases`, which takes the task's
+byte budget (`TestCaseMaxBytesPerTask`, or the member budget in a batch) and
+tells which cases observe a declared requirement check: the cases whose test
+the task's feature verification report names. `BoundTestCases` and
+`BoundTestCasesWithin` are the same bound with no case observing a check. It
+sanitizes each string with sanitizer v1 before it cuts, so the CLI's own
+sanitization never grows a bounded string again, and drops a case it cannot
+describe. When the cases exceed the count or byte budget, it keeps them in this
+order, each while it fits:
+
+1. failed cases, in runner order;
+2. skipped cases, in runner order;
+3. passed cases that observe a declared check, in runner order;
+4. the other passed cases that ran for at least 10 ms
+   (`TestCaseQuickDurationMs`), slowest first;
+5. the other passed cases, in runner order.
+
+The kept cases keep their runner order. The bound reports the rest as dropped,
+with their wall time. `TruncateTestCaseOutput` keeps the head and the tail of a
+long output and sets `outputTruncated`.
 
 The CLI writes a task's `test:case` records immediately before that task's
 `task:end`, for solo, batched and cache-replayed tasks alike, and reports each
 case once. An extension hands the cases to the CLI in its test result's `data`
-(`testCases` and `testCasesDropped`, see
+(`testCases`, `testCasesDropped` and `testCasesDroppedDurationMs`, see
 [`protocols/runtime`](../../runtime/doc/04-output-contract.md)); the CLI removes
 `testCases` from the result it copies into `task:event`, so the stream never
 carries a case twice. `task:end.task.testCasesDropped` adds the producer's
-dropped count to the CLI's.
+dropped count to the CLI's, and `task:end.task.testCasesDroppedDurationMs` adds
+their wall times the same way.
 
 `test:case` is additive to the v2 stream: a reader that does not know a
 `record` value skips the record, and the `sessions` commands already do. The
@@ -379,7 +395,9 @@ addition is not invisible everywhere:
 - A strict validator built before this contract, a `ValidateDocument` or
   `validateDocument` from an older release, rejects a `test:case` record
   (unknown `record` value) and a task record that carries `testCasesDropped`
-  (unknown member). Upgrade the validator before validating new streams.
+  (unknown member). A validator built before `testCasesDroppedDurationMs`
+  rejects a task record that carries it. Upgrade the validator before
+  validating new streams.
 - An older CLI's `sessions inspect` lists a `test:case` record by its record
   type without its case payload.
 

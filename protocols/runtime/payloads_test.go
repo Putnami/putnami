@@ -41,6 +41,10 @@ func TestTestCasesSchemaReferencesTheCLIContract(t *testing.T) {
 	if dropped["type"] != "integer" || dropped["minimum"] != float64(1) {
 		t.Errorf("TestCasesDropped = %#v, want an integer of at least 1", dropped)
 	}
+	droppedDuration := schemaObject(t, schema, "$defs", "TestCasesDroppedDurationMs")
+	if droppedDuration["type"] != "integer" || droppedDuration["minimum"] != float64(1) {
+		t.Errorf("TestCasesDroppedDurationMs = %#v, want an integer of at least 1", droppedDuration)
+	}
 }
 
 func TestExtractResultPayloads(t *testing.T) {

@@ -102,10 +102,11 @@ func (s *testCaseSink) reset() {
 }
 
 // read returns the cases the last attempt recorded, bounded to maxBytes of
-// encoded cases, and the count of cases the bound left out.
-func (s *testCaseSink) read(wsRoot string, maxBytes int) ([]protocolcli.TestCase, int) {
+// encoded cases, with the count and the wall time of the cases the bound left
+// out.
+func (s *testCaseSink) read(wsRoot string, maxBytes int) protocolcli.TestCaseSelection {
 	if s == nil || s.stale {
-		return nil, 0
+		return protocolcli.TestCaseSelection{}
 	}
 	return readTestCases(s.file, wsRoot, maxBytes)
 }
@@ -137,10 +138,10 @@ type testCaseRecord struct {
 // process did not finish writing, and a line that does not decode is not a
 // record: both are ignored, so a crashed run still reports every case it
 // finished.
-func readTestCases(path, wsRoot string, maxBytes int) ([]protocolcli.TestCase, int) {
+func readTestCases(path, wsRoot string, maxBytes int) protocolcli.TestCaseSelection {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, 0
+		return protocolcli.TestCaseSelection{}
 	}
 	defer file.Close()
 
@@ -158,7 +159,7 @@ func readTestCases(path, wsRoot string, maxBytes int) ([]protocolcli.TestCase, i
 		}
 		cases = append(cases, record.testCase(paths))
 	}
-	return protocolcli.BoundTestCasesWithin(cases, maxBytes)
+	return protocolcli.SelectTestCases(cases, maxBytes, nil)
 }
 
 // testCase converts one record. Suite is the workspace-relative test module
@@ -262,19 +263,23 @@ func relativeInside(root, path string) (string, bool) {
 
 // attachTestCases adds the per-case results to a test result payload, beside
 // its testSummary. It adds the dropped count only when the bound left cases
-// out, and leaves data untouched when there is nothing to report.
-func attachTestCases(data map[string]any, cases []protocolcli.TestCase, dropped int) map[string]any {
-	if len(cases) == 0 && dropped == 0 {
+// out, their wall time only when it is not zero, and leaves data untouched
+// when there is nothing to report.
+func attachTestCases(data map[string]any, selection protocolcli.TestCaseSelection) map[string]any {
+	if len(selection.Kept) == 0 && selection.Dropped == 0 {
 		return data
 	}
 	if data == nil {
 		data = map[string]any{}
 	}
-	if len(cases) > 0 {
-		data[protocolruntime.TestCasesResultDataKey] = cases
+	if len(selection.Kept) > 0 {
+		data[protocolruntime.TestCasesResultDataKey] = selection.Kept
 	}
-	if dropped > 0 {
-		data[protocolruntime.TestCasesDroppedResultDataKey] = dropped
+	if selection.Dropped > 0 {
+		data[protocolruntime.TestCasesDroppedResultDataKey] = selection.Dropped
+		if selection.DroppedDurationMs > 0 {
+			data[protocolruntime.TestCasesDroppedDurationMsResultDataKey] = selection.DroppedDurationMs
+		}
 	}
 	return data
 }

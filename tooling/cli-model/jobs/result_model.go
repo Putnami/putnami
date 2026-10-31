@@ -241,6 +241,11 @@ type TaskResult struct {
 	// carry: the producer's own "testCasesDropped", every entry that is not a
 	// test-case object, and every case the contract dropped. See testCasesOf.
 	TestCasesDropped int
+	// TestCasesDroppedDurationMs is the wall time of the cases
+	// TestCasesDropped counts: the producer's own
+	// "testCasesDroppedDurationMs" plus the durationMs of every case the
+	// contract dropped. An entry that is not a test-case object adds nothing.
+	TestCasesDroppedDurationMs int64
 }
 
 // Outcome is the user-visible classification: reuse when the result was reused,
@@ -400,7 +405,7 @@ func TaskResultOf(job *ScheduledJob, result *JobResult) TaskResult {
 		// so a warm hit replayed under the enforcing cadence was produced
 		// under it.
 		task.Tests, task.Coverage, _, _ = runtimeproto.ExtractResultPayloads(result.Data)
-		task.TestCases, task.TestCasesDropped = testCasesOf(result.Data)
+		task.TestCases, task.TestCasesDropped, task.TestCasesDroppedDurationMs = testCasesOf(result.Data)
 	}
 	applyTaskSummary(&task, job, result)
 	return task
@@ -419,22 +424,28 @@ func TaskResultOf(job *ScheduledJob, result *JobResult) TaskResult {
 //     one whose name or suite sanitization left empty;
 //   - "testCasesDropped" adds the producer's own count when it is an integer
 //     from 0 to math.MaxInt32, and counts nothing otherwise.
-func testCasesOf(data map[string]any) ([]protocolcli.TestCase, int) {
+//
+// The dropped wall time follows the same rules: "testCasesDroppedDurationMs"
+// adds the producer's own sum when it is an integer from 0 to
+// maxDroppedDurationMs, and every case BoundTestCases drops adds its
+// durationMs. An entry that does not decode adds no time.
+func testCasesOf(data map[string]any) ([]protocolcli.TestCase, int, int64) {
 	if data == nil {
-		return nil, 0
+		return nil, 0, 0
 	}
-	dropped := producerDroppedTestCases(data[runtimeproto.TestCasesDroppedResultDataKey])
+	dropped := int(producerInteger(data[runtimeproto.TestCasesDroppedResultDataKey], math.MaxInt32))
+	droppedMs := producerInteger(data[runtimeproto.TestCasesDroppedDurationMsResultDataKey], maxDroppedDurationMs)
 	value, present := data[runtimeproto.TestCasesResultDataKey]
 	if !present {
-		return nil, dropped
+		return nil, dropped, droppedMs
 	}
 	raw, err := json.Marshal(value)
 	if err != nil {
-		return nil, dropped
+		return nil, dropped, droppedMs
 	}
 	var entries []json.RawMessage
 	if err := json.Unmarshal(raw, &entries); err != nil {
-		return nil, dropped
+		return nil, dropped, droppedMs
 	}
 	decoded := make([]protocolcli.TestCase, 0, len(entries))
 	for _, entry := range entries {
@@ -445,16 +456,22 @@ func testCasesOf(data map[string]any) ([]protocolcli.TestCase, int) {
 		}
 		decoded = append(decoded, testCase)
 	}
-	kept, boundDropped := protocolcli.BoundTestCases(decoded)
+	selection := protocolcli.SelectTestCases(decoded, protocolcli.TestCaseMaxBytesPerTask, nil)
+	kept := selection.Kept
 	if len(kept) == 0 {
 		kept = nil
 	}
-	return kept, dropped + boundDropped
+	droppedMs = min(droppedMs+selection.DroppedDurationMs, maxDroppedDurationMs)
+	return kept, dropped + selection.Dropped, droppedMs
 }
 
-// producerDroppedTestCases reads the producer's dropped-case count. A value
-// that is not an integer from 0 to math.MaxInt32 is not a count.
-func producerDroppedTestCases(value any) int {
+// maxDroppedDurationMs is the largest dropped wall time the CLI reads or
+// reports: the largest integer a JSON reader holds exactly.
+const maxDroppedDurationMs = 1<<53 - 1
+
+// producerInteger reads one of the producer's dropped-case figures. A value
+// that is not an integer from 0 to limit counts as 0.
+func producerInteger(value any, limit float64) int64 {
 	var count float64
 	switch number := value.(type) {
 	case float64:
@@ -466,10 +483,10 @@ func producerDroppedTestCases(value any) int {
 	default:
 		return 0
 	}
-	if count < 0 || count > math.MaxInt32 || count != math.Trunc(count) {
+	if count < 0 || count > limit || count != math.Trunc(count) {
 		return 0
 	}
-	return int(count)
+	return int64(count)
 }
 
 // TaskSummaryOf projects a job and its result onto the canonical model WITHOUT

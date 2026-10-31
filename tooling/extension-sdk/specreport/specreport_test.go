@@ -367,6 +367,45 @@ func TestMergeSoloWritesTheReservedArtifact(t *testing.T) {
 	}
 }
 
+func TestObservingTestsKeepsEveryObservingTestOfTheProject(t *testing.T) {
+	root := specProject(t)
+	nested := filepath.Join(root, "internal", "x")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "x_test.go"), []byte("package x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fragmentsDir := t.TempDir()
+	// Two tests observe one check, so the report keeps one of them; a test
+	// that observes two checks is listed once; a declaration outside the
+	// project is not listed.
+	for _, fragment := range []spectest.Fragment{
+		{Check: "flush", Status: "passed", File: filepath.Join(root, "logger_test.go"), Symbol: "TestFlush"},
+		{Check: "flush", Status: "passed", File: filepath.Join(nested, "x_test.go"), Symbol: "TestNested"},
+		{Check: "close", Status: "passed", File: filepath.Join(root, "logger_test.go"), Symbol: "TestFlush"},
+		{Check: "outside", Status: "passed", File: "/elsewhere/other_test.go", Symbol: "TestOther"},
+	} {
+		fragment.Feature, fragment.Requirement = "go/structured-logging", "lifecycle"
+		writeSpecFragment(t, fragmentsDir, fragment)
+	}
+
+	var observing []features.ObservationProvenance
+	captureEvents(t, func(emit *jsonl.Emitter) {
+		observing = MergeSoloObserving(emit, fragmentsDir, root, t.TempDir())
+	})
+	want := []features.ObservationProvenance{
+		{Path: "internal/x/x_test.go", Symbol: "TestNested"},
+		{Path: "logger_test.go", Symbol: "TestFlush"},
+	}
+	if fmt.Sprint(observing) != fmt.Sprint(want) {
+		t.Fatalf("observing = %+v, want %+v", observing, want)
+	}
+	if got := ObservingTests(nil, root); got != nil {
+		t.Errorf("no fragment: observing = %+v, want none", got)
+	}
+}
+
 func TestMergeSoloWritesNothingWithoutObservations(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "one-report-per-project", "the-merge-writes-a-strictly-readable-report-or-nothing")
 	outDir := t.TempDir()

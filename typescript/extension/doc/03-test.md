@@ -130,10 +130,13 @@ A JUnit report is written to the output directory for CI consumption. It contain
 | `file`, `line` | The workspace-relative file and the line Bun reports for the test |
 
 The list keeps at most 1,000 entries and at most 1 MiB of encoded entries:
-failed first, then skipped, then passed. In a batch, the members share 8 MiB
-equally, since their entries travel in one result line.
+failed first, then skipped, then the tests that observe a declared check
+through `specTest` or `observeMeasurement`, then the slowest passed tests.
+Passed tests under 10 ms come last, in run order. In a batch, the members share
+8 MiB equally, since their entries travel in one result line.
 `result.data.testCasesDropped` counts the entries left out, including a test
-whose file lies outside the workspace. The CLI turns each entry into one
+whose file lies outside the workspace, and
+`result.data.testCasesDroppedDurationMs` sums their run time. The CLI turns each entry into one
 `test:case` record of the session stream.
 
 ### Spec verification report

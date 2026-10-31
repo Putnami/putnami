@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	protocolcli "go.putnami.dev/protocol/cli"
+	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	coveragecheck "go.putnami.dev/sdk/extension/coverage"
@@ -238,10 +239,11 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	}
 	// One locator resolves the test files that both the test cases and the
 	// failure diagnostics name.
+	modulePath := readModulePath(ctx.Project.FullPath)
 	locate := parse.ModuleTestFileLocator(
 		ctx.WorkspaceRoot,
 		ctx.Project.FullPath,
-		readModulePath(ctx.Project.FullPath),
+		modulePath,
 	)
 	testCases := moduleTestCases(outputStr, useJSON, locate)
 
@@ -290,8 +292,11 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	// Merge and publish the spec-verification fragments, for failing runs too:
 	// a failed check is an observation the gate must see, not a report to
 	// withhold.
+	// The tests that observed a check keep their test cases past the case
+	// bound.
+	var observing []featureproto.ObservationProvenance
 	if fragErr == nil {
-		specreport.MergeSolo(emit, fragmentsDir, ctx.Project.FullPath, ctx.OutputPath)
+		observing = specreport.MergeSoloObserving(emit, fragmentsDir, ctx.Project.FullPath, ctx.OutputPath)
 	}
 
 	// Emit one deterministic recap. Raw output has already been retained as
@@ -313,7 +318,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	// Build result data
 	resultData := buildResultData(testCounts, coverageResult, hasCoverage, coverageThreshold)
 	recordFailureDetailsTruncated(resultData, failureDetailsTruncated)
-	recordTestCases(resultData, testCases, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(resultData, testCases, protocolcli.TestCaseMaxBytesPerTask, observingTestCases(observing, modulePath))
 
 	// Enforce the coverage threshold (if configured). A failing gate is reported
 	// as an error diagnostic and fails the job even when every test passed.

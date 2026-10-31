@@ -672,9 +672,13 @@ func TaskRecord(task Task) protocolcli.TaskRecord {
 		TaskWallMs:  millis(task.Result.Timing.TaskWall),
 		Diagnostics: diagnostics(task.Result.Diagnostics),
 	}
-	// The cases the task ran that have no test:case record: the producer's
-	// count plus what the CLI's own bound dropped (jobs.TaskResult).
+	// The cases the task ran that have no test:case record and their wall
+	// time: the producer's figures plus what the CLI's own bound dropped
+	// (jobs.TaskResult).
 	record.TestCasesDropped = nonNegative(task.Result.TestCasesDropped)
+	if record.TestCasesDropped > 0 {
+		record.TestCasesDroppedDurationMs = nonNegative64(task.Result.TestCasesDroppedDurationMs)
+	}
 	// The key the task was keyed on, derived once in the canonical model. The
 	// guard reads the WIRE status, because this projection is what turns a
 	// verdict outside the vocabulary into "skipped", and a skipped record that

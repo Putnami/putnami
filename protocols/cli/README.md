@@ -26,7 +26,7 @@ import protocolcli "go.putnami.dev/protocol/cli"
 | `SessionStreamRecord`, `BoundedSessionEndRecord`, `SessionFile`, `SessionPlanFile` | The other version-2 machine documents, including JSONL `plan:end` previews and the opt-in bounded session terminal |
 | `ReportFile` + `ReportMax*` | The run's bounded synthesis document (`report.json`) and the caps that bound it |
 | `TaskIdentity` / `RunSummary` / `TaskRecord` | The typed task identity and the one run verdict every v2 surface reports |
-| `TestCase` + `TestCaseMax*`, `BoundTestCases`, `BoundTestCasesWithin`, `TestCaseBatchMemberBytes`, `TruncateTestCaseOutput` | The `test:case` stream record's payload, its bounds, and the helpers a test producer bounds it with — [doc/02-result-v2.md](doc/02-result-v2.md#test-case-records) |
+| `TestCase` + `TestCaseMax*`, `TestCaseQuickDurationMs`, `BoundTestCases`, `BoundTestCasesWithin`, `SelectTestCases` / `TestCaseSelection`, `TestCaseBatchMemberBytes`, `TruncateTestCaseOutput` | The `test:case` stream record's payload, its bounds, and the helpers a test producer bounds it with — [doc/02-result-v2.md](doc/02-result-v2.md#test-case-records) |
 | `ValidateDocument`, `ValidateSessionStream` / `Violation` | Per-document and whole bounded-stream validation, mirrored in TypeScript and pinned by the cross-language corpus |
 | `Result` / `ResultError` | The version-1 envelope, retained as a READ-ONLY shape for documents recorded by builds published before its removal — its constructor and writer are deleted |
 | `Err*` sentinels, `Classify`, `ExitCodeForError`, `ErrorCode` | Error classification → exit code |

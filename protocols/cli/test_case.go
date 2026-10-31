@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -19,12 +21,17 @@ const (
 // cannot widen them locally. Both validators enforce the text and output
 // bounds on every test:case record. The count and byte budgets span records,
 // so no per-record check can enforce them; BoundTestCases applies them and
-// task:end reports the rest in TaskRecord.TestCasesDropped.
+// task:end reports the rest in TaskRecord.TestCasesDropped and
+// TaskRecord.TestCasesDroppedDurationMs.
 const (
 	// TestCaseMaxPerTask bounds the test:case records of one task. A producer
-	// past it keeps failed cases first, then skipped, then passed, and counts
-	// the rest in TaskRecord.TestCasesDropped.
+	// past it keeps failed cases first, then skipped, then passed cases that
+	// observe a declared requirement check, then the other passed cases,
+	// slowest first. It counts the rest in TaskRecord.TestCasesDropped.
 	TestCaseMaxPerTask = 1000
+	// TestCaseQuickDurationMs is the duration under which a passed case that
+	// observes no check is kept last, in runner order.
+	TestCaseQuickDurationMs = 10
 	// TestCaseMaxOutputBytes bounds TestCase.Output, in UTF-8 bytes.
 	TestCaseMaxOutputBytes = 4096
 	// TestCaseMaxTextBytes bounds TestCase.Name, Suite and File, in UTF-8 bytes.
@@ -86,61 +93,130 @@ func BoundTestCases(cases []TestCase) (kept []TestCase, dropped int) {
 }
 
 // BoundTestCasesWithin applies the test-case contract to the cases one task
+// reported, in runner order, within maxBytes of encoded cases. It is
+// SelectTestCases with no case observing a check.
+func BoundTestCasesWithin(cases []TestCase, maxBytes int) (kept []TestCase, dropped int) {
+	selection := SelectTestCases(cases, maxBytes, nil)
+	return selection.Kept, selection.Dropped
+}
+
+// TestCaseSelection is what SelectTestCases keeps of one task's cases and
+// what it leaves out.
+type TestCaseSelection struct {
+	// Kept are the cases the task sends as test:case records, in runner order.
+	Kept []TestCase
+	// Dropped counts every reported case Kept does not carry.
+	Dropped int
+	// DroppedDurationMs is the sum of the DurationMs of the dropped cases,
+	// each counted from 0 when it is negative.
+	DroppedDurationMs int64
+}
+
+// SelectTestCases applies the test-case contract to the cases one task
 // reported, in runner order, within maxBytes of encoded cases. A batch
 // producer passes TestCaseBatchMemberBytes; any budget above
-// TestCaseMaxBytesPerTask is lowered to it.
+// TestCaseMaxBytesPerTask is lowered to it. observes reports whether a case,
+// as the runner reported it, observes a declared requirement check: the
+// task's verification report names its test. A nil observes reports none.
 //
 // It drops a case without a name, a suite or a known status, since a producer
 // never guesses them. It sanitizes every string with SanitizeMachineOutputString
 // before it cuts over-long text on a code point, so the CLI's own sanitization
 // of the record cannot grow a bounded string past its bound or leave part of a
-// secret at a cut. It drops the output of a passed case. It then keeps failed
-// cases first, then skipped, then passed, each in runner order: a case is kept
-// while fewer than TestCaseMaxPerTask are kept and its compact JSON encoding
-// fits in what remains of maxBytes. The kept cases keep their original order.
-// dropped counts every case it did not keep.
-func BoundTestCasesWithin(cases []TestCase, maxBytes int) (kept []TestCase, dropped int) {
+// secret at a cut. It drops the output of a passed case.
+//
+// When the cases exceed the count or the byte budget, it keeps them in this
+// order: failed, skipped, passed cases that observe a check, each in runner
+// order; then the other passed cases that ran for at least
+// TestCaseQuickDurationMs, slowest first; then the rest, in runner order. A
+// case is kept while fewer than TestCaseMaxPerTask are kept and its compact
+// JSON encoding fits in what remains of maxBytes. The kept cases keep their
+// original order.
+func SelectTestCases(cases []TestCase, maxBytes int, observes func(TestCase) bool) TestCaseSelection {
 	maxBytes = min(maxBytes, TestCaseMaxBytesPerTask)
+	var selection TestCaseSelection
 	valid := make([]TestCase, 0, len(cases))
+	ranks := make([]int, 0, len(cases))
 	sizes := make([]int, 0, len(cases))
 	total := 0
-	for _, c := range cases {
-		c, ok := boundTestCase(c)
+	for _, reported := range cases {
+		c, ok := boundTestCase(reported)
 		if !ok {
-			dropped++
+			selection.Dropped++
+			selection.DroppedDurationMs += max(reported.DurationMs, 0)
 			continue
 		}
 		size := encodedTestCaseBytes(c)
 		valid = append(valid, c)
+		ranks = append(ranks, testCaseRank(c, observes != nil && observes(reported)))
 		sizes = append(sizes, size)
 		total += size
 	}
 	if len(valid) <= TestCaseMaxPerTask && total <= maxBytes {
-		return valid, dropped
+		selection.Kept = valid
+		return selection
 	}
+	order := make([]int, len(valid))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int {
+		if ranks[a] != ranks[b] {
+			return ranks[a] - ranks[b]
+		}
+		if ranks[a] == testCaseRankSlow {
+			return cmp.Compare(valid[b].DurationMs, valid[a].DurationMs)
+		}
+		return 0
+	})
 	keep := make([]bool, len(valid))
 	room, bytesRoom := TestCaseMaxPerTask, maxBytes
-	for _, status := range []string{TestCaseStatusFailed, TestCaseStatusSkipped, TestCaseStatusPassed} {
-		for i := range valid {
-			if room == 0 {
-				break
-			}
-			if valid[i].Status == status && sizes[i] <= bytesRoom {
-				keep[i] = true
-				room--
-				bytesRoom -= sizes[i]
-			}
+	for _, i := range order {
+		if room == 0 {
+			break
+		}
+		if sizes[i] <= bytesRoom {
+			keep[i] = true
+			room--
+			bytesRoom -= sizes[i]
 		}
 	}
-	kept = make([]TestCase, 0, min(len(valid), TestCaseMaxPerTask))
+	selection.Kept = make([]TestCase, 0, min(len(valid), TestCaseMaxPerTask))
 	for i, c := range valid {
 		if keep[i] {
-			kept = append(kept, c)
+			selection.Kept = append(selection.Kept, c)
 		} else {
-			dropped++
+			selection.Dropped++
+			selection.DroppedDurationMs += c.DurationMs
 		}
 	}
-	return kept, dropped
+	return selection
+}
+
+// The ranks SelectTestCases keeps cases in past the bound, lowest first.
+const (
+	testCaseRankFailed = iota
+	testCaseRankSkipped
+	testCaseRankObserving
+	testCaseRankSlow
+	testCaseRankQuick
+)
+
+// testCaseRank is the rank of one bounded case. observing reports that the
+// case observes a declared requirement check.
+func testCaseRank(c TestCase, observing bool) int {
+	switch {
+	case c.Status == TestCaseStatusFailed:
+		return testCaseRankFailed
+	case c.Status == TestCaseStatusSkipped:
+		return testCaseRankSkipped
+	case observing:
+		return testCaseRankObserving
+	case c.DurationMs >= TestCaseQuickDurationMs:
+		return testCaseRankSlow
+	default:
+		return testCaseRankQuick
+	}
 }
 
 // TestCaseBatchMemberBytes is the case budget of one member of a batched run

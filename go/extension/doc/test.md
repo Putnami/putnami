@@ -541,9 +541,12 @@ test that reached a result, subtests included:
 | `file`, `line` | For a failed or skipped test, the first `name_test.go:N` location in its output, workspace-relative, when that file exists in the package directory |
 
 The list keeps at most 1,000 entries and at most 1 MiB of encoded entries:
-failed first, then skipped, then passed. In a batch, the members share 8 MiB
-equally, since their entries travel in one result line.
-`result.data.testCasesDropped` counts the entries left out. The CLI turns each
+failed first, then skipped, then the tests that observe a declared check
+through `spectest.Proves` or `spectest.ObserveMeasurement`, then the slowest
+passed tests. Passed tests under 10 ms come last, in run order. In a batch, the
+members share 8 MiB equally, since their entries travel in one result line.
+`result.data.testCasesDropped` counts the entries left out, and
+`result.data.testCasesDroppedDurationMs` sums their run time. The CLI turns each
 entry into one `test:case` record of the session stream. With
 `--test-json=false` the job reports no entries.
 

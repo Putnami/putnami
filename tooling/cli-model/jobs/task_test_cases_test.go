@@ -69,9 +69,9 @@ func TestTaskResultOf_CountsEveryReportedCaseWithoutARecord(t *testing.T) {
 	job := canonicalTestJob("a", "test", "test-exec")
 	cases := make([]string, 0, 1005)
 	for i := range 1005 {
-		cases = append(cases, fmt.Sprintf(`{"name":"TestP%04d","suite":"example.com/a","status":"passed"}`, i))
+		cases = append(cases, fmt.Sprintf(`{"name":"TestP%04d","suite":"example.com/a","status":"passed","durationMs":2}`, i))
 	}
-	result := testCasesResult(t, "OK", `{"testCasesDropped": 3, "testCases": [`+strings.Join(cases, ",")+`]}`)
+	result := testCasesResult(t, "OK", `{"testCasesDropped": 3, "testCasesDroppedDurationMs": 70, "testCases": [`+strings.Join(cases, ",")+`]}`)
 
 	task := TaskResultOf(job, result)
 	if len(task.TestCases) != protocolcli.TestCaseMaxPerTask {
@@ -79,6 +79,9 @@ func TestTaskResultOf_CountsEveryReportedCaseWithoutARecord(t *testing.T) {
 	}
 	if task.TestCasesDropped != 8 {
 		t.Fatalf("dropped = %d, want 3 from the producer + 5 over the bound", task.TestCasesDropped)
+	}
+	if task.TestCasesDroppedDurationMs != 80 {
+		t.Fatalf("dropped duration = %d ms, want 70 from the producer + 5 cases of 2 ms over the bound", task.TestCasesDroppedDurationMs)
 	}
 	if task.TestCases[0].Name != "TestP0000" || task.TestCases[999].Name != "TestP0999" {
 		t.Fatalf("kept cases lost runner order: first=%s last=%s", task.TestCases[0].Name, task.TestCases[999].Name)
@@ -88,9 +91,10 @@ func TestTaskResultOf_CountsEveryReportedCaseWithoutARecord(t *testing.T) {
 func TestTaskResultOf_MalformedTestCasesNeverFailTheTask(t *testing.T) {
 	job := canonicalTestJob("a", "test", "test-exec")
 	for name, tc := range map[string]struct {
-		data        string
-		wantKept    int
-		wantDropped int
+		data          string
+		wantKept      int
+		wantDropped   int
+		wantDroppedMs int64
 	}{
 		"not an array counts nothing": {data: `{"testCases": "TestA passed"}`},
 		"object counts nothing":       {data: `{"testCases": {"name": "TestA"}}`},
@@ -112,15 +116,24 @@ func TestTaskResultOf_MalformedTestCasesNeverFailTheTask(t *testing.T) {
 		"string producer count":       {data: `{"testCasesDropped": "3"}`},
 		"out-of-range producer count": {data: `{"testCasesDropped": 1e12}`},
 		"producer count alone":        {data: `{"testCasesDropped": 4}`, wantDropped: 4},
+		"producer duration alone": {
+			data:        `{"testCasesDropped": 4, "testCasesDroppedDurationMs": 12}`,
+			wantDropped: 4, wantDroppedMs: 12,
+		},
+		"negative producer duration":   {data: `{"testCasesDropped": 4, "testCasesDroppedDurationMs": -12}`, wantDropped: 4},
+		"fractional producer duration": {data: `{"testCasesDropped": 4, "testCasesDroppedDurationMs": 1.5}`, wantDropped: 4},
+		"string producer duration":     {data: `{"testCasesDropped": 4, "testCasesDroppedDurationMs": "12"}`, wantDropped: 4},
 	} {
 		t.Run(name, func(t *testing.T) {
 			task := TaskResultOf(job, testCasesResult(t, "OK", tc.data))
 			if task.Status != TaskStatusSuccess {
 				t.Fatalf("a malformed optional payload changed the verdict to %s", task.Status)
 			}
-			if len(task.TestCases) != tc.wantKept || task.TestCasesDropped != tc.wantDropped {
-				t.Fatalf("kept=%d dropped=%d, want kept=%d dropped=%d",
-					len(task.TestCases), task.TestCasesDropped, tc.wantKept, tc.wantDropped)
+			if len(task.TestCases) != tc.wantKept || task.TestCasesDropped != tc.wantDropped ||
+				task.TestCasesDroppedDurationMs != tc.wantDroppedMs {
+				t.Fatalf("kept=%d dropped=%d droppedMs=%d, want kept=%d dropped=%d droppedMs=%d",
+					len(task.TestCases), task.TestCasesDropped, task.TestCasesDroppedDurationMs,
+					tc.wantKept, tc.wantDropped, tc.wantDroppedMs)
 			}
 			if tc.wantKept == 0 && task.TestCases != nil {
 				t.Fatalf("no kept case must read as nil, got %#v", task.TestCases)

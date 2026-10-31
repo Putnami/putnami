@@ -178,7 +178,7 @@ func TestTestCasePluginRecordsRealPytestCases(t *testing.T) {
 		t.Fatalf("the armed plugin registered no recorder:\n%s", output)
 	}
 
-	cases, dropped := sink.read(wsRoot, protocolcli.TestCaseMaxBytesPerTask)
+	cases, dropped := keptAndDropped(sink.read(wsRoot, protocolcli.TestCaseMaxBytesPerTask))
 	if dropped != 0 {
 		t.Errorf("dropped = %d, want 0\npytest output:\n%s", dropped, output)
 	}

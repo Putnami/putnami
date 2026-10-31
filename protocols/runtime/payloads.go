@@ -26,15 +26,18 @@ const ReleaseSetResultDataKey = "releaseSet"
 
 // Test-case result-data keys. A test job carries one entry per test case it
 // ran under TestCasesResultDataKey, beside its testSummary, and, when it left
-// cases out, their count under TestCasesDroppedResultDataKey. The entry shape
-// and its bounds are protocols/cli's TestCase (go.putnami.dev/protocol/cli),
-// bounded with its BoundTestCases: the CLI turns each entry into one test:case
-// session-stream record attributed to the task, so the two layers share one
-// definition instead of two copies. A runtime without structured per-case
-// output omits both keys; it never guesses.
+// cases out, their count under TestCasesDroppedResultDataKey and the sum of
+// their durationMs under TestCasesDroppedDurationMsResultDataKey, when that sum
+// is not zero. The entry shape and its bounds are protocols/cli's TestCase
+// (go.putnami.dev/protocol/cli), bounded with its SelectTestCases: the CLI
+// turns each entry into one test:case session-stream record attributed to the
+// task, so the two layers share one definition instead of two copies. A
+// runtime without structured per-case output omits every key; it never
+// guesses.
 const (
-	TestCasesResultDataKey        = "testCases"
-	TestCasesDroppedResultDataKey = "testCasesDropped"
+	TestCasesResultDataKey                  = "testCases"
+	TestCasesDroppedResultDataKey           = "testCasesDropped"
+	TestCasesDroppedDurationMsResultDataKey = "testCasesDroppedDurationMs"
 )
 
 // TestSummary is the canonical test outcome payload, carried in the

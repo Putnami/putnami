@@ -136,14 +136,16 @@ func runProjectTestSuite(
 	}
 
 	result.Data = testResultData(testSummary, covSummary, params.CoverageThreshold)
-	// Every member's cases share the batch's one result line.
-	recordTestCases(result.Data, ctx.WorkspaceRoot, proj.Path, testSummary, protocolcli.TestCaseBatchMemberBytes(len(ctx.SelectedProjects)))
 	result.Artifacts = testBatchArtifacts(ctx, outputPath, covSummary)
 	// Merge and publish the spec-verification fragments, for failing suites
-	// too: a failed check is an observation the gate must see.
+	// too: a failed check is an observation the gate must see. The tests that
+	// observed a check keep their test cases past the case bound.
+	var observing []features.ObservationProvenance
 	if fragErr == nil {
-		attachBatchSpecVerification(&result, ctx, fragmentsDir, projectPath, outputPath)
+		observing = attachBatchSpecVerification(&result, ctx, fragmentsDir, projectPath, outputPath)
 	}
+	// Every member's cases share the batch's one result line.
+	recordTestCases(result.Data, ctx.WorkspaceRoot, proj.Path, testSummary, protocolcli.TestCaseBatchMemberBytes(len(ctx.SelectedProjects)), observing)
 
 	// Enforce the coverage threshold per project against this project's own
 	// coverage (evaluated against line coverage, same as solo).
@@ -223,9 +225,15 @@ const specVerificationCategory = "SPEC_VERIFICATION"
 // attachBatchSpecVerification merges the fragments one member's suite wrote
 // into its own report artifact, keeping per-project attribution exactly as a
 // solo run produces it. Reporting problems become warning diagnostics and
-// never change the member's test verdict.
-func attachBatchSpecVerification(result *testBatchProjectResult, ctx *pctx.Context, fragmentsDir, projectRoot, outputPath string) {
+// never change the member's test verdict. It returns the member's
+// specreport.ObservingTests.
+func attachBatchSpecVerification(
+	result *testBatchProjectResult,
+	ctx *pctx.Context,
+	fragmentsDir, projectRoot, outputPath string,
+) []features.ObservationProvenance {
 	fragments, warnings := specreport.ReadFragments(fragmentsDir)
+	observing := specreport.ObservingTests(fragments, projectRoot)
 	report, foreign, buildWarnings := specreport.ProjectReport(fragments, projectRoot)
 	warnings = append(warnings, buildWarnings...)
 	for _, fragment := range foreign {
@@ -239,14 +247,14 @@ func attachBatchSpecVerification(result *testBatchProjectResult, ctx *pctx.Conte
 		})
 	}
 	if report == nil {
-		return
+		return observing
 	}
 	destination, err := specreport.EmitReport(nil, report, outputPath)
 	if err != nil {
 		result.Diagnostics = append(result.Diagnostics, testBatchDiagnostic{
 			Severity: "warning", Description: err.Error(), Category: specVerificationCategory,
 		})
-		return
+		return observing
 	}
 	result.Artifacts = append(result.Artifacts, testBatchArtifact{
 		ID:   features.VerificationReportArtifactID,
@@ -254,6 +262,7 @@ func attachBatchSpecVerification(result *testBatchProjectResult, ctx *pctx.Conte
 		Kind: "report",
 		Path: project.RelativePath(ctx.WorkspaceRoot, destination),
 	})
+	return observing
 }
 
 // testBatchArtifacts builds the coverage/junit artifact rows for a project,

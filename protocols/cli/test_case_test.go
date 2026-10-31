@@ -91,6 +91,115 @@ func TestBoundTestCasesKeepsFailedThenSkippedThenPassedInRunnerOrder(t *testing.
 	}
 }
 
+func TestSelectTestCasesKeepsTheCasesThatObserveACheckThenTheSlowest(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
+	// 1,500 passed cases. Every 150th observes a declared check and takes
+	// 0 ms; the others take from 0 to 1,489 ms, in no order.
+	cases := make([]TestCase, 0, 1500)
+	observing := map[string]bool{}
+	for i := range 1500 {
+		c := TestCase{Name: fmt.Sprintf("Test%04d", i), Suite: "example.com/a", Status: TestCaseStatusPassed}
+		if i%150 == 0 {
+			observing[c.Name] = true
+		} else {
+			c.DurationMs = int64((i * 7919) % 1500)
+		}
+		cases = append(cases, c)
+	}
+	selection := SelectTestCases(cases, TestCaseMaxBytesPerTask, func(c TestCase) bool { return observing[c.Name] })
+	if len(selection.Kept) != TestCaseMaxPerTask || selection.Dropped != 500 {
+		t.Fatalf("kept %d, dropped %d; want %d and 500", len(selection.Kept), selection.Dropped, TestCaseMaxPerTask)
+	}
+
+	kept := map[string]bool{}
+	previous := -1
+	for _, c := range selection.Kept {
+		kept[c.Name] = true
+		var index int
+		if _, err := fmt.Sscanf(c.Name, "Test%04d", &index); err != nil || index <= previous {
+			t.Fatalf("kept cases lost runner order at %q", c.Name)
+		}
+		previous = index
+	}
+	for name := range observing {
+		if !kept[name] {
+			t.Errorf("dropped %s, which observes a check", name)
+		}
+	}
+	// The other 990 kept cases are the slowest ones: no dropped case ran
+	// longer than a kept one that observes no check.
+	slowestDropped, fastestKept, droppedMs := int64(-1), int64(1<<62), int64(0)
+	for _, c := range cases {
+		switch {
+		case !kept[c.Name]:
+			slowestDropped = max(slowestDropped, c.DurationMs)
+			droppedMs += c.DurationMs
+		case !observing[c.Name]:
+			fastestKept = min(fastestKept, c.DurationMs)
+		}
+	}
+	if slowestDropped > fastestKept {
+		t.Errorf("dropped a %d ms case and kept a %d ms one", slowestDropped, fastestKept)
+	}
+	if selection.DroppedDurationMs != droppedMs || droppedMs == 0 {
+		t.Errorf("DroppedDurationMs = %d, want %d, the sum of the dropped cases", selection.DroppedDurationMs, droppedMs)
+	}
+}
+
+func TestSelectTestCasesKeepsQuickCasesLastInRunnerOrder(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
+	// Past the cap by 3: the 10 ms case outranks every quicker one, and among
+	// the quick cases, durations under TestCaseQuickDurationMs do not reorder
+	// them, so the last three in runner order go.
+	cases := make([]TestCase, 0, TestCaseMaxPerTask+3)
+	for i := range TestCaseMaxPerTask + 2 {
+		cases = append(cases, TestCase{
+			Name: fmt.Sprintf("Test%04d", i), Suite: "example.com/a", Status: TestCaseStatusPassed,
+			DurationMs: int64(i % TestCaseQuickDurationMs),
+		})
+	}
+	cases = append(cases, TestCase{Name: "TestSlow", Suite: "example.com/a", Status: TestCaseStatusPassed, DurationMs: TestCaseQuickDurationMs})
+	selection := SelectTestCases(cases, TestCaseMaxBytesPerTask, nil)
+	if selection.Dropped != 3 {
+		t.Fatalf("dropped %d, want 3", selection.Dropped)
+	}
+	if last := selection.Kept[len(selection.Kept)-1].Name; last != "TestSlow" {
+		t.Errorf("last kept case = %q, want TestSlow", last)
+	}
+	if last := selection.Kept[len(selection.Kept)-2].Name; last != "Test0998" {
+		t.Errorf("last kept quick case = %q, want Test0998, the earliest quick cases kept", last)
+	}
+	// Test0999, Test1000 and Test1001 took 9, 0 and 1 ms.
+	if selection.DroppedDurationMs != 10 {
+		t.Errorf("DroppedDurationMs = %d, want 10", selection.DroppedDurationMs)
+	}
+}
+
+func TestSelectTestCasesUnderTheBoundKeepsEveryCase(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
+	cases := []TestCase{
+		{Name: "TestFast", Suite: "example.com/a", Status: TestCaseStatusPassed, DurationMs: 1},
+		{Name: "TestSlow", Suite: "example.com/a", Status: TestCaseStatusPassed, DurationMs: 900},
+		{Name: "TestFail", Suite: "example.com/a", Status: TestCaseStatusFailed, DurationMs: 3},
+	}
+	selection := SelectTestCases(cases, TestCaseMaxBytesPerTask, func(c TestCase) bool { return c.Name == "TestFast" })
+	if !reflect.DeepEqual(selection.Kept, cases) || selection.Dropped != 0 || selection.DroppedDurationMs != 0 {
+		t.Fatalf("selection = %+v, want every case in runner order and nothing dropped", selection)
+	}
+}
+
+func TestSelectTestCasesCountsTheTimeOfCasesItCannotDescribe(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
+	selection := SelectTestCases([]TestCase{
+		{Name: "TestA", Suite: "example.com/a", Status: TestCaseStatusPassed, DurationMs: 5},
+		{Name: "TestB", Suite: "example.com/a", Status: "errored", DurationMs: 40},
+		{Name: "", Suite: "example.com/a", Status: TestCaseStatusFailed, DurationMs: -7},
+	}, TestCaseMaxBytesPerTask, nil)
+	if len(selection.Kept) != 1 || selection.Dropped != 2 || selection.DroppedDurationMs != 40 {
+		t.Fatalf("selection = %+v, want TestA kept, 2 dropped and 40 ms, a negative duration counted as 0", selection)
+	}
+}
+
 func TestBoundTestCasesRemovesPassedOutputAndOrphanMembers(t *testing.T) {
 	spectest.Proves(t, "cli/machine-contract", "test-cases-are-bounded", "cases-keep-their-priority-within-the-cap")
 	kept, dropped := BoundTestCases([]TestCase{

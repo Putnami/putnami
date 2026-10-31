@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/go/extension/internal/parse"
 	protocolcli "go.putnami.dev/protocol/cli"
+	featureproto "go.putnami.dev/protocol/features"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -35,7 +36,7 @@ func TestRecordTestCasesKeepsTheBoundAndCountsTheRest(t *testing.T) {
 	)
 
 	data := map[string]any{}
-	recordTestCases(data, cases, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(data, cases, protocolcli.TestCaseMaxBytesPerTask, nil)
 	kept, ok := data["testCases"].([]protocolcli.TestCase)
 	if !ok || len(kept) != protocolcli.TestCaseMaxPerTask {
 		t.Fatalf("testCases = %d cases, want %d", len(kept), protocolcli.TestCaseMaxPerTask)
@@ -54,14 +55,71 @@ func TestRecordTestCasesKeepsTheBoundAndCountsTheRest(t *testing.T) {
 	}
 }
 
+func TestRecordTestCasesKeepsTheTestsThatObserveACheck(t *testing.T) {
+	// 1,500 passed cases of 1 ms in two packages. Two top-level tests observe
+	// a check: TestRoot in the module's root package and TestNested in
+	// internal/x. A subtest and a same-named test of another package do not.
+	cases := make([]protocolcli.TestCase, 0, 1500)
+	for i := range 1496 {
+		cases = append(cases, protocolcli.TestCase{
+			Name: fmt.Sprintf("TestPass%04d", i), Suite: "example.com/a", Status: protocolcli.TestCaseStatusPassed, DurationMs: 1,
+		})
+	}
+	cases = append(cases,
+		protocolcli.TestCase{Name: "TestRoot", Suite: "example.com/a", Status: protocolcli.TestCaseStatusPassed},
+		protocolcli.TestCase{Name: "TestNested", Suite: "example.com/a/internal/x", Status: protocolcli.TestCaseStatusPassed},
+		protocolcli.TestCase{Name: "TestRoot/sub", Suite: "example.com/a", Status: protocolcli.TestCaseStatusPassed},
+		protocolcli.TestCase{Name: "TestNested", Suite: "example.com/a/internal/y", Status: protocolcli.TestCaseStatusPassed},
+	)
+	observes := observingTestCases([]featureproto.ObservationProvenance{
+		{Path: "a_test.go", Symbol: "TestRoot"},
+		{Path: "internal/x/x_test.go", Symbol: "TestNested"},
+	}, "example.com/a")
+
+	data := map[string]any{}
+	recordTestCases(data, cases, protocolcli.TestCaseMaxBytesPerTask, observes)
+	kept, _ := data["testCases"].([]protocolcli.TestCase)
+	observed := map[string]bool{}
+	for _, testCase := range kept {
+		observed[testCase.Suite+" "+testCase.Name] = true
+	}
+	for _, key := range []string{"example.com/a TestRoot", "example.com/a/internal/x TestNested"} {
+		if !observed[key] {
+			t.Errorf("kept cases miss %s, which observes a check", key)
+		}
+	}
+	for _, key := range []string{"example.com/a TestRoot/sub", "example.com/a/internal/y TestNested"} {
+		if observed[key] {
+			t.Errorf("kept %s ahead of the 1 ms cases, though it observes no check", key)
+		}
+	}
+	if len(kept) != protocolcli.TestCaseMaxPerTask || data["testCasesDropped"] != 500 {
+		t.Fatalf("kept %d, dropped %v; want %d and 500", len(kept), data["testCasesDropped"], protocolcli.TestCaseMaxPerTask)
+	}
+	// The dropped cases are the two 0 ms cases that observe nothing and 498
+	// of the 1 ms ones.
+	if data["testCasesDroppedDurationMs"] != int64(498) {
+		t.Errorf("testCasesDroppedDurationMs = %v, want 498", data["testCasesDroppedDurationMs"])
+	}
+}
+
+func TestObservingTestCasesIsNilWithoutAnObservingTest(t *testing.T) {
+	if observingTestCases(nil, "example.com/a") != nil {
+		t.Error("no observing test: want a nil predicate")
+	}
+	if observingTestCases([]featureproto.ObservationProvenance{{Path: "a_test.go", Symbol: "TestA"}}, "") != nil {
+		t.Error("no module path: want a nil predicate")
+	}
+}
+
 func TestRecordTestCasesWritesNothingForNoCases(t *testing.T) {
 	data := map[string]any{}
-	recordTestCases(data, nil, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(data, nil, protocolcli.TestCaseMaxBytesPerTask, nil)
 	if len(data) != 0 {
 		t.Fatalf("data = %v, want no test-case keys", data)
 	}
 	// A case without a suite breaks the contract: it is dropped and counted.
-	recordTestCases(data, []protocolcli.TestCase{{Name: "TestA", Status: protocolcli.TestCaseStatusPassed}}, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(data, []protocolcli.TestCase{{Name: "TestA", Status: protocolcli.TestCaseStatusPassed}}, protocolcli.TestCaseMaxBytesPerTask, nil)
 	if _, ok := data["testCases"]; ok || data["testCasesDropped"] != 1 {
 		t.Fatalf("data = %v, want only testCasesDropped 1", data)
 	}
@@ -76,7 +134,7 @@ func TestRecordTestCasesKeepsWithinItsByteBudget(t *testing.T) {
 	data := map[string]any{}
 	// The budget of a member of a 2048-project batch is 4 KiB: the failed case
 	// alone fills it, so the passed case is dropped and counted.
-	recordTestCases(data, []protocolcli.TestCase{passed, failed}, protocolcli.TestCaseBatchMemberBytes(2048))
+	recordTestCases(data, []protocolcli.TestCase{passed, failed}, protocolcli.TestCaseBatchMemberBytes(2048), nil)
 	kept, _ := data["testCases"].([]protocolcli.TestCase)
 	if len(kept) != 1 || kept[0].Name != "TestFail" || data["testCasesDropped"] != 1 {
 		t.Fatalf("data = %v, want the failed case kept and 1 dropped", data)

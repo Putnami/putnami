@@ -535,13 +535,15 @@ known, `output` with `outputTruncated`, `file`, and `line`. A task's cases come
 in runner order, immediately before its `task:end`, for executed, batched, and
 cache-replayed tasks alike. A task reports at most 1,000 cases and at most
 1 MiB of encoded cases, and a batch's members share 8 MiB: failed first, then
-skipped, then passed. Normal mode keeps every case in `events.jsonl` only,
+skipped, then passed cases that observe a declared check, then the slowest
+passed cases. Normal mode keeps every case in `events.jsonl` only,
 since the failed task's `task:end` and error diagnostics already carry the
 failure live; `--verbose` admits all of them. The contract is in `protocols/cli/doc/02-result-v2.md`.
 
 **`task:end`**: `identity`, `task` (status, reuse, exit code, timings,
-diagnostics, `error` when it did not succeed, and `testCasesDropped` when the
-task ran cases that no `test:case` record carries)
+diagnostics, `error` when it did not succeed, and `testCasesDropped` with
+`testCasesDroppedDurationMs`, their wall time, when the task ran cases that no
+`test:case` record carries)
 
 **`session:end`**: bounded `run` verdict plus `machineOutput` budget, exact
 elision, sanitizer version, and complete-artifact reference. The general JSON

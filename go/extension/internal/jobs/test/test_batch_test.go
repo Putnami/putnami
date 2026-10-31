@@ -296,7 +296,7 @@ func TestEvaluateBatchProjectReportsUnreadableProfile(t *testing.T) {
 			// A directory opens, then every read fails.
 			project := &batchProject{ref: pctx.ProjectRef{ID: "/a"}, coverFile: t.TempDir()}
 			options := batchOptions{coverage: true, coverageThreshold: test.threshold}
-			result := evaluateBatchProject("go", options, project, testEvent("pass", "example.com/a", "TestA", "")+"\n", false, "", false)
+			result := evaluateBatchProject("go", options, project, testEvent("pass", "example.com/a", "TestA", "")+"\n", false, "", false, nil)
 
 			if result.Status != test.wantStatus {
 				t.Fatalf("status = %q, want %q", result.Status, test.wantStatus)

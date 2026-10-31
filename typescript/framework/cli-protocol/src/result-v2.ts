@@ -147,14 +147,21 @@ export type TestCaseStatus = (typeof TEST_CASE_STATUS)[keyof typeof TEST_CASE_ST
 
 /**
  * The most `test:case` records one task carries. A producer past it keeps
- * failed cases first, then skipped, then passed, and counts the rest in
- * {@link TaskRecord.testCasesDropped}. The bound spans records, so no
+ * failed cases first, then skipped, then passed cases that observe a declared
+ * requirement check, then the other passed cases, slowest first. It counts the
+ * rest in {@link TaskRecord.testCasesDropped}. The bound spans records, so no
  * per-record check enforces it.
  *
  * The test-case bounds are the numbers the Go constants carry, and both are
  * pinned against `result-v2.json` by the drift tests.
  */
 export const TEST_CASE_MAX_PER_TASK = 1000 as const;
+
+/**
+ * The duration under which a passed case that observes no check is kept last,
+ * in runner order, by a producer past {@link TEST_CASE_MAX_PER_TASK}.
+ */
+export const TEST_CASE_QUICK_DURATION_MS = 10 as const;
 
 /**
  * The most bytes of test cases one task carries: the sum of the compact JSON
@@ -382,6 +389,12 @@ export interface TaskRecord {
    * when every reported case has its record.
    */
   testCasesDropped?: number;
+  /**
+   * The wall time of the cases {@link TaskRecord.testCasesDropped} counts: the
+   * sum of their `durationMs`. Absent when nothing was dropped, and when the
+   * dropped cases took 0 ms in total.
+   */
+  testCasesDroppedDurationMs?: number;
 }
 
 /** One test case a test task ran: the payload of a `test:case` record. */
@@ -1600,6 +1613,7 @@ const taskRecordFields: Field[] = [
   opt('error', resultError),
   opt('diagnostics', arrayOf(diagnostic)),
   opt('testCasesDropped', intAtLeast(1)),
+  opt('testCasesDroppedDurationMs', intAtLeast(1)),
 ];
 
 /**
