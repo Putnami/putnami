@@ -155,7 +155,11 @@ func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
 		}
 		projectPath := filepath.Join(targetDir, "putnami.json")
 		if _, statErr := os.Stat(projectPath); errIsNotExist(statErr) {
-			project := renderGeneratedGoProject(cfg.Go.ModulePath)
+			provider, err := providerProjectID(projectRoot)
+			if err != nil {
+				return result, err
+			}
+			project := renderGeneratedGoProject(cfg.Go.ModulePath, provider)
 			if err := os.WriteFile(projectPath, []byte(project), 0o600); err != nil {
 				return result, err
 			}
@@ -167,7 +171,11 @@ func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
 	return result, nil
 }
 
-func renderGeneratedGoProject(modulePath string) string {
+// renderGeneratedGoProject renders the project document of a generated Go
+// client module. Generated code owns no outcome of its own: its
+// featureAuthority names the provider project it mirrors, which the
+// feature-coverage step resolves.
+func renderGeneratedGoProject(modulePath, provider string) string {
 	project := struct {
 		Schema           string              `json:"$schema"`
 		Name             string              `json:"name"`
@@ -190,9 +198,7 @@ func renderGeneratedGoProject(modulePath string) string {
 				"coverage-threshold": 0,
 			},
 		},
-		FeatureAuthority: map[string]string{
-			"none": "Generated client code mirrors provider-owned operations and does not own a separate user outcome.",
-		},
+		FeatureAuthority: map[string]string{"provider": provider},
 	}
 	body, err := json.MarshalIndent(project, "", "  ")
 	if err != nil {

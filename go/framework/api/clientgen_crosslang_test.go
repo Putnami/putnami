@@ -33,7 +33,7 @@ func TestCrossLanguage_TSProviderGoClientInSync(t *testing.T) {
 
 	// Mirror the provider's generate inputs (committed spec + the clientgen
 	// contract its build emits) in a throwaway project, then regenerate.
-	root := t.TempDir()
+	root := providerRoot(t)
 	spec, err := os.ReadFile(filepath.Join(sampleRoot, "schema", "openapi.json"))
 	if err != nil {
 		t.Fatalf("read provider spec: %v", err)

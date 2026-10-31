@@ -13,6 +13,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -60,6 +61,15 @@ func writeProjectFile(t *testing.T, projectRoot, rel, content string) {
 	}
 }
 
+// providerRoot returns the root of a provider project, "svc", inside a
+// fresh workspace, so a scaffolded client can name its provider "/svc".
+func providerRoot(t *testing.T) string {
+	t.Helper()
+	workspace := t.TempDir()
+	writeProjectFile(t, workspace, workspaceConfigFile, `{"name":"w"}`)
+	return filepath.Join(workspace, "svc")
+}
+
 func readProjectFile(t *testing.T, projectRoot, rel string) string {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join(projectRoot, filepath.FromSlash(rel)))
@@ -70,7 +80,7 @@ func readProjectFile(t *testing.T, projectRoot, rel string) string {
 }
 
 func TestGenerateProjectClients_EmitsStandaloneGoModule(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 
@@ -111,12 +121,16 @@ func TestGenerateProjectClients_EmitsStandaloneGoModule(t *testing.T) {
 		t.Errorf("go.mod missing framework client require:\n%s", gomod)
 	}
 	var project struct {
-		Name         string   `json:"name"`
-		Extensions   []string `json:"extensions"`
-		Dependencies []string `json:"dependencies"`
+		Name             string            `json:"name"`
+		Extensions       []string          `json:"extensions"`
+		Dependencies     []string          `json:"dependencies"`
+		FeatureAuthority map[string]string `json:"featureAuthority"`
 	}
 	if err := json.Unmarshal([]byte(readProjectFile(t, root, "clients/go/putnami.json")), &project); err != nil {
 		t.Fatalf("parse generated project metadata: %v", err)
+	}
+	if want := map[string]string{"provider": "/svc"}; !reflect.DeepEqual(project.FeatureAuthority, want) {
+		t.Fatalf("generated featureAuthority = %v, want %v", project.FeatureAuthority, want)
 	}
 	if project.Name != "example.com/svc/clients/go" || len(project.Extensions) != 1 || project.Extensions[0] != "@putnami/go" {
 		t.Fatalf("generated project metadata = %#v", project)
@@ -127,7 +141,7 @@ func TestGenerateProjectClients_EmitsStandaloneGoModule(t *testing.T) {
 }
 
 func TestGenerateProjectClients_EmitsValidatedFirstPartyManifest(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	cfg := strings.Replace(goTargetConfig, "\n  \"thirdParty\": true,", "", 1)
 	cfg = strings.Replace(cfg, `"modulePath": "example.com/svc/clients/go"`, `"modulePath": ""`, 1)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", cfg)
@@ -168,7 +182,7 @@ func TestGenerateProjectClients_EmitsValidatedFirstPartyManifest(t *testing.T) {
 }
 
 func TestGenerateProjectClients_PrefersFreshGeneratedContract(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 	fresh := strings.ReplaceAll(minimalSpec, "/items/{id}", "/fresh/{id}")
@@ -187,7 +201,7 @@ func TestGenerateProjectClients_PrefersFreshGeneratedContract(t *testing.T) {
 // .gen/clientgen, so a contract committed there would be gone before the
 // clientgen task reads it. A contract a build wrote still wins.
 func TestGenerateProjectClients_ReadsTheCommittedContractWhenNoBuildWroteOne(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, CommittedClientGenConfigPath, goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 
@@ -222,7 +236,7 @@ func TestGenerateProjectClients_ReadsTheCommittedContractWhenNoBuildWroteOne(t *
 // project whose build does not write the contract. A contract a build wrote
 // still prefers the fresh .gen spec.
 func TestGenerateProjectClients_ACommittedContractReadsOnlyTheCommittedSpec(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, CommittedClientGenConfigPath, goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 	writeProjectFile(t, root, ".gen/schema/openapi.json", strings.ReplaceAll(minimalSpec, "/items/{id}", "/stale/{id}"))
@@ -253,7 +267,7 @@ func TestGenerateProjectClients_ACommittedContractReadsOnlyTheCommittedSpec(t *t
 }
 
 func TestGenerateProjectClients_RemovesOnlyUnmodifiedManifestOwnedFiles(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	cfg := strings.Replace(goTargetConfig, "\n  \"thirdParty\": true,", "", 1)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", cfg)
 	writeProjectFile(t, root, ".gen/schema/openapi.json", strictMinimalSpec)
@@ -282,7 +296,7 @@ func TestGenerateProjectClients_RemovesOnlyUnmodifiedManifestOwnedFiles(t *testi
 }
 
 func TestGenerateProjectClients_OutputChangeRemovesPriorOwnedTarget(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	cfg := strings.Replace(goTargetConfig, "\n  \"thirdParty\": true,", "", 1)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", cfg)
 	writeProjectFile(t, root, ".gen/schema/openapi.json", strictMinimalSpec)
@@ -308,7 +322,7 @@ func TestGenerateProjectClients_OutputChangeRemovesPriorOwnedTarget(t *testing.T
 }
 
 func TestGenerateProjectClients_FirstPartyDefaultRejectsUnmarkedSpec(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	cfg := strings.Replace(goTargetConfig, "\n  \"thirdParty\": true,", "", 1)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", cfg)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
@@ -321,7 +335,7 @@ func TestGenerateProjectClients_FirstPartyDefaultRejectsUnmarkedSpec(t *testing.
 
 func TestGenerateProjectClients_OutputIsGofmtCleanAndParses(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "generated-from-contract", "the-output-is-gofmt-clean-and-compilable")
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 
@@ -346,7 +360,7 @@ func TestGenerateProjectClients_OutputIsGofmtCleanAndParses(t *testing.T) {
 }
 
 func TestGenerateProjectClients_ScaffoldOncePreservesGoMod(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 
@@ -379,7 +393,7 @@ func TestGenerateProjectClients_ScaffoldOncePreservesGoMod(t *testing.T) {
 
 func TestGenerateProjectClients_DeterministicAcrossRuns(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "generated-from-contract", "generating-twice-is-byte-identical")
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 
@@ -396,7 +410,7 @@ func TestGenerateProjectClients_DeterministicAcrossRuns(t *testing.T) {
 }
 
 func TestGenerateProjectClients_PackageModeOmitsGoMod(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	// Empty modulePath = package mode (the same-language case where the client is a
 	// package inside the provider's own module): no go.mod is scaffolded.
 	cfg := strings.Replace(goTargetConfig, `"modulePath": "example.com/svc/clients/go"`, `"modulePath": ""`, 1)
@@ -421,7 +435,7 @@ func TestGenerateProjectClients_PackageModeOmitsGoMod(t *testing.T) {
 }
 
 func TestGenerateProjectClients_ReadsGzippedSpec(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 
 	// Only the gzipped companion exists (the openapi output:false / runtime case).
@@ -462,7 +476,7 @@ func TestGenerateProjectClients_NoopWhenNotConfigured(t *testing.T) {
 	})
 
 	t.Run("go target disabled", func(t *testing.T) {
-		root := t.TempDir()
+		root := providerRoot(t)
 		writeProjectFile(t, root, ".gen/clientgen/config.json",
 			`{"targets":["ts"],"ts":{"output":"clients/ts","packageName":"@x/c"},"go":{"output":"clients/go","modulePath":"","packageName":"client","clientName":"Client"}}`)
 		writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
@@ -480,7 +494,7 @@ func TestGenerateProjectClients_NoopWhenNotConfigured(t *testing.T) {
 }
 
 func TestGenerateProjectClients_MissingSpecErrors(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
 	// No spec written.
 	if _, err := GenerateProjectClients(root); err == nil {
@@ -489,11 +503,39 @@ func TestGenerateProjectClients_MissingSpecErrors(t *testing.T) {
 }
 
 func TestGenerateProjectClients_RejectsEscapingOutput(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json",
 		`{"targets":["go"],"ts":{"output":"clients/ts","packageName":""},"go":{"output":"../escape","modulePath":"x","packageName":"client","clientName":"Client"}}`)
 	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
 	if _, err := GenerateProjectClients(root); err == nil {
 		t.Fatalf("expected an error for a go.output that escapes the project root")
+	}
+}
+
+// A generated client names its provider by workspace project id: the path
+// below the workspace root, without transparent group folders. Outside a
+// workspace there is no id to name, so generation fails.
+func TestProviderProjectID(t *testing.T) {
+	workspace := t.TempDir()
+	writeProjectFile(t, workspace, workspaceConfigFile, `{"name":"w"}`)
+	for _, test := range []struct{ rel, want string }{
+		{rel: "svc", want: "/svc"},
+		{rel: "go/samples/task-api", want: "/go/samples/task-api"},
+		{rel: "(apps)/billing", want: "/billing"},
+	} {
+		got, err := providerProjectID(filepath.Join(workspace, filepath.FromSlash(test.rel)))
+		if err != nil || got != test.want {
+			t.Errorf("providerProjectID(%s) = %q, %v; want %q", test.rel, got, err, test.want)
+		}
+	}
+	if _, err := providerProjectID(workspace); err == nil {
+		t.Error("the workspace root got a provider id")
+	}
+
+	outside := t.TempDir()
+	writeProjectFile(t, outside, ".gen/clientgen/config.json", goTargetConfig)
+	writeProjectFile(t, outside, "schema/openapi.json", minimalSpec)
+	if _, err := GenerateProjectClients(outside); err == nil || !strings.Contains(err.Error(), workspaceConfigFile) {
+		t.Fatalf("GenerateProjectClients outside a workspace: err = %v, want it to name %s", err, workspaceConfigFile)
 	}
 }

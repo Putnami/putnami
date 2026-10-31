@@ -77,9 +77,12 @@ clients/ts/
 `putnami.json` is the client's project document. The generator writes it
 only when the directory has none: it names the package, marks it a
 `library`, tags it `ts` and `generated-client`, selects `@putnami/typescript`,
-and declares `featureAuthority.none`. As a library, the client has no `serve`
-or `run` job. With `featureAuthority.none`, `putnami validate` accepts it
-without a feature of its own. After that the file is yours: no later run rewrites it,
+and declares `featureAuthority.provider` with the provider's project id, such
+as `/go/samples/task-api`. As a library, the client has no `serve` or `run`
+job. `putnami validate` accepts it without a feature of its own while its
+provider carries a feature, a spec or a `featureAuthority` that resolves.
+Generation fails when no `putnami.workspace.json` sits above the provider,
+since the client then has no provider id to name. After that the file is yours: no later run rewrites it,
 and `client.putnami.json` does not list it. Its `name` is the project's name in
 Putnami, so when you change `ts.packageName`, change `name` too.
 
