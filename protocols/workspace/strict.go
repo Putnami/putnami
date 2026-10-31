@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -223,7 +224,8 @@ func validateProjectFeatureAuthority(c *ProjectConfig) []diag.Diagnostic {
 	case answers == 0:
 		return []diag.Diagnostic{diag.Errorf("required-field", "featureAuthority",
 			"featureAuthority must set one of `owner` (the feature this project contributes to), `none` (why it has none), `dependents` (true: its dependents' specs cover it) or `provider` (the project id it is generated from)")}
-	case provider != "" && (provider != authority.Provider || !strings.HasPrefix(provider, "/") || provider == "/"):
+	case provider != "" && (provider != authority.Provider || !strings.HasPrefix(provider, "/") || provider == "/" ||
+		path.Clean(provider) != provider):
 		return []diag.Diagnostic{diag.Errorf("invalid-value", "featureAuthority.provider",
 			"featureAuthority.provider is %q; it must be a project id such as \"/go/samples/task-api\"", authority.Provider)}
 	}

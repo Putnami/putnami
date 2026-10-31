@@ -538,4 +538,7 @@ func TestProviderProjectID(t *testing.T) {
 	if _, err := GenerateProjectClients(outside); err == nil || !strings.Contains(err.Error(), workspaceConfigFile) {
 		t.Fatalf("GenerateProjectClients outside a workspace: err = %v, want it to name %s", err, workspaceConfigFile)
 	}
+	if _, err := os.Stat(filepath.Join(outside, "clients", "go")); !os.IsNotExist(err) {
+		t.Fatalf("a failed generation left clients/go behind: %v", err)
+	}
 }

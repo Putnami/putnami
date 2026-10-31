@@ -113,6 +113,19 @@ func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
 	result.Omitted = omittedOperationIDs(omitted)
 
 	targetDir := filepath.Join(projectRoot, filepath.FromSlash(output))
+	// The project document names the provider. Resolve its id before the first
+	// write, so a provider outside a workspace leaves the target as it was.
+	projectPath := filepath.Join(targetDir, "putnami.json")
+	var project string
+	if cfg.Go.ModulePath != "" {
+		if _, statErr := os.Stat(projectPath); errIsNotExist(statErr) {
+			provider, err := providerProjectID(projectRoot)
+			if err != nil {
+				return result, err
+			}
+			project = renderGeneratedGoProject(cfg.Go.ModulePath, provider)
+		}
+	}
 	if err := removeObsoleteGeneratedTargets(projectRoot, targetDir); err != nil {
 		return result, err
 	}
@@ -153,13 +166,7 @@ func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
 			}
 			result.Files = append(result.Files, output+"/go.mod")
 		}
-		projectPath := filepath.Join(targetDir, "putnami.json")
-		if _, statErr := os.Stat(projectPath); errIsNotExist(statErr) {
-			provider, err := providerProjectID(projectRoot)
-			if err != nil {
-				return result, err
-			}
-			project := renderGeneratedGoProject(cfg.Go.ModulePath, provider)
+		if project != "" {
 			if err := os.WriteFile(projectPath, []byte(project), 0o600); err != nil {
 				return result, err
 			}

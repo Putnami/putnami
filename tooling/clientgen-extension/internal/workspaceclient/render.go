@@ -152,11 +152,12 @@ func requireNoCommittedTarget(workspaceRoot, projectRoot string, language client
 }
 
 // mirrorRootInputs are the workspace-root files whose presence or bytes decide
-// what the TypeScript emitter writes; the Go emitter reads none. The mirror
-// holds each one byte for byte, so a render there writes the bytes a render in
-// the workspace writes:
+// what the emitters write. The mirror holds each one byte for byte, so a render
+// there writes the bytes a render in the workspace writes:
 //
-//   - putnami.workspace.json marks the root the emitter resolves;
+//   - putnami.workspace.json marks the root the emitters resolve. Both derive
+//     the provider id a new client project names from the provider's path
+//     below it, which the mirror keeps;
 //   - package.json decides how a TypeScript client depends on
 //     @putnami/client: `catalog:` when a root catalog lists it, the pinned
 //     version when the root dependencies pin it, `workspace:*` otherwise;
