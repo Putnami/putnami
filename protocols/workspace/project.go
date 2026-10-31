@@ -63,6 +63,11 @@ type ProjectConfig struct {
 // for a published project that declares none, in the project that owns the
 // answer. Exactly one member is set.
 //
+// Dependents and Provider are the two answers a check can resolve without a
+// reason to review: a library that serves the outcomes of the projects that
+// depend on it, and a client generated from one provider. Each repeated the
+// same `None` sentence across a workspace, which no check reads.
+//
 // Both answers already existed as prose in module READMEs, which no check can
 // read: a protocol module explaining that a wire contract is not a feature a
 // user enables, and go.putnami.dev/{openapi,proto} explaining that they serve
@@ -81,6 +86,12 @@ type ProjectFeatureAuthority struct {
 	// user-facing feature. Prose is the point: the reason is what a reviewer
 	// checks, and a bare boolean would carry none.
 	None string `json:"none,omitempty"`
+	// Dependents states that the specs of the projects that depend on this
+	// one, directly or not, cover it. Only true is an answer.
+	Dependents bool `json:"dependents,omitempty"`
+	// Provider is the project id ("/go/samples/task-api") of the provider
+	// this project is generated from. A client generator writes it.
+	Provider string `json:"provider,omitempty"`
 }
 
 // BinConfig models the `bin` field, whose schema is

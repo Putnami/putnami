@@ -56,7 +56,7 @@ func restoreBeside(parent, name string, files map[string]string) error {
 func TestGenerateProjectClients_WalkToleratesConcurrentRestores(t *testing.T) {
 	const generations = 200
 
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", strictGoTargetConfig)
 	writeProjectFile(t, root, ".gen/schema/openapi.json", strictMinimalSpec)
 	clients := filepath.Join(root, "clients")
@@ -117,7 +117,7 @@ func TestGenerateProjectClients_WalkToleratesConcurrentRestores(t *testing.T) {
 // target of this project, even when it holds a valid Go ownership manifest
 // whose files all match.
 func TestGenerateProjectClients_NeverTouchesRestoreStaging(t *testing.T) {
-	root := t.TempDir()
+	root := providerRoot(t)
 	writeProjectFile(t, root, ".gen/clientgen/config.json", strictGoTargetConfig)
 	writeProjectFile(t, root, ".gen/schema/openapi.json", strictMinimalSpec)
 	if _, err := GenerateProjectClients(root); err != nil {

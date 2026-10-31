@@ -179,6 +179,25 @@ func TestValidateProjectConfig_FeatureAuthorityMustSayExactlyOneThing(t *testing
 			authority: &ProjectFeatureAuthority{Owner: "go/api-contracts", None: "also none"},
 			wantError: true,
 		},
+		{name: "dependents", authority: &ProjectFeatureAuthority{Dependents: true}},
+		{name: "provider", authority: &ProjectFeatureAuthority{Provider: "/go/samples/task-api"}},
+		{
+			name:      "dependents and none",
+			authority: &ProjectFeatureAuthority{Dependents: true, None: "a library"},
+			wantError: true,
+		},
+		{
+			name:      "provider and dependents",
+			authority: &ProjectFeatureAuthority{Provider: "/go/samples/task-api", Dependents: true},
+			wantError: true,
+		},
+		{name: "provider names a project, not an id", authority: &ProjectFeatureAuthority{Provider: "task-api"}, wantError: true},
+		{name: "provider is the root", authority: &ProjectFeatureAuthority{Provider: "/"}, wantError: true},
+		{name: "provider is padded", authority: &ProjectFeatureAuthority{Provider: " /go/samples/task-api"}, wantError: true},
+		{name: "blank provider", authority: &ProjectFeatureAuthority{Provider: "  "}, wantError: true},
+		{name: "provider with a trailing slash", authority: &ProjectFeatureAuthority{Provider: "/go/api/"}, wantError: true},
+		{name: "provider with a dot segment", authority: &ProjectFeatureAuthority{Provider: "/go/./api"}, wantError: true},
+		{name: "provider with an empty segment", authority: &ProjectFeatureAuthority{Provider: "//api"}, wantError: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			diags := ValidateProjectConfig(&ProjectConfig{Name: "p", FeatureAuthority: test.authority})

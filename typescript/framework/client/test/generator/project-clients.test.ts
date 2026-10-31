@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -86,9 +87,14 @@ function sha256(content: string | Uint8Array): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
+// The provider project is `svc` in a fresh workspace, so a client project
+// generation writes names its provider "/svc".
 function setupProject(files: Record<string, string>): string {
   // Keep the config and file-walker identities equal on macOS (/var -> /private/var).
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'cg-ts-')));
+  const workspace = realpathSync(mkdtempSync(join(tmpdir(), 'cg-ts-')));
+  writeFileSync(join(workspace, 'putnami.workspace.json'), '{"name":"w"}\n');
+  const root = join(workspace, 'svc');
+  mkdirSync(root);
   for (const [rel, content] of Object.entries({ 'biome.json': DEFAULT_BIOME_CONFIG, ...files })) {
     const p = join(root, rel);
     mkdirSync(dirname(p), { recursive: true });
@@ -589,11 +595,11 @@ describe('generateProjectClients (TypeScript)', () => {
   );
 
   specTest(
-    'writes a putnami.json that declares featureAuthority.none when the output has none',
+    'writes a putnami.json that names its provider when the output has none',
     {
       feature: 'typescript/service-clients',
       requirement: 'client-project-document',
-      check: 'a-new-client-gets-a-putnami-json-declaring-feature-authority-none',
+      check: 'a-new-client-gets-a-putnami-json-naming-its-provider',
     },
     () => {
       const root = setupProject({
@@ -611,9 +617,7 @@ describe('generateProjectClients (TypeScript)', () => {
         type: 'library',
         tags: ['ts', 'generated-client'],
         extensions: ['@putnami/typescript'],
-        featureAuthority: {
-          none: 'Generated client code mirrors provider-owned operations and does not own a separate user outcome.',
-        },
+        featureAuthority: { provider: '/svc' },
       });
       // Biome rendered it with the provider's configuration: the EditorConfig
       // indentation, and the short array on one line.
@@ -621,6 +625,29 @@ describe('generateProjectClients (TypeScript)', () => {
       const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
       expect(manifest.files.map((file: { path: string }) => file.path)).not.toContain('putnami.json');
       expect(result.files).not.toContain('clients/ts/putnami.json');
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
+  test(
+    'names the provider without its transparent group folders, and fails outside a workspace',
+    () => {
+      const grouped = setupProject({
+        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
+        '.gen/schema/openapi.json': firstPartySpec(),
+      });
+      const provider = join(dirname(grouped), '(apps)', 'billing');
+      mkdirSync(dirname(provider), { recursive: true });
+      cpSync(grouped, provider, { recursive: true });
+      generateProjectClients(provider);
+      expect(JSON.parse(readFileSync(join(provider, 'clients/ts/putnami.json'), 'utf8')).featureAuthority).toEqual({
+        provider: '/billing',
+      });
+
+      const outside = realpathSync(mkdtempSync(join(tmpdir(), 'cg-ts-outside-')));
+      cpSync(grouped, outside, { recursive: true });
+      expect(() => generateProjectClients(outside)).toThrow('putnami.workspace.json');
+      expect(existsSync(join(outside, 'clients/ts'))).toBe(false);
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
@@ -739,11 +766,10 @@ describe('generateProjectClients (TypeScript)', () => {
       const root = setupProject({
         '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
         '.gen/schema/openapi.json': `${preserveWideIntegers(firstPartySpec(), JSON.stringify(fixture, null, 2))}\n`,
-        'putnami.workspace.json': '{}',
       });
       const result = spawnSync(process.execPath, [GENERATE_BIN, '--project', root], {
         encoding: 'utf8',
-        env: { ...process.env, PUTNAMI_WORKSPACE_ROOT: root },
+        env: { ...process.env, PUTNAMI_WORKSPACE_ROOT: dirname(root) },
       });
 
       if (result.status !== 0) throw new Error(result.stderr || 'standalone generator failed without a diagnostic');

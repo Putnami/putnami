@@ -84,6 +84,9 @@ const MANIFEST_FILE = 'client.putnami.json';
  */
 const PROJECT_FILE = 'putnami.json';
 
+/** The file that marks the root of a Putnami workspace. */
+const WORKSPACE_FILE = 'putnami.workspace.json';
+
 /**
  * Emit the TypeScript client for a provider from the OpenAPI spec and the
  * generation contract of the project at `projectRoot`, writing it into
@@ -200,7 +203,8 @@ export function generateProjectClients(projectRoot: string, selected: ProjectCli
 /**
  * Renders the client's project document with the provider's Biome
  * configuration when the output directory has none. Returns `undefined` when
- * it has one, which generation never rewrites.
+ * it has one, which generation never rewrites. The provider is
+ * `formatProjectRoot`: the original project when `projectRoot` is a mirror.
  */
 function renderMissingClientProject(
   outputDir: string,
@@ -212,8 +216,39 @@ function renderMissingClientProject(
     return undefined;
   }
   return canonicalizeGeneratedFiles(formatProjectRoot, formatOutputDir, [
-    { path: PROJECT_FILE, content: renderClientProject(packageName) },
+    { path: PROJECT_FILE, content: renderClientProject(packageName, providerProjectId(formatProjectRoot)) },
   ])[0].content;
+}
+
+/**
+ * The workspace project id of the provider at `providerRoot`: its path below
+ * the nearest directory that holds a `putnami.workspace.json`, with a leading
+ * slash and without the transparent group folders, such as `(apps)`, that the
+ * workspace leaves out of every id. A provider outside any workspace, or at
+ * its root, has no id to name, so generation fails rather than write a client
+ * project no feature-coverage step can resolve.
+ */
+function providerProjectId(providerRoot: string): string {
+  const provider = resolve(providerRoot);
+  let root = provider;
+  while (!fileExists(joinPath(root, WORKSPACE_FILE))) {
+    const parent = dirname(root);
+    if (parent === root) {
+      throw new Error(
+        `clientgen: no ${WORKSPACE_FILE} above ${provider}, so the generated client cannot name its provider.`,
+      );
+    }
+    root = parent;
+  }
+  const segments = toPosixPath(relative(root, provider))
+    .split('/')
+    .filter((segment) => segment !== '' && !(segment.length > 2 && segment.startsWith('(') && segment.endsWith(')')));
+  if (segments.length === 0) {
+    throw new Error(
+      `clientgen: the provider ${provider} is the workspace root, which has no project id for a generated client to name.`,
+    );
+  }
+  return `/${segments.join('/')}`;
 }
 
 /** Writes the project document {@link renderMissingClientProject} rendered, if any. */
@@ -226,19 +261,18 @@ function writeClientProject(outputDir: string, content: string | undefined): voi
 /**
  * The project document of a generated client, the TypeScript counterpart of the
  * one the Go emitter scaffolds. Generated code owns no user outcome of its own,
- * so it declares `featureAuthority.none` instead of a feature. The client is a
- * library: it has no entrypoint, so `serve` and `run` skip it.
+ * so its `featureAuthority.provider` names the provider project it mirrors,
+ * which the feature-coverage step resolves. The client is a library: it has no
+ * entrypoint, so `serve` and `run` skip it.
  */
-function renderClientProject(packageName: string): string {
+function renderClientProject(packageName: string, provider: string): string {
   const project = {
     $schema: 'https://putnami.dev/schemas/putnami-project.json',
     name: packageName,
     type: 'library',
     tags: ['ts', 'generated-client'],
     extensions: ['@putnami/typescript'],
-    featureAuthority: {
-      none: 'Generated client code mirrors provider-owned operations and does not own a separate user outcome.',
-    },
+    featureAuthority: { provider },
   };
   return `${JSON.stringify(project, null, 2)}\n`;
 }
