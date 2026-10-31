@@ -196,22 +196,36 @@ func validateRegistries(registries map[string]json.RawMessage) []diag.Diagnostic
 
 // validateProjectFeatureAuthority keeps `featureAuthority` an answer rather than
 // an off switch. A declared block must say exactly one thing, and it must say
-// something: an empty object, both members, or a blank reason would all silence
-// the completeness check while explaining nothing.
+// something: an empty object, two members, or a blank reason would all silence
+// the completeness check while explaining nothing. A provider must be a
+// project id, so a name or a path cannot pass for one.
 func validateProjectFeatureAuthority(c *ProjectConfig) []diag.Diagnostic {
 	authority := c.FeatureAuthority
 	if authority == nil {
 		return nil
 	}
-	owner := strings.TrimSpace(authority.Owner)
-	none := strings.TrimSpace(authority.None)
+	provider := strings.TrimSpace(authority.Provider)
+	answers := 0
+	for _, set := range []bool{
+		strings.TrimSpace(authority.Owner) != "",
+		strings.TrimSpace(authority.None) != "",
+		authority.Dependents,
+		provider != "",
+	} {
+		if set {
+			answers++
+		}
+	}
 	switch {
-	case owner != "" && none != "":
+	case answers > 1:
 		return []diag.Diagnostic{diag.Errorf("conflicting-field", "featureAuthority",
-			"featureAuthority declares both an owning feature and no feature; set exactly one")}
-	case owner == "" && none == "":
+			"featureAuthority declares more than one answer; set exactly one of `owner`, `none`, `dependents` and `provider`")}
+	case answers == 0:
 		return []diag.Diagnostic{diag.Errorf("required-field", "featureAuthority",
-			"featureAuthority must set either `owner` (the feature this project contributes to) or `none` (why it has none)")}
+			"featureAuthority must set one of `owner` (the feature this project contributes to), `none` (why it has none), `dependents` (true: its dependents' specs cover it) or `provider` (the project id it is generated from)")}
+	case provider != "" && (provider != authority.Provider || !strings.HasPrefix(provider, "/") || provider == "/"):
+		return []diag.Diagnostic{diag.Errorf("invalid-value", "featureAuthority.provider",
+			"featureAuthority.provider is %q; it must be a project id such as \"/go/samples/task-api\"", authority.Provider)}
 	}
 	return nil
 }
