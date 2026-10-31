@@ -74,6 +74,7 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		key(collab.ContractMissions, collab.OperationSync):    p.syncMission,
 		key(collab.ContractMissions, collab.OperationAsk):     p.askDecision,
 		key(collab.ContractMissions, collab.OperationReply):   p.replyToMessage,
+		key(collab.ContractMissions, collab.OperationStatus):  p.missionStatus,
 	}
 }
 

@@ -160,6 +160,8 @@ func normalize(input any, workspaceName string) {
 		identity(&in.Identity)
 	case *collab.MemoryCheckpointInput:
 		identity(&in.Identity)
+	case *collab.MissionsStatusInput:
+		page(&in.Page)
 	}
 }
 
@@ -262,6 +264,8 @@ func requestedPage(input any) *collab.PageRequest {
 		return in.Page
 	case *collab.MemorySearchInput:
 		return in.Page
+	case *collab.MissionsStatusInput:
+		return in.Page
 	}
 	return nil
 }
@@ -362,6 +366,18 @@ func missionsMismatch(input, result any) (string, bool) {
 		}
 		if reply.Message.ID != in.Message {
 			return fmt.Sprintf("message %s, requested message %s", reply.Message.ID, in.Message), true
+		}
+		return "", true
+	case *collab.MissionsStatusInput:
+		status, wrong := resultAs[*collab.MissionsStatusResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if status.Mission.Key != in.Mission.Key {
+			return fmt.Sprintf("mission %q, requested mission %q", status.Mission.Key, in.Mission.Key), true
+		}
+		if len(status.Sessions) > in.Page.Size {
+			return fmt.Sprintf("%d sessions for a page of %d", len(status.Sessions), in.Page.Size), true
 		}
 		return "", true
 	}
