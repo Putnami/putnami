@@ -144,8 +144,10 @@ stream carries one `test:case` record per case, right before the task's
 `failed` or `skipped`, the duration, and the file and line when the runner
 knows them. Failed and skipped cases carry their output, cut to 4,096 bytes and
 redacted like every other machine string. A task keeps at most 1,000 records
-and 1 MiB of encoded cases, and a batch's members share 8 MiB, failed cases
-first; `task:end` counts the rest in `testCasesDropped`.
+and 1 MiB of encoded cases, and a batch's members share 8 MiB: failed cases
+first, then skipped, then the cases that observe a declared check, then the
+slowest. `task:end` counts the rest in `testCasesDropped` and their wall time
+in `testCasesDroppedDurationMs`.
 Normal `--output=jsonl` keeps every case in `events.jsonl` only; `--verbose`
 shows them live. A reader that does not know `test:case` skips the line, but a
 validator built before this contract rejects it: upgrade the validator first.

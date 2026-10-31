@@ -414,6 +414,7 @@ func executeBatchGroup(
 			failed[project.ref.ID],
 			unattributedFailures[project.ref.ID],
 			invocationTimedOut[project.ref.ID],
+			specreport.ObservingTests(fragments, project.fullPath),
 		)
 		attachBatchVerification(&result, fragments, project)
 		results = append(results, result)
@@ -753,6 +754,7 @@ func evaluateBatchProject(
 	testFailed bool,
 	unattributedFailure string,
 	invocationTimedOut bool,
+	observing []featureproto.ObservationProvenance,
 ) batchProjectResult {
 	testCounts := parse.TestJSON(output)
 	var coverageResult parse.CoverageResult
@@ -848,7 +850,12 @@ func evaluateBatchProject(
 	recordFailureDetailsTruncated(data, failureDetailsTruncated)
 	// output is the part of the stream split to this member, the same events
 	// its testSummary counts, so its cases never name a batch mate's package.
-	recordTestCases(data, moduleTestCases(output, options.useJSON, locate), protocolcli.TestCaseBatchMemberBytes(options.members))
+	recordTestCases(
+		data,
+		moduleTestCases(output, options.useJSON, locate),
+		protocolcli.TestCaseBatchMemberBytes(options.members),
+		observingTestCases(observing, project.modulePath),
+	)
 	return batchProjectResult{
 		ProjectID:   project.ref.ID,
 		Status:      status,

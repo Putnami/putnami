@@ -80,7 +80,7 @@ const result = JSON.parse(line) as ResultV2;
 | `REPORT_MAX_JOBS`, `REPORT_MAX_JOB_DIAGNOSTICS`, `REPORT_MAX_MESSAGE_BYTES` | The report's bounds — contract clauses, pinned against the schema |
 | `TEST_FAILURE_DETAILS_TRUNCATED_CODE`, `BATCH_PROJECT_LOG_CONTEXT_KEY`, `BATCH_PROJECT_LOGS_CONTEXT_KEY` | Shared test-output accounting and batch-routing spellings |
 | `MACHINE_OUTPUT_BUDGETS`, `isMachineOutputDebugDetail`, `sanitizeMachineOutputValue` | Fixed live-stream policy/budgets and sanitization-v1 helper |
-| `TestCase`, `TEST_CASE_STATUS`, `TEST_CASE_MAX_PER_TASK`, `TEST_CASE_MAX_OUTPUT_BYTES`, `TEST_CASE_MAX_TEXT_BYTES`, `TEST_CASE_MAX_BYTES_PER_TASK`, `TEST_CASE_MAX_BYTES_PER_BATCH` | The `test:case` record's payload, statuses and bounds, pinned against the schema |
+| `TestCase`, `TEST_CASE_STATUS`, `TEST_CASE_MAX_PER_TASK`, `TEST_CASE_QUICK_DURATION_MS`, `TEST_CASE_MAX_OUTPUT_BYTES`, `TEST_CASE_MAX_TEXT_BYTES`, `TEST_CASE_MAX_BYTES_PER_TASK`, `TEST_CASE_MAX_BYTES_PER_BATCH` | The `test:case` record's payload, statuses and bounds, pinned against the schema |
 
 The contract is specified in `protocols/cli/doc/02-result-v2.md`, and the report
 document in `protocols/cli/doc/03-report.md`. This binding

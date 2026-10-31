@@ -437,6 +437,10 @@ type TaskRecord struct {
 	// Absent when every reported case has its record. It rides on every task
 	// record: task:end and the session file's tasks.
 	TestCasesDropped int `json:"testCasesDropped,omitempty"`
+	// TestCasesDroppedDurationMs is the wall time of the cases
+	// TestCasesDropped counts: the sum of their durationMs. Absent when nothing
+	// was dropped, and when the dropped cases took 0 ms in total.
+	TestCasesDroppedDurationMs int64 `json:"testCasesDroppedDurationMs,omitempty"`
 }
 
 // TaskFailure is one failed task in a run summary. It carries the full typed

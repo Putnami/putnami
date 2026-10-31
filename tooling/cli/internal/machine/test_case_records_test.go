@@ -76,9 +76,10 @@ func TestTaskEndRecords_CasesPrecedeTheTerminalInRunnerOrder(t *testing.T) {
 		{Name: "TestC", Suite: "example.com/a", Status: "skipped", Output: "needs docker"},
 	}
 	task := Task{Identity: identity, Result: jobs.TaskResult{
-		Status:           jobs.TaskStatusFailed,
-		TestCases:        cases,
-		TestCasesDropped: 3,
+		Status:                     jobs.TaskStatusFailed,
+		TestCases:                  cases,
+		TestCasesDropped:           3,
+		TestCasesDroppedDurationMs: 45,
 	}}
 	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
 
@@ -99,8 +100,9 @@ func TestTaskEndRecords_CasesPrecedeTheTerminalInRunnerOrder(t *testing.T) {
 		}
 	}
 	end := records[2]
-	if end.Record != protocolcli.RecordTaskEnd || end.Task == nil || end.Task.TestCasesDropped != 3 {
-		t.Fatalf("last record = %+v, want the task:end with testCasesDropped 3", end)
+	if end.Record != protocolcli.RecordTaskEnd || end.Task == nil || end.Task.TestCasesDropped != 3 ||
+		end.Task.TestCasesDroppedDurationMs != 45 {
+		t.Fatalf("last record = %+v, want the task:end with testCasesDropped 3 and testCasesDroppedDurationMs 45", end)
 	}
 	for i, record := range records {
 		line := encodeJSON(t, record)

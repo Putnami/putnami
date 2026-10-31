@@ -173,8 +173,7 @@ func Test(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[st
 			},
 		}
 	}
-	keptCases, droppedCases := cases.read(wsRoot, protocolcli.TestCaseMaxBytesPerTask)
-	resultData = attachTestCases(resultData, keptCases, droppedCases)
+	resultData = attachTestCases(resultData, cases.read(wsRoot, protocolcli.TestCaseMaxBytesPerTask))
 
 	if runErr != nil {
 		emit.PhaseEnd("run", "failed")

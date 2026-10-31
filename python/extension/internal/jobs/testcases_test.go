@@ -66,7 +66,7 @@ func TestReadTestCasesConvertsPluginRecords(t *testing.T) {
 		`{"name": "test_cut", "status": "passed", "dura`,
 	)
 
-	cases, dropped := readTestCases(casesFile, wsRoot, protocolcli.TestCaseMaxBytesPerTask)
+	cases, dropped := keptAndDropped(readTestCases(casesFile, wsRoot, protocolcli.TestCaseMaxBytesPerTask))
 
 	if dropped != 1 {
 		t.Errorf("dropped = %d, want 1 (the case outside the workspace)", dropped)
@@ -122,7 +122,7 @@ func TestReadTestCasesTruncatesLongOutput(t *testing.T) {
 		"file":   filepath.Join(wsRoot, "tests", "test_a.py"),
 	}))
 
-	cases, dropped := readTestCases(casesFile, wsRoot, protocolcli.TestCaseMaxBytesPerTask)
+	cases, dropped := keptAndDropped(readTestCases(casesFile, wsRoot, protocolcli.TestCaseMaxBytesPerTask))
 	if dropped != 0 || len(cases) != 1 {
 		t.Fatalf("cases = %+v dropped = %d, want one case", cases, dropped)
 	}
@@ -132,7 +132,7 @@ func TestReadTestCasesTruncatesLongOutput(t *testing.T) {
 }
 
 func TestReadTestCasesMissingFileReportsNothing(t *testing.T) {
-	cases, dropped := readTestCases(filepath.Join(t.TempDir(), "absent.jsonl"), t.TempDir(), protocolcli.TestCaseMaxBytesPerTask)
+	cases, dropped := keptAndDropped(readTestCases(filepath.Join(t.TempDir(), "absent.jsonl"), t.TempDir(), protocolcli.TestCaseMaxBytesPerTask))
 	if cases != nil || dropped != 0 {
 		t.Fatalf("missing file = (%v, %d), want nothing", cases, dropped)
 	}
@@ -156,23 +156,28 @@ func TestReadTestCasesResolvesSymlinkedWorkspace(t *testing.T) {
 		"name": "test_a", "status": "passed", "duration": 0, "output": "", "file": testFile, "line": 1,
 	}))
 
-	cases, dropped := readTestCases(casesFile, linkRoot, protocolcli.TestCaseMaxBytesPerTask)
+	cases, dropped := keptAndDropped(readTestCases(casesFile, linkRoot, protocolcli.TestCaseMaxBytesPerTask))
 	if dropped != 0 || len(cases) != 1 || cases[0].Suite != "pkg/tests/test_a.py" {
 		t.Fatalf("cases = %+v dropped = %d, want the file relative to the linked workspace", cases, dropped)
 	}
 }
 
+// keptAndDropped returns the kept cases and the dropped count of a selection.
+func keptAndDropped(selection protocolcli.TestCaseSelection) ([]protocolcli.TestCase, int) {
+	return selection.Kept, selection.Dropped
+}
+
 func TestAttachTestCases(t *testing.T) {
-	if got := attachTestCases(nil, nil, 0); got != nil {
+	if got := attachTestCases(nil, protocolcli.TestCaseSelection{}); got != nil {
 		t.Errorf("no cases = %v, want the payload untouched", got)
 	}
 	summary := map[string]any{"testSummary": map[string]any{"total": 1}}
-	if got := attachTestCases(summary, nil, 0); len(got) != 1 {
+	if got := attachTestCases(summary, protocolcli.TestCaseSelection{}); len(got) != 1 {
 		t.Errorf("no cases = %v, want only testSummary", got)
 	}
 
 	cases := []protocolcli.TestCase{{Name: "test_a", Suite: "tests/test_a.py", Status: protocolcli.TestCaseStatusPassed}}
-	got := attachTestCases(summary, cases, 0)
+	got := attachTestCases(summary, protocolcli.TestCaseSelection{Kept: cases})
 	if _, ok := got[protocolruntime.TestCasesDroppedResultDataKey]; ok {
 		t.Errorf("payload = %v; testCasesDropped must be absent when nothing was dropped", got)
 	}
@@ -183,9 +188,18 @@ func TestAttachTestCases(t *testing.T) {
 		t.Error("attaching cases lost testSummary")
 	}
 
-	onlyDropped := attachTestCases(nil, nil, 3)
-	if onlyDropped[protocolruntime.TestCasesDroppedResultDataKey] != 3 {
-		t.Errorf("payload = %v, want testCasesDropped = 3", onlyDropped)
+	if _, ok := got[protocolruntime.TestCasesDroppedDurationMsResultDataKey]; ok {
+		t.Errorf("payload = %v; testCasesDroppedDurationMs must be absent when nothing was dropped", got)
+	}
+
+	onlyDropped := attachTestCases(nil, protocolcli.TestCaseSelection{Dropped: 3, DroppedDurationMs: 40})
+	if onlyDropped[protocolruntime.TestCasesDroppedResultDataKey] != 3 ||
+		onlyDropped[protocolruntime.TestCasesDroppedDurationMsResultDataKey] != int64(40) {
+		t.Errorf("payload = %v, want testCasesDropped = 3 and testCasesDroppedDurationMs = 40", onlyDropped)
+	}
+	instant := attachTestCases(nil, protocolcli.TestCaseSelection{Dropped: 2})
+	if _, ok := instant[protocolruntime.TestCasesDroppedDurationMsResultDataKey]; ok {
+		t.Errorf("payload = %v; testCasesDroppedDurationMs must be absent when the dropped cases took 0 ms", instant)
 	}
 	if _, ok := onlyDropped[protocolruntime.TestCasesResultDataKey]; ok {
 		t.Errorf("payload = %v, want no testCases when none was kept", onlyDropped)
@@ -203,7 +217,7 @@ func TestTestCaseSinkNilReportsNothing(t *testing.T) {
 		t.Errorf("nil sink changed the environment: %v", extra)
 	}
 	sink.reset()
-	if cases, dropped := sink.read("/workspace", protocolcli.TestCaseMaxBytesPerTask); cases != nil || dropped != 0 {
+	if cases, dropped := keptAndDropped(sink.read("/workspace", protocolcli.TestCaseMaxBytesPerTask)); cases != nil || dropped != 0 {
 		t.Errorf("nil sink read = (%v, %d)", cases, dropped)
 	}
 	sink.remove()
@@ -431,7 +445,7 @@ func TestReadTestCasesTakesTheSuiteFromTheCollectingModule(t *testing.T) {
 			"file":   filepath.Join(wsRoot, "pkg", "tests", "base_cases.py"), "line": 2}),
 	)
 
-	cases, dropped := readTestCases(casesFile, wsRoot, protocolcli.TestCaseMaxBytesPerTask)
+	cases, dropped := keptAndDropped(readTestCases(casesFile, wsRoot, protocolcli.TestCaseMaxBytesPerTask))
 	if len(cases) != 1 || dropped != 1 {
 		t.Fatalf("cases = %+v, dropped = %d; want the inherited case and the outside one dropped", cases, dropped)
 	}

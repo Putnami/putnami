@@ -212,8 +212,7 @@ func runProjectPytestSuite(uv, wsRoot string, proj pctx.ProjectRef, withLog, upd
 			},
 		}
 	}
-	keptCases, droppedCases := cases.read(wsRoot, caseBytes)
-	result.Data = attachTestCases(result.Data, keptCases, droppedCases)
+	result.Data = attachTestCases(result.Data, cases.read(wsRoot, caseBytes))
 
 	if runErr != nil {
 		result.Status = "FAILED"

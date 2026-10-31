@@ -76,6 +76,7 @@ var (
 		opt("error", resultError),
 		opt("diagnostics", arrayOf(diagnostic)),
 		opt("testCasesDropped", intAtLeast(1)),
+		opt("testCasesDroppedDurationMs", intAtLeast(1)),
 	}
 
 	testCaseFields = []field{

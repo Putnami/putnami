@@ -373,6 +373,9 @@ func TestTestCaseBoundsMatchSchema(t *testing.T) {
 			TestCaseMaxPerTask struct {
 				Const *int `json:"const"`
 			} `json:"testCaseMaxPerTask"`
+			TestCaseQuickDurationMs struct {
+				Const *int `json:"const"`
+			} `json:"testCaseQuickDurationMs"`
 			TestCaseMaxBytesPerTask struct {
 				Const *int `json:"const"`
 			} `json:"testCaseMaxBytesPerTask"`
@@ -402,6 +405,7 @@ func TestTestCaseBoundsMatchSchema(t *testing.T) {
 		want   int
 	}{
 		{"testCaseMaxPerTask.const", schema.Defs.TestCaseMaxPerTask.Const, TestCaseMaxPerTask},
+		{"testCaseQuickDurationMs.const", schema.Defs.TestCaseQuickDurationMs.Const, TestCaseQuickDurationMs},
 		{"testCaseMaxBytesPerTask.const", schema.Defs.TestCaseMaxBytesPerTask.Const, TestCaseMaxBytesPerTask},
 		{"testCaseMaxBytesPerBatch.const", schema.Defs.TestCaseMaxBytesPerBatch.Const, TestCaseMaxBytesPerBatch},
 		{"testCase.name.maxLength", properties.Name.MaxLength, TestCaseMaxTextBytes},

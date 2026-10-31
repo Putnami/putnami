@@ -3820,7 +3820,7 @@
       "id": "stream.task-end.test-cases-dropped",
       "document": "sessionStreamRecord",
       "expect": "accept",
-      "summary": "task:end counts the test cases that have no test:case record, so a reader knows the records it read are not every case the task ran.",
+      "summary": "task:end counts the test cases that have no test:case record and their wall time, so a reader knows the records it read are not every case the task ran, nor all of its time.",
       "value": {
         "protocolVersion": 2,
         "record": "task:end",
@@ -3845,7 +3845,8 @@
           "exitCode": 1,
           "durationMs": 4210,
           "error": { "code": "failure", "message": "5 tests failed" },
-          "testCasesDropped": 205
+          "testCasesDropped": 205,
+          "testCasesDroppedDurationMs": 1840
         }
       }
     },
@@ -4147,6 +4148,41 @@
         }
       },
       "violations": [{ "code": "cli.result.invalid_value", "path": "task.testCasesDropped" }]
+    },
+    {
+      "id": "invalid.task.test-cases-dropped-duration-zero",
+      "document": "sessionStreamRecord",
+      "expect": "reject",
+      "summary": "testCasesDroppedDurationMs is absent when the dropped cases took 0 ms in total, so a zero is rejected.",
+      "value": {
+        "protocolVersion": 2,
+        "record": "task:end",
+        "time": "2026-09-28T10:00:02.000Z",
+        "identity": {
+          "key": "/tooling/cli:test",
+          "scope": "project",
+          "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+          "task": { "name": "test", "command": "test", "kind": "go-test" },
+          "provider": { "extension": "@putnami/go" }
+        },
+        "task": {
+          "identity": {
+            "key": "/tooling/cli:test",
+            "scope": "project",
+            "project": { "id": "/tooling/cli", "name": "@putnami/cli" },
+            "task": { "name": "test", "command": "test", "kind": "go-test" },
+            "provider": { "extension": "@putnami/go" }
+          },
+          "status": "failed",
+          "reuse": "none",
+          "exitCode": 1,
+          "durationMs": 4210,
+          "error": { "code": "failure", "message": "5 tests failed" },
+          "testCasesDropped": 205,
+          "testCasesDroppedDurationMs": 0
+        }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "task.testCasesDroppedDurationMs" }]
     }
   ],
   "streamCases": [

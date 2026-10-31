@@ -414,12 +414,49 @@ func EmitReport(emit *jsonl.Emitter, report *features.VerificationReport, outDir
 	return destination, nil
 }
 
+// ObservingTests returns the tests that observed a declared check of the
+// project at projectRoot: the project-relative declaration path and the
+// symbol of every fragment whose declaration lives inside the project, once
+// each, in (path, symbol) order. It keeps every observing test, where the
+// report keeps one per check.
+func ObservingTests(fragments []spectest.Fragment, projectRoot string) []features.ObservationProvenance {
+	root, err := canonicalPath(projectRoot)
+	if err != nil {
+		return nil
+	}
+	seen := make(map[features.ObservationProvenance]bool)
+	var observing []features.ObservationProvenance
+	for _, fragment := range fragments {
+		file, err := canonicalPath(fragment.File)
+		if err != nil {
+			continue
+		}
+		relative, err := filepath.Rel(root, file)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			continue
+		}
+		provenance := features.ObservationProvenance{Path: filepath.ToSlash(relative), Symbol: fragment.Symbol}
+		if !seen[provenance] {
+			seen[provenance] = true
+			observing = append(observing, provenance)
+		}
+	}
+	sort.Slice(observing, func(i, j int) bool { return provenanceLess(observing[i], observing[j]) })
+	return observing
+}
+
 // MergeSolo is the single-project path: read, resolve, publish, and surface
 // every dropped fragment as a warning diagnostic. Reporting problems never
 // change the test verdict — the report is transport, and core resolves a
 // missing or partial one as missing evidence, which is the fail-closed
 // direction.
 func MergeSolo(emit *jsonl.Emitter, directory, projectRoot, outDir string) {
+	MergeSoloObserving(emit, directory, projectRoot, outDir)
+}
+
+// MergeSoloObserving is MergeSolo that also returns the project's
+// ObservingTests.
+func MergeSoloObserving(emit *jsonl.Emitter, directory, projectRoot, outDir string) []features.ObservationProvenance {
 	fragments, warnings := ReadFragments(directory)
 	report, foreign, buildWarnings := ProjectReport(fragments, projectRoot)
 	warnings = append(warnings, buildWarnings...)
@@ -434,4 +471,5 @@ func MergeSolo(emit *jsonl.Emitter, directory, projectRoot, outDir string) {
 	for _, warning := range warnings {
 		emit.Diagnostic("warning", warning, "", 0)
 	}
+	return ObservingTests(fragments, projectRoot)
 }

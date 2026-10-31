@@ -85,7 +85,10 @@ a producer-less, consumer-less protocol is deleted rather than frozen. See
 A test job reports its cases in result data: `ResultData.Data["testCases"]`
 (`TestCasesResultDataKey`) holds one entry per case, and
 `ResultData.Data["testCasesDropped"]` (`TestCasesDroppedResultDataKey`) counts
-the cases it left out, only when it left some out. The entry shape and its
+the cases it left out, only when it left some out.
+`ResultData.Data["testCasesDroppedDurationMs"]`
+(`TestCasesDroppedDurationMsResultDataKey`) is the sum of their `durationMs`,
+only when it is not zero. The entry shape and its
 bounds are `TestCase` in [`go.putnami.dev/protocol/cli`](../cli/doc/02-result-v2.md#test-case-records);
 [`schemas/payloads.json`](schemas/payloads.json) refers to that definition and
 restates none of it. The CLI writes each entry as one `test:case` session-stream

@@ -15,6 +15,7 @@ import {
   TEST_CASE_MAX_OUTPUT_BYTES,
   TEST_CASE_MAX_PER_TASK,
   TEST_CASE_MAX_TEXT_BYTES,
+  TEST_CASE_QUICK_DURATION_MS,
   TEST_CASE_STATUS,
   type TestCase,
   V2_FIELD_NAMES,
@@ -280,6 +281,7 @@ describe('CLI result v2 schema binding', () => {
         { maxLength?: number; enum?: string[] }
       >;
       expect(schema.$defs['testCaseMaxPerTask']?.const).toBe(TEST_CASE_MAX_PER_TASK);
+      expect(schema.$defs['testCaseQuickDurationMs']?.const).toBe(TEST_CASE_QUICK_DURATION_MS);
       expect(schema.$defs['testCaseMaxBytesPerTask']?.const).toBe(TEST_CASE_MAX_BYTES_PER_TASK);
       expect(schema.$defs['testCaseMaxBytesPerBatch']?.const).toBe(TEST_CASE_MAX_BYTES_PER_BATCH);
       expect(members['name']?.maxLength).toBe(TEST_CASE_MAX_TEXT_BYTES);

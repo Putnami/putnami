@@ -9,6 +9,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	features "go.putnami.dev/protocol/features"
 	pctx "go.putnami.dev/sdk/extension/context"
 	coveragecheck "go.putnami.dev/sdk/extension/coverage"
 	"go.putnami.dev/sdk/extension/dbtestenv"
@@ -99,8 +100,11 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	// Merge and publish the spec-verification fragments, for failing runs too:
 	// a failed check is an observation the gate must see, not a report to
 	// withhold.
+	// The tests that observed a check keep their test cases past the case
+	// bound.
+	var observing []features.ObservationProvenance
 	if fragErr == nil {
-		specreport.MergeSolo(emit, fragmentsDir, projectPath, ctx.OutputPath)
+		observing = specreport.MergeSoloObserving(emit, fragmentsDir, projectPath, ctx.OutputPath)
 	}
 
 	// Phase 3: Parse
@@ -177,7 +181,7 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	// across languages.
 	resultData := testResultData(testSummary, covSummary, params.CoverageThreshold)
 	recordFailureDetailsTruncated(resultData, failureDetailsTruncated)
-	recordTestCases(resultData, ctx.WorkspaceRoot, ctx.Project.Path, testSummary, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(resultData, ctx.WorkspaceRoot, ctx.Project.Path, testSummary, protocolcli.TestCaseMaxBytesPerTask, observing)
 
 	// Emit only the bounded causal projection. The complete transcript is kept
 	// separately in debug log events above.

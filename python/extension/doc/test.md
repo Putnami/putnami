@@ -103,9 +103,11 @@ record of the task. An entry carries:
   stdout and stderr when both fit in the output bound; for a skipped case, the
   reason.
 
-A run keeps at most 1,000 entries and at most 1 MiB of encoded entries, failed
-cases first; in a batch, the members share 8 MiB equally. It reports the rest
-as `testCasesDropped`. The scratch file is not a task output: it is neither
+A run keeps at most 1,000 entries and at most 1 MiB of encoded entries: failed
+cases first, then skipped, then the slowest passed cases, with passed cases
+under 10 ms last in run order; in a batch, the members share 8 MiB equally. It
+reports the rest as `testCasesDropped`, and their run time as
+`testCasesDroppedDurationMs`. The scratch file is not a task output: it is neither
 captured nor restored, and a cache hit replays the entries from the cached
 result payload. Without the adapter the plugin is never loaded, and loaded
 without its scratch file it records nothing.

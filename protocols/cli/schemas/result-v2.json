@@ -265,12 +265,21 @@
           "type": "integer",
           "minimum": 1,
           "description": "How many test cases this task ran that have no test:case record: cases the producer or the CLI left out to stay within testCaseMaxPerTask or the byte budgets, plus cases a producer could not describe. Absent when every reported case has its record, and when the task reported no cases. It rides on every task record: task:end and the session file's tasks."
+        },
+        "testCasesDroppedDurationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The wall time of the cases testCasesDropped counts: the sum of their durationMs. Absent when nothing was dropped, and when the dropped cases took 0 ms in total."
         }
       }
     },
     "testCaseMaxPerTask": {
       "const": 1000,
-      "description": "The most test:case records one task carries in a session stream. A producer past it keeps failed cases first, then skipped, then passed, each in runner order, and counts the rest in taskRecord.testCasesDropped. The bound spans records, so no per-record schema can check it; the drift tests pin it to the Go and TypeScript constants."
+      "description": "The most test:case records one task carries in a session stream. A producer past it keeps failed cases first, then skipped, then passed cases that observe a declared requirement check, each in runner order, then the other passed cases that ran for at least testCaseQuickDurationMs, slowest first, then the rest in runner order. It counts the rest in taskRecord.testCasesDropped and their wall time in taskRecord.testCasesDroppedDurationMs. The bound spans records, so no per-record schema can check it; the drift tests pin it to the Go and TypeScript constants."
+    },
+    "testCaseQuickDurationMs": {
+      "const": 10,
+      "description": "The duration, in milliseconds, under which a passed case that observes no check is kept last, in runner order, by a producer past testCaseMaxPerTask. The drift tests pin it to the Go and TypeScript constants."
     },
     "testCaseMaxBytesPerTask": {
       "const": 1048576,

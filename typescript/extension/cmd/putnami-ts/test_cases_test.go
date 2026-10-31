@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/parse"
@@ -138,7 +139,7 @@ func TestRecordTestCasesKeepsTheBoundAndCountsTheRest(t *testing.T) {
 	})
 
 	data := map[string]any{}
-	recordTestCases(data, "/ws", "packages/a", summary, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(data, "/ws", "packages/a", summary, protocolcli.TestCaseMaxBytesPerTask, nil)
 	kept, _ := data["testCases"].([]protocolcli.TestCase)
 	if len(kept) != protocolcli.TestCaseMaxPerTask {
 		t.Fatalf("testCases = %d cases, want %d", len(kept), protocolcli.TestCaseMaxPerTask)
@@ -151,9 +152,65 @@ func TestRecordTestCasesKeepsTheBoundAndCountsTheRest(t *testing.T) {
 	}
 
 	empty := map[string]any{}
-	recordTestCases(empty, "/ws", "packages/a", &parse.TestSummary{}, protocolcli.TestCaseMaxBytesPerTask)
+	recordTestCases(empty, "/ws", "packages/a", &parse.TestSummary{}, protocolcli.TestCaseMaxBytesPerTask, nil)
 	if len(empty) != 0 {
 		t.Fatalf("data = %v, want no test-case keys for a report without cases", empty)
+	}
+}
+
+func TestRecordTestCasesKeepsTheTestsThatObserveACheck(t *testing.T) {
+	// 1,500 passed cases: 10 observe a check, 5 ran for 50 ms and the rest
+	// for 1 ms. "parser > proves 3" observes one through a describe block,
+	// and a case of the same name in another file observes nothing.
+	summary := &parse.TestSummary{}
+	for i := range 1485 {
+		summary.Cases = append(summary.Cases, parse.TestCase{
+			Name: fmt.Sprintf("case %04d", i), SuiteFile: "test/a.test.ts", File: "test/a.test.ts",
+			Status: parse.TestCasePassed, DurationMs: 1,
+		})
+	}
+	observing := make([]features.ObservationProvenance, 0, 10)
+	for i := range 10 {
+		name := fmt.Sprintf("proves %d", i)
+		observing = append(observing, features.ObservationProvenance{Path: "test/a.test.ts", Symbol: name})
+		summary.Cases = append(summary.Cases, parse.TestCase{
+			Name: "parser > " + name, SuiteFile: "test/a.test.ts", File: "test/a.test.ts", Status: parse.TestCasePassed,
+		})
+	}
+	for i := range 4 {
+		summary.Cases = append(summary.Cases, parse.TestCase{
+			Name: fmt.Sprintf("slow %d", i), SuiteFile: "test/b.test.ts", File: "test/b.test.ts",
+			Status: parse.TestCasePassed, DurationMs: 50,
+		})
+	}
+	summary.Cases = append(summary.Cases, parse.TestCase{
+		Name: "proves 3", SuiteFile: "test/b.test.ts", File: "test/b.test.ts", Status: parse.TestCasePassed, DurationMs: 50,
+	})
+
+	data := map[string]any{}
+	recordTestCases(data, "/ws", "packages/a", summary, protocolcli.TestCaseMaxBytesPerTask, observing)
+	kept, _ := data["testCases"].([]protocolcli.TestCase)
+	if len(kept) != protocolcli.TestCaseMaxPerTask || data["testCasesDropped"] != 500 {
+		t.Fatalf("kept %d, dropped %v; want %d and 500", len(kept), data["testCasesDropped"], protocolcli.TestCaseMaxPerTask)
+	}
+	observed, slow := 0, 0
+	for _, testCase := range kept {
+		switch {
+		case strings.HasPrefix(testCase.Name, "parser > proves "):
+			observed++
+		case testCase.DurationMs == 50:
+			slow++
+		}
+	}
+	if observed != 10 || slow != 5 {
+		t.Errorf("kept %d observing and %d slow cases, want 10 and 5", observed, slow)
+	}
+	// The 500 dropped cases are the last 1 ms cases in runner order.
+	if data["testCasesDroppedDurationMs"] != int64(500) {
+		t.Errorf("testCasesDroppedDurationMs = %v, want 500", data["testCasesDroppedDurationMs"])
+	}
+	if observingTestCases("/ws", "packages/a", nil) != nil {
+		t.Error("no observing test: want a nil predicate")
 	}
 }
 

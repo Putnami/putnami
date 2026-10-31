@@ -34,6 +34,11 @@
       "type": "integer",
       "minimum": 1
     },
+    "TestCasesDroppedDurationMs": {
+      "description": "The wall time of the test cases 'testCasesDropped' counts, the sum of their durationMs, carried in result data under 'testCasesDroppedDurationMs'. Present only when the job left cases out and their sum is not zero.",
+      "type": "integer",
+      "minimum": 1
+    },
     "CoverageSummary": {
       "description": "Coverage outcome, carried in result data under 'coverageSummary'. Percentage at a declared granularity; languages measure differently (Go: statements, TypeScript: lines), so consumers must not mix counts across granularities.",
       "type": "object",
