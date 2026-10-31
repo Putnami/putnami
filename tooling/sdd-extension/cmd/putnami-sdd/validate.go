@@ -452,7 +452,7 @@ func runFeatureCoverageRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _
 		emit.Summary("feature coverage ratchet: " + report.Note)
 	case verdict == nil:
 		emit.Summary(fmt.Sprintf("feature coverage ratchet: no new debt entry (%d now, %d at the merge base %s with %s)",
-			len(report.Debt), len(report.BaselineDebt), report.MergeBase, report.Baseline))
+			len(report.Debt), len(report.BaselineDebt), report.MergeBase[:min(12, len(report.MergeBase))], report.Baseline))
 	}
 	return finish(report, verdict)
 }

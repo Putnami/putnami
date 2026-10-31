@@ -361,7 +361,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// run rewrites.
 			Cache: sdkmanifest.NoCache(),
 			Outputs: map[string]proto.TaskOutputPort{
-				"data": {Description: "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and sorted diagnostics."},
+				"data": {Description: "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and diagnostics in list order."},
 			},
 			Declares: sdkmanifest.Declares(),
 		}).

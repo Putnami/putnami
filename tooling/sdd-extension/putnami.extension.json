@@ -933,7 +933,7 @@
       "timeoutMs": 120000,
       "outputs": {
         "data": {
-          "description": "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and sorted diagnostics."
+          "description": "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and diagnostics in list order."
         }
       },
       "cache": {

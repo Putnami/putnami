@@ -297,16 +297,17 @@ its existing admission gate; the shared absent-policy default remains `report`.
   | Situation | Result |
   |---|---|
   | `options.sdd.featureCoverage` unset | Passes, with a note |
-  | The run selected its projects without `--impacted` | Passes, with a note: nothing names a baseline |
+  | The run selected its projects without `--impacted`, or its baseline did not resolve without `--impacted-strict` | Passes, with a note: nothing names a baseline |
   | The merge base declares no `options.sdd.featureCoverage`, or no `putnami.workspace.json` | Passes, with a note: this change adopts the gate |
   | An entry the list at the merge base does not hold | Fails with one `sdd.grown_coverage_debt` diagnostic per entry, at its index in the current list |
   | An entry removed, or the list unchanged | Passes |
   | A shallow clone | Fails: its history can stop before the merge base |
   | A list at the merge base the step cannot read | Fails with `sdd.coverage_debt_baseline_unavailable` |
 
-  The change gate runs `putnami validate --impacted --baseline origin/<base>`,
-  so every pull request is compared with its base branch. A run that names no
-  baseline enforces nothing here. The step is never cached (see
+  A gate that compares a pull request with its base branch runs
+  `putnami validate --impacted --impacted-strict --baseline origin/<base>` on a
+  full history, as Contributor CI does. A run that names no baseline enforces
+  nothing here. The step is never cached (see
   [below](#feature-coverage-ratchet-validate--never-cached)).
 
 Selection narrows what a run **owns**, never what it **reads**: durable
@@ -431,7 +432,7 @@ scope was exhausted and that the fix is a `spectest.Proves` call rather than a
 wider selection, so a bare `check-not-observed` never reaches a reader on its
 own.
 
-## Caching, and the one step that is not cached
+## Caching, and the steps that are not cached
 
 A task may be cacheable only when its declared inputs cover what it reads.
 
@@ -676,7 +677,7 @@ the variable the step reads, and keys nothing.
 
 The verdict reads the debt list at a commit the run's baseline names, and the
 candidate cut holds neither the baseline nor the history. So the task runs
-every time, and costs one `git merge-base` and one blob read. It declares no
+every time, and costs a few Git reads and one blob read. It declares no
 port: the current list arrives on the job context. `feature-coverage-validate`
 keeps its key on the candidate cut and reads no history.
 

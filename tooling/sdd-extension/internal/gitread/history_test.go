@@ -87,6 +87,19 @@ func TestMergeBaseIsTheCommitTheBranchStartedFrom(t *testing.T) {
 			t.Fatalf("MergeBase(%q) succeeded, want an error", base)
 		}
 	}
+
+	// A base with no local branch is read as its origin counterpart.
+	runGit(t, repo, "update-ref", "refs/remotes/origin/trunk", "main")
+	if got, err := MergeBase(repo, "trunk"); err != nil || got != start {
+		t.Fatalf("MergeBase(trunk) = %q, %v, want %s through origin/trunk", got, err, start)
+	}
+
+	// Unrelated histories share no commit.
+	runGit(t, repo, "checkout", "-q", "--orphan", "unrelated")
+	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "feat: elsewhere")
+	if _, err := MergeBase(repo, "main"); err == nil || !strings.Contains(err.Error(), "share no commit") {
+		t.Fatalf("MergeBase across unrelated histories = %v, want an error that says they share no commit", err)
+	}
 }
 
 // TestRepositoryLocationNamesTheTopAndThePrefix pins both answers at the top

@@ -62,16 +62,26 @@ func CommitsSince(repoRoot, base string) ([]Commit, error) {
 }
 
 // MergeBase returns the best common ancestor of base and HEAD: the commit a
-// branch started from, or the last base commit it merged. base is resolved to
-// one commit first, so a revision that names nothing is an error.
+// branch started from, or the last base commit it merged. A base that names no
+// commit is read as its origin counterpart, origin/<base>, as the impacted
+// selection reads it. A base that names nothing, or that shares no commit with
+// HEAD, is an error.
 func MergeBase(repoRoot, base string) (string, error) {
 	resolved, err := ResolveCommit(repoRoot, base)
-	if err != nil {
-		return "", err
+	if err != nil && !strings.HasPrefix(base, "origin/") {
+		if remote, remoteErr := ResolveCommit(repoRoot, "origin/"+base); remoteErr == nil {
+			resolved, err = remote, nil
+		}
 	}
-	output, err := run(repoRoot, "merge-base", resolved, "HEAD")
 	if err != nil {
-		return "", fmt.Errorf("find the merge base of %s and HEAD: %w", base, err)
+		return "", fmt.Errorf("%w; fetch the base branch, or pass origin/<branch>", err)
+	}
+	output, stderr, err := runCapture(repoRoot, "merge-base", resolved, "HEAD")
+	if err != nil {
+		if strings.TrimSpace(stderr) == "" {
+			return "", fmt.Errorf("find the merge base of %s and HEAD: they share no commit; fetch the whole history of both", base)
+		}
+		return "", fmt.Errorf("find the merge base of %s and HEAD: %w: %s", base, err, strings.TrimSpace(stderr))
 	}
 	sha := strings.ToLower(strings.TrimSpace(output))
 	if !validObjectID(sha) {
