@@ -331,11 +331,16 @@ into the `build` skill's `references/recipes.md`.
 its code serves. A project answers with a feature in its own
 `putnami.features.json`, a spec under its own `specs/`, or a reviewed
 `featureAuthority` in its `putnami.json`: an `owner` that names an authored
-feature, or `none` with the reason it has no feature. A project that gives no
-answer fails with `sdd.uncovered_project`, unless the committed debt list
+feature, `none` with the reason it has no feature, `dependents: true` for a
+library whose dependents carry its specs, or `provider` with the project id a
+generated client comes from. A project that gives no answer fails with
+`sdd.uncovered_project`, unless the committed debt list
 `options.sdd.featureCoverage.debt` in `putnami.workspace.json` names it. An
-`owner` that names no authored feature covers nothing. A debt entry whose
-project answers, or that names no project, fails. The list only shrinks:
+`owner` that names no authored feature covers nothing. So does `dependents`
+when no project that depends on it, directly or not, declares a feature or
+hosts a spec, and `provider` when the id names no member or a member that
+does not pass on its own answer. A debt entry whose project answers, or that
+names no project, fails. The list only shrinks:
 `feature-coverage-ratchet-validate` reads it at the merge base of the run's
 impacted baseline and `HEAD`, and fails each new entry with
 `sdd.grown_coverage_debt`. A workspace without
