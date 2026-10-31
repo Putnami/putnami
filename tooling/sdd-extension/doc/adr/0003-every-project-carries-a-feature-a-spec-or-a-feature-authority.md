@@ -76,8 +76,8 @@ D-026, settled the same day, decides how the protocols answer:
    that carries `featureAuthority.none` today keeps it until it gets the
    feature of its contract.
 
-Issue #724 adds two answers the step checks, so a library and a generated
-client stop repeating one `none` reason. In one workspace of 147 projects, 105
+Two more answers the step checks let a library and a generated client stop
+repeating one `none` reason. In one workspace of 147 projects, 105
 declared `none`: 50 repeated one reason for libraries, and 45 repeated one
 reason for generated clients. No check reads a copied reason, so it cannot go
 false.
