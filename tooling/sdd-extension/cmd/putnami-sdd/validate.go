@@ -424,6 +424,39 @@ func runFeatureCoverageValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []stri
 	return finish(report, verdict)
 }
 
+// runFeatureCoverageRatchetValidate is the tenth step of the workspace-scoped
+// `validate-workspace` command. It reads options.sdd.featureCoverage.debt in
+// putnami.workspace.json at the merge base of the run's impacted baseline and
+// HEAD, and fails naming each current entry that list does not hold: the debt
+// list only shrinks (ADR 0003 of this extension). A run that selected its
+// projects another way names no baseline and passes with a note.
+//
+// The step reads Git history, which the candidate cut does not hold, so it is
+// never served from cache.
+func runFeatureCoverageRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	workspaceOptions, err := wsview.WorkspaceOptionsFromContext(ctx)
+	if err != nil {
+		return "", nil, protocolcli.Classify(
+			fmt.Errorf("decode workspace options: %w", err),
+			protocolcli.ErrInvalidConfig,
+		)
+	}
+	baseline := ""
+	if ctx.Selection != nil && ctx.Selection.Mode == pctx.SelectionModeImpacted {
+		baseline = ctx.Selection.Baseline
+	}
+	report, verdict := sdd.BuildFeatureCoverageRatchetResult(ctx.WorkspaceRoot, workspaceOptions, baseline)
+	publishDiagnostics(emit, report.Diagnostics)
+	switch {
+	case report.Note != "":
+		emit.Summary("feature coverage ratchet: " + report.Note)
+	case verdict == nil:
+		emit.Summary(fmt.Sprintf("feature coverage ratchet: no new debt entry (%d now, %d at the merge base %s with %s)",
+			len(report.Debt), len(report.BaselineDebt), report.MergeBase, report.Baseline))
+	}
+	return finish(report, verdict)
+}
+
 // projectValidationView builds the membership and the projection a PROJECT-
 // SCOPED validation task runs over.
 //

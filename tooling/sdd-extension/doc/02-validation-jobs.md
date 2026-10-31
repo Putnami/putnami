@@ -8,7 +8,7 @@ contract.
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
 | `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker and the agent attribution are never cached |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -280,12 +280,34 @@ its existing admission gate; the shared absent-policy default remains `report`.
   | A `debt` entry that names no project | Fails with `sdd.unknown_coverage_debt` |
   | Another member, no `debt`, an entry that is not a project id, or a duplicate entry | Fails with `sdd.invalid_feature_coverage`, and judges no project |
 
-  The list only shrinks: a paid debt fails until its entry is removed, and a
-  new entry is an edit a reviewer sees. The step reads no history. A manifest
-  or a spec covers its project when it is a tracked or unignored file, and the
-  step is cached on the input `git:**` (see
+  The list only shrinks: a paid debt fails until its entry is removed, and
+  `feature-coverage-ratchet-validate` refuses a new entry. This step reads no
+  history. A manifest or a spec covers its project when it is a tracked or
+  unignored file, and the step is cached on the input `git:**` (see
   [Caching](#the-steps-cached-on-the-git-candidate-cut)). The decision is
   [ADR 0003](adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md).
+
+- **`feature-coverage-ratchet-validate`** — the shrink-only rule of the debt
+  list. It reads `options.sdd.featureCoverage.debt` in `putnami.workspace.json`
+  at the merge base of the run's impacted baseline and `HEAD`: the list the
+  change started from. The merge base, not the baseline commit, is the
+  comparison point, so a branch behind its base keeps an entry the base removed
+  since without a failure.
+
+  | Situation | Result |
+  |---|---|
+  | `options.sdd.featureCoverage` unset | Passes, with a note |
+  | The run selected its projects without `--impacted` | Passes, with a note: nothing names a baseline |
+  | The merge base declares no `options.sdd.featureCoverage`, or no `putnami.workspace.json` | Passes, with a note: this change adopts the gate |
+  | An entry the list at the merge base does not hold | Fails with one `sdd.grown_coverage_debt` diagnostic per entry, at its index in the current list |
+  | An entry removed, or the list unchanged | Passes |
+  | A shallow clone | Fails: its history can stop before the merge base |
+  | A list at the merge base the step cannot read | Fails with `sdd.coverage_debt_baseline_unavailable` |
+
+  The change gate runs `putnami validate --impacted --baseline origin/<base>`,
+  so every pull request is compared with its base branch. A run that names no
+  baseline enforces nothing here. The step is never cached (see
+  [below](#feature-coverage-ratchet-validate--never-cached)).
 
 Selection narrows what a run **owns**, never what it **reads**: durable
 manifests and canonical spec documents are read at every root under any
@@ -645,6 +667,18 @@ port names the variable the step reads, and keys nothing.
 The verdict reads an environment variable, and the candidate cut does not
 hold it. So the task runs every time, and reads no file. The `env` port names
 the variable the step reads, and keys nothing.
+
+### `feature-coverage-ratchet-validate` — never cached
+
+```json
+"cache": { "enabled": false }
+```
+
+The verdict reads the debt list at a commit the run's baseline names, and the
+candidate cut holds neither the baseline nor the history. So the task runs
+every time, and costs one `git merge-base` and one blob read. It declares no
+port: the current list arrives on the job context. `feature-coverage-validate`
+keeps its key on the candidate cut and reads no history.
 
 ## Exit codes
 

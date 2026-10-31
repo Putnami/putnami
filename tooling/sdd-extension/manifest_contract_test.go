@@ -87,10 +87,10 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			},
 		}).
 		Command("validate-workspace", proto.CommandDefinition{
-			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority.",
+			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks.",
 			Activation:  "workspace-once",
 			Traits:      &proto.CommandTraits{Kind: proto.CommandKindCriteria},
-			// The nine steps are independent workspace-wide steps; none reads
+			// The ten steps are independent workspace-wide steps; none reads
 			// another's answer, so no dependsOn orders them.
 			Run: []proto.PipelineStep{
 				{ID: "architecture", Task: "architecture-validate"},
@@ -102,6 +102,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				{ID: "breaking-marker", Task: "breaking-marker-validate"},
 				{ID: "agent-attribution", Task: "agent-attribution-validate"},
 				{ID: "feature-coverage", Task: "feature-coverage-validate"},
+				{ID: "feature-coverage-ratchet", Task: "feature-coverage-ratchet-validate"},
 			},
 		}).
 		Task("features-validate", proto.TaskDefinition{
@@ -342,6 +343,25 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cache: cacheEnabledNoOutput(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Feature-coverage report: whether the gate is adopted, the projects judged, how many a feature or spec and a featureAuthority cover, the debt list, the uncovered projects, and sorted diagnostics."},
+			},
+			Declares: sdkmanifest.Declares(),
+		}).
+		Task("feature-coverage-ratchet-validate", proto.TaskDefinition{
+			Description: "Read options.sdd.featureCoverage.debt in putnami.workspace.json at the merge base of the run's impacted baseline and HEAD, " +
+				"and fail with sdd.grown_coverage_debt naming each current entry that list does not hold: the debt list only shrinks. A removed or kept entry passes. " +
+				"A workspace that declares no options.sdd.featureCoverage, a run without an impacted baseline, and a merge base that declares no options.sdd.featureCoverage pass with a note; a shallow clone fails. " +
+				"Uncached on purpose: the verdict reads Git history, which the candidate cut does not hold, so a restored answer could approve a list it never compared.",
+			Kind:      "command",
+			Command:   "{extensionRuntime}",
+			Args:      []string{"feature-coverage-ratchet-validate"},
+			Cwd:       "{workspaceRoot}",
+			TimeoutMs: 120000,
+			// No port and no sources read: the current list arrives on the job
+			// context, and the other is read from a commit, which no task of the
+			// run rewrites.
+			Cache: sdkmanifest.NoCache(),
+			Outputs: map[string]proto.TaskOutputPort{
+				"data": {Description: "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and sorted diagnostics."},
 			},
 			Declares: sdkmanifest.Declares(),
 		}).
@@ -735,9 +755,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if workspace.Activation != "workspace-once" {
 		t.Errorf("validate-workspace activation = %q, want workspace-once", workspace.Activation)
 	}
-	// The nine workspace-wide steps are independent — none reads another's
+	// The ten workspace-wide steps are independent — none reads another's
 	// answer — so no dependsOn orders them.
-	if len(workspace.Run) != 9 ||
+	if len(workspace.Run) != 10 ||
 		workspace.Run[0].Task != "architecture-validate" ||
 		workspace.Run[1].Task != "specs-ratchet-validate" ||
 		workspace.Run[2].Task != "decisions-validate" ||
@@ -747,6 +767,7 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		workspace.Run[6].Task != "breaking-marker-validate" ||
 		workspace.Run[7].Task != "agent-attribution-validate" ||
 		workspace.Run[8].Task != "feature-coverage-validate" ||
+		workspace.Run[9].Task != "feature-coverage-ratchet-validate" ||
 		len(workspace.Run[1].DependsOn) != 0 ||
 		len(workspace.Run[2].DependsOn) != 0 ||
 		len(workspace.Run[3].DependsOn) != 0 ||
@@ -754,8 +775,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		len(workspace.Run[5].DependsOn) != 0 ||
 		len(workspace.Run[6].DependsOn) != 0 ||
 		len(workspace.Run[7].DependsOn) != 0 ||
-		len(workspace.Run[8].DependsOn) != 0 {
-		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step and the feature-coverage gate", workspace.Run)
+		len(workspace.Run[8].DependsOn) != 0 ||
+		len(workspace.Run[9].DependsOn) != 0 {
+		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step, the feature-coverage gate and its ratchet", workspace.Run)
 	}
 	// Both are user-facing: they are what `putnami validate` and the CI gate
 	// run. The internal self-check is the only hidden command here.
@@ -900,6 +922,35 @@ func TestTheProposalMessageStepsAreNeverServedFromCache(t *testing.T) {
 	}
 }
 
+// TestTheCoverageRatchetIsNeverServedFromCache pins the feature-coverage
+// ratchet uncached. It reads the debt list at the merge base of the run's
+// impacted baseline, and the candidate cut holds neither the baseline nor the
+// history, so a replayed verdict would approve a list this run never compared.
+// It declares no port: the current list arrives on the job context.
+func TestTheCoverageRatchetIsNeverServedFromCache(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "coverage-debt-only-shrinks", "the-step-is-never-served-from-cache")
+	m := committedManifest(t)
+
+	task, found := m.Tasks["feature-coverage-ratchet-validate"]
+	if !found {
+		t.Fatal("the manifest declares no feature-coverage-ratchet-validate task")
+	}
+	if task.Cache == nil || task.Cache.IsEnabled() {
+		t.Errorf("cache = %+v, want disabled: its verdict reads history no key holds", task.Cache)
+	}
+	if !strings.Contains(task.Description, "Uncached on purpose") {
+		t.Errorf("description = %q, want it to say why it is uncached", task.Description)
+	}
+	if len(task.Inputs) != 0 || len(task.Reads) != 0 {
+		t.Errorf("inputs = %+v, reads = %+v, want none", task.Inputs, task.Reads)
+	}
+	// The coverage gate keeps its key on the candidate cut:
+	// TestCachePolicyMatchesTheDeclaredReadSet pins that key.
+	if coverage := m.Tasks["feature-coverage-validate"]; !coverage.Cache.IsEnabled() {
+		t.Errorf("feature-coverage-validate cache = %+v, want enabled", coverage.Cache)
+	}
+}
+
 // TestEveryTaskCarriesAV3Declaration pins that the contract is COMPLETE. v3 is
 // additive per task, so a task that quietly loses (or never gains) its
 // `declares` block keeps v2 inferred capture while the rest of the manifest is
@@ -966,9 +1017,10 @@ func TestNoTaskDeclaresAnEffectOrOwnsAPath(t *testing.T) {
 	}
 	// The self-check is uncacheable because its whole verdict is about the
 	// environment of THIS invocation, so a restored answer from another one
-	// would be the single thing it must never report. The breaking-marker and
-	// agent-attribution steps are the other uncached tasks;
-	// TestTheProposalMessageStepsAreNeverServedFromCache pins them.
+	// would be the single thing it must never report. The breaking-marker,
+	// agent-attribution and feature-coverage ratchet steps are the other
+	// uncached tasks; TestTheProposalMessageStepsAreNeverServedFromCache and
+	// TestTheCoverageRatchetIsNeverServedFromCache pin them.
 	if m.Tasks["sdd-selfcheck-exec"].Cache.IsEnabled() {
 		t.Error("sdd-selfcheck-exec is cacheable; a restored self-check reports another invocation's environment")
 	}

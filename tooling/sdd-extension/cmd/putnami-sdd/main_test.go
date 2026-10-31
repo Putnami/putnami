@@ -195,7 +195,7 @@ func TestHandlerNamesAreStable(t *testing.T) {
 	}
 	sort.Strings(got)
 
-	want := []string{"agent-attribution-validate", "architecture-validate", "breaking-marker-validate", "codeowners-sync", "decisions-validate", "docs-links-validate", "feature-coverage-validate", "features-validate", "recipes-validate", "selfcheck", "specs-ratchet-validate", "specs-validate"}
+	want := []string{"agent-attribution-validate", "architecture-validate", "breaking-marker-validate", "codeowners-sync", "decisions-validate", "docs-links-validate", "feature-coverage-ratchet-validate", "feature-coverage-validate", "features-validate", "recipes-validate", "selfcheck", "specs-ratchet-validate", "specs-validate"}
 	if len(got) != len(want) {
 		t.Fatalf("handlers = %v, want %v", got, want)
 	}
