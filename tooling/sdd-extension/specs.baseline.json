@@ -5,6 +5,7 @@
     "tooling/specification-driven-development#architecture-adoption-policy",
     "tooling/specification-driven-development#authoring-never-grants-a-permission",
     "tooling/specification-driven-development#codeowners-follow-declared-owners",
+    "tooling/specification-driven-development#coverage-debt-only-shrinks",
     "tooling/specification-driven-development#declared-inputs-cover-the-read-set",
     "tooling/specification-driven-development#every-document-has-working-links",
     "tooling/specification-driven-development#every-project-carries-feature-coverage",

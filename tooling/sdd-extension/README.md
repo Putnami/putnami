@@ -204,7 +204,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker and the agent attribution are never cached |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Both are in the canonical gate:
 
@@ -279,6 +279,10 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   message in `PUTNAMI_PROPOSAL_MESSAGE` when `options.sdd.agentAttribution` is
   `"forbid"`, and the candidate cut does not hold the variable. See
   [the validation jobs](doc/02-validation-jobs.md#agent-attribution-validate--never-cached).
+- `feature-coverage-ratchet-validate` is never cached. It reads the
+  feature-coverage debt list at the merge base of the run's impacted baseline
+  and `HEAD`, and the candidate cut holds neither. See
+  [the validation jobs](doc/02-validation-jobs.md#feature-coverage-ratchet-validate--never-cached).
 
 ### The decision gate
 
@@ -331,10 +335,13 @@ feature, or `none` with the reason it has no feature. A project that gives no
 answer fails with `sdd.uncovered_project`, unless the committed debt list
 `options.sdd.featureCoverage.debt` in `putnami.workspace.json` names it. An
 `owner` that names no authored feature covers nothing. A debt entry whose
-project answers, or that names no project, fails, so the list only shrinks. A
-workspace without `options.sdd.featureCoverage` has not adopted the gate and
-passes with a note. The task reads the manifests and specs through the Git
-candidate cut and is cached on the input `git:**`. See
+project answers, or that names no project, fails. The list only shrinks:
+`feature-coverage-ratchet-validate` reads it at the merge base of the run's
+impacted baseline and `HEAD`, and fails each new entry with
+`sdd.grown_coverage_debt`. A workspace without
+`options.sdd.featureCoverage` has not adopted the gate and passes with a note.
+The task reads the manifests and specs through the Git candidate cut and is
+cached on the input `git:**`. See
 [the validation jobs](doc/02-validation-jobs.md) and
 [ADR 0003](doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md).
 

@@ -472,7 +472,9 @@ Two checks read the answer. `putnami specs validate` warns about a published
 project that gives none, with `specs.missing_feature_link`. In a workspace that
 sets `options.sdd.featureCoverage`, the `feature-coverage-validate` step of
 `validate-workspace` fails every project that gives none, unless the committed
-debt list names it
+debt list names it, and its `feature-coverage-ratchet-validate` step fails a
+debt entry the list at the merge base with the run's impacted baseline does not
+hold
 ([ADR 0003 of `@putnami/sdd`](../../tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md)).
 
 The field is optional: a project that omits it answers with its own feature or
