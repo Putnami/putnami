@@ -50,9 +50,10 @@ warning named 7 of them.
    `options.sdd.featureCoverage`, pass with a note. A shallow clone fails: its
    history can stop before the merge base. The step reads Git history, which
    the candidate cut does not hold, so it is never cached, like
-   `breaking-marker-validate`. The change gate runs `validate --impacted
-   --baseline` against the base branch, so it enforces the rule on every pull
-   request.
+   `breaking-marker-validate`. Both change gates run `validate --impacted`:
+   Contributor CI names the base branch with `--baseline`, and the hosted
+   Putnami CI runner resolves the trunk or the nearest epic branch. Both
+   check out the whole history, so the rule holds on every pull request.
 6. **The workspace opts in.** Without `options.sdd.featureCoverage`, the step
    passes with a note that counts the projects that would fail. A block the
    step cannot read fails closed: an unknown member, a missing `debt`, an
@@ -106,9 +107,11 @@ D-026, settled the same day, decides how the protocols answer:
 - A new project fails the gate until it declares a feature, a spec or a
   `featureAuthority`. A debt entry does not defer it: a run with a baseline
   fails every entry the merge base does not list.
-- A run without an impacted baseline does not refuse a new entry. The gate
-  that compares a pull request with its base branch must run `validate` with
-  `--impacted` and a full history.
+- A run without an impacted baseline does not refuse a new entry. Without
+  `--impacted-strict`, a baseline that does not resolve selects every project
+  and names no baseline, so the step passes with a note. Contributor CI passes
+  `--impacted-strict`. The hosted Putnami CI runner does not, and relies on
+  its full checkout to hold the trunk.
 - A `featureAuthority` now passes a gate, not a warning: a reviewer reads
   every new `none` reason and every new `owner`.
 - The `specs.missing_feature_link` warning stays. It applies the same rule to
