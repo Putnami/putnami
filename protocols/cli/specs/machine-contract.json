@@ -50,7 +50,7 @@
     },
     {
       "id": "test-cases-are-bounded",
-      "text": "BoundTestCases keeps failed, then skipped, then passed cases in runner order within the cap, drops a case it cannot describe and the output of a passed one, cuts text on code points and repairs invalid UTF-8. Truncation keeps head and tail, stays bounded through sanitization and redacts a secret the cut would split. Failed cases fit the task's byte budget, a batch member shares the batch budget, and the result validates as records."
+      "text": "Past the cap, SelectTestCases keeps failed, then skipped, then passed cases that observe a declared check, then the slowest passed cases, with cases under 10 ms last in runner order, and reports the count and the wall time of the cases it drops. Under the cap it keeps every case. It drops a case it cannot describe and the output of a passed one, cuts text on code points and repairs invalid UTF-8. Truncation keeps head and tail, stays bounded through sanitization and redacts a secret the cut would split. Failed cases fit the task's byte budget, a batch member shares the batch budget, and the result validates as records."
     },
     {
       "id": "reserved-flags-and-the-extension-contract",
