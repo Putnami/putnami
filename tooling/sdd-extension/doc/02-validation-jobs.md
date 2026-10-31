@@ -306,8 +306,9 @@ its existing admission gate; the shared absent-policy default remains `report`.
 
   A gate that compares a pull request with its base branch runs
   `putnami validate --impacted --impacted-strict --baseline origin/<base>` on a
-  full history, as Contributor CI does. A run that names no baseline enforces
-  nothing here. The step is never cached (see
+  full history, as Contributor CI does. The hosted Putnami CI runner runs
+  `--impacted` alone, which resolves the trunk or the nearest epic branch. A
+  run without `--impacted` enforces nothing here. The step is never cached (see
   [below](#feature-coverage-ratchet-validate--never-cached)).
 
 Selection narrows what a run **owns**, never what it **reads**: durable

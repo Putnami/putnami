@@ -339,8 +339,9 @@ project answers, or that names no project, fails. The list only shrinks:
 `feature-coverage-ratchet-validate` reads it at the merge base of the run's
 impacted baseline and `HEAD`, and fails each new entry with
 `sdd.grown_coverage_debt`. A workspace without
-`options.sdd.featureCoverage` has not adopted the gate and passes with a note. The task reads the manifests and specs through the Git
-candidate cut and is cached on the input `git:**`. See
+`options.sdd.featureCoverage` has not adopted the gate and passes with a note.
+The task reads the manifests and specs through the Git candidate cut and is
+cached on the input `git:**`. See
 [the validation jobs](doc/02-validation-jobs.md) and
 [ADR 0003](doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md).
 

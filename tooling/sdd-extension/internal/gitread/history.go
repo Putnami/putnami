@@ -1,7 +1,9 @@
 package gitread
 
 import (
+	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 )
 
@@ -78,7 +80,8 @@ func MergeBase(repoRoot, base string) (string, error) {
 	}
 	output, stderr, err := runCapture(repoRoot, "merge-base", resolved, "HEAD")
 	if err != nil {
-		if strings.TrimSpace(stderr) == "" {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == 1 && strings.TrimSpace(stderr) == "" {
 			return "", fmt.Errorf("find the merge base of %s and HEAD: they share no commit; fetch the whole history of both", base)
 		}
 		return "", fmt.Errorf("find the merge base of %s and HEAD: %w: %s", base, err, strings.TrimSpace(stderr))
