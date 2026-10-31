@@ -89,6 +89,10 @@
     {
       "id": "every-project-carries-feature-coverage",
       "text": "With options.sdd.featureCoverage declared, validate-workspace judges every project, with or without a putnami.json. A project passes when its root declares a feature or hosts a spec in the candidate cut, or when its featureAuthority is none with a reason or an owner that names an authored feature. Any other project fails, named, unless the debt list names it. A debt entry whose project passes, or that names no project, fails. A malformed block fails closed; an absent one is adoption."
+    },
+    {
+      "id": "coverage-debt-only-shrinks",
+      "text": "With options.sdd.featureCoverage declared and an impacted baseline, validate-workspace reads the debt list at the merge base of the baseline and HEAD, and fails each entry of the current list that the merge base does not list, named. A removed or kept entry passes. A run without an impacted baseline, or a merge base that declares no options.sdd.featureCoverage, passes with a note; a shallow clone fails. This step is never served from cache, and feature-coverage-validate keeps its key and reads no history."
     }
   ],
   "decisions": [

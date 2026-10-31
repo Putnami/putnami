@@ -295,6 +295,25 @@
               "an-unresolvable-owner-does-not-cover"
             ]
           }
+        },
+        {
+          "id": "coverage-debt-only-shrinks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-new-debt-entry-fails-naming-it",
+              "a-removed-or-kept-entry-passes",
+              "base-commits-merged-in-do-not-count",
+              "a-run-without-an-impacted-baseline-passes-with-a-note",
+              "an-unadopted-merge-base-passes-with-a-note",
+              "a-shallow-clone-fails",
+              "the-step-is-never-served-from-cache"
+            ]
+          }
         }
       ],
       "surface": {

@@ -1,8 +1,9 @@
 # ADR 0003 — Every project carries a feature, a spec or a featureAuthority
 
 - **Status**: accepted
-- **Scope**: `@putnami/sdd` (`feature-coverage-validate`, a step of
-  `validate-workspace`), every workspace that sets
+- **Scope**: `@putnami/sdd` (`feature-coverage-validate` and
+  `feature-coverage-ratchet-validate`, steps of `validate-workspace`), every
+  workspace that sets
   `options.sdd.featureCoverage`, and the protocol modules of this repository
 
 ## Context
@@ -39,9 +40,19 @@ warning named 7 of them.
    answer yet, and a listed project passes. An entry whose project answers
    fails, and so does an entry that names no project, so the pull request that
    pays a debt removes its entry.
-5. **The list only shrinks, by review.** The step reads no history, so it does
-   not refuse a new entry. A new entry is an edit of `putnami.workspace.json`
-   that a reviewer sees, and D-025 states the rule.
+5. **The list only shrinks, and a run with a baseline enforces it.**
+   `feature-coverage-validate` reads no history, so it does not refuse a new
+   entry. A second step, `feature-coverage-ratchet-validate`, reads the debt
+   list in `putnami.workspace.json` at the merge base of the run's impacted
+   baseline and `HEAD`, and fails each current entry the merge base does not
+   list with `sdd.grown_coverage_debt`, naming the entry. A run without an
+   impacted baseline, and a merge base that declares no
+   `options.sdd.featureCoverage`, pass with a note. A shallow clone fails: its
+   history can stop before the merge base. The step reads Git history, which
+   the candidate cut does not hold, so it is never cached, like
+   `breaking-marker-validate`. The change gate runs `validate --impacted
+   --baseline` against the base branch, so it enforces the rule on every pull
+   request.
 6. **The workspace opts in.** Without `options.sdd.featureCoverage`, the step
    passes with a note that counts the projects that would fail. A block the
    step cannot read fails closed: an unknown member, a missing `debt`, an
@@ -77,9 +88,18 @@ D-026, settled the same day, decides how the protocols answer:
 - **An exemption by tag or by type.** A rule such as "a sample needs no
   feature" exempts every future sample without a review. A `featureAuthority`
   states one project's reason where a reviewer reads it.
-- **Read the history to refuse a growing list.** The step would need the base
-  commit, which the `git:**` key does not hold, so a cached verdict would not
-  follow the base. Review already sees the edit.
+- **Read the history in `feature-coverage-validate`.** The step would need
+  the base commit, which the `git:**` key does not hold, so a cached verdict
+  would not follow the base. A separate uncached step keeps that key exact.
+- **Refuse a growing list by review alone.** Under time pressure, a debt entry
+  is the cheapest way to silence `sdd.uncovered_project`, and nothing but the
+  reader of the diff stops it.
+- **An interactive `putnami features coverage --baseline <ref>` command.** It
+  refuses nothing until a gate runs it, and the change gate already runs
+  `validate` with a baseline.
+- **Compare with the baseline commit itself.** A branch behind its base would
+  fail for an entry the base removed after the branch started. The merge base
+  is the list the branch started from.
 
 ## Consequences
 
