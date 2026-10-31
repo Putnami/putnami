@@ -104,7 +104,11 @@ D-026, settled the same day, decides how the protocols answer:
 ## Consequences
 
 - A new project fails the gate until it declares a feature, a spec or a
-  `featureAuthority`, or until a reviewer accepts a debt entry for it.
+  `featureAuthority`. A debt entry does not defer it: a run with a baseline
+  fails every entry the merge base does not list.
+- A run without an impacted baseline does not refuse a new entry. The gate
+  that compares a pull request with its base branch must run `validate` with
+  `--impacted` and a full history.
 - A `featureAuthority` now passes a gate, not a warning: a reviewer reads
   every new `none` reason and every new `owner`.
 - The `specs.missing_feature_link` warning stays. It applies the same rule to
