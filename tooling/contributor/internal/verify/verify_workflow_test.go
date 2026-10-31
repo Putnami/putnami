@@ -588,7 +588,7 @@ func TestWorkflowPendingCannotMintReady(t *testing.T) {
 	if result.value["verifiedRequirements"] != float64(0) || result.value["outcomeComplete"] != false {
 		t.Fatalf("pending proof advanced outcome: %s", result.out)
 	}
-	f.workflow(w, true, "current unit lacks passing native checks")
+	f.workflow(w, true, "workflow ready needs native producer proof")
 	if slices.Contains([]string{"ready", "Putnami verified"}, result.value["stage"].(string)) {
 		t.Fatalf("standalone workflow minted candidate readiness: %s", result.out)
 	}
@@ -689,7 +689,7 @@ func TestWorkflowReadyReceiptResumesNativeDossier(t *testing.T) {
 	f.workflow(w, true, "")
 
 	delete(w, "proof")
-	f.workflow(w, true, "workflow current unit lacks passing native checks")
+	f.workflow(w, true, "workflow ready needs native producer proof")
 	w["proof"] = fxObj{"session": f.reference(".context/sessions/synthetic-gate/session.json"),
 		"specVerification": f.reference(".context/sessions/synthetic-gate/spec-verification.json")}
 	f.write(".context/blocked-ready.md", "A current decision remains open.")

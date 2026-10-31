@@ -51,7 +51,11 @@ func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verifi
 		return verified, errors.New("hosted workflow changed during finalization")
 	}
 	if !c.opts.PartialDelivery && !projection.WouldCompleteAfterReady {
-		return verified, errors.New("hosted workflow is not eligible to complete the parent; use --partial-delivery")
+		reason := projection.IncompleteReason
+		if reason == "" {
+			reason = "workflow outcome is incomplete"
+		}
+		return verified, fmt.Errorf("hosted workflow cannot complete the parent: %s; complete the workflow, or publish one unit with --partial-delivery", reason)
 	}
 	c.workflowSHA = projection.WorkflowSHA256
 	return verified, nil

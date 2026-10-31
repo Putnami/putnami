@@ -168,26 +168,37 @@ func TestHostedWorkflowDoesNotPromoteBlockedCurrentUnit(t *testing.T) {
 func TestHostedChecksNeverStandForNativeProofOfABuildingUnit(t *testing.T) {
 	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "hosted-workflow-readiness-bound-to-required-checks")
 	t.Parallel()
-	f, workflow, request := hostedWorkflowFixture(t)
-	delete(workflow, "proof")
-	fxObjAt(workflow, "units", 0)["stage"] = "building"
-	f.write(".context/workflow.json", workflow)
-	ref := f.reference(".context/workflow.json")
-	digest, ok := ref["sha256"].(string)
-	if !ok {
-		t.Fatal("workflow fixture has no digest")
-	}
-	request.SHA256 = digest
-	preflight, err := f.checkHostedWorkflow(request)
-	if err != nil || preflight.WouldCompleteAfterReady || len(preflight.ReadyUnits) != 0 ||
-		!strings.Contains(preflight.IncompleteReason, "lacks passing native checks: first") {
-		t.Fatalf("building unit preflight = %+v, %v; want a valid workflow with no ready unit", preflight, err)
-	}
-	request.Status = hostedPassingStatus(request.HeadSHA)
-	request.ProposalRef = request.Status.Proposal.Ref
-	hosted, err := f.checkHostedWorkflow(request)
-	if err != nil || hosted.OutcomeComplete || hosted.WouldCompleteAfterReady || len(hosted.ReadyUnits) != 0 {
-		t.Fatalf("passing hosted checks stood for native proof: %+v, %v", hosted, err)
+	for _, tc := range []struct {
+		name, reason string
+		change       func(fxObj)
+	}{
+		{"proven building unit", "has not reached candidate: first", func(fxObj) {}},
+		{"unproven building unit", "needs native producer proof", func(workflow fxObj) { delete(workflow, "proof") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, workflow, request := hostedWorkflowFixture(t)
+			fxObjAt(workflow, "units", 0)["stage"] = "building"
+			tc.change(workflow)
+			f.write(".context/workflow.json", workflow)
+			ref := f.reference(".context/workflow.json")
+			digest, ok := ref["sha256"].(string)
+			if !ok {
+				t.Fatal("workflow fixture has no digest")
+			}
+			request.SHA256 = digest
+			preflight, err := f.checkHostedWorkflow(request)
+			if err != nil || preflight.WouldCompleteAfterReady || len(preflight.ReadyUnits) != 0 ||
+				!strings.Contains(preflight.IncompleteReason, tc.reason) {
+				t.Fatalf("building unit preflight = %+v, %v; want a valid workflow with no ready unit and %q", preflight, err, tc.reason)
+			}
+			request.Status = hostedPassingStatus(request.HeadSHA)
+			request.ProposalRef = request.Status.Proposal.Ref
+			hosted, err := f.checkHostedWorkflow(request)
+			if err != nil || hosted.OutcomeComplete || hosted.WouldCompleteAfterReady || len(hosted.ReadyUnits) != 0 {
+				t.Fatalf("passing hosted checks stood for native proof: %+v, %v", hosted, err)
+			}
+		})
 	}
 }
 
@@ -254,7 +265,8 @@ func TestHostedWorkflowPreservesLaterOutcomeScope(t *testing.T) {
 	request.SHA256 = digest
 	preflight, err := f.checkHostedWorkflow(request)
 	if err != nil || preflight.WouldCompleteAfterReady || preflight.OutcomeComplete ||
-		len(preflight.ReadyUnits) != 1 || preflight.ReadyUnits[0] != "first" {
+		len(preflight.ReadyUnits) != 1 || preflight.ReadyUnits[0] != "first" ||
+		preflight.IncompleteReason != "workflow outcome has later requirements (1)" {
 		t.Fatalf("later outcome preflight = %+v, %v", preflight, err)
 	}
 	request.Status = hostedPassingStatus(request.HeadSHA)

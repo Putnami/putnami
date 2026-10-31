@@ -61,6 +61,7 @@ type HostedWorkflowResult struct {
 	WorkflowSHA256                           string
 	WouldCompleteAfterReady, OutcomeComplete bool
 	ReadyUnits                               []string
+	IncompleteReason                         string
 }
 type HostedWorkflow func(context.Context, HostedWorkflowRequest) (HostedWorkflowResult, error)
 

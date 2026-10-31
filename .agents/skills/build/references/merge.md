@@ -28,11 +28,20 @@ exists; never invent a task to use it.
   committed tree and rechecks the dossier and its gate.
 - Hosted ready, when check selected it: `--gate ci`, plus `--workflow-file`
   when it names a task, unless a partial delivery changes only paths of
-  projects that declare `featureAuthority.none` and author no feature. It
-  pushes, marks the proposal ready, waits for the named checks on the pushed
-  commit, and returns it to draft when one fails. It can wait up to
+  projects that declare `featureAuthority.none` and author no feature. The
+  command pushes, marks the proposal ready, waits for the named checks on the
+  pushed commit, and returns it to draft when one fails. It can wait up to
   `verification.ciGate.timeoutMinutes`: run it in the background where the
   host bounds a command's duration; invoking it again keeps waiting.
+- Hosted ready that completes a task: the hosted checks never stand for the
+  workflow's native proof. After the last commit, run one `--projects` gate on
+  the committed tree, over the projects of the current requirements' specs.
+  Its `spec-verification.json` must show each current requirement
+  `verified`. Set the workflow's `proof` to that session,
+  `.putnami/sessions/<id>/session.json`, and its sibling
+  `spec-verification.json`, and set each current unit to `candidate`. The end
+  report names this gate as one that followed no edit. Without that proof,
+  publish the unit with `--partial-delivery`.
 - One unit of a larger task: `--partial-delivery`, on the draft and the final
   call. It keeps a non-closing reference and leaves the task's state alone.
 

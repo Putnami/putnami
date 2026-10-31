@@ -1058,6 +1058,10 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		proofTree = r.fingerprint()
 		proof, session = r.workflowProof(w.get("proof"), proofTree)
 	}
+	// A ready projection needs a local producer session: without one, no
+	// requirement is proven.
+	require(!final || proof != nil,
+		"workflow ready needs native producer proof: set proof to the session of a local run on this tree and its spec-verification.json")
 	verdicts := r.workflowVerdicts(proof, session, sources)
 	reports := map[string][]any{}
 	warnings := map[string][]diag.Diagnostic{}
@@ -1120,7 +1124,7 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 	}
 	workflowStrings(handoff.get("unresolvedFindings"), "workflow handoff unresolved findings")
 	if final {
-		require(current > 0 && proof != nil, "workflow ready needs current requirements and native producer proof")
+		require(current > 0, "workflow ready needs current requirements")
 		require(current == complete, "workflow current requirements are incomplete")
 	}
 	if proofTree != "" {
