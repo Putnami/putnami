@@ -314,6 +314,22 @@
               "the-step-is-never-served-from-cache"
             ]
           }
+        },
+        {
+          "id": "feature-authority-answers-resolve",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependent-with-a-feature-or-spec-covers-a-library",
+              "a-library-whose-dependents-carry-no-feature-fails",
+              "a-provider-without-coverage-fails",
+              "an-unknown-provider-fails"
+            ]
+          }
         }
       ],
       "surface": {

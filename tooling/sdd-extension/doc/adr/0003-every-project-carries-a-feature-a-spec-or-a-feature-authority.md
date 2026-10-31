@@ -12,6 +12,7 @@ A feature in `putnami.features.json` and a spec under `specs/` link a
 project's code to the outcome it serves. A project that has neither can state
 a reviewed `featureAuthority` in its `putnami.json`: an `owner` that names the
 feature it serves elsewhere, or `none` with the reason it has no feature.
+Decisions 9 to 11 add two more answers.
 
 One check read these answers: `specs.missing_feature_link`, a warning of
 `putnami specs validate`. It assesses only the projects that declare a
@@ -75,6 +76,30 @@ D-026, settled the same day, decides how the protocols answer:
    that carries `featureAuthority.none` today keeps it until it gets the
    feature of its contract.
 
+Issue #724 adds two answers the step checks, so a library and a generated
+client stop repeating one `none` reason. In one workspace of 147 projects, 105
+declared `none`: 50 repeated one reason for libraries, and 45 repeated one
+reason for generated clients. No check reads a copied reason, so it cannot go
+false.
+
+9. **`dependents: true` covers a library through its dependents.** The
+   project has no feature of its own, and the specs of the projects that
+   depend on it state its behavior. The step walks the resolved dependency
+   graph backwards. The project passes when one of its dependents, directly
+   or not, declares a feature or hosts a spec at its own root. A dependent
+   that answers with a `featureAuthority` does not count: it carries no
+   requirement either. Otherwise the step fails with `sdd.uncovered_project`.
+10. **`provider: "<project id>"` covers a generated client through its
+    provider.** The project passes when the id names a workspace member that
+    passes on its own answer: a feature, a spec or a `featureAuthority` that
+    resolves. A debt entry is no answer. Otherwise the step fails with
+    `sdd.uncovered_project`, naming the provider. The Go and TypeScript client
+    generators write this member, with the id of the project they generate
+    from, so a person does not.
+11. **`none` stays** for a project that serves no outcome, such as a fixture
+    or a repository tool. Exactly one of `owner`, `none`, `dependents` and
+    `provider` is set.
+
 ## Alternatives rejected
 
 - **Extend the specs ratchet.** `specs.baseline.json` freezes requirements
@@ -101,6 +126,12 @@ D-026, settled the same day, decides how the protocols answer:
 - **Compare with the baseline commit itself.** A branch behind its base would
   fail for an entry the base removed after the branch started. The merge base
   is the list the branch started from.
+- **A library names every feature it serves in `owner`.** `owner` names one
+  feature, so it fits a library with one consumer, not one with several. A
+  list would go stale each time a consumer appears.
+- **The step infers a generated client from its `generated-client` tag.** A
+  tag is an exemption by tag, which decision 2 rejects. The `provider` member
+  names the project a reviewer and the step can check.
 
 ## Consequences
 
@@ -114,6 +145,9 @@ D-026, settled the same day, decides how the protocols answer:
   its full checkout to hold the trunk.
 - A `featureAuthority` now passes a gate, not a warning: a reviewer reads
   every new `none` reason and every new `owner`.
+- A library that declares `dependents: true` fails the day its last
+  dependent with a feature or a spec drops it. A generated client fails the
+  day its provider stops answering.
 - The `specs.missing_feature_link` warning stays. It applies the same rule to
   fewer projects.
 - A manifest or a spec that fails to parse covers nothing in this step. The
