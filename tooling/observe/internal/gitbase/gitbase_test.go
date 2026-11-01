@@ -1,7 +1,9 @@
 package gitbase
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,8 +32,13 @@ func run(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	// The fixture's own commits and fetches start no automatic maintenance
+	// either: a detached repack would still write in a temporary directory
+	// the test is removing.
 	cmd.Env = append(gitEnv(),
 		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_0=maintenance.auto", "GIT_CONFIG_VALUE_0=false",
+		"GIT_CONFIG_KEY_1=gc.auto", "GIT_CONFIG_VALUE_1=0",
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
 	out, err := cmd.CombinedOutput()
@@ -121,6 +128,50 @@ func codes(r Result) []string {
 	return out
 }
 
+// traceGit records, in a trace2 event file, the processes every git command
+// of the test starts, and returns the file.
+func traceGit(t *testing.T) string {
+	t.Helper()
+	trace := filepath.Join(t.TempDir(), "trace2.json")
+	t.Setenv("GIT_TRACE2_EVENT", trace)
+	return trace
+}
+
+// noMaintenance fails when a traced git command started automatic
+// maintenance, which goes on writing in the checkout after observe exits.
+func noMaintenance(t *testing.T, trace string) {
+	t.Helper()
+	file, err := os.Open(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64<<10), 1<<20)
+	fetches := 0
+	for scanner.Scan() {
+		var event struct {
+			Event string   `json:"event"`
+			Argv  []string `json:"argv"`
+		}
+		if json.Unmarshal(scanner.Bytes(), &event) != nil || len(event.Argv) < 2 {
+			continue
+		}
+		switch {
+		case event.Event == "start" && event.Argv[1] == "fetch":
+			fetches++
+		case event.Event == "child_start" && event.Argv[0] == "git" && (event.Argv[1] == "maintenance" || event.Argv[1] == "gc"):
+			t.Fatalf("a git command started %q", strings.Join(event.Argv, " "))
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if fetches == 0 {
+		t.Fatal("the trace records no fetch")
+	}
+}
+
 // state is what a run must leave as it was: the working tree, the index and
 // HEAD.
 func state(t *testing.T, dir string) string {
@@ -189,7 +240,9 @@ func TestAShallowCloneDeepensToTheMergeBase(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir := f.clone(t, 1)
 			before := state(t, dir)
+			trace := traceGit(t)
 			r := Resolve(context.Background(), Request{Dir: dir, Head: "HEAD", Base: base, Fetch: true})
+			noMaintenance(t, trace)
 			if len(r.Diagnostics) != 0 {
 				t.Fatalf("diagnostics %v", r.Diagnostics)
 			}
@@ -225,7 +278,9 @@ func TestAPullRequestMergeCommitIsMeasuredAsBuilt(t *testing.T) {
 	run(t, dir, "fetch", "--quiet", "--no-tags", "--depth=1", "origin", "+refs/pull/1/merge:refs/remotes/pull/1/merge")
 	run(t, dir, "checkout", "--quiet", "--detach", "refs/remotes/pull/1/merge")
 
+	trace := traceGit(t)
 	r := Resolve(context.Background(), Request{Dir: dir, Head: "HEAD", Base: &ci.Base{Ref: "main", SHA: f.mainTip, Source: ci.BaseFromPullRequest}, Fetch: true})
+	noMaintenance(t, trace)
 	if len(r.Diagnostics) != 0 {
 		t.Fatalf("diagnostics %v", r.Diagnostics)
 	}

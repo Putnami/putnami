@@ -67,8 +67,9 @@ it fetches to reach the merge base (objects, the `origin` branch of the base
 and the shallow boundary) and the file `--evidence` names. When the server
 refuses to deepen by commit id, the history is deepened through the remote's
 configured refspecs, which also updates their remote-tracking branches. The
-working tree, the index and `HEAD` stay as they were. `--no-fetch` turns the
-fetch off. Everything else is printed.
+working tree, the index and `HEAD` stay as they were. Its fetches start no
+automatic Git maintenance, so nothing repacks the history after it exits.
+`--no-fetch` turns the fetch off. Everything else is printed.
 
 The fetch and the deepening need Git 2.29 or later. With an older Git, each
 fails as a diagnostic.
