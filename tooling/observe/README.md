@@ -43,6 +43,8 @@ See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.
 See [doc/03-nx.md](doc/03-nx.md) for how it reads the projects of an Nx
 workspace.
+See [doc/04-node-workspaces.md](doc/04-node-workspaces.md) for how it reads the
+packages of an npm, pnpm or yarn workspace.
 
 ## Support
 
