@@ -64,3 +64,15 @@ cleanly, each invalid one gets exactly its listed codes. The tests pin the
 vocabularies, check that the schema, the Go types and the strict decoder
 declare the same members, and bind each requirement of
 `specs/change-evidence-document.json` to its proof.
+
+## Support status
+
+- **Owner**: `go.putnami.dev/protocol/evidence`.
+- **Status**: `experimental`, explicit opt-in and never part of the default
+  experience, recorded as
+  `{"id": "go.putnami.dev/protocol/evidence", "kind": "protocol", "status": "experimental", "default": false}`
+  in the workspace-root [`putnami.support.json`](../../putnami.support.json)
+  catalog (contract: [`protocols/support`](../support/README.md)). The wire
+  format and finding codes may change without a migration.
+- **Missing for `preview`**: an active consumer in this repository, such as
+  the observe extension writing the document.
