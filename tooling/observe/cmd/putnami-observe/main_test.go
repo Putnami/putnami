@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/evidence"
 	extension "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/observe/internal/observe"
@@ -157,7 +158,8 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 		"CI_JOB_ID":                           "2",
 	}
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"run", "--junit", "reports/*.xml", "--putnamiContext", jobContext(t, invocation, invocation, "json")},
+	evidencePath := filepath.Join(t.TempDir(), "evidence.json")
+	code := run([]string{"run", "--junit", "reports/*.xml", "--evidence", evidencePath, "--putnamiContext", jobContext(t, invocation, invocation, "json")},
 		func(k string) string { return env[k] }, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr.String())
@@ -188,6 +190,13 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	}
 	if !slices.Equal(codes, []string{"observe.report_missing"}) {
 		t.Fatalf("diagnostics %v: the coverage report is missing and nothing else", o.Diagnostics)
+	}
+	data, err := os.ReadFile(evidencePath)
+	if err != nil {
+		t.Fatalf("no evidence document: %v", err)
+	}
+	if doc, problems := evidence.ParseAndValidate(data); diag.HasErrors(problems) || doc.Subject.BaseSHA != o.Subject.BaseSHA || len(doc.ChangedFiles) != 2 {
+		t.Fatalf("evidence %s: %v", data, problems)
 	}
 	if after := git(t, repo, "status", "--porcelain=v2", "--ignored", "--branch", "--untracked-files=all"); after != before {
 		t.Fatalf("observe changed the caller's directory:\nbefore %s\nafter  %s", before, after)

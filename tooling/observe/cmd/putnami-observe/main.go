@@ -20,6 +20,7 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 
 	"go.putnami.dev/protocol/job"
@@ -45,7 +46,7 @@ const contextFlag = "--putnamiContext"
 var runtimeVersion string
 
 // knownFlags are the flags `putnami observe` takes.
-var knownFlags = []string{"base", "head", "junit", "coverage", "fetch"}
+var knownFlags = []string{"base", "head", "junit", "coverage", "fetch", "evidence"}
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	handled, err := runtimeinfo.Handle(args, stdout, extensionName, runtimeVersion)
@@ -61,7 +62,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		fmt.Fprintln(stderr, "putnami-observe: unknown invocation; this runtime answers the Putnami runtime handshake and `run`")
 		return 2
 	}
-	opts, jsonOutput, err := parseRun(args[1:], contextFile)
+	opts, evidencePath, jsonOutput, err := parseRun(args[1:], contextFile)
 	if err != nil {
 		fmt.Fprintf(stderr, "putnami observe: %v\n", err)
 		return 2
@@ -70,6 +71,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	o := observe.Run(ctx, opts)
+	if evidencePath != "" {
+		o.Diagnostics = append(o.Diagnostics, observe.WriteEvidence(evidencePath, o, time.Now())...)
+	}
 	write := observe.WriteText
 	if jsonOutput {
 		write = observe.WriteJSON
@@ -81,13 +85,15 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	return 0
 }
 
-// parseRun reads the flags of `run` and the job context.
-func parseRun(args []string, contextFile string) (observe.Options, bool, error) {
+// parseRun reads the flags of `run` and the job context, and returns the
+// options, the absolute evidence path ("" for none) and whether the output is
+// JSON.
+func parseRun(args []string, contextFile string) (observe.Options, string, bool, error) {
 	var launch *job.Context
 	if contextFile != "" {
 		parsed, err := job.ParseFile(contextFile)
 		if err != nil {
-			return observe.Options{}, false, fmt.Errorf("read the job context: %w", err)
+			return observe.Options{}, "", false, fmt.Errorf("read the job context: %w", err)
 		}
 		launch = parsed
 	}
@@ -97,11 +103,11 @@ func parseRun(args []string, contextFile string) (observe.Options, bool, error) 
 		}
 		name := flagName(arg)
 		if !slices.Contains(knownFlags, name) {
-			return observe.Options{}, false, fmt.Errorf("unknown flag %s", arg)
+			return observe.Options{}, "", false, fmt.Errorf("unknown flag %s", arg)
 		}
 	}
 	if positional := positionals(args); len(positional) > 0 {
-		return observe.Options{}, false, fmt.Errorf("takes no argument, got %q", positional[0])
+		return observe.Options{}, "", false, fmt.Errorf("takes no argument, got %q", positional[0])
 	}
 	flags := sdkcli.ParseFlags(args)
 	fetch := true
@@ -110,16 +116,16 @@ func parseRun(args []string, contextFile string) (observe.Options, bool, error) 
 	case value == "false":
 		fetch = false
 	default:
-		return observe.Options{}, false, fmt.Errorf("--fetch takes no value, got %q", value)
+		return observe.Options{}, "", false, fmt.Errorf("--fetch takes no value, got %q", value)
 	}
-	for _, name := range []string{"base", "head", "junit", "coverage"} {
+	for _, name := range []string{"base", "head", "junit", "coverage", "evidence"} {
 		if value, ok := flags[name]; ok && (value == "" || value == "true") {
-			return observe.Options{}, false, fmt.Errorf("--%s needs a value", name)
+			return observe.Options{}, "", false, fmt.Errorf("--%s needs a value", name)
 		}
 	}
 	dir, err := os.Getwd()
 	if err != nil {
-		return observe.Options{}, false, err
+		return observe.Options{}, "", false, err
 	}
 	opts := observe.Options{
 		Dir:      dir,
@@ -138,7 +144,11 @@ func parseRun(args []string, contextFile string) (observe.Options, bool, error) 
 			jsonOutput = true
 		}
 	}
-	return opts, jsonOutput, nil
+	evidencePath := ""
+	if flags["evidence"] != "" {
+		evidencePath = opts.Resolve(flags["evidence"])
+	}
+	return opts, evidencePath, jsonOutput, nil
 }
 
 // flagName returns the name of a flag token, without dashes, value or the

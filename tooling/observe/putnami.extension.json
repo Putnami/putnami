@@ -67,7 +67,7 @@
   },
   "commands": {
     "observe-run": {
-      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: only a usage error exits non-zero (2). It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off.",
+      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: only a usage error exits non-zero (2). It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names.",
       "flags": {
         "base": {
           "type": "string",
@@ -89,6 +89,10 @@
           "type": "boolean",
           "default": true,
           "description": "Fetch the base and deepen a shallow clone up to the merge base; --no-fetch reads only the local history."
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Write the change evidence document (protocol/evidence v1) to this path, resolved against the invocation directory."
         }
       },
       "run": [
@@ -121,6 +125,10 @@
             {
               "command": "putnami observe --junit 'reports/*.xml' --coverage coverage/lcov.info --output=json",
               "description": "Name the reports and print one JSON document."
+            },
+            {
+              "command": "putnami observe --evidence putnami-evidence.json",
+              "description": "Keep the change evidence document as a CI artifact."
             }
           ]
         }

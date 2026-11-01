@@ -4,6 +4,7 @@ go 1.25.7
 
 require (
 	go.putnami.dev/protocol/diagnostic v0.0.0
+	go.putnami.dev/protocol/evidence v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
@@ -25,6 +26,7 @@ replace (
 	go.putnami.dev/protocol/diagnostic => ../../protocols/diagnostic
 	go.putnami.dev/protocol/distribution => ../../protocols/distribution
 	go.putnami.dev/protocol/events => ../../protocols/events
+	go.putnami.dev/protocol/evidence => ../../protocols/evidence
 	go.putnami.dev/protocol/extension => ../../protocols/extension
 	go.putnami.dev/protocol/features => ../../protocols/features
 	go.putnami.dev/protocol/gomod => ../../protocols/gomod

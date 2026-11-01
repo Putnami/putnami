@@ -14,6 +14,7 @@ answer, so the workspace must declare `@putnami/observe` to run it there.
 | `--junit <paths>` | Comma-separated JUnit XML paths or glob patterns, resolved against the directory you run in. Replaces JUnit discovery. |
 | `--coverage <paths>` | The same for coverage reports. Replaces coverage discovery. |
 | `--no-fetch` | Read only the local history: fetch no base and deepen no shallow clone. |
+| `--evidence <path>` | Write the change evidence document to this path, resolved against the directory you run in. |
 
 A glob pattern takes `*`, `?`, `[...]` and `**`, which matches any number of
 directories.
@@ -57,9 +58,10 @@ the changed files are empty and a diagnostic says why:
 ## What it writes
 
 In the directory you run it in, `putnami observe` writes only the Git history
-it fetches to reach the merge base: objects, the `origin` branch of the base
-and the shallow boundary. The working tree, the index and `HEAD` stay as they
-were. `--no-fetch` turns the fetch off. Everything else is printed.
+it fetches to reach the merge base (objects, the `origin` branch of the base
+and the shallow boundary) and the file `--evidence` names. The working tree,
+the index and `HEAD` stay as they were. `--no-fetch` turns the fetch off.
+Everything else is printed.
 
 ## Reports
 
@@ -90,3 +92,20 @@ The summary names the CI, the repository, the commit, the base, the changed
 files (the first 50) and the reports, then each diagnostic. `--output=json`
 prints one document with `subject`, `ci`, `producer`, `base`,
 `deepenedCommits`, `changedFiles`, `reports` and `diagnostics`.
+
+## The evidence document
+
+`--evidence <path>` writes a
+[`protocol/evidence`](../../../protocols/evidence/README.md) v1 document: the
+subject, the CI run, the producer, the changed files and the diagnostics. Until
+a detector names the repository's components, the repository is one
+`fallback` component `.` of ecosystem `unknown`, `changed` when a file changed
+and `unaffected` otherwise. Tests and coverage per component are not written
+yet.
+
+The document is validated before it is written, and replaces the file in one
+rename. A document that does not validate, such as one without a commit or a
+GitHub or GitLab job without its numeric project id, is written nowhere and
+gets `observe.evidence_invalid`; a path that cannot be written gets
+`observe.evidence_unwritable`. Diagnostics past the document's 500 are
+summarized by `observe.too_many_diagnostics`.
