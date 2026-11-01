@@ -53,7 +53,8 @@
               "an-explicit-base-wins",
               "a-shallow-clone-deepens-to-the-merge-base",
               "an-unresolved-base-is-a-diagnostic",
-              "changed-files-are-measured-from-the-merge-base"
+              "changed-files-are-measured-from-the-merge-base",
+              "a-pull-request-merge-commit-is-measured-as-built"
             ]
           }
         },

@@ -23,15 +23,15 @@
     },
     {
       "id": "ci-detection",
-      "text": "GITHUB_ACTIONS=true selects GitHub Actions and GITLAB_CI=true selects GitLab CI; any other CI is generic. The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit, the branch and the pull or merge request number; the run names its id, job, attempt and page. A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
+      "text": "GITHUB_ACTIONS=true selects GitHub Actions and GITLAB_CI=true selects GitLab CI; any other CI is generic. The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit the job built and measured (the resolved head), the branch and the pull or merge request number; the run names its id, job, attempt and page. A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
     },
     {
       "id": "diff-base",
-      "text": "The base is --base, else the merge request diff base (CI_MERGE_REQUEST_DIFF_BASE_SHA), else the pull request target branch (GITHUB_BASE_REF) on origin, else the push's previous commit unless all zeros. A missing base is fetched; a shallow clone is deepened in bounded steps until the merge base of base and head is reachable. Changed files are the diff from that merge base to the head, renames detected. A base that cannot be resolved or reached is a diagnostic."
+      "text": "The base is --base, else the merge request diff base (CI_MERGE_REQUEST_DIFF_BASE_SHA), else the pull request base commit from the event payload or its target branch (GITHUB_BASE_REF) on origin, else the push's previous commit unless all zeros. A missing base is fetched; a shallow clone is deepened in bounded steps until the merge base of base and head is reachable. Changed files are the diff from that merge base to the head, renames detected. A base that cannot be resolved or reached is a diagnostic."
     },
     {
       "id": "report-discovery",
-      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each JUnit XML, LCOV, Cobertura, Clover or Go cover report it recognizes by content. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. Only a usage error exits non-zero (2)."
+      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each JUnit XML, LCOV, Cobertura, Clover or Go cover report it recognizes by content. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. observe exits 0 whatever it observes, 2 on a usage error, 1 when its job context or output fails."
     },
     {
       "id": "evidence-document",

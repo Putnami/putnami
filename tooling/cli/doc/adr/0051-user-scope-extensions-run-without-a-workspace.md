@@ -23,9 +23,9 @@ commands:
 1. `putnami extensions install --user --latest <@scope/name[@constraint]>`
 2. `putnami <command> [args]`, in the caller's directory
 
-That directory has no `putnami.workspace.json` and must stay exactly as it was.
-The extension needs somewhere to be pinned, and the command needs somewhere to
-run.
+That directory has no `putnami.workspace.json`, and the CLI must write nothing
+in it. The extension needs somewhere to be pinned, and the command needs
+somewhere to run.
 
 ## Decision
 
