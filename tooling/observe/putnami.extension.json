@@ -1,0 +1,150 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/observe",
+  "cliContract": 4,
+  "runtime": {
+    "executable": "compiled/putnami-observe",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "commands": {
+    "observe-run": {
+      "visibility": "internal",
+      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: it exits 0 whatever it observes, 2 on a usage error and 1 when it cannot read its job context or write its output. It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names.",
+      "flags": {
+        "base": {
+          "type": "string",
+          "description": "Commit or branch the change is measured against; overrides what the CI says. Required for a generic CI."
+        },
+        "head": {
+          "type": "string",
+          "description": "Commit that was built; default HEAD."
+        },
+        "junit": {
+          "type": "string",
+          "description": "Comma-separated JUnit XML report paths or glob patterns; replaces JUnit discovery."
+        },
+        "coverage": {
+          "type": "string",
+          "description": "Comma-separated coverage report paths or glob patterns (LCOV, Cobertura, Clover, Go cover profile); replaces coverage discovery."
+        },
+        "fetch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fetch the base and deepen a shallow clone up to the merge base; --no-fetch reads only the local history."
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Write the change evidence document (protocol/evidence v1) to this path, resolved against the invocation directory."
+        }
+      },
+      "run": [
+        {
+          "id": "observe",
+          "task": "observe-run"
+        }
+      ]
+    }
+  },
+  "commandGroups": {
+    "observe": {
+      "description": "Observe a change in a repository that keeps its own CI.",
+      "default": "run",
+      "subcommands": {
+        "run": {
+          "description": "Detect the CI, the diff base, the changed files and the reports of this job.",
+          "command": "observe-run",
+          "interactive": true,
+          "workspace": "optional",
+          "examples": [
+            {
+              "command": "putnami observe",
+              "description": "In a GitHub Actions or GitLab CI job, after the tests."
+            },
+            {
+              "command": "putnami observe --base origin/main",
+              "description": "In another CI, measured against main."
+            },
+            {
+              "command": "putnami observe --junit 'reports/*.xml' --coverage coverage/lcov.info --output=json",
+              "description": "Name the reports and print one JSON document."
+            },
+            {
+              "command": "putnami observe --evidence putnami-evidence.json",
+              "description": "Keep the change evidence document as a CI artifact."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "tasks": {
+    "observe-run": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "run"
+      ],
+      "cache": false,
+      "timeoutMs": 600000
+    }
+  }
+}

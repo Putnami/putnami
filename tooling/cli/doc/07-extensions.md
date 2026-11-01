@@ -1093,7 +1093,9 @@ are no projects to select.
 
 The job runs in the directory you invoked it from. Its scratch space, job
 context file, output directory and caches live under `~/.putnami/user/` or in
-the machine-wide caches, so the invoking directory is left untouched. The job
+the machine-wide caches, so the CLI writes nothing in the invoking directory.
+The extension command writes there only what its own flags or its documented
+defaults name ([ADR 0051](adr/0051-user-scope-extensions-run-without-a-workspace.md)). The job
 context carries `userScope.callerDir`, and the environment carries
 `PUTNAMI_CALLER_DIR`. Either tells the extension that no workspace exists; see
 [Process Setup](04-job-execution.md#process-setup).

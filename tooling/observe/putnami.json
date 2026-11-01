@@ -1,0 +1,37 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/observe",
+  "tags": [
+    "go",
+    "extension"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "publish": [
+    "archives"
+  ],
+  "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-observe",
+      "version-var": "main.runtimeVersion"
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    },
+    "test": {
+      "filePatterns": [
+        "putnami.extension.json"
+      ]
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
+    }
+  }
+}

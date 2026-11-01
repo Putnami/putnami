@@ -5,6 +5,9 @@
   and `claimPackageRoot` no longer hold. Only `putnami.workspace.json` marks a
   workspace root, so no package-manager root is left to claim. See requirement
   `workspace-root` of `cli/workspace-discovery-selection`.
+- **Amended**: 2026-11-01, decision 4 and the first invariant: the CLI writes
+  nothing in the caller's directory; an extension command writes there only
+  what its own flags or its documented defaults name.
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commands/extensions`,
   `internal/extension`, `internal/jobs`, `internal/launch`,
   `internal/commandmeta`), `@putnami/cli-model` (`jobs.ScheduledJob`),
@@ -20,9 +23,9 @@ commands:
 1. `putnami extensions install --user --latest <@scope/name[@constraint]>`
 2. `putnami <command> [args]`, in the caller's directory
 
-That directory has no `putnami.workspace.json` and must stay exactly as it was.
-The extension needs somewhere to be pinned, and the command needs somewhere to
-run.
+That directory has no `putnami.workspace.json`, and the CLI must write nothing
+in it. The extension needs somewhere to be pinned, and the command needs
+somewhere to run.
 
 ## Decision
 
@@ -124,6 +127,13 @@ workspace.
 `userScope` is run state (`ScheduledJob.UserScope`). Nothing derived from it
 reaches a cache key or a session record.
 
+The CLI writes nothing in the caller's directory. The extension command it
+runs there writes only what its own flags or its documented defaults name, and
+its documentation lists each such write: a file at a path the person passed,
+or a fetch into the repository's Git history that the command needs to read
+the change. Any other state lives in the job's scratch space or output
+directory.
+
 ### 5. Inside a workspace the user scope does not exist
 
 A workspace discovers only its own extensions. A workspace that pins version A
@@ -137,7 +147,9 @@ no command and loads no workspace extension.
 
 ## Enforceable invariants
 
-- A command run outside a workspace writes nothing in the caller's directory.
+- The CLI writes nothing in the caller's directory. An extension command run
+  outside a workspace writes there only what its flags or its documented
+  defaults name.
 - The user scope is never read inside a workspace, except for the credential
   provider of ADR 0055.
 - A user-scope pin passes the same archive verification as a workspace pin.

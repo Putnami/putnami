@@ -1,0 +1,49 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe",
+  "outcomes": [
+    "A team adds putnami observe at the end of its existing GitHub Actions or GitLab CI job, or of any other CI with two flags, and changes nothing else in its pipeline",
+    "The job names the repository by a key that survives a rename or a transfer: the code host, its hostname and its numeric project id",
+    "The change is measured against the commit its pull or merge request targets, found even when the CI cloned one commit deep",
+    "The job lists the test and coverage reports it can read, found by their content or named by the team, and says which ones it could not read without failing",
+    "The job can keep what it observed as a change evidence document, a CI artifact that a reporter uploads and that a third party can read"
+  ],
+  "nonGoals": [
+    "Running a build or tests, or asking the team to change how it builds or tests",
+    "Inferring components beyond the repository itself, mapping reports to components, changed-line coverage and dependency changes: the detectors, the readers and the change analyses own them",
+    "Uploading the change evidence document: the cloud reporter owns it",
+    "Reading another extension's workspace probe outside a workspace, which needs a host call the CLI does not offer yet",
+    "Running inside a Putnami workspace: there the workspace's own extensions answer"
+  ],
+  "requirements": [
+    {
+      "id": "runs-without-a-workspace",
+      "text": "@putnami/observe declares the observe command group whose default subcommand is interactive and workspace-optional, so a person who installed the extension in the user scope runs putnami observe in a directory that has no putnami.workspace.json. The manifest passes the extension protocol's strict validation."
+    },
+    {
+      "id": "ci-detection",
+      "text": "GITHUB_ACTIONS=true selects GitHub Actions and GITLAB_CI=true selects GitLab CI; any other CI is generic. The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit the job built and measured (the resolved head), the branch and the pull or merge request number; the run names its id, job, attempt and page. A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
+    },
+    {
+      "id": "diff-base",
+      "text": "The base is --base, else the merge request diff base (CI_MERGE_REQUEST_DIFF_BASE_SHA), else the pull request base commit from the event payload or its target branch (GITHUB_BASE_REF) on origin, else the push's previous commit unless all zeros. A missing base is fetched; a shallow clone is deepened in bounded steps until the merge base of base and head is reachable. Changed files are the diff from that merge base to the head, renames detected. A base that cannot be resolved or reached is a diagnostic."
+    },
+    {
+      "id": "report-discovery",
+      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each JUnit XML, LCOV, Cobertura, Clover or Go cover report it recognizes by content. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. observe exits 0 whatever it observes, 2 on a usage error, 1 when its job context or output fails."
+    },
+    {
+      "id": "evidence-document",
+      "text": "--evidence <path>, resolved against the invocation directory, writes a protocol/evidence v1 document: the subject, the CI run, the producer, the changed files and, until a detector names components, the repository as one fallback component, changed when a file changed. The document is validated before it is written; one that does not validate is written nowhere and is a diagnostic, as is a path that cannot be written."
+    },
+    {
+      "id": "caller-directory-writes",
+      "text": "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, which --no-fetch turns off, and the file --evidence names; the working tree, the index and HEAD stay as they were. Everything else it prints: a text summary, or one JSON document with --output=json."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
+  ]
+}

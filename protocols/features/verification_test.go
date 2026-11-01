@@ -203,6 +203,11 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		// commands in the verification block.
 		filepath.Join("tooling", "contributor", ManifestFilename): true,
 
+		// The observe extension names the acceptance checks of its CI
+		// detection, diff base, reports and evidence document in the
+		// verification block.
+		filepath.Join("tooling", "observe", ManifestFilename): true,
+
 		// The development verb vocabulary names the acceptance checks of its
 		// manifest and its runtime in the verification block.
 		filepath.Join("tooling", "dev", ManifestFilename): true,

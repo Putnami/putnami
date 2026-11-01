@@ -31,7 +31,9 @@ const userScopeWorkspaceName = "user"
 // caches live there or in the machine-global caches. The process itself runs
 // in the caller's directory, and its context carries that directory as
 // userScope.callerDir (mirrored in PUTNAMI_CALLER_DIR), which is how it knows
-// there is no workspace. Nothing is written to the caller's directory.
+// there is no workspace. The CLI writes nothing to the caller's directory;
+// the extension command writes there only what its flags or documented
+// defaults name.
 func (a *App) runUserScopeSubcommand(
 	ctx context.Context,
 	parsed *ParsedArgs,
