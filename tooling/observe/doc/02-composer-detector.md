@@ -29,8 +29,8 @@ A component depends on another when it requires that component's package, in
 
 The path repository's `url` is a directory or a glob pattern, relative to the
 manifest that declares it. A package that a registry provides is not a
-component, so requiring it creates no dependency. A path outside the
-repository creates none either.
+component, so requiring it creates no dependency. An absolute url, or a path
+outside the repository, creates none either.
 
 ## Areas
 
@@ -54,11 +54,11 @@ Each component also carries:
 - its source roots and its test roots: the `autoload-dev` roots that are not
   also autoloaded, and the test suite directories of its PHPUnit
   configuration;
-- its PHPUnit configuration (`phpunit.xml`, `phpunit.xml.dist` or
-  `phpunit.dist.xml`) and the JUnit, Clover and Cobertura output files it
-  names. A CI that passes `--log-junit` or `--coverage-clover` on the command
-  line leaves them empty; report discovery still finds those reports by their
-  content.
+- its PHPUnit configuration, the first of `phpunit.xml`, `phpunit.dist.xml`
+  and `phpunit.xml.dist`, as PHPUnit looks them up, and the JUnit, Clover and
+  Cobertura output files it names. A CI that passes `--log-junit` or
+  `--coverage-clover` on the command line leaves them empty; report discovery
+  still finds those reports by their content.
 
 A `composer.json` or a PHPUnit configuration that does not parse is a
 diagnostic. The detector skips it and continues.

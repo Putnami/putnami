@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
-	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
@@ -126,9 +125,6 @@ func TestTheAnswerIsAValidProbeResult(t *testing.T) {
 	if strings.Contains(answer.String(), root) {
 		t.Fatalf("the answer carries the absolute root: %s", answer.Bytes())
 	}
-	if problems := extproto.ValidateWorkspaceAdapter(&extproto.Manifest{Workspace: &Adapter}); diag.HasErrors(problems) {
-		t.Fatalf("the adapter does not validate: %v", problems)
-	}
 }
 
 func TestARequiredPathRepositoryPackageIsAnEdge(t *testing.T) {
@@ -169,6 +165,24 @@ func TestARequiredPathRepositoryPackageIsAnEdge(t *testing.T) {
 	}
 	if got := projects["libs/billing"].Dependencies; !reflect.DeepEqual(got, []string{"libs/money"}) {
 		t.Fatalf("billing depends on %v", got)
+	}
+
+	// A checkout directory with glob characters in its name keeps the edge.
+	checkout := filepath.Join(t.TempDir(), "repo[1]")
+	for name, content := range map[string]string{
+		"composer.json":            `{"type": "project", "require": {"acme/a": "*"}, "repositories": [{"type": "path", "url": "packages/*"}]}`,
+		"packages/a/composer.json": `{"name": "acme/a"}`,
+	} {
+		file := filepath.Join(checkout, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := byPath(t, Detect(checkout))["."].Dependencies; !reflect.DeepEqual(got, []string{"packages/a"}) {
+		t.Fatalf("in %s the application depends on %v", checkout, got)
 	}
 }
 
@@ -298,9 +312,10 @@ func TestTheLockfileAndReportOutputsAreExposed(t *testing.T) {
 			<logging><junit outputFile="build/junit.xml"/></logging>
 			<coverage><report><clover outputFile="build/clover.xml"/><cobertura outputFile="../escape.xml"/></report></coverage>
 		</phpunit>`,
-		"phpunit.dist.xml":     `not read: phpunit.xml comes first`,
-		"legacy/composer.json": `{"name": "acme/legacy"}`,
-		"legacy/phpunit.xml.dist": `<phpunit><logging>
+		"phpunit.dist.xml":        `not read: phpunit.xml comes first`,
+		"legacy/composer.json":    `{"name": "acme/legacy"}`,
+		"legacy/phpunit.xml.dist": `not read: PHPUnit looks up phpunit.dist.xml first`,
+		"legacy/phpunit.dist.xml": `<phpunit><logging>
 			<log type="junit" target="var/junit.xml"/>
 			<log type="coverage-clover" target="var/clover.xml"/>
 			<log type="coverage-cobertura" target="var/cobertura.xml"/>
@@ -316,7 +331,7 @@ func TestTheLockfileAndReportOutputsAreExposed(t *testing.T) {
 		t.Fatalf("application tests %v", app.Tests)
 	}
 	legacy := metadata(t, projects["legacy"])
-	if want := (&PHPUnit{Config: "legacy/phpunit.xml.dist", JUnit: "legacy/var/junit.xml", Clover: "legacy/var/clover.xml", Cobertura: "legacy/var/cobertura.xml"}); !reflect.DeepEqual(legacy.PHPUnit, want) {
+	if want := (&PHPUnit{Config: "legacy/phpunit.dist.xml", JUnit: "legacy/var/junit.xml", Clover: "legacy/var/clover.xml", Cobertura: "legacy/var/cobertura.xml"}); !reflect.DeepEqual(legacy.PHPUnit, want) {
 		t.Fatalf("legacy PHPUnit %+v", legacy.PHPUnit)
 	}
 }

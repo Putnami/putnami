@@ -5,7 +5,7 @@
 // It answers over the workspace probe wire (go.putnami.dev/protocol/workspace):
 // Probe has the shape of a probe answer, and its result passes the probe
 // protocol's strict validation, so the detector can move to its own extension
-// once the CLI can run a probe outside a workspace (Putnami/putnami#742).
+// once the CLI can run a probe outside a workspace.
 // Outside a workspace no core lists the candidate directories, so Candidates
 // walks the repository for them.
 //
@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
-	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -61,20 +60,12 @@ const (
 // MaxWalkedEntries bounds the directory entries Candidates visits.
 const MaxWalkedEntries = 200000
 
-// phpunitConfigs are the PHPUnit configuration names, in PHPUnit's own order
-// of preference.
-var phpunitConfigs = []string{"phpunit.xml", "phpunit.xml.dist", "phpunit.dist.xml"}
+// phpunitConfigs are the PHPUnit configuration names, in the order PHPUnit
+// looks them up.
+var phpunitConfigs = []string{"phpunit.xml", "phpunit.dist.xml", "phpunit.xml.dist"}
 
 // skippedDirs are never walked: dependencies installed by package managers.
 var skippedDirs = map[string]bool{"vendor": true, "node_modules": true}
-
-// Adapter is the workspace adapter the detector declares once it is its own
-// extension: the marker, and the inputs whose content decides its answer.
-var Adapter = extproto.WorkspaceAdapter{
-	Markers:  []string{Marker},
-	Inputs:   append([]string{Marker, Lockfile}, phpunitConfigs...),
-	Excludes: []string{"vendor", "node_modules"},
-}
 
 // Metadata is what the detector knows about one component beyond the probe
 // project's own members. Every path is repository-relative and
@@ -305,20 +296,18 @@ func pathPackages(root string, components []*component, byDir map[string]*compon
 	provided := map[string]string{}
 	for _, c := range components {
 		for _, url := range pathRepositoryURLs(c.manifest.Repositories) {
-			pattern := url
-			if !filepath.IsAbs(pattern) {
-				pattern = filepath.Join(abs(root, c.dir), filepath.FromSlash(url))
+			// The pattern is globbed relative to the repository, so the
+			// directory the repository is checked out in never matters.
+			pattern, ok := under(c.dir, url)
+			if !ok {
+				continue
 			}
-			matches, err := filepath.Glob(pattern)
+			matches, err := fs.Glob(os.DirFS(root), pattern)
 			if err != nil {
 				continue
 			}
 			for _, match := range matches {
-				rel, err := filepath.Rel(root, match)
-				if err != nil {
-					continue
-				}
-				dir, ok := wsproto.NormalizeProbePath(filepath.ToSlash(rel))
+				dir, ok := wsproto.NormalizeProbePath(match)
 				if !ok {
 					continue
 				}
