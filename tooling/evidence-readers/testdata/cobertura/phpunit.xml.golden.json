@@ -1,0 +1,44 @@
+{
+  "sources": [
+    "/app/src"
+  ],
+  "files": [
+    {
+      "path": "Calc.php",
+      "lines": [
+        {
+          "number": 11,
+          "hits": 3
+        },
+        {
+          "number": 16,
+          "hits": 1
+        },
+        {
+          "number": 17,
+          "hits": 1
+        },
+        {
+          "number": 19,
+          "hits": 0
+        },
+        {
+          "number": 25,
+          "hits": 0
+        },
+        {
+          "number": 26,
+          "hits": 0
+        }
+      ],
+      "lineCounts": {
+        "total": 6,
+        "covered": 3
+      },
+      "functions": {
+        "total": 3,
+        "covered": 2
+      }
+    }
+  ]
+}

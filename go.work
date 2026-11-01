@@ -104,6 +104,7 @@ use (
 	./tooling/clientgen-extension
 	./tooling/contributor
 	./tooling/dev
+	./tooling/evidence-readers
 	./tooling/extension-sdk
 	./tooling/github-collaboration
 	./tooling/install-scripts

@@ -1,0 +1,5 @@
+<testsuites>
+  <testsuite name="a">
+    <testcase name="b" line="-3"/>
+  </testsuite>
+</testsuites>

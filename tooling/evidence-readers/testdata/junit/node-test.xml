@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="add sums two numbers" time="0.005209" classname="test" file="/app/test/calc.test.js"/>
+	<testsuite name="sign" time="0.001475" disabled="0" errors="0" tests="1" failures="0" skipped="0" timestamp="2026-11-01T17:50:09.347Z" hostname="ci-runner">
+		<testsuite name="non-negative input" time="0.000423" disabled="0" errors="0" tests="1" failures="0" skipped="0" timestamp="2026-11-01T17:50:09.347Z" hostname="ci-runner">
+			<testcase name="returns positive" time="0.000227" classname="sign.non-negative input" file="/app/test/calc.test.js"/>
+		</testsuite>
+	</testsuite>
+	<testcase name="add is wrong on purpose" time="0.000913" classname="test" file="/app/test/calc.test.js" failure="two plus two should be five&#10;&#10;4 !== 5&#10;">
+		<failure type="testCodeFailure" message="two plus two should be five&#10;&#10;4 !== 5">
+[Error [ERR_TEST_FAILURE]: two plus two should be five
+
+4 !== 5
+] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: two plus two should be five
+  
+  4 !== 5
+  
+      at TestContext.&lt;anonymous> (/app/test/calc.test.js:18:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Suite.postRun (node:internal/test_runner/test:1542:19)
+      at Suite.run (node:internal/test_runner/test:1921:10)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+}
+		</failure>
+	</testcase>
+	<testcase name="skipped test" time="0.000091" classname="test" file="/app/test/calc.test.js">
+		<skipped type="skipped" message="not ready"/>
+	</testcase>
+	<!-- tests 4 -->
+	<!-- suites 2 -->
+	<!-- pass 2 -->
+	<!-- fail 1 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 1 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 164.394417 -->
+</testsuites>

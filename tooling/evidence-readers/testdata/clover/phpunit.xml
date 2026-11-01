@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1793554460">
+  <project timestamp="1793554460" name="Clover Coverage">
+    <package name="App">
+      <file name="/app/src/Calc.php">
+        <class name="App\Calc" namespace="App">
+          <metrics complexity="4" methods="3" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="6" coveredstatements="3" elements="9" coveredelements="4"/>
+        </class>
+        <line num="9" type="method" name="add" visibility="public" complexity="1" crap="1" count="3"/>
+        <line num="11" type="stmt" count="3"/>
+        <line num="14" type="method" name="sign" visibility="public" complexity="2" crap="2.15" count="1"/>
+        <line num="16" type="stmt" count="1"/>
+        <line num="17" type="stmt" count="1"/>
+        <line num="19" type="stmt" count="0"/>
+        <line num="23" type="method" name="neverCalled" visibility="public" complexity="1" crap="2" count="0"/>
+        <line num="25" type="stmt" count="0"/>
+        <line num="26" type="stmt" count="0"/>
+        <metrics loc="29" ncloc="29" classes="1" methods="3" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="6" coveredstatements="3" elements="9" coveredelements="4"/>
+      </file>
+    </package>
+    <metrics files="1" loc="29" ncloc="29" classes="1" methods="3" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="6" coveredstatements="3" elements="9" coveredelements="4"/>
+  </project>
+</coverage>

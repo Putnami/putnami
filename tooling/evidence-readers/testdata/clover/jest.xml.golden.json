@@ -1,0 +1,45 @@
+{
+  "files": [
+    {
+      "path": "/app/src/calc.js",
+      "lines": [
+        {
+          "number": 2,
+          "hits": 2
+        },
+        {
+          "number": 6,
+          "hits": 1
+        },
+        {
+          "number": 7,
+          "hits": 1
+        },
+        {
+          "number": 9,
+          "hits": 0
+        },
+        {
+          "number": 14,
+          "hits": 0
+        },
+        {
+          "number": 15,
+          "hits": 0
+        },
+        {
+          "number": 18,
+          "hits": 1
+        }
+      ],
+      "lineCounts": {
+        "total": 7,
+        "covered": 4
+      },
+      "functions": {
+        "total": 3,
+        "covered": 2
+      }
+    }
+  ]
+}

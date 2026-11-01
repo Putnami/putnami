@@ -1,0 +1,56 @@
+{
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0
+  },
+  "cases": [
+    {
+      "name": "add sums two numbers",
+      "classname": "test",
+      "file": "/app/test/calc.test.js",
+      "status": "passed",
+      "durationMs": 5
+    },
+    {
+      "name": "returns positive",
+      "classname": "sign.non-negative input",
+      "suites": [
+        {
+          "name": "sign"
+        },
+        {
+          "name": "non-negative input"
+        }
+      ],
+      "file": "/app/test/calc.test.js",
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "add is wrong on purpose",
+      "classname": "test",
+      "file": "/app/test/calc.test.js",
+      "status": "failed",
+      "durationMs": 1,
+      "failure": {
+        "type": "testCodeFailure",
+        "message": "two plus two should be five\n\n4 !== 5",
+        "body": "\n[Error [ERR_TEST_FAILURE]: two plus two should be five\n\n4 !== 5\n] {\n  code: 'ERR_TEST_FAILURE',\n  failureType: 'testCodeFailure',\n  cause: AssertionError [ERR_ASSERTION]: two plus two should be five\n  \n  4 !== 5\n  \n      at TestContext.\u003canonymous\u003e (/app/test/calc.test.js:18:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Suite.postRun (node:internal/test_runner/test:1542:19)\n      at Suite.run (node:internal/test_runner/test:1921:10)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n}\n\t\t"
+      }
+    },
+    {
+      "name": "skipped test",
+      "classname": "test",
+      "file": "/app/test/calc.test.js",
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {
+        "message": "not ready"
+      }
+    }
+  ]
+}

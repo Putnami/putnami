@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="4" failures="1" errors="0" time="0.008202">
+    <testsuite name="src/calc.test.js" timestamp="2026-11-01T17:50:10.753Z" hostname="ci-runner" tests="4" failures="1" errors="0" skipped="1" time="0.008202">
+        <testcase classname="src/calc.test.js" name="add sums two numbers" time="0.001503667">
+        </testcase>
+        <testcase classname="src/calc.test.js" name="sign &gt; non-negative input &gt; returns positive" time="0.00015725">
+        </testcase>
+        <testcase classname="src/calc.test.js" name="add is wrong on purpose" time="0.005288917">
+            <failure message="two plus two should be five: expected 4 to be 5 // Object.is equality" type="AssertionError">
+AssertionError: two plus two should be five: expected 4 to be 5 // Object.is equality
+
+- Expected
++ Received
+
+- 5
++ 4
+
+ ❯ src/calc.test.js:17:52
+            </failure>
+        </testcase>
+        <testcase classname="src/calc.test.js" name="skipped test" time="0">
+            <skipped/>
+        </testcase>
+    </testsuite>
+</testsuites>

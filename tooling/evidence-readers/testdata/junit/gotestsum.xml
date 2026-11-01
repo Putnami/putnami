@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="6" failures="1" errors="0" time="0.657984">
+	<testsuite tests="5" failures="1" skipped="1" time="0.362000" name="example.com/calc" timestamp="2026-11-01T18:34:53+01:00">
+		<properties>
+			<property name="go.version" value="go1.26.1 darwin/arm64"></property>
+		</properties>
+		<testcase classname="example.com/calc" name="TestAddWrongOnPurpose" time="0.000000">
+			<failure message="Failed" type="">=== RUN   TestAddWrongOnPurpose&#xA;    calc_test.go:21: two plus two should be five: Add(2, 2) = 4, want 5&#xA;--- FAIL: TestAddWrongOnPurpose (0.00s)&#xA;</failure>
+		</testcase>
+		<testcase classname="example.com/calc" name="TestSkipped" time="0.000000">
+			<skipped message="=== RUN   TestSkipped&#xA;    calc_test.go:26: not ready&#xA;--- SKIP: TestSkipped (0.00s)&#xA;"></skipped>
+		</testcase>
+		<testcase classname="example.com/calc" name="TestAdd" time="0.000000"></testcase>
+		<testcase classname="example.com/calc" name="TestSign/non-negative_input" time="0.000000"></testcase>
+		<testcase classname="example.com/calc" name="TestSign" time="0.000000"></testcase>
+	</testsuite>
+	<testsuite tests="1" failures="0" time="0.658000" name="example.com/calc/internal/fmtx" timestamp="2026-11-01T18:34:53+01:00">
+		<properties>
+			<property name="go.version" value="go1.26.1 darwin/arm64"></property>
+		</properties>
+		<testcase classname="example.com/calc/internal/fmtx" name="TestLabel" time="0.000000"></testcase>
+	</testsuite>
+</testsuites>

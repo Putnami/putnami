@@ -1,0 +1,89 @@
+{
+  "files": [
+    {
+      "path": "src/calc.js",
+      "lines": [
+        {
+          "number": 1,
+          "hits": 2
+        },
+        {
+          "number": 2,
+          "hits": 2
+        },
+        {
+          "number": 3,
+          "hits": 2
+        },
+        {
+          "number": 4,
+          "hits": 1
+        },
+        {
+          "number": 5,
+          "hits": 1
+        },
+        {
+          "number": 6,
+          "hits": 1
+        },
+        {
+          "number": 7,
+          "hits": 1
+        },
+        {
+          "number": 8,
+          "hits": 1
+        },
+        {
+          "number": 9,
+          "hits": 0
+        },
+        {
+          "number": 10,
+          "hits": 0
+        },
+        {
+          "number": 11,
+          "hits": 1
+        },
+        {
+          "number": 12,
+          "hits": 1
+        },
+        {
+          "number": 13,
+          "hits": 0
+        },
+        {
+          "number": 14,
+          "hits": 0
+        },
+        {
+          "number": 15,
+          "hits": 0
+        },
+        {
+          "number": 16,
+          "hits": 0
+        },
+        {
+          "number": 17,
+          "hits": 1
+        },
+        {
+          "number": 18,
+          "hits": 1
+        }
+      ],
+      "lineCounts": {
+        "total": 18,
+        "covered": 12
+      },
+      "functions": {
+        "total": 3,
+        "covered": 2
+      }
+    }
+  ]
+}
