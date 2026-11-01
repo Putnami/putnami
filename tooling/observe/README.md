@@ -45,6 +45,8 @@ See [doc/03-nx.md](doc/03-nx.md) for how it reads the projects of an Nx
 workspace.
 See [doc/04-node-workspaces.md](doc/04-node-workspaces.md) for how it reads the
 packages of an npm, pnpm or yarn workspace.
+See [doc/05-go-modules.md](doc/05-go-modules.md) for how it reads the modules,
+edges and dependency versions of a Go repository.
 
 ## Support
 
