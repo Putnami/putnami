@@ -5,6 +5,7 @@
     "tooling/observe#caller-directory-writes",
     "tooling/observe#ci-detection",
     "tooling/observe#diff-base",
+    "tooling/observe#evidence-document",
     "tooling/observe#report-discovery",
     "tooling/observe#runs-without-a-workspace"
   ]

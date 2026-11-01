@@ -6,12 +6,13 @@
     "A team adds putnami observe at the end of its existing GitHub Actions or GitLab CI job, or of any other CI with two flags, and changes nothing else in its pipeline",
     "The job names the repository by a key that survives a rename or a transfer: the code host, its hostname and its numeric project id",
     "The change is measured against the commit its pull or merge request targets, found even when the CI cloned one commit deep",
-    "The job lists the test and coverage reports it can read, found by their content or named by the team, and says which ones it could not read without failing"
+    "The job lists the test and coverage reports it can read, found by their content or named by the team, and says which ones it could not read without failing",
+    "The job can keep what it observed as a change evidence document, a CI artifact that a reporter uploads and that a third party can read"
   ],
   "nonGoals": [
     "Running a build or tests, or asking the team to change how it builds or tests",
-    "Inferring components, mapping reports to components, changed-line coverage and dependency changes: the detectors and the change analyses own them",
-    "Writing the change evidence document and uploading it: they follow the evidence protocol and the cloud reporter",
+    "Inferring components beyond the repository itself, mapping reports to components, changed-line coverage and dependency changes: the detectors, the readers and the change analyses own them",
+    "Uploading the change evidence document: the cloud reporter owns it",
     "Reading another extension's workspace probe outside a workspace, which needs a host call the CLI does not offer yet",
     "Running inside a Putnami workspace: there the workspace's own extensions answer"
   ],
@@ -33,11 +34,16 @@
       "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each JUnit XML, LCOV, Cobertura, Clover or Go cover report it recognizes by content. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. Only a usage error exits non-zero (2)."
     },
     {
+      "id": "evidence-document",
+      "text": "--evidence <path>, resolved against the invocation directory, writes a protocol/evidence v1 document: the subject, the CI run, the producer, the changed files and, until a detector names components, the repository as one fallback component, changed when a file changed. The document is validated before it is written; one that does not validate is written nowhere and is a diagnostic, as is a path that cannot be written."
+    },
+    {
       "id": "caller-directory-writes",
-      "text": "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, and --no-fetch turns that off; the working tree, the index and HEAD stay as they were. Everything else it prints: a text summary, or one JSON document with --output=json."
+      "text": "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, which --no-fetch turns off, and the file --evidence names; the working tree, the index and HEAD stay as they were. Everything else it prints: a text summary, or one JSON document with --output=json."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md"
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md",
+    "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md"
   ]
 }

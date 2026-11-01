@@ -7,14 +7,16 @@
       "id": "tooling/observe",
       "type": "feature",
       "name": "Observe a change in a repository that keeps its own CI",
-      "outcome": "A CI job in a repository without a Putnami workspace runs putnami observe after its own build and tests, and learns which CI and repository it runs in, which commit the change is measured against even on a shallow clone, which files changed, and which test and coverage reports it can read, without changing its pipeline and without failing on a missing report",
+      "outcome": "A CI job in a repository without a Putnami workspace runs putnami observe after its own build and tests, and learns which CI and repository it runs in, which commit the change is measured against even on a shallow clone, which files changed, and which test and coverage reports it can read, without changing its pipeline and without failing on a missing report, and can keep it as a change evidence document",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
         {
           "id": "runs-without-a-workspace",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -26,7 +28,9 @@
         {
           "id": "ci-detection",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -40,7 +44,9 @@
         {
           "id": "diff-base",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -54,7 +60,9 @@
         {
           "id": "report-discovery",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -65,9 +73,25 @@
           }
         },
         {
+          "id": "evidence-document",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-evidence-document-validates",
+              "an-invalid-evidence-document-is-not-written"
+            ]
+          }
+        },
+        {
           "id": "caller-directory-writes",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
