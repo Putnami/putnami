@@ -1,0 +1,116 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "evidence",
+  "features": [
+    {
+      "id": "evidence/change-evidence-document",
+      "type": "feature",
+      "name": "Change evidence document",
+      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage and its dependency changes, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "version-1-and-closed-vocabularies",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-protocol-version-is-1", "the-vocabularies-are-closed", "every-code-starts-with-evidence"]
+          }
+        },
+        {
+          "id": "one-member-set",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-schema-declares-the-go-members", "the-strict-walk-declares-the-go-members", "the-schema-enums-are-the-go-vocabularies"]
+          }
+        },
+        {
+          "id": "one-fixture-corpus",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-corpus-is-what-expectations-lists", "every-fixture-gets-its-listed-codes"]
+          }
+        },
+        {
+          "id": "parsing-is-strict",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["non-documents-are-parse-errors", "an-undeclared-member-is-an-unknown-field"]
+          }
+        },
+        {
+          "id": "the-subject-names-the-change",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-subject-defect-gets-its-code"]
+          }
+        },
+        {
+          "id": "paths-stay-in-the-repository",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-path-defect-is-an-invalid-path"]
+          }
+        },
+        {
+          "id": "references-resolve",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["duplicates-are-refused", "every-reference-names-a-component"]
+          }
+        },
+        {
+          "id": "impact-is-consistent",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-impact-follows-the-files-and-the-edges"]
+          }
+        },
+        {
+          "id": "counts-add-up",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-count-defect-is-an-invalid-count"]
+          }
+        },
+        {
+          "id": "dependency-changes-are-well-formed",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-change-kind-has-its-versions"]
+          }
+        },
+        {
+          "id": "the-document-is-bounded",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-bound-is-enforced", "timestamps-and-diagnostics-are-checked"]
+          }
+        }
+      ]
+    }
+  ]
+}
