@@ -25,7 +25,7 @@
     },
     {
       "id": "go-report-paths",
-      "text": "An import path, as a go test -json event, a gotestsum or go-junit-report suite name and a go test -coverprofile file name write it, maps to the path below the component whose module path is its longest prefix on a slash boundary, and to that component. An import path no component's module path prefixes, or with an empty, . or .. element, maps to nothing."
+      "text": "An import path, as a go test -json event, a gotestsum or go-junit-report suite name and a go test -coverprofile file name write it, maps to the path below the component whose module path is its longest prefix on a slash boundary, and to that component; the root module's own path maps to the root component and no file. An import path no component's module path prefixes, or with an empty, . or .. element, maps to nothing."
     },
     {
       "id": "go-locked-versions",

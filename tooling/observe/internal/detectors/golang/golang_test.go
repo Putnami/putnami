@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -354,7 +355,7 @@ func TestAnImportPathNamesItsFileAndModule(t *testing.T) {
 		{"github.com/Putnami/demo-observe-go/api/internal/quote", "api/internal/quote", "api"},
 		{"github.com/Putnami/demo-observe-go/pricing/rates/rates.go", "pricing/rates/rates.go", "pricing/rates"},
 		{"github.com/Putnami/demo-observe-go/cmd/tool/main.go", "cmd/tool/main.go", "."},
-		{"github.com/Putnami/demo-observe-go", ".", "."},
+		{"github.com/Putnami/demo-observe-go", "", "."},
 	}
 	for _, c := range cases {
 		file, component, ok := d.Locate(c.in)
@@ -586,5 +587,22 @@ func TestAnUnreadableDirectoryIsADiagnostic(t *testing.T) {
 	}
 	if len(d.Modules) != 2 {
 		t.Fatalf("modules %+v", d.Modules)
+	}
+}
+
+func TestADetectionDecodedFromJSONLocates(t *testing.T) {
+	spectest.Proves(t, feature, "go-report-paths", "an-import-path-names-its-file-and-module")
+	data, err := json.Marshal(Detect(tree(t, with(demo, map[string]string{
+		"copy/go.mod": "module github.com/Putnami/demo-observe-go/pricing\n",
+	}))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded Detection
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if file, component, ok := decoded.Locate("github.com/Putnami/demo-observe-go/pricing/format.go"); !ok || file != "pricing/format.go" || component != "pricing" {
+		t.Fatalf("Locate = %q %q %v", file, component, ok)
 	}
 }

@@ -219,20 +219,10 @@ func parseGoMod(name string, data []byte) (*modfile.File, error) {
 // link computes each module's edges from its requires and replaces and the
 // root go.work's replaces.
 func (d *Detection) link() {
-	byPath := map[string]string{}
-	source := map[string]string{}
+	byPath := names(d.Modules)
 	byDir := map[string]bool{}
-	// A go.work member names its module path, as the go command builds it;
-	// among directories of one source, the first in path order does.
 	for _, m := range d.Modules {
 		byDir[m.Dir] = true
-		source[m.Dir] = m.Source
-		if m.Path == "" {
-			continue
-		}
-		if kept, seen := byPath[m.Path]; !seen || (m.Source == evidence.SourceWorkspace && source[kept] != evidence.SourceWorkspace) {
-			byPath[m.Path] = m.Dir
-		}
 	}
 	for _, m := range d.Modules {
 		if m.Path != "" && byPath[m.Path] != m.Dir {
@@ -277,6 +267,24 @@ func (d *Detection) link() {
 		}
 		sort.Strings(m.DependsOn)
 	}
+}
+
+// names returns the component directory each module path names. A go.work
+// member names its module path, as the go command builds it; among
+// directories of one source, the first in path order does.
+func names(modules []Module) map[string]string {
+	byPath := map[string]string{}
+	source := map[string]string{}
+	for _, m := range modules {
+		source[m.Dir] = m.Source
+		if m.Path == "" {
+			continue
+		}
+		if kept, seen := byPath[m.Path]; !seen || (m.Source == evidence.SourceWorkspace && source[kept] != evidence.SourceWorkspace) {
+			byPath[m.Path] = m.Dir
+		}
+	}
+	return byPath
 }
 
 // replacement is where a replace directive sends a module: a component
@@ -376,7 +384,8 @@ func depth(dir string) int {
 
 // Locate maps an import path, or an import path followed by a file name as a
 // cover profile writes it, to its repository-relative path and the component
-// whose module path is its longest prefix on a slash boundary. A path with an
+// whose module path is its longest prefix on a slash boundary. The root
+// module's own path maps to the root component and no file. A path with an
 // empty, . or .. element maps to nothing.
 func (d Detection) Locate(importPath string) (file, component string, ok bool) {
 	for _, element := range strings.Split(importPath, "/") {
@@ -384,9 +393,13 @@ func (d Detection) Locate(importPath string) (file, component string, ok bool) {
 			return "", "", false
 		}
 	}
+	byPath := d.byPath
+	if byPath == nil {
+		byPath = names(d.Modules)
+	}
 	best := -1
 	for i, m := range d.Modules {
-		if m.Path == "" || d.byPath[m.Path] != m.Dir {
+		if m.Path == "" || byPath[m.Path] != m.Dir {
 			continue
 		}
 		if importPath != m.Path && !strings.HasPrefix(importPath, m.Path+"/") {
@@ -402,6 +415,9 @@ func (d Detection) Locate(importPath string) (file, component string, ok bool) {
 	m := d.Modules[best]
 	rest := strings.TrimPrefix(strings.TrimPrefix(importPath, m.Path), "/")
 	if rest == "" {
+		if m.Dir == "." {
+			return "", m.Dir, true
+		}
 		return m.Dir, m.Dir, true
 	}
 	return join(m.Dir, rest), m.Dir, true

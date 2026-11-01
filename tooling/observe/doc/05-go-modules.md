@@ -50,7 +50,8 @@ The detector maps an import path to the repository path below the module
 whose path is its longest prefix, and to that module. For example, in
 [Putnami/demo-observe-go](https://github.com/Putnami/demo-observe-go),
 `github.com/Putnami/demo-observe-go/pricing/format.go` maps to
-`pricing/format.go` in the `pricing` module.
+`pricing/format.go` in the `pricing` module. The root module's own path
+maps to the root module and no file.
 
 ## Dependency versions
 
