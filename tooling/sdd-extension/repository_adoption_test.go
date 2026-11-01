@@ -69,8 +69,9 @@ var declaredDomains = []string{
 // excluded the same way: no repository project links it from the workspace,
 // and no existing domain owns the hosted platform's wire contracts. The Cloud
 // CLI extension and its generated service clients follow the same rule. The
-// development verb vocabulary is a new project, and a new project starts
-// excluded until a review names the domain that owns its authority.
+// development verb vocabulary and the evidence report readers are new projects,
+// and a new project starts excluded until a review names the domain that owns
+// its authority.
 var excludedProjects = map[string]string{
 	"/cloud/extension":                                     reasonCloudCLIExtension,
 	"/cloud/clients/auth-server":                           reasonCloudCLIClient,
@@ -110,6 +111,7 @@ var excludedProjects = map[string]string{
 	"/python/templates/python-library":                     reasonTemplate,
 	"/python/templates/python-server":                      reasonTemplate,
 	"/tooling/dev":                                         reasonDevelopmentVocabulary,
+	"/tooling/evidence-readers":                            reasonEvidenceReaders,
 	"/typescript/samples/01-hello-world":                   reasonSample,
 	"/typescript/samples/02-rest-api":                      reasonSample,
 	"/typescript/samples/03-web":                           reasonSample,
@@ -143,6 +145,7 @@ const (
 	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIClient          = "generated client: produced by @putnami/clientgen from the published Cloud CLI schema, consumed only by the Cloud CLI extension, owned by cloud"
 	reasonDevelopmentVocabulary   = "development verb vocabulary: the @putnami/dev extension, a new project that stays outside the frontier until a review names the domain that owns the vocabulary, owned by tooling"
+	reasonEvidenceReaders         = "evidence report readers: the @putnami/evidence-readers library, a new project that stays outside the frontier until a review names the domain that owns the reading of CI test and coverage reports, owned by tooling"
 )
 
 // expectedEvidenceRows is every DARC evidence row this repository commits, as the
