@@ -1,0 +1,41 @@
+<?xml version="1.0" ?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage lines-valid="7" lines-covered="4" line-rate="0.5714" branches-valid="2" branches-covered="1" branch-rate="0.5" timestamp="1793555414188" complexity="0" version="0.1">
+  <sources>
+    <source>/app</source>
+  </sources>
+  <packages>
+    <package name="main" line-rate="0.5714" branch-rate="0.5">
+      <classes>
+        <class name="calc.js" filename="src/calc.js" line-rate="0.5714" branch-rate="0.5">
+          <methods>
+            <method name="add" hits="2" signature="()V">
+              <lines>
+                <line number="1" hits="2"/>
+              </lines>
+            </method>
+            <method name="sign" hits="1" signature="()V">
+              <lines>
+                <line number="5" hits="1"/>
+              </lines>
+            </method>
+            <method name="neverCalled" hits="0" signature="()V">
+              <lines>
+                <line number="13" hits="0"/>
+              </lines>
+            </method>
+          </methods>
+          <lines>
+            <line number="2" hits="2" branch="false"/>
+            <line number="6" hits="1" branch="true" condition-coverage="50% (1/2)"/>
+            <line number="7" hits="1" branch="false"/>
+            <line number="9" hits="0" branch="false"/>
+            <line number="14" hits="0" branch="false"/>
+            <line number="15" hits="0" branch="false"/>
+            <line number="18" hits="1" branch="false"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

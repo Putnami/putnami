@@ -1,0 +1,123 @@
+{
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0
+  },
+  "cases": [
+    {
+      "name": "testAddSumsTwoNumbers with data set \"small\"",
+      "classname": "App.Tests.CalcTest",
+      "suites": [
+        {
+          "name": "/app/phpunit.xml"
+        },
+        {
+          "name": "default"
+        },
+        {
+          "name": "App\\Tests\\CalcTest",
+          "file": "/app/tests/CalcTest.php"
+        },
+        {
+          "name": "App\\Tests\\CalcTest::testAddSumsTwoNumbers"
+        }
+      ],
+      "file": "/app/tests/CalcTest.php",
+      "line": 19,
+      "status": "passed",
+      "durationMs": 65
+    },
+    {
+      "name": "testAddSumsTwoNumbers with data set \"zero\"",
+      "classname": "App.Tests.CalcTest",
+      "suites": [
+        {
+          "name": "/app/phpunit.xml"
+        },
+        {
+          "name": "default"
+        },
+        {
+          "name": "App\\Tests\\CalcTest",
+          "file": "/app/tests/CalcTest.php"
+        },
+        {
+          "name": "App\\Tests\\CalcTest::testAddSumsTwoNumbers"
+        }
+      ],
+      "file": "/app/tests/CalcTest.php",
+      "line": 19,
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "testSignReturnsPositive",
+      "classname": "App.Tests.CalcTest",
+      "suites": [
+        {
+          "name": "/app/phpunit.xml"
+        },
+        {
+          "name": "default"
+        },
+        {
+          "name": "App\\Tests\\CalcTest",
+          "file": "/app/tests/CalcTest.php"
+        }
+      ],
+      "file": "/app/tests/CalcTest.php",
+      "line": 24,
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "testAddIsWrongOnPurpose",
+      "classname": "App.Tests.CalcTest",
+      "suites": [
+        {
+          "name": "/app/phpunit.xml"
+        },
+        {
+          "name": "default"
+        },
+        {
+          "name": "App\\Tests\\CalcTest",
+          "file": "/app/tests/CalcTest.php"
+        }
+      ],
+      "file": "/app/tests/CalcTest.php",
+      "line": 29,
+      "status": "failed",
+      "durationMs": 38,
+      "failure": {
+        "type": "PHPUnit\\Framework\\ExpectationFailedException",
+        "body": "App\\Tests\\CalcTest::testAddIsWrongOnPurpose\ntwo plus two should be five\nFailed asserting that 4 is identical to 5.\n\n/app/tests/CalcTest.php:31"
+      }
+    },
+    {
+      "name": "testSkipped",
+      "classname": "App.Tests.CalcTest",
+      "suites": [
+        {
+          "name": "/app/phpunit.xml"
+        },
+        {
+          "name": "default"
+        },
+        {
+          "name": "App\\Tests\\CalcTest",
+          "file": "/app/tests/CalcTest.php"
+        }
+      ],
+      "file": "/app/tests/CalcTest.php",
+      "line": 34,
+      "status": "skipped",
+      "durationMs": 8,
+      "skipped": {}
+    }
+  ]
+}

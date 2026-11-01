@@ -1,0 +1,64 @@
+{
+  "totals": {
+    "tests": 4,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0.527
+  },
+  "cases": [
+    {
+      "name": " add sums two numbers",
+      "classname": " add sums two numbers",
+      "suites": [
+        {
+          "name": "undefined"
+        }
+      ],
+      "file": "src/calc.test.js",
+      "status": "passed",
+      "durationMs": 2
+    },
+    {
+      "name": "sign non-negative input returns positive",
+      "classname": "sign non-negative input returns positive",
+      "suites": [
+        {
+          "name": "undefined"
+        }
+      ],
+      "file": "src/calc.test.js",
+      "status": "passed",
+      "durationMs": 1
+    },
+    {
+      "name": " add is wrong on purpose",
+      "classname": " add is wrong on purpose",
+      "suites": [
+        {
+          "name": "undefined"
+        }
+      ],
+      "file": "src/calc.test.js",
+      "status": "failed",
+      "durationMs": 1,
+      "failure": {
+        "body": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 5\nReceived: 4\n    at Object.toBe (/app/src/calc.test.js:16:21)\n    at Promise.finally.completed (/app/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)\n    at new Promise (\u003canonymous\u003e)\n    at callAsyncCircusFn (/app/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)\n    at _callCircusTest (/app/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at _runTestInContext (/app/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)\n    at runTestWithContext (/app/node_modules/jest-circus/build/jestAdapterInit.js:996:5)\n    at _runTestsForDescribeBlockOnce (/app/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)\n    at _runTestsForDescribeBlock (/app/node_modules/jest-circus/build/jestAdapterInit.js:824:5)\n    at run (/app/node_modules/jest-circus/build/jestAdapterInit.js:789:3)\n    at runAndTransformResultsToJestFormat (/app/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)\n    at jestAdapter (/app/node_modules/jest-circus/build/runner.js:111:19)\n    at runTestInternal (/app/node_modules/jest-runner/build/index.js:247:16)\n    at runTest (/app/node_modules/jest-runner/build/index.js:315:7)"
+      }
+    },
+    {
+      "name": " skipped test",
+      "classname": " skipped test",
+      "suites": [
+        {
+          "name": "undefined"
+        }
+      ],
+      "file": "src/calc.test.js",
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {}
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "files": [
+    {
+      "path": "example.com/calc/calc.go",
+      "lines": [
+        {
+          "number": 5,
+          "hits": 2
+        },
+        {
+          "number": 6,
+          "hits": 2
+        },
+        {
+          "number": 7,
+          "hits": 2
+        },
+        {
+          "number": 9,
+          "hits": 1
+        },
+        {
+          "number": 10,
+          "hits": 1
+        },
+        {
+          "number": 11,
+          "hits": 1
+        },
+        {
+          "number": 12,
+          "hits": 1
+        },
+        {
+          "number": 13,
+          "hits": 0
+        },
+        {
+          "number": 14,
+          "hits": 0
+        },
+        {
+          "number": 17,
+          "hits": 0
+        },
+        {
+          "number": 18,
+          "hits": 0
+        },
+        {
+          "number": 19,
+          "hits": 0
+        },
+        {
+          "number": 20,
+          "hits": 0
+        }
+      ],
+      "lineCounts": {
+        "total": 13,
+        "covered": 7
+      },
+      "functions": {
+        "total": 0,
+        "covered": 0
+      }
+    },
+    {
+      "path": "example.com/calc/internal/fmtx/fmtx.go",
+      "lines": [
+        {
+          "number": 3,
+          "hits": 2
+        },
+        {
+          "number": 4,
+          "hits": 2
+        },
+        {
+          "number": 5,
+          "hits": 0
+        },
+        {
+          "number": 6,
+          "hits": 0
+        },
+        {
+          "number": 7,
+          "hits": 2
+        },
+        {
+          "number": 10,
+          "hits": 0
+        },
+        {
+          "number": 11,
+          "hits": 0
+        },
+        {
+          "number": 12,
+          "hits": 0
+        }
+      ],
+      "lineCounts": {
+        "total": 8,
+        "covered": 3
+      },
+      "functions": {
+        "total": 0,
+        "covered": 0
+      }
+    }
+  ]
+}

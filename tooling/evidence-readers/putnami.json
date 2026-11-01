@@ -1,0 +1,27 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "@putnami/evidence-readers",
+  "visibility": "public",
+  "tags": [
+    "go"
+  ],
+  "extensions": [
+    "/go/extension",
+    "/tooling/sdd-extension"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "test": {
+      "coverage-threshold": 80
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
+    }
+  }
+}

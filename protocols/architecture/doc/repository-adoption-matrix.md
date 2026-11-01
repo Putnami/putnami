@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **98 of its 156 projects** to **10 architecture domains**.
-The other **58 are excluded on purpose**: 28 samples, 7 templates, 2 template
+This repository maps **98 of its 157 projects** to **10 architecture domains**.
+The other **59 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
-destinations, the Cloud CLI extension with its 14 generated clients, and the new
-development verb vocabulary. Every one of the 156 appears in a table below,
-mapped or excluded, with a reason.
+destinations, the Cloud CLI extension with its 14 generated clients, the new
+development verb vocabulary and the new evidence report readers. Every one of
+the 157 appears in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -326,6 +326,25 @@ protocols and the extension SDK need.
 | Project | Class | Owner |
 |---|---|---|
 | `/tooling/dev` | Development verb vocabulary | `tooling` |
+
+### Evidence report readers — 1 project
+
+**Why excluded:** `@putnami/evidence-readers` is a new project. It reads the
+JUnit, LCOV, Cobertura, Clover and Go cover reports a CI already wrote into
+test cases and line coverage. Unlike the other excluded libraries, it already
+has a workspace consumer: `/typescript/extension` reads its own reports
+through it. A new project starts excluded (rule 4), and the domain that owns
+the reading of CI reports stays undecided until the library's second consumer,
+the observe extension, settles who reads them.
+
+**What would change it:** a second consumer, or a review before it, that
+states which domain carries that reading, with the exact cross-domain
+permissions its import of the protocols and its consumer in
+`extension-providers` need.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/tooling/evidence-readers` | Evidence report readers | `tooling` |
 
 ### Samples — 28 projects
 

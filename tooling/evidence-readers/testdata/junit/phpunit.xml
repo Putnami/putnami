@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/app/phpunit.xml" tests="5" assertions="4" errors="0" failures="1" skipped="1" time="0.111134">
+    <testsuite name="default" tests="5" assertions="4" errors="0" failures="1" skipped="1" time="0.111134">
+      <testsuite name="App\Tests\CalcTest" file="/app/tests/CalcTest.php" tests="5" assertions="4" errors="0" failures="1" skipped="1" time="0.111134">
+        <testsuite name="App\Tests\CalcTest::testAddSumsTwoNumbers" tests="2" assertions="2" errors="0" failures="0" skipped="0" time="0.065159">
+          <testcase name="testAddSumsTwoNumbers with data set &quot;small&quot;" file="/app/tests/CalcTest.php" line="19" class="App\Tests\CalcTest" classname="App.Tests.CalcTest" assertions="1" time="0.064890"/>
+          <testcase name="testAddSumsTwoNumbers with data set &quot;zero&quot;" file="/app/tests/CalcTest.php" line="19" class="App\Tests\CalcTest" classname="App.Tests.CalcTest" assertions="1" time="0.000269"/>
+        </testsuite>
+        <testcase name="testSignReturnsPositive" file="/app/tests/CalcTest.php" line="24" class="App\Tests\CalcTest" classname="App.Tests.CalcTest" assertions="1" time="0.000179"/>
+        <testcase name="testAddIsWrongOnPurpose" file="/app/tests/CalcTest.php" line="29" class="App\Tests\CalcTest" classname="App.Tests.CalcTest" assertions="1" time="0.038055">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">App\Tests\CalcTest::testAddIsWrongOnPurpose
+two plus two should be five
+Failed asserting that 4 is identical to 5.
+
+/app/tests/CalcTest.php:31</failure>
+        </testcase>
+        <testcase name="testSkipped" file="/app/tests/CalcTest.php" line="34" class="App\Tests\CalcTest" classname="App.Tests.CalcTest" assertions="0" time="0.007741">
+          <skipped/>
+        </testcase>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

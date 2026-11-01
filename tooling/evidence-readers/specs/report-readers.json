@@ -1,0 +1,38 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "evidence-readers/report-readers",
+  "outcomes": [
+    "Jest, Vitest, PHPUnit and gotestsum JUnit reports read into the same test cases, with the test file when the report names it.",
+    "Istanbul, c8, V8, PHPUnit and go test coverage reads into the same line-level file coverage, so a consumer can measure the coverage of the lines a change touches.",
+    "A missing, malformed or oversized report is one diagnostic with a stable code, and the reader never panics."
+  ],
+  "nonGoals": [
+    "Finding the report files in a CI workspace, which the observe extension owns.",
+    "Mapping cases and files to components, or resolving absolute paths and Go import paths to repository paths, which the observe extension owns.",
+    "Writing the change evidence document, which protocol/evidence specifies.",
+    "JaCoCo, SARIF, CycloneDX and SPDX, which later slices add."
+  ],
+  "requirements": [
+    {
+      "id": "junit-reads-every-case",
+      "text": "ReadJUnit reads a testsuites or testsuite root, up to MaxSuiteDepth nested suites, into one case per testcase element in document order, with its name, classname, enclosing suites, file, line, duration in milliseconds and failure or skip. A case's file is its file attribute, else the one of its nearest enclosing suite that states one. A failure or error element fails the case, a skipped element skips it, and a case with neither passed."
+    },
+    {
+      "id": "coverage-reads-every-instrumented-line",
+      "text": "The LCOV, Cobertura, Clover and Go cover readers return one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and their hit counts. A line stated twice keeps its largest count. A file's totals are counted from its lines and functions; a file whose report lists none keeps the totals the report states (LCOV's LF, LH, FNF and FNH, a Clover file's methods metrics)."
+    },
+    {
+      "id": "go-cover-blocks-become-lines",
+      "text": "ReadGoCover reads set, count and atomic profiles, a profile concatenated from several runs included. A block the profile states more than once sums its counts in count and atomic mode and keeps the largest in set mode. A block with statements marks each line from its start line to its end line, a line takes the largest count of the blocks that span it, and a block without statements marks none."
+    },
+    {
+      "id": "paths-as-the-report-states",
+      "text": "A reader reports each path as the report states it, in slash form, without resolving it: a Clover file's path attribute wins over its name, a Cobertura report's source roots are returned beside its files, and a Go profile keeps its import paths."
+    },
+    {
+      "id": "malformed-reports-are-diagnostics",
+      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, suites nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a file that does not exist. No input makes a reader panic."
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "totals": {
+    "tests": 6,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0.657984
+  },
+  "cases": [
+    {
+      "name": "TestAddWrongOnPurpose",
+      "classname": "example.com/calc",
+      "suites": [
+        {
+          "name": "example.com/calc"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 0,
+      "failure": {
+        "message": "Failed",
+        "body": "=== RUN   TestAddWrongOnPurpose\n    calc_test.go:21: two plus two should be five: Add(2, 2) = 4, want 5\n--- FAIL: TestAddWrongOnPurpose (0.00s)\n"
+      }
+    },
+    {
+      "name": "TestSkipped",
+      "classname": "example.com/calc",
+      "suites": [
+        {
+          "name": "example.com/calc"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {
+        "message": "=== RUN   TestSkipped\n    calc_test.go:26: not ready\n--- SKIP: TestSkipped (0.00s)\n"
+      }
+    },
+    {
+      "name": "TestAdd",
+      "classname": "example.com/calc",
+      "suites": [
+        {
+          "name": "example.com/calc"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "TestSign/non-negative_input",
+      "classname": "example.com/calc",
+      "suites": [
+        {
+          "name": "example.com/calc"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "TestSign",
+      "classname": "example.com/calc",
+      "suites": [
+        {
+          "name": "example.com/calc"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "TestLabel",
+      "classname": "example.com/calc/internal/fmtx",
+      "suites": [
+        {
+          "name": "example.com/calc/internal/fmtx"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    }
+  ]
+}

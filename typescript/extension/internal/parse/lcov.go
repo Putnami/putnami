@@ -1,19 +1,22 @@
 package parse
 
 import (
-	"bufio"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
+
+	"go.putnami.dev/evidence/readers"
+	diag "go.putnami.dev/protocol/diagnostic"
 )
 
 // CoverageSummary holds aggregate coverage metrics.
 //
 // LineCoverage / TotalLines / CoveredLines are derived solely from LCOV's
-// instrumented-line counts (LF/LH). Source files that tests never imported are
+// instrumented lines: the DA lines of each record, or its LF/LH when it lists
+// none. Source files that tests never imported are
 // surfaced via UncoveredFileCount and as not-analyzed per-file entries, but are
 // intentionally kept out of the line-percentage denominator: counting their
 // raw source lines (imports, comments, type-only declarations) as a proxy for
@@ -52,7 +55,7 @@ type FileCoverage struct {
 // are reported as not-analyzed (0% coverage) entries for visibility, but their
 // raw source lines are deliberately NOT folded into the aggregate line-coverage
 // denominator: a non-empty-line count is a poor proxy for LCOV's instrumented
-// lines (LF) and would make the reported project percentage inconsistent with
+// lines and would make the reported project percentage inconsistent with
 // the per-file LCOV numbers (see CoverageSummary doc comment).
 //
 // Returns the aggregate summary (line counts from LCOV only) and the combined
@@ -119,119 +122,57 @@ func ParseLCOVFileForProject(lcovPath, projectPath string) (CoverageSummary, []F
 }
 
 // parseLCOV parses an LCOV file and returns the summary, the set of
-// covered file paths, and per-file coverage data.
+// covered file paths, and per-file coverage data. A missing file is an empty
+// summary; files outside the project (paths starting with "..") are skipped.
 func parseLCOV(path string) (CoverageSummary, map[string]bool, []FileCoverage, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return CoverageSummary{}, nil, nil, nil
-		}
-		return CoverageSummary{}, nil, nil, err
+	report, diagnostics := readers.ReadFile(path, readers.ReadLCOV)
+	if len(diagnostics) == 1 && diagnostics[0].Code == readers.CodeMissing {
+		return CoverageSummary{}, nil, nil, nil
 	}
-	defer f.Close()
+	if diag.HasErrors(diagnostics) {
+		return CoverageSummary{}, nil, nil, errors.New(diag.ErrorText(diagnostics))
+	}
 
 	coveredFiles := make(map[string]bool)
 	var files []FileCoverage
-
-	var (
-		totalLF, totalLH       int
-		totalFNF, totalFNH     int
-		fileCount              int
-		currentLF, currentLH   int
-		currentFNF, currentFNH int
-		currentFile            string
-		inFile                 bool
-		skip                   bool
-	)
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if strings.HasPrefix(line, "TN:") {
+	var totalLF, totalLH, totalFNF, totalFNH int
+	for _, file := range report.Files {
+		if strings.HasPrefix(file.Path, "..") {
 			continue
 		}
-
-		if strings.HasPrefix(line, "SF:") {
-			// A report path is in slash form on every host: bun writes the
-			// host's separator, a backslash on Windows.
-			filePath := filepath.ToSlash(line[3:])
-			// Skip external dependencies (paths starting with ..)
-			skip = strings.HasPrefix(filePath, "..")
-			if !skip {
-				inFile = true
-				currentFile = filePath
-				currentLF = 0
-				currentLH = 0
-				currentFNF = 0
-				currentFNH = 0
-			}
-			continue
-		}
-
-		if skip {
-			if line == "end_of_record" {
-				skip = false
-			}
-			continue
-		}
-
-		if !inFile {
-			continue
-		}
-
-		if strings.HasPrefix(line, "FNF:") {
-			currentFNF, _ = strconv.Atoi(line[4:])
-		} else if strings.HasPrefix(line, "FNH:") {
-			currentFNH, _ = strconv.Atoi(line[4:])
-		} else if strings.HasPrefix(line, "LF:") {
-			currentLF, _ = strconv.Atoi(line[3:])
-		} else if strings.HasPrefix(line, "LH:") {
-			currentLH, _ = strconv.Atoi(line[3:])
-		} else if line == "end_of_record" {
-			totalLF += currentLF
-			totalLH += currentLH
-			totalFNF += currentFNF
-			totalFNH += currentFNH
-			fileCount++
-			coveredFiles[currentFile] = true
-
-			pct := 100.0
-			if currentLF > 0 {
-				pct = math.Round(float64(currentLH)/float64(currentLF)*10000) / 100
-			}
-			files = append(files, FileCoverage{
-				Path:         currentFile,
-				TotalLines:   currentLF,
-				CoveredLines: currentLH,
-				Coverage:     pct,
-				Analyzed:     true,
-			})
-
-			inFile = false
-		}
-	}
-
-	lineCov := 100.0
-	if totalLF > 0 {
-		lineCov = math.Round(float64(totalLH)/float64(totalLF)*10000) / 100
-	}
-
-	funcCov := 100.0
-	if totalFNF > 0 {
-		funcCov = math.Round(float64(totalFNH)/float64(totalFNF)*10000) / 100
+		totalLF += file.LineCounts.Total
+		totalLH += file.LineCounts.Covered
+		totalFNF += file.Functions.Total
+		totalFNH += file.Functions.Covered
+		coveredFiles[file.Path] = true
+		files = append(files, FileCoverage{
+			Path:         file.Path,
+			TotalLines:   file.LineCounts.Total,
+			CoveredLines: file.LineCounts.Covered,
+			Coverage:     percent(file.LineCounts.Covered, file.LineCounts.Total),
+			Analyzed:     true,
+		})
 	}
 
 	return CoverageSummary{
-		LineCoverage:     lineCov,
-		FunctionCoverage: funcCov,
+		LineCoverage:     percent(totalLH, totalLF),
+		FunctionCoverage: percent(totalFNH, totalFNF),
 		TotalLines:       totalLF,
 		CoveredLines:     totalLH,
 		UncoveredLines:   totalLF - totalLH,
 		TotalFunctions:   totalFNF,
 		CoveredFunctions: totalFNH,
-		FileCount:        fileCount,
+		FileCount:        len(files),
 	}, coveredFiles, files, nil
+}
+
+// percent is covered over total in percent, rounded to two decimals; 100 when
+// nothing is instrumented.
+func percent(covered, total int) float64 {
+	if total == 0 {
+		return 100
+	}
+	return math.Round(float64(covered)/float64(total)*10000) / 100
 }
 
 var sourceFileRe = regexp.MustCompile(`\.(ts|tsx)$`)

@@ -1,0 +1,10 @@
+mode: set
+example.com/calc/calc.go:5.24,7.2 1 1
+example.com/calc/calc.go:9.25,10.12 1 1
+example.com/calc/calc.go:10.12,12.3 1 1
+example.com/calc/calc.go:12.8,14.3 1 0
+example.com/calc/calc.go:17.29,20.2 2 0
+example.com/calc/internal/fmtx/fmtx.go:3.29,4.13 1 1
+example.com/calc/internal/fmtx/fmtx.go:4.13,6.3 1 0
+example.com/calc/internal/fmtx/fmtx.go:7.2,7.22 1 1
+example.com/calc/internal/fmtx/fmtx.go:10.30,12.2 1 0

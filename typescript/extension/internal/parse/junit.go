@@ -1,11 +1,11 @@
 package parse
 
 import (
-	"encoding/xml"
-	"math"
-	"os"
-	"slices"
+	"errors"
 	"strings"
+
+	"go.putnami.dev/evidence/readers"
+	diag "go.putnami.dev/protocol/diagnostic"
 )
 
 // TestSummary aggregates test results.
@@ -62,152 +62,87 @@ type TestFailure struct {
 	Message string `json:"message,omitempty"`
 }
 
-// JUnit XML structures
-type junitTestSuites struct {
-	XMLName    xml.Name         `xml:"testsuites"`
-	Name       string           `xml:"name,attr"`
-	Tests      int              `xml:"tests,attr"`
-	Assertions int              `xml:"assertions,attr"`
-	Failures   int              `xml:"failures,attr"`
-	Skipped    int              `xml:"skipped,attr"`
-	Time       float64          `xml:"time,attr"`
-	TestSuites []junitTestSuite `xml:"testsuite"`
-}
-
-type junitTestSuite struct {
-	Name       string           `xml:"name,attr"`
-	File       string           `xml:"file,attr"`
-	Tests      int              `xml:"tests,attr"`
-	Assertions int              `xml:"assertions,attr"`
-	Failures   int              `xml:"failures,attr"`
-	Skipped    int              `xml:"skipped,attr"`
-	Time       float64          `xml:"time,attr"`
-	Line       int              `xml:"line,attr"`
-	TestCases  []junitTestCase  `xml:"testcase"`
-	TestSuites []junitTestSuite `xml:"testsuite"`
-}
-
-type junitTestCase struct {
-	Name       string        `xml:"name,attr"`
-	Classname  string        `xml:"classname,attr"`
-	File       string        `xml:"file,attr"`
-	Line       int           `xml:"line,attr"`
-	Time       float64       `xml:"time,attr"`
-	Assertions int           `xml:"assertions,attr"`
-	Failure    *junitFailure `xml:"failure"`
-	Skipped    *junitSkipped `xml:"skipped"`
-}
-
-type junitFailure struct {
-	Type    string `xml:"type,attr"`
-	Message string `xml:"message,attr"`
-	Body    string `xml:",chardata"`
-}
-
-type junitSkipped struct {
-	Message string `xml:"message,attr"`
-	Body    string `xml:",chardata"`
-}
-
 // emptyTestSummary returns a zero-value summary.
 func emptyTestSummary() TestSummary {
 	return TestSummary{FailedTests: []FailedTest{}}
 }
 
 // ParseJUnitFile parses a JUnit XML file and returns a test summary.
-// Returns an empty summary if the file doesn't exist.
+// Returns an empty summary if the file doesn't exist. The counts are the
+// totals the report's root states.
 func ParseJUnitFile(path string) (TestSummary, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return emptyTestSummary(), nil
-		}
-		return emptyTestSummary(), err
+	report, diagnostics := readers.ReadFile(path, readers.ReadJUnit)
+	if len(diagnostics) == 1 && diagnostics[0].Code == readers.CodeMissing {
+		return emptyTestSummary(), nil
+	}
+	if diag.HasErrors(diagnostics) {
+		return emptyTestSummary(), errors.New(diag.ErrorText(diagnostics))
 	}
 
-	var suites junitTestSuites
-	if err := xml.Unmarshal(data, &suites); err != nil {
-		return emptyTestSummary(), err
+	summary := TestSummary{
+		Total:       report.Totals.Tests,
+		Passed:      report.Totals.Tests - report.Totals.Failures - report.Totals.Skipped,
+		Failed:      report.Totals.Failures,
+		Skipped:     report.Totals.Skipped,
+		Assertions:  report.Totals.Assertions,
+		Time:        report.Totals.Time,
+		FailedTests: []FailedTest{},
 	}
-
-	// Collect failed tests recursively
-	var failedTests []FailedTest
-	collectFailed(suites.TestSuites, &failedTests)
-
-	var cases []TestCase
-	for _, fileSuite := range suites.TestSuites {
-		collectCases(fileSuite, fileSuite.File, nil, fileSuite.File, &cases)
-	}
-
-	return TestSummary{
-		Total:       suites.Tests,
-		Passed:      suites.Tests - suites.Failures - suites.Skipped,
-		Failed:      suites.Failures,
-		Skipped:     suites.Skipped,
-		Assertions:  suites.Assertions,
-		Time:        suites.Time,
-		FailedTests: failedTests,
-		Cases:       cases,
-	}, nil
-}
-
-// collectCases appends every case of suite and of its nested suites. A
-// top-level suite of a bun report is one test file and each suite below it is
-// one describe block: describes names the blocks that enclose suite, and file
-// is the innermost file a suite states. The cases of a suite come before the
-// cases of its nested suites.
-func collectCases(suite junitTestSuite, testFile string, describes []string, file string, out *[]TestCase) {
-	for _, tc := range suite.TestCases {
-		testCase := TestCase{
-			Name:       strings.Join(append(slices.Clone(describes), tc.Name), " > "),
-			SuiteFile:  testFile,
-			File:       tc.File,
-			Line:       tc.Line,
-			Status:     TestCasePassed,
-			DurationMs: durationMs(tc.Time),
-		}
-		if testCase.File == "" {
-			testCase.File = file
-		}
-		switch {
-		case tc.Failure != nil:
-			testCase.Status = TestCaseFailed
-			testCase.Output = failureOutput(tc.Failure)
-		case tc.Skipped != nil:
-			testCase.Status = TestCaseSkipped
-			testCase.Output = strings.TrimSpace(tc.Skipped.Message)
-			if testCase.Output == "" {
-				testCase.Output = strings.TrimSpace(tc.Skipped.Body)
+	for _, tc := range report.Cases {
+		summary.Cases = append(summary.Cases, testCase(tc))
+		if tc.Failure != nil {
+			message := tc.Failure.Message
+			if message == "" {
+				message = tc.Failure.Body
 			}
+			summary.FailedTests = append(summary.FailedTests, FailedTest{
+				Name:    tc.Name,
+				File:    tc.File,
+				Line:    tc.Line,
+				Failure: &TestFailure{Type: tc.Failure.Type, Message: message},
+			})
 		}
-		*out = append(*out, testCase)
 	}
-	for _, nested := range suite.TestSuites {
-		nestedFile := nested.File
-		if nestedFile == "" {
-			nestedFile = file
-		}
-		collectCases(nested, testFile, append(slices.Clone(describes), nested.Name), nestedFile, out)
-	}
+	return summary, nil
 }
 
-// durationMs converts a duration in seconds to whole milliseconds: 0 for a
-// value that is not positive or not a number, math.MaxInt64 for one past the
-// int64 range.
-func durationMs(seconds float64) int64 {
-	millis := math.Round(seconds * 1000)
-	if !(millis > 0) {
-		return 0
+// testCase maps a report case to a bun case. A top-level suite of a bun report
+// is one test file and each suite below it is one describe block: the case's
+// name is the describe names, then its own, joined by " > ".
+func testCase(tc readers.TestCase) TestCase {
+	names := []string{}
+	suiteFile := ""
+	if len(tc.Suites) > 0 {
+		suiteFile = tc.Suites[0].File
+		for _, describe := range tc.Suites[1:] {
+			names = append(names, describe.Name)
+		}
 	}
-	if millis >= math.MaxInt64 {
-		return math.MaxInt64
+	testCase := TestCase{
+		Name:       strings.Join(append(names, tc.Name), " > "),
+		SuiteFile:  suiteFile,
+		File:       tc.File,
+		Line:       tc.Line,
+		Status:     TestCasePassed,
+		DurationMs: tc.DurationMs,
 	}
-	return int64(millis)
+	switch {
+	case tc.Failure != nil:
+		testCase.Status = TestCaseFailed
+		testCase.Output = failureOutput(tc.Failure)
+	case tc.Skipped != nil:
+		testCase.Status = TestCaseSkipped
+		testCase.Output = strings.TrimSpace(tc.Skipped.Message)
+		if testCase.Output == "" {
+			testCase.Output = strings.TrimSpace(tc.Skipped.Body)
+		}
+	}
+	return testCase
 }
 
 // failureOutput joins a failure's message and body. A body that already
 // carries the message, as bun's "Type: message" and stack do, stands alone.
-func failureOutput(failure *junitFailure) string {
+func failureOutput(failure *readers.Failure) string {
 	message := strings.TrimSpace(failure.Message)
 	body := strings.TrimSpace(failure.Body)
 	switch {
@@ -217,32 +152,5 @@ func failureOutput(failure *junitFailure) string {
 		return body
 	default:
 		return message + "\n" + body
-	}
-}
-
-func collectFailed(suites []junitTestSuite, out *[]FailedTest) {
-	for _, suite := range suites {
-		for _, tc := range suite.TestCases {
-			if tc.Failure != nil {
-				ft := FailedTest{
-					Name: tc.Name,
-					File: tc.File,
-					Line: tc.Line,
-				}
-				if ft.File == "" {
-					ft.File = suite.File
-				}
-				msg := tc.Failure.Message
-				if msg == "" {
-					msg = tc.Failure.Body
-				}
-				ft.Failure = &TestFailure{
-					Type:    tc.Failure.Type,
-					Message: msg,
-				}
-				*out = append(*out, ft)
-			}
-		}
-		collectFailed(suite.TestSuites, out)
 	}
 }

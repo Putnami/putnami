@@ -1,0 +1,62 @@
+{
+  "totals": {
+    "tests": 4,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0.008202
+  },
+  "cases": [
+    {
+      "name": "add sums two numbers",
+      "classname": "src/calc.test.js",
+      "suites": [
+        {
+          "name": "src/calc.test.js"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 2
+    },
+    {
+      "name": "sign \u003e non-negative input \u003e returns positive",
+      "classname": "src/calc.test.js",
+      "suites": [
+        {
+          "name": "src/calc.test.js"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "add is wrong on purpose",
+      "classname": "src/calc.test.js",
+      "suites": [
+        {
+          "name": "src/calc.test.js"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 5,
+      "failure": {
+        "type": "AssertionError",
+        "message": "two plus two should be five: expected 4 to be 5 // Object.is equality",
+        "body": "\nAssertionError: two plus two should be five: expected 4 to be 5 // Object.is equality\n\n- Expected\n+ Received\n\n- 5\n+ 4\n\n ❯ src/calc.test.js:17:52\n            "
+      }
+    },
+    {
+      "name": "skipped test",
+      "classname": "src/calc.test.js",
+      "suites": [
+        {
+          "name": "src/calc.test.js"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 0,
+      "skipped": {}
+    }
+  ]
+}
