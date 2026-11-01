@@ -103,6 +103,13 @@
       "status": "stable"
     },
     {
+      "id": "@putnami/observe",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/python",
       "kind": "package",
       "status": "experimental",
