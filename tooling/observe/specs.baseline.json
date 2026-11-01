@@ -7,6 +7,10 @@
     "tooling/observe#diff-base",
     "tooling/observe#evidence-document",
     "tooling/observe#report-discovery",
-    "tooling/observe#runs-without-a-workspace"
+    "tooling/observe#runs-without-a-workspace",
+    "tooling/observe-composer#analysis-inputs",
+    "tooling/observe-composer#areas",
+    "tooling/observe-composer#components-from-manifests",
+    "tooling/observe-composer#path-repository-edges"
   ]
 }
