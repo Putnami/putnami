@@ -110,6 +110,7 @@ use (
 	./tooling/install-scripts
 	./tooling/local-collaboration
 	./tooling/memory-store
+	./tooling/observe
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/windows-vet

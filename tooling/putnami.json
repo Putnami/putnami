@@ -13,6 +13,7 @@
     "install-scripts",
     "local-collaboration",
     "memory-store",
+    "observe",
     "scaffold",
     "sdd-extension",
     "windows-vet"
