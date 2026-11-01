@@ -1,0 +1,11 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/observe#caller-directory-writes",
+    "tooling/observe#ci-detection",
+    "tooling/observe#diff-base",
+    "tooling/observe#report-discovery",
+    "tooling/observe#runs-without-a-workspace"
+  ]
+}

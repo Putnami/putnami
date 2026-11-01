@@ -1,0 +1,81 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/observe",
+      "type": "feature",
+      "name": "Observe a change in a repository that keeps its own CI",
+      "outcome": "A CI job in a repository without a Putnami workspace runs putnami observe after its own build and tests, and learns which CI and repository it runs in, which commit the change is measured against even on a shallow clone, which files changed, and which test and coverage reports it can read, without changing its pipeline and without failing on a missing report",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "runs-without-a-workspace",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-declares-a-workspace-optional-command",
+              "observe-runs-in-a-repository-without-a-workspace"
+            ]
+          }
+        },
+        {
+          "id": "ci-detection",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-github-actions-pull-request",
+              "a-gitlab-merge-request",
+              "a-generic-ci-takes-its-base-and-head-from-flags",
+              "the-repository-key-is-the-numeric-project-id"
+            ]
+          }
+        },
+        {
+          "id": "diff-base",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-explicit-base-wins",
+              "a-shallow-clone-deepens-to-the-merge-base",
+              "an-unresolved-base-is-a-diagnostic",
+              "changed-files-are-measured-from-the-merge-base"
+            ]
+          }
+        },
+        {
+          "id": "report-discovery",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "reports-are-found-by-their-content",
+              "explicit-report-paths-replace-discovery",
+              "a-missing-or-malformed-report-is-a-diagnostic"
+            ]
+          }
+        },
+        {
+          "id": "caller-directory-writes",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "observe-writes-only-git-history-in-the-caller-directory"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

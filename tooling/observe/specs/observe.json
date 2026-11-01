@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/observe",
+  "outcomes": [
+    "A team adds putnami observe at the end of its existing GitHub Actions or GitLab CI job, or of any other CI with two flags, and changes nothing else in its pipeline",
+    "The job names the repository by a key that survives a rename or a transfer: the code host, its hostname and its numeric project id",
+    "The change is measured against the commit its pull or merge request targets, found even when the CI cloned one commit deep",
+    "The job lists the test and coverage reports it can read, found by their content or named by the team, and says which ones it could not read without failing"
+  ],
+  "nonGoals": [
+    "Running a build or tests, or asking the team to change how it builds or tests",
+    "Inferring components, mapping reports to components, changed-line coverage and dependency changes: the detectors and the change analyses own them",
+    "Writing the change evidence document and uploading it: they follow the evidence protocol and the cloud reporter",
+    "Reading another extension's workspace probe outside a workspace, which needs a host call the CLI does not offer yet",
+    "Running inside a Putnami workspace: there the workspace's own extensions answer"
+  ],
+  "requirements": [
+    {
+      "id": "runs-without-a-workspace",
+      "text": "@putnami/observe declares the observe command group whose default subcommand is interactive and workspace-optional, so a person who installed the extension in the user scope runs putnami observe in a directory that has no putnami.workspace.json. The manifest passes the extension protocol's strict validation."
+    },
+    {
+      "id": "ci-detection",
+      "text": "GITHUB_ACTIONS=true selects GitHub Actions and GITLAB_CI=true selects GitLab CI; otherwise the CI is generic. On GitHub Actions the subject reads the host from GITHUB_SERVER_URL, the project id from GITHUB_REPOSITORY_ID, the repository from GITHUB_REPOSITORY, the commit from GITHUB_SHA or the pull request's head, the branch from GITHUB_HEAD_REF or GITHUB_REF_NAME, and the pull request number from GITHUB_REF; the run from GITHUB_RUN_ID, GITHUB_JOB and GITHUB_RUN_ATTEMPT. On GitLab CI it reads CI_SERVER_HOST, CI_PROJECT_ID, CI_PROJECT_PATH, CI_COMMIT_SHA, CI_COMMIT_REF_NAME or CI_MERGE_REQUEST_SOURCE_BRANCH_NAME, CI_MERGE_REQUEST_IID, CI_PIPELINE_ID, CI_JOB_ID and CI_JOB_URL. A generic CI takes --head (default HEAD) and --base, and names the repository from its origin remote. The repository key is the provider, the host and the numeric project id, never the path; a GitHub or GitLab job that lacks the numeric id gets a diagnostic. --head and --base override what the CI says."
+    },
+    {
+      "id": "diff-base",
+      "text": "The base is --base when given, else the merge request's diff base (CI_MERGE_REQUEST_DIFF_BASE_SHA), else the pull request's target branch (GITHUB_BASE_REF, read from origin), else GitLab's previous commit of a branch push (CI_COMMIT_BEFORE_SHA, unless it is all zeros). On a shallow clone observe fetches the base and deepens the history in bounded steps until the merge base of the base and the head is reachable. The changed files are the diff from that merge base to the head, each added, modified, deleted or renamed, with renames detected. A base that cannot be resolved or reached leaves the changed files empty and adds a diagnostic; it never fails the job."
+    },
+    {
+      "id": "report-discovery",
+      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, and keeps each file whose content is a JUnit XML report (a testsuites or testsuite root), an LCOV trace, a Cobertura or Clover XML report or a Go cover profile, within a bound on files and bytes it reports when reached. --junit and --coverage, repeatable paths or glob patterns resolved against the invocation directory, replace discovery for their kind. A named path that matches nothing, a file that cannot be read, and a file whose content is not the kind it was named for are diagnostics. Observation never exits non-zero for a report, a base or a CI fact: only a usage error exits 2."
+    },
+    {
+      "id": "caller-directory-writes",
+      "text": "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, and --no-fetch turns that off; the working tree, the index and HEAD stay as they were. Everything else it prints: a text summary, or one JSON document with --output=json."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0051-user-scope-extensions-run-without-a-workspace.md"
+  ]
+}
