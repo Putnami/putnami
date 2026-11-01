@@ -210,6 +210,17 @@
       "reversal": "Repoint the contributor and provider archive channels at the previous version. An installed workspace is unaffected because its lock pins a resolved version and archive digest, so the rollback only changes what a fresh resolve returns. These extensions publish after the CLI because agent content needs extension contract 5, which the CLI reads, and before templates because a template or starter may name an agent-content extension."
     },
     {
+      "id": "observe-extension",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/observe"
+      ],
+      "rollbackPoint": "the previous observe archive channel pointer",
+      "reversal": "Repoint the observe archive channel at the previous version. A user scope that installed observe keeps its pinned version and archive digest, so the rollback only changes what a fresh install resolves. Observe publishes after the CLI because it runs only from the user scope the CLI provides."
+    },
+    {
       "id": "templates",
       "channels": [
         "archives",

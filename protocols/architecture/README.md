@@ -220,7 +220,7 @@ its declarations complete, so there has never been debt to record.
 | `protocols` | protocols | 42 | The strict wire contracts every other domain speaks |
 | `go-framework` | framework | 24 | The Go application runtime API and its documentation |
 | `typescript-framework` | framework | 14 | The TypeScript application runtime API and its documentation |
-| `extension-providers` | extension-providers | 8 | Probe answers, verification observations, provider results, the Python surface |
+| `extension-providers` | extension-providers | 9 | Probe answers, verification observations, provider results, the Python surface |
 | `cli` | cli | 5 | The workspace engine and the tooling documentation |
 | `sdd` | sdd | 1 | The spec-driven method and its documentation |
 | `extension-sdk` | tooling | 1 | The extension runtime an extension binary is built on |
