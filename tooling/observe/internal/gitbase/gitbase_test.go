@@ -209,6 +209,37 @@ func TestAShallowCloneDeepensToTheMergeBase(t *testing.T) {
 	}
 }
 
+func TestAPullRequestMergeCommitIsMeasuredAsBuilt(t *testing.T) {
+	spectest.Proves(t, feature, "diff-base", "a-pull-request-merge-commit-is-measured-as-built")
+	f := newFixture(t, 3, 100)
+	// GitHub builds a pull request on refs/pull/<n>/merge, a merge of the
+	// feature into main, and checks it out one commit deep.
+	run(t, f.origin, "checkout", "--quiet", "--detach", "main")
+	run(t, f.origin, "merge", "--quiet", "--no-ff", "-m", "merge", "feature")
+	merge := run(t, f.origin, "rev-parse", "HEAD")
+	run(t, f.origin, "update-ref", "refs/pull/1/merge", merge)
+	run(t, f.origin, "checkout", "--quiet", "main")
+	dir := filepath.Join(t.TempDir(), "checkout")
+	run(t, t.TempDir(), "init", "--quiet", dir)
+	run(t, dir, "remote", "add", "origin", "file://"+f.origin)
+	run(t, dir, "fetch", "--quiet", "--no-tags", "--depth=1", "origin", "+refs/pull/1/merge:refs/remotes/pull/1/merge")
+	run(t, dir, "checkout", "--quiet", "--detach", "refs/remotes/pull/1/merge")
+
+	r := Resolve(context.Background(), Request{Dir: dir, Head: "HEAD", Base: &ci.Base{Ref: "main", SHA: f.mainTip, Source: ci.BaseFromPullRequest}, Fetch: true})
+	if len(r.Diagnostics) != 0 {
+		t.Fatalf("diagnostics %v", r.Diagnostics)
+	}
+	if r.HeadSHA != merge || r.BaseSHA != f.mainTip {
+		t.Fatalf("head %s base %s, want the merge commit %s and main %s", r.HeadSHA, r.BaseSHA, merge, f.mainTip)
+	}
+	if !reflect.DeepEqual(r.ChangedFiles, wantChanged) {
+		t.Fatalf("changed %+v, want the feature's own changes %+v", r.ChangedFiles, wantChanged)
+	}
+	if diff := run(t, dir, "diff", "--no-renames", "--name-only", r.BaseSHA, r.HeadSHA); diff != "gone.txt\nkeep.txt\nnew/name.txt\nold/name.txt\nsrc/new.txt" {
+		t.Fatalf("the diff from the base to the head is %q", diff)
+	}
+}
+
 func TestNoFetchReadsOnlyTheLocalHistory(t *testing.T) {
 	spectest.Proves(t, feature, "caller-directory-writes", "observe-writes-only-git-history-in-the-caller-directory")
 	f := newFixture(t, 3, 2)
@@ -240,6 +271,7 @@ func TestNoFetchReadsOnlyTheLocalHistory(t *testing.T) {
 func TestAnUnresolvedBaseIsADiagnostic(t *testing.T) {
 	spectest.Proves(t, feature, "diff-base", "an-unresolved-base-is-a-diagnostic")
 	f := newFixture(t, 1, 1)
+	marker := filepath.Join(t.TempDir(), "ran")
 	for name, tc := range map[string]struct {
 		dir  func(t *testing.T) string
 		req  Request
@@ -258,6 +290,11 @@ func TestAnUnresolvedBaseIsADiagnostic(t *testing.T) {
 		"an option for a base": {
 			dir:  func(t *testing.T) string { return f.clone(t, 0) },
 			req:  Request{Head: "HEAD", Base: &ci.Base{Ref: "--upload-pack=touch /tmp/x", Source: ci.BaseFromFlag}, Fetch: true},
+			code: CodeBaseUnresolved,
+		},
+		"an option for a base commit": {
+			dir:  func(t *testing.T) string { return f.clone(t, 1) },
+			req:  Request{Head: "HEAD", Base: &ci.Base{SHA: "--upload-pack=touch " + marker, Ref: "main", Source: ci.BaseFromMergeRequest}, Fetch: true},
 			code: CodeBaseUnresolved,
 		},
 		"an unknown head": {
@@ -282,6 +319,9 @@ func TestAnUnresolvedBaseIsADiagnostic(t *testing.T) {
 				t.Fatalf("an unresolved base gave %s %+v", r.BaseSHA, r.ChangedFiles)
 			}
 		})
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("a base commit reached git as an option")
 	}
 }
 

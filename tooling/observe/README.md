@@ -15,7 +15,9 @@ It answers four questions:
 - Which test and coverage reports the job produced.
 
 A missing or malformed report, or a base it cannot reach, is a diagnostic:
-`putnami observe` exits 0 whatever it observes, and 2 only on a usage error.
+`putnami observe` exits 0 whatever it observes, 2 on a usage error, and 1 when
+it cannot read its job context or write its output. It needs Git 2.29 or
+later.
 
 ## Use it
 
@@ -39,3 +41,9 @@ reporter can upload.
 
 See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.
+
+## Support
+
+`@putnami/observe` is `experimental` in the
+[support catalog](../../putnami.support.json): it promises no compatibility
+yet, and no consumer in this repository runs it.

@@ -65,7 +65,7 @@ func TestAGitHubActionsPullRequest(t *testing.T) {
 	want := Detection{
 		Subject: Subject{
 			Provider: ProviderGitHub, Host: "github.com", ProjectID: "123456", Repository: "acme/shop",
-			SHA: headSHA, Branch: "feature/cart", ChangeRequest: &ChangeRequest{Number: 42},
+			SHA: mergeSHA, Branch: "feature/cart", ChangeRequest: &ChangeRequest{Number: 42},
 		},
 		Run: Run{
 			System: SystemGitHubActions, RunID: "987", JobID: "test", Attempt: &attempt,
@@ -136,7 +136,7 @@ func TestAGitLabMergeRequest(t *testing.T) {
 	spectest.Proves(t, feature, "ci-detection", "a-gitlab-merge-request")
 	env := envOf(map[string]string{
 		"GITLAB_CI":                           "true",
-		"CI_SERVER_HOST":                      "gitlab.example.com",
+		"CI_SERVER_HOST":                      "GitLab.Example.com",
 		"CI_PROJECT_ID":                       "77",
 		"CI_PROJECT_PATH":                     "group/sub/app",
 		"CI_COMMIT_SHA":                       headSHA,
@@ -164,6 +164,30 @@ func TestAGitLabMergeRequest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(d, want) {
 		t.Fatalf("detection:\n got %+v\nwant %+v", d, want)
+	}
+}
+
+func TestAMalformedMergeRequestDiffBaseIsNoBase(t *testing.T) {
+	spectest.Proves(t, feature, "ci-detection", "a-gitlab-merge-request")
+	for name, tc := range map[string]struct {
+		diffBase string
+		base     *Base
+	}{
+		"an option":           {diffBase: "--upload-pack=/bin/sh", base: &Base{SHA: beforeSHA, Source: BaseFromPush}},
+		"a branch name":       {diffBase: "main", base: &Base{SHA: beforeSHA, Source: BaseFromPush}},
+		"an uppercase commit": {diffBase: "ABCDEF0123456789ABCDEF0123456789ABCDEF01", base: &Base{SHA: "abcdef0123456789abcdef0123456789abcdef01", Source: BaseFromMergeRequest}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := Detect(envOf(map[string]string{
+				"GITLAB_CI":                      "true",
+				"CI_PROJECT_ID":                  "77",
+				"CI_MERGE_REQUEST_DIFF_BASE_SHA": tc.diffBase,
+				"CI_COMMIT_BEFORE_SHA":           beforeSHA,
+			}), filesOf(nil), Overrides{})
+			if !reflect.DeepEqual(d.Base, tc.base) {
+				t.Fatalf("base %+v, want %+v", d.Base, tc.base)
+			}
+		})
 	}
 }
 

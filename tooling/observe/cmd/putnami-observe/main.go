@@ -7,7 +7,8 @@
 //
 // Putnami launches it as `putnami observe`, an interactive command that runs
 // in the caller's directory, inside a workspace or not. It exits 0 whatever it
-// observes, 2 on a usage error and 1 when it cannot write its output.
+// observes, 2 on a usage error, and 1 when it cannot read its job context or
+// write its output.
 package main
 
 import (
@@ -58,11 +59,20 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 0
 	}
 	contextFile, args := splitContext(args)
+	var launch *job.Context
+	if contextFile != "" {
+		parsed, err := job.ParseFile(contextFile)
+		if err != nil {
+			fmt.Fprintf(stderr, "putnami observe: read the job context: %v\n", err)
+			return 1
+		}
+		launch = parsed
+	}
 	if len(args) == 0 || args[0] != runArg {
 		fmt.Fprintln(stderr, "putnami-observe: unknown invocation; this runtime answers the Putnami runtime handshake and `run`")
 		return 2
 	}
-	opts, evidencePath, jsonOutput, err := parseRun(args[1:], contextFile)
+	opts, evidencePath, jsonOutput, err := parseRun(args[1:], launch)
 	if err != nil {
 		fmt.Fprintf(stderr, "putnami observe: %v\n", err)
 		return 2
@@ -85,18 +95,10 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	return 0
 }
 
-// parseRun reads the flags of `run` and the job context, and returns the
-// options, the absolute evidence path ("" for none) and whether the output is
-// JSON.
-func parseRun(args []string, contextFile string) (observe.Options, string, bool, error) {
-	var launch *job.Context
-	if contextFile != "" {
-		parsed, err := job.ParseFile(contextFile)
-		if err != nil {
-			return observe.Options{}, "", false, fmt.Errorf("read the job context: %w", err)
-		}
-		launch = parsed
-	}
+// parseRun reads the flags of `run` against the job context, nil outside
+// Putnami, and returns the options, the absolute evidence path ("" for none)
+// and whether the output is JSON.
+func parseRun(args []string, launch *job.Context) (observe.Options, string, bool, error) {
 	for _, arg := range args {
 		if len(arg) == 0 || arg[0] != '-' {
 			continue

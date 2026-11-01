@@ -134,6 +134,8 @@ func (r *Result) resolveBase(g git, req Request) (string, bool) {
 		depth = firstDeepenStep
 	}
 	var errs []string
+	// A server that refuses a fetch by commit id still sends the commit
+	// with the branch that holds it.
 	if base.SHA != "" {
 		if err := g.fetch(depth, base.SHA); err != nil {
 			errs = append(errs, err.Error())
@@ -322,7 +324,7 @@ func (g git) fetch(depth int, refspec string) error {
 	if depth > 0 {
 		args = append(args, fmt.Sprintf("--depth=%d", depth))
 	}
-	_, err := g.raw(append(args, remote, refspec)...)
+	_, err := g.raw(append(args, "--end-of-options", remote, refspec)...)
 	return err
 }
 
@@ -330,12 +332,17 @@ func (g git) fetch(depth int, refspec string) error {
 // commits. A remote that refuses a fetch by commit id is deepened through
 // its configured refspecs.
 func (g git) deepen(step int, base, head string) error {
-	args := []string{"fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", fmt.Sprintf("--deepen=%d", step), remote}
+	args := []string{"fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", fmt.Sprintf("--deepen=%d", step), "--end-of-options", remote}
 	if _, err := g.raw(append(args, head, base)...); err == nil {
 		return nil
 	}
 	_, err := g.raw(args...)
 	return err
+}
+
+// RemoteURL returns the URL of the origin remote of the repository at dir.
+func RemoteURL(ctx context.Context, dir string) (string, error) {
+	return git{ctx: ctx, dir: dir}.output("remote", "get-url", remote)
 }
 
 func (g git) output(args ...string) (string, error) {

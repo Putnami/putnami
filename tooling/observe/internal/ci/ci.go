@@ -175,9 +175,6 @@ func detectGitHub(env Env, readFile ReadFile) Detection {
 		if d.Subject.ChangeRequest == nil && event.PullRequest.Number > 0 {
 			d.Subject.ChangeRequest = &ChangeRequest{Number: event.PullRequest.Number}
 		}
-		if event.PullRequest.Head.SHA != "" {
-			d.Subject.SHA = event.PullRequest.Head.SHA
-		}
 	}
 	switch {
 	case env("GITHUB_BASE_REF") != "":
@@ -192,7 +189,7 @@ func detectGitLab(env Env) Detection {
 	d := Detection{
 		Subject: Subject{
 			Provider:   ProviderGitLab,
-			Host:       firstOf(env("CI_SERVER_HOST"), hostOf(env("CI_SERVER_URL"), "")),
+			Host:       strings.ToLower(firstOf(env("CI_SERVER_HOST"), hostOf(env("CI_SERVER_URL"), ""))),
 			Repository: env("CI_PROJECT_PATH"),
 			SHA:        env("CI_COMMIT_SHA"),
 			Branch:     firstOf(env("CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"), env("CI_COMMIT_BRANCH"), env("CI_COMMIT_REF_NAME")),
@@ -209,8 +206,8 @@ func detectGitLab(env Env) Detection {
 		d.Subject.ChangeRequest = &ChangeRequest{Number: *number}
 	}
 	switch base := env("CI_MERGE_REQUEST_DIFF_BASE_SHA"); {
-	case base != "":
-		d.Base = &Base{SHA: base, Ref: env("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"), Source: BaseFromMergeRequest}
+	case commitID(base):
+		d.Base = &Base{SHA: strings.ToLower(base), Ref: env("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"), Source: BaseFromMergeRequest}
 	case commitID(env("CI_COMMIT_BEFORE_SHA")) && !zeroSHA(env("CI_COMMIT_BEFORE_SHA")):
 		d.Base = &Base{SHA: env("CI_COMMIT_BEFORE_SHA"), Source: BaseFromPush}
 	}
@@ -231,10 +228,7 @@ type event struct {
 	Before      string `json:"before"`
 	PullRequest *struct {
 		Number int `json:"number"`
-		Head   struct {
-			SHA string `json:"sha"`
-		} `json:"head"`
-		Base struct {
+		Base   struct {
 			SHA string `json:"sha"`
 		} `json:"base"`
 	} `json:"pull_request"`

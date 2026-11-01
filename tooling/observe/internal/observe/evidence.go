@@ -3,6 +3,7 @@ package observe
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,6 +16,7 @@ import (
 // Diagnostic codes of the evidence document.
 const (
 	CodeEvidenceInvalid      = "observe.evidence_invalid"
+	CodeRunURLDropped        = "observe.run_url_dropped"
 	CodeEvidenceUnwritable   = "observe.evidence_unwritable"
 	CodeTooManyDiagnostics   = "observe.too_many_diagnostics"
 	fallbackEcosystem        = "unknown"
@@ -45,7 +47,6 @@ func Evidence(o Observation, now time.Time) *evidence.Document {
 			RunID:   truncate(o.CI.RunID),
 			JobID:   truncate(o.CI.JobID),
 			Attempt: o.CI.Attempt,
-			URL:     o.CI.URL,
 		},
 		Producer:     evidence.Producer{Name: o.Producer.Name, Version: version},
 		GeneratedAt:  now.UTC().Format(time.RFC3339),
@@ -66,8 +67,22 @@ func Evidence(o Observation, now time.Time) *evidence.Document {
 	doc.Components = []evidence.Component{{
 		ID: evidence.RootComponent, Ecosystem: fallbackEcosystem, Source: evidence.SourceFallback, Impact: impact,
 	}}
-	doc.Diagnostics = boundedDiagnostics(o.Diagnostics)
+	diags := o.Diagnostics
+	if httpsURL(o.CI.URL) {
+		doc.CI.URL = o.CI.URL
+	} else if o.CI.URL != "" {
+		diags = append(append([]diag.Diagnostic{}, diags...), diag.Warningf(CodeRunURLDropped, "ci.url",
+			"the run page is left out of the evidence document, which takes only an https URL without credentials"))
+	}
+	doc.Diagnostics = boundedDiagnostics(diags)
 	return doc
+}
+
+// httpsURL reports whether raw is an https URL without credentials, the only
+// run page the document takes.
+func httpsURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	return err == nil && parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil
 }
 
 // WriteEvidence writes the evidence document of o to path when it validates,

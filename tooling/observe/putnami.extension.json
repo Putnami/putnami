@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/observe",
-  "cliContract": 19,
+  "cliContract": 4,
   "runtime": {
     "executable": "compiled/putnami-observe",
     "toolchains": {
@@ -67,7 +67,7 @@
   },
   "commands": {
     "observe-run": {
-      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: only a usage error exits non-zero (2). It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names.",
+      "description": "Observe the change a CI job built, in a repository that keeps its own CI and needs no Putnami workspace. It detects GitHub Actions, GitLab CI or a generic CI, names the repository by its code host and numeric project id, resolves the commit the change is measured against, deepening a shallow clone up to the merge base, lists the changed files, and finds the test and coverage reports the job produced. A missing or malformed report, or a base it cannot reach, is a diagnostic: it exits 0 whatever it observes, 2 on a usage error and 1 when it cannot read its job context or write its output. It prints a text summary, or one JSON document with --output=json. In the caller's directory it writes only the Git history it fetches, which --no-fetch turns off, and the change evidence document --evidence names.",
       "flags": {
         "base": {
           "type": "string",

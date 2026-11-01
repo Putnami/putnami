@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -70,7 +69,9 @@ func Run(ctx context.Context, opts Options) Observation {
 	if o.ChangedFiles == nil {
 		o.ChangedFiles = []gitbase.ChangedFile{}
 	}
-	if o.Subject.SHA == "" {
+	// The subject's commit is the one the changed files and the reports were
+	// measured on, which on a GitHub pull request is the merge commit.
+	if resolved.HeadSHA != "" {
 		o.Subject.SHA = resolved.HeadSHA
 	}
 	o.Subject.BaseSHA = resolved.BaseSHA
@@ -93,9 +94,8 @@ func Run(ctx context.Context, opts Options) Observation {
 // repositoryName names a repository no CI names: the path of its origin
 // remote without credentials or .git suffix, else its directory name.
 func repositoryName(ctx context.Context, root string) string {
-	out, err := exec.CommandContext(ctx, "git", "-C", root, "remote", "get-url", "origin").Output()
-	if err == nil {
-		if name := remotePath(strings.TrimSpace(string(out))); name != "" {
+	if remote, err := gitbase.RemoteURL(ctx, root); err == nil {
+		if name := remotePath(remote); name != "" {
 			return name
 		}
 	}
@@ -217,7 +217,14 @@ func baseCandidate(b *ci.Base) string {
 	if name == "" {
 		name = short(b.SHA)
 	}
-	return name + " from the " + b.Source
+	return name + " from " + sourceLabels[b.Source]
+}
+
+var sourceLabels = map[string]string{
+	ci.BaseFromFlag:         "--base",
+	ci.BaseFromMergeRequest: "the merge request",
+	ci.BaseFromPullRequest:  "the pull request",
+	ci.BaseFromPush:         "the previous push",
 }
 
 func short(sha string) string {

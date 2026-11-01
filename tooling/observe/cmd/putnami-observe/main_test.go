@@ -150,6 +150,7 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 		"CI_SERVER_HOST":                      "gitlab.com",
 		"CI_PROJECT_ID":                       "4242",
 		"CI_PROJECT_PATH":                     "acme/shop",
+		"CI_COMMIT_SHA":                       strings.Repeat("c", 40),
 		"CI_MERGE_REQUEST_IID":                "7",
 		"CI_MERGE_REQUEST_DIFF_BASE_SHA":      git(t, repo, "rev-parse", "main"),
 		"CI_MERGE_REQUEST_TARGET_BRANCH_NAME": "main",
@@ -171,7 +172,7 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	if o.Subject.ProjectID != "4242" || o.Subject.Host != "gitlab.com" || o.Subject.ChangeRequest == nil || o.Subject.ChangeRequest.Number != 7 {
 		t.Fatalf("subject %+v", o.Subject)
 	}
-	if o.Subject.BaseSHA != git(t, repo, "rev-parse", "main") || o.Subject.SHA != "" && o.Subject.SHA != git(t, repo, "rev-parse", "HEAD") {
+	if o.Subject.BaseSHA != git(t, repo, "rev-parse", "main") || o.Subject.SHA != git(t, repo, "rev-parse", "HEAD") {
 		t.Fatalf("base %s sha %s", o.Subject.BaseSHA, o.Subject.SHA)
 	}
 	changed := make([]string, 0, len(o.ChangedFiles))
@@ -206,7 +207,7 @@ func TestObserveRunsInARepositoryWithoutAWorkspace(t *testing.T) {
 	if code := run([]string{"run", "--no-fetch", "--putnamiContext", jobContext(t, invocation, invocation, "")}, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
 		t.Fatalf("text run exit %d: %s", code, stderr.String())
 	}
-	for _, want := range []string{"putnami observe: GitLab CI, gitlab.com/acme/shop (project 4242)", "merge request #7", "modified  packages/web/index.js", "junit     packages/web/reports/junit.xml"} {
+	for _, want := range []string{"putnami observe: GitLab CI, gitlab.com/acme/shop (project 4242)", "merge request #7", "merge base with main from the merge request", "modified  packages/web/index.js", "junit     packages/web/reports/junit.xml"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("the summary lacks %q:\n%s", want, stdout.String())
 		}
@@ -230,6 +231,12 @@ func TestAUsageErrorExitsTwo(t *testing.T) {
 				t.Fatalf("exit %d, want 2: %s", code, stderr.String())
 			}
 		})
+	}
+
+	// A job context that cannot be read is the runtime's failure, not a usage error.
+	var out, errOut bytes.Buffer
+	if code := run([]string{"run", "--putnamiContext", filepath.Join(t.TempDir(), "missing.json")}, func(string) string { return "" }, &out, &errOut); code != 1 {
+		t.Fatalf("an unreadable job context exits %d, want 1: %s", code, errOut.String())
 	}
 
 	// Outside a repository, with nothing to read, observe still exits 0.

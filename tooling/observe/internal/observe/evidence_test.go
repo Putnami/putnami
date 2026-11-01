@@ -101,6 +101,25 @@ func TestAnUnchangedOrNoisyObservationStaysWithinTheDocumentBounds(t *testing.T)
 	}
 }
 
+func TestARunPageTheDocumentRefusesIsLeftOut(t *testing.T) {
+	spectest.Proves(t, feature, "evidence-document", "the-evidence-document-validates")
+	for _, page := range []string{"http://ghes.example.com/acme/shop/actions/runs/987", "https://user:token@gitlab.example.com/p/-/pipelines/1"} {
+		o := pullRequest()
+		o.CI.URL = page
+		path := filepath.Join(t.TempDir(), "evidence.json")
+		if diags := WriteEvidence(path, o, now); len(diags) != 0 {
+			t.Fatalf("diagnostics %v", diags)
+		}
+		doc := readEvidence(t, path)
+		if doc.CI.URL != "" || doc.Diagnostics[len(doc.Diagnostics)-1].Code != CodeRunURLDropped {
+			t.Fatalf("url %q diagnostics %+v", doc.CI.URL, doc.Diagnostics)
+		}
+		if strings.Contains(doc.Diagnostics[len(doc.Diagnostics)-1].Message, "token") {
+			t.Fatal("the diagnostic copies the credentials of the run page")
+		}
+	}
+}
+
 func TestAnInvalidEvidenceDocumentIsNotWritten(t *testing.T) {
 	spectest.Proves(t, feature, "evidence-document", "an-invalid-evidence-document-is-not-written")
 	dir := t.TempDir()

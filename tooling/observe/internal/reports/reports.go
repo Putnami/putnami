@@ -148,7 +148,11 @@ func collectNamed(req Request, kind string, patterns []string) ([]Report, []diag
 				diags = append(diags, diag.Warningf(CodePatternInvalid, kind, "the --%s pattern %q is invalid: %v", kind, pattern, err))
 				continue
 			}
-			files = glob(abs)
+			var bounded bool
+			if files, bounded = glob(abs); bounded {
+				diags = append(diags, diag.Warningf(CodeDiscoveryBounded, kind,
+					"the --%s pattern %q stopped after %d entries or %d reports: name the reports more narrowly", kind, pattern, MaxWalkedEntries, MaxReports))
+			}
 		} else if info, err := os.Stat(abs); err == nil && info.Mode().IsRegular() {
 			files = []string{abs}
 		}
@@ -340,8 +344,9 @@ func hasMeta(pattern string) bool {
 }
 
 // glob returns the regular files that match an absolute pattern, where **
-// matches any number of directories, walking from its longest literal prefix.
-func glob(pattern string) []string {
+// matches any number of directories, walking from its longest literal prefix,
+// and whether the walk stopped at its bounds.
+func glob(pattern string) ([]string, bool) {
 	pattern = filepath.ToSlash(pattern)
 	segments := strings.Split(pattern, "/")
 	literal := 0
@@ -356,12 +361,14 @@ func glob(pattern string) []string {
 	rest := segments[literal:]
 	var files []string
 	walked := 0
+	bounded := false
 	_ = filepath.WalkDir(start, func(file string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		walked++
 		if walked > MaxWalkedEntries || len(files) >= MaxReports {
+			bounded = true
 			return filepath.SkipAll
 		}
 		if entry.IsDir() {
@@ -379,7 +386,7 @@ func glob(pattern string) []string {
 		}
 		return nil
 	})
-	return files
+	return files, bounded
 }
 
 // matchSegments matches path segments against pattern segments, where a **
