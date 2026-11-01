@@ -438,12 +438,18 @@ func canMatchBelow(pattern, parts []string) bool {
 			return false
 		}
 		if pattern[i] == "**" {
-			for _, rest := range parts[i:] {
-				if strings.HasPrefix(rest, ".") {
+			// "**" takes any number of segments but no dot-directory, which
+			// only a later pattern segment can name.
+			rest := parts[i:]
+			for j := 0; j <= len(rest); j++ {
+				if canMatchBelow(pattern[i+1:], rest[j:]) {
+					return true
+				}
+				if j < len(rest) && strings.HasPrefix(rest[j], ".") {
 					return false
 				}
 			}
-			return true
+			return false
 		}
 		if !matchSegment(pattern[i], part) {
 			return false

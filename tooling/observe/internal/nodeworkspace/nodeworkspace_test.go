@@ -212,6 +212,18 @@ func TestANegatedPatternExcludesAMember(t *testing.T) {
 	}
 }
 
+func TestAPatternNamesADotDirectory(t *testing.T) {
+	root := tree(t, map[string]string{
+		"package.json":                           `{"workspaces":["packages/**/.internal"]}`,
+		"packages/a/.internal/package.json":      pkg("a-internal", "1.0.0", nil),
+		"packages/.cache/.internal/package.json": pkg("cached", "1.0.0", nil),
+		"packages/b/package.json":                pkg("b", "1.0.0", nil),
+	})
+	if ws := read(t, root); !reflect.DeepEqual(ws.Members, []string{"packages/a/.internal"}) {
+		t.Fatalf("members %v", ws.Members)
+	}
+}
+
 func TestARepositoryWithoutAWorkspaceIsNotDetected(t *testing.T) {
 	spectest.Proves(t, feature, "workspace-members", "a-repository-without-a-workspace-is-not-detected")
 	for name, files := range map[string]map[string]string{
