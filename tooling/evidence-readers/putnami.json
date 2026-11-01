@@ -1,6 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/evidence-readers",
+  "visibility": "public",
   "tags": [
     "go"
   ],

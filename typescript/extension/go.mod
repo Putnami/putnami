@@ -3,6 +3,7 @@ module go.putnami.dev/typescript/extension
 go 1.25.7
 
 require (
+	go.putnami.dev/evidence/readers v0.0.0
 	go.putnami.dev/protocol/capabilities v0.0.0
 	go.putnami.dev/protocol/distribution v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
@@ -76,3 +77,5 @@ replace go.putnami.dev/protocol/features => ../../protocols/features
 replace go.putnami.dev/protocol/architecture => ../../protocols/architecture
 
 replace go.putnami.dev/protocol/gomod => ../../protocols/gomod
+
+replace go.putnami.dev/evidence/readers => ../../tooling/evidence-readers
